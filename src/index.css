@@ -1,0 +1,44 @@
+/* src/index.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-blue-50 font-sans;
+}
+
+@media print {
+  .no-print,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  @page {
+    size: A4 landscape;
+    margin: 0;
+  }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    transform: none !important;
+    width: auto;
+    height: auto;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
+
+/* remove setinhas de spin dos inputs[type=number] */
+input[type=number].no-spinner::-webkit-outer-spin-button,
+input[type=number].no-spinner::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type=number].no-spinner {
+  -moz-appearance: textfield;
+}

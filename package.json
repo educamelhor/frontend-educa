@@ -9,7 +9,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "vite": "^5.4.19",
     "@fontsource/montserrat": "^5.2.6",
     "@heroicons/react": "^2.2.0",
     "axios": "^1.10.0",
@@ -35,6 +34,7 @@
     "@vitejs/plugin-react": "^4.6.0",
     "autoprefixer": "^10.4.19",
     "postcss": "^8.4.31",
-    "tailwindcss": "^3.4.1"
+    "tailwindcss": "^3.4.1",
+    "vite": "^5.4.19"
   }
 }

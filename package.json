@@ -34,7 +34,8 @@
     "@vitejs/plugin-react": "^4.6.0",
     "autoprefixer": "^10.4.19",
     "postcss": "^8.4.31",
+    "rollup": "^3.29.4",
     "tailwindcss": "^3.4.1",
-    "vite": "^5.4.19"
+    "vite": "5.4.19"
   }
 }

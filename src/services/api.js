@@ -2,8 +2,10 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "http://localhost:3000", // seu backend roda em porta 3000, com prefixo /api
+  baseURL:
+    import.meta.env.MODE === "development"
+      ? "http://localhost:3000/api"
+      : "https://backend-educa.onrender.com/api",
 });
 
 export default api;
-

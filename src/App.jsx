@@ -45,12 +45,14 @@ import Monitoramento from "./features/monitoramento/Monitoramento.jsx";
 import MonitoramentoPainel from "./features/monitoramento/MonitoramentoPainel.jsx";
 
 // ⭐️ NOVO: Módulo Monitoramento > Visitantes
+
+
 {/*
- import VisitantesRegistrar from "./features/monitoramento/visitantes/VisitantesRegistrar.jsx";
+   import VisitantesRegistrar from "./features/monitoramento/visitantes/VisitantesRegistrar.jsx";
+  import VisitantesHistorico from "./features/monitoramento/visitantes/VisitantesHistorico.jsx";
 */}
 
 
-import VisitantesHistorico from "./features/monitoramento/visitantes/VisitantesHistorico.jsx";
 
 // ⭐️ NOVO IMPORT: Embeddings — Gerar
 import EmbeddingsGerar from "./features/monitoramento/EmbeddingsGerar.jsx";
@@ -111,17 +113,22 @@ export default function App() {
                     element={<MonitoramentoPainel />}
                   />
 
+
+
                   {/* Visitantes */}
                   {/*
-                  <Route
-                    path="/monitoramento/visitantes/registrar"
-                    element={<VisitantesRegistrar />}
-                  />
+                    <Route
+                      path="/monitoramento/visitantes/registrar"
+                      element={<VisitantesRegistrar />}
+                    />
+                    <Route
+                      path="/monitoramento/visitantes/historico"
+                      element={<VisitantesHistorico />}
+                    />
                   */}
-                  <Route
-                    path="/monitoramento/visitantes/historico"
-                    element={<VisitantesHistorico />}
-                  />
+
+
+
 
                   {/* Embeddings */}
                   <Route

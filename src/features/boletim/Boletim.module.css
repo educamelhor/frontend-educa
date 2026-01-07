@@ -1,0 +1,205 @@
+/* src/features/boletim/Boletim.module.css */
+
+/* Faz a tabela usar bordas colapsadas */
+:global(table) {
+  border-collapse: collapse;
+}
+
+/* Aplica borda a todas as células (cabeçalho e corpo) */
+:global(th),
+:global(td) {
+  border: 1px solid #ddd;
+  text-align: center;
+  vertical-align: middle;
+}
+
+/* --- Seus estilos específicos continuam abaixo --- */
+
+.cabDisc {
+  width: 20%;
+  padding: 0.75rem;
+  background: #f0f4f8;
+  font-weight: bold;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.ano2024 {
+  background: #ffeaa7;
+  text-align: center;
+  vertical-align: middle;
+  padding: 8px;
+}
+
+.ano2025 {
+  background: #b2fab4;
+  text-align: center;
+  vertical-align: middle;
+  padding: 8px;
+}
+
+.final {
+  width: 8%;
+  padding: 0.75rem;
+  background: #ffcc99;
+  text-align: center;
+  vertical-align: middle;
+  font-weight: bold;
+  padding: 8px;
+}
+
+.situacao {
+  width: 10%;
+  padding: 0.75rem;
+  background: #0984e3;
+  color: white;
+  text-align: center;
+  vertical-align: middle;
+  font-weight: bold;
+  padding: 8px;
+}
+
+.rotated {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  white-space: nowrap;
+  padding: 4px 2px;
+  font-size: 12px;
+  width: 20px;
+  min-width: 20px;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.disc {
+  padding: 8px;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.finalCell {
+  background: #ffe5cc;
+  text-align: center;
+  vertical-align: middle;
+  padding: 4px;
+}
+
+.faltasCell {
+  background: #ffe5cc;
+  text-align: center;
+  vertical-align: middle;
+  padding: 4px;
+}
+
+.situacaoCell {
+  background: #fff3bf;
+  text-align: center;
+  vertical-align: middle;
+  font-weight: bold;
+  padding: 4px;
+}
+
+/* impressão em paisagem e ajustes para caber em uma página */
+@media print {
+  @page {
+    size: landscape;
+    margin: 0;
+  }
+
+  :global(html), :global(body), :global(#root) {
+    margin: 0;
+    padding: 0;
+    height: auto;
+    overflow: visible;
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  :global(.min-h-screen) {
+    page-break-after: avoid;
+    page-break-inside: avoid;
+    background: #fff !important;
+    height: auto !important;
+  }
+
+  table, thead, tbody, tr, td, th {
+    page-break-inside: avoid !important;
+    page-break-after: avoid !important;
+  }
+
+  :global(.bg-blue-50), :global(.bg-slate-50) {
+    background-color: transparent !important;
+  }
+
+  body {
+    font-size: 8pt;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  thead th, tbody td {
+    padding: 2px !important;
+    text-align: center !important;
+    vertical-align: middle !important;
+  }
+
+  tbody tr {
+    height: 1.2rem !important;
+  }
+
+  thead th {
+    font-size: 7pt;
+    padding: 1px !important;
+    text-align: center !important;
+    vertical-align: middle !important;
+  }
+
+  tbody, tbody tr, tbody td {
+    page-break-inside: avoid;
+  }
+
+  /* ---------- Ajuste para esconder menus e só imprimir o boletim ---------- */
+  /* Esconde os elementos mais comuns de menu/lateral/header */
+  .sidebar, .Sidebar, .menu-lateral, .HeaderGlobal, .no-print, nav, aside {
+    display: none !important;
+  }
+  /* Mantém só o boletim visível */
+  .boletimWrapper {
+    background: white !important;
+    width: 100vw !important;
+    min-width: 0 !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+  #root {
+    width: 100vw !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+}
+
+@media print {
+  @page {
+    size: landscape;
+    margin: 5mm;
+  }
+
+  body, .boletimWrapper {
+    background: white !important;
+  }
+
+  .boletimWrapper {
+    page-break-after: avoid;
+    page-break-inside: avoid;
+  }
+
+  body {
+    margin: 0;
+  }
+
+  .no-print, .naoImprimir {
+    display: none !important;
+  }
+}

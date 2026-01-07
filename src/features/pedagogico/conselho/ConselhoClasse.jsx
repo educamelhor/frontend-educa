@@ -1,0 +1,279 @@
+import React, { useState, useEffect } from "react";
+import api from "../../../services/api";
+import ModalBoletim from "../../boletim/ModalBoletim";
+import ModalFichaAluno from "./ModalFichaAluno";
+import ModalZoomFoto from "./ModalZoomFoto"; // 👈 Import do modal de zoom
+import {
+  EyeIcon,
+  DocumentTextIcon,
+  IdentificationIcon,
+  PencilIcon,
+} from "@heroicons/react/24/outline";
+import { getFotoURL } from "../../../utils/foto";
+
+function normalizaTexto(str) {
+  if (!str) return "";
+  return str
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
+
+export default function ConselhoClasse() {
+  const [turnoSelecionado, setTurnoSelecionado] = useState(null);
+  const [turmas, setTurmas] = useState([]);
+  const [turmaSelecionada, setTurmaSelecionada] = useState(null);
+  const [alunosTurma, setAlunosTurma] = useState([]);
+  const [loadingAlunos, setLoadingAlunos] = useState(false);
+  const [loadingTurmas, setLoadingTurmas] = useState(false);
+
+  // Boletim
+  const [modalBoletimOpen, setModalBoletimOpen] = useState(false);
+  const [codigoAlunoBoletim, setCodigoAlunoBoletim] = useState(null);
+
+  // Ficha do Estudante (modal)
+  const [modalFichaOpen, setModalFichaOpen] = useState(false);
+  const [codigoAlunoFicha, setCodigoAlunoFicha] = useState(null);
+
+  // Cache-buster p/ fotos na lista
+  const [fotoStamp, setFotoStamp] = useState(0);
+
+  // Zoom da Foto
+  const [zoomOpen, setZoomOpen] = useState(false);
+  const [zoomSrc, setZoomSrc] = useState("");
+  const [zoomAlt, setZoomAlt] = useState("");
+
+  function abrirModalBoletim(codigo) {
+    setCodigoAlunoBoletim(codigo);
+    setModalBoletimOpen(true);
+  }
+
+  function abrirModalFicha(codigo) {
+    setCodigoAlunoFicha(codigo);
+    setModalFichaOpen(true);
+  }
+
+  const turnos = ["Matutino", "Vespertino", "Noturno"];
+
+  useEffect(() => {
+    fetchTurmas();
+    // eslint-disable-next-line
+  }, []);
+
+  const fetchTurmas = async () => {
+    setLoadingTurmas(true);
+    try {
+      const escola_id = localStorage.getItem("escola_id") || 1;
+      const { data } = await api.get("/api/turmas", {
+        params: { escola_id },
+      });
+      setTurmas(data);
+    } catch (error) {
+      console.error("Erro ao buscar turmas:", error);
+      setTurmas([]);
+    } finally {
+      setLoadingTurmas(false);
+    }
+  };
+
+  const turmasFiltradas = turmas.filter(
+    (t) =>
+      turnoSelecionado &&
+      normalizaTexto(t.turno) === normalizaTexto(turnoSelecionado)
+  );
+
+  const handleClickTurno = (turno) => {
+    setTurnoSelecionado(turno);
+    setTurmaSelecionada(null);
+    setAlunosTurma([]);
+  };
+
+  const handleClickTurma = async (turma) => {
+    setTurmaSelecionada(turma);
+    setLoadingAlunos(true);
+    setAlunosTurma([]);
+    try {
+      const escola_id = localStorage.getItem("escola_id") || 1;
+      const { data } = await api.get(`/api/alunos`, {
+        params: { turma_id: turma.id },
+      });
+      setAlunosTurma(data || []);
+    } catch (err) {
+      console.error("Erro ao buscar alunos da turma:", err);
+    } finally {
+      setLoadingAlunos(false);
+    }
+  };
+
+  // Fechou a ficha → força reload das fotos na lista
+  const handleCloseFicha = () => {
+    setModalFichaOpen(false);
+    setFotoStamp(Date.now()); // muda a URL das imagens e força novo GET
+  };
+
+  return (
+    <div className="p-6">
+      <h1
+        className="text-5xl font-bold text-center text-blue-900 mb-8"
+        style={{ fontFamily: "'Montserrat', sans-serif" }}
+      >
+        Conselho de Classe
+      </h1>
+
+      {/* Botões de Turnos */}
+      <div className="flex justify-center gap-4 mb-10">
+        {turnos.map((turno) => (
+          <button
+            key={turno}
+            onClick={() => handleClickTurno(turno)}
+            className={`px-8 py-4 text-xl font-semibold rounded-xl shadow-md transition transform hover:scale-105 ${
+              turnoSelecionado === turno
+                ? "bg-green-600 text-white"
+                : "bg-white text-blue-800 border border-blue-400 hover:bg-blue-100"
+            }`}
+          >
+            {turno}
+          </button>
+        ))}
+      </div>
+
+      {/* Cards de Turmas */}
+      {turnoSelecionado && (
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2 mb-8">
+          {loadingTurmas ? (
+            <p className="col-span-full text-center text-gray-500">
+              Turmas sendo carregadas...
+            </p>
+          ) : turmasFiltradas.length > 0 ? (
+            turmasFiltradas.map((turma) => (
+              <div
+                key={turma.id}
+                onClick={() => handleClickTurma(turma)}
+                className={`bg-gradient-to-b from-blue-200 to-blue-50 rounded-md px-9 py-2 shadow-md cursor-pointer hover:shadow-xl transition-transform hover:scale-105 text-center font-bold text-blue-900 text-base ${
+                  turmaSelecionada?.id === turma.id ? "ring-2 ring-green-600" : ""
+                }`}
+                style={{ minWidth: "80px", maxWidth: "100px", margin: "0 auto" }}
+              >
+                {turma.turma}
+              </div>
+            ))
+          ) : (
+            <p className="col-span-full text-center text-gray-500">
+              Nenhuma turma encontrada para {turnoSelecionado}.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Lista de Alunos */}
+      {turmaSelecionada && (
+        <div className="bg-white rounded-lg shadow-md p-4">
+          <h2 className="text-2xl font-semibold mb-4 text-blue-800">
+            Alunos da Turma {turmaSelecionada.turma}
+          </h2>
+
+          {loadingAlunos ? (
+            <p className="text-center text-gray-500">Carregando alunos...</p>
+          ) : alunosTurma.length > 0 ? (
+            <table className="w-full">
+              <tbody>
+                {alunosTurma.map((aluno) => {
+                  const baseFoto = getFotoURL(aluno);
+                  const fotoSrc =
+                    baseFoto && fotoStamp
+                      ? `${baseFoto}${baseFoto.includes("?") ? "&" : "?"}t=${fotoStamp}`
+                      : baseFoto;
+
+                  return (
+                    <tr key={aluno.id} className="hover:bg-gray-50">
+                      {/* Foto */}
+                      <td className="py-2 px-2 text-center">
+                        <img
+                          key={`${aluno.codigo}-${fotoStamp}`}
+                          src={fotoSrc}
+                          alt={`Foto de ${aluno.estudante}`}
+                          className="w-12 h-12 rounded-full object-cover mx-auto cursor-pointer"
+                          onClick={() => {
+                            setZoomSrc(fotoSrc);
+                            setZoomAlt(`Foto de ${aluno.estudante}`);
+                            setZoomOpen(true);
+                          }}
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.src =
+                              "data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96'%3E%3Crect width='100%25' height='100%25' rx='48' ry='48' fill='%23e5e7eb'/%3E%3Ctext x='50%25' y='54%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial' font-size='12' fill='%236b7280'%3ESem%20foto%3C/text%3E%3C/svg%3E";
+                          }}
+                        />
+                      </td>
+
+                      {/* Nome */}
+                      <td className="py-2 px-2 text-left font-medium">
+                        {aluno.estudante}
+                      </td>
+
+                      {/* Ações */}
+                      <td className="py-2 px-2 text-center">
+                        <div className="flex justify-center gap-3">
+                          <button>
+                            <EyeIcon className="h-6 w-6 text-gray-600 hover:text-blue-600" />
+                          </button>
+
+                          <button
+                            onClick={() => abrirModalBoletim(aluno.codigo)}
+                            title="Visualizar boletim"
+                          >
+                            <DocumentTextIcon className="h-6 w-6 text-gray-600 hover:text-green-600" />
+                          </button>
+
+                          <button
+                            onClick={() => abrirModalFicha(aluno.codigo)}
+                            title="Ficha do estudante"
+                          >
+                            <IdentificationIcon className="h-6 w-6 text-gray-600 hover:text-purple-600" />
+                          </button>
+
+                          <button>
+                            <PencilIcon className="h-6 w-6 text-gray-600 hover:text-yellow-600" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          ) : (
+            <p className="text-center text-gray-500">Nenhum aluno encontrado.</p>
+          )}
+        </div>
+      )}
+
+      {/* Modais */}
+      {modalBoletimOpen && (
+        <ModalBoletim
+          open={modalBoletimOpen}
+          codigo={codigoAlunoBoletim}
+          onClose={() => setModalBoletimOpen(false)}
+        />
+      )}
+
+      {modalFichaOpen && (
+        <ModalFichaAluno
+          open={modalFichaOpen}
+          codigo={codigoAlunoFicha}
+          onClose={handleCloseFicha}
+        />
+      )}
+
+      {zoomOpen && (
+        <ModalZoomFoto
+          open={zoomOpen}
+          src={zoomSrc}
+          alt={zoomAlt}
+          onClose={() => setZoomOpen(false)}
+        />
+      )}
+    </div>
+  );
+}

@@ -1,0 +1,14 @@
+# Variáveis de ambiente
+.env
+.env.*
+!.env.example
+
+# Uploads locais (nunca versionar)
+uploads/
+uploads/**
+
+# Node
+node_modules/
+
+# Build
+dist/

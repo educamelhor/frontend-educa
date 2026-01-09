@@ -6,12 +6,9 @@ function normalizeSlashes(url = "") {
   return url.replace(/([^:]\/)\/+/g, "$1");
 }
 
-/** Base absoluta dos uploads (controlada por .env) */
+/** (OPÇÃO B) Uploads em URL RELATIVA: o browser resolve em /uploads/... */
 function getUploadsBase() {
-  return (
-    import.meta.env.VITE_UPLOADS_BASE_URL ||
-    "http://localhost:3000/uploads"
-  ).replace(/\/+$/, "");
+  return ""; // não usado na opção B (mantido apenas para compatibilidade)
 }
 
 
@@ -24,12 +21,17 @@ export function buildFotoURL(path) {
   if (!path) return null;
 
   let p = String(path).trim().replace(/\\/g, "/");
+
+  // Se vier absoluto (http/https), respeita.
   if (/^https?:\/\//i.test(p)) {
     return normalizeSlashes(p);
   }
-  const base = getUploadsBase();
-  return normalizeSlashes(`${base}/${p.replace(/^\/+/, "")}`);
+
+  // Se vier relativo, garante que comece com "/"
+  p = `/${p.replace(/^\/+/, "")}`;
+  return normalizeSlashes(p);
 }
+
 
 /**
  * Monta a URL da foto do aluno.
@@ -46,7 +48,8 @@ export function buildFotoURL(path) {
  */
 export function getFotoURL(
   aluno,
-  { stamp, folder = "CEF04_PLAN/alunos", placeholder = "/images/placeholder.png" } = {}
+  { stamp, folder = "/uploads/CEF04_PLAN/alunos", placeholder = "/images/placeholder.png" } = {}
+
 
 ) {
   // 1) foto vinda do banco (pode ser absoluta ou relativa)

@@ -43,22 +43,30 @@ function normalizeApiUrl(baseURL, url) {
   // Se já for absoluta, não mexe
   if (/^https?:\/\//i.test(url)) return url;
 
-  let u = url;
+  let u = String(url);
 
-  // Garante que começa com /
+  // Remove espaços e garante que começa com /
+  u = u.trim();
   if (!u.startsWith("/")) u = `/${u}`;
 
-  // Evita /api/api/...
-  u = u.replace(/^\/api\/api\//, "/api/");
+  // 1) Colapsa qualquer duplicação /api/api/... (mesmo se ocorrer mais de uma vez)
+  // Ex.: /api/api/usuarios -> /api/usuarios
+  u = u.replace(/\/api\/api\//g, "/api/");
 
-  // Se baseURL já termina com /api e url começa com /api, remove um /api
-  const baseEndsWithApi = /\/api$/i.test(baseURL);
-  if (baseEndsWithApi && u.startsWith("/api/")) {
-    u = u.replace(/^\/api/, "");
+  // 2) Se o baseURL já termina com /api, então a URL NÃO deve começar com /api
+  // Ex.: baseURL = https://.../api  e url = /api/usuarios  => /usuarios
+  const baseEndsWithApi = /\/api$/i.test(String(baseURL || ""));
+  if (baseEndsWithApi && /^\/api(\/|$)/i.test(u)) {
+    u = u.replace(/^\/api/i, "");
+    if (u === "") u = "/";
   }
+
+  // 3) (Blindagem) Se sobrar /api/api por algum motivo, garante novamente
+  u = u.replace(/\/api\/api\//g, "/api/");
 
   return u;
 }
+
 
 export const api = axios.create({
   baseURL: getApiBaseUrl(),

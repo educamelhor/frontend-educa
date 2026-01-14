@@ -13,13 +13,29 @@ import axios from "axios";
  */
 
 function getApiBaseUrl() {
-  // Em DEV: normalmente vazio -> fallback localhost
-  // Em PROD: defina VITE_API_BASE_URL (ex: https://backend-xxxxx.ondigitalocean.app)
-  const envUrl = (import.meta?.env?.VITE_API_BASE_URL || "").trim();
+  const envUrl = import.meta.env.VITE_API_BASE_URL;
 
-  if (envUrl) return envUrl.replace(/\/+$/, "");
-  return "http://localhost:3000";
+  // Normaliza: remove barra final e garante sufixo /api
+  const normalize = (url) => {
+    let u = String(url || "").trim().replace(/\/+$/, "");
+    if (!u) return "";
+    if (!u.endsWith("/api")) u = `${u}/api`;
+    return u;
+  };
+
+  const normalizedEnv = normalize(envUrl);
+  if (normalizedEnv) return normalizedEnv;
+
+  // Se estiver rodando localmente, usa localhost. Em produção, NUNCA.
+  const host = window.location.hostname;
+  const isLocal = host === "localhost" || host === "127.0.0.1";
+
+  if (isLocal) return "http://localhost:3000/api";
+
+  // Fallback de produção (blindagem)
+  return "https://educa-backend-docker-659zo.ondigitalocean.app/api";
 }
+
 
 function normalizeApiUrl(baseURL, url) {
   if (!url) return url;

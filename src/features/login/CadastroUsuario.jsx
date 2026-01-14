@@ -213,40 +213,63 @@ export default function CadastroUsuario() {
     setMensagem("");
   };
 
+
+
+
+
+
+
+
+
+
   const handleEnviarCodigo = async (e) => {
     e.preventDefault();
     setMensagem("");
     setAguardando(true);
 
-    if (emailJaExiste) {
-      navigate("/login");
-      return;
-    }
-
     try {
-      await api.get(`/api/usuarios/por-email/${email}`);
-      setMensagem(
-        "E-mail já cadastrado. Entre com seu usuário e senha. Se esqueceu a senha, crie uma nova senha."
-      );
-      setEmailJaExiste(true);
-    } catch (err) {
-      if (err.response && err.response.status === 404) {
-        try {
-          await api.post("/api/auth/enviar-codigo-cadastro", { email });
-          setCodigoEnviadoPara(email);
-          setMensagem("Enviamos um código de verificação para seu e-mail.");
-          setEtapa(2);
-          setEmailJaExiste(false);
-        } catch {
-          setMensagem("Erro ao enviar código. Tente novamente.");
-        }
-      } else {
-        setMensagem("Erro ao verificar usuário. Tente novamente.");
+      const { data } = await api.get(`/api/usuarios/por-email/${email}`);
+
+      // ✅ Se já tem senha, não é "cadastro": é login
+      if (data?.tem_senha) {
+        setMensagem(
+          "E-mail já cadastrado. Use a tela de Login. Se esqueceu a senha, utilize 'Esqueci minha senha'."
+        );
+        setEmailJaExiste(true);
+        return;
       }
+
+      // ✅ Se existe, mas ainda não tem senha (pré-cadastro), envia o código
+      await api.post("/api/auth/enviar-codigo-cadastro", { email });
+      setCodigoEnviadoPara(email);
+      setMensagem("Enviamos um código de verificação para seu e-mail.");
+      setEtapa(2);
+      setEmailJaExiste(false);
+    } catch (err) {
+      // ✅ Se não existe na escola, orienta o usuário e não tenta enviar código
+      if (err?.response?.status === 404) {
+        setMensagem(
+          "Usuário não localizado para esta escola. Procure a direção/secretaria para liberar seu acesso."
+        );
+        setEmailJaExiste(false);
+        return;
+      }
+
+      setMensagem("Erro ao verificar usuário. Tente novamente.");
     } finally {
       setAguardando(false);
     }
   };
+
+
+
+
+
+
+
+
+
+
 
   /* ── ETAPA 2: código ─────────────────────────────────────── */
   const handleVerificarCodigo = async (e) => {
@@ -414,20 +437,50 @@ export default function CadastroUsuario() {
             autoComplete="off"
             disabled={aguardando}
           />
+
           {!emailValido && email.length > 3 && (
             <div className="animate-fadeIn mb-2 text-sm text-red-600">
               Informe um e-mail válido.
             </div>
           )}
+
+          {/* ✅ Feedback visível também na ETAPA 1 */}
+          {mensagem && !sucesso && (
+            <div
+              className={`mb-3 rounded border p-2 text-center text-sm font-semibold ${
+                emailJaExiste
+                  ? "border-blue-200 bg-blue-50 text-blue-700"
+                  : "border-red-200 bg-red-50 text-red-700"
+              }`}
+            >
+              {mensagem}
+            </div>
+          )}
+
+
+
           <button
             className="w-full rounded bg-blue-600 px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-40"
-            type="submit"
+            type={emailJaExiste ? "button" : "submit"}
+            onClick={() => {
+              if (emailJaExiste) navigate("/login", { state: { email } });
+            }}
             disabled={!emailValido || aguardando}
           >
             {emailJaExiste ? "Ir para Login" : aguardando ? "Enviando código..." : "Avançar"}
           </button>
+
+
+
+
+
+
+
+
+
         </form>
       )}
+
 
       {/* ETAPA 2: código de verificação */}
       {etapa === 2 && (

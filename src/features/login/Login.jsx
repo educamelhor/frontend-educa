@@ -61,8 +61,8 @@ export default function Login() {
   useEffect(() => {
     if (etapa !== "codigo") return;
 
-    // inicia 30s somente se ainda não houver cooldown ativo
-    setCooldown((prev) => (prev > 0 ? prev : 30));
+    // inicia 60s somente se ainda não houver cooldown ativo
+    setCooldown((prev) => (prev > 0 ? prev : 60));
 
     const t = setInterval(() => {
       setCooldown((s) => (s > 0 ? s - 1 : 0));
@@ -101,7 +101,7 @@ export default function Login() {
       setTipoMensagem("info");
       setMensagem("Código enviado. Verifique seu e-mail.");
 
-      setCooldown(30);
+      setCooldown(60);
       setEtapa("codigo");
 
     } catch (err) {
@@ -145,7 +145,7 @@ export default function Login() {
 
       setTipoMensagem("info");
       setMensagem("Novo código enviado. Verifique seu e-mail.");
-      setCooldown(30);
+      setCooldown(60);
     } catch (err) {
       setTipoMensagem("erro");
       setMensagem(err.response?.data?.message || "Erro ao reenviar o código.");
@@ -328,7 +328,7 @@ export default function Login() {
               {loading ? "Confirmando..." : "Confirmar"}
             </button>
 
-            {/* ✅ Reenviar código (cooldown 30s) */}
+            {/* ✅ Reenviar código (cooldown 60s) */}
             <button
               type="button"
               onClick={handleReenviarCodigo}

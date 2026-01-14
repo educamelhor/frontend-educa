@@ -6,10 +6,18 @@ function normalizeSlashes(url = "") {
   return url.replace(/([^:]\/)\/+/g, "$1");
 }
 
-/** (OPÇÃO B) Uploads em URL RELATIVA: o browser resolve em /uploads/... */
+/** Uploads base (Spaces/CDN) via env. Se vazio, usa fallback fixo do Spaces/CDN. */
 function getUploadsBase() {
-  return ""; // não usado na opção B (mantido apenas para compatibilidade)
+  const base = (import.meta?.env?.VITE_UPLOADS_BASE_URL || "").trim();
+
+  // Fallback seguro para não depender do env em runtime
+  const fallback = "https://educa-melhor-uploads.nyc3.cdn.digitaloceanspaces.com/uploads";
+
+  const finalBase = base || fallback;
+  return finalBase.replace(/\/+$/, "");
 }
+
+
 
 
 /**
@@ -27,10 +35,26 @@ export function buildFotoURL(path) {
     return normalizeSlashes(p);
   }
 
-  // Se vier relativo, garante que comece com "/"
+  const base = getUploadsBase();
+
+  // Se tiver base configurada (Spaces/CDN), monta URL absoluta
+  if (base) {
+    // remove barras iniciais do path
+    let rel = p.replace(/^\/+/, "");
+
+    // evita duplicar "uploads/" quando a base já termina com "/uploads"
+    if (base.endsWith("/uploads") && rel.startsWith("uploads/")) {
+      rel = rel.slice("uploads/".length);
+    }
+
+    return normalizeSlashes(`${base}/${rel}`);
+  }
+
+  // Sem base (ex.: localhost): mantém URL relativa
   p = `/${p.replace(/^\/+/, "")}`;
   return normalizeSlashes(p);
 }
+
 
 
 /**

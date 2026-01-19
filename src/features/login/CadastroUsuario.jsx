@@ -1,5 +1,5 @@
 // src/features/login/CadastroUsuario.jsx
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import api from "../../services/api";
 import { useNavigate } from "react-router-dom";
 
@@ -58,8 +58,20 @@ function formatDateForInput(data) {
 }
 function senhaForte(s) {
   if (!s) return false;
-  return s.length >= 6; // regra mínima acordada (pode evoluir)
+
+  // Regras:
+  // - mínimo 6 caracteres
+  // - pelo menos 1 letra
+  // - pelo menos 1 número
+  // - pelo menos 1 caractere especial dentre: $#@*_
+  const temMinimo = s.length >= 6;
+  const temLetra = /[A-Za-z]/.test(s);
+  const temNumero = /\d/.test(s);
+  const temEspecial = /[$#@*_]/.test(s);
+
+  return temMinimo && temLetra && temNumero && temEspecial;
 }
+
 
 /* ──────────────────────────────────────────────────────────────
    Constantes
@@ -68,19 +80,7 @@ const sexos = [
   { value: "M", label: "Masculino" },
   { value: "F", label: "Feminino" },
 ];
-const perfis = [
-  "Admin",
-  "Coordenador",
-  "Diretor ou Vice",
-  "Estudante",
-  "Militar",
-  "Orientador",
-  "Pais ou Responsáveis",
-  "Professor",
-  "Prof. Sala de Recurso",
-  "Secretário",
-  "Supervisor",
-].sort();
+const perfis = ["Professor"];
 
 /* ──────────────────────────────────────────────────────────────
    Modal de Senha (moderno)
@@ -104,8 +104,9 @@ function ModalSenha({
           Crie sua senha
         </h2>
         <p className="mb-4 text-center text-sm text-gray-500">
-          Use no mínimo 6 caracteres. Confirme abaixo.
+          Mínimo 6 caracteres, com letras, números e pelo menos 1 destes: $#@*_
         </p>
+
 
         <div className="mb-3">
           <label className="text-sm text-gray-700">Senha</label>
@@ -117,11 +118,12 @@ function ModalSenha({
             autoFocus
             autoComplete="new-password"
           />
-          {!senhaForte(senha) && (
+          {senha && !senhaForte(senha) && (
             <div className="mt-1 text-xs text-red-600">
-              Senha fraca (mínimo 6 caracteres).
+              Senha fraca. Use no mínimo 6 caracteres com letras, números e 1 destes: $#@*_
             </div>
           )}
+
         </div>
 
         <div className="mb-2">
@@ -192,9 +194,33 @@ export default function CadastroUsuario() {
   const [dataNasc, setDataNasc] = useState("");
   const [sexo, setSexo] = useState("");
   const [celular, setCelular] = useState("");
+  const fileInputRef = useRef(null);
+
+  const [fotoFile, setFotoFile] = useState(null);
+  const [erroFoto, setErroFoto] = useState("");
   const [tocado, setTocado] = useState({});
+
   const [enviando, setEnviando] = useState(false);
+
+
+
+
+
+
   const [escolaId, setEscolaId] = useState(null);
+
+  // Pré-cadastros pendentes por CPF (pode haver mais de uma escola)
+  const [escolasPendentes, setEscolasPendentes] = useState([]);
+
+  // ✅ NOVO: seleção múltipla (1 ou mais escolas)
+  const [escolasSelecionadas, setEscolasSelecionadas] = useState([]); // array de strings (ids)
+
+
+
+
+
+
+
 
   // Modal de senha
   const [abrirModalSenha, setAbrirModalSenha] = useState(false);
@@ -205,7 +231,22 @@ export default function CadastroUsuario() {
 
   const navigate = useNavigate();
 
-  /* ── ETAPA 1: e-mail ─────────────────────────────────────── */
+  /* ── ETAPA 1: CPF (pré-cadastro) ─────────────────────────── */
+  const [cpfPreValidado, setCpfPreValidado] = useState(false);
+
+  const handleCpfChange = (e) => {
+    const val = maskCPF(e.target.value);
+    setCpf(val);
+    setCpfPreValidado(false);
+    setEscolasPendentes([]);
+    setEscolasSelecionadas([]);
+    setEscolaId(null);
+    setMensagem("");
+    setEmailJaExiste(false); // reutilizado como "já cadastrado" para exibir CTA de login
+  };
+
+
+  /* ── ETAPA 2: e-mail (OTP) ───────────────────────────────── */
   const handleEmailChange = (e) => {
     const val = e.target.value;
     setEmail(val);
@@ -213,62 +254,128 @@ export default function CadastroUsuario() {
     setMensagem("");
   };
 
-
-
-
-
-
-
-
-
-
-  const handleEnviarCodigo = async (e) => {
+  // -------------------------------------------------------------------------
+  // ETAPA 1 — Valida pré-cadastro por CPF (professores é a fonte oficial)
+  // Endpoint esperado: GET /api/auth/pre-cadastros/por-cpf/:cpf
+  // Retorno esperado (padrão do fluxo aprovado):
+  //   { jaCadastrado:boolean, preCadastroValido:boolean, escolas:[...] }
+  // -------------------------------------------------------------------------
+  const handleValidarCpfPreCadastro = async (e) => {
     e.preventDefault();
     setMensagem("");
+
+    const cpfLimpo = (cpf || "").replace(/\D/g, "");
+    if (!isCPFValido(cpfLimpo)) {
+      setMensagem("CPF inválido. Verifique e tente novamente.");
+      return;
+    }
+
+    // Se já validou CPF e já escolheu escola (quando houver múltiplas), avança direto
+    if (
+      cpfPreValidado &&
+      ((Array.isArray(escolasPendentes) && escolasPendentes.length <= 1) ||
+        (Array.isArray(escolasSelecionadas) && escolasSelecionadas.length > 0))
+    ) {
+      setEtapa(2); // próxima etapa: coletar e-mail e enviar OTP
+      return;
+    }
+
+
     setAguardando(true);
 
     try {
-      const { data } = await api.get(`/api/usuarios/por-email/${email}`);
+      const { data } = await api.post("/api/auth/validar-professor",{ cpf: cpfLimpo });
 
-      // ✅ Se já tem senha, não é "cadastro": é login
-      if (data?.tem_senha) {
+
+      // ⛔ Se já está cadastrado, interrompe o cadastro e orienta login
+      if (data?.jaCadastrado === true) {
         setMensagem(
-          "E-mail já cadastrado. Use a tela de Login. Se esqueceu a senha, utilize 'Esqueci minha senha'."
+          data?.message ||
+            "Cadastro já concluído para este CPF. Faça login para acessar o sistema."
         );
-        setEmailJaExiste(true);
+        setEmailJaExiste(true); // reutilizado para CTA "Ir para Login"
         return;
       }
 
-      // ✅ Se existe, mas ainda não tem senha (pré-cadastro), envia o código
-      await api.post("/api/auth/enviar-codigo-cadastro", { email });
-      setCodigoEnviadoPara(email);
-      setMensagem("Enviamos um código de verificação para seu e-mail.");
-      setEtapa(2);
-      setEmailJaExiste(false);
-    } catch (err) {
-      // ✅ Se não existe na escola, orienta o usuário e não tenta enviar código
-      if (err?.response?.status === 404) {
+      // ⛔ Se não existe pré-cadastro válido, interrompe
+      if (data?.preCadastroValido !== true) {
         setMensagem(
-          "Usuário não localizado para esta escola. Procure a direção/secretaria para liberar seu acesso."
+          data?.message ||
+            "Não foi possível prosseguir. Procure a direção/secretaria para liberar seu acesso."
         );
         setEmailJaExiste(false);
         return;
       }
 
-      setMensagem("Erro ao verificar usuário. Tente novamente.");
+      // ✅ Pré-cadastro válido: pode haver mais de um vínculo/escola
+      const escolas = Array.isArray(data?.escolas) ? data.escolas : [];
+      setEscolasPendentes(escolas);
+
+      // Normaliza id da escola (tolerante a nomes de campo do backend)
+      const getEscolaId = (x) => x?.escola_id ?? x?.escolaId ?? x?.id ?? null;
+
+      if (escolas.length > 1) {
+        // ✅ Mensagem fica dentro do bloco de seleção (evita repetição)
+        setMensagem("");
+        setCpfPreValidado(true);
+        setEmailJaExiste(false);
+        return; // aguarda seleção (agora múltipla)
+      }
+
+
+      // Se só existe 1 vínculo, já define e segue
+      const unicaEscolaId = escolas.length === 1 ? getEscolaId(escolas[0]) : null;
+      if (unicaEscolaId) {
+        setEscolaId(unicaEscolaId);
+        setEscolasSelecionadas([String(unicaEscolaId)]);
+      }
+
+
+      setCpfPreValidado(true);
+      setEmailJaExiste(false);
+      setEtapa(2); // próxima etapa: coletar e-mail e enviar OTP
+    } catch (err) {
+      if (err?.response?.status === 404) {
+        setMensagem(
+          "CPF não localizado no pré-cadastro. Procure a direção/secretaria para liberar seu acesso."
+        );
+        setEmailJaExiste(false);
+        return;
+      }
+      setMensagem("Erro ao verificar CPF. Tente novamente.");
     } finally {
       setAguardando(false);
     }
   };
 
+  // -------------------------------------------------------------------------
+  // ETAPA 2 — Envia OTP para o e-mail (CPF já validado e escola_id definido)
+  // -------------------------------------------------------------------------
+  const handleEnviarCodigoEmail = async (e) => {
+    e.preventDefault();
+    setMensagem("");
+    setAguardando(true);
 
+    try {
+      await api.post("/api/auth/enviar-codigo-cadastro", {
+        email,
+        cpf: (cpf || "").replace(/\D/g, ""),
+        escola_id: escolaId || undefined,
+      });
 
-
-
-
-
-
-
+      setCodigoEnviadoPara(email);
+      setMensagem("Enviamos um código de verificação para seu e-mail.");
+      setEtapa(3); // próxima etapa: confirmar OTP
+      setEmailJaExiste(false);
+    } catch (err) {
+      const msg =
+        err?.response?.data?.message ||
+        "Erro ao enviar código. Verifique o e-mail e tente novamente.";
+      setMensagem(msg);
+    } finally {
+      setAguardando(false);
+    }
+  };
 
 
   /* ── ETAPA 2: código ─────────────────────────────────────── */
@@ -277,16 +384,33 @@ export default function CadastroUsuario() {
     setMensagem("");
     setAguardando(true);
     try {
-      await api.post("/api/auth/confirmar-codigo-cadastro", {
+      const { data } = await api.post("/api/auth/confirmar-codigo-cadastro", {
         email: codigoEnviadoPara,
         codigo: codigoInput,
       });
+
       setMensagem("Código verificado com sucesso!");
-      // pequena transição antes da próxima tela
+
+      // ✅ Dados vindos do pré-cadastro (professores)
+      const cpfSrv = String(data?.cpf || "").replace(/\D/g, "");
+      const escolaSrv = data?.escola_id ?? null;
+
+      setUsuarioIdPreCadastro(data?.usuario_id ?? null);
+      setEscolaId(escolaSrv);
+      setCpf(maskCPF(cpfSrv || (cpf || "").replace(/\D/g, "")));
+
+      // perfil deve vir do pré-cadastro (preferir em minúsculo, como no BD)
+      setPerfilSelecionado(String(data?.perfil || "professor").toLowerCase());
+
+      // nome vem do pré-cadastro e pode ser conferido na tela seguinte
+      setNomePreCadastrado(data?.nome || "");
+
+      // Libera diretamente a etapa de completar dados
       setTimeout(() => {
         setMensagem("");
-        setEtapa(4); // vai para seleção de perfil (conforme fluxo já aprovado)
-      }, 1200);
+        setCpfLocalizado(true); // já está validado via OTP + pré-cadastro
+        setEtapa(4);
+      }, 800);
     } catch {
       setMensagem("Código não confere ou expirou.");
     } finally {
@@ -346,60 +470,147 @@ export default function CadastroUsuario() {
   // Nada é salvo no backend ainda.
   const abrirModalDeSenha = (e) => {
     e.preventDefault();
+
+    if (erroFoto) {
+      setMensagem(erroFoto);
+      return;
+    }
+
+    setMensagem("");
     setErroSenha("");
     setSenha("");
     setConfSenha("");
     setAbrirModalSenha(true);
   };
 
+
+
+
+
+
+
+
+
+
+
   /* ── ETAPA FINAL: salvar tudo (dados pessoais + senha) ───── */
   const handleSalvarTudo = async () => {
     setErroSenha("");
     setEnviando(true);
- 
-     // 🔹 Sempre enviar CPF sem máscara para evitar falhas no backend
-  const cpfLimpo = cpf.replace(/\D/g, "");
 
+    // 🔹 Sempre enviar CPF sem máscara para evitar falhas no backend
+    const cpfLimpo = cpf.replace(/\D/g, "");
 
-    const payloadDados = {
-      id: usuarioIdPreCadastro, // 🔹 ID do usuário pré-cadastrado (preferido no backend)
-      cpf: cpfLimpo,
-      nome: nomePreCadastrado,
-      data_nascimento: formatDateForInput(dataNasc),
-      sexo,
-      celular: celular.replace(/\D/g, ""), // 🔹 Celular também sem máscara
-      email: codigoEnviadoPara, // 🔹 Sempre o e-mail verificado
-      escola_id: escolaId
-    };
+    // ✅ Multi-escola: salva em 1 ou mais escolas selecionadas
+    const escolasParaSalvar =
+      Array.isArray(escolasSelecionadas) && escolasSelecionadas.length > 0
+        ? escolasSelecionadas.map(String)
+        : escolaId
+        ? [String(escolaId)]
+        : [];
+
+    if (!escolasParaSalvar.length) {
+      setErroSenha("Selecione ao menos uma escola para concluir o cadastro.");
+      setEnviando(false);
+      return;
+    }
 
     try {
-      // 1) Completa dados pessoais
-      await api.post("/api/auth/complementar-professor", payloadDados);
+      // 0) Foto (opcional) + 1) Complementar dados — para CADA escola selecionada
+      for (const escolaIdLoop of escolasParaSalvar) {
+        const payloadDados = {
+          // ⚠️ Não fixar id aqui: em multi-escola, cada linha pode ter um id diferente.
+          // O backend já consegue localizar por (cpf + escola_id + perfil) se id não vier.
+          cpf: cpfLimpo,
+          nome: nomePreCadastrado,
+          data_nascimento: formatDateForInput(dataNasc),
+          sexo,
+          celular: celular.replace(/\D/g, ""),
+          email: codigoEnviadoPara,
+          escola_id: Number(escolaIdLoop),
+          perfil: perfilSelecionado,
+        };
 
-      // 2) Cadastra senha usando o CPF limpo
+        if (fotoFile) {
+          const fd = new FormData();
+          fd.append("foto", fotoFile);
+          fd.append("cpf", cpfLimpo);
+          fd.append("escola_id", String(escolaIdLoop));
+
+          await api.post("/api/auth/upload-foto-professor", fd, {
+            headers: { "Content-Type": "multipart/form-data" },
+          });
+        }
+
+        await api.post("/api/auth/complementar-professor", payloadDados);
+      }
+
+      // 2) Cadastrar senha — UMA vez só
+      // (backend já atualiza por cpf+perfil e cobre as linhas das escolas)
       await api.post("/api/auth/cadastrar-senha", {
         cpf: cpfLimpo,
         senha,
         email: codigoEnviadoPara,
         celular: celular.replace(/\D/g, ""),
-        perfil: perfilSelecionado
+        perfil: perfilSelecionado,
       });
 
-      // Sucesso → mensagem verde + redirecionar /login em 2s
       setSucesso(true);
-      setMensagem("Cadastro concluído! Redirecionando para o login...");
+      setMensagem("Cadastro realizado com sucesso!");
       setAbrirModalSenha(false);
-      setTimeout(() => navigate("/login"), 2000);
+      setTimeout(() => {
+        navigate("/login", { state: { email: codigoEnviadoPara } });
+      }, 1500);
     } catch (err) {
-      const msg =
-        err?.response?.data?.error ||
-        err?.response?.data?.message ||
-        "Erro ao concluir o cadastro. Tente novamente.";
+      const status = err?.response?.status;
+      const backendMsg = err?.response?.data?.error || err?.response?.data?.message || "";
+
+      // ✅ Mensagens "premium" para conflitos (409)
+      if (status === 409) {
+        const msgLower = String(backendMsg || "").toLowerCase();
+
+        // Se o backend já mandou uma mensagem boa, prioriza.
+        if (backendMsg) {
+          setErroSenha(backendMsg);
+          return;
+        }
+
+        // Fallback seguro caso o backend não mande mensagem detalhada
+        if (msgLower.includes("celular") || msgLower.includes("telefone")) {
+          setErroSenha("Este celular já está em uso. Informe outro celular para continuar.");
+          return;
+        }
+
+        if (msgLower.includes("e-mail") || msgLower.includes("email")) {
+          setErroSenha("Este e-mail já está em uso. Informe outro e-mail para continuar.");
+          return;
+        }
+
+        setErroSenha("Conflito de cadastro. Verifique seus dados e tente novamente.");
+        return;
+      }
+
+      const msg = backendMsg || "Erro ao concluir o cadastro. Tente novamente.";
       setErroSenha(msg);
     } finally {
       setEnviando(false);
     }
   };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
   /* ─────────────────────────────────────────────────────────── */
   return (
@@ -420,9 +631,146 @@ export default function CadastroUsuario() {
         <div className="mb-4 text-center font-semibold text-green-600">{mensagem}</div>
       )}
 
-      {/* ETAPA 1: e-mail */}
+      {/* ETAPA 1: CPF (pré-cadastro) */}
       {etapa === 1 && (
-        <form onSubmit={handleEnviarCodigo}>
+        <form onSubmit={handleValidarCpfPreCadastro}>
+          <label>Digite seu CPF:</label>
+          <input
+            className="mb-2 w-full rounded border px-3 py-2"
+            type="text"
+            value={cpf}
+            onChange={handleCpfChange}
+            required
+            autoFocus
+            maxLength={14}
+            placeholder="000.000.000-00"
+            inputMode="numeric"
+            autoComplete="off"
+            disabled={aguardando}
+          />
+
+          {cpf && cpf.replace(/\D/g, "").length >= 11 && !isCPFValido(cpf) && (
+            <div className="animate-fadeIn mb-2 text-sm text-red-600">CPF inválido.</div>
+          )}
+
+          {/* ✅ Feedback visível */}
+          {mensagem && !sucesso && !(Array.isArray(escolasPendentes) && escolasPendentes.length > 1) && (
+            <div
+              className={`mb-3 rounded border p-2 text-center text-sm font-semibold ${
+                emailJaExiste
+                  ? "border-blue-200 bg-blue-50 text-blue-700"
+                  : "border-red-200 bg-red-50 text-red-700"
+              }`}
+            >
+              {mensagem}
+            </div>
+          )}
+
+
+          {/* ✅ Se houver múltiplas escolas/vínculos, solicitar seleção */}
+          {Array.isArray(escolasPendentes) && escolasPendentes.length > 1 && !emailJaExiste && (
+            <div className="mb-3">
+              <div className="mb-1 flex items-center justify-between">
+                <label className="block text-sm font-semibold text-gray-700">
+                  Selecione a(s) escola(s) para concluir:
+                </label>
+
+
+                <button
+                  type="button"
+                  className="text-xs font-semibold text-blue-700 hover:underline disabled:opacity-40"
+                  disabled={aguardando}
+                  onClick={() => {
+                    const ids = escolasPendentes
+                      .map((esc) => String(esc?.escola_id ?? esc?.escolaId ?? esc?.id ?? ""))
+                      .filter(Boolean);
+
+                    setEscolasSelecionadas(ids);
+
+                    // ✅ Mantém compatibilidade: escolaId = primeira selecionada (OTP seguirá por ela)
+                    setEscolaId(ids.length ? Number(ids[0]) : null);
+                    setMensagem("");
+                  }}
+                >
+                  Selecionar todas
+                </button>
+              </div>
+
+              <div className="rounded border bg-white p-3">
+                <div className="mb-2 text-sm text-gray-600">
+                  Pré-cadastros encontrados: <span className="font-semibold">{escolasPendentes.length}</span>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  {escolasPendentes.map((esc, idx) => {
+                    const id = String(esc?.escola_id ?? esc?.escolaId ?? esc?.id ?? "");
+                    const nome =
+                      esc?.escola_nome ?? esc?.escolaNome ?? esc?.nome ?? `Escola ${id || idx + 1}`;
+
+                    const checked = escolasSelecionadas.includes(id);
+
+                    return (
+                      <label key={`${id}-${idx}`} className="flex cursor-pointer items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={aguardando}
+                          onChange={(e) => {
+                            const on = e.target.checked;
+
+                            setEscolasSelecionadas((prev) => {
+                              const next = on ? [...prev, id] : prev.filter((x) => x !== id);
+
+                              // ✅ Mantém compatibilidade: escolaId = primeira selecionada (para OTP)
+                              const first = next[0] ? Number(next[0]) : null;
+                              setEscolaId(first);
+
+                              return next;
+                            });
+
+                            setMensagem("");
+                          }}
+                        />
+                        <span className="text-sm text-gray-800">{nome}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+
+                {Array.isArray(escolasSelecionadas) && escolasSelecionadas.length > 0 && (
+                  <div className="mt-2 text-xs text-gray-600">
+                    Selecionadas: <span className="font-semibold">{escolasSelecionadas.length}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+
+          <button
+            className="w-full rounded bg-blue-600 px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-40"
+            type={emailJaExiste ? "button" : "submit"}
+            onClick={() => {
+              if (emailJaExiste) navigate("/login");
+            }}
+            disabled={
+              aguardando ||
+              !isCPFValido(cpf) ||
+              (Array.isArray(escolasPendentes) &&
+                escolasPendentes.length > 1 &&
+                !emailJaExiste &&
+                !(Array.isArray(escolasSelecionadas) && escolasSelecionadas.length > 0))
+            }
+
+          >
+            {emailJaExiste ? "Ir para Login" : aguardando ? "Validando..." : "Avançar"}
+          </button>
+        </form>
+      )}
+
+      {/* ETAPA 2: e-mail (envio OTP) */}
+      {etapa === 2 && (
+        <form onSubmit={handleEnviarCodigoEmail}>
           <label>Digite seu e-mail:</label>
           <input
             className="mb-2 w-full rounded border px-3 py-2"
@@ -444,46 +792,24 @@ export default function CadastroUsuario() {
             </div>
           )}
 
-          {/* ✅ Feedback visível também na ETAPA 1 */}
           {mensagem && !sucesso && (
-            <div
-              className={`mb-3 rounded border p-2 text-center text-sm font-semibold ${
-                emailJaExiste
-                  ? "border-blue-200 bg-blue-50 text-blue-700"
-                  : "border-red-200 bg-red-50 text-red-700"
-              }`}
-            >
+            <div className="mb-3 rounded border border-red-200 bg-red-50 p-2 text-center text-sm font-semibold text-red-700">
               {mensagem}
             </div>
           )}
 
-
-
           <button
             className="w-full rounded bg-blue-600 px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-40"
-            type={emailJaExiste ? "button" : "submit"}
-            onClick={() => {
-              if (emailJaExiste) navigate("/login", { state: { email } });
-            }}
+            type="submit"
             disabled={!emailValido || aguardando}
           >
-            {emailJaExiste ? "Ir para Login" : aguardando ? "Enviando código..." : "Avançar"}
+            {aguardando ? "Enviando código..." : "Enviar código"}
           </button>
-
-
-
-
-
-
-
-
-
         </form>
       )}
 
-
-      {/* ETAPA 2: código de verificação */}
-      {etapa === 2 && (
+      {/* ETAPA 3: código de verificação */}
+      {etapa === 3 && (
         <form onSubmit={handleVerificarCodigo}>
           <label>
             Informe o código enviado para <br />
@@ -519,172 +845,178 @@ export default function CadastroUsuario() {
         </form>
       )}
 
-      {/* ETAPA 4: seleção de perfil + CPF + DADOS PESSOAIS */}
+      {/* ETAPA 4: dados do cadastro (perfil/nome vindos do pré-cadastro) */}
       {etapa === 4 && (
         <div>
-          <label>Selecione o tipo de usuário:</label>
-          <select
-            className="mb-4 w-full rounded border px-3 py-2"
-            value={perfilSelecionado}
-            onChange={handlePerfilChange}
-            autoFocus
-          >
-            <option value="">Selecione...</option>
-            {perfis.map((p) => (
-              <option value={p} key={p}>
-                {p}
-              </option>
-            ))}
-          </select>
+          <div className="mb-4 rounded border border-blue-200 bg-blue-50 p-2 text-center text-sm font-semibold text-blue-700">
+            Perfil definido pelo pré-cadastro: <b>{(perfilSelecionado || "professor").toUpperCase()}</b>
+          </div>
 
-          {/* Perfil que exige CPF */}
-          {perfilSelecionado &&
-            perfilSelecionado !== "Estudante" &&
-            perfilSelecionado !== "Pais ou Responsáveis" && (
-              <>
-                {/* CPF */}
-                <form onSubmit={handleBuscarCPF} autoComplete="off">
-                  <label>Digite seu CPF:</label>
-                  <input
-                    className="mb-2 w-full rounded border px-3 py-2"
-                    type="text"
-                    value={cpf}
-                    onChange={(e) => setCpf(maskCPF(e.target.value))}
-                    required
-                    maxLength={14}
-                    placeholder="000.000.000-00"
-                    disabled={cpfBuscando || cpfLocalizado}
-                    autoFocus
-                  />
-                  {cpf && !isCPFValido(cpf) && (
-                    <div className="animate-fadeIn mb-2 text-sm text-red-600">CPF inválido!</div>
-                  )}
+          <div className="mb-3 grid grid-cols-1 gap-2">
+            <div>
+              <label className="text-sm text-gray-700">CPF (pré-cadastro)</label>
+              <input
+                className="w-full cursor-not-allowed rounded border bg-gray-100 px-3 py-2"
+                value={cpf}
+                readOnly
+                disabled
+              />
+            </div>
+
+            <div>
+              <label className="text-sm text-gray-700">Nome (confirme)</label>
+              <input
+                className="w-full rounded border px-3 py-2"
+                value={nomePreCadastrado}
+                onChange={(e) => setNomePreCadastrado(e.target.value)}
+                required
+              />
+            </div>
+          </div>
+
+          <form className="mt-2" autoComplete="off" onSubmit={abrirModalDeSenha}>
+            {/* Data Nascimento */}
+            <div className="mb-2">
+              <label>Data de nascimento:</label>
+              <input
+                className="w-full rounded border px-3 py-2"
+                type="date"
+                value={formatDateForInput(dataNasc)}
+                onBlur={() => setTocado((t) => ({ ...t, dataNasc: true }))}
+                onChange={(e) => setDataNasc(e.target.value)}
+                required
+              />
+              {tocado.dataNasc && !isDataValida(formatDateForInput(dataNasc)) && (
+                <div className="mt-1 text-xs text-red-600">Campo obrigatório</div>
+              )}
+            </div>
+
+            {/* Sexo */}
+            <div className="mb-2">
+              <label>Sexo:</label>
+              <select
+                className="w-full rounded border px-3 py-2"
+                value={sexo}
+                onBlur={() => setTocado((t) => ({ ...t, sexo: true }))}
+                onChange={(e) => setSexo(e.target.value)}
+                required
+              >
+                <option value="">Selecione...</option>
+                {sexos.map((s) => (
+                  <option key={s.value} value={s.value}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+              {tocado.sexo && !sexo && (
+                <div className="mt-1 text-xs text-red-600">Campo obrigatório</div>
+              )}
+            </div>
+
+            {/* Celular (vai para usuarios) */}
+            <div className="mb-2">
+              <label>Celular:</label>
+              <input
+                className="w-full rounded border px-3 py-2"
+                type="text"
+                value={celular}
+                onBlur={() => setTocado((t) => ({ ...t, celular: true }))}
+                onChange={(e) => setCelular(maskCelular(e.target.value))}
+                required
+                placeholder="(99) 99999-9999"
+                maxLength={15}
+              />
+              {tocado.celular && !celular && (
+                <div className="mt-1 text-xs text-red-600">Campo obrigatório</div>
+              )}
+            </div>
+
+            {/* Foto (opcional) - será ligada no próximo passo */}
+            <div className="mb-2">
+              <label>Foto (opcional):</label>
+
+              <div className="flex items-center gap-2">
+
+                <input
+                  ref={fileInputRef}
+                  className="w-full"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0] || null;
+
+                    // reset
+                    setErroFoto("");
+                    setFotoFile(null);
+
+                    if (!f) return;
+
+                    const tiposOk = ["image/jpeg", "image/png", "image/webp"];
+                    const maxBytes = 2 * 1024 * 1024; // 2MB
+
+                    if (!tiposOk.includes(f.type)) {
+                      setErroFoto("Formato inválido. Envie JPEG, PNG ou WEBP.");
+                      if (fileInputRef.current) fileInputRef.current.value = "";
+                      return;
+                    }
+
+                    if (f.size > maxBytes) {
+                      setErroFoto("Arquivo muito grande. Limite: 2MB.");
+                      if (fileInputRef.current) fileInputRef.current.value = "";
+                      return;
+                    }
+
+                    setFotoFile(f);
+                  }}
+                />
+                {fotoFile && (
                   <button
-                    className="w-full rounded bg-blue-500 px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-40"
-                    type="submit"
-                    disabled={!isCPFValido(cpf) || cpfBuscando || cpfLocalizado}
+                    type="button"
+                    className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm font-bold text-red-700 hover:bg-red-100"
+                    title="Remover foto"
+                    onClick={() => {
+                      setFotoFile(null);
+                      setErroFoto("");
+                      if (fileInputRef.current) fileInputRef.current.value = "";
+                    }}
+
                   >
-                    {cpfBuscando ? "Buscando CPF..." : "Confirmar CPF"}
+                    X
                   </button>
+                )}
+              </div>
 
-                  {cpfNaoEncontrado && (
-                    <div className="mt-3 rounded border border-red-200 bg-red-50 p-2 text-center text-red-600">
-                      Procure sua escola para realizar o seu pré-cadastro.
-                    </div>
-                  )}
-                </form>
+              {fotoFile && !erroFoto && (
+                <div className="mt-2 text-xs text-gray-600">
+                  Arquivo selecionado: <span className="font-semibold">{fotoFile.name}</span>
+                </div>
+              )}
 
-                {/* CPF localizado e perfil confere → formulário de dados pessoais */}
-                {cpfLocalizado &&
-                  perfilDoBanco &&
-                  perfilDoBanco.toLowerCase() === perfilSelecionado.toLowerCase() && (
-                    <>
-                      <div className="mt-3 rounded border border-green-200 bg-green-50 p-2 text-center text-green-700">
-                        CPF localizado! Complete seu cadastro abaixo.
-                      </div>
+              {erroFoto ? (
+                <div className="mt-2 rounded border border-red-200 bg-red-50 p-2 text-center text-sm font-semibold text-red-700">
+                  {erroFoto}
+                </div>
+              ) : (
+                <div className="mt-1 text-xs text-gray-500">
+                  Formatos aceitos: JPEG, PNG, WEBP (até 2MB).
+                </div>
+              )}
+            </div>
 
-                      <form className="mt-4" autoComplete="off" onSubmit={abrirModalDeSenha}>
-                        {/* Nome (somente leitura) */}
-                        <div className="mb-2">
-                          <label>Nome completo:</label>
-                          <input
-                            className="w-full cursor-not-allowed rounded border bg-gray-100 px-3 py-2"
-                            value={nomePreCadastrado}
-                            readOnly
-                            disabled
-                          />
-                        </div>
-
-                        {/* Data Nascimento */}
-                        <div className="mb-2">
-                          <label>Data de nascimento:</label>
-                          <input
-                            className="w-full rounded border px-3 py-2"
-                            type="date"
-                            value={formatDateForInput(dataNasc)}
-                            onBlur={() => setTocado((t) => ({ ...t, dataNasc: true }))}
-                            onChange={(e) => setDataNasc(e.target.value)}
-                            required
-                          />
-                          {tocado.dataNasc && !isDataValida(formatDateForInput(dataNasc)) && (
-                            <div className="mt-1 text-xs text-red-600">Campo obrigatório</div>
-                          )}
-                        </div>
-
-                        {/* Sexo */}
-                        <div className="mb-2">
-                          <label>Sexo:</label>
-                          <select
-                            className="w-full rounded border px-3 py-2"
-                            value={sexo}
-                            onBlur={() => setTocado((t) => ({ ...t, sexo: true }))}
-                            onChange={(e) => setSexo(e.target.value)}
-                            required
-                          >
-                            <option value="">Selecione...</option>
-                            {sexos.map((s) => (
-                              <option key={s.value} value={s.value}>
-                                {s.label}
-                              </option>
-                            ))}
-                          </select>
-                          {tocado.sexo && !sexo && (
-                            <div className="mt-1 text-xs text-red-600">Campo obrigatório</div>
-                          )}
-                        </div>
-
-
-
-
-
-                        {/* Celular */}
-                        <div className="mb-2">
-                          <label>Celular:</label>
-                          <input
-                            className="w-full rounded border px-3 py-2"
-                            type="text"
-                            value={celular}
-                            onBlur={() => setTocado((t) => ({ ...t, celular: true }))}
-                            onChange={(e) => setCelular(maskCelular(e.target.value))}
-                            required
-                            placeholder="(99) 99999-9999"
-                            maxLength={15}
-                          />
-                          {tocado.celular && !celular && (
-                            <div className="mt-1 text-xs text-red-600">Campo obrigatório</div>
-                          )}
-                        </div>
-
-
-
-
-
-
-
-
-                        {/* Continuar → abre modal de senha (NADA salvo ainda) */}
-                        <button
-                          className="mt-3 w-full rounded bg-green-600 px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50"
-                          type="submit"
-                          disabled={!isDataValida(formatDateForInput(dataNasc)) || !sexo}
-                        >
-                          Continuar
-                        </button>
-                      </form>
-                    </>
-                  )}
-
-                {/* Perfil divergente */}
-                {cpfLocalizado &&
-                  perfilDoBanco &&
-                  perfilDoBanco.toLowerCase() !== perfilSelecionado.toLowerCase() && (
-                    <div className="mt-3 rounded border border-red-300 bg-red-100 p-2 text-center text-red-700">
-                      Você não tem permissão para cadastrar como <b>{perfilSelecionado}</b>, apenas
-                      como <b>{perfilDoBanco}</b>.
-                    </div>
-                  )}
-              </>
-            )}
+            {/* Continuar → abre modal de senha */}
+            <button
+              className="mt-3 w-full rounded bg-green-600 px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50"
+              type="submit"
+              disabled={
+                !nomePreCadastrado ||
+                !isDataValida(formatDateForInput(dataNasc)) ||
+                !sexo ||
+                !!erroFoto
+              }
+            >
+              Continuar
+            </button>
+          </form>
         </div>
       )}
 

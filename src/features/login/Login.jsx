@@ -3,9 +3,20 @@ import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import api from "../../services/api"; // Serviço centralizado para requisições
 
+function isEmailValido(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || "").trim());
+}
+
+function isCelularValido(valor) {
+  const digits = String(valor || "").replace(/\D/g, "");
+  // Aceita 10 ou 11 dígitos (com ou sem DDD)
+  return digits.length === 10 || digits.length === 11;
+}
+
+
 export default function Login() {
   // 📌 Controle de etapas do fluxo de login
-  const [etapa, setEtapa] = useState("login"); // "login" ou "codigo"
+  const [etapa, setEtapa] = useState("login"); // "login" | "codigo" | "escola"
 
   // 📌 Campos do formulário
   const location = useLocation();
@@ -16,8 +27,15 @@ export default function Login() {
 
   // 📌 Metadados do usuário e UI
   const [usuarioId, setUsuarioId] = useState(null);
+  const [nomeUsuarioLogin, setNomeUsuarioLogin] = useState(""); // ✅ nome para exibir no multi-escola
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+
+
+  // ✅ Multi-escola (seleção de contexto)
+  const [escolasVinculadas, setEscolasVinculadas] = useState([]);
+  const [escolaSelecionada, setEscolaSelecionada] = useState("");
+
 
   // ✅ Mensagens inline (substitui alert)
   const [mensagem, setMensagem] = useState("");
@@ -29,13 +47,28 @@ export default function Login() {
 
   const navigate = useNavigate();
 
+  // ✅ Voltar da etapa "escola" para "codigo" sem resetar sessão (usuarioId/senha/cooldown)
+  const voltarParaCodigo = () => {
+    setEtapa("codigo");
+    setMensagem("");
+    setTipoMensagem("info");
+    // Mantém escolasVinculadas e usuarioId para evitar reenviar código
+  };
+
+
   // ✅ Voltar com limpeza completa do estado da etapa "codigo"
   const voltarParaLogin = () => {
     setEtapa("login");
 
+    // ✅ Limpa multi-escola
+    setEscolasVinculadas([]);
+    setEscolaSelecionada("");
+
+
     // ✅ Limpa estado da etapa de código
     setCodigo("");
     setUsuarioId(null);
+    setNomeUsuarioLogin("");
 
     // ✅ Segurança: ao voltar, limpa a senha (mantém e-mail por conveniência)
     setSenha("");
@@ -82,9 +115,20 @@ export default function Login() {
     // ✅ Hard validation (não dispara request desnecessária)
     if (!usuario?.trim() || !senha?.trim()) {
       setTipoMensagem("erro");
-      setMensagem("Informe e-mail e senha para continuar.");
+      setMensagem("Informe e-mail (ou celular) e senha para continuar.");
       return;
     }
+
+    // ✅ Validação premium: evita tentar login com NOME (ou texto aleatório)
+    const valorLogin = usuario.trim();
+    const okLogin = isEmailValido(valorLogin) || isCelularValido(valorLogin);
+
+    if (!okLogin) {
+      setTipoMensagem("erro");
+      setMensagem("Informe um e-mail válido ou um celular válido (com DDD) para continuar.");
+      return;
+    }
+
 
     setLoading(true);
     setMensagem("");
@@ -96,7 +140,18 @@ export default function Login() {
       });
 
       // Armazena ID do usuário para usar na confirmação
-      setUsuarioId(data.usuarioId);
+      // Blindagem: backend pode devolver esse id com nomes diferentes (usuarioId, userId, id, usuario_id)
+      const resolvedUsuarioId =
+        data?.usuarioId ?? data?.userId ?? data?.id ?? data?.usuario_id ?? data?.usuario?.id ?? null;
+
+      if (!resolvedUsuarioId) {
+        setTipoMensagem("erro");
+        setMensagem("Falha ao iniciar confirmação: usuarioId não retornou no login. Atualize a página e tente novamente.");
+        return;
+      }
+
+      setUsuarioId(resolvedUsuarioId);
+
 
       setTipoMensagem("info");
       setMensagem("Código enviado. Verifique seu e-mail.");
@@ -140,8 +195,18 @@ export default function Login() {
         senha,
       });
 
-      setUsuarioId(data.usuarioId);
+      const resolvedUsuarioId =
+        data?.usuarioId ?? data?.userId ?? data?.id ?? data?.usuario_id ?? data?.usuario?.id ?? null;
+
+      if (!resolvedUsuarioId) {
+        setTipoMensagem("erro");
+        setMensagem("Falha ao reenviar: usuarioId não retornou no login. Volte e tente novamente.");
+        return;
+      }
+
+      setUsuarioId(resolvedUsuarioId);
       setCodigo(""); // limpa tentativa anterior
+
 
       setTipoMensagem("info");
       setMensagem("Novo código enviado. Verifique seu e-mail.");
@@ -163,6 +228,13 @@ export default function Login() {
       return;
     }
 
+    // Blindagem: se o usuarioId não estiver presente, não adianta tentar confirmar
+    if (!usuarioId) {
+      setTipoMensagem("erro");
+      setMensagem("Sessão da confirmação perdida. Clique em Voltar e envie o código novamente.");
+      return;
+    }
+
     setLoading(true);
     setMensagem("");
 
@@ -171,6 +243,26 @@ export default function Login() {
         usuarioId,
         codigo,
       });
+
+      // ✅ Se for multi-escola, não salva token ainda. Obriga escolher a escola.
+      if (data?.multi_escola) {
+        const lista = Array.isArray(data?.escolas) ? data.escolas : [];
+        setEscolasVinculadas(lista);
+
+        // ✅ Pré-seleciona última escola usada (se ainda existir no vínculo)
+        const ultima = localStorage.getItem("last_escola_id");
+        const existe = ultima && lista.some((e) => String(e.id) === String(ultima));
+        setEscolaSelecionada(existe ? String(ultima) : "");
+
+        // ✅ Nome para cabeçalho da etapa "escola"
+        setNomeUsuarioLogin(String(data?.nome || ""));
+
+        setTipoMensagem("info");
+        setMensagem("Selecione a escola para entrar no sistema.");
+        setEtapa("escola");
+        return;
+      }
+
 
       // Salva dados no localStorage para uso global
       localStorage.setItem("token", data.token);
@@ -197,6 +289,58 @@ export default function Login() {
 
 
 
+  const handleConfirmarEscola = async (e) => {
+    e.preventDefault();
+
+    if (!usuarioId) {
+      setTipoMensagem("erro");
+      setMensagem("Sessão perdida. Volte e envie o código novamente.");
+      setEtapa("login");
+      return;
+    }
+
+    if (!escolaSelecionada) {
+      setTipoMensagem("erro");
+      setMensagem("Selecione uma escola para continuar.");
+      return;
+    }
+
+    setLoading(true);
+    setMensagem("");
+
+    try {
+      const { data } = await api.post("/api/auth/confirmar-escola", {
+        usuarioId,
+        escola_id: Number(escolaSelecionada),
+      });
+
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("userName", data.nome || "Usuário");
+      localStorage.setItem("escola_id", data.escola_id || 1);
+      localStorage.setItem("nome_escola", data.nome_escola || "Escola não definida");
+      localStorage.setItem("perfil", data.perfil || "aluno");
+
+      // ✅ Memoriza a última escola usada para pré-seleção futura
+      localStorage.setItem("last_escola_id", String(data.escola_id || ""));
+
+
+      setTipoMensagem("sucesso");
+      setMensagem("Login realizado com sucesso!");
+      setSuccess(true);
+
+      setTimeout(() => {
+        navigate("/home");
+      }, 1500);
+    } catch (err) {
+      setTipoMensagem("erro");
+      setMensagem(err.response?.data?.message || "Erro ao selecionar escola.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
+
   return (
     <div className="h-screen w-screen relative flex items-center justify-center">
       {/* 🌆 Fundo */}
@@ -209,6 +353,7 @@ export default function Login() {
           <div className="text-center text-green-700 font-semibold text-lg animate-fadeIn">
             Login realizado com sucesso!
           </div>
+
         ) : etapa === "login" ? (
           // 🔐 Formulário de login
           <form onSubmit={handleLogin} className="flex flex-col space-y-4">
@@ -230,7 +375,7 @@ export default function Login() {
 
             <input
               type="text"
-              placeholder="E-mail"
+              placeholder="E-mail ou celular"
               value={usuario}
               onChange={(e) => {
                 setUsuario(e.target.value);
@@ -256,7 +401,6 @@ export default function Login() {
             >
               {loading ? "Enviando..." : "Enviar código"}
             </button>
-
 
             {loading && (
               <div className="flex flex-col items-center mt-2 text-blue-600">
@@ -284,7 +428,7 @@ export default function Login() {
               </div>
             )}
           </form>
-        ) : (
+        ) : etapa === "codigo" ? (
           // 🔢 Formulário de confirmação de código
           <form onSubmit={handleConfirmar} className="flex flex-col space-y-4">
             <h2 className="text-xl font-bold text-center text-blue-900">Confirmação</h2>
@@ -328,7 +472,6 @@ export default function Login() {
               {loading ? "Confirmando..." : "Confirmar"}
             </button>
 
-            {/* ✅ Reenviar código (cooldown 60s) */}
             <button
               type="button"
               onClick={handleReenviarCodigo}
@@ -338,8 +481,6 @@ export default function Login() {
               {cooldown > 0 ? `Reenviar em 00:${String(cooldown).padStart(2, "0")}` : "Reenviar código"}
             </button>
 
-
-            {/* ✅ Voltar (limpa código e usuárioId) */}
             <button
               type="button"
               onClick={voltarParaLogin}
@@ -348,8 +489,6 @@ export default function Login() {
             >
               Voltar
             </button>
-
-
 
             {loading && (
               <div className="flex flex-col items-center mt-2 text-green-600">
@@ -377,8 +516,89 @@ export default function Login() {
               </div>
             )}
           </form>
+        ) : (
+          // 🏫 Seleção de escola (multi-escola)
+          <form onSubmit={handleConfirmarEscola} className="flex flex-col space-y-4">
+            <h2 className="text-xl font-bold text-center text-blue-900">Selecione a escola</h2>
+
+            {nomeUsuarioLogin?.trim() && (
+              <p className="text-center text-sm text-gray-700">
+                Bem-vindo(a), <span className="font-semibold">{nomeUsuarioLogin}</span>
+              </p>
+            )}
+
+            <p className="text-center text-sm text-gray-600">
+              Você possui vínculo com mais de uma escola. Escolha o contexto de acesso.
+            </p>
+
+
+            {mensagem && (
+              <div
+                className={`rounded border p-2 text-center text-sm font-semibold ${
+                  tipoMensagem === "sucesso"
+                    ? "border-green-200 bg-green-50 text-green-700"
+                    : tipoMensagem === "info"
+                    ? "border-blue-200 bg-blue-50 text-blue-700"
+                    : "border-red-200 bg-red-50 text-red-700"
+                }`}
+              >
+                {mensagem}
+              </div>
+            )}
+
+            <div className="rounded-lg border border-gray-200 bg-white p-3">
+              <div className="flex flex-col gap-2">
+                {(Array.isArray(escolasVinculadas) ? escolasVinculadas : []).map((esc) => (
+                  <label
+                    key={String(esc.id)}
+                      className="flex items-center gap-2 cursor-pointer rounded px-2 py-1 hover:bg-gray-50"
+                  >
+
+                    <input
+                      type="radio"
+                      name="escola"
+                      value={String(esc.id)}
+                      checked={String(escolaSelecionada) === String(esc.id)}
+                      onChange={(e) => {
+                        setEscolaSelecionada(e.target.value);
+                        setMensagem("");
+                      }}
+                      disabled={loading}
+                    />
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-800">{esc.nome}</span>
+
+                      {String(localStorage.getItem("last_escola_id") || "") === String(esc.id) && (
+                        <span className="rounded bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                          Última usada
+                        </span>
+                      )}
+                    </div>
+                  </label>
+
+                ))}
+              </div>
+            </div>
+
+            <button
+              className="bg-green-600 text-white py-2 rounded-lg disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={loading || !escolaSelecionada}
+            >
+              {loading ? "Entrando..." : "Entrar"}
+            </button>
+
+            <button
+              type="button"
+              onClick={voltarParaCodigo}
+              className="rounded-lg border border-gray-300 bg-white py-2 font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={loading}
+            >
+              Voltar
+            </button>
+          </form>
         )}
       </div>
     </div>
   );
 }
+

@@ -46,23 +46,6 @@ export default function HeaderGlobal() {
 
   // Dimensões naturais da imagem carregada (para clamp preciso)
   const [cropImgSize, setCropImgSize] = useState({ w: 0, h: 0 });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
   useEffect(() => {
     const hydrateFromStorage = () => {
       const savedName = localStorage.getItem("userName") || "Usuário";
@@ -150,14 +133,32 @@ export default function HeaderGlobal() {
   };
 
 
-  const API_URL = import.meta?.env?.VITE_API_URL || "http://localhost:3000";
+// Backend (API)
+const API_URL =
+  import.meta?.env?.VITE_API_BASE_URL ||
+  "http://localhost:3000";
+
+// CDN público do DigitalOcean Spaces (uploads)
+const UPLOADS_CDN =
+  import.meta?.env?.VITE_UPLOADS_BASE_URL ||
+  "https://educa-melhor-uploads.nyc3.cdn.digitaloceanspaces.com";
+
 
   const toPublicUrl = (path) => {
     if (!path) return "";
+
+    // já é URL absoluta
     if (path.startsWith("http://") || path.startsWith("https://")) return path;
+
+    // ✅ qualquer /uploads/... deve vir do CDN do Spaces (e não do API_URL)
+    if (path.startsWith("/uploads/")) return `${UPLOADS_CDN}${path}`;
+
+    // demais rotas relativas continuam apontando para o backend
     if (path.startsWith("/")) return `${API_URL}${path}`;
+
     return `${API_URL}/${path}`;
   };
+
 
   const resetEditor = () => {
     setCropScale(1);

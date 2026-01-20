@@ -271,6 +271,15 @@ export default function Login() {
       localStorage.setItem("nome_escola", data.nome_escola || "Escola não definida");
       localStorage.setItem("perfil", data.perfil || "aluno");
 
+      // ✅ Cabeçalho: CPF + Foto (URL) para avatar global
+      // Tolerante a variações do backend: fotoUrl | foto_url | foto
+      const cpfLs = data?.cpf || data?.usuario?.cpf || data?.user?.cpf || "";
+      const fotoLs = data?.fotoUrl || data?.foto_url || data?.foto || "";
+
+      localStorage.setItem("cpf", String(cpfLs || ""));
+      localStorage.setItem("foto_url", String(fotoLs || ""));
+
+
       setTipoMensagem("sucesso");
       setMensagem("Login realizado com sucesso!");
       setSuccess(true);
@@ -320,8 +329,17 @@ export default function Login() {
       localStorage.setItem("nome_escola", data.nome_escola || "Escola não definida");
       localStorage.setItem("perfil", data.perfil || "aluno");
 
+      // ✅ Cabeçalho: CPF + Foto (URL) para avatar global
+      // Tolerante a variações do backend: fotoUrl | foto_url | foto
+      const cpfLs = data?.cpf || data?.usuario?.cpf || data?.user?.cpf || "";
+      const fotoLs = data?.fotoUrl || data?.foto_url || data?.foto || "";
+
+      localStorage.setItem("cpf", String(cpfLs || ""));
+      localStorage.setItem("foto_url", String(fotoLs || ""));
+
       // ✅ Memoriza a última escola usada para pré-seleção futura
       localStorage.setItem("last_escola_id", String(data.escola_id || ""));
+
 
 
       setTipoMensagem("sucesso");

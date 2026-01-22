@@ -13,7 +13,10 @@ import axios from "axios";
  */
 
 function getApiBaseUrl() {
-  const envUrl = import.meta.env.VITE_API_BASE_URL;
+  // Suporta ambos nomes (para evitar build antigo/variável divergente)
+  const envUrl =
+    import.meta.env.VITE_API_BASE_URL ||
+    import.meta.env.VITE_API_URL;
 
   // Normaliza: remove barra final e garante sufixo /api
   const normalize = (url) => {
@@ -26,13 +29,12 @@ function getApiBaseUrl() {
   const normalizedEnv = normalize(envUrl);
   if (normalizedEnv) return normalizedEnv;
 
-  // Se estiver rodando localmente, usa localhost. Em produção, NUNCA.
+  // Localhost APENAS quando o próprio site estiver em localhost/127.0.0.1
   const host = window.location.hostname;
   const isLocal = host === "localhost" || host === "127.0.0.1";
-
   if (isLocal) return "http://localhost:3000/api";
 
-  // Fallback de produção (blindagem)
+  // Produção: jamais retornar localhost
   return "https://educa-backend-docker-659zo.ondigitalocean.app/api";
 }
 

@@ -749,6 +749,7 @@ const UPLOADS_CDN = (() => {
               </div>
             </div>
 
+
             {/* Footer */}
             <div className="px-6 py-4 border-t bg-white flex items-center justify-between">
 

@@ -159,10 +159,14 @@ const API_BASE = (() => {
 
 
 // CDN público do DigitalOcean Spaces (uploads)
-const UPLOADS_CDN =
-  import.meta?.env?.VITE_UPLOADS_BASE_URL ||
-  "https://educa-melhor-uploads.nyc3.cdn.digitaloceanspaces.com";
+const UPLOADS_CDN = (() => {
+  const raw =
+    import.meta?.env?.VITE_UPLOADS_BASE_URL ||
+    "https://educa-melhor-uploads.nyc3.cdn.digitaloceanspaces.com";
 
+  // Normaliza para NÃO terminar com /uploads
+  return String(raw).trim().replace(/\/+$/, "").replace(/\/uploads$/, "");
+})();
 
   const toPublicUrl = (path) => {
     if (!path) return "";
@@ -175,10 +179,13 @@ const UPLOADS_CDN =
     // - em produção: servir do CDN do Spaces
     if (path.startsWith("/uploads/")) {
       const isLocal =
-        API_URL.includes("localhost") ||
-        API_URL.includes("127.0.0.1");
+        API_BASE.includes("localhost") ||
+        API_BASE.includes("127.0.0.1");
 
-      if (isLocal) return `${API_URL}${path}`;
+      // em localhost, sirva do backend (sem /api no meio)
+      if (isLocal) return `${API_BASE.replace(/\/api$/, "")}${path}`;
+
+      // em produção, sirva do CDN do Spaces
       return `${UPLOADS_CDN}${path}`;
     }
 

@@ -150,8 +150,17 @@ const UPLOADS_CDN =
     // já é URL absoluta
     if (path.startsWith("http://") || path.startsWith("https://")) return path;
 
-    // ✅ qualquer /uploads/... deve vir do CDN do Spaces (e não do API_URL)
-    if (path.startsWith("/uploads/")) return `${UPLOADS_CDN}${path}`;
+    // ✅ /uploads/...:
+    // - em localhost: servir do próprio backend (http://localhost:3000/uploads/...)
+    // - em produção: servir do CDN do Spaces
+    if (path.startsWith("/uploads/")) {
+      const isLocal =
+        API_URL.includes("localhost") ||
+        API_URL.includes("127.0.0.1");
+
+      if (isLocal) return `${API_URL}${path}`;
+      return `${UPLOADS_CDN}${path}`;
+    }
 
     // demais rotas relativas continuam apontando para o backend
     if (path.startsWith("/")) return `${API_URL}${path}`;

@@ -19,7 +19,9 @@ export default function HeaderGlobal() {
   const [cpf, setCpf] = useState("");
   const [fotoUrl, setFotoUrl] = useState("");
   const [fotoVersion, setFotoVersion] = useState(Date.now()); // cache-bust no <img>
-  const [fotoErro, setFotoErro] = useState(false); // evita "apagar" fotoUrl em falhas momentâneas
+  const [fotoErro, setFotoErro] = useState(false); // quando true, usa fallback (iniciais)
+  const [fotoRetries, setFotoRetries] = useState(0); // evita loop infinito de retry
+
 
   const navigate = useNavigate();
 
@@ -122,6 +124,7 @@ export default function HeaderGlobal() {
   useEffect(() => {
     if (!fotoUrl) return;
     setFotoErro(false);
+    setFotoRetries(0);
     setFotoVersion(Date.now());
   }, [fotoUrl]);
 
@@ -437,13 +440,23 @@ const UPLOADS_CDN = (() => {
                 src={`${toPublicUrl(fotoUrl)}?v=${fotoVersion}`}
                 alt="Foto do usuário"
                 className="h-full w-full object-cover"
-                onError={() => {
-                  // Se o CDN ainda não propagou/cache, tenta mais uma vez automaticamente
-                  setFotoErro(true);
-                  setTimeout(() => {
-                    setFotoErro(false);
-                    setFotoVersion(Date.now());
-                  }, 1200);
+                onLoad={() => {
+                  // carregou: estabiliza
+                  setFotoErro(false);
+                  setFotoRetries(0);
+                }}
+                  onError={() => {
+                  // Se falhar, tenta no máximo 2 vezes com cache-bust.
+                  // Se continuar falhando, cai no fallback e PARA (sem loop infinito).
+                  setFotoRetries((r) => {
+                    const next = r + 1;
+                    if (next <= 2) {
+                      setFotoVersion(Date.now());
+                      return next;
+                    }
+                    setFotoErro(true);
+                    return next;
+                  });
                 }}
               />
             ) : (

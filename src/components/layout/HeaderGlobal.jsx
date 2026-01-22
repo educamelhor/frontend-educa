@@ -76,7 +76,7 @@ export default function HeaderGlobal() {
         const savedFoto = localStorage.getItem("foto_url") || "";
         if (savedFoto) return; // já tem foto em storage
 
-        const resp = await fetch(`${API_URL}/api/professores/me/foto`, {
+        const resp = await fetch(`${API_BASE}/professores/me/foto`, {
           method: "GET",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -133,10 +133,30 @@ export default function HeaderGlobal() {
   };
 
 
-// Backend (API)
-const API_URL =
-  import.meta?.env?.VITE_API_BASE_URL ||
-  "http://localhost:3000";
+// Backend (API) — sempre normalizado para terminar com /api
+const API_BASE = (() => {
+  const envUrl =
+    import.meta?.env?.VITE_API_BASE_URL ||
+    import.meta?.env?.VITE_API_URL;
+
+  const normalize = (url) => {
+    let u = String(url || "").trim().replace(/\/+$/, "");
+    if (!u) return "";
+    if (!u.endsWith("/api")) u = `${u}/api`;
+    return u;
+  };
+
+  const normalizedEnv = normalize(envUrl);
+  if (normalizedEnv) return normalizedEnv;
+
+  // fallback seguro: nunca usar localhost em produção
+  const host = window.location.hostname;
+  const isLocal = host === "localhost" || host === "127.0.0.1";
+  if (isLocal) return "http://localhost:3000/api";
+
+  return "https://educa-backend-docker-659zo.ondigitalocean.app/api";
+})();
+
 
 // CDN público do DigitalOcean Spaces (uploads)
 const UPLOADS_CDN =
@@ -163,9 +183,9 @@ const UPLOADS_CDN =
     }
 
     // demais rotas relativas continuam apontando para o backend
-    if (path.startsWith("/")) return `${API_URL}${path}`;
+    if (path.startsWith("/")) return `${API_BASE}${path}`;
 
-    return `${API_URL}/${path}`;
+    return `${API_BASE}/${path}`;
   };
 
 
@@ -338,7 +358,7 @@ const UPLOADS_CDN =
     const form = new FormData();
     form.append("foto", file);
 
-    const resp = await fetch(`${API_URL}/api/professores/me/foto`, {
+    const resp = await fetch(`${API_BASE}/professores/me/foto`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,

@@ -49,7 +49,9 @@ export default function HeaderGlobal() {
   useEffect(() => {
     const hydrateFromStorage = () => {
       const savedName = localStorage.getItem("userName") || "Usuário";
-      const savedPerfil = localStorage.getItem("perfil") || "aluno";
+      const savedPerfil = (localStorage.getItem("perfil") || "aluno")
+        .toLowerCase()
+        .trim();
       const savedNomeEscola = localStorage.getItem("nome_escola") || "Escola não definida";
       const savedCpf = localStorage.getItem("cpf") || "";
       const savedFoto = localStorage.getItem("foto_url") || "";
@@ -68,7 +70,9 @@ export default function HeaderGlobal() {
       try {
         const token = localStorage.getItem("token");
         const escolaId = localStorage.getItem("escola_id");
-        const savedPerfil = localStorage.getItem("perfil") || "";
+        const savedPerfil = (localStorage.getItem("perfil") || "")
+          .toLowerCase()
+          .trim();
 
         // Só faz sentido para professor logado
         if (!token || !escolaId || savedPerfil !== "professor") return;
@@ -107,11 +111,19 @@ export default function HeaderGlobal() {
       rehydrateFotoFromBackend();
     };
 
-  window.addEventListener("storage", onStorage);
-  return () => window.removeEventListener("storage", onStorage);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, []);
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
+
+
+  // Sempre que a foto mudar, tente renderizar novamente (evita ficar preso nas iniciais)
+  useEffect(() => {
+    if (!fotoUrl) return;
+    setFotoErro(false);
+    setFotoVersion(Date.now());
+  }, [fotoUrl]);
 
 
   /**
@@ -425,7 +437,14 @@ const UPLOADS_CDN = (() => {
                 src={`${toPublicUrl(fotoUrl)}?v=${fotoVersion}`}
                 alt="Foto do usuário"
                 className="h-full w-full object-cover"
-                onError={() => setFotoErro(true)}
+                onError={() => {
+                  // Se o CDN ainda não propagou/cache, tenta mais uma vez automaticamente
+                  setFotoErro(true);
+                  setTimeout(() => {
+                    setFotoErro(false);
+                    setFotoVersion(Date.now());
+                  }, 1200);
+                }}
               />
             ) : (
               <div className="h-full w-full bg-blue-600 text-white flex items-center justify-center font-semibold text-base">
@@ -748,7 +767,6 @@ const UPLOADS_CDN = (() => {
                 )}
               </div>
             </div>
-
 
             {/* Footer */}
             <div className="px-6 py-4 border-t bg-white flex items-center justify-between">

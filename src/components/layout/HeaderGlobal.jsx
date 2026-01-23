@@ -430,6 +430,10 @@ const UPLOADS_CDN = (() => {
             setAvatarFile(null);
             setAvatarPreview("");
             setFotoErro(false);
+
+            // ✅ garante que o modal não pegue imagem antiga do cache
+            setFotoVersion(Date.now());
+
             resetEditor();
             setShowAvatarModal(true);
           }}
@@ -564,14 +568,21 @@ const UPLOADS_CDN = (() => {
                     {avatarPreview || fotoUrl ? (
                       <div className="h-full w-full relative overflow-hidden select-none touch-none">
 
+
+
+
+
                         <img
-                          src={avatarPreview || toPublicUrl(fotoUrl)}
+                          src={
+                            avatarPreview
+                              ? avatarPreview
+                              : `${toPublicUrl(fotoUrl)}?v=${fotoVersion}`
+                          }
                           alt="Preview"
                           className={`absolute left-1/2 top-1/2 will-change-transform ${isPanning ? "cursor-grabbing" : "cursor-grab"}`}
                           style={{
                             transform: `translate(calc(-50% + ${cropOffset.x}px), calc(-50% + ${cropOffset.y}px)) scale(${cropScale})`,
                             transformOrigin: "center",
-                            // garante "cover" no círculo (fazemos via minWidth/minHeight)
                             minWidth: "100%",
                             minHeight: "100%",
                           }}
@@ -734,7 +745,10 @@ const UPLOADS_CDN = (() => {
                       setAvatarMsg("");
 
                       try {
-                        const imageSrc = avatarPreview || toPublicUrl(fotoUrl);
+                        const imageSrc = avatarPreview
+                          ? avatarPreview
+                          : `${toPublicUrl(fotoUrl)}?v=${fotoVersion}`;
+
 
                         // Sempre gera o arquivo final (512x512) respeitando pan/zoom
                         const fileFinal = await buildCroppedFile({

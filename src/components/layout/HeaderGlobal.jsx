@@ -200,8 +200,10 @@ const UPLOADS_CDN = (() => {
       // em localhost, sirva do backend (sem /api no meio)
       if (isLocal) return `${API_BASE.replace(/\/api$/, "")}${path}`;
 
-      // em produção, sirva do CDN do Spaces
-      return `${UPLOADS_CDN}${path}`;
+      // 🔒 PRODUÇÃO:
+      // sempre servir uploads pelo BACKEND,
+      // pois o Space é privado e o CDN retorna AccessDenied
+      return `${API_BASE.replace(/\/api$/, "")}${path}`;
     }
 
     // demais rotas relativas continuam apontando para o backend

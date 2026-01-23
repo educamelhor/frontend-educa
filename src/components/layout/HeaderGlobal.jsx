@@ -828,12 +828,7 @@ const UPLOADS_CDN = (() => {
             </div>
 
             {/* Footer */}
-            <div className="px-6 py-4 border-t bg-white flex items-center justify-between">
-
-              <p className="text-xs text-gray-500">
-                Upload conectado: a foto é salva no backend e a URL real é refletida no cabeçalho.
-              </p>
-
+            <div className="px-6 py-4 border-t bg-white flex items-center justify-end">
               <button
                 type="button"
                 className="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 transition font-semibold text-gray-800"

@@ -13,10 +13,19 @@ function isCelularValido(valor) {
   return digits.length === 10 || digits.length === 11;
 }
 
+// ✅ Mesma regra do cadastro (mínimo 6, letra, número e 1 destes: $#@*_)
+function senhaForte(s) {
+  if (!s) return false;
+  const temMinimo = s.length >= 6;
+  const temLetra = /[A-Za-z]/.test(s);
+  const temNumero = /\d/.test(s);
+  const temEspecial = /[$#@*_]/.test(s);
+  return temMinimo && temLetra && temNumero && temEspecial;
+}
 
 export default function Login() {
   // 📌 Controle de etapas do fluxo de login
-  const [etapa, setEtapa] = useState("login"); // "login" | "codigo" | "escola"
+  const [etapa, setEtapa] = useState("login"); // "login" | "codigo" | 'escola' | "reset_codigo" | "reset_nova_senha"
 
   // 📌 Campos do formulário
   const location = useLocation();
@@ -24,6 +33,12 @@ export default function Login() {
   const [usuario, setUsuario] = useState("");
   const [senha, setSenha] = useState("");
   const [codigo, setCodigo] = useState("");
+
+  // ✅ Reset de senha (via OTP)
+  const [resetCodigo, setResetCodigo] = useState("");
+  const [resetSenha, setResetSenha] = useState("");
+  const [resetConfSenha, setResetConfSenha] = useState("");
+  const [resetEmailLocked, setResetEmailLocked] = useState(false);
 
   // 📌 Metadados do usuário e UI
   const [usuarioId, setUsuarioId] = useState(null);
@@ -47,6 +62,12 @@ export default function Login() {
 
   const navigate = useNavigate();
 
+  // ✅ CTA de cadastro (aparece somente quando a mensagem for "Usuário não encontrado.")
+  const irParaCadastro = () => {
+    const email = String(usuario || "").trim();
+    navigate("/cadastro", { state: { email } });
+  };
+
   // ✅ Voltar da etapa "escola" para "codigo" sem resetar sessão (usuarioId/senha/cooldown)
   const voltarParaCodigo = () => {
     setEtapa("codigo");
@@ -64,7 +85,6 @@ export default function Login() {
     setEscolasVinculadas([]);
     setEscolaSelecionada("");
 
-
     // ✅ Limpa estado da etapa de código
     setCodigo("");
     setUsuarioId(null);
@@ -72,6 +92,12 @@ export default function Login() {
 
     // ✅ Segurança: ao voltar, limpa a senha (mantém e-mail por conveniência)
     setSenha("");
+
+    // ✅ Reset de senha
+    setResetCodigo("");
+    setResetSenha("");
+    setResetConfSenha("");
+    setResetEmailLocked(false);
 
     // ✅ Limpa feedback/flags
     setMensagem("");
@@ -81,8 +107,160 @@ export default function Login() {
     setCooldown(0);
   };
 
+  // ✅ Abrir fluxo de reset (só quando o e-mail for válido)
+  const abrirResetSenha = () => {
+    const email = String(usuario || "").trim().toLowerCase();
 
+    if (!isEmailValido(email)) {
+      setTipoMensagem("erro");
+      setMensagem("Para redefinir a senha, informe um e-mail válido.");
+      return;
+    }
 
+    setResetCodigo("");
+    setResetSenha("");
+    setResetConfSenha("");
+    setResetEmailLocked(true); // trava para garantir o e-mail localizado
+
+    setTipoMensagem("info");
+    setMensagem("");
+    setEtapa("reset_codigo");
+    setCooldown(0);
+  };
+
+  // ✅ Enviar código de reset
+  const handleResetEnviarCodigo = async () => {
+    if (loading) return;
+
+    const email = String(usuario || "").trim().toLowerCase();
+    if (!isEmailValido(email)) {
+      setTipoMensagem("erro");
+      setMensagem("E-mail inválido.");
+      return;
+    }
+
+    setLoading(true);
+    setMensagem("");
+
+    try {
+      await api.post("/api/auth/reset-senha/enviar-codigo", { email });
+
+      setTipoMensagem("info");
+      setMensagem("Enviamos um código para seu e-mail. Informe abaixo para continuar.");
+      setCooldown(60);
+    } catch (err) {
+      setTipoMensagem("erro");
+      setMensagem(err.response?.data?.message || "Erro ao enviar o código.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ✅ Confirmar código de reset
+  const handleResetConfirmarCodigo = async (e) => {
+    e.preventDefault();
+    if (loading) return;
+
+    const email = String(usuario || "").trim().toLowerCase();
+
+    if (!isEmailValido(email)) {
+      setTipoMensagem("erro");
+      setMensagem("E-mail inválido.");
+      return;
+    }
+
+    if (String(resetCodigo || "").trim().length !== 6) {
+      setTipoMensagem("erro");
+      setMensagem("Informe o código de 6 dígitos.");
+      return;
+    }
+
+    setLoading(true);
+    setMensagem("");
+
+    try {
+      await api.post("/api/auth/reset-senha/confirmar-codigo", {
+        email,
+        codigo: String(resetCodigo).trim(),
+      });
+
+      setTipoMensagem("sucesso");
+      setMensagem("Código confirmado. Agora crie sua nova senha.");
+      setEtapa("reset_nova_senha");
+    } catch (err) {
+      setTipoMensagem("erro");
+      setMensagem(err.response?.data?.message || "Código inválido ou expirado.");
+
+      // 🔁 Limpa o código quando estiver incorreto
+      setResetCodigo("");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ✅ Alterar senha (reset)
+  const handleResetAlterarSenha = async (e) => {
+    e.preventDefault();
+    if (loading) return;
+
+    const email = String(usuario || "").trim().toLowerCase();
+    const code = String(resetCodigo || "").trim();
+
+    if (!isEmailValido(email)) {
+      setTipoMensagem("erro");
+      setMensagem("E-mail inválido.");
+      return;
+    }
+
+    if (code.length !== 6) {
+      setTipoMensagem("erro");
+      setMensagem("Código inválido.");
+      return;
+    }
+
+    if (!senhaForte(resetSenha)) {
+      setTipoMensagem("erro");
+      setMensagem("Senha fraca. Use no mínimo 6 caracteres com letras, números e 1 destes: $#@*_");
+      return;
+    }
+
+    if (resetSenha !== resetConfSenha) {
+      setTipoMensagem("erro");
+      setMensagem("As senhas não coincidem.");
+      return;
+    }
+
+    setLoading(true);
+    setMensagem("");
+
+    try {
+      await api.post("/api/auth/reset-senha/alterar", {
+        email,
+        codigo: code,
+        senha: resetSenha,
+      });
+
+      setTipoMensagem("sucesso");
+      setMensagem("Senha redefinida com sucesso! Você será redirecionado para o login.");
+
+      // ✅ volta automático para login (mantendo o e-mail)
+      setTimeout(() => {
+        setEtapa("login");
+        setSenha("");
+        setResetCodigo("");
+        setResetSenha("");
+        setResetConfSenha("");
+        setResetEmailLocked(false);
+        setTipoMensagem("info");
+        setMensagem("Agora faça login com sua nova senha.");
+      }, 1200);
+    } catch (err) {
+      setTipoMensagem("erro");
+      setMensagem(err.response?.data?.message || "Erro ao redefinir senha.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // ✅ Se veio do CadastroUsuario, já preenche o e-mail no campo
   useEffect(() => {
@@ -378,16 +556,64 @@ export default function Login() {
             <h2 className="text-xl font-bold text-center text-blue-900">Login</h2>
 
             {mensagem && (
-              <div
-                className={`rounded border p-2 text-center text-sm font-semibold ${
-                  tipoMensagem === "sucesso"
-                    ? "border-green-200 bg-green-50 text-green-700"
-                    : tipoMensagem === "info"
-                    ? "border-blue-200 bg-blue-50 text-blue-700"
-                    : "border-red-200 bg-red-50 text-red-700"
-                }`}
-              >
-                {mensagem}
+              <div className="space-y-3">
+                <div
+                  className={`rounded border p-2 text-center text-sm font-semibold ${
+                    tipoMensagem === "sucesso"
+                      ? "border-green-200 bg-green-50 text-green-700"
+                      : tipoMensagem === "info"
+                      ? "border-blue-200 bg-blue-50 text-blue-700"
+                      : "border-red-200 bg-red-50 text-red-700"
+                  }`}
+                >
+                  {mensagem}
+                </div>
+
+                {/* ✅ CTA: direciona para cadastro somente quando for "Usuário não encontrado." */}
+                {tipoMensagem === "erro" &&
+                  String(mensagem || "").toLowerCase().includes("usuário não encontrado") && (
+                    <div className="rounded-lg border border-gray-200 bg-white px-3 py-2">
+                      <div className="text-center text-sm text-gray-700">
+                        Ainda não tem cadastro?
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={irParaCadastro}
+                        className="mt-2 w-full rounded-lg bg-gray-900 py-2 text-sm font-semibold text-white hover:bg-black"
+                      >
+                        Criar conta
+                      </button>
+
+                      <div className="mt-2 text-center text-xs text-gray-500">
+                        Você será direcionado para o cadastro e seu e-mail será reaproveitado.
+                      </div>
+                    </div>
+                  )}
+
+                {/* ✅ CTA: redefinir senha (somente quando senha estiver incorreta) */}
+                {tipoMensagem === "erro" &&
+                  (String(mensagem || "").toLowerCase().includes("senha") ||
+                    String(mensagem || "").toLowerCase().includes("credenciais")) &&
+                  !String(mensagem || "").toLowerCase().includes("usuário não encontrado") && (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                      <div className="text-center text-sm font-semibold text-amber-900">
+                        Esqueceu sua senha?
+                      </div>
+
+                      <div className="mt-1 text-center text-xs text-amber-800">
+                        Vamos enviar um código para seu e-mail e permitir criar uma nova senha com segurança.
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={abrirResetSenha}
+                        className="mt-2 w-full rounded-lg bg-amber-600 py-2 text-sm font-semibold text-white hover:bg-amber-700"
+                      >
+                        Criar nova senha
+                      </button>
+                    </div>
+                  )}
               </div>
             )}
 
@@ -446,7 +672,168 @@ export default function Login() {
               </div>
             )}
           </form>
+
+
+
+
+
+        ) : etapa === "reset_codigo" ? (
+          // 🔐 Reset senha — etapa 1: enviar/confirmar código
+          <form onSubmit={handleResetConfirmarCodigo} className="flex flex-col space-y-4">
+            <h2 className="text-xl font-bold text-center text-blue-900">Redefinir senha</h2>
+
+            <p className="text-center text-sm text-gray-600">
+              Enviaremos um código de verificação para o e-mail cadastrado.
+            </p>
+
+            {mensagem && (
+              <div
+                className={`rounded border p-2 text-center text-sm font-semibold ${
+                  tipoMensagem === "sucesso"
+                    ? "border-green-200 bg-green-50 text-green-700"
+                    : tipoMensagem === "info"
+                    ? "border-blue-200 bg-blue-50 text-blue-700"
+                    : "border-red-200 bg-red-50 text-red-700"
+                }`}
+              >
+                {mensagem}
+              </div>
+            )}
+
+            <input
+              type="email"
+              placeholder="E-mail"
+              value={usuario}
+              readOnly={resetEmailLocked}
+              onChange={(e) => {
+                setUsuario(e.target.value);
+                setMensagem("");
+              }}
+              className={`px-4 py-2 rounded-lg border border-gray-300 ${
+                resetEmailLocked ? "bg-gray-100 cursor-not-allowed" : ""
+              }`}
+            />
+
+            <button
+              type="button"
+              onClick={handleResetEnviarCodigo}
+              className="rounded-lg border border-blue-200 bg-blue-50 py-2 font-semibold text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={loading || !isEmailValido(usuario)}
+            >
+              {loading ? "Enviando..." : "Enviar código"}
+            </button>
+
+            <input
+              type="text"
+              placeholder="Digite o código"
+              value={resetCodigo}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              onChange={(e) => {
+                const onlyDigits = e.target.value.replace(/\D/g, "").slice(0, 6);
+                setResetCodigo(onlyDigits);
+                setMensagem("");
+              }}
+              className="px-4 py-2 rounded-lg border border-gray-300 text-center font-mono text-lg tracking-widest"
+            />
+
+            <button
+              className="bg-green-600 text-white py-2 rounded-lg disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={loading || resetCodigo.length !== 6}
+            >
+              {loading ? "Confirmando..." : "Confirmar código"}
+            </button>
+
+            <button
+              type="button"
+              onClick={voltarParaLogin}
+              className="rounded-lg border border-gray-300 bg-white py-2 font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={loading}
+            >
+              Voltar
+            </button>
+          </form>
+        ) : etapa === "reset_nova_senha" ? (
+          // 🔐 Reset senha — etapa 2: criar nova senha
+          <form onSubmit={handleResetAlterarSenha} className="flex flex-col space-y-4">
+            <h2 className="text-xl font-bold text-center text-blue-900">Criar nova senha</h2>
+
+            <p className="text-center text-sm text-gray-600">
+              Mínimo 6 caracteres, com letras, números e pelo menos 1 destes: $#@*_
+            </p>
+
+            {mensagem && (
+              <div
+                className={`rounded border p-2 text-center text-sm font-semibold ${
+                  tipoMensagem === "sucesso"
+                    ? "border-green-200 bg-green-50 text-green-700"
+                    : tipoMensagem === "info"
+                    ? "border-blue-200 bg-blue-50 text-blue-700"
+                    : "border-red-200 bg-red-50 text-red-700"
+                }`}
+              >
+                {mensagem}
+              </div>
+            )}
+
+            <input
+              type="password"
+              placeholder="Nova senha"
+              value={resetSenha}
+              autoComplete="new-password"
+              onChange={(e) => {
+                setResetSenha(e.target.value);
+                setMensagem("");
+              }}
+              className="px-4 py-2 rounded-lg border border-gray-300"
+            />
+
+            {resetSenha && !senhaForte(resetSenha) && (
+              <div className="text-xs text-red-600 text-center">
+                Senha fraca. Use no mínimo 6 caracteres com letras, números e 1 destes: $#@*_
+              </div>
+            )}
+
+            <input
+              type="password"
+              placeholder="Confirmar nova senha"
+              value={resetConfSenha}
+              autoComplete="new-password"
+              onChange={(e) => {
+                setResetConfSenha(e.target.value);
+                setMensagem("");
+              }}
+              className="px-4 py-2 rounded-lg border border-gray-300"
+            />
+
+            {resetConfSenha && resetSenha !== resetConfSenha && (
+              <div className="text-xs text-red-600 text-center">As senhas não coincidem.</div>
+            )}
+
+            <button
+              className="bg-green-600 text-white py-2 rounded-lg disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={loading || !senhaForte(resetSenha) || resetSenha !== resetConfSenha}
+            >
+              {loading ? "Salvando..." : "Salvar nova senha"}
+            </button>
+
+            <button
+              type="button"
+              onClick={voltarParaLogin}
+              className="rounded-lg border border-gray-300 bg-white py-2 font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={loading}
+            >
+              Voltar
+            </button>
+          </form>
         ) : etapa === "codigo" ? (
+
+
+
+
+
+
           // 🔢 Formulário de confirmação de código
           <form onSubmit={handleConfirmar} className="flex flex-col space-y-4">
             <h2 className="text-xl font-bold text-center text-blue-900">Confirmação</h2>

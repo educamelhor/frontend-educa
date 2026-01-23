@@ -22,6 +22,9 @@ export default function HeaderGlobal() {
   const [fotoErro, setFotoErro] = useState(false); // quando true, usa fallback (iniciais)
   const [fotoRetries, setFotoRetries] = useState(0); // evita loop infinito de retry
 
+  // ✅ Snapshot do modal (NÃO altera a bolinha até salvar)
+  const [modalFotoUrl, setModalFotoUrl] = useState("");
+  const [modalFotoVersion, setModalFotoVersion] = useState(0);
 
   const navigate = useNavigate();
 
@@ -218,6 +221,23 @@ const UPLOADS_CDN = (() => {
     setCropOffset({ x: 0, y: 0 });
     setIsPanning(false);
   };
+
+  // ✅ Fecha o modal SEM alterar a bolinha, mas limpando todo o estado do modal/editor
+  const closeAvatarModal = () => {
+    // revoga preview (quando gerado via URL.createObjectURL)
+    if (avatarPreview) {
+      try { URL.revokeObjectURL(avatarPreview); } catch {}
+    }
+
+    setAvatarFile(null);
+    setAvatarPreview("");
+    setAvatarMsg("");
+    setDragOver(false);
+
+    resetEditor();
+    setShowAvatarModal(false);
+  };
+
 
   // Impede que a imagem "vaze" do círculo: limita offset com base no cover + scale
   const clampCropOffset = (offset) => {
@@ -429,11 +449,12 @@ const UPLOADS_CDN = (() => {
             setAvatarMsg("");
             setAvatarFile(null);
             setAvatarPreview("");
-            setFotoErro(false);
 
-            // ✅ garante que o modal não pegue imagem antiga do cache
-            setFotoVersion(Date.now());
+            // ✅ modal sempre abre com a foto atual da bolinha (snapshot)
+            setModalFotoUrl(fotoUrl || "");
+            setModalFotoVersion(Date.now());
 
+            // ✅ não mexe na bolinha ao abrir/fechar
             resetEditor();
             setShowAvatarModal(true);
           }}
@@ -531,7 +552,7 @@ const UPLOADS_CDN = (() => {
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={() => setShowAvatarModal(false)}
+            onClick={closeAvatarModal}
           />
 
           <div className="relative z-10 w-[520px] max-w-[92vw] rounded-2xl bg-white shadow-2xl overflow-hidden">
@@ -552,7 +573,7 @@ const UPLOADS_CDN = (() => {
               <button
                 type="button"
                 className="h-9 w-9 rounded-xl hover:bg-gray-100 flex items-center justify-center transition"
-                onClick={() => setShowAvatarModal(false)}
+                onClick={closeAvatarModal}
                 title="Fechar"
               >
                 <XMarkIcon className="h-5 w-5 text-gray-700" />
@@ -565,7 +586,7 @@ const UPLOADS_CDN = (() => {
               <div className="flex flex-col items-center justify-center">
                 <div className="h-32 w-32 rounded-full p-[3px] bg-gradient-to-br from-blue-500 via-indigo-500 to-cyan-400 shadow-lg">
                   <div className="h-full w-full rounded-full bg-white overflow-hidden flex items-center justify-center">
-                    {avatarPreview || fotoUrl ? (
+                    {avatarPreview || modalFotoUrl ? (
                       <div className="h-full w-full relative overflow-hidden select-none touch-none">
 
 
@@ -576,7 +597,7 @@ const UPLOADS_CDN = (() => {
                           src={
                             avatarPreview
                               ? avatarPreview
-                              : `${toPublicUrl(fotoUrl)}?v=${fotoVersion}`
+                              : `${toPublicUrl(modalFotoUrl)}?v=${modalFotoVersion}`
                           }
                           alt="Preview"
                           className={`absolute left-1/2 top-1/2 will-change-transform ${isPanning ? "cursor-grabbing" : "cursor-grab"}`}
@@ -747,7 +768,7 @@ const UPLOADS_CDN = (() => {
                       try {
                         const imageSrc = avatarPreview
                           ? avatarPreview
-                          : `${toPublicUrl(fotoUrl)}?v=${fotoVersion}`;
+                          : `${toPublicUrl(modalFotoUrl)}?v=${modalFotoVersion}`;
 
 
                         // Sempre gera o arquivo final (512x512) respeitando pan/zoom
@@ -766,7 +787,11 @@ const UPLOADS_CDN = (() => {
                         // ✅ Persistência correta + refresh imediato (sem depender de F5)
                         localStorage.setItem("foto_url", fotoUrlReal);
 
-                        // força uma “troca real” de estado para o React remontar o <img>
+                        // ✅ atualiza o snapshot do modal (para refletir a foto salva)
+                        setModalFotoUrl(fotoUrlReal);
+                        setModalFotoVersion(Date.now());
+
+                        // ✅ só aqui atualiza a bolinha (regra: somente ao salvar)
                         setFotoErro(false);
                         setFotoRetries(0);
                         setFotoVersion(Date.now());
@@ -775,14 +800,13 @@ const UPLOADS_CDN = (() => {
                         setFotoUrl("");
                         requestAnimationFrame(() => setFotoUrl(fotoUrlReal));
 
-
                         // limpa estado do modal
                         setAvatarFile(null);
                         setAvatarPreview("");
                         resetEditor();
 
                         setAvatarMsg("Foto atualizada com sucesso.");
-                        setTimeout(() => setShowAvatarModal(false), 500);
+                        setTimeout(() => closeAvatarModal(), 500);
                       } catch (e) {
                         setAvatarMsg(e?.message || "Falha ao enviar a foto.");
                       } finally {
@@ -812,7 +836,7 @@ const UPLOADS_CDN = (() => {
               <button
                 type="button"
                 className="px-4 py-2 rounded-xl bg-gray-100 hover:bg-gray-200 transition font-semibold text-gray-800"
-                onClick={() => setShowAvatarModal(false)}
+                onClick={closeAvatarModal}
               >
                 Fechar
               </button>

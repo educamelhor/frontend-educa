@@ -450,9 +450,10 @@ const UPLOADS_CDN = (() => {
             setAvatarFile(null);
             setAvatarPreview("");
 
-            // ✅ modal sempre abre com a foto atual da bolinha (snapshot)
+            // ✅ modal abre com a MESMA imagem efetiva da bolinha (mesma URL completa)
+            // Evita alternância por reload em servidores/cache diferentes
             setModalFotoUrl(fotoUrl || "");
-            setModalFotoVersion(Date.now());
+            setModalFotoVersion(fotoVersion);
 
             // ✅ não mexe na bolinha ao abrir/fechar
             resetEditor();

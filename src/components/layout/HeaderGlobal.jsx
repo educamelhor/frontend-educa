@@ -439,17 +439,15 @@ const UPLOADS_CDN = (() => {
           <div className="h-full w-full rounded-full bg-white flex items-center justify-center overflow-hidden">
             {fotoUrl && !fotoErro ? (
               <img
+                key={`${fotoUrl}-${fotoVersion}`}   // ✅ força React remontar e recarregar a imagem
                 src={`${toPublicUrl(fotoUrl)}?v=${fotoVersion}`}
                 alt="Foto do usuário"
                 className="h-full w-full object-cover"
                 onLoad={() => {
-                  // carregou: estabiliza
                   setFotoErro(false);
                   setFotoRetries(0);
                 }}
-                  onError={() => {
-                  // Se falhar, tenta no máximo 2 vezes com cache-bust.
-                  // Se continuar falhando, cai no fallback e PARA (sem loop infinito).
+                onError={() => {
                   setFotoRetries((r) => {
                     const next = r + 1;
                     if (next <= 2) {
@@ -751,11 +749,18 @@ const UPLOADS_CDN = (() => {
 
                         const fotoUrlReal = await uploadFotoPerfil(fileFinal);
 
-                        // Persistência correta (URL real) + força refresh do <img> no header
+                        // ✅ Persistência correta + refresh imediato (sem depender de F5)
                         localStorage.setItem("foto_url", fotoUrlReal);
-                        setFotoUrl(fotoUrlReal);
+
+                        // força uma “troca real” de estado para o React remontar o <img>
                         setFotoErro(false);
+                        setFotoRetries(0);
                         setFotoVersion(Date.now());
+
+                        // limpa e repõe no próximo frame (evita ficar preso em cache/ETag/CDN)
+                        setFotoUrl("");
+                        requestAnimationFrame(() => setFotoUrl(fotoUrlReal));
+
 
                         // limpa estado do modal
                         setAvatarFile(null);

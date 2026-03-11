@@ -375,7 +375,6 @@ export default function Sidebar() {
                 <ChevronRightIcon className="h-4 w-4" />
               )}
             </button>
-
             {openGroup === 'pedagogico' && (
               <ul className="ml-4 mb-2">
                 <li>
@@ -387,93 +386,6 @@ export default function Sidebar() {
                       }`}
                   >
                     <CheckCircleIcon className="h-5 w-5 mr-2" /> Conselho de Classe
-                  </Link>
-                </li>
-
-                {canConteudos && (
-                  <li>
-                    <Link
-                      to="/pedagogico/conteudos"
-                      className={getSubmenuLinkClasses('/pedagogico/conteudos')}
-                    >
-                      <BookOpenIcon className="h-5 w-5 mr-2" /> Conteúdos
-                    </Link>
-                  </li>
-                )}
-
-                <li>
-                  <Link
-                    to="/pedagogico/coordenacao/solicitacoes"
-                    className={getSubmenuLinkClasses('/pedagogico/coordenacao/solicitacoes')}
-                  >
-                    <ClipboardDocumentListIcon className="h-5 w-5 mr-2" /> Coordenação — Solicitações
-                  </Link>
-                </li>
-
-                {canAvaliacoes && (
-                  <li>
-                    <Link
-                      to="/pedagogico/avaliacoes"
-                      className={getSubmenuLinkClasses('/pedagogico/avaliacoes')}
-                    >
-                      <PencilSquareIcon className="h-5 w-5 mr-2" /> Avaliações
-                    </Link>
-                  </li>
-                )}
-
-                <li>
-                  <Link
-                    to="/pedagogico/provas"
-                    className={getSubmenuLinkClasses('/pedagogico/provas')}
-                  >
-                    <DocumentTextIcon className="h-5 w-5 mr-2" /> Provas
-                  </Link>
-                </li>
-
-                {/* Submenu Correções */}
-                <li>
-                  <button
-                    className="flex items-center w-full py-2 pl-6 pr-3 rounded hover:bg-blue-700 transition"
-                    onClick={() => setOpenCorrecoes((v) => !v)}
-                    type="button"
-                  >
-                    <BookOpenIcon className="h-5 w-5 mr-2" />
-                    <span className="flex-1 text-left">Correções</span>
-                    {openCorrecoes ? (
-                      <ChevronDownIcon className="h-4 w-4" />
-                    ) : (
-                      <ChevronRightIcon className="h-4 w-4" />
-                    )}
-                  </button>
-
-                  {openCorrecoes && (
-                    <ul className="ml-8 mb-2">
-                      <li>
-                        <Link
-                          to="/pedagogico/correcoes/redacao"
-                          className={getSubmenuLinkClasses('/pedagogico/correcoes/redacao')}
-                        >
-                          <PencilSquareIcon className="h-5 w-5 mr-2" /> Redação
-                        </Link>
-                      </li>
-                      <li>
-                        <Link
-                          to="/pedagogico/correcoes/gabarito"
-                          className={getSubmenuLinkClasses('/pedagogico/correcoes/gabarito')}
-                        >
-                          <DocumentTextIcon className="h-5 w-5 mr-2" /> Gabarito
-                        </Link>
-                      </li>
-                    </ul>
-                  )}
-                </li>
-
-                <li>
-                  <Link
-                    to="/pedagogico/graficos"
-                    className={getSubmenuLinkClasses('/pedagogico/graficos')}
-                  >
-                    <ChartBarIcon className="h-5 w-5 mr-2" /> Gráficos
                   </Link>
                 </li>
               </ul>

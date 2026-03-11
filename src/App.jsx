@@ -11,16 +11,12 @@ import Professores from "./features/secretaria/professores";
 import FichaProfessor from "./features/secretaria/professores/FichaProfessor";
 import BancoQuestoes from "./features/questoes/BancoQuestoes";
 import Secretaria from "./features/secretaria";
-import Redacao from "./features/pedagogico/correcoes/Redacao";
-import Gabarito from "./features/pedagogico/correcoes/Gabarito";
 import "@fontsource/montserrat/400.css";
 import "@fontsource/montserrat/600.css";
 import Login from "./features/login/Login.jsx";
 import AtivarDiretor from "./features/login/AtivarDiretor.jsx";
 import GerarGabaritos from "./features/impressao/GerarGabaritos";
 import ConselhoClasse from "./features/pedagogico/conselho/ConselhoClasse";
-import ConteudosAdmin from "./features/pedagogico/conteudos/ConteudosAdmin.jsx";
-import AtividadesAvaliativas from "./features/pedagogico/avaliacoes/AtividadesAvaliativas";
 import LandingPage from "./features/landing/LandingPage";
 import Ferramentas from "./features/ferramentas";
 
@@ -289,34 +285,8 @@ export default function App() {
 
           {/* Pedagógico */}
           <Route
-            path="/pedagogico/correcoes/redacao"
-            element={<Redacao />}
-          />
-          <Route
-            path="/pedagogico/correcoes/gabarito"
-            element={<Gabarito />}
-          />
-          <Route
             path="/pedagogico/conselho"
             element={<ConselhoClasse />}
-          />
-
-          <Route
-            path="/pedagogico/conteudos"
-            element={
-              <RequirePerm perm="conteudos.visualizar">
-                <ConteudosAdmin />
-              </RequirePerm>
-            }
-          />
-
-          <Route
-            path="/pedagogico/avaliacoes"
-            element={
-              <RequirePerm perm="avaliacoes.visualizar">
-                <AtividadesAvaliativas />
-              </RequirePerm>
-            }
           />
 
 

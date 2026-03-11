@@ -57,7 +57,11 @@ export default function HeaderGlobal() {
       const savedPerfil = (localStorage.getItem("perfil") || "aluno")
         .toLowerCase()
         .trim();
-      const savedNomeEscola = localStorage.getItem("nome_escola") || "Escola não definida";
+      const savedScope = (localStorage.getItem("scope") || "escola").toLowerCase().trim();
+      const savedNomeEscola =
+        savedScope === "plataforma"
+          ? "Plataforma (CEO)"
+          : localStorage.getItem("nome_escola") || "Escola não definida";
       const savedCpf = localStorage.getItem("cpf") || "";
       const savedFoto = localStorage.getItem("foto_url") || "";
 
@@ -142,6 +146,12 @@ export default function HeaderGlobal() {
     localStorage.removeItem("perfil");
     localStorage.removeItem("nome_escola");
     localStorage.removeItem("escola_id");
+    localStorage.removeItem("scope");
+    localStorage.removeItem("perfis");
+    localStorage.removeItem("permissoes");
+    localStorage.removeItem("last_escola_id");
+    localStorage.removeItem("disciplinas_professor_ctx");
+    localStorage.removeItem("disciplinas_professor");
 
     // ✅ novos campos do cabeçalho
     localStorage.removeItem("cpf");

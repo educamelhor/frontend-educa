@@ -235,7 +235,8 @@ export default function CadastroUsuario() {
   const [cpfPreValidado, setCpfPreValidado] = useState(false);
 
   const handleCpfChange = (e) => {
-    const val = maskCPF(e.target.value);
+    // ✅ Estado interno SEM máscara (somente dígitos)
+    const val = String(e.target.value || "").replace(/\D/g, "").slice(0, 11);
     setCpf(val);
     setCpfPreValidado(false);
     setEscolasPendentes([]);
@@ -397,7 +398,8 @@ export default function CadastroUsuario() {
 
       setUsuarioIdPreCadastro(data?.usuario_id ?? null);
       setEscolaId(escolaSrv);
-      setCpf(maskCPF(cpfSrv || (cpf || "").replace(/\D/g, "")));
+      // ✅ Estado interno SEM máscara (somente dígitos)
+      setCpf(cpfSrv || (cpf || "").replace(/\D/g, ""));
 
       // perfil deve vir do pré-cadastro (preferir em minúsculo, como no BD)
       setPerfilSelecionado(String(data?.perfil || "professor").toLowerCase());
@@ -638,7 +640,7 @@ export default function CadastroUsuario() {
           <input
             className="mb-2 w-full rounded border px-3 py-2"
             type="text"
-            value={cpf}
+            value={maskCPF(cpf)}
             onChange={handleCpfChange}
             required
             autoFocus
@@ -857,7 +859,7 @@ export default function CadastroUsuario() {
               <label className="text-sm text-gray-700">CPF (pré-cadastro)</label>
               <input
                 className="w-full cursor-not-allowed rounded border bg-gray-100 px-3 py-2"
-                value={cpf}
+                value={maskCPF(cpf)}
                 readOnly
                 disabled
               />

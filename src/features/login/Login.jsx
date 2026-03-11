@@ -9,8 +9,22 @@ function isEmailValido(email) {
 
 function isCelularValido(valor) {
   const digits = String(valor || "").replace(/\D/g, "");
-  // Aceita 10 ou 11 dígitos (com ou sem DDD)
+  // Aceita 10 ou 11 dÃ­gitos (com ou sem DDD)
   return digits.length === 10 || digits.length === 11;
+}
+
+function isCpfValido(valor) {
+  const digits = String(valor || "").replace(/\D/g, "");
+  return digits.length === 11;
+}
+
+// âœ… Normaliza o identificador de login:
+// - e-mail => trim + lowercase
+// - celular/cpf => somente dÃ­gitos
+function normalizarLogin(valor) {
+  const v = String(valor || "").trim();
+  if (isEmailValido(v)) return v.toLowerCase();
+  return v.replace(/\D/g, "");
 }
 
 // ✅ Mesma regra do cadastro (mínimo 6, letra, número e 1 destes: $#@*_)
@@ -29,6 +43,8 @@ export default function Login() {
 
   // 📌 Campos do formulário
   const location = useLocation();
+
+  const [tipoAcesso, setTipoAcesso] = useState("escola"); // "escola" | "plataforma"
 
   const [usuario, setUsuario] = useState("");
   const [senha, setSenha] = useState("");
@@ -50,6 +66,7 @@ export default function Login() {
   // ✅ Multi-escola (seleção de contexto)
   const [escolasVinculadas, setEscolasVinculadas] = useState([]);
   const [escolaSelecionada, setEscolaSelecionada] = useState("");
+  const [usuarioCtxSelecionado, setUsuarioCtxSelecionado] = useState("");
 
 
   // ✅ Mensagens inline (substitui alert)
@@ -61,6 +78,51 @@ export default function Login() {
 
 
   const navigate = useNavigate();
+
+  // ✅ Higiene de sessão: ao entrar no Sistema Escolar, remove vestígios da Plataforma (CEO)
+  // (não toca no token escolar)
+  const limparSessaoPlataforma = () => {
+    try {
+      localStorage.removeItem("plataforma_token");
+      localStorage.removeItem("plataforma_scope");
+      localStorage.removeItem("plataforma_perfil");
+    } catch {}
+  };
+
+  // ✅ Carrega disciplinas do professor logado e grava no localStorage
+  // - Formato novo (definitivo): disciplinas_professor_ctx = [{ id, nome }]
+  // - Compatibilidade (até PASSO 9.3): disciplinas_professor = ["Matemática", ...]
+  const carregarDisciplinasProfessor = async (token) => {
+    try {
+      if (!token) return;
+
+      const { data } = await api.get("/api/professores/me/disciplinas", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      // Novo formato: [{ id, nome }]
+      const disciplinasCtx = Array.isArray(data?.disciplinas)
+        ? data.disciplinas
+            .map((d) => ({
+              id: Number(d?.id),
+              nome: String(d?.nome || "").trim(),
+            }))
+            .filter((d) => Number.isFinite(d.id) && d.nome)
+        : [];
+
+      // Compatibilidade: apenas nomes (para a tela Conteúdos atual não quebrar)
+      const nomes = disciplinasCtx.map((d) => d.nome);
+
+      localStorage.setItem("disciplinas_professor_ctx", JSON.stringify(disciplinasCtx));
+      localStorage.setItem("disciplinas_professor", JSON.stringify(nomes));
+    } catch (e) {
+      // fallback seguro: não impede login
+      localStorage.setItem("disciplinas_professor_ctx", JSON.stringify([]));
+      localStorage.setItem("disciplinas_professor", JSON.stringify([]));
+    }
+  };
 
   // ✅ CTA de cadastro (aparece somente quando a mensagem for "Usuário não encontrado.")
   const irParaCadastro = () => {
@@ -283,42 +345,111 @@ export default function Login() {
   }, [etapa]);
 
 
-
   /**
-   * 1ª Etapa — Envia e-mail/celular + senha para gerar o código de confirmação
+   * 1ª Etapa — Envia:
+   * - escola + cpf + senha => login escolar direto (diretor)
+   * - escola + email/celular + senha => gera código de confirmação (OTP)
+   * - plataforma + email + senha => inicia OTP da plataforma
    */
   const handleLogin = async (e) => {
     e.preventDefault();
 
-    // ✅ Hard validation (não dispara request desnecessária)
     if (!usuario?.trim() || !senha?.trim()) {
       setTipoMensagem("erro");
-      setMensagem("Informe e-mail (ou celular) e senha para continuar.");
+      setMensagem(
+        tipoAcesso === "plataforma"
+          ? "Informe e-mail e senha para continuar."
+          : "Informe CPF, e-mail ou celular, além da senha, para continuar."
+      );
       return;
     }
 
-    // ✅ Validação premium: evita tentar login com NOME (ou texto aleatório)
-    const valorLogin = usuario.trim();
-    const okLogin = isEmailValido(valorLogin) || isCelularValido(valorLogin);
+    const valorLogin = normalizarLogin(usuario);
+    const isCpf = isCpfValido(valorLogin);
+
+    if (tipoAcesso === "plataforma") {
+      if (!isEmailValido(valorLogin)) {
+        setTipoMensagem("erro");
+        setMensagem("Na Plataforma, informe um e-mail válido para continuar.");
+        return;
+      }
+
+      setLoading(true);
+      setMensagem("");
+
+      try {
+        const { data } = await api.post("/api/auth-plataforma/login", {
+          email: valorLogin,
+          senha,
+        });
+
+        const resolvedUsuarioId =
+          data?.usuarioId ?? data?.userId ?? data?.id ?? data?.usuario_id ?? data?.usuario?.id ?? null;
+
+        if (!resolvedUsuarioId) {
+          setTipoMensagem("erro");
+          setMensagem("Falha ao iniciar confirmação da Plataforma. Atualize a página e tente novamente.");
+          return;
+        }
+
+        setUsuarioId(resolvedUsuarioId);
+        setTipoMensagem("info");
+        setMensagem("Código enviado para o e-mail da Plataforma.");
+        setCooldown(60);
+        setEtapa("codigo");
+        return;
+      } catch (err) {
+        setTipoMensagem("erro");
+        setMensagem(err.response?.data?.message || "Erro no login da Plataforma.");
+        return;
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    const okLogin = isEmailValido(valorLogin) || isCelularValido(valorLogin) || isCpf;
 
     if (!okLogin) {
       setTipoMensagem("erro");
-      setMensagem("Informe um e-mail válido ou um celular válido (com DDD) para continuar.");
+      setMensagem("Informe um CPF, e-mail ou celular válido para continuar.");
       return;
     }
-
 
     setLoading(true);
     setMensagem("");
 
     try {
-      const { data } = await api.post("/api/auth/login", {
-        emailOuCelular: usuario,
-        senha,
-      });
+      const payload = isCpf
+        ? { cpf: valorLogin, senha }
+        : { emailOuCelular: valorLogin, senha };
 
-      // Armazena ID do usuário para usar na confirmação
-      // Blindagem: backend pode devolver esse id com nomes diferentes (usuarioId, userId, id, usuario_id)
+      const { data } = await api.post("/api/auth/login", payload);
+
+      // ✅ Fluxo novo: CPF de diretor retorna token direto (sem etapa OTP)
+      if (isCpf && data?.token) {
+        limparSessaoPlataforma();
+
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("userName", data.nome || "Usuário");
+        localStorage.setItem("escola_id", data.escola_id || "");
+        localStorage.setItem("nome_escola", data.nome_escola || "Escola não definida");
+        localStorage.setItem("perfil", data.perfil || "diretor");
+        localStorage.setItem("scope", data.scope || "escola");
+        localStorage.setItem("perfis", JSON.stringify(Array.isArray(data?.perfis) ? data.perfis : []));
+        localStorage.setItem("permissoes", JSON.stringify(Array.isArray(data?.permissoes) ? data.permissoes : []));
+
+        setTipoMensagem("sucesso");
+        setMensagem("Login realizado com sucesso!");
+        setSuccess(true);
+
+        setTimeout(() => {
+          navigate("/home");
+        }, 1200);
+
+        return;
+      }
+
+      // ✅ Fluxo legado/OTP: backend devolve usuarioId para confirmar código
       const resolvedUsuarioId =
         data?.usuarioId ?? data?.userId ?? data?.id ?? data?.usuario_id ?? data?.usuario?.id ?? null;
 
@@ -329,14 +460,10 @@ export default function Login() {
       }
 
       setUsuarioId(resolvedUsuarioId);
-
-
       setTipoMensagem("info");
       setMensagem("Código enviado. Verifique seu e-mail.");
-
       setCooldown(60);
       setEtapa("codigo");
-
     } catch (err) {
       setTipoMensagem("erro");
       setMensagem(err.response?.data?.message || "Erro no login.");
@@ -345,21 +472,76 @@ export default function Login() {
     }
   };
 
-
-
   /**
    * 2ª Etapa — Confirma o código enviado por e-mail
    * ✅ IMPORTANTE: mesma regra de rota (prefixo /auth já é aplicado ao /api no baseURL)
    * Espera-se que o backend retorne token, nome, escola_id, nome_escola e perfil.
    */
+
   const handleReenviarCodigo = async () => {
     if (loading) return;
     if (cooldown > 0) return;
 
-    // segurança: precisa de credenciais ainda em memória para reenviar
     if (!usuario?.trim() || !senha?.trim()) {
       setTipoMensagem("erro");
-      setMensagem("Para reenviar o código, informe e-mail e senha novamente.");
+      setMensagem(
+        tipoAcesso === "plataforma"
+          ? "Para reenviar o código, informe e-mail e senha novamente."
+          : "Para reenviar o código, informe e-mail ou celular e senha novamente."
+      );
+      setEtapa("login");
+      return;
+    }
+
+    const valorLogin = normalizarLogin(usuario);
+    const isCpf = isCpfValido(valorLogin);
+
+    if (tipoAcesso === "plataforma") {
+      if (!isEmailValido(valorLogin)) {
+        setTipoMensagem("erro");
+        setMensagem("Na Plataforma, o reenviar código é válido apenas para e-mail.");
+        setEtapa("login");
+        return;
+      }
+
+      setLoading(true);
+      setMensagem("");
+
+      try {
+        const { data } = await api.post("/api/auth-plataforma/login", {
+          email: valorLogin,
+          senha,
+        });
+
+        const resolvedUsuarioId =
+          data?.usuarioId ?? data?.userId ?? data?.id ?? data?.usuario_id ?? data?.usuario?.id ?? null;
+
+        if (!resolvedUsuarioId) {
+          setTipoMensagem("erro");
+          setMensagem("Falha ao reenviar: usuarioId não retornou no login da Plataforma.");
+          return;
+        }
+
+        setUsuarioId(resolvedUsuarioId);
+        setCodigo("");
+        setTipoMensagem("info");
+        setMensagem("Novo código enviado para o e-mail da Plataforma.");
+        setCooldown(60);
+        return;
+      } catch (err) {
+        setTipoMensagem("erro");
+        setMensagem(err.response?.data?.message || "Erro ao reenviar o código da Plataforma.");
+        return;
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    const okLogin = isEmailValido(valorLogin) || isCelularValido(valorLogin);
+
+    if (isCpf || !okLogin) {
+      setTipoMensagem("erro");
+      setMensagem("O reenviar código é válido apenas para login por e-mail ou celular.");
       setEtapa("login");
       return;
     }
@@ -369,7 +551,7 @@ export default function Login() {
 
     try {
       const { data } = await api.post("/api/auth/login", {
-        emailOuCelular: usuario,
+        emailOuCelular: valorLogin,
         senha,
       });
 
@@ -383,9 +565,7 @@ export default function Login() {
       }
 
       setUsuarioId(resolvedUsuarioId);
-      setCodigo(""); // limpa tentativa anterior
-
-
+      setCodigo("");
       setTipoMensagem("info");
       setMensagem("Novo código enviado. Verifique seu e-mail.");
       setCooldown(60);
@@ -406,7 +586,6 @@ export default function Login() {
       return;
     }
 
-    // Blindagem: se o usuarioId não estiver presente, não adianta tentar confirmar
     if (!usuarioId) {
       setTipoMensagem("erro");
       setMensagem("Sessão da confirmação perdida. Clique em Voltar e envie o código novamente.");
@@ -417,22 +596,56 @@ export default function Login() {
     setMensagem("");
 
     try {
+      // ✅ Fluxo Plataforma (CEO)
+      if (tipoAcesso === "plataforma") {
+        const { data } = await api.post("/api/auth-plataforma/confirmar", {
+          usuarioId,
+          codigo,
+        });
+
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("userName", data.nome || "Usuário");
+        localStorage.setItem("perfil", data.perfil || "ADMIN_GLOBAL");
+        localStorage.setItem("scope", data.scope || "plataforma");
+        localStorage.setItem("perfis", JSON.stringify(Array.isArray(data?.perfis) ? data.perfis : []));
+        localStorage.setItem("permissoes", JSON.stringify(Array.isArray(data?.permissoes) ? data.permissoes : []));
+
+        // limpa vestígios do contexto escolar
+        localStorage.removeItem("escola_id");
+        localStorage.removeItem("nome_escola");
+        localStorage.removeItem("cpf");
+        localStorage.removeItem("foto_url");
+        localStorage.removeItem("disciplinas_professor_ctx");
+        localStorage.removeItem("disciplinas_professor");
+
+        setTipoMensagem("sucesso");
+        setMensagem("Login da Plataforma realizado com sucesso!");
+        setSuccess(true);
+
+        setTimeout(() => {
+          navigate("/plataforma/escolas");
+        }, 1200);
+
+        return;
+      }
+
+      // ✅ Fluxo Escolar
       const { data } = await api.post("/api/auth/confirmar", {
         usuarioId,
         codigo,
       });
 
-      // ✅ Se for multi-escola, não salva token ainda. Obriga escolher a escola.
       if (data?.multi_escola) {
         const lista = Array.isArray(data?.escolas) ? data.escolas : [];
         setEscolasVinculadas(lista);
 
-        // ✅ Pré-seleciona última escola usada (se ainda existir no vínculo)
         const ultima = localStorage.getItem("last_escola_id");
-        const existe = ultima && lista.some((e) => String(e.id) === String(ultima));
-        setEscolaSelecionada(existe ? String(ultima) : "");
+        const contextoUltimo = ultima
+          ? lista.find((e) => String(e.id) === String(ultima))
+          : null;
 
-        // ✅ Nome para cabeçalho da etapa "escola"
+        setEscolaSelecionada(contextoUltimo ? String(contextoUltimo.id) : "");
+        setUsuarioCtxSelecionado(contextoUltimo ? String(contextoUltimo.usuario_ctx_id || "") : "");
         setNomeUsuarioLogin(String(data?.nome || ""));
 
         setTipoMensagem("info");
@@ -441,28 +654,29 @@ export default function Login() {
         return;
       }
 
+      limparSessaoPlataforma();
 
-      // Salva dados no localStorage para uso global
       localStorage.setItem("token", data.token);
       localStorage.setItem("userName", data.nome || "Usuário");
       localStorage.setItem("escola_id", data.escola_id || 1);
       localStorage.setItem("nome_escola", data.nome_escola || "Escola não definida");
       localStorage.setItem("perfil", data.perfil || "aluno");
+      localStorage.setItem("scope", data.scope || "escola");
+      localStorage.setItem("perfis", JSON.stringify(Array.isArray(data?.perfis) ? data.perfis : []));
+      localStorage.setItem("permissoes", JSON.stringify(Array.isArray(data?.permissoes) ? data.permissoes : []));
 
-      // ✅ Cabeçalho: CPF + Foto (URL) para avatar global
-      // Tolerante a variações do backend: fotoUrl | foto_url | foto
+      await carregarDisciplinasProfessor(data.token);
+
       const cpfLs = data?.cpf || data?.usuario?.cpf || data?.user?.cpf || "";
       const fotoLs = data?.fotoUrl || data?.foto_url || data?.foto || "";
 
-      localStorage.setItem("cpf", String(cpfLs || ""));
+      localStorage.setItem("cpf", String(cpfLs || "").replace(/\D/g, ""));
       localStorage.setItem("foto_url", String(fotoLs || ""));
-
 
       setTipoMensagem("sucesso");
       setMensagem("Login realizado com sucesso!");
       setSuccess(true);
 
-      // Redireciona após breve feedback
       setTimeout(() => {
         navigate("/home");
       }, 1500);
@@ -474,8 +688,6 @@ export default function Login() {
     }
   };
 
-
-
   const handleConfirmarEscola = async (e) => {
     e.preventDefault();
 
@@ -486,7 +698,7 @@ export default function Login() {
       return;
     }
 
-    if (!escolaSelecionada) {
+    if (!escolaSelecionada || !usuarioCtxSelecionado) {
       setTipoMensagem("erro");
       setMensagem("Selecione uma escola para continuar.");
       return;
@@ -499,20 +711,33 @@ export default function Login() {
       const { data } = await api.post("/api/auth/confirmar-escola", {
         usuarioId,
         escola_id: Number(escolaSelecionada),
+        usuario_ctx_id: Number(usuarioCtxSelecionado),
       });
 
       localStorage.setItem("token", data.token);
+
+      // ✅ Entrou no escopo escola: limpa sessão antiga da Plataforma (CEO)
+      limparSessaoPlataforma();
+
       localStorage.setItem("userName", data.nome || "Usuário");
       localStorage.setItem("escola_id", data.escola_id || 1);
       localStorage.setItem("nome_escola", data.nome_escola || "Escola não definida");
       localStorage.setItem("perfil", data.perfil || "aluno");
+      localStorage.setItem("scope", data.scope || "escola");
+
+      // ✅ RBAC (perfis/permissoes)
+      localStorage.setItem("perfis", JSON.stringify(Array.isArray(data?.perfis) ? data.perfis : []));
+      localStorage.setItem("permissoes", JSON.stringify(Array.isArray(data?.permissoes) ? data.permissoes : []));
+
+      // ✅ DISCIPLINAS do professor (para Conteúdos)
+      await carregarDisciplinasProfessor(data.token);
 
       // ✅ Cabeçalho: CPF + Foto (URL) para avatar global
       // Tolerante a variações do backend: fotoUrl | foto_url | foto
       const cpfLs = data?.cpf || data?.usuario?.cpf || data?.user?.cpf || "";
       const fotoLs = data?.fotoUrl || data?.foto_url || data?.foto || "";
 
-      localStorage.setItem("cpf", String(cpfLs || ""));
+      localStorage.setItem("cpf", String(cpfLs || "").replace(/\D/g, ""));
       localStorage.setItem("foto_url", String(fotoLs || ""));
 
       // ✅ Memoriza a última escola usada para pré-seleção futura
@@ -535,8 +760,6 @@ export default function Login() {
     }
   };
 
-
-
   return (
     <div className="h-screen w-screen relative flex items-center justify-center">
       {/* 🌆 Fundo */}
@@ -553,7 +776,45 @@ export default function Login() {
         ) : etapa === "login" ? (
           // 🔐 Formulário de login
           <form onSubmit={handleLogin} className="flex flex-col space-y-4">
-            <h2 className="text-xl font-bold text-center text-blue-900">Login</h2>
+            <div className="flex rounded-xl border border-gray-200 bg-gray-50 p-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setTipoAcesso("escola");
+                  setMensagem("");
+                  setUsuario("");
+                  setSenha("");
+                }}
+                className={`flex-1 rounded-lg py-2 text-sm font-semibold transition ${
+                  tipoAcesso === "escola"
+                    ? "bg-blue-600 text-white shadow"
+                    : "text-gray-700 hover:bg-white"
+                }`}
+              >
+                Sistema Escolar
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setTipoAcesso("plataforma");
+                  setMensagem("");
+                  setUsuario("");
+                  setSenha("");
+                }}
+                className={`flex-1 rounded-lg py-2 text-sm font-semibold transition ${
+                  tipoAcesso === "plataforma"
+                    ? "bg-slate-800 text-white shadow"
+                    : "text-gray-700 hover:bg-white"
+                }`}
+              >
+                Plataforma (CEO)
+              </button>
+            </div>
+
+            <h2 className="text-xl font-bold text-center text-blue-900">
+              {tipoAcesso === "plataforma" ? "Login da Plataforma" : "Login"}
+            </h2>
 
             {mensagem && (
               <div className="space-y-3">
@@ -570,7 +831,8 @@ export default function Login() {
                 </div>
 
                 {/* ✅ CTA: direciona para cadastro somente quando for "Usuário não encontrado." */}
-                {tipoMensagem === "erro" &&
+                {tipoAcesso === "escola" &&
+                  tipoMensagem === "erro" &&
                   String(mensagem || "").toLowerCase().includes("usuário não encontrado") && (
                     <div className="rounded-lg border border-gray-200 bg-white px-3 py-2">
                       <div className="text-center text-sm text-gray-700">
@@ -592,7 +854,8 @@ export default function Login() {
                   )}
 
                 {/* ✅ CTA: redefinir senha (somente quando senha estiver incorreta) */}
-                {tipoMensagem === "erro" &&
+                {tipoAcesso === "escola" &&
+                  tipoMensagem === "erro" &&
                   (String(mensagem || "").toLowerCase().includes("senha") ||
                     String(mensagem || "").toLowerCase().includes("credenciais")) &&
                   !String(mensagem || "").toLowerCase().includes("usuário não encontrado") && (
@@ -619,7 +882,11 @@ export default function Login() {
 
             <input
               type="text"
-              placeholder="E-mail ou celular"
+              placeholder={
+                tipoAcesso === "plataforma"
+                  ? "E-mail da Plataforma"
+                  : "CPF, e-mail ou celular"
+              }
               value={usuario}
               onChange={(e) => {
                 setUsuario(e.target.value);
@@ -643,7 +910,7 @@ export default function Login() {
               className="bg-blue-600 text-white py-2 rounded-lg disabled:cursor-not-allowed disabled:opacity-40"
               disabled={loading || !usuario?.trim() || !senha?.trim()}
             >
-              {loading ? "Enviando..." : "Enviar código"}
+              {loading ? "Entrando..." : "Continuar"}
             </button>
 
             {loading && (
@@ -962,16 +1229,19 @@ export default function Login() {
                     <input
                       type="radio"
                       name="escola"
-                      value={String(esc.id)}
-                      checked={String(escolaSelecionada) === String(esc.id)}
-                      onChange={(e) => {
-                        setEscolaSelecionada(e.target.value);
+                      value={String(esc.usuario_ctx_id || esc.id)}
+                      checked={String(usuarioCtxSelecionado) === String(esc.usuario_ctx_id || "")}
+                      onChange={() => {
+                        setEscolaSelecionada(String(esc.id));
+                        setUsuarioCtxSelecionado(String(esc.usuario_ctx_id || ""));
                         setMensagem("");
                       }}
                       disabled={loading}
                     />
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-800">{esc.nome}</span>
+                      <span className="text-sm text-gray-800">
+                        {esc.nome} <span className="text-xs text-gray-500">({esc.perfil})</span>
+                      </span>
 
                       {String(localStorage.getItem("last_escola_id") || "") === String(esc.id) && (
                         <span className="rounded bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
@@ -987,7 +1257,7 @@ export default function Login() {
 
             <button
               className="bg-green-600 text-white py-2 rounded-lg disabled:cursor-not-allowed disabled:opacity-40"
-              disabled={loading || !escolaSelecionada}
+              disabled={loading || !escolaSelecionada || !usuarioCtxSelecionado}
             >
               {loading ? "Entrando..." : "Entrar"}
             </button>

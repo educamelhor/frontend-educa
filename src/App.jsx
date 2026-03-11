@@ -22,7 +22,6 @@ import GerarGabaritos from "./features/impressao/GerarGabaritos";
 import ConselhoClasse from "./features/pedagogico/conselho/ConselhoClasse";
 import ConteudosAdmin from "./features/pedagogico/conteudos/ConteudosAdmin.jsx";
 import AtividadesAvaliativas from "./features/pedagogico/avaliacoes/AtividadesAvaliativas";
-import SolicitacoesConteudos from "./features/pedagogico/coordenacao/SolicitacoesConteudos.jsx";
 import LandingPage from "./features/landing/LandingPage";
 import Ferramentas from "./features/ferramentas";
 
@@ -339,12 +338,6 @@ export default function App() {
                 <ConteudosAdmin />
               </RequirePerm>
             }
-          />
-
-
-          <Route
-            path="/pedagogico/coordenacao/solicitacoes"
-            element={<SolicitacoesConteudos />}
           />
 
           <Route

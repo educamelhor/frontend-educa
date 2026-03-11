@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 
 /**
  * ModalAdicionarItemAvaliativo.jsx
@@ -19,6 +19,9 @@ export default function ModalAdicionarItemAvaliativo({
   open,
   onClose,
   onSalvar,
+
+  modo = "adicionar", // "adicionar" | "editar"
+
 
   atividade,
   setAtividade,
@@ -41,9 +44,32 @@ export default function ModalAdicionarItemAvaliativo({
   descricao,
   setDescricao,
 }) {
+
+
+
+
+
+
   if (!open) return null;
 
+  const [alerta, setAlerta] = useState(null); // { type, text }
+
+  useEffect(() => {
+    // sempre que abrir o modal, limpamos alerta
+    if (open) setAlerta(null);
+  }, [open]);
+
   return (
+
+
+
+
+
+
+
+
+
+
     <div className="fixed inset-0 z-[100] flex items-center justify-center">
       {/* Fundo escurecido */}
       <div
@@ -57,14 +83,29 @@ export default function ModalAdicionarItemAvaliativo({
         className="relative bg-white rounded-2xl shadow-2xl w-[95vw] max-w-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
+
+
+
+
+
         <div className="px-6 py-5 border-b">
           <h4 className="text-xl font-bold text-blue-900">
-            Adicionar atividade avaliativa
+            {modo === "editar" ? "Editar atividade avaliativa" : "Adicionar atividade avaliativa"}
           </h4>
           <p className="text-sm text-gray-500">
-            Preencha os dados e clique em Salvar para incluir uma nova linha.
+            {modo === "editar"
+              ? "Ajuste os dados e clique em Atualizar para salvar as alterações."
+              : "Preencha os dados e clique em Salvar para incluir uma nova linha."}
           </p>
         </div>
+
+
+
+
+
+
+
+
 
         <div className="p-6 space-y-5">
           {/* a) Atividade avaliativa */}
@@ -169,6 +210,30 @@ export default function ModalAdicionarItemAvaliativo({
           </div>
         </div>
 
+
+
+
+
+
+
+
+        {/* Alerta do modal (ex.: pontuação excedida) */}
+        {alerta && (
+          <div
+            className={`mx-6 mb-4 rounded-lg px-4 py-3 text-sm font-semibold ${
+              alerta.type === "success"
+                ? "bg-green-100 text-green-800"
+                : alerta.type === "warn"
+                  ? "bg-yellow-100 text-yellow-800"
+                  : alerta.type === "info"
+                    ? "bg-blue-100 text-blue-800"
+                    : "bg-red-100 text-red-800"
+            }`}
+          >
+            {alerta.text}
+          </div>
+        )}
+
         <div className="px-6 py-5 border-t flex items-center justify-end gap-3">
           <button
             type="button"
@@ -178,13 +243,46 @@ export default function ModalAdicionarItemAvaliativo({
             Cancelar
           </button>
 
+
+
+
+
+
+
           <button
             type="button"
-            onClick={onSalvar}
+            onClick={() => {
+              const resp = onSalvar?.();
+
+              // se não retornar nada, mantém comportamento antigo
+              if (!resp) return;
+
+              if (resp.ok) {
+                // fecha o modal e limpa alerta
+                setAlerta(null);
+                onClose?.();
+              } else {
+                // mantém aberto e mostra alerta dentro do modal
+                setAlerta({
+                  type: resp.type || "error",
+                  text: resp.text || "Ação não permitida.",
+                });
+              }
+            }}
             className="px-5 py-2.5 rounded-lg bg-green-600 hover:bg-green-700 text-white font-bold shadow transition"
           >
-            Salvar
+            {modo === "editar" ? "Atualizar" : "Salvar"}
           </button>
+
+
+
+
+
+
+
+
+
+
         </div>
       </div>
     </div>

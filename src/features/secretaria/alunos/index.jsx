@@ -22,6 +22,13 @@ import styles from "./styles.module.css";
 import api from "../../../services/api";
 import ModalBoletim from "../../boletim/ModalBoletim";
 
+// Helper: ano letivo com data de corte 31/jan (espelha a lógica do backend)
+function anoLetivoPadrao() {
+  const hoje = new Date();
+  const mes = hoje.getMonth() + 1;
+  return mes <= 1 ? hoje.getFullYear() - 1 : hoje.getFullYear();
+}
+
 export default function Alunos() {
   // ────────────────────────────────────────────────────────────────
   // Preferências de filtro
@@ -59,6 +66,12 @@ export default function Alunos() {
   const [isImportOpen, setImportOpen] = useState(false);
   const [resultadoImportacao, setResultadoImportacao] = useState(null);
 
+  // ────────────────────────────────────────────────────────────────
+  // Filtro de Ano Letivo
+  // ────────────────────────────────────────────────────────────────
+  const [anosLetivos, setAnosLetivos] = useState([]);
+  const [anoLetivo, setAnoLetivo] = useState(anoLetivoPadrao());
+
   const [modalBoletimOpen, setModalBoletimOpen] = useState(false);
   const [codigoAlunoBoletim, setCodigoAlunoBoletim] = useState(null);
 
@@ -84,7 +97,7 @@ export default function Alunos() {
   }, [filtro]);
 
   // ────────────────────────────────────────────────────────────────
-  // Carregar turmas (para o formulário)
+  // Carregar turmas e anos letivos disponíveis
   // ────────────────────────────────────────────────────────────────
   useEffect(() => {
     async function carregarTurmas() {
@@ -95,7 +108,16 @@ export default function Alunos() {
         setTurmas([]);
       }
     }
+    async function carregarAnos() {
+      try {
+        const res = await api.get("/api/matriculas/anos");
+        setAnosLetivos(Array.isArray(res.data) ? res.data : []);
+      } catch {
+        setAnosLetivos([anoLetivoPadrao()]);
+      }
+    }
     carregarTurmas();
+    carregarAnos();
   }, []);
 
   // ────────────────────────────────────────────────────────────────
@@ -125,7 +147,8 @@ export default function Alunos() {
       // - limpamos o filtro textual para trazer todos os inativos (paginação normal).
       const params = {
         filtro: somenteInativos ? "" : debouncedFiltro,
-        status: somenteInativos ? "inativo" : "",      // 👈 chave do ajuste
+        status: somenteInativos ? "inativo" : "",
+        ano_letivo: anoLetivo || undefined,
         limit,
         offset: (page - 1) * limit,
         escola_id: escolaId,
@@ -161,11 +184,11 @@ export default function Alunos() {
     }
   }
 
-  // Dispara busca
+  // Dispara busca quando muda: página, filtro textual ou ano letivo
   useEffect(() => {
     fetchAlunos();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, debouncedFiltro]);
+  }, [page, debouncedFiltro, anoLetivo]);
 
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
@@ -224,25 +247,29 @@ export default function Alunos() {
       <div className="flex justify-between items-start mb-3">
         {/* Botões à esquerda */}
         <div className="flex flex-col gap-2">
-          <button
-            type="button"
-            onClick={() => { setAlunoEditando(null); setFormOpen(true); }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition shadow-sm"
-            title="Adicionar Estudante"
-          >
-            <PlusCircleIcon className="w-5 h-5" />
-            Adicionar Estudante
-          </button>
+          {anoLetivo === anoLetivoPadrao() && (
+            <>
+              <button
+                type="button"
+                onClick={() => { setAlunoEditando(null); setFormOpen(true); }}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition shadow-sm"
+                title="Adicionar Estudante"
+              >
+                <PlusCircleIcon className="w-5 h-5" />
+                Adicionar Estudante
+              </button>
 
-          <button
-            type="button"
-            onClick={() => setImportOpen(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 transition shadow-sm"
-            title="Incluir Estudantes"
-          >
-            <FolderOpenIcon className="w-5 h-5" />
-            Incluir Estudantes
-          </button>
+              <button
+                type="button"
+                onClick={() => setImportOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 transition shadow-sm"
+                title="Incluir Estudantes"
+              >
+                <FolderOpenIcon className="w-5 h-5" />
+                Incluir Estudantes
+              </button>
+            </>
+          )}
 
           {/* Card pós-importação */}
           {resultadoImportacao && (
@@ -279,6 +306,24 @@ export default function Alunos() {
               )}
             </div>
           )}
+        </div>
+
+        {/* Filtro de Ano Letivo */}
+        <div className="flex flex-wrap items-center gap-3 mb-4 p-3 bg-white rounded-lg shadow-sm border border-blue-200">
+          {/* Seletor de Ano Letivo */}
+          <div className="flex items-center gap-1">
+            <label htmlFor="filtro-ano" className="text-sm text-gray-600">Ano Letivo:</label>
+            <select
+              id="filtro-ano"
+              value={anoLetivo}
+              onChange={(e) => { setAnoLetivo(Number(e.target.value)); setPage(1); }}
+              className="border rounded px-2 py-1 text-sm text-gray-800"
+            >
+              {anosLetivos.map((a) => (
+                <option key={a} value={a}>{a}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {/* Busca à direita */}
@@ -355,6 +400,7 @@ export default function Alunos() {
         onSubmit={handleSalvar}
         initialData={alunoEditando || {}}
         turmas={turmas}
+        anoLetivo={anoLetivo}
       />
 
       {/* Modal Gerenciar (inativar/cancelar) */}

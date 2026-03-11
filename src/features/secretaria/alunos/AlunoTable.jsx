@@ -55,12 +55,12 @@ export default function AlunoTable({
     setOpenFicha(true);
   };
 
-// ────────────────────────────────────────────────────────────────
+  // ────────────────────────────────────────────────────────────────
   // Renderização condicional: estado de carregamento
   // ────────────────────────────────────────────────────────────────
   if (loading) return <p>Carregando alunos…</p>;
 
-// ────────────────────────────────────────────────────────────────
+  // ────────────────────────────────────────────────────────────────
   // Renderização principal da tabela de alunos
   // ────────────────────────────────────────────────────────────────
   return (
@@ -73,6 +73,7 @@ export default function AlunoTable({
             <th className="p-2 border text-center">Data Nasc.</th>
             <th className="p-2 border text-center">Sexo</th>
             <th className="p-2 border text-center">Turma</th>
+            <th className="p-2 border text-center">Ano</th>
             <th className="p-2 border text-center">Turno</th>
             <th className="p-2 border text-center">Ações</th>
           </tr>
@@ -88,10 +89,18 @@ export default function AlunoTable({
               }
             >
               <td className="p-2 border text-center">{aluno.codigo}</td>
-              <td className="p-2 border text-left">{(aluno.estudante || "").toUpperCase()}</td>
+              <td className="p-2 border text-left">
+                {(aluno.estudante || "").toUpperCase()}
+                {aluno.status === "inativo" && (
+                  <span className="ml-2 font-bold text-xs uppercase tracking-wider text-gray-400">
+                    (inativo)
+                  </span>
+                )}
+              </td>
               <td className="p-2 border text-center">{formatarDataBR(aluno.data_nascimento)}</td>
               <td className="p-2 border text-center">{(aluno.sexo || "").toUpperCase()}</td>
               <td className="p-2 border text-center">{(aluno.turma || "").toUpperCase()}</td>
+              <td className="p-2 border text-center">{aluno.ano_letivo || "—"}</td>
               <td className="p-2 border text-center">{(aluno.turno || "").toUpperCase()}</td>
               <td className="p-2 border text-center">
                 <div className="flex justify-center gap-2">

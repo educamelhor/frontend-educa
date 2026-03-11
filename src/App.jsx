@@ -11,7 +11,6 @@ import Professores from "./features/secretaria/professores";
 import FichaProfessor from "./features/secretaria/professores/FichaProfessor";
 import BancoQuestoes from "./features/questoes/BancoQuestoes";
 import Secretaria from "./features/secretaria";
-import Modulacao from "./features/secretaria/modulacao/Modulacao";
 import Redacao from "./features/pedagogico/correcoes/Redacao";
 import Gabarito from "./features/pedagogico/correcoes/Gabarito";
 import "@fontsource/montserrat/400.css";
@@ -35,17 +34,8 @@ import BoletimTurmas from "./features/impressao/BoletimTurmas";
 import PrintBoletinsTurma from "./features/impressao/PrintBoletinsTurma";
 import LoginProfessor from "./features/login/LoginProfessor";
 import CadastroUsuario from "./features/login/CadastroUsuario.jsx";
-import TabelaCodigos from "./features/secretaria/tabela-codigos";
-import HorariosPage from "./features/secretaria/horarios/index.jsx";
 import LayoutGrade from "./features/secretaria/horarios/LayoutGrade.jsx";
 import ExecutarMock from "./features/secretaria/horarios/ExecutarMock.jsx";
-
-// ✅ NOVO IMPORT — Configurações Pedagógicas
-import ConfiguracoesPedagogicas from "./features/secretaria/horarios/ConfiguracoesPedagogicas.jsx";
-
-// ✅ NOVO IMPORT — EscopoStep (página inicial do módulo Horários)
-import EscopoStep from "./features/secretaria/horarios/EscopoStep.jsx";
-
 import MonitoramentoAlertasTeste from "./features/monitoramento/MonitoramentoAlertasTeste.jsx";
 
 // >>> NOVO IMPORT: Monitoramento
@@ -64,9 +54,6 @@ import MonitoramentoPainel from "./features/monitoramento/MonitoramentoPainel.js
 
 // ⭐️ NOVO IMPORT: Embeddings — Gerar
 import EmbeddingsGerar from "./features/monitoramento/EmbeddingsGerar.jsx";
-
-// ⭐️ NOVO IMPORT: Boletim → Secretaria (Edição)
-import BoletimEdicao from "./features/secretaria/boletim/BoletimEdicao.jsx";
 
 // Layout protegido para rotas autenticadas
 function ProtectedLayout() {
@@ -234,6 +221,7 @@ export default function App() {
           <Route path="/home" element={<Home />} />
 
           <Route path="/alunos" element={<Alunos />} />
+          <Route path="/secretaria/alunos" element={<Alunos />} />
 
           {/* Monitoramento */}
           <Route
@@ -297,25 +285,7 @@ export default function App() {
             element={<FichaProfessor />}
           />
 
-          {/* ⭐️ ROTA DO BOLETIM (SECRETARIA) */}
-          <Route path="/secretaria/boletim" element={<BoletimEdicao />} />
-
           <Route path="/secretaria/*" element={<Secretaria />} />
-          <Route path="/secretaria/modulacao" element={<Modulacao />} />
-
-          {/* ✅ AJUSTE: Horários agora abre direto no EscopoStep */}
-          <Route path="/secretaria/horarios" element={<HorariosPage />} />
-
-          {/* ✅ NOVA ROTA — Configurações Pedagógicas */}
-          <Route
-            path="/secretaria/horarios/configuracoes-pedagogicas"
-            element={<ConfiguracoesPedagogicas />}
-          />
-
-          <Route
-            path="/secretaria/tabela-codigos"
-            element={<TabelaCodigos />}
-          />
 
           {/* Pedagógico */}
           <Route

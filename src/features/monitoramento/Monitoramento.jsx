@@ -6,7 +6,7 @@
 // Suporta 3 câmeras (Centro, Direita, Esquerda) + miniaturas dinâmicas e modo AO VIVO.
 // ============================================================================
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import StreamCamera from "./StreamCamera.jsx";
 import ModalPresencasTurno from "./ModalPresencasTurno.jsx";
@@ -26,7 +26,25 @@ export default function Monitoramento() {
   const [alunosAlerta, setAlunosAlerta] = useState([]);
   const [alunoDestacado, setAlunoDestacado] = useState(null);
   const [loadingAlunosAlerta, setLoadingAlunosAlerta] = useState(false);
+  const [sseAlertasConectado, setSseAlertasConectado] = useState(false);
   const [toast, setToast] = useState(null);
+
+  // --------------------------------------------------------------------------
+  // Flags & refs (performance / produção)
+  // --------------------------------------------------------------------------
+  const DEBUG_MONITORAMENTO =
+    localStorage.getItem("debug_monitoramento") === "1";
+
+  const ultimosInFlightRef = useRef(false);
+  const ultimosLastHashRef = useRef("");
+  const ultimosErrLastAtRef = useRef(0);
+
+  const alertasInFlightRef = useRef(false);
+  const alertasLastHashRef = useRef("");
+  const alertasErrLastAtRef = useRef(0);
+
+  const toastTimeoutRef = useRef(null);
+
   const [modalAberto, setModalAberto] = useState(false);
   const [turnoModal, setTurnoModal] = useState(null);
   const [filtroTurno, setFiltroTurno] = useState("hoje");
@@ -79,49 +97,155 @@ export default function Monitoramento() {
   // Função simulada para atualizar lista de alunos em alerta
   // (mantido o comportamento original validado)
   // --------------------------------------------------------------------------
-  useEffect(() => {
+useEffect(() => {
+    let alive = true;
+    let abortCtrl = null;
+
     async function carregarAlunosAlerta() {
+      if (!alive) return;
+
+      // ✅ evita overlap: se já tem request em andamento, não dispara outro
+      if (alertasInFlightRef.current) return;
+      alertasInFlightRef.current = true;
+
       setLoadingAlunosAlerta(true);
+
       try {
         const token = localStorage.getItem("token");
         const escolaId = localStorage.getItem("escola_id") || "1";
+
+        // ✅ abort do request anterior (e também no unmount)
+        if (abortCtrl) abortCtrl.abort();
+        abortCtrl = new AbortController();
+
         const resp = await fetch(
           `/api/monitoramento/alertas-ativos?escola_id=${escolaId}`,
           {
             headers: { Authorization: `Bearer ${token}` },
+            signal: abortCtrl.signal,
           }
         );
+
         if (resp.ok) {
           const json = await resp.json();
-          setAlunosAlerta(json.alertas || []);
+
+          // Backend pode retornar:
+          // A) array direto: [ { ... }, ... ]
+          // B) objeto: { alertas: [ ... ] }
+          const lista = Array.isArray(json) ? json : (json?.alertas || []);
+
+          // ✅ elimina setState redundante (se conteúdo não mudou)
+          const nextHash = JSON.stringify(lista);
+          if (alertasLastHashRef.current !== nextHash) {
+            alertasLastHashRef.current = nextHash;
+            if (alive) setAlunosAlerta(lista);
+          }
         }
       } catch (err) {
-        console.error("Erro ao carregar alertas:", err);
+        // Abort é esperado em troca/unmount → não logar como erro
+        if (err?.name !== "AbortError") {
+          const now = Date.now();
+          const passouJanela = now - alertasErrLastAtRef.current > 30000;
+
+          if (DEBUG_MONITORAMENTO || passouJanela) {
+            alertasErrLastAtRef.current = now;
+            console.error("Erro ao carregar alertas:", err);
+          }
+        }
       } finally {
-        setLoadingAlunosAlerta(false);
+        alertasInFlightRef.current = false;
+        if (alive) setLoadingAlunosAlerta(false);
       }
     }
+
+    // ✅ Primeira carga imediata (mantém UX)
     carregarAlunosAlerta();
-    const interval = setInterval(carregarAlunosAlerta, 5000);
-    return () => clearInterval(interval);
-  }, []);
+
+    // ✅ SSE é primário. Se estiver conectado, NÃO cria polling (zero metralhamento).
+    if (sseAlertasConectado) {
+      return () => {
+        alive = false;
+        if (abortCtrl) abortCtrl.abort();
+      };
+    }
+
+    // ✅ Fallback: polling apenas quando SSE estiver OFF
+    const intervalMs = 15000;
+
+    const interval = setInterval(() => {
+      if (document.visibilityState === "hidden") return;
+      carregarAlunosAlerta();
+    }, intervalMs);
+
+    return () => {
+      alive = false;
+      if (abortCtrl) abortCtrl.abort();
+      clearInterval(interval);
+    };
+  }, [sseAlertasConectado]);
 
   // --------------------------------------------------------------------------
   // SSE - Eventos de alerta ao vivo (mantido e validado)
   // --------------------------------------------------------------------------
-  useEffect(() => {
+useEffect(() => {
     const token = localStorage.getItem("token");
     const escolaId = localStorage.getItem("escola_id") || "1";
     if (!token) return;
+
+    let alive = true;
 
     const sse = new EventSource(
       `/api/monitoramento/alertas-stream?escola_id=${escolaId}&token=${token}`
     );
 
+    sse.onopen = () => {
+      if (!alive) return;
+      setSseAlertasConectado(true);
+    };
+
     sse.onmessage = (event) => {
+      if (!alive) return;
+
       try {
         const data = JSON.parse(event.data);
+
         if (data && data.tipo === "alerta") {
+          // ✅ SSE primário: atualiza lista local imediatamente (polling vira só fallback)
+          setAlunosAlerta((prev) => {
+            const codigo = String(data.codigo ?? "");
+            if (!codigo) return prev;
+
+            const novo = {
+              id: data.id ?? null,
+              codigo: data.codigo,
+              estudante: data.nome ?? data.estudante ?? "",
+              alerta_flag: 1,
+              alerta_motivo: data.motivo ?? "",
+              turma: data.turma ?? "",
+              turno: data.turno ?? "",
+            };
+
+            const idx = prev.findIndex((a) => String(a.codigo) === codigo);
+            if (idx >= 0) {
+              const atual = prev[idx];
+              const igual =
+                String(atual.estudante ?? "") === String(novo.estudante ?? "") &&
+                String(atual.alerta_motivo ?? "") === String(novo.alerta_motivo ?? "") &&
+                String(atual.turma ?? "") === String(novo.turma ?? "") &&
+                String(atual.turno ?? "") === String(novo.turno ?? "");
+
+              if (igual) return prev;
+
+              const next = prev.slice();
+              next[idx] = { ...atual, ...novo };
+              return next;
+            }
+
+            // adiciona no topo
+            return [novo, ...prev].slice(0, 50);
+          });
+
+          // toast (com cleanup)
           setToast({
             nome: data.nome,
             codigo: data.codigo,
@@ -131,20 +255,36 @@ export default function Monitoramento() {
             motivo: data.motivo,
             when: new Date().toLocaleTimeString("pt-BR"),
           });
+
           setAlunoDestacado(data.codigo);
-          setTimeout(() => setToast(null), 6000);
+
+          if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+          toastTimeoutRef.current = setTimeout(() => {
+            if (alive) setToast(null);
+          }, 6000);
         }
       } catch (err) {
-        console.error("Erro SSE:", err);
+        if (DEBUG_MONITORAMENTO) {
+          console.error("Erro SSE:", err);
+        }
       }
     };
 
     sse.onerror = () => {
-      console.warn("SSE desconectado, tentando reconectar...");
-      sse.close();
+      if (!alive) return;
+      setSseAlertasConectado(false);
+
+      // ✅ NÃO fechar: EventSource tem reconexão automática
+      if (DEBUG_MONITORAMENTO) {
+        console.warn("SSE desconectado (reconexão automática em andamento)...");
+      }
     };
 
-    return () => sse.close();
+    return () => {
+      alive = false;
+      if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+      sse.close();
+    };
   }, []);
 
   // --------------------------------------------------------------------------
@@ -154,33 +294,81 @@ useEffect(() => {
   const token = localStorage.getItem("token");
   if (!token) return;
 
+  let alive = true;
+  let abortCtrl = null;
+
   async function carregarUltimos() {
+    if (!alive) return;
+
+    // ✅ evita overlap: se já tem request em andamento, não dispara outro
+    if (ultimosInFlightRef.current) return;
+    ultimosInFlightRef.current = true;
+
     try {
+      // ✅ abort do request anterior (e também no unmount)
+      if (abortCtrl) abortCtrl.abort();
+      abortCtrl = new AbortController();
+
       const res = await fetch(
         "/api/monitoramento/ultimos?limit=5&janelaMin=1440",
-        { headers: { Authorization: `Bearer ${token}` } }
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: abortCtrl.signal,
+        }
       );
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
 
       const cams = data?.cameras || {};
-      console.log("[Monitoramento] cameras recebidas:", cams); // <-- seu log
 
-      setListaAtual({
+      if (DEBUG_MONITORAMENTO) {
+        console.log("[Monitoramento] cameras recebidas:", cams);
+      }
+
+      const next = {
         camera1: Array.isArray(cams["1"]) ? cams["1"] : [],
         camera2: Array.isArray(cams["2"]) ? cams["2"] : [],
         camera3: Array.isArray(cams["3"]) ? cams["3"] : [],
-      });
+      };
+
+      // ✅ elimina setState redundante (se conteúdo não mudou)
+      const nextHash = JSON.stringify(next);
+      if (ultimosLastHashRef.current !== nextHash) {
+        ultimosLastHashRef.current = nextHash;
+        if (alive) setListaAtual(next);
+      }
     } catch (err) {
-      console.error("[Monitoramento] erro ao buscar ultimos:", err);
+      // Abort é esperado em troca/unmount → não logar como erro
+      if (err?.name !== "AbortError") {
+        const now = Date.now();
+        const passouJanela = now - ultimosErrLastAtRef.current > 30000;
+
+        if (DEBUG_MONITORAMENTO || passouJanela) {
+          ultimosErrLastAtRef.current = now;
+          console.error("[Monitoramento] erro ao buscar ultimos:", err);
+        }
+      }
+    } finally {
+      ultimosInFlightRef.current = false;
     }
   }
 
   carregarUltimos();
-  const id = setInterval(carregarUltimos, 2000);
-  return () => clearInterval(id);
-}, []);
 
+  // ✅ Polling otimizado (mantém o seu 15s + pausa quando aba oculta)
+  const intervalMs = 15000;
+
+  const id = setInterval(() => {
+    if (document.visibilityState === "hidden") return;
+    carregarUltimos();
+  }, intervalMs);
+
+  return () => {
+    alive = false;
+    if (abortCtrl) abortCtrl.abort();
+    clearInterval(id);
+  };
+}, []);
 
   // --------------------------------------------------------------------------
   // Layout principal

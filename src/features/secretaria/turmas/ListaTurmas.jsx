@@ -6,11 +6,19 @@ import Modal from "../../../components/ui/Modal";
 import TurmaForm from "./TurmaForm";
 import api from "../../../services/api";
 
+function anoLetivoPadrao() {
+  const hoje = new Date();
+  const mes = hoje.getMonth() + 1;
+  return mes <= 1 ? hoje.getFullYear() - 1 : hoje.getFullYear();
+}
+
 export default function ListaTurmas() {
   // Estados principais
   const [turmas, setTurmas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [anosLetivos, setAnosLetivos] = useState([]);
+  const [anoLetivo, setAnoLetivo] = useState(anoLetivoPadrao());
   const [isFormOpen, setFormOpen] = useState(false);
   const [toDeleteTurma, setToDeleteTurma] = useState(null);
   const [editingTurma, setEditingTurma] = useState(null);
@@ -19,9 +27,24 @@ export default function ListaTurmas() {
   // Carrega lista de turmas ao iniciar
   useEffect(() => {
     async function load() {
-      const { data } = await api.get("/api/turmas");
-      setTurmas(data);
-      setLoading(false);
+      try {
+        const { data } = await api.get("/api/turmas");
+        setTurmas(data);
+
+        // Deriva os anos da própria lista ou API
+        try {
+          const res = await api.get("/api/matriculas/anos");
+          setAnosLetivos(Array.isArray(res.data) ? res.data : [anoLetivoPadrao()]);
+        } catch {
+          const uniqueYears = Array.from(new Set(data.map(t => Number(t.ano)))).filter(Boolean).sort((a, b) => b - a);
+          if (!uniqueYears.includes(anoLetivoPadrao())) uniqueYears.push(anoLetivoPadrao());
+          setAnosLetivos(uniqueYears.sort((a, b) => b - a));
+        }
+      } catch (e) {
+        console.error("Erro ao carregar turmas", e);
+      } finally {
+        setLoading(false);
+      }
     }
     load();
   }, []);
@@ -127,25 +150,51 @@ export default function ListaTurmas() {
         </div>
       )}
 
-      {/* Botão para abrir formulário */}
-      <button
-        onClick={() => {
-          setEditingTurma(null);
-          setFormOpen(true);
-        }}
-        className="mb-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-      >
-        + Adicionar Turma
-      </button>
+      <div className="flex justify-between items-start mb-3">
+        {/* Botões à esquerda */}
+        <div className="flex flex-col gap-2">
+          {anoLetivo === anoLetivoPadrao() && (
+            <button
+              onClick={() => {
+                setEditingTurma(null);
+                setFormOpen(true);
+              }}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-sm"
+              title="Adicionar Turma"
+            >
+              + Adicionar Turma
+            </button>
+          )}
+        </div>
 
-      {/* Campo de busca */}
-      <input
-        type="text"
-        placeholder="🔍 Filtrar por Turma, Etapa, Ano, Turno ou Série"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="float-right mb-4 px-3 py-2 border rounded w-64"
-      />
+        {/* Filtro de Ano Letivo (Centro) */}
+        <div className="flex flex-wrap items-center gap-3 p-3 bg-white rounded-lg shadow-sm border border-blue-200">
+          <div className="flex items-center gap-1">
+            <label htmlFor="filtro-ano" className="text-sm text-gray-600">Ano Letivo:</label>
+            <select
+              id="filtro-ano"
+              value={anoLetivo}
+              onChange={(e) => setAnoLetivo(Number(e.target.value))}
+              className="border rounded px-2 py-1 text-sm text-gray-800"
+            >
+              {anosLetivos.map((a) => (
+                <option key={a} value={a}>{a}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Campo de busca */}
+        <div className="flex flex-col items-end gap-2">
+          <input
+            type="text"
+            placeholder="🔍 Filtrar turmas..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring focus:ring-blue-100"
+          />
+        </div>
+      </div>
 
       {/* Tabela */}
       <div className="clear-right overflow-x-auto">
@@ -162,6 +211,7 @@ export default function ListaTurmas() {
           </thead>
           <tbody>
             {turmas
+              .filter((t) => Number(t.ano) === Number(anoLetivo))
               .filter(
                 (t) =>
                   normalize(t.turma).includes(term) ||

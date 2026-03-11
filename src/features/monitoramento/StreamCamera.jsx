@@ -16,14 +16,26 @@
 import React, { useEffect, useRef, useState } from "react";
 
 export default function StreamCamera({ cameraId, titulo, registros }) {
-  const API_BASE_PROTECTED = "/api/monitoramento";
-  const API_BASE_PUBLIC   = "/api/monitoramento-public";
+  // Em DEV (Vite:5173), as rotas /api/* precisam apontar para o backend (3000),
+  // senão o request vai para 5173 e dá 404.
+  const API_ORIGIN =
+    import.meta.env.VITE_API_ORIGIN ||
+    (window.location.port === "5173" ? "http://localhost:3000" : window.location.origin);
+
+  const API_BASE_PROTECTED = `${API_ORIGIN}/api/monitoramento`;
+  const API_BASE_PUBLIC    = `${API_ORIGIN}/api/monitoramento-public`;
   const imgRef = useRef(null);
   const canvasRef = useRef(null);
 
   const [imgSrc, setImgSrc] = useState("");
   const [facesData, setFacesData] = useState({ width: 0, height: 0, faces: [] });
   const [modoAoVivo, setModoAoVivo] = useState(false);
+
+  const [streamToken, setStreamToken] = useState("");
+
+  // PRÉVIA: controlar o "polling" do snapshot (evita requests cancelled)
+  const snapTimerRef = useRef(null);
+  const [snapTick, setSnapTick] = useState(0);
 
   // ----------------------------------------------------------------------------
   // util: sincronizar <canvas> com o tamanho VISÍVEL atual da <img>
@@ -32,51 +44,110 @@ export default function StreamCamera({ cameraId, titulo, registros }) {
     const imgEl = imgRef.current;
     const canvasEl = canvasRef.current;
     if (!imgEl || !canvasEl) return;
-    const w = imgEl.clientWidth;
-    const h = imgEl.clientHeight;
-    if (!w || !h) return;
-    canvasEl.width = w;
-    canvasEl.height = h;
-    canvasEl.style.width = w + "px";
-    canvasEl.style.height = h + "px";
+
+    // Usa o tamanho REAL renderizado (CSS px) e aplica DPR para evitar desvio de escala/offset
+    const rect = imgEl.getBoundingClientRect();
+    const cssW = Math.round(rect.width);
+    const cssH = Math.round(rect.height);
+    if (!cssW || !cssH) return;
+
+    const dpr = (typeof window !== "undefined" && window.devicePixelRatio) ? window.devicePixelRatio : 1;
+
+    // Canvas cobre o mesmo box do <img> (por CSS). Os pixels internos seguem DPR.
+    canvasEl.style.width = "100%";
+    canvasEl.style.height = "100%";
+    canvasEl.width = Math.round(cssW * dpr);
+    canvasEl.height = Math.round(cssH * dpr);
+
+    const ctx = canvasEl.getContext("2d");
+    if (ctx) {
+      // A partir daqui, desenhamos em "CSS pixels"
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
   }
 
   // ----------------------------------------------------------------------------
+  // 0) Obter stream_token curto (necessário para <img src="...mjpeg">)
+  // ----------------------------------------------------------------------------
+  useEffect(() => {
+    // FASE ATUAL: somente câmera 1 deve pedir stream_token
+    if (cameraId !== 1) return;
+
+    let cancelado = false;
+
+    async function obterStreamToken() {
+      try {
+        const authToken = localStorage.getItem("token") || "";
+        if (!authToken) return;
+
+        const resp = await fetch(`${API_BASE_PROTECTED}/stream/token?ttl=90`, {
+          headers: { Authorization: `Bearer ${authToken}` },
+        });
+
+        if (!resp.ok) return;
+        const json = await resp.json();
+        if (!json?.ok || !json?.stream_token) return;
+
+        if (!cancelado) setStreamToken(json.stream_token);
+      } catch (e) {
+        console.error("[StreamCamera] falha ao obter stream_token:", e);
+      }
+    }
+
+    obterStreamToken();
+    const id = setInterval(obterStreamToken, 60_000); // renova antes de expirar (ttl=90s)
+    return () => {
+      cancelado = true;
+      clearInterval(id);
+    };
+  }, [cameraId]);
+
+  // ----------------------------------------------------------------------------
   // 1) Atualizar URL da imagem conforme modo (snapshot ou stream)
-  //    Para cameraId === 1, usar o frame base já disponível por HTTP.
+  //    Para cameraId === 1, usar o MJPEG/IMG do backend com stream_token + fallback.
   //    Para demais câmeras, manter a rota protegida existente.
   // ----------------------------------------------------------------------------
   useEffect(() => {
-    const token = localStorage.getItem("token") || "";
-    const escolaId = localStorage.getItem("escola_id") || "1";
-
-    function construirUrl() {
-      // Câmera 1: usar frame base estático exposto (mantém UI, evita encoder do overlay)
-      if (cameraId === 1) {
-        return `http://localhost:3000/uploads/CEF04_PLAN/monitoramento/camera-01/frame.jpg?_=${Date.now()}`;
-      }
-
-      // Demais câmeras: manter comportamento aprovado (snapshot/stream protegidos)
-      if (modoAoVivo) {
-        return `${API_BASE_PROTECTED}/stream/${cameraId}.mjpeg?token=${encodeURIComponent(
-          token
-        )}&escola_id=${encodeURIComponent(
-          escolaId
-        )}&transport=tcp&fps=8&quality=7&_=${Date.now()}`;
-      } else {
-        return `${API_BASE_PROTECTED}/stream/${cameraId}.jpg?token=${encodeURIComponent(
-          token
-        )}&escola_id=${encodeURIComponent(escolaId)}&quality=4&_=${Date.now()}`;
-      }
+    // FASE ATUAL DO PROJETO: apenas câmera 1.
+    // Objetivo: zero requests de stream/snapshot para cams 2 e 3.
+    if (cameraId !== 1) {
+      setImgSrc("");
+      return;
     }
 
-    setImgSrc(construirUrl());
-    if (!modoAoVivo || cameraId === 1) {
-      // Câmera 1 também deve atualizar o frame periodicamente (mesmo sem modoAoVivo)
-      const id = setInterval(() => setImgSrc(construirUrl()), 1000);
-      return () => clearInterval(id);
+    if (!streamToken) return;
+
+    // sempre reseta o decoder do <img> antes de trocar de modo (JPG <-> MJPEG)
+    setImgSrc("");
+
+    // AO VIVO (MJPEG): NÃO pode recriar o src continuamente
+    if (modoAoVivo) {
+      const url = `${API_BASE_PROTECTED}/1.mjpeg?token=${encodeURIComponent(
+        streamToken
+      )}&fallback=1&fps=5`;
+
+      // next tick para garantir que o reset do src foi aplicado
+      const t = setTimeout(() => setImgSrc(url), 0);
+      return () => clearTimeout(t);
     }
-  }, [cameraId, modoAoVivo]);
+
+    // Snapshot (JPG): cache-bust para "quase-vídeo"
+    // ATENÇÃO: o próximo tick será disparado SOMENTE após o onLoad (evita "cancelled")
+    const buildJpgUrl = (tick) =>
+      `${API_BASE_PROTECTED}/1.jpg?token=${encodeURIComponent(
+        streamToken
+      )}&fallback=1&_=${tick}`;
+
+    setImgSrc(buildJpgUrl(snapTick));
+
+    return () => {
+      if (snapTimerRef.current) {
+        clearTimeout(snapTimerRef.current);
+        snapTimerRef.current = null;
+      }
+    };
+  }, [cameraId, modoAoVivo, streamToken, snapTick]);
+
 
   // ----------------------------------------------------------------------------
   // 2) Buscar faces periodicamente
@@ -85,29 +156,37 @@ export default function StreamCamera({ cameraId, titulo, registros }) {
   //    - Normalizar a estrutura (bbox -> x,y,w,h) sem alterar desenho
   // ----------------------------------------------------------------------------
   useEffect(() => {
+    // FASE ATUAL: somente câmera 1 deve buscar faces (zero requests cams 2 e 3)
+    if (cameraId !== 1) {
+      setFacesData({ width: 0, height: 0, faces: [] });
+      return;
+    }
+
     let cancelado = false;
 
     async function fetchFaces() {
       try {
-        const token = localStorage.getItem("token") || "";
-        const escolaId = localStorage.getItem("escola_id") || "1";
+        const escolaDir =
+          localStorage.getItem("escola_dir") ||
+          localStorage.getItem("escola_apelido") ||
+          "CEF04_PLAN";
 
-        // Monta URL de faces conforme a câmera
-        const facesUrl =
-          cameraId === 1
-            ? `${API_BASE_PUBLIC}/camera/${cameraId}/faces`
-            : `${API_BASE_PROTECTED}/camera/${cameraId}/faces`;
+        // Evitar 304/ETag do /faces (senão o overlay congela).
+        // Forçamos no-store e um cache-bust na query.
+        const facesUrl = `${API_BASE_PUBLIC}/camera/${cameraId}/faces?escola_dir=${encodeURIComponent(
+          escolaDir
+        )}&_=${Date.now()}`;
 
-        const headers =
-          cameraId === 1
-            ? {} // público (não exige bearer)
-            : {
-                Authorization: `Bearer ${token}`,
-                "x-escola-id": escolaId,
-              };
+        const resp = await fetch(facesUrl, {
+          cache: "no-store",
+          headers: {
+            "Cache-Control": "no-cache",
+            Pragma: "no-cache",
+          },
+        });
 
-        const resp = await fetch(facesUrl, { headers });
         if (!resp.ok) return;
+
         const json = await resp.json();
 
         if (!json || !json.ok) return;
@@ -115,13 +194,30 @@ export default function StreamCamera({ cameraId, titulo, registros }) {
         // Normalização para manter o desenho original (x,y,w,h; aluno_nome; turma)
         const normFaces = Array.isArray(json.faces)
           ? json.faces.map((f) => {
-              // aceita tanto {x,y,w,h} quanto {bbox:{left,top,width,height}}
-              const hasXYWH = typeof f.x === "number" && typeof f.w === "number";
-              const bbox = f.bbox || {};
-              const x = hasXYWH ? f.x : (typeof bbox.left === "number" ? bbox.left : 0);
-              const y = hasXYWH ? f.y : (typeof bbox.top === "number" ? bbox.top : 0);
-              const w = hasXYWH ? f.w : (typeof bbox.width === "number" ? bbox.width : 0);
-              const h = hasXYWH ? f.h : (typeof bbox.height === "number" ? bbox.height : 0);
+              // aceita tanto {x,y,w,h} quanto {bbox:{x,y,width,height}} ou {bbox:{left,top,width,height}}
+              const hasXYWH =
+                Number.isFinite(f.x) &&
+                Number.isFinite(f.y) &&
+                Number.isFinite(f.w) &&
+                Number.isFinite(f.h);
+
+              const bbox = f.bbox || f.box || {};
+
+              const x = hasXYWH
+                ? f.x
+                : (Number.isFinite(bbox.x) ? bbox.x : (Number.isFinite(bbox.left) ? bbox.left : 0));
+
+              const y = hasXYWH
+                ? f.y
+                : (Number.isFinite(bbox.y) ? bbox.y : (Number.isFinite(bbox.top) ? bbox.top : 0));
+
+              const w = hasXYWH
+                ? f.w
+                : (Number.isFinite(bbox.w) ? bbox.w : (Number.isFinite(bbox.width) ? bbox.width : 0));
+
+              const h = hasXYWH
+                ? f.h
+                : (Number.isFinite(bbox.h) ? bbox.h : (Number.isFinite(bbox.height) ? bbox.height : 0));
 
               // nome/turma podem vir com chaves diferentes
               const aluno_nome = f.aluno_nome || f.nome || "";
@@ -138,6 +234,7 @@ export default function StreamCamera({ cameraId, titulo, registros }) {
               };
             })
           : [];
+
 
         if (!cancelado) {
           setFacesData({
@@ -168,22 +265,61 @@ export default function StreamCamera({ cameraId, titulo, registros }) {
     if (!imgEl || !canvasEl) return;
     if (!facesData.width || !facesData.height) return;
 
+    // garante que canvas == box do <img> (com DPR)
     syncCanvasToImageSize();
+
     const ctx = canvasEl.getContext("2d");
     if (!ctx) return;
-    ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
 
-    const scaleX = imgEl.clientWidth / facesData.width;
-    const scaleY = imgEl.clientHeight / facesData.height;
+    // limpar em CSS pixels (porque setTransform(dpr,...) já foi aplicado)
+    const imgRect = imgEl.getBoundingClientRect();
+    const containerW = Math.round(imgRect.width);
+    const containerH = Math.round(imgRect.height);
+    if (!containerW || !containerH) return;
+
+    ctx.clearRect(0, 0, containerW, containerH);
+
+    // object-contain: a imagem pode ficar com "barras" (letterbox).
+    // Precisamos mapear bbox (facesData.width/height) -> área efetiva da imagem renderizada dentro do <img>.
+
+    // Referência REAL do frame renderizado no <img>
+    const naturalW = imgEl.naturalWidth || 0;
+    const naturalH = imgEl.naturalHeight || 0;
+
+    // Coordenadas do /faces (padrão: 1920x1080)
+    const facesW = facesData.width || 0;
+    const facesH = facesData.height || 0;
+
+    // Nesta fase, o mapeamento deve ser 100% baseado no espaço do /faces (facesW/facesH),
+    // e então convertido para a área renderizada (renderW/renderH + offsets).
+    // Isso evita misturar naturalW/naturalH com heurísticas que “congelam” a bbox.
+    const srcW = facesW || naturalW;
+    const srcH = facesH || naturalH;
+
+    if (!srcW || !srcH) return;
+
+    const fitScale = Math.min(containerW / srcW, containerH / srcH);
+    const renderW = srcW * fitScale;
+    const renderH = srcH * fitScale;
+
+    const offsetX = (containerW - renderW) / 2;
+    const offsetY = (containerH - renderH) / 2;
 
     ctx.font = "16px sans-serif";
     ctx.lineWidth = 3;
 
     facesData.faces.forEach((face) => {
-      const drawX = face.x * scaleX;
-      const drawY = face.y * scaleY;
-      const drawW = face.w * scaleX;
-      const drawH = face.h * scaleY;
+      const fx = Number(face.x) || 0;
+      const fy = Number(face.y) || 0;
+      const fw = Number(face.w) || 0;
+      const fh = Number(face.h) || 0;
+
+      const drawX = offsetX + fx * fitScale;
+      const drawY = offsetY + fy * fitScale;
+      const drawW = fw * fitScale;
+      const drawH = fh * fitScale;
+
+
 
       ctx.strokeStyle = face.recognized ? "rgb(0,200,0)" : "rgb(220,0,0)";
       ctx.strokeRect(drawX, drawY, drawW, drawH);
@@ -209,12 +345,42 @@ export default function StreamCamera({ cameraId, titulo, registros }) {
     });
   }, [facesData]);
 
+  // ----------------------------------------------------------------------------
+  // Logs (DEV) — evitar spam em produção
+  // Ative manualmente: localStorage.setItem("debug_monitoramento","1")
+  // ----------------------------------------------------------------------------
+  const debugRef = useRef({
+    lastAt: 0,
+    lastKey: "",
+  });
+
+  // Debug específico para validar letterbox (object-contain)
+  // Ative manualmente: localStorage.setItem("debug_letterbox","1")
+  const letterboxDebugRef = useRef({
+    lastAt: 0,
+    lastKey: "",
+  });
 
 
+  useEffect(() => {
+    const DEBUG =
+      (typeof window !== "undefined" &&
+        window.localStorage &&
+        window.localStorage.getItem("debug_monitoramento") === "1") ||
+      false;
 
-console.log("[StreamCamera] cameraId=", cameraId, "registros=", registros);
+    if (!DEBUG) return;
 
+    const now = Date.now();
+    const key = `${cameraId}::${JSON.stringify(registros || [])}`;
 
+    // throttle 5s + só loga se mudou
+    if (debugRef.current.lastKey !== key && now - debugRef.current.lastAt > 5000) {
+      debugRef.current.lastKey = key;
+      debugRef.current.lastAt = now;
+      console.log("[StreamCamera]", { cameraId, registrosCount: (registros || []).length });
+    }
+  }, [cameraId, registros]);
 
   // ----------------------------------------------------------------------------
   // Renderização visual
@@ -225,28 +391,48 @@ console.log("[StreamCamera] cameraId=", cameraId, "registros=", registros);
       <div className="flex-1 relative bg-black flex items-center justify-center min-h-[180px] group">
         {/* imagem base (snapshot ou stream) */}
         <img
+          key={`cam-${cameraId}-${modoAoVivo ? "live" : "snap"}`}
           ref={imgRef}
           src={imgSrc}
           alt={`Câmera ${cameraId}`}
-          className="max-h-full max-w-full object-contain transition-all duration-500 cursor-pointer"
-          onLoad={() => syncCanvasToImageSize()}
-          onClick={() => setModoAoVivo((v) => !v)}
+          className={`w-full h-full transition-all duration-500 cursor-pointer object-contain`}
+          onLoad={() => {
+            syncCanvasToImageSize();
+
+            // PRÉVIA: só agenda o próximo snapshot depois que este carregou
+            if (!modoAoVivo && cameraId === 1) {
+              if (snapTimerRef.current) clearTimeout(snapTimerRef.current);
+              snapTimerRef.current = setTimeout(() => {
+                setSnapTick((t) => t + 1);
+              }, 1000);
+            }
+          }}
+          onClick={() => {
+            // ao mudar de modo, limpa timer da prévia imediatamente
+            if (snapTimerRef.current) {
+              clearTimeout(snapTimerRef.current);
+              snapTimerRef.current = null;
+            }
+            setModoAoVivo((v) => !v);
+          }}
         />
 
         {/* canvas overlay */}
         <canvas
           ref={canvasRef}
-          className="absolute top-0 left-0 pointer-events-none"
-          style={{
-            width: imgRef.current ? imgRef.current.clientWidth : "100%",
-            height: imgRef.current ? imgRef.current.clientHeight : "100%",
-          }}
+          className="absolute inset-0 w-full h-full pointer-events-none"
         />
 
+
         {/* botão flutuante */}
-        <div className="absolute top-2 right-2 bg-blue-600 text-white text-xs px-3 py-1 rounded-md shadow cursor-pointer opacity-80 hover:opacity-100">
+        <button
+          type="button"
+          onClick={() => setModoAoVivo((v) => !v)}
+          className="absolute top-2 right-2 bg-blue-600 text-white text-xs px-3 py-1 rounded-md shadow cursor-pointer opacity-80 hover:opacity-100"
+          title={modoAoVivo ? "Clique para voltar para Prévia" : "Clique para ir AO VIVO"}
+        >
           {modoAoVivo ? "AO VIVO" : "Prévia"}
-        </div>
+        </button>
       </div>
 
       {/* título */}

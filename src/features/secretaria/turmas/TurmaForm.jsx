@@ -4,12 +4,20 @@ import React, { useState, useEffect } from 'react';
 import Input from '../../../components/ui/Input';
 import { Button } from "../../../components/ui/Button";
 
+function anoLetivoPadrao() {
+  const hoje = new Date();
+  const mes = hoje.getMonth() + 1;
+  return mes <= 1 ? hoje.getFullYear() - 1 : hoje.getFullYear();
+}
+
 export default function TurmaForm({ open, onClose, onSubmit, turma }) {
+  const anoAtual = String(anoLetivoPadrao());
+
   const [form, setForm] = useState({
     escola_id: '',
     nome: '',
     etapa: '',
-    ano: '2025',
+    ano: anoAtual,
     turno: '',
     serie: '',
   });
@@ -54,7 +62,7 @@ export default function TurmaForm({ open, onClose, onSubmit, turma }) {
         escola_id: turma.escola_id ?? escolaIdLogin ?? '',
         nome: turma.nome ?? turma.turma ?? '',
         etapa: turma.etapa ?? '',
-        ano: turma.ano ?? '2025',
+        ano: turma.ano ?? anoAtual,
         turno: turma.turno?.toUpperCase() ?? '',
         serie: turma.serie ?? '',
       });
@@ -63,7 +71,7 @@ export default function TurmaForm({ open, onClose, onSubmit, turma }) {
         escola_id: escolaIdLogin,
         nome: '',
         etapa: '',
-        ano: '2025',
+        ano: anoAtual,
         turno: '',
         serie: ''
       });
@@ -167,17 +175,13 @@ export default function TurmaForm({ open, onClose, onSubmit, turma }) {
       {/* Ano */}
       <div>
         <label className="block mb-1">Ano</label>
-        <select
+        <input
           name="ano"
           value={form.ano}
-          onChange={handleChange}
-          className="w-full border rounded p-2"
-        >
-          <option value="2025">2025</option>
-          <option value="2026">2026</option>
-          <option value="2027">2027</option>
-          <option value="2028">2028</option>
-        </select>
+          readOnly
+          disabled
+          className="w-full border rounded p-2 bg-gray-100 text-gray-500 cursor-not-allowed font-medium"
+        />
         {errors.ano && <p className="text-red-600 text-sm">{errors.ano}</p>}
       </div>
 

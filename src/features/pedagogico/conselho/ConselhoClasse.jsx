@@ -179,7 +179,10 @@ export default function ConselhoClasse() {
             <table className="w-full">
               <tbody>
                 {alunosTurma.map((aluno) => {
-                  const baseFoto = getFotoURL(aluno);
+                  // Prioridade: foto_url canônica vinda do backend (Spaces)
+                  // Fallback: lógica legada do getFotoURL(aluno)
+                  const baseFoto = aluno?.foto_url || getFotoURL(aluno);
+
                   const fotoSrc =
                     baseFoto && fotoStamp
                       ? `${baseFoto}${baseFoto.includes("?") ? "&" : "?"}t=${fotoStamp}`

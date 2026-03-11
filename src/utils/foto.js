@@ -30,8 +30,20 @@ export function buildFotoURL(path) {
 
   let p = String(path).trim().replace(/\\/g, "/");
 
-  // Se vier absoluto (http/https), respeita.
+  // Se vier absoluto (http/https), tenta normalizar para a mesma base (CDN) quando for um link do Spaces.
   if (/^https?:\/\//i.test(p)) {
+    try {
+      const u = new URL(p);
+
+      // Se for um link apontando para ".../uploads/<...>", converte para a base da CDN (getUploadsBase)
+      const idx = u.pathname.indexOf("/uploads/");
+      if (idx >= 0) {
+        const after = u.pathname.slice(idx + "/uploads/".length).replace(/^\/+/, "");
+        const base = getUploadsBase(); // ex.: https://educa-melhor-uploads.nyc3.cdn.digitaloceanspaces.com/uploads
+        return normalizeSlashes(`${base}/${after}`);
+      }
+    } catch {}
+
     return normalizeSlashes(p);
   }
 
@@ -76,8 +88,13 @@ export function getFotoURL(
 
 
 ) {
-  // 1) foto vinda do banco (pode ser absoluta ou relativa)
-  const raw = aluno?.foto && String(aluno.foto).trim();
+  // 1) Prioridade:
+  //    - aluno.foto_url (canônica do backend, Spaces)
+  //    - aluno.foto (legado: absoluta ou relativa)
+  const raw =
+    (aluno?.foto_url && String(aluno.foto_url).trim()) ||
+    (aluno?.foto && String(aluno.foto).trim());
+
   let url = raw ? buildFotoURL(raw) : null;
 
   // 2) fallback por código

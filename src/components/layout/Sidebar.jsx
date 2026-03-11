@@ -321,37 +321,10 @@ export default function Sidebar() {
 
                 <li>
                   <Link
-                    to="/secretaria/cargas-horarias"
-                    className={getSubmenuLinkClasses('/secretaria/cargas-horarias')}
-                  >
-                    <ClockIcon className="h-5 w-5 mr-2" /> Cargas Horárias
-                  </Link>
-                </li>
-
-                <li>
-                  <Link
                     to="/secretaria/disciplinas"
                     className={getSubmenuLinkClasses('/secretaria/disciplinas')}
                   >
                     <BookOpenIcon className="h-5 w-5 mr-2" /> Disciplinas
-                  </Link>
-                </li>
-
-                <li>
-                  <Link
-                    to="/secretaria/modulacao"
-                    className={getSubmenuLinkClasses('/secretaria/modulacao')}
-                  >
-                    <ClockIcon className="h-5 w-5 mr-2" /> Modulação
-                  </Link>
-                </li>
-
-                <li>
-                  <Link
-                    to="/secretaria/horarios"
-                    className={getSubmenuLinkClasses('/secretaria/horarios')}
-                  >
-                    <ClockIcon className="h-5 w-5 mr-2" /> Horários
                   </Link>
                 </li>
 
@@ -370,25 +343,6 @@ export default function Sidebar() {
                     className={getSubmenuLinkClasses('/secretaria/turmas')}
                   >
                     <AcademicCapIcon className="h-5 w-5 mr-2" /> Turmas
-                  </Link>
-                </li>
-
-                {/* NOVO SUBMENU: Boletim */}
-                <li>
-                  <Link
-                    to="/secretaria/boletim"
-                    className={getSubmenuLinkClasses('/secretaria/boletim')}
-                  >
-                    <DocumentTextIcon className="h-5 w-5 mr-2" /> Boletim
-                  </Link>
-                </li>
-
-                <li>
-                  <Link
-                    to="/secretaria/tabela-codigos"
-                    className={getSubmenuLinkClasses('/secretaria/tabela-codigos')}
-                  >
-                    <TableCellsIcon className="h-5 w-5 mr-2" /> Tabela Códigos
                   </Link>
                 </li>
               </ul>

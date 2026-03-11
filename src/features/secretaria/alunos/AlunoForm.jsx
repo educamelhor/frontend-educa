@@ -22,7 +22,7 @@ import api from "../../../services/api";
 import Input from "../../../components/ui/Input";
 import { Button } from "../../../components/ui/Button";
 
-export default function AlunoForm({ open, onClose, onSubmit, initialData = {} }) {
+export default function AlunoForm({ open, onClose, onSubmit, initialData = {}, anoLetivo }) {
   // ────────────────────────────────────────────────────────────────
   // Helpers locais
   // ────────────────────────────────────────────────────────────────
@@ -42,6 +42,7 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {} })
     initialData.turma_id ? String(initialData.turma_id) : ""
   );
   const [turmas, setTurmas] = useState([]);
+  const [modalAtivarOpen, setModalAtivarOpen] = useState(false);
 
   // ────────────────────────────────────────────────────────────────
   // Carrega lista de turmas quando o modal abre
@@ -105,11 +106,11 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {} })
     let sucesso = false;
 
     if (initialData.id) {
-      // aluno já existia — vamos atualizar (reativar)
+      // aluno já existia — mantemos o status atual ou ativo (se undefined)
       sucesso = await onSubmit({
         ...initialData,
         ...payload,
-        status: "ativo",
+        status: initialData.status || "ativo",
       });
     } else {
       // novo aluno
@@ -117,6 +118,30 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {} })
     }
 
     if (sucesso) onClose();
+  };
+
+  // ────────────────────────────────────────────────────────────────
+  // Ativação explícita
+  // ────────────────────────────────────────────────────────────────
+  const handleConfirmarAtivacao = async () => {
+    const payload = {
+      codigo,
+      estudante,
+      data_nascimento: dataNascimento,
+      sexo,
+      turma_id: Number(turmaId),
+    };
+
+    const sucesso = await onSubmit({
+      ...initialData,
+      ...payload,
+      status: "ativo",
+    });
+
+    if (sucesso) {
+      setModalAtivarOpen(false);
+      onClose();
+    }
   };
 
   // ────────────────────────────────────────────────────────────────
@@ -196,16 +221,27 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {} })
               required
             >
               <option value="">Selecione a turma</option>
-              {turmas.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.turma}
-                </option>
-              ))}
+              {turmas
+                .filter((t) => !anoLetivo || Number(t.ano) === Number(anoLetivo))
+                .map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.turma}
+                  </option>
+                ))}
             </select>
           </div>
 
           {/* Botões */}
           <div className="flex justify-end space-x-3 mt-6">
+            {initialData?.status === "inativo" && (
+              <Button
+                type="button"
+                onClick={() => setModalAtivarOpen(true)}
+                className="px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 transition shadow-sm"
+              >
+                Ativar
+              </Button>
+            )}
             <Button
               type="button"
               onClick={onClose}
@@ -222,6 +258,37 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {} })
           </div>
         </form>
       </div>
+
+      {/* Modal Confirmar Ativação */}
+      <Dialog
+        open={modalAtivarOpen}
+        onClose={() => setModalAtivarOpen(false)}
+        className="fixed inset-0 z-[60] flex items-center justify-center"
+      >
+        <Dialog.Overlay className="fixed inset-0 bg-black/40" />
+        <div className="bg-white rounded-lg w-full max-w-sm p-6 z-10 text-center shadow-xl">
+          <h3 className="text-lg font-bold text-gray-800 mb-3">Confirmar Ativação</h3>
+          <p className="text-gray-600 mb-6">
+            Deseja reativar o estudante <strong>{estudante}</strong>?
+          </p>
+          <div className="flex justify-center gap-3">
+            <Button
+              type="button"
+              onClick={() => setModalAtivarOpen(false)}
+              className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition"
+            >
+              Voltar
+            </Button>
+            <Button
+              type="button"
+              onClick={handleConfirmarAtivacao}
+              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition"
+            >
+              Sim, Ativar
+            </Button>
+          </div>
+        </div>
+      </Dialog>
     </Dialog>
   );
 }

@@ -1,10 +1,11 @@
 // src/features/alunos/FichaAluno.jsx
 import React, { useEffect, useState, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import api from "../../services/api";
 import { Button } from "../../components/ui/Button";
 import * as faceapi from "face-api.js";
 import { AcademicCapIcon } from "@heroicons/react/24/solid";
+import ModalRelatorioDisciplinar from "./ModalRelatorioDisciplinar";
 
 /* =========================================================
    FICHA DO ESTUDANTE
@@ -19,12 +20,15 @@ export default function FichaAluno({ codigo: codigoProp }) {
   const codigo = codigoProp || codigoParam;
   const isModal = Boolean(codigoProp);
   const navigate = useNavigate();
+  const location = useLocation();
+  const isDisciplinar = location.pathname.includes("/disciplinar");
 
   // Estados principais
   const [aluno, setAluno] = useState(null);
   const [erro, setErro] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [feedback, setFeedback] = useState(null);
+  const [modalRelatorioOpen, setModalRelatorioOpen] = useState(false);
 
   // 🔐 trava anti-reentrada de upload
   const isUploadingRef = useRef(false);
@@ -363,26 +367,28 @@ export default function FichaAluno({ codigo: codigoProp }) {
           </div>
         </div>
 
-        {/* Upload de foto */}
-        <div className="space-y-4">
-          <h3 className="font-medium">Selecionar Pasta e Inserir Foto</h3>
-          <label className="inline-block">
-            <span className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded cursor-pointer">
-              Escolher pasta
-            </span>
-            <input
-              type="file"
-              webkitdirectory="true"
-              directory="true"
-              multiple
-              accept=".jpg,.jpeg,.png,.webp,.jfif,image/*"
-              onChange={handleFolderSelect}
-              className="hidden"
-              disabled={uploading}
-            />
-          </label>
-          {uploading && <p>Enviando foto…</p>}
-        </div>
+        {/* Upload de foto - Oculto no módulo disciplinar */}
+        {!isDisciplinar && (
+          <div className="space-y-4">
+            <h3 className="font-medium">Selecionar Pasta e Inserir Foto</h3>
+            <label className="inline-block">
+              <span className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded cursor-pointer">
+                Escolher pasta
+              </span>
+              <input
+                type="file"
+                webkitdirectory="true"
+                directory="true"
+                multiple
+                accept=".jpg,.jpeg,.png,.webp,.jfif,image/*"
+                onChange={handleFolderSelect}
+                className="hidden"
+                disabled={uploading}
+              />
+            </label>
+            {uploading && <p>Enviando foto…</p>}
+          </div>
+        )}
 
         {/* Seções futuras */}
         <div className="grid grid-cols-2 gap-4">
@@ -390,11 +396,23 @@ export default function FichaAluno({ codigo: codigoProp }) {
             <h2 className="text-lg font-semibold mb-2">Relatório Pedagógico</h2>
             <p className="text-gray-600">Nenhum relatório disponível.</p>
           </div>
-          <div className="bg-blue-50 p-4 rounded shadow">
-            <h2 className="text-lg font-semibold mb-2">Relatório Disciplinar</h2>
-            <p className="text-gray-600">Nenhum relatório disponível.</p>
+          <div
+            className="bg-blue-50 p-4 rounded shadow cursor-pointer hover:bg-blue-100 transition border border-transparent hover:border-blue-200"
+            onClick={() => setModalRelatorioOpen(true)}
+            role="button"
+            tabIndex={0}
+          >
+            <h2 className="text-lg font-semibold mb-2 text-blue-900">Relatório Disciplinar</h2>
+            <p className="text-gray-600">Clique para visualizar o histórico de ocorrências.</p>
           </div>
         </div>
+
+        {/* Modais */}
+        <ModalRelatorioDisciplinar
+          open={modalRelatorioOpen}
+          onClose={() => setModalRelatorioOpen(false)}
+          aluno={aluno}
+        />
       </div>
     </div>
   );

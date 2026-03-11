@@ -4,7 +4,6 @@ import Sidebar from "./components/layout/Sidebar";
 import HeaderGlobal from "./components/layout/HeaderGlobal";
 import Home from "./features/home/Home.jsx";
 import Alunos from "./features/secretaria/alunos";
-import AlunosDisciplinar from "./features/disciplinar/alunos";
 import Boletim from "./features/boletim/Boletim";
 import FichaAluno from "./features/alunos/FichaAluno";
 import FotoAluno from "./features/alunos/FotoAluno";
@@ -236,8 +235,6 @@ export default function App() {
           <Route path="/home" element={<Home />} />
 
           <Route path="/alunos" element={<Alunos />} />
-
-          <Route path="/disciplinar/alunos" element={<AlunosDisciplinar />} />
 
           {/* Monitoramento */}
           <Route

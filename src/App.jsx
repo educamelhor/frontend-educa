@@ -26,7 +26,7 @@ import LandingPage from "./features/landing/LandingPage";
 import Ferramentas from "./features/ferramentas";
 
 // ✅ Direção (Diretor) — Devices EDUCA-CAPTURE
-import DiretorPedagogico from "./features/direcao/diretor/DiretorPedagogico.jsx";
+
 
 // ✅ PLATAFORMA (CEO) — v1
 import PlataformaEscolas from "./features/plataforma/PlataformaEscolas.jsx";
@@ -372,15 +372,6 @@ export default function App() {
 
           <Route path="/ferramentas" element={<Ferramentas />} />
 
-          {/* Direção (Diretor) — Devices EDUCA-CAPTURE */}
-          <Route
-            path="/direcao/diretor"
-            element={
-              <RequirePerm perm="capture_devices.gerenciar">
-                <DiretorPedagogico />
-              </RequirePerm>
-            }
-          />
 
           <Route path="*" element={<Navigate to="/home" replace />} />
         </Route>

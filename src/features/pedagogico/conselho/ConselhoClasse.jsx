@@ -20,6 +20,13 @@ function normalizaTexto(str) {
     .trim();
 }
 
+// Helper: ano letivo com data de corte 31/jan (espelha a lógica do backend)
+function anoLetivoPadrao() {
+  const hoje = new Date();
+  const mes = hoje.getMonth() + 1;
+  return mes <= 1 ? hoje.getFullYear() - 1 : hoje.getFullYear();
+}
+
 export default function ConselhoClasse() {
   const [turnoSelecionado, setTurnoSelecionado] = useState(null);
   const [turmas, setTurmas] = useState([]);
@@ -27,6 +34,10 @@ export default function ConselhoClasse() {
   const [alunosTurma, setAlunosTurma] = useState([]);
   const [loadingAlunos, setLoadingAlunos] = useState(false);
   const [loadingTurmas, setLoadingTurmas] = useState(false);
+
+  // Ano Letivo
+  const [anosLetivos, setAnosLetivos] = useState([]);
+  const [anoLetivo, setAnoLetivo] = useState(anoLetivoPadrao());
 
   // Boletim
   const [modalBoletimOpen, setModalBoletimOpen] = useState(false);
@@ -57,6 +68,15 @@ export default function ConselhoClasse() {
   const turnos = ["Matutino", "Vespertino", "Noturno"];
 
   useEffect(() => {
+    async function carregarAnos() {
+      try {
+        const res = await api.get("/api/matriculas/anos");
+        setAnosLetivos(Array.isArray(res.data) ? res.data : []);
+      } catch {
+        setAnosLetivos([anoLetivoPadrao()]);
+      }
+    }
+    carregarAnos();
     fetchTurmas();
     // eslint-disable-next-line
   }, []);
@@ -80,7 +100,8 @@ export default function ConselhoClasse() {
   const turmasFiltradas = turmas.filter(
     (t) =>
       turnoSelecionado &&
-      normalizaTexto(t.turno) === normalizaTexto(turnoSelecionado)
+      normalizaTexto(t.turno) === normalizaTexto(turnoSelecionado) &&
+      Number(t.ano) === anoLetivo
   );
 
   const handleClickTurno = (turno) => {
@@ -96,9 +117,9 @@ export default function ConselhoClasse() {
     try {
       const escola_id = localStorage.getItem("escola_id") || 1;
       const { data } = await api.get(`/api/alunos`, {
-        params: { turma_id: turma.id },
+        params: { turma_id: turma.id, ano_letivo: anoLetivo },
       });
-      setAlunosTurma(data || []);
+      setAlunosTurma(data?.alunos || data || []);
     } catch (err) {
       console.error("Erro ao buscar alunos da turma:", err);
     } finally {
@@ -115,11 +136,33 @@ export default function ConselhoClasse() {
   return (
     <div className="p-6">
       <h1
-        className="text-5xl font-bold text-center text-blue-900 mb-8"
+        className="text-5xl font-bold text-center text-blue-900 mb-6"
         style={{ fontFamily: "'Montserrat', sans-serif" }}
       >
         Conselho de Classe
       </h1>
+
+      {/* Filtro de Ano Letivo */}
+      <div className="flex justify-center mb-8">
+        <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-lg shadow-sm border border-blue-200">
+          <label htmlFor="filtro-ano" className="text-sm font-semibold text-gray-700">Ano Letivo:</label>
+          <select
+            id="filtro-ano"
+            value={anoLetivo}
+            onChange={(e) => {
+              setAnoLetivo(Number(e.target.value));
+              setTurnoSelecionado(null);
+              setTurmaSelecionada(null);
+              setAlunosTurma([]);
+            }}
+            className="border rounded px-2 py-1 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {anosLetivos.map((a) => (
+              <option key={a} value={a}>{a}</option>
+            ))}
+          </select>
+        </div>
+      </div>
 
       {/* Botões de Turnos */}
       <div className="flex justify-center gap-4 mb-10">
@@ -140,9 +183,9 @@ export default function ConselhoClasse() {
 
       {/* Cards de Turmas */}
       {turnoSelecionado && (
-        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2 mb-8">
+        <div className="flex flex-wrap justify-center gap-4 mb-8">
           {loadingTurmas ? (
-            <p className="col-span-full text-center text-gray-500">
+            <p className="w-full text-center text-gray-500">
               Turmas sendo carregadas...
             </p>
           ) : turmasFiltradas.length > 0 ? (
@@ -150,17 +193,16 @@ export default function ConselhoClasse() {
               <div
                 key={turma.id}
                 onClick={() => handleClickTurma(turma)}
-                className={`bg-gradient-to-b from-blue-200 to-blue-50 rounded-md px-9 py-2 shadow-md cursor-pointer hover:shadow-xl transition-transform hover:scale-105 text-center font-bold text-blue-900 text-base ${
+                className={`bg-gradient-to-b from-blue-200 to-blue-50 rounded-lg px-6 py-3 shadow-md cursor-pointer hover:shadow-xl transition-transform hover:scale-105 text-center font-bold text-blue-900 text-base flex items-center justify-center whitespace-nowrap min-w-[120px] ${
                   turmaSelecionada?.id === turma.id ? "ring-2 ring-green-600" : ""
                 }`}
-                style={{ minWidth: "80px", maxWidth: "100px", margin: "0 auto" }}
               >
                 {turma.turma}
               </div>
             ))
           ) : (
-            <p className="col-span-full text-center text-gray-500">
-              Nenhuma turma encontrada para {turnoSelecionado}.
+            <p className="w-full text-center text-gray-500">
+              Nenhuma turma encontrada para {turnoSelecionado} no ano {anoLetivo}.
             </p>
           )}
         </div>

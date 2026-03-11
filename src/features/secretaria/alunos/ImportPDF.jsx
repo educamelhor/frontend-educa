@@ -21,6 +21,7 @@ export default function ImportPDF({ open, onClose, onFinish }) {
   const fileRef = useRef(null);
   const [progress, setProgress] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  const [pdfAlertOpen, setPdfAlertOpen] = useState(false);
 
   if (!open) return null; // 🔹 modal só é renderizado quando open = true
 
@@ -115,6 +116,14 @@ export default function ImportPDF({ open, onClose, onFinish }) {
 
     // Valida extensão
     const ext = file.name.split(".").pop()?.toLowerCase();
+
+    // Bloqueio temporário de PDF 
+    if (ext === "pdf") {
+      setPdfAlertOpen(true);
+      if (e.target) e.target.value = null;
+      return;
+    }
+
     if (ext !== "pdf" && ext !== "xlsx") {
       alert("Formato não suportado. Selecione um arquivo PDF ou XLSX.");
       e.target.value = null;
@@ -275,6 +284,25 @@ export default function ImportPDF({ open, onClose, onFinish }) {
           </p>
         </div>
       </div>
+
+      {/* Modal de Alerta para PDF (Provisório) */}
+      {pdfAlertOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-2xl text-center">
+            <h3 className="text-lg font-bold text-gray-800 mb-3">Formato não suportado</h3>
+            <p className="text-gray-600 mb-6">
+              Provisoriamente não estamos recebendo arquivos em PDF, envie seu arquivo no formato XLSX.
+            </p>
+            <Button
+              type="button"
+              onClick={() => setPdfAlertOpen(false)}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg"
+            >
+              Entendi
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -9,9 +9,15 @@ export default function ModalNovaOcorrencia({ open, onClose, aluno, onOcorrencia
     const [convocarResponsavel, setConvocarResponsavel] = useState(false);
     const [salvando, setSalvando] = useState(false);
     const [nextRegistro, setNextRegistro] = useState("");
+    const [tiposOcorrencia, setTiposOcorrencia] = useState([]);
 
     React.useEffect(() => {
         if (open) {
+            // Buscar os tipos de Ocorrência cadastrados no sistema
+            api.get('/api/tipos-ocorrencia').then(res => {
+               setTiposOcorrencia(res.data.filter(t => t.ativo));
+            }).catch(err => console.error("Erro ao buscar tipos:", err));
+
             if (ocorrenciaInicial) {
                 // Se o backend retorna YYYY-MM-DD, já estará OK para o input type date
                 // Mas se precisar converter, fazemos isso. Vamos usar data_ocorrencia ou raw
@@ -131,12 +137,9 @@ export default function ModalNovaOcorrencia({ open, onClose, aluno, onOcorrencia
                                 className="w-full border rounded p-2 focus:ring focus:border-blue-300 outline-none"
                             >
                                 <option value="">-- Selecione uma opção --</option>
-                                <option value="Sair da sala sem autorização do professor">Sair da sala sem autorização do professor</option>
-                                <option value="Chegar atrasado após o intervalo">Chegar atrasado após o intervalo</option>
-                                <option value="Atrapalhando aula com conversa">Atrapalhando aula com conversa</option>
-                                <option value="Desrespeito aos colegas/professores">Desrespeito aos colegas/professores</option>
-                                <option value="Uso de celular em sala">Uso de celular indevido em sala</option>
-                                <option value="Outros">Outros</option>
+                                {tiposOcorrencia.map(t => (
+                                    <option key={t.id} value={t.motivo}>{t.motivo}</option>
+                                ))}
                             </select>
                         )}
                     </div>

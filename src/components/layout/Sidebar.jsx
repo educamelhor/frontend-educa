@@ -248,13 +248,6 @@ export default function Sidebar() {
           </>
         )}
 
-
-
-
-
-
-
-
         {isScopeEscola && (
           <>
             {/* ───────────────────────────────
@@ -282,6 +275,24 @@ export default function Sidebar() {
                     className={getSubmenuLinkClasses('/disciplinar/alunos')}
                   >
                     <UsersIcon className="h-5 w-5 mr-2" /> Alunos
+                  </Link>
+                </li>
+
+                <li>
+                  <Link
+                    to="/disciplinar/ajustes"
+                    className={getSubmenuLinkClasses('/disciplinar/ajustes')}
+                  >
+                    <WrenchIcon className="h-5 w-5 mr-2" /> Ajustes
+                  </Link>
+                </li>
+
+                <li>
+                  <Link
+                    to="/disciplinar/responsaveis"
+                    className={getSubmenuLinkClasses('/disciplinar/responsaveis')}
+                  >
+                    <UsersIcon className="h-5 w-5 mr-2" /> Responsáveis
                   </Link>
                 </li>
               </ul>

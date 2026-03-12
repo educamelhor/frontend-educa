@@ -17,6 +17,8 @@ export default function ResponsaveisDisciplinar() {
   const [responsaveis, setResponsaveis] = useState([]);
   const [loading, setLoading] = useState(true);
 
+
+
   // Modal Novo / Editar
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);

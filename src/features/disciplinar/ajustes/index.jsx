@@ -374,6 +374,7 @@ export default function AjustesDisciplinar() {
               onClick={handleDelete}
               className="px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl transition disabled:opacity-50"
             >
+
               {excluindo ? "Aguarde..." : "Excluir"}
             </button>
           </div>

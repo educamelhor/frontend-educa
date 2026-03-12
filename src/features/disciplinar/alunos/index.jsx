@@ -10,6 +10,8 @@ function anoLetivoPadrao() {
     return mes <= 1 ? hoje.getFullYear() - 1 : hoje.getFullYear();
 }
 
+
+
 export default function AlunosDisciplinar() {
     const [manterFiltro, setManterFiltro] = useState(
         () => JSON.parse(localStorage.getItem("manterFiltroDisciplinar") || "false")

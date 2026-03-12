@@ -136,6 +136,8 @@ export default function ImportPDF({ open, onClose, onFinish }) {
 
     // Nome da turma derivado do nome do arquivo
     const turmaNome = file.name.replace(/\.[^.]+$/, "").trim();
+    formData.append("turmaNome", turmaNome);
+    
     setProgress(0);
     setSubmitting(true);
 

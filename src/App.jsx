@@ -19,6 +19,8 @@ import GerarGabaritos from "./features/impressao/GerarGabaritos";
 import ConselhoClasse from "./features/pedagogico/conselho/ConselhoClasse";
 import LandingPage from "./features/landing/LandingPage";
 import Ferramentas from "./features/ferramentas";
+import DisciplinarAjustes from "./features/disciplinar/ajustes";
+import DisciplinarResponsaveis from "./features/disciplinar/responsaveis";
 
 // ✅ Direção (Diretor) — Devices EDUCA-CAPTURE
 
@@ -218,6 +220,13 @@ export default function App() {
 
           <Route path="/alunos" element={<Alunos />} />
           <Route path="/secretaria/alunos" element={<Alunos />} />
+
+          <Route path="/disciplinar/alunos" element={<Alunos />} />
+          <Route path="/disciplinar/ajustes" element={<DisciplinarAjustes />} />
+          <Route
+            path="/disciplinar/responsaveis"
+            element={<DisciplinarResponsaveis />}
+          />
 
           {/* Monitoramento */}
           <Route

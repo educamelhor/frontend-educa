@@ -68,10 +68,9 @@ export default function AlunoTable({
       <table className="w-full border-collapse mt-4">
         <thead className="bg-blue-100">
           <tr>
-            <th className="p-2 border text-center">Código</th>
+            <th className="p-2 border text-center">RE</th>
             <th className="p-2 border text-center">Estudante</th>
             <th className="p-2 border text-center">Data Nasc.</th>
-            <th className="p-2 border text-center">Sexo</th>
             <th className="p-2 border text-center">Turma</th>
             <th className="p-2 border text-center">Ano</th>
             <th className="p-2 border text-center">Turno</th>
@@ -98,7 +97,6 @@ export default function AlunoTable({
                 )}
               </td>
               <td className="p-2 border text-center">{formatarDataBR(aluno.data_nascimento)}</td>
-              <td className="p-2 border text-center">{(aluno.sexo || "").toUpperCase()}</td>
               <td className="p-2 border text-center">{(aluno.turma || "").toUpperCase()}</td>
               <td className="p-2 border text-center">{aluno.ano_letivo || "—"}</td>
               <td className="p-2 border text-center">{(aluno.turno || "").toUpperCase()}</td>

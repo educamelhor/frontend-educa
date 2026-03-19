@@ -1240,7 +1240,11 @@ export default function Login() {
                     />
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-gray-800">
-                        {esc.nome} <span className="text-xs text-gray-500">({esc.perfil})</span>
+                        {esc.nome}
+                        {esc.apelido && (
+                          <span className="ml-1 font-semibold text-blue-700">({esc.apelido})</span>
+                        )}
+                        {" "}<span className="text-xs text-gray-500">({esc.perfil})</span>
                       </span>
 
                       {String(localStorage.getItem("last_escola_id") || "") === String(esc.id) && (

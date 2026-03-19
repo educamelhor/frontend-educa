@@ -14,6 +14,7 @@ import ListaDisciplinas from './disciplinas/ListaDisciplinas';
 import ListaCargasHorarias from './cargas-horarias/ListaCargasHorarias';
 import Alunos from "./alunos";
 import CargasHorariasPage from "./cargas-horarias";
+import ListaResponsaveis from "./responsaveis";
 
 // ============================================================================
 // Componente principal da Secretaria
@@ -35,6 +36,9 @@ export default function Secretaria() {
 
       {/* Alunos */}
       <Route path="alunos" element={<Alunos />} />
+
+      {/* Responsáveis */}
+      <Route path="responsaveis" element={<ListaResponsaveis />} />
     </Routes>
   );
 }

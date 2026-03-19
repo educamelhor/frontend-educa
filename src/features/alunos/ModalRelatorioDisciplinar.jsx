@@ -83,8 +83,8 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
     };
 
     const handleOpenDelete = (oc) => {
-        if (oc.status === 'FINALIZADA' || oc.status === 'Finalizado') {
-            setInfoMensagem("Ocorrências com o status 'Finalizada' não podem ser excluídas.");
+        if (oc.status === 'FINALIZADA' || oc.status === 'Finalizado' || oc.status === 'CANCELADA') {
+            setInfoMensagem("Ocorrências com o status 'Finalizada' ou 'Cancelada' não podem ser excluídas.");
             setModalInfoOpen(true);
             return;
         }
@@ -114,6 +114,36 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
             setExcluindo(false);
         }
     };
+
+    // ==================== PONTUAÇÃO & COMPORTAMENTO ====================
+    const PONTUACAO_INICIAL = 8.00;
+
+    // Calcula a pontuação: pontos do BD já possuem sinal correto
+    // (negativo para medidas disciplinares, positivo para elogios)
+    // Apenas ocorrências com status FINALIZADA afetam a pontuação
+    const pontuacaoCalculada = React.useMemo(() => {
+        let pontuacao = PONTUACAO_INICIAL;
+        for (const oc of ocorrencias) {
+            if (oc.status !== 'FINALIZADA' && oc.status !== 'Finalizado') continue;
+            const pts = Number(oc.pontos) || 0;
+            pontuacao += pts;
+        }
+        // Limitar entre 0 e 10
+        return Math.max(0, Math.min(10, parseFloat(pontuacao.toFixed(2))));
+    }, [ocorrencias]);
+
+    // Classifica o comportamento conforme Art. 45
+    const getComportamento = (nota) => {
+        if (nota >= 10.0) return { label: "I - Excepcional", cor: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200" };
+        if (nota >= 9.0)  return { label: "II - Ótimo",      cor: "text-blue-700",    bg: "bg-blue-50",    border: "border-blue-200" };
+        if (nota >= 7.0)  return { label: "III - Bom",       cor: "text-green-700",   bg: "bg-green-50",   border: "border-green-200" };
+        if (nota >= 5.0)  return { label: "IV - Regular",    cor: "text-yellow-700",  bg: "bg-yellow-50",  border: "border-yellow-200" };
+        if (nota >= 2.0)  return { label: "V - Insuficiente",cor: "text-orange-700",  bg: "bg-orange-50",  border: "border-orange-200" };
+        return               { label: "VI - Incompatível",   cor: "text-red-700",     bg: "bg-red-50",     border: "border-red-200" };
+    };
+
+    const comportamento = getComportamento(pontuacaoCalculada);
+    // ==================================================================
 
     if (!open || !aluno) return null;
 
@@ -154,31 +184,47 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
 
                 <div className="p-6 overflow-y-auto">
                     {/* Cabeçalho do Estudante */}
-                    <div className="flex items-center gap-6 mb-8 p-4 bg-blue-50/50 border border-blue-100 rounded-lg">
+                    <div className="flex items-center gap-6 mb-6 p-4 bg-blue-50/50 border border-blue-100 rounded-lg">
                         <div className="flex-shrink-0">
                             <img
                                 src={fotoURL || PLACEHOLDER}
                                 alt={`Foto de ${aluno.estudante || ""}`}
-                                className="w-24 h-24 rounded-full object-cover border-2 border-white shadow-sm"
+                                className="w-20 h-20 rounded-full object-cover border-2 border-white shadow-sm"
                                 onError={(e) => {
                                     e.currentTarget.onerror = null;
                                     e.currentTarget.src = PLACEHOLDER;
                                 }}
                             />
                         </div>
-                        <div className="flex flex-col gap-1 flex-1">
-                            <h3 className="text-2xl font-bold text-gray-800 uppercase">
+                        <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                            <h3 className="text-xl font-bold text-gray-800 uppercase truncate">
                                 {aluno.estudante ?? "NOME NÃO INFORMADO"}
                             </h3>
-                            <p className="text-lg text-gray-600">
+                            <p className="text-sm text-gray-600">
                                 <span className="font-semibold text-gray-700">Turma:</span>{" "}
                                 {aluno.turma ?? "-"} {aluno.turno ? `(${aluno.turno})` : ""}
                             </p>
-                            <p className="text-sm text-gray-500">
+                            <p className="text-xs text-gray-500">
                                 <span className="font-semibold text-gray-600">Código:</span> {aluno.codigo}
                             </p>
                         </div>
-                        <div className="ml-auto flex-shrink-0">
+
+                        {/* Pontuação e Comportamento */}
+                        <div className="flex items-center gap-3 flex-shrink-0">
+                            <div className="flex flex-col items-center gap-1">
+                                <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Pontuação</span>
+                                <span className="text-2xl font-bold text-gray-800">{pontuacaoCalculada.toFixed(2).replace('.', ',')}</span>
+                            </div>
+                            <div className="w-px h-12 bg-gray-200"></div>
+                            <div className="flex flex-col items-center gap-1">
+                                <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Comportamento</span>
+                                <span className={`px-3 py-1 text-sm font-semibold rounded-full border ${comportamento.cor} ${comportamento.bg} ${comportamento.border}`}>
+                                    {comportamento.label}
+                                </span>
+                            </div>
+                        </div>
+
+                        <div className="flex-shrink-0">
                             <button
                                 onClick={() => {
                                     setOcorrenciaSelecionada(null);
@@ -199,6 +245,7 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
                             <thead className="bg-gray-100 border-b">
                                 <tr>
                                     <th className="px-4 py-3 font-semibold text-gray-700">Registro</th>
+                                    <th className="px-4 py-3 font-semibold text-gray-700">Tipo</th>
                                     <th className="px-4 py-3 font-semibold text-gray-700">Data</th>
                                     <th className="px-4 py-3 font-semibold text-gray-700">Descrição</th>
                                     <th className="px-4 py-3 font-semibold text-gray-700">Status</th>
@@ -208,13 +255,13 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
                             <tbody className="divide-y divide-gray-200">
                                 {loading ? (
                                     <tr>
-                                        <td colSpan="5" className="px-4 py-8 text-center text-gray-500 italic">
+                                        <td colSpan="6" className="px-4 py-8 text-center text-gray-500 italic">
                                             Carregando histórico...
                                         </td>
                                     </tr>
                                 ) : ocorrencias.length === 0 ? (
                                     <tr>
-                                        <td colSpan="5" className="px-4 py-8 text-center text-gray-500 italic">
+                                        <td colSpan="6" className="px-4 py-8 text-center text-gray-500 italic">
                                             Nenhum registro disciplinar encontrado para este estudante.
                                         </td>
                                     </tr>
@@ -222,6 +269,7 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
                                     ocorrencias.map((oc) => (
                                         <tr key={oc.id} className="hover:bg-gray-50 transition">
                                             <td className="px-4 py-3 font-medium text-gray-800">{oc.registro || oc.id}</td>
+                                            <td className="px-4 py-3 text-gray-600 capitalize">{oc.tipo || '-'}</td>
                                             <td className="px-4 py-3 text-gray-600">{oc.data_ocorrencia}</td>
                                             <td className="px-4 py-3 text-gray-600">
                                                 <div className="font-semibold text-gray-800">{oc.motivo}</div>

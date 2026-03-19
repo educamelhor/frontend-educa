@@ -37,7 +37,6 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {}, a
   const [dataNascimento, setDataNascimento] = useState(
     initialData.data_nascimento ? normalizeDate(initialData.data_nascimento) : ""
   );
-  const [sexo, setSexo] = useState(initialData.sexo || "");
   const [turmaId, setTurmaId] = useState(
     initialData.turma_id ? String(initialData.turma_id) : ""
   );
@@ -63,7 +62,6 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {}, a
       setCodigo(initialData.codigo || "");
       setEstudante(initialData.estudante || "");
       setDataNascimento(normalizeDate(initialData.data_nascimento));
-      setSexo(initialData.sexo || "");
       setTurmaId(initialData.turma_id ? String(initialData.turma_id) : "");
     }
   }, [open, initialData]);
@@ -99,7 +97,6 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {}, a
       codigo,
       estudante,
       data_nascimento: dataNascimento,
-      sexo,
       turma_id: Number(turmaId),
     };
 
@@ -128,7 +125,6 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {}, a
       codigo,
       estudante,
       data_nascimento: dataNascimento,
-      sexo,
       turma_id: Number(turmaId),
     };
 
@@ -160,9 +156,9 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {}, a
         </Dialog.Title>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Código (PASSO 2: bloqueado em modo edição) */}
+          {/* RE (Registro Estudantil) */}
           <div>
-            <label className="block font-medium mb-1">Código</label>
+            <label className="block font-medium mb-1">RE (Registro Estudantil)</label>
             <Input
               value={codigo}
               onChange={(e) => setCodigo(e.target.value)}
@@ -195,21 +191,6 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {}, a
               disabled={true}
               className="w-full bg-gray-100 cursor-not-allowed"
             />
-          </div>
-
-          {/* Sexo */}
-          <div>
-            <label className="block font-medium mb-1">Sexo</label>
-            <select
-              value={sexo}
-              onChange={(e) => setSexo(e.target.value)}
-              className="w-full border rounded p-2"
-              required
-            >
-              <option value="">Selecione</option>
-              <option value="M">M</option>
-              <option value="F">F</option>
-            </select>
           </div>
 
           {/* Turma */}

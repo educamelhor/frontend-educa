@@ -24,6 +24,17 @@ function naturalCompare(a, b) {
   return String(a).localeCompare(String(b), "pt-BR", { numeric: true, sensitivity: "base" });
 }
 
+// Retorna o ano letivo atual considerando que até 31/01 pertence ao ano letivo anterior
+function getAnoLetivoAtual() {
+  const hoje = new Date();
+  const ano = hoje.getFullYear();
+  // Janeiro é mês 0; consideramos ano anterior se for até 31 de janeiro
+  if (hoje.getMonth() === 0) {
+    return ano - 1;
+  }
+  return ano;
+}
+
 // Normaliza turmas preservando possível campo de turno/periodo (para filtragem)
 function normalizeTurmas(raw) {
   const arr = Array.isArray(raw) ? raw : Array.isArray(raw?.turmas) ? raw.turmas : [];
@@ -52,7 +63,9 @@ function normalizeTurmas(raw) {
         t?.periodo ??
         null;
 
-      return id && nome ? { id, nome: String(nome), turno } : null;
+      const ano = t?.ano ?? t?.ano_letivo ?? t?.anoLetivo ?? null;
+
+      return id && nome ? { id, nome: String(nome), turno, ano } : null;
     })
     .filter(Boolean);
 
@@ -264,6 +277,10 @@ export default function Modulacao() {
 
     // Se mesmo assim vierem turmas de vários turnos, filtra
     turmas = filtrarTurmasPorTurno(turmas, turno);
+
+    // ✅ Filtra pelo ano letivo atual (ignorando o filtro se não houver 'ano' na turma, por segurança)
+    const anoAtual = getAnoLetivoAtual();
+    turmas = turmas.filter((t) => !t.ano || Number(t.ano) === anoAtual);
 
     setTurmasTurno(turmas);
     if (turmas.length === 0) {
@@ -674,6 +691,7 @@ export default function Modulacao() {
           professor_id: Number(prof.id),
           turma_id: Number(turmaId),
           disciplina_id: Number(prof.disciplina_id),
+          aulas: Number(cargaPorDisciplina[prof.disciplina_id]) || 1,
         }));
       });
 
@@ -769,7 +787,7 @@ export default function Modulacao() {
         setSaveStage("Enviando novas alocações…");
         let ok = false;
         try {
-          await api.post("/api/modulacao/salvar", novos);
+          await api.post("/api/modulacao/upsert", novos);
           ok = true;
         } catch {
           try {
@@ -1651,9 +1669,15 @@ export default function Modulacao() {
                 {turmasTurno.map((turma) => (
                   <th
                     key={turma.id}
-                    className="py-2 px-3 border text-blue-900 font-semibold text-center sticky top-0 z-40 bg-gray-100"
+                    className="p-1 border text-blue-900 font-semibold text-center sticky top-0 z-40 bg-gray-100 min-w-[40px]"
                   >
-                    {turma.nome}
+                    <div
+                      className="mx-auto h-32 flex items-center justify-center whitespace-nowrap"
+                      style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
+                      title={turma.nome}
+                    >
+                      {turma.nome}
+                    </div>
                   </th>
                 ))}
 

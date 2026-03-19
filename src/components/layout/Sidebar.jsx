@@ -53,13 +53,19 @@ export default function Sidebar() {
 
   const hasPerm = (perm) => getPermissoes().includes(perm);
 
+  // ── Perfil do usuário logado ──
+  const getPerfil = () =>
+    String(localStorage.getItem('perfil') || '').toLowerCase().trim();
+  const perfil = getPerfil();
+  const isDisciplinar = perfil === 'disciplinar' || perfil === 'diretor_disciplinar' || perfil === 'militar';
+
   // Começando pelos 3 módulos solicitados
-  const canConteudos = isScopeEscola && hasPerm('conteudos.visualizar');
-  const canAvaliacoes = isScopeEscola && hasPerm('avaliacoes.visualizar');
-  const canMonitoramento = isScopeEscola && hasPerm('monitoramento.visualizar');
+  const canConteudos = isScopeEscola && !isDisciplinar && hasPerm('conteudos.visualizar');
+  const canAvaliacoes = isScopeEscola && !isDisciplinar && hasPerm('avaliacoes.visualizar');
+  const canMonitoramento = isScopeEscola && !isDisciplinar && hasPerm('monitoramento.visualizar');
 
   // Direção (Diretor) — Devices EDUCA-CAPTURE
-  const canDirecaoDevices = isScopeEscola && hasPerm('capture_devices.gerenciar');
+  const canDirecaoDevices = isScopeEscola && !isDisciplinar && hasPerm('capture_devices.gerenciar');
 
 
   // ─────────────────────────────────────────────────────────────
@@ -72,9 +78,12 @@ export default function Sidebar() {
     }
     else if (p.startsWith('/disciplinar')) setOpenGroup('disciplinar');
     else if (p.startsWith('/pedagogico')) setOpenGroup('pedagogico');
+    else if (p.startsWith('/professores')) setOpenGroup('professores');
     else if (p.startsWith('/impressao')) setOpenGroup('impressao');
     else if (p.startsWith('/monitoramento')) setOpenGroup('monitoramento');
     else if (p.startsWith('/direcao')) setOpenGroup('direcao');
+    else if (p.startsWith('/plataforma')) setOpenGroup('plataforma');
+    else if (p.startsWith('/gabarito')) setOpenGroup('gabarito');
     else setOpenGroup(null);
   }, [location.pathname]);
 
@@ -102,11 +111,41 @@ export default function Sidebar() {
       <nav className="p-4">
         {isScopePlataforma ? (
           <>
-            {/* LINK: Plataforma - Escolas */}
-            <Link to="/plataforma/escolas" className={getMainLinkClasses('/plataforma/escolas')}>
+            {/* ─── GRUPO: Escolas (submenus) ─── */}
+            <button
+              className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 transition"
+              onClick={() => setOpenGroup(openGroup === 'plataforma' ? null : 'plataforma')}
+              type="button"
+            >
               <HomeIcon className="h-5 w-5 mr-2" />
-              Plataforma - Escolas
-            </Link>
+              <span className="flex-1 text-left">Escolas</span>
+              {openGroup === 'plataforma' ? (
+                <ChevronDownIcon className="h-4 w-4" />
+              ) : (
+                <ChevronRightIcon className="h-4 w-4" />
+              )}
+            </button>
+
+            {openGroup === 'plataforma' && (
+              <ul className="ml-4 mb-2">
+                <li>
+                  <Link
+                    to="/plataforma/escolas"
+                    className={getSubmenuLinkClasses('/plataforma/escolas', true)}
+                  >
+                    <HomeIcon className="h-5 w-5 mr-2" /> Escolas
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/plataforma/diretores"
+                    className={getSubmenuLinkClasses('/plataforma/diretores', true)}
+                  >
+                    <UsersIcon className="h-5 w-5 mr-2" /> Diretores
+                  </Link>
+                </li>
+              </ul>
+            )}
 
             {/* LINK: Plataforma - Auditoria RBAC */}
             <Link to="/plataforma/auditoria-rbac" className={getMainLinkClasses('/plataforma/auditoria-rbac')}>
@@ -117,34 +156,139 @@ export default function Sidebar() {
         ) : (
           <>
             {/* LINK: Home */}
+            {!isDisciplinar && (
             <Link to="/" className={getMainLinkClasses('/')}>
               <HomeIcon className="h-5 w-5 mr-2" />
               Home
             </Link>
+            )}
 
             {/* LINK: Estudantes */}
+            {!isDisciplinar && (
             <Link to="/alunos" className={getMainLinkClasses('/alunos')}>
               <UserGroupIcon className="h-5 w-5 mr-2" />
               Estudantes
             </Link>
+            )}
 
-            {/* LINK: Professores (fora de Secretaria) */}
-            <Link to="/professores" className={getMainLinkClasses('/professores')}>
+            {/* GRUPO: Professores (fora de Secretaria) */}
+            {!isDisciplinar && (
+            <>
+            <button
+              className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-2 transition"
+              onClick={() => setOpenGroup(openGroup === 'professores' ? null : 'professores')}
+              type="button"
+            >
               <AcademicCapIcon className="h-5 w-5 mr-2" />
-              Gestão de Professores
-            </Link>
+              <span className="flex-1 text-left">Professores</span>
+              {openGroup === 'professores' ? (
+                <ChevronDownIcon className="h-4 w-4" />
+              ) : (
+                <ChevronRightIcon className="h-4 w-4" />
+              )}
+            </button>
+
+            {openGroup === 'professores' && (
+              <ul className="ml-4 mb-2">
+                <li>
+                  <Link
+                    to="/professores/planos"
+                    className={getSubmenuLinkClasses('/professores/planos')}
+                  >
+                    <PencilSquareIcon className="h-5 w-5 mr-2" /> Planos
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/professores/avaliacoes"
+                    className={getSubmenuLinkClasses('/professores/avaliacoes')}
+                  >
+                    <TableCellsIcon className="h-5 w-5 mr-2" /> Avaliações
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/professores/conteudos"
+                    className={getSubmenuLinkClasses('/professores/conteudos')}
+                  >
+                    <BookOpenIcon className="h-5 w-5 mr-2" /> Conteúdos
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/professores/provas"
+                    className={getSubmenuLinkClasses('/professores/provas')}
+                  >
+                    <DocumentTextIcon className="h-5 w-5 mr-2" /> Provas
+                  </Link>
+                </li>
+              </ul>
+            )}
+            </>
+            )}
 
             {/* LINK: Banco de Questões */}
+            {!isDisciplinar && (
             <Link to="/questoes" className={getMainLinkClasses('/questoes')}>
               <BookOpenIcon className="h-5 w-5 mr-2" />
               Banco de Questões
             </Link>
+            )}
 
             {/* LINK: Ferramentas */}
+            {!isDisciplinar && (
             <Link to="/ferramentas" className={getMainLinkClasses('/ferramentas')}>
               <WrenchIcon className="h-5 w-5 mr-2" />
               Ferramentas
             </Link>
+            )}
+
+            {/* ⭐ MÓDULO GABARITO — Destaque Premium */}
+            {!isDisciplinar && (
+            <>
+            <button
+              className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-2 transition"
+              onClick={() => setOpenGroup(openGroup === 'gabarito' ? null : 'gabarito')}
+              type="button"
+              style={{
+                background: openGroup === 'gabarito'
+                  ? 'linear-gradient(90deg, rgba(6,182,212,0.15), transparent)'
+                  : undefined,
+              }}
+            >
+              <CheckCircleIcon className="h-5 w-5 mr-2" style={{ color: openGroup === 'gabarito' ? '#22d3ee' : undefined }} />
+              <span className="flex-1 text-left" style={{ fontWeight: 700 }}>Gabarito</span>
+              <span style={{
+                fontSize: '0.55rem',
+                fontWeight: 800,
+                background: 'linear-gradient(135deg, #06b6d4, #8b5cf6)',
+                color: '#fff',
+                padding: '2px 6px',
+                borderRadius: '8px',
+                letterSpacing: '0.5px',
+                marginRight: 4,
+              }}>NOVO</span>
+              {openGroup === 'gabarito' ? (
+                <ChevronDownIcon className="h-4 w-4" />
+              ) : (
+                <ChevronRightIcon className="h-4 w-4" />
+              )}
+            </button>
+
+            {openGroup === 'gabarito' && (
+              <ul className="ml-4 mb-2">
+                <li>
+                  <Link
+                    to="/gabarito"
+                    className={getSubmenuLinkClasses('/gabarito', true)}
+                  >
+                    <CheckCircleIcon className="h-5 w-5 mr-2" /> Painel
+                  </Link>
+                </li>
+              </ul>
+            )}
+            </>
+            )}
           </>
         )}
 
@@ -178,6 +322,14 @@ export default function Sidebar() {
                     className={getSubmenuLinkClasses('/direcao/diretor', true)}
                   >
                     <ClipboardDocumentListIcon className="h-5 w-5 mr-2" /> Educa-Capture
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/direcao/responsaveis"
+                    className={getSubmenuLinkClasses('/direcao/responsaveis', true)}
+                  >
+                    <UserGroupIcon className="h-5 w-5 mr-2" /> Responsáveis
                   </Link>
                 </li>
               </ul>
@@ -248,6 +400,13 @@ export default function Sidebar() {
           </>
         )}
 
+
+
+
+
+
+
+
         {isScopeEscola && (
           <>
             {/* ───────────────────────────────
@@ -277,7 +436,8 @@ export default function Sidebar() {
                     <UsersIcon className="h-5 w-5 mr-2" /> Alunos
                   </Link>
                 </li>
-
+                {/* ── DESABILITADO no EDUCA.MELHOR_escola ──
+                    Será recriado futuramente no EDUCA.MELHOR_ceo
                 <li>
                   <Link
                     to="/disciplinar/ajustes"
@@ -286,13 +446,21 @@ export default function Sidebar() {
                     <WrenchIcon className="h-5 w-5 mr-2" /> Ajustes
                   </Link>
                 </li>
-
+                ── FIM DESABILITADO ── */}
                 <li>
                   <Link
                     to="/disciplinar/responsaveis"
                     className={getSubmenuLinkClasses('/disciplinar/responsaveis')}
                   >
-                    <UsersIcon className="h-5 w-5 mr-2" /> Responsáveis
+                    <UserGroupIcon className="h-5 w-5 mr-2" /> Responsáveis
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/disciplinar/equipe"
+                    className={getSubmenuLinkClasses('/disciplinar/equipe')}
+                  >
+                    <UsersIcon className="h-5 w-5 mr-2" /> Gestão de Equipe
                   </Link>
                 </li>
               </ul>
@@ -300,7 +468,7 @@ export default function Sidebar() {
           </>
         )}
 
-        {isScopeEscola && (
+        {isScopeEscola && !isDisciplinar && (
           <>
             {/* ───────────────────────────────
                 GRUPO: Secretaria
@@ -319,6 +487,18 @@ export default function Sidebar() {
               )}
             </button>
 
+
+
+
+
+
+
+
+
+
+
+
+
             {openGroup === 'secretaria' && (
               <ul className="ml-4 mb-2">
                 <li>
@@ -332,10 +512,46 @@ export default function Sidebar() {
 
                 <li>
                   <Link
+                    to="/secretaria/responsaveis"
+                    className={getSubmenuLinkClasses('/secretaria/responsaveis')}
+                  >
+                    <UserGroupIcon className="h-5 w-5 mr-2" /> Responsáveis
+                  </Link>
+                </li>
+
+                <li>
+                  <Link
+                    to="/secretaria/cargas-horarias"
+                    className={getSubmenuLinkClasses('/secretaria/cargas-horarias')}
+                  >
+                    <ClockIcon className="h-5 w-5 mr-2" /> Cargas Horárias
+                  </Link>
+                </li>
+
+                <li>
+                  <Link
                     to="/secretaria/disciplinas"
                     className={getSubmenuLinkClasses('/secretaria/disciplinas')}
                   >
                     <BookOpenIcon className="h-5 w-5 mr-2" /> Disciplinas
+                  </Link>
+                </li>
+
+                <li>
+                  <Link
+                    to="/secretaria/modulacao"
+                    className={getSubmenuLinkClasses('/secretaria/modulacao')}
+                  >
+                    <ClockIcon className="h-5 w-5 mr-2" /> Modulação
+                  </Link>
+                </li>
+
+                <li>
+                  <Link
+                    to="/secretaria/horarios"
+                    className={getSubmenuLinkClasses('/secretaria/horarios')}
+                  >
+                    <ClockIcon className="h-5 w-5 mr-2" /> Horários
                   </Link>
                 </li>
 
@@ -356,12 +572,31 @@ export default function Sidebar() {
                     <AcademicCapIcon className="h-5 w-5 mr-2" /> Turmas
                   </Link>
                 </li>
+
+                {/* NOVO SUBMENU: Boletim */}
+                <li>
+                  <Link
+                    to="/secretaria/boletim"
+                    className={getSubmenuLinkClasses('/secretaria/boletim')}
+                  >
+                    <DocumentTextIcon className="h-5 w-5 mr-2" /> Boletim
+                  </Link>
+                </li>
+
+                <li>
+                  <Link
+                    to="/secretaria/tabela-codigos"
+                    className={getSubmenuLinkClasses('/secretaria/tabela-codigos')}
+                  >
+                    <TableCellsIcon className="h-5 w-5 mr-2" /> Tabela Códigos
+                  </Link>
+                </li>
               </ul>
             )}
           </>
         )}
 
-        {isScopeEscola && (
+        {isScopeEscola && !isDisciplinar && (
           <>
             {/* ───────────────────────────────
                 GRUPO: Pedagógico
@@ -386,6 +621,7 @@ export default function Sidebar() {
                 <ChevronRightIcon className="h-4 w-4" />
               )}
             </button>
+
             {openGroup === 'pedagogico' && (
               <ul className="ml-4 mb-2">
                 <li>
@@ -399,12 +635,90 @@ export default function Sidebar() {
                     <CheckCircleIcon className="h-5 w-5 mr-2" /> Conselho de Classe
                   </Link>
                 </li>
+
+                {canConteudos && (
+                  <li>
+                    <Link
+                      to="/pedagogico/conteudos"
+                      className={getSubmenuLinkClasses('/pedagogico/conteudos')}
+                    >
+                      <BookOpenIcon className="h-5 w-5 mr-2" /> Conteúdos
+                    </Link>
+                  </li>
+                )}
+
+                <li>
+                  <Link
+                    to="/pedagogico/coordenacao/solicitacoes"
+                    className={getSubmenuLinkClasses('/pedagogico/coordenacao/solicitacoes')}
+                  >
+                    <ClipboardDocumentListIcon className="h-5 w-5 mr-2" /> Solicitações
+                  </Link>
+                </li>
+
+
+
+                <li>
+                  <Link
+                    to="/pedagogico/provas"
+                    className={getSubmenuLinkClasses('/pedagogico/provas')}
+                  >
+                    <DocumentTextIcon className="h-5 w-5 mr-2" /> Provas
+                  </Link>
+                </li>
+
+                {/* Submenu Correções */}
+                <li>
+                  <button
+                    className="flex items-center w-full py-2 pl-6 pr-3 rounded hover:bg-blue-700 transition"
+                    onClick={() => setOpenCorrecoes((v) => !v)}
+                    type="button"
+                  >
+                    <BookOpenIcon className="h-5 w-5 mr-2" />
+                    <span className="flex-1 text-left">Correções</span>
+                    {openCorrecoes ? (
+                      <ChevronDownIcon className="h-4 w-4" />
+                    ) : (
+                      <ChevronRightIcon className="h-4 w-4" />
+                    )}
+                  </button>
+
+                  {openCorrecoes && (
+                    <ul className="ml-8 mb-2">
+                      <li>
+                        <Link
+                          to="/pedagogico/correcoes/redacao"
+                          className={getSubmenuLinkClasses('/pedagogico/correcoes/redacao')}
+                        >
+                          <PencilSquareIcon className="h-5 w-5 mr-2" /> Redação
+                        </Link>
+                      </li>
+                      <li>
+                        <Link
+                          to="/pedagogico/correcoes/gabarito"
+                          className={getSubmenuLinkClasses('/pedagogico/correcoes/gabarito')}
+                        >
+                          <DocumentTextIcon className="h-5 w-5 mr-2" /> Gabarito
+                        </Link>
+                      </li>
+                    </ul>
+                  )}
+                </li>
+
+                <li>
+                  <Link
+                    to="/pedagogico/graficos"
+                    className={getSubmenuLinkClasses('/pedagogico/graficos')}
+                  >
+                    <ChartBarIcon className="h-5 w-5 mr-2" /> Gráficos
+                  </Link>
+                </li>
               </ul>
             )}
           </>
         )}
 
-        {isScopeEscola && (
+        {isScopeEscola && !isDisciplinar && (
           <>
             {/* ───────────────────────────────
                 GRUPO: Impressão

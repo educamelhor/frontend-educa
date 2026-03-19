@@ -83,13 +83,13 @@ export default function HeaderGlobal() {
           .toLowerCase()
           .trim();
 
-        // Só faz sentido para professor logado
-        if (!token || !escolaId || savedPerfil !== "professor") return;
+        // Reidrata foto de qualquer perfil logado
+        if (!token || !escolaId) return;
 
         const savedFoto = localStorage.getItem("foto_url") || "";
         if (savedFoto) return; // já tem foto em storage
 
-        const resp = await fetch(`${API_BASE}/professores/me/foto`, {
+        const resp = await fetch(`${API_BASE}/usuarios/me/foto`, {
           method: "GET",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -412,7 +412,7 @@ const UPLOADS_CDN = (() => {
     const form = new FormData();
     form.append("foto", file);
 
-    const resp = await fetch(`${API_BASE}/professores/me/foto`, {
+    const resp = await fetch(`${API_BASE}/usuarios/me/foto`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -517,7 +517,17 @@ const UPLOADS_CDN = (() => {
 
         {/* Nome e perfil */}
         <span className="text-blue-900 font-semibold">
-          {userName} <span className="text-sm text-gray-600">({perfil})</span>
+          {userName} <span className="text-sm text-gray-600">({
+            {
+              militar: "Comandante",
+              disciplinar: "Disciplinar",
+              diretor_disciplinar: "Diretor Disciplinar",
+              professor: "Professor",
+              diretor: "Diretor",
+              coordenador: "Coordenador",
+              admin: "Administrador",
+            }[perfil] || perfil
+          })</span>
         </span>
 
         {/* Botão de sair */}

@@ -141,8 +141,21 @@ function ModalSenha({
         </div>
 
         {erroSenha && (
-          <div className="mb-3 rounded border border-red-200 bg-red-50 p-2 text-center text-sm text-red-600">
-            {erroSenha}
+          <div className="mb-3 flex flex-col items-center gap-3 rounded border border-red-200 bg-red-50 p-3 text-center text-sm text-red-700">
+            <span>{erroSenha}</span>
+            
+            {(erroSenha.toLowerCase().includes("celular") || 
+               erroSenha.toLowerCase().includes("telefone") ||
+               erroSenha.toLowerCase().includes("e-mail") ||
+               erroSenha.toLowerCase().includes("email")) && (
+              <button
+                type="button"
+                className="rounded bg-blue-600 px-4 py-1.5 font-semibold text-white shadow hover:bg-blue-700 transition w-full max-w-[200px]"
+                onClick={onClose}
+              >
+                Voltar e editar dados
+              </button>
+            )}
           </div>
         )}
 
@@ -194,10 +207,6 @@ export default function CadastroUsuario() {
   const [dataNasc, setDataNasc] = useState("");
   const [sexo, setSexo] = useState("");
   const [celular, setCelular] = useState("");
-  const fileInputRef = useRef(null);
-
-  const [fotoFile, setFotoFile] = useState(null);
-  const [erroFoto, setErroFoto] = useState("");
   const [tocado, setTocado] = useState({});
 
   const [enviando, setEnviando] = useState(false);
@@ -473,11 +482,6 @@ export default function CadastroUsuario() {
   const abrirModalDeSenha = (e) => {
     e.preventDefault();
 
-    if (erroFoto) {
-      setMensagem(erroFoto);
-      return;
-    }
-
     setMensagem("");
     setErroSenha("");
     setSenha("");
@@ -518,7 +522,6 @@ export default function CadastroUsuario() {
     }
 
     try {
-      // 0) Foto (opcional) + 1) Complementar dados — para CADA escola selecionada
       for (const escolaIdLoop of escolasParaSalvar) {
         const payloadDados = {
           // ⚠️ Não fixar id aqui: em multi-escola, cada linha pode ter um id diferente.
@@ -532,17 +535,6 @@ export default function CadastroUsuario() {
           escola_id: Number(escolaIdLoop),
           perfil: perfilSelecionado,
         };
-
-        if (fotoFile) {
-          const fd = new FormData();
-          fd.append("foto", fotoFile);
-          fd.append("cpf", cpfLimpo);
-          fd.append("escola_id", String(escolaIdLoop));
-
-          await api.post("/api/auth/upload-foto-professor", fd, {
-            headers: { "Content-Type": "multipart/form-data" },
-          });
-        }
 
         await api.post("/api/auth/complementar-professor", payloadDados);
       }
@@ -851,7 +843,10 @@ export default function CadastroUsuario() {
       {etapa === 4 && (
         <div>
           <div className="mb-4 rounded border border-blue-200 bg-blue-50 p-2 text-center text-sm font-semibold text-blue-700">
-            Perfil definido pelo pré-cadastro: <b>{(perfilSelecionado || "professor").toUpperCase()}</b>
+            Perfil definido pelo pré-cadastro: <b>{
+              perfilSelecionado === "disciplinar" ? "EQUIPE DISCIPLINAR"
+              : (perfilSelecionado || "professor").toUpperCase()
+            }</b>
           </div>
 
           <div className="mb-3 grid grid-cols-1 gap-2">
@@ -933,78 +928,6 @@ export default function CadastroUsuario() {
               )}
             </div>
 
-            {/* Foto (opcional) - será ligada no próximo passo */}
-            <div className="mb-2">
-              <label>Foto (opcional):</label>
-
-              <div className="flex items-center gap-2">
-
-                <input
-                  ref={fileInputRef}
-                  className="w-full"
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0] || null;
-
-                    // reset
-                    setErroFoto("");
-                    setFotoFile(null);
-
-                    if (!f) return;
-
-                    const tiposOk = ["image/jpeg", "image/png", "image/webp"];
-                    const maxBytes = 2 * 1024 * 1024; // 2MB
-
-                    if (!tiposOk.includes(f.type)) {
-                      setErroFoto("Formato inválido. Envie JPEG, PNG ou WEBP.");
-                      if (fileInputRef.current) fileInputRef.current.value = "";
-                      return;
-                    }
-
-                    if (f.size > maxBytes) {
-                      setErroFoto("Arquivo muito grande. Limite: 2MB.");
-                      if (fileInputRef.current) fileInputRef.current.value = "";
-                      return;
-                    }
-
-                    setFotoFile(f);
-                  }}
-                />
-                {fotoFile && (
-                  <button
-                    type="button"
-                    className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm font-bold text-red-700 hover:bg-red-100"
-                    title="Remover foto"
-                    onClick={() => {
-                      setFotoFile(null);
-                      setErroFoto("");
-                      if (fileInputRef.current) fileInputRef.current.value = "";
-                    }}
-
-                  >
-                    X
-                  </button>
-                )}
-              </div>
-
-              {fotoFile && !erroFoto && (
-                <div className="mt-2 text-xs text-gray-600">
-                  Arquivo selecionado: <span className="font-semibold">{fotoFile.name}</span>
-                </div>
-              )}
-
-              {erroFoto ? (
-                <div className="mt-2 rounded border border-red-200 bg-red-50 p-2 text-center text-sm font-semibold text-red-700">
-                  {erroFoto}
-                </div>
-              ) : (
-                <div className="mt-1 text-xs text-gray-500">
-                  Formatos aceitos: JPEG, PNG, WEBP (até 2MB).
-                </div>
-              )}
-            </div>
-
             {/* Continuar → abre modal de senha */}
             <button
               className="mt-3 w-full rounded bg-green-600 px-4 py-2 text-white disabled:cursor-not-allowed disabled:opacity-50"
@@ -1012,8 +935,7 @@ export default function CadastroUsuario() {
               disabled={
                 !nomePreCadastrado ||
                 !isDataValida(formatDateForInput(dataNasc)) ||
-                !sexo ||
-                !!erroFoto
+                !sexo
               }
             >
               Continuar

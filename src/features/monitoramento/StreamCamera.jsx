@@ -404,7 +404,7 @@ export default function StreamCamera({ cameraId, titulo, registros }) {
               if (snapTimerRef.current) clearTimeout(snapTimerRef.current);
               snapTimerRef.current = setTimeout(() => {
                 setSnapTick((t) => t + 1);
-              }, 1000);
+              }, 500);  // 500ms — rápido porque agora serve do disco (frame.jpg do worker)
             }
           }}
           onClick={() => {

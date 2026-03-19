@@ -7,8 +7,11 @@ import {
   UserGroupIcon,
   CheckCircleIcon,
   ExclamationTriangleIcon,
-  DevicePhoneMobileIcon
+  DevicePhoneMobileIcon,
+  ShieldCheckIcon,
+  PrinterIcon
 } from "@heroicons/react/24/outline";
+import { CheckCircleIcon as CheckCircleSolidIcon } from "@heroicons/react/24/solid";
 import { Dialog, Transition } from "@headlessui/react";
 import { Fragment } from "react";
 import api from "../../../services/api";
@@ -49,6 +52,21 @@ export default function ResponsaveisDisciplinar() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deletingItem, setDeletingItem] = useState(null);
   const [excluindo, setExcluindo] = useState(false);
+
+  // Modal Consentimento de Imagem
+  const [isConsentModalOpen, setIsConsentModalOpen] = useState(false);
+  const [consentItem, setConsentItem] = useState(null);
+  const [alunosConsentimento, setAlunosConsentimento] = useState([]);
+  const [alunosSelecionados, setAlunosSelecionados] = useState([]);
+  const [carregandoAlunos, setCarregandoAlunos] = useState(false);
+  const [salvandoConsentimento, setSalvandoConsentimento] = useState(false);
+  const [consentimentoSucesso, setConsentimentoSucesso] = useState(false);
+
+  // Modal para imprimir Termo de Consentimento (seleção de aluno)
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [printItem, setPrintItem] = useState(null);
+  const [printAlunos, setPrintAlunos] = useState([]);
+  const [carregandoPrintAlunos, setCarregandoPrintAlunos] = useState(false);
 
   // Fechar dropdown de aluno se clicar fora
   useEffect(() => {
@@ -151,10 +169,122 @@ export default function ResponsaveisDisciplinar() {
     setIsDeleteModalOpen(true);
   };
 
+  const openConsentModal = async (item) => {
+    setConsentItem(item);
+    setAlunosSelecionados([]);
+    setConsentimentoSucesso(false);
+    setIsConsentModalOpen(true);
+    setCarregandoAlunos(true);
+    try {
+      const { data } = await api.get(`/api/responsaveis/${item.id}/alunos`);
+      setAlunosConsentimento(Array.isArray(data) ? data : []);
+      // Auto-selecionar alunos que ainda não têm consentimento
+      const naoAutorizados = (Array.isArray(data) ? data : [])
+        .filter((a) => Number(a.consentimento_imagem) !== 1)
+        .map((a) => a.aluno_id);
+      setAlunosSelecionados(naoAutorizados);
+    } catch (err) {
+      console.error("Erro ao buscar alunos para consentimento:", err);
+      setAlunosConsentimento([]);
+    } finally {
+      setCarregandoAlunos(false);
+    }
+  };
+
+  const handleSalvarConsentimento = async () => {
+    if (!consentItem || alunosSelecionados.length === 0) return;
+    setSalvandoConsentimento(true);
+    try {
+      await api.post(`/api/responsaveis/${consentItem.id}/consentimento-imagem`, {
+        aluno_ids: alunosSelecionados,
+      });
+      setConsentimentoSucesso(true);
+      fetchResponsaveis(); // atualiza lista
+    } catch (err) {
+      console.error("Erro ao registrar consentimento:", err);
+      alert("Erro ao registrar o consentimento. Tente novamente.");
+    } finally {
+      setSalvandoConsentimento(false);
+    }
+  };
+
+  // ── Gerar PDF do Termo de Consentimento ──
+  const handlePrintTermo = async (item) => {
+    setPrintItem(item);
+    setCarregandoPrintAlunos(true);
+    setIsPrintModalOpen(true);
+    try {
+      const { data } = await api.get(`/api/responsaveis/${item.id}/alunos`);
+      const alunos = Array.isArray(data) ? data : [];
+      setPrintAlunos(alunos);
+
+      // Se tem apenas 1 aluno, gera direto
+      if (alunos.length === 1) {
+        setIsPrintModalOpen(false);
+        gerarTermoPDF(item.id, alunos[0].aluno_id);
+      }
+    } catch (err) {
+      console.error("Erro ao buscar alunos para impressão:", err);
+      setPrintAlunos([]);
+    } finally {
+      setCarregandoPrintAlunos(false);
+    }
+  };
+
+  const gerarTermoPDF = (responsavelId, alunoId) => {
+    // Abre o PDF em nova aba via API autenticada
+    const token = localStorage.getItem("token");
+    const escolaId = localStorage.getItem("escola_id");
+    // baseURL já termina com /api, então NÃO duplicar
+    const url = `${api.defaults.baseURL}/termo-consentimento/${responsavelId}/${alunoId}`;
+    
+    // Busca via fetch com token + escola para abrir o PDF
+    fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "x-escola-id": escolaId,
+      },
+    })
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.blob();
+      })
+      .then((blob) => {
+        const blobUrl = URL.createObjectURL(blob);
+        window.open(blobUrl, "_blank");
+      })
+      .catch((err) => {
+        console.error("Erro ao gerar PDF:", err);
+        alert("Erro ao gerar o Termo de Consentimento.");
+      });
+  };
+
+  // ── Validação matemática de CPF (dígitos verificadores) ──
+  const validarCPF = (cpfRaw) => {
+    const digits = cpfRaw.replace(/\D/g, "");
+    if (digits.length !== 11) return false;
+    // Rejeita CPFs com todos os dígitos iguais (ex: 111.111.111-11)
+    if (/^(\d)\1{10}$/.test(digits)) return false;
+    // Cálculo do 1º dígito verificador
+    let soma = 0;
+    for (let i = 0; i < 9; i++) soma += parseInt(digits.charAt(i)) * (10 - i);
+    let resto = (soma * 10) % 11;
+    if (resto === 10) resto = 0;
+    if (resto !== parseInt(digits.charAt(9))) return false;
+    // Cálculo do 2º dígito verificador
+    soma = 0;
+    for (let i = 0; i < 10; i++) soma += parseInt(digits.charAt(i)) * (11 - i);
+    resto = (soma * 10) % 11;
+    if (resto === 10) resto = 0;
+    if (resto !== parseInt(digits.charAt(10))) return false;
+    return true;
+  };
+
   const handleSave = async (e) => {
     e.preventDefault();
     if (!nome.trim()) return alert("O nome não pode estar vazio.");
     if (!cpf.trim()) return alert("O CPF é obrigatório.");
+    if (!validarCPF(cpf)) return alert("CPF inválido. Verifique os dígitos e tente novamente.");
     if (!telefone.trim()) return alert("O Telefone Principal é obrigatório.");
     
     // Na criação do registro, é obrigatório vincular um estudante.
@@ -324,13 +454,20 @@ export default function ResponsaveisDisciplinar() {
                       )}
                     </td>
                     <td className="px-6 py-4 text-center align-middle">
-                      <div className="flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex items-center justify-center gap-2">
                         <button
-                          onClick={() => alert("Em breve irá liberar acesso ao app EDUCA-MOBILE para os responsáveis.")}
+                          onClick={() => openConsentModal(item)}
                           className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                          title="Autorizar app EDUCA-MOBILE"
+                          title="Termo de Consentimento de Imagem"
                         >
                           <DevicePhoneMobileIcon className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handlePrintTermo(item)}
+                          className="p-1.5 text-gray-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors"
+                          title="Imprimir Termo de Consentimento (PDF)"
+                        >
+                          <PrinterIcon className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => openEditModal(item)}
@@ -647,6 +784,310 @@ export default function ResponsaveisDisciplinar() {
                       )}
                       Sim, Remover
                     </button>
+                  </div>
+                </Dialog.Panel>
+              </Transition.Child>
+            </div>
+          </div>
+        </Dialog>
+      </Transition>
+
+      {/* ── MODAL CONSENTIMENTO DE IMAGEM ──────────── */}
+      <Transition appear show={isConsentModalOpen} as={Fragment}>
+        <Dialog as="div" className="relative z-50" onClose={() => { if (!salvandoConsentimento) { setIsConsentModalOpen(false); setConsentimentoSucesso(false); } }}>
+          <Transition.Child
+            as={Fragment}
+            enter="ease-out duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm" />
+          </Transition.Child>
+
+          <div className="fixed inset-0 overflow-y-auto">
+            <div className="flex min-h-full items-center justify-center p-4">
+              <Transition.Child
+                as={Fragment}
+                enter="ease-out duration-300"
+                enterFrom="opacity-0 scale-95"
+                enterTo="opacity-100 scale-100"
+                leave="ease-in duration-200"
+                leaveFrom="opacity-100 scale-100"
+                leaveTo="opacity-0 scale-95"
+              >
+                <Dialog.Panel className="w-full max-w-lg transform overflow-hidden rounded-2xl bg-white shadow-2xl transition-all border border-gray-100">
+                  {/* Header premium com gradiente */}
+                  <div className="bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 px-7 py-5">
+                    <div className="flex items-center gap-3">
+                      <div className="flex-shrink-0 w-11 h-11 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center ring-2 ring-white/30">
+                        <ShieldCheckIcon className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <Dialog.Title as="h3" className="text-lg font-bold text-white leading-tight">
+                          Termo de Consentimento
+                        </Dialog.Title>
+                        <p className="text-emerald-100 text-sm mt-0.5">Uso de Imagem e Dados Biométricos</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="px-7 py-5">
+                    {consentimentoSucesso ? (
+                      /* ── Estado de sucesso ── */
+                      <div className="flex flex-col items-center text-center py-6">
+                        <div className="w-16 h-16 rounded-full bg-emerald-50 flex items-center justify-center mb-4 ring-8 ring-emerald-50/50">
+                          <CheckCircleSolidIcon className="w-10 h-10 text-emerald-500" />
+                        </div>
+                        <h4 className="text-lg font-bold text-gray-800 mb-1">Consentimento Registrado!</h4>
+                        <p className="text-sm text-gray-500 max-w-xs">
+                          O termo foi registrado com sucesso. As imagens dos estudantes autorizados agora podem ser exibidas no sistema EDUCA.MELHOR.
+                        </p>
+                        <button
+                          onClick={() => { setIsConsentModalOpen(false); setConsentimentoSucesso(false); }}
+                          className="mt-6 px-6 py-2.5 bg-emerald-600 text-white font-semibold text-sm rounded-xl hover:bg-emerald-700 transition-colors"
+                        >
+                          Fechar
+                        </button>
+                      </div>
+                    ) : (
+                      /* ── Formulário de consentimento ── */
+                      <>
+                        {/* Responsável */}
+                        <div className="flex items-center gap-3 bg-slate-50 rounded-xl px-4 py-3 mb-4 border border-slate-100">
+                          <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center">
+                            <span className="text-blue-700 font-bold text-sm">
+                              {(consentItem?.nome || "?").charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-gray-800">{consentItem?.nome}</p>
+                            <p className="text-xs text-gray-400">{consentItem?.cpf ? formatCpf(consentItem.cpf) : "CPF não informado"}</p>
+                          </div>
+                        </div>
+
+                        {/* Texto legal */}
+                        <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-5">
+                          <p className="text-xs text-amber-900 leading-relaxed">
+                            <span className="font-bold">Declaração:</span> O(a) responsável acima identificado(a) compareceu
+                            presencialmente à escola e assinou o <span className="font-semibold">Termo de Consentimento para Uso
+                            de Imagem e Dados Biométricos do(s) Aluno(s)</span>, autorizando a captura, armazenamento
+                            e exibição da imagem do estudante no sistema EDUCA.MELHOR e aplicativos vinculados,
+                            em conformidade com a Lei Geral de Proteção de Dados (LGPD — Lei nº 13.709/2018).
+                          </p>
+                        </div>
+
+                        {/* Lista de alunos */}
+                        <div className="mb-5">
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">
+                            Estudantes vinculados
+                          </label>
+
+                          {carregandoAlunos ? (
+                            <div className="flex items-center justify-center gap-2 py-6 text-gray-400">
+                              <div className="w-5 h-5 border-2 border-gray-200 border-t-emerald-500 rounded-full animate-spin" />
+                              <span className="text-sm">Carregando alunos...</span>
+                            </div>
+                          ) : alunosConsentimento.length === 0 ? (
+                            <div className="text-center py-6 text-gray-400 text-sm">
+                              Nenhum aluno vinculado encontrado.
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              {alunosConsentimento.map((aluno) => {
+                                const jaAutorizado = Number(aluno.consentimento_imagem) === 1;
+                                const selecionado = alunosSelecionados.includes(aluno.aluno_id);
+
+                                return (
+                                  <label
+                                    key={aluno.aluno_id}
+                                    className={`flex items-center gap-3 rounded-xl px-4 py-3 border transition-all cursor-pointer ${
+                                      jaAutorizado
+                                        ? "bg-emerald-50 border-emerald-200"
+                                        : selecionado
+                                        ? "bg-blue-50 border-blue-300 ring-2 ring-blue-200"
+                                        : "bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                                    }`}
+                                  >
+                                    {jaAutorizado ? (
+                                      <CheckCircleSolidIcon className="w-5 h-5 text-emerald-500 flex-shrink-0" />
+                                    ) : (
+                                      <input
+                                        type="checkbox"
+                                        checked={selecionado}
+                                        onChange={() => {
+                                          setAlunosSelecionados((prev) =>
+                                            prev.includes(aluno.aluno_id)
+                                              ? prev.filter((id) => id !== aluno.aluno_id)
+                                              : [...prev, aluno.aluno_id]
+                                          );
+                                        }}
+                                        className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 flex-shrink-0"
+                                      />
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                      <p className={`text-sm font-medium truncate ${
+                                        jaAutorizado ? "text-emerald-800" : "text-gray-800"
+                                      }`}>
+                                        {aluno.aluno_nome}
+                                      </p>
+                                      {aluno.aluno_codigo && (
+                                        <p className="text-xs text-gray-400">Cód: {aluno.aluno_codigo}</p>
+                                      )}
+                                    </div>
+                                    {jaAutorizado && (
+                                      <span className="text-xs font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full whitespace-nowrap">
+                                        ✓ Autorizado
+                                      </span>
+                                    )}
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Ações */}
+                        <div className="flex gap-3 pt-2">
+                          <button
+                            type="button"
+                            onClick={() => { setIsConsentModalOpen(false); setConsentimentoSucesso(false); }}
+                            disabled={salvandoConsentimento}
+                            className="flex-1 px-4 py-2.5 bg-white border-2 border-gray-200 text-gray-700 font-semibold text-sm rounded-xl hover:bg-gray-50 focus:outline-none transition-colors disabled:opacity-50"
+                          >
+                            Voltar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleSalvarConsentimento}
+                            disabled={salvandoConsentimento || alunosSelecionados.length === 0}
+                            className="flex-1 px-4 py-2.5 bg-emerald-600 text-white font-semibold text-sm rounded-xl hover:bg-emerald-700 shadow-sm shadow-emerald-600/30 focus:outline-none active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex justify-center items-center gap-2"
+                          >
+                            {salvandoConsentimento && (
+                              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            )}
+                            {salvandoConsentimento ? "Registrando..." : "Confirmar Consentimento"}
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </Dialog.Panel>
+              </Transition.Child>
+            </div>
+          </div>
+        </Dialog>
+      </Transition>
+
+      {/* ── MODAL SELECIONAR ALUNO PARA IMPRESSÃO ──────── */}
+      <Transition appear show={isPrintModalOpen} as={Fragment}>
+        <Dialog as="div" className="relative z-50" onClose={() => setIsPrintModalOpen(false)}>
+          <Transition.Child
+            as={Fragment}
+            enter="ease-out duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm" />
+          </Transition.Child>
+
+          <div className="fixed inset-0 overflow-y-auto">
+            <div className="flex min-h-full items-center justify-center p-4">
+              <Transition.Child
+                as={Fragment}
+                enter="ease-out duration-300"
+                enterFrom="opacity-0 scale-95"
+                enterTo="opacity-100 scale-100"
+                leave="ease-in duration-200"
+                leaveFrom="opacity-100 scale-100"
+                leaveTo="opacity-0 scale-95"
+              >
+                <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white shadow-2xl transition-all border border-gray-100">
+                  {/* Header com gradiente */}
+                  <div className="bg-gradient-to-r from-violet-600 via-violet-500 to-purple-500 px-7 py-5">
+                    <div className="flex items-center gap-3">
+                      <div className="flex-shrink-0 w-11 h-11 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center ring-2 ring-white/30">
+                        <PrinterIcon className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <Dialog.Title as="h3" className="text-lg font-bold text-white leading-tight">
+                          Gerar Termo de Consentimento
+                        </Dialog.Title>
+                        <p className="text-violet-100 text-sm mt-0.5">Selecione o(a) aluno(a)</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="px-7 py-5">
+                    {/* Responsável */}
+                    <div className="flex items-center gap-3 bg-slate-50 rounded-xl px-4 py-3 mb-4 border border-slate-100">
+                      <div className="w-9 h-9 rounded-full bg-violet-100 flex items-center justify-center">
+                        <span className="text-violet-700 font-bold text-sm">
+                          {(printItem?.nome || "?").charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-800">{printItem?.nome}</p>
+                        <p className="text-xs text-gray-400">{printItem?.cpf ? formatCpf(printItem.cpf) : "CPF não informado"}</p>
+                      </div>
+                    </div>
+
+                    {/* Lista de alunos */}
+                    {carregandoPrintAlunos ? (
+                      <div className="flex items-center justify-center gap-2 py-8 text-gray-400">
+                        <div className="w-5 h-5 border-2 border-gray-200 border-t-violet-500 rounded-full animate-spin" />
+                        <span className="text-sm">Carregando alunos...</span>
+                      </div>
+                    ) : printAlunos.length === 0 ? (
+                      <div className="text-center py-8 text-gray-400 text-sm">
+                        Nenhum aluno vinculado encontrado.
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium text-gray-600 mb-2">
+                          Clique no aluno para gerar o PDF:
+                        </p>
+                        {printAlunos.map((aluno) => (
+                          <button
+                            key={aluno.aluno_id}
+                            onClick={() => {
+                              setIsPrintModalOpen(false);
+                              gerarTermoPDF(printItem.id, aluno.aluno_id);
+                            }}
+                            className="w-full flex items-center gap-3 rounded-xl px-4 py-3 border border-gray-200 bg-white hover:border-violet-300 hover:bg-violet-50 transition-all text-left group"
+                          >
+                            <div className="w-8 h-8 rounded-full bg-gray-100 group-hover:bg-violet-100 flex items-center justify-center transition-colors">
+                              <PrinterIcon className="w-4 h-4 text-gray-400 group-hover:text-violet-600 transition-colors" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-gray-800 truncate">{aluno.aluno_nome}</p>
+                              {aluno.aluno_codigo && (
+                                <p className="text-xs text-gray-400">RE: {aluno.aluno_codigo}</p>
+                              )}
+                            </div>
+                            <span className="text-xs font-semibold text-violet-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                              Gerar PDF →
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Fechar */}
+                    <div className="mt-5 pt-3 border-t border-gray-100">
+                      <button
+                        type="button"
+                        onClick={() => setIsPrintModalOpen(false)}
+                        className="w-full px-4 py-2.5 bg-white border-2 border-gray-200 text-gray-700 font-semibold text-sm rounded-xl hover:bg-gray-50 focus:outline-none transition-colors"
+                      >
+                        Fechar
+                      </button>
+                    </div>
                   </div>
                 </Dialog.Panel>
               </Transition.Child>

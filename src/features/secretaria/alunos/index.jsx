@@ -453,15 +453,20 @@ export default function Alunos() {
           setImportOpen(false);
           await fetchAlunos();
           if (res && typeof res === "object") {
-            setResultadoImportacao({
-              localizados: res.localizados ?? 0,
-              inseridos: res.inseridos ?? 0,
-              jaExistiam: res.jaExistiam ?? 0,
-              reativados: res.reativados ?? 0,
-              inativados: res.inativados ?? 0,
-              turma: res.turma || res.turmaNome || res.nomeTurma || undefined,
-              message: res.message,
-            });
+            // Se for erro (status === "erro"), mostra apenas a mensagem
+            if (res.status === "erro") {
+              setResultadoImportacao({ message: res.message || "Erro na importação." });
+            } else {
+              setResultadoImportacao({
+                localizados: res.localizados ?? 0,
+                inseridos: res.inseridos ?? 0,
+                jaExistiam: res.jaExistiam ?? 0,
+                reativados: res.reativados ?? 0,
+                inativados: res.inativados ?? 0,
+                turma: res.turma || res.turmaNome || res.nomeTurma || undefined,
+                message: res.message,
+              });
+            }
           } else {
             setResultadoImportacao({ message: "📥 Importação concluída." });
           }

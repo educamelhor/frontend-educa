@@ -27,12 +27,6 @@ export default function Alunos() {
 
   const fileInputRef = useRef();
 
-  // Fallback de sexo por nome
-  const inferSexo = (nome) => {
-    if (!nome) return "";
-    const primeiro = nome.split(" ")[0];
-    return primeiro.slice(-1).toLowerCase() === "a" ? "F" : "M";
-  };
 
   // Carrega alunos ativos
   const buscarAlunos = async () => {
@@ -232,10 +226,9 @@ export default function Alunos() {
         <table className="min-w-full bg-white">
           <thead className="bg-blue-100">
             <tr>
-              <th className="p-2 border">Código</th>
+              <th className="p-2 border">RE</th>
               <th className="p-2 border">Estudante</th>
               <th className="p-2 border">Data de Nasc.</th>
-              <th className="p-2 border">Sexo</th>
               <th className="p-2 border">Turma</th>
               <th className="p-2 border">Turno</th>
               <th className="p-2 border">Ações</th>
@@ -249,10 +242,6 @@ export default function Alunos() {
                   aluno.data_nascimento && aluno.data_nascimento !== "0000-00-00"
                     ? new Date(aluno.data_nascimento).toLocaleDateString("pt-BR")
                     : "";
-                const displaySexo =
-                  aluno.sexo && aluno.sexo.trim()
-                    ? aluno.sexo
-                    : inferSexo(aluno.estudante);
                 return (
                   <tr
                     key={aluno.id}
@@ -263,7 +252,6 @@ export default function Alunos() {
                     <td className="p-2 border">{aluno.codigo}</td>
                     <td className="p-2 border">{aluno.estudante}</td>
                     <td className="p-2 border">{displayDate}</td>
-                    <td className="p-2 border">{displaySexo}</td>
                     <td className="p-2 border">{aluno.turma || "—"}</td>
                     <td className="p-2 border">{aluno.turno || "—"}</td>
                     <td className="p-2 border flex gap-2">

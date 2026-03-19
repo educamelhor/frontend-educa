@@ -4,6 +4,9 @@ import Sidebar from "./components/layout/Sidebar";
 import HeaderGlobal from "./components/layout/HeaderGlobal";
 import Home from "./features/home/Home.jsx";
 import Alunos from "./features/secretaria/alunos";
+import AlunosDisciplinar from "./features/disciplinar/alunos";
+import AjustesDisciplinar from "./features/disciplinar/ajustes";
+import ResponsaveisDisciplinar from "./features/disciplinar/responsaveis/index.jsx";
 import Boletim from "./features/boletim/Boletim";
 import FichaAluno from "./features/alunos/FichaAluno";
 import FotoAluno from "./features/alunos/FotoAluno";
@@ -11,29 +14,48 @@ import Professores from "./features/secretaria/professores";
 import FichaProfessor from "./features/secretaria/professores/FichaProfessor";
 import BancoQuestoes from "./features/questoes/BancoQuestoes";
 import Secretaria from "./features/secretaria";
+import Modulacao from "./features/secretaria/modulacao/Modulacao";
+import Redacao from "./features/pedagogico/correcoes/Redacao";
+import Gabarito from "./features/pedagogico/correcoes/Gabarito";
+import GabaritoModule from "./features/gabarito";
 import "@fontsource/montserrat/400.css";
 import "@fontsource/montserrat/600.css";
 import Login from "./features/login/Login.jsx";
 import AtivarDiretor from "./features/login/AtivarDiretor.jsx";
 import GerarGabaritos from "./features/impressao/GerarGabaritos";
 import ConselhoClasse from "./features/pedagogico/conselho/ConselhoClasse";
+import ConteudosAdmin from "./features/pedagogico/conteudos/ConteudosAdmin.jsx";
+import Planos from "./features/professores/planos/Planos";
+import Avaliacoes from "./features/professores/avaliacoes/Avaliacoes";
+import ConteudosProfessor from "./features/professores/conteudos/Conteudos";
+import ProvasProfessor from "./features/professores/provas/Provas";
+import SolicitacoesConteudos from "./features/pedagogico/coordenacao/SolicitacoesConteudos.jsx";
 import LandingPage from "./features/landing/LandingPage";
 import Ferramentas from "./features/ferramentas";
-import DisciplinarAjustes from "./features/disciplinar/ajustes";
-import DisciplinarResponsaveis from "./features/disciplinar/responsaveis";
 
 // ✅ Direção (Diretor) — Devices EDUCA-CAPTURE
-
+import DiretorPedagogico from "./features/direcao/diretor/DiretorPedagogico.jsx";
+import GestaoEquipe from "./features/direcao/gestao-acessos/GestaoEquipe.jsx";
 
 // ✅ PLATAFORMA (CEO) — v1
 import PlataformaEscolas from "./features/plataforma/PlataformaEscolas.jsx";
+import PlataformaDiretores from "./features/plataforma/PlataformaDiretores.jsx";
 import PlataformaAuditoriaRBAC from "./features/plataforma/PlataformaAuditoriaRBAC.jsx";
 import BoletimTurmas from "./features/impressao/BoletimTurmas";
 import PrintBoletinsTurma from "./features/impressao/PrintBoletinsTurma";
 import LoginProfessor from "./features/login/LoginProfessor";
 import CadastroUsuario from "./features/login/CadastroUsuario.jsx";
+import TabelaCodigos from "./features/secretaria/tabela-codigos";
+import HorariosPage from "./features/secretaria/horarios/index.jsx";
 import LayoutGrade from "./features/secretaria/horarios/LayoutGrade.jsx";
 import ExecutarMock from "./features/secretaria/horarios/ExecutarMock.jsx";
+
+// ✅ NOVO IMPORT — Configurações Pedagógicas
+import ConfiguracoesPedagogicas from "./features/secretaria/horarios/ConfiguracoesPedagogicas.jsx";
+
+// ✅ NOVO IMPORT — EscopoStep (página inicial do módulo Horários)
+import EscopoStep from "./features/secretaria/horarios/EscopoStep.jsx";
+
 import MonitoramentoAlertasTeste from "./features/monitoramento/MonitoramentoAlertasTeste.jsx";
 
 // >>> NOVO IMPORT: Monitoramento
@@ -52,6 +74,9 @@ import MonitoramentoPainel from "./features/monitoramento/MonitoramentoPainel.js
 
 // ⭐️ NOVO IMPORT: Embeddings — Gerar
 import EmbeddingsGerar from "./features/monitoramento/EmbeddingsGerar.jsx";
+
+// ⭐️ NOVO IMPORT: Boletim → Secretaria (Edição)
+import BoletimEdicao from "./features/secretaria/boletim/BoletimEdicao.jsx";
 
 // Layout protegido para rotas autenticadas
 function ProtectedLayout() {
@@ -199,6 +224,14 @@ export default function App() {
             }
           />
           <Route
+            path="/plataforma/diretores"
+            element={
+              <RequireCeo>
+                <PlataformaDiretores />
+              </RequireCeo>
+            }
+          />
+          <Route
             path="/plataforma/auditoria-rbac"
             element={
               <RequireCeo>
@@ -219,14 +252,13 @@ export default function App() {
           <Route path="/home" element={<Home />} />
 
           <Route path="/alunos" element={<Alunos />} />
-          <Route path="/secretaria/alunos" element={<Alunos />} />
 
-          <Route path="/disciplinar/alunos" element={<Alunos />} />
-          <Route path="/disciplinar/ajustes" element={<DisciplinarAjustes />} />
-          <Route
-            path="/disciplinar/responsaveis"
-            element={<DisciplinarResponsaveis />}
-          />
+          <Route path="/disciplinar/alunos" element={<AlunosDisciplinar />} />
+          <Route path="/disciplinar/ajustes" element={<AjustesDisciplinar />} />
+          <Route path="/disciplinar/responsaveis" element={<ResponsaveisDisciplinar />} />
+
+          {/* Disciplinar — Gestão de Equipe */}
+          <Route path="/disciplinar/equipe" element={<GestaoEquipe />} />
 
           {/* Monitoramento */}
           <Route
@@ -290,12 +322,79 @@ export default function App() {
             element={<FichaProfessor />}
           />
 
+          {/* ⭐️ ROTA DO BOLETIM (SECRETARIA) */}
+          <Route path="/secretaria/boletim" element={<BoletimEdicao />} />
+
           <Route path="/secretaria/*" element={<Secretaria />} />
+          <Route path="/secretaria/modulacao" element={<Modulacao />} />
+
+          {/* ✅ AJUSTE: Horários agora abre direto no EscopoStep */}
+          <Route path="/secretaria/horarios" element={<HorariosPage />} />
+
+          {/* ✅ NOVA ROTA — Configurações Pedagógicas */}
+          <Route
+            path="/secretaria/horarios/configuracoes-pedagogicas"
+            element={<ConfiguracoesPedagogicas />}
+          />
+
+          <Route
+            path="/secretaria/tabela-codigos"
+            element={<TabelaCodigos />}
+          />
 
           {/* Pedagógico */}
           <Route
+            path="/pedagogico/correcoes/redacao"
+            element={<Redacao />}
+          />
+          <Route
+            path="/pedagogico/correcoes/gabarito"
+            element={<Gabarito />}
+          />
+
+          {/* ⭐ MÓDULO GABARITO (Novo — Premium) */}
+          <Route path="/gabarito" element={<GabaritoModule />} />
+          <Route path="/gabarito/gerar" element={<GabaritoModule />} />
+          <Route path="/gabarito/corrigir" element={<GabaritoModule />} />
+          <Route path="/gabarito/resultados" element={<GabaritoModule />} />
+          <Route
             path="/pedagogico/conselho"
             element={<ConselhoClasse />}
+          />
+
+          <Route
+            path="/pedagogico/conteudos"
+            element={
+              <RequirePerm perm="conteudos.visualizar">
+                <ConteudosAdmin />
+              </RequirePerm>
+            }
+          />
+
+
+          <Route
+            path="/pedagogico/coordenacao/solicitacoes"
+            element={<SolicitacoesConteudos />}
+          />
+
+          <Route
+            path="/professores/planos"
+            element={<Planos />}
+          />
+
+          <Route
+            path="/professores/avaliacoes"
+            element={<Avaliacoes />}
+          />
+
+          <Route
+            path="/professores/conteudos"
+            element={<ConteudosProfessor />}
+          />
+
+          <Route
+            path="/professores/provas"
+            element={<ProvasProfessor />}
           />
 
 
@@ -321,6 +420,18 @@ export default function App() {
 
           <Route path="/ferramentas" element={<Ferramentas />} />
 
+          {/* Direção (Diretor) — Devices EDUCA-CAPTURE */}
+          <Route
+            path="/direcao/diretor"
+            element={
+              <RequirePerm perm="capture_devices.gerenciar">
+                <DiretorPedagogico />
+              </RequirePerm>
+            }
+          />
+
+          {/* Direção — Responsáveis (cópia do Disciplinar) */}
+          <Route path="/direcao/responsaveis" element={<ResponsaveisDisciplinar />} />
 
           <Route path="*" element={<Navigate to="/home" replace />} />
         </Route>

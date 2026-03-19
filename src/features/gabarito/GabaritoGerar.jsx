@@ -7,6 +7,19 @@ import React, { useState, useEffect } from "react";
 
 const API = "http://localhost:3000/api";
 
+function authHeaders() {
+  return {
+    Authorization: `Bearer ${localStorage.getItem("token")}`,
+  };
+}
+
+// Ano letivo padrão: até 31/01, pertence ao ano anterior (padrão do sistema)
+function anoLetivoPadrao() {
+  const hoje = new Date();
+  const mes = hoje.getMonth() + 1; // 1-12
+  return mes <= 1 ? hoje.getFullYear() - 1 : hoje.getFullYear();
+}
+
 export default function GabaritoGerar() {
   // ─── Dados para os selects ───
   const [turnos, setTurnos] = useState([]);
@@ -35,26 +48,26 @@ export default function GabaritoGerar() {
     setTimeout(() => setToast(null), 3500);
   };
 
-  // ─── Fetch Turnos ───
+  // ─── Fetch Turmas (filtradas pelo ano letivo atual) + derivar Turnos ───
   useEffect(() => {
     (async () => {
       setLoadingTurnos(true);
-      try {
-        const resp = await fetch(`${API}/turnos`);
-        if (resp.ok) setTurnos(await resp.json());
-      } catch { /* empty */ }
-      setLoadingTurnos(false);
-    })();
-  }, []);
-
-  // ─── Fetch Turmas ───
-  useEffect(() => {
-    (async () => {
       setLoadingTurmas(true);
       try {
-        const resp = await fetch(`${API}/turmas`);
-        if (resp.ok) setTurmas(await resp.json());
+        const resp = await fetch(`${API}/turmas`, { headers: authHeaders() });
+        if (resp.ok) {
+          const todas = await resp.json();
+          // Filtra pelo ano letivo atual (padrão do sistema: corte 31/jan)
+          const anoAtual = anoLetivoPadrao();
+          const filtradas = todas.filter((t) => Number(t.ano) === anoAtual);
+          setTurmas(filtradas);
+
+          // Deriva turnos únicos diretamente das turmas do ano letivo
+          const turnosUnicos = [...new Set(filtradas.map((t) => t.turno).filter(Boolean))].sort();
+          setTurnos(turnosUnicos);
+        }
       } catch { /* empty */ }
+      setLoadingTurnos(false);
       setLoadingTurmas(false);
     })();
   }, []);
@@ -69,8 +82,12 @@ export default function GabaritoGerar() {
     (async () => {
       setLoadingAlunos(true);
       try {
-        const resp = await fetch(`${API}/alunos?turma_id=${encodeURIComponent(turmaSel)}`);
-        if (resp.ok) setAlunos(await resp.json());
+        // Usa a rota /turmas/:id/alunos que já filtra por ano_letivo atual
+        const resp = await fetch(`${API}/turmas/${encodeURIComponent(turmaSel)}/alunos`, { headers: authHeaders() });
+        if (resp.ok) {
+          const data = await resp.json();
+          setAlunos(data.alunos || data || []);
+        }
       } catch { /* empty */ }
       setAlunoSel("");
       setLoadingAlunos(false);
@@ -87,35 +104,21 @@ export default function GabaritoGerar() {
     setGerando(true);
     try {
       let endpoint = "";
-      let body = {};
+      const body = {
+        descricao: titulo,
+        num_questoes: Number(numQuestoes),
+        num_alternativas: Number(numAlternativas),
+        modelo,
+      };
 
       if (modoGeracao === "aluno" && alunoSel) {
-        endpoint = `${API}/gabaritos-generator/gerar-individual`;
-        body = {
-          aluno_codigo: alunoSel,
-          turma_id: turmaSel,
-          descricao: titulo,
-          num_questoes: Number(numQuestoes),
-          num_alternativas: Number(numAlternativas),
-          modelo,
-        };
+        endpoint = `${API}/gabarito-pdf/gerar-individual`;
+        body.aluno_codigo = alunoSel;
+        body.turma_id = turmaSel;
       } else if (modoGeracao === "turma" && turmaSel) {
-        endpoint = `${API}/gabaritos-generator/gerar/${encodeURIComponent(turmaSel)}`;
-        body = {
-          descricao: titulo,
-          num_questoes: Number(numQuestoes),
-          num_alternativas: Number(numAlternativas),
-          modelo,
-        };
+        endpoint = `${API}/gabarito-pdf/gerar-turma/${encodeURIComponent(turmaSel)}`;
       } else if (modoGeracao === "turno" && turnoSel) {
-        // Gera para todas as turmas do turno
-        endpoint = `${API}/gabaritos-generator/gerar-turno/${encodeURIComponent(turnoSel)}`;
-        body = {
-          descricao: titulo,
-          num_questoes: Number(numQuestoes),
-          num_alternativas: Number(numAlternativas),
-          modelo,
-        };
+        endpoint = `${API}/gabarito-pdf/gerar-turno/${encodeURIComponent(turnoSel)}`;
       } else {
         showToast("Selecione o destino da geração.", "error");
         setGerando(false);
@@ -131,15 +134,19 @@ export default function GabaritoGerar() {
         body: JSON.stringify(body),
       });
 
-      if (!resp.ok) throw new Error("Erro ao gerar");
-
-      const data = await resp.json();
-      if (data.downloadUrl) {
-        window.open(`http://localhost:3000${data.downloadUrl}`, "_blank");
+      if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.error || "Erro ao gerar");
       }
-      showToast(data.message || "Gabaritos gerados com sucesso!");
-    } catch {
-      showToast("Erro ao gerar gabaritos.", "error");
+
+      // O backend retorna o PDF diretamente como stream
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+
+      showToast("Gabaritos gerados com sucesso!");
+    } catch (err) {
+      showToast(err.message || "Erro ao gerar gabaritos.", "error");
     }
     setGerando(false);
   }
@@ -380,8 +387,8 @@ export default function GabaritoGerar() {
                   >
                     <option value="">Selecione o aluno</option>
                     {alunos.map((a) => (
-                      <option key={a.codigo} value={a.codigo}>
-                        {a.codigo} — {a.nome || a.estudante}
+                      <option key={a.matricula || a.codigo || a.id} value={a.matricula || a.codigo || a.id}>
+                        {a.matricula || a.codigo} — {a.nome || a.estudante}
                       </option>
                     ))}
                   </select>

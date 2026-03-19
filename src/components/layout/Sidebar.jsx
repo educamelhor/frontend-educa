@@ -58,14 +58,15 @@ export default function Sidebar() {
     String(localStorage.getItem('perfil') || '').toLowerCase().trim();
   const perfil = getPerfil();
   const isDisciplinar = perfil === 'disciplinar' || perfil === 'diretor_disciplinar' || perfil === 'militar';
+  const isProfessor = perfil === 'professor';
 
   // Começando pelos 3 módulos solicitados
-  const canConteudos = isScopeEscola && !isDisciplinar && hasPerm('conteudos.visualizar');
-  const canAvaliacoes = isScopeEscola && !isDisciplinar && hasPerm('avaliacoes.visualizar');
-  const canMonitoramento = isScopeEscola && !isDisciplinar && hasPerm('monitoramento.visualizar');
+  const canConteudos = isScopeEscola && !isDisciplinar && !isProfessor && hasPerm('conteudos.visualizar');
+  const canAvaliacoes = isScopeEscola && !isDisciplinar && !isProfessor && hasPerm('avaliacoes.visualizar');
+  const canMonitoramento = isScopeEscola && !isDisciplinar && !isProfessor && hasPerm('monitoramento.visualizar');
 
   // Direção (Diretor) — Devices EDUCA-CAPTURE
-  const canDirecaoDevices = isScopeEscola && !isDisciplinar && hasPerm('capture_devices.gerenciar');
+  const canDirecaoDevices = isScopeEscola && !isDisciplinar && !isProfessor && hasPerm('capture_devices.gerenciar');
 
 
   // ─────────────────────────────────────────────────────────────
@@ -156,7 +157,7 @@ export default function Sidebar() {
         ) : (
           <>
             {/* LINK: Home */}
-            {!isDisciplinar && (
+            {!isDisciplinar && !isProfessor && (
             <Link to="/" className={getMainLinkClasses('/')}>
               <HomeIcon className="h-5 w-5 mr-2" />
               Home
@@ -164,7 +165,7 @@ export default function Sidebar() {
             )}
 
             {/* LINK: Estudantes */}
-            {!isDisciplinar && (
+            {!isDisciplinar && !isProfessor && (
             <Link to="/alunos" className={getMainLinkClasses('/alunos')}>
               <UserGroupIcon className="h-5 w-5 mr-2" />
               Estudantes
@@ -172,7 +173,61 @@ export default function Sidebar() {
             )}
 
             {/* GRUPO: Professores (fora de Secretaria) */}
-            {!isDisciplinar && (
+            {isProfessor ? (
+            /* ── Professor: mostra APENAS o grupo Professores, sempre aberto ── */
+            <>
+            <button
+              className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-2 transition"
+              onClick={() => setOpenGroup(openGroup === 'professores' ? null : 'professores')}
+              type="button"
+            >
+              <AcademicCapIcon className="h-5 w-5 mr-2" />
+              <span className="flex-1 text-left">Professores</span>
+              {openGroup === 'professores' ? (
+                <ChevronDownIcon className="h-4 w-4" />
+              ) : (
+                <ChevronRightIcon className="h-4 w-4" />
+              )}
+            </button>
+
+            {openGroup === 'professores' && (
+              <ul className="ml-4 mb-2">
+                <li>
+                  <Link
+                    to="/professores/planos"
+                    className={getSubmenuLinkClasses('/professores/planos')}
+                  >
+                    <PencilSquareIcon className="h-5 w-5 mr-2" /> Planos
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/professores/avaliacoes"
+                    className={getSubmenuLinkClasses('/professores/avaliacoes')}
+                  >
+                    <TableCellsIcon className="h-5 w-5 mr-2" /> Avaliações
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/professores/conteudos"
+                    className={getSubmenuLinkClasses('/professores/conteudos')}
+                  >
+                    <BookOpenIcon className="h-5 w-5 mr-2" /> Conteúdos
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/professores/provas"
+                    className={getSubmenuLinkClasses('/professores/provas')}
+                  >
+                    <DocumentTextIcon className="h-5 w-5 mr-2" /> Provas
+                  </Link>
+                </li>
+              </ul>
+            )}
+            </>
+            ) : !isDisciplinar && (
             <>
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-2 transition"
@@ -228,7 +283,7 @@ export default function Sidebar() {
             )}
 
             {/* LINK: Banco de Questões */}
-            {!isDisciplinar && (
+            {!isDisciplinar && !isProfessor && (
             <Link to="/questoes" className={getMainLinkClasses('/questoes')}>
               <BookOpenIcon className="h-5 w-5 mr-2" />
               Banco de Questões
@@ -236,7 +291,7 @@ export default function Sidebar() {
             )}
 
             {/* LINK: Ferramentas */}
-            {!isDisciplinar && (
+            {!isDisciplinar && !isProfessor && (
             <Link to="/ferramentas" className={getMainLinkClasses('/ferramentas')}>
               <WrenchIcon className="h-5 w-5 mr-2" />
               Ferramentas
@@ -244,7 +299,7 @@ export default function Sidebar() {
             )}
 
             {/* ⭐ MÓDULO GABARITO — Destaque Premium */}
-            {!isDisciplinar && (
+            {!isDisciplinar && !isProfessor && (
             <>
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-2 transition"
@@ -407,7 +462,7 @@ export default function Sidebar() {
 
 
 
-        {isScopeEscola && (
+        {isScopeEscola && !isProfessor && (
           <>
             {/* ───────────────────────────────
                 GRUPO: Disciplinar
@@ -468,7 +523,7 @@ export default function Sidebar() {
           </>
         )}
 
-        {isScopeEscola && !isDisciplinar && (
+        {isScopeEscola && !isDisciplinar && !isProfessor && (
           <>
             {/* ───────────────────────────────
                 GRUPO: Secretaria
@@ -596,7 +651,7 @@ export default function Sidebar() {
           </>
         )}
 
-        {isScopeEscola && !isDisciplinar && (
+        {isScopeEscola && !isDisciplinar && !isProfessor && (
           <>
             {/* ───────────────────────────────
                 GRUPO: Pedagógico
@@ -718,7 +773,7 @@ export default function Sidebar() {
           </>
         )}
 
-        {isScopeEscola && !isDisciplinar && (
+        {isScopeEscola && !isDisciplinar && !isProfessor && (
           <>
             {/* ───────────────────────────────
                 GRUPO: Impressão

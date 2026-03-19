@@ -15,6 +15,12 @@ import ModalGabaritoOficial from "./components/ModalGabaritoOficial";
 const API = "http://localhost:3000/api";
 const PYTHON_API = "http://localhost:8500";
 
+function authHeaders() {
+  return {
+    Authorization: `Bearer ${localStorage.getItem("token")}`,
+  };
+}
+
 export default function GabaritoCorrigir() {
   // ─── Estado da avaliação (gabarito oficial) ───
   const [avaliacaoAtiva, setAvaliacaoAtiva] = useState(null);
@@ -108,6 +114,7 @@ export default function GabaritoCorrigir() {
 
       const resp = await fetch(`${API}/ocr/azure-text`, {
         method: "POST",
+        headers: authHeaders(),
         body: formData,
       });
       const data = await resp.json();
@@ -128,7 +135,9 @@ export default function GabaritoCorrigir() {
 
       // Buscar dados do aluno no banco
       try {
-        const respAluno = await fetch(`${API}/alunos/por-codigo/${codigo}`);
+        const respAluno = await fetch(`${API}/alunos/por-codigo/${codigo}`, {
+          headers: authHeaders(),
+        });
         const dataAluno = await respAluno.json();
         if (!respAluno.ok || !dataAluno.nome) {
           setAlunoInfo({ codigo, nome: "NÃO ENCONTRADO", turma: "-" });
@@ -148,14 +157,15 @@ export default function GabaritoCorrigir() {
     setLoadingAluno(false);
   }
 
-  // Extrair código do aluno do texto OCR
+  // Extrair código do aluno do texto OCR (reconhece "RE" e "CÓDIGO")
   function extrairCodigo(texto) {
     if (!texto) return null;
-    const match = texto.match(/C[ÓO]DIGO\s*[:\-–]?\s*([0-9]{5,10})/i);
+    // Tenta encontrar "RE:" ou "CÓDIGO:" seguido de número
+    const match = texto.match(/(?:RE|C[ÓO]DIGO)\s*[:\-–]?\s*([0-9]{5,10})/i);
     if (match) return match[1].trim();
     const linhas = texto.split(/\r?\n/);
     for (let i = 0; i < linhas.length; i++) {
-      if (/C[ÓO]DIGO\s*[:\-–]?\s*$/i.test(linhas[i].trim())) {
+      if (/(?:RE|C[ÓO]DIGO)\s*[:\-–]?\s*$/i.test(linhas[i].trim())) {
         for (let j = i + 1; j <= i + 8 && j < linhas.length; j++) {
           const n = linhas[j].match(/([0-9]{5,10})/);
           if (n) return n[1];
@@ -163,7 +173,7 @@ export default function GabaritoCorrigir() {
       }
     }
     for (let i = 0; i < linhas.length; i++) {
-      if (/C[ÓO]DIGO/.test(linhas[i].toUpperCase())) {
+      if (/(?:RE|C[ÓO]DIGO)/.test(linhas[i].toUpperCase())) {
         for (let j = i; j < linhas.length && j < i + 12; j++) {
           const n = linhas[j].match(/\b(\d{5,10})\b/);
           if (n) return n[1];

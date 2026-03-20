@@ -4,14 +4,7 @@
 // ============================================================================
 
 import React, { useState, useEffect } from "react";
-
-const API = "http://localhost:3000/api";
-
-function authHeaders() {
-  return {
-    Authorization: `Bearer ${localStorage.getItem("token")}`,
-  };
-}
+import api from "../../services/api";
 
 // Ano letivo padrão: até 31/01, pertence ao ano anterior (padrão do sistema)
 function anoLetivoPadrao() {
@@ -54,18 +47,16 @@ export default function GabaritoGerar() {
       setLoadingTurnos(true);
       setLoadingTurmas(true);
       try {
-        const resp = await fetch(`${API}/turmas`, { headers: authHeaders() });
-        if (resp.ok) {
-          const todas = await resp.json();
-          // Filtra pelo ano letivo atual (padrão do sistema: corte 31/jan)
-          const anoAtual = anoLetivoPadrao();
-          const filtradas = todas.filter((t) => Number(t.ano) === anoAtual);
-          setTurmas(filtradas);
+        const resp = await api.get("/turmas");
+        const todas = resp.data;
+        // Filtra pelo ano letivo atual (padrão do sistema: corte 31/jan)
+        const anoAtual = anoLetivoPadrao();
+        const filtradas = todas.filter((t) => Number(t.ano) === anoAtual);
+        setTurmas(filtradas);
 
-          // Deriva turnos únicos diretamente das turmas do ano letivo
-          const turnosUnicos = [...new Set(filtradas.map((t) => t.turno).filter(Boolean))].sort();
-          setTurnos(turnosUnicos);
-        }
+        // Deriva turnos únicos diretamente das turmas do ano letivo
+        const turnosUnicos = [...new Set(filtradas.map((t) => t.turno).filter(Boolean))].sort();
+        setTurnos(turnosUnicos);
       } catch { /* empty */ }
       setLoadingTurnos(false);
       setLoadingTurmas(false);
@@ -83,11 +74,9 @@ export default function GabaritoGerar() {
       setLoadingAlunos(true);
       try {
         // Usa a rota /turmas/:id/alunos que já filtra por ano_letivo atual
-        const resp = await fetch(`${API}/turmas/${encodeURIComponent(turmaSel)}/alunos`, { headers: authHeaders() });
-        if (resp.ok) {
-          const data = await resp.json();
-          setAlunos(data.alunos || data || []);
-        }
+        const resp = await api.get(`/turmas/${encodeURIComponent(turmaSel)}/alunos`);
+        const data = resp.data;
+        setAlunos(data.alunos || data || []);
       } catch { /* empty */ }
       setAlunoSel("");
       setLoadingAlunos(false);
@@ -112,35 +101,25 @@ export default function GabaritoGerar() {
       };
 
       if (modoGeracao === "aluno" && alunoSel) {
-        endpoint = `${API}/gabarito-pdf/gerar-individual`;
+        endpoint = `/gabarito-pdf/gerar-individual`;
         body.aluno_codigo = alunoSel;
         body.turma_id = turmaSel;
       } else if (modoGeracao === "turma" && turmaSel) {
-        endpoint = `${API}/gabarito-pdf/gerar-turma/${encodeURIComponent(turmaSel)}`;
+        endpoint = `/gabarito-pdf/gerar-turma/${encodeURIComponent(turmaSel)}`;
       } else if (modoGeracao === "turno" && turnoSel) {
-        endpoint = `${API}/gabarito-pdf/gerar-turno/${encodeURIComponent(turnoSel)}`;
+        endpoint = `/gabarito-pdf/gerar-turno/${encodeURIComponent(turnoSel)}`;
       } else {
         showToast("Selecione o destino da geração.", "error");
         setGerando(false);
         return;
       }
 
-      const resp = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-        body: JSON.stringify(body),
+      const resp = await api.post(endpoint, body, {
+        responseType: "blob",
       });
 
-      if (!resp.ok) {
-        const err = await resp.json().catch(() => ({}));
-        throw new Error(err.error || "Erro ao gerar");
-      }
-
       // O backend retorna o PDF diretamente como stream
-      const blob = await resp.blob();
+      const blob = new Blob([resp.data], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
       window.open(url, "_blank");
 

@@ -4,8 +4,7 @@
 // ============================================================================
 
 import React, { useState, useEffect, useMemo } from "react";
-
-const API = "http://localhost:3000/api";
+import api from "../../services/api";
 
 export default function GabaritoResultados() {
   // ─── Dados ───
@@ -22,15 +21,9 @@ export default function GabaritoResultados() {
     (async () => {
       setLoading(true);
       try {
-        const token = localStorage.getItem("token");
-        const headers = { Authorization: `Bearer ${token}` };
-
         // Buscar nomes únicos de gabaritos
-        const respNomes = await fetch(`${API}/gabaritos/nome-unicos`, { headers });
-        if (respNomes.ok) {
-          const nomes = await respNomes.json();
-          setAvaliacoes(nomes);
-        }
+        const resp = await api.get("/gabaritos/nome-unicos");
+        setAvaliacoes(resp.data);
       } catch {
         /* empty */
       }

@@ -11,15 +11,9 @@
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import ModalGabaritoOficial from "./components/ModalGabaritoOficial";
+import api from "../../services/api";
 
-const API = "http://localhost:3000/api";
 const PYTHON_API = "http://localhost:8500";
-
-function authHeaders() {
-  return {
-    Authorization: `Bearer ${localStorage.getItem("token")}`,
-  };
-}
 
 export default function GabaritoCorrigir() {
   // ─── Estado da avaliação (gabarito oficial) ───
@@ -112,14 +106,12 @@ export default function GabaritoCorrigir() {
       const formData = new FormData();
       formData.append("file", file);
 
-      const resp = await fetch(`${API}/ocr/azure-text`, {
-        method: "POST",
-        headers: authHeaders(),
-        body: formData,
+      const resp = await api.post("/ocr/azure-text", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
       });
-      const data = await resp.json();
+      const data = resp.data;
 
-      if (!resp.ok || !data.text) {
+      if (!data.text) {
         setAlunoInfo({ codigo: "-", nome: "NÃO DETECTADO", turma: "-" });
         setLoadingAluno(false);
         return;
@@ -135,11 +127,9 @@ export default function GabaritoCorrigir() {
 
       // Buscar dados do aluno no banco
       try {
-        const respAluno = await fetch(`${API}/alunos/por-codigo/${codigo}`, {
-          headers: authHeaders(),
-        });
-        const dataAluno = await respAluno.json();
-        if (!respAluno.ok || !dataAluno.nome) {
+        const respAluno = await api.get(`/alunos/por-codigo/${codigo}`);
+        const dataAluno = respAluno.data;
+        if (!dataAluno.nome) {
           setAlunoInfo({ codigo, nome: "NÃO ENCONTRADO", turma: "-" });
         } else {
           setAlunoInfo({
@@ -278,23 +268,16 @@ export default function GabaritoCorrigir() {
 
     setSalvando(true);
     try {
-      const resp = await fetch(`${API}/gabaritos/corrigir`, {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${localStorage.getItem("token")}`,
-        },
-        body: JSON.stringify({
-          respostasAluno,
-          gabaritoOficial: avaliacaoAtiva.gabarito,
-          codigoAluno: alunoInfo.codigo,
-          nome: alunoInfo.nome,
-          turma: alunoInfo.turma,
-          nomeGabarito: avaliacaoAtiva.titulo,
-        }),
+      const resp = await api.post("/gabaritos/corrigir", {
+        respostasAluno,
+        gabaritoOficial: avaliacaoAtiva.gabarito,
+        codigoAluno: alunoInfo.codigo,
+        nome: alunoInfo.nome,
+        turma: alunoInfo.turma,
+        nomeGabarito: avaliacaoAtiva.titulo,
       });
 
-      const data = await resp.json();
+      const data = resp.data;
       if (data.saved || data.success) {
         showToast("Resultado salvo com sucesso!", "success");
       } else {

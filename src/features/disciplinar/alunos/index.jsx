@@ -209,18 +209,11 @@ export default function AlunosDisciplinar() {
                 return;
             }
 
-            // 2) Tudo OK → Gerar PDF
+            // 2) Tudo OK → Abrir o PDF (mesmo padrão do TACE)
             const token = localStorage.getItem("token");
-            const baseUrl = import.meta.env.VITE_API_URL || "";
-            const url = `${baseUrl}/api/relatorio-disciplinar/${aluno.id}`;
-
-            const res = await fetch(url, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            if (!res.ok) throw new Error("Erro ao gerar relatório");
-            const blob = await res.blob();
-            const pdfUrl = URL.createObjectURL(blob);
-            window.open(pdfUrl, "_blank");
+            const escolaId = localStorage.getItem("escola_id");
+            const url = `${api.defaults.baseURL}/relatorio-disciplinar/${aluno.id}?token=${encodeURIComponent(token)}&escola_id=${encodeURIComponent(escolaId)}`;
+            window.open(url, "_blank");
         } catch (err) {
             console.error("Erro ao gerar Relatório Disciplinar:", err);
             alert("Erro ao gerar o Relatório de Registros Disciplinares.");

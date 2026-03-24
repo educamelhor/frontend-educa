@@ -24,6 +24,7 @@ export default function ListaProfessores() {
   const [successMessage, setSuccessMessage] = useState('');
   const [toDelete, setToDelete]         = useState(null);
   const [editingProfessor, setEditingProfessor] = useState(null);
+  const [deleting, setDeleting]         = useState(false);
 
   // ─────────────────────────────────────────────────────────────
   // Carrega professores e disciplinas
@@ -109,7 +110,7 @@ export default function ListaProfessores() {
 
   async function handleDeleteConfirmed() {
     if (!toDelete) return;
-    setLoading(true);
+    setDeleting(true);
     try {
       await api.delete(`/api/professores/${toDelete.id}`);
       const { data } = await api.get('/api/professores');
@@ -117,12 +118,19 @@ export default function ListaProfessores() {
 
       setSuccessMessage('✅ Professor excluído com sucesso!');
       setTimeout(() => setSuccessMessage(''), 3000);
-    } catch {
-      alert('Erro ao excluir professor.');
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Erro ao excluir professor.';
+      alert(`Falha na operação: ${msg}`);
     } finally {
-      setLoading(false);
+      setDeleting(false);
       setToDelete(null);
     }
+  }
+
+  // helper: nome da disciplina
+  function getDiscLabel(prof) {
+    const disc = disciplinas.find(d => d.id === prof.disciplina_id);
+    return disc ? (disc.disciplina ?? disc.nome) : '—';
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -170,7 +178,7 @@ export default function ListaProfessores() {
                   <th className="p-2 border text-center font-medium text-blue-900">Nome</th>
                   <th className="p-2 border text-center font-medium text-blue-900">Data Nasc.</th>
                   <th className="p-2 border text-center font-medium text-blue-900">Sexo</th>
-                  <th className="p-2 border text-center font-medium text-blue-900">Turno</th>{/* ← NOVO */}
+                  <th className="p-2 border text-center font-medium text-blue-900">Turno</th>
                   <th className="p-2 border text-center font-medium text-blue-900">Disciplina</th>
                   <th className="p-2 border text-center font-medium text-blue-900">Aulas</th>
                   <th className="p-2 border text-center font-medium text-blue-900">Ações</th>
@@ -181,15 +189,14 @@ export default function ListaProfessores() {
                   .filter(p => {
                     const cpfMatch   = (p.cpf || "").includes(search);
                     const nomeMatch  = normalize(p.nome).includes(term);
-                    const turnoMatch = normalize(p.turno || "").includes(term); // ← NOVO
+                    const turnoMatch = normalize(p.turno || "").includes(term);
                     const discObj    = disciplinas.find(d => d.id === p.disciplina_id);
                     const discName   = discObj ? (discObj.disciplina ?? discObj.nome) : '';
                     const discMatch  = normalize(discName).includes(term);
                     return cpfMatch || nomeMatch || turnoMatch || discMatch;
                   })
                   .map(p => {
-                    const disc = disciplinas.find(d => d.id === p.disciplina_id);
-                    const discLabel = disc ? (disc.disciplina ?? disc.nome) : '—';
+                    const discLabel = getDiscLabel(p);
                     return (
                       <tr key={p.id} className="hover:bg-blue-50">
                         <td className="p-2 border text-center">{p.cpf}</td>
@@ -200,7 +207,7 @@ export default function ListaProfessores() {
                             : '—'}
                         </td>
                         <td className="p-2 border text-center">{p.sexo}</td>
-                        <td className="p-2 border text-center uppercase">{(p.turno || '—')}</td>{/* ← NOVO */}
+                        <td className="p-2 border text-center uppercase">{(p.turno || '—')}</td>
                         <td className="p-2 border text-center uppercase">{discLabel}</td>
                         <td className="p-2 border text-center">{p.aulas}</td>
                         <td className="p-2 border text-center space-x-2">
@@ -247,31 +254,211 @@ export default function ListaProfessores() {
         />
       </Modal>
 
-      {/* Modal: Confirmação de exclusão */}
-      <Modal open={!!toDelete} onClose={() => setToDelete(null)}>
-        <div className="p-6 space-y-4">
-          <h3 className="text-lg font-semibold">Confirmação</h3>
-          <p>
-            Tem certeza que deseja excluir o professor{" "}
-            <strong>{toDelete?.nome}</strong> (CPF: {toDelete?.cpf}) na
-            disciplina <strong>{toDelete?.disciplina_nome}</strong>?
-          </p>
-          <div className="flex justify-end space-x-2">
-            <button
-              onClick={() => setToDelete(null)}
-              className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
-            >
-              Não
-            </button>
-            <button
-              onClick={handleDeleteConfirmed}
-              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-            >
-              Sim
-            </button>
+      {/* ================================================================
+          MODAL PREMIUM: Confirmação de Exclusão de Professor
+          ================================================================ */}
+      {!!toDelete && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center"
+          style={{ backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+          onClick={() => !deleting && setToDelete(null)}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: '95%',
+              maxWidth: 480,
+              borderRadius: 20,
+              overflow: 'hidden',
+              background: 'linear-gradient(160deg, #fff 60%, #fef2f2 100%)',
+              boxShadow: '0 25px 60px rgba(0,0,0,0.3), 0 0 0 1px rgba(220,38,38,0.15)',
+              animation: 'modalSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+          >
+            {/* ── CSS animation via style tag ── */}
+            <style>{`
+              @keyframes modalSlideIn {
+                from { opacity: 0; transform: translateY(30px) scale(0.95); }
+                to   { opacity: 1; transform: translateY(0) scale(1); }
+              }
+              @keyframes pulseRing {
+                0%   { transform: scale(0.8); opacity: 0; }
+                50%  { opacity: 0.4; }
+                100% { transform: scale(1.5); opacity: 0; }
+              }
+              @keyframes spinDelete {
+                to { transform: rotate(360deg); }
+              }
+            `}</style>
+
+            {/* ── Header com gradiente de perigo ── */}
+            <div style={{
+              background: 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)',
+              padding: '28px 24px 24px',
+              textAlign: 'center',
+              position: 'relative',
+            }}>
+              {/* Ícone animado */}
+              <div style={{ position: 'relative', display: 'inline-block', marginBottom: 12 }}>
+                <div style={{
+                  position: 'absolute', inset: -8,
+                  borderRadius: '50%',
+                  border: '2px solid rgba(255,255,255,0.3)',
+                  animation: 'pulseRing 2s ease-out infinite',
+                }} />
+                <div style={{
+                  width: 56, height: 56,
+                  borderRadius: '50%',
+                  background: 'rgba(255,255,255,0.2)',
+                  backdropFilter: 'blur(4px)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 28,
+                }}>
+                  ⚠️
+                </div>
+              </div>
+              <h3 style={{
+                color: '#fff',
+                fontSize: 20,
+                fontWeight: 700,
+                margin: 0,
+                letterSpacing: '-0.01em',
+              }}>
+                Excluir Professor
+              </h3>
+              <p style={{
+                color: 'rgba(255,255,255,0.8)',
+                fontSize: 13,
+                margin: '6px 0 0',
+              }}>
+                Esta ação é irreversível
+              </p>
+            </div>
+
+            {/* ── Corpo ── */}
+            <div style={{ padding: '24px 24px 20px' }}>
+              <p style={{ color: '#374151', fontSize: 15, lineHeight: 1.6, margin: 0 }}>
+                Tem certeza que deseja excluir permanentemente o professor abaixo?
+              </p>
+
+              {/* Card com dados do professor */}
+              <div style={{
+                marginTop: 16,
+                padding: '14px 16px',
+                borderRadius: 12,
+                background: '#fef2f2',
+                border: '1px solid #fecaca',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{
+                    width: 42, height: 42,
+                    borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #dc2626, #f87171)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: '#fff', fontWeight: 700, fontSize: 18,
+                    flexShrink: 0,
+                  }}>
+                    {(toDelete.nome || '?')[0]}
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <p style={{
+                      fontWeight: 700, color: '#1f2937', fontSize: 15,
+                      margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {toDelete.nome}
+                    </p>
+                    <p style={{ color: '#6b7280', fontSize: 13, margin: '2px 0 0' }}>
+                      CPF: {toDelete.cpf}
+                      {toDelete.turno ? ` · ${toDelete.turno.toUpperCase()}` : ''}
+                      {getDiscLabel(toDelete) !== '—' ? ` · ${getDiscLabel(toDelete)}` : ''}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Aviso sobre dados relacionados */}
+              <div style={{
+                marginTop: 12,
+                padding: '10px 14px',
+                borderRadius: 10,
+                background: '#fffbeb',
+                border: '1px solid #fde68a',
+                display: 'flex', alignItems: 'flex-start', gap: 8,
+              }}>
+                <span style={{ fontSize: 16, lineHeight: '20px' }}>💡</span>
+                <p style={{ color: '#92400e', fontSize: 12, margin: 0, lineHeight: 1.5 }}>
+                  Serão removidos também os registros de <strong>modulação</strong> e <strong>preferências de horário</strong> vinculados a este professor.
+                </p>
+              </div>
+            </div>
+
+            {/* ── Footer com botões ── */}
+            <div style={{
+              padding: '0 24px 24px',
+              display: 'flex', gap: 12, justifyContent: 'flex-end',
+            }}>
+              <button
+                onClick={() => setToDelete(null)}
+                disabled={deleting}
+                style={{
+                  padding: '10px 24px',
+                  borderRadius: 10,
+                  border: '1px solid #d1d5db',
+                  background: '#fff',
+                  color: '#374151',
+                  fontWeight: 600,
+                  fontSize: 14,
+                  cursor: deleting ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.15s',
+                  opacity: deleting ? 0.5 : 1,
+                }}
+                onMouseEnter={e => { if (!deleting) { e.target.style.background = '#f3f4f6'; e.target.style.borderColor = '#9ca3af'; }}}
+                onMouseLeave={e => { e.target.style.background = '#fff'; e.target.style.borderColor = '#d1d5db'; }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDeleteConfirmed}
+                disabled={deleting}
+                style={{
+                  padding: '10px 28px',
+                  borderRadius: 10,
+                  border: 'none',
+                  background: deleting
+                    ? 'linear-gradient(135deg, #9ca3af, #6b7280)'
+                    : 'linear-gradient(135deg, #dc2626, #b91c1c)',
+                  color: '#fff',
+                  fontWeight: 700,
+                  fontSize: 14,
+                  cursor: deleting ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s',
+                  boxShadow: deleting ? 'none' : '0 4px 14px rgba(220,38,38,0.4)',
+                  display: 'flex', alignItems: 'center', gap: 8,
+                }}
+                onMouseEnter={e => { if (!deleting) { e.target.style.transform = 'translateY(-1px)'; e.target.style.boxShadow = '0 6px 20px rgba(220,38,38,0.5)'; }}}
+                onMouseLeave={e => { e.target.style.transform = 'translateY(0)'; e.target.style.boxShadow = '0 4px 14px rgba(220,38,38,0.4)'; }}
+              >
+                {deleting ? (
+                  <>
+                    <span style={{
+                      width: 16, height: 16,
+                      border: '2px solid rgba(255,255,255,0.3)',
+                      borderTopColor: '#fff',
+                      borderRadius: '50%',
+                      display: 'inline-block',
+                      animation: 'spinDelete 0.6s linear infinite',
+                    }} />
+                    Excluindo...
+                  </>
+                ) : (
+                  'Sim, Excluir'
+                )}
+              </button>
+            </div>
           </div>
         </div>
-      </Modal>
+      )}
     </div>
   );
 }
+

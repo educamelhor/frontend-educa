@@ -271,6 +271,8 @@ export default function GabaritoCorrigir() {
       const payload = {
         avaliacao_id: avaliacaoAtiva.id,
         codigo_aluno: alunoInfo.codigo,
+        nome_aluno: alunoInfo.nome,
+        turma_nome: alunoInfo.turma,
         respostas_aluno: respostasAluno,
         acertos: correcao.acertos,
         total_questoes: correcao.totalQuestoes,
@@ -280,7 +282,7 @@ export default function GabaritoCorrigir() {
 
       // Calcular acertos por disciplina se tiver configuração
       if (avaliacaoAtiva.disciplinas_config && avaliacaoAtiva.disciplinas_config.length > 0) {
-        const acertosPorDisc = {};
+        const acertosPorDisc = [];
         for (const dc of avaliacaoAtiva.disciplinas_config) {
           let acertosDisc = 0;
           let totalDisc = 0;
@@ -288,12 +290,21 @@ export default function GabaritoCorrigir() {
             totalDisc++;
             if (correcao.resultado[q - 1]?.acertou) acertosDisc++;
           }
-          acertosPorDisc[dc.nome] = { acertos: acertosDisc, total: totalDisc };
+          const notaDisc = totalDisc > 0 
+            ? parseFloat(((acertosDisc / totalDisc) * (avaliacaoAtiva.notaTotal || 10)).toFixed(2))
+            : 0;
+          acertosPorDisc.push({
+            disciplina_id: dc.disciplina_id,
+            nome: dc.nome,
+            acertos: acertosDisc,
+            total: totalDisc,
+            nota: notaDisc,
+          });
         }
         payload.acertos_por_disciplina = acertosPorDisc;
       }
 
-      const resp = await api.post("/gabaritos/corrigir", payload);
+      const resp = await api.post("/api/gabaritos/corrigir", payload);
 
       const data = resp.data;
       if (data.saved || data.success) {

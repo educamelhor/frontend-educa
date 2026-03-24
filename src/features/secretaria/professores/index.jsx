@@ -8,7 +8,7 @@
 // ============================================================================
 
 import React, { useState, useRef } from "react";
-import { AcademicCapIcon, PlusIcon } from "@heroicons/react/24/solid";
+import { AcademicCapIcon, PlusIcon, TrashIcon } from "@heroicons/react/24/solid";
 import api from "../../../services/api";
 import { Button } from "../../../components/ui/Button";
 import Input from "../../../components/ui/Input";
@@ -31,6 +31,9 @@ export default function Professores() {
   // Exclusão / Inativação
   const [isExcluirOpen, setIsExcluirOpen] = useState(false);
   const [professorParaExcluir, setProfessorParaExcluir] = useState(null);
+
+  // Exclusão em lote
+  const [isLoteOpen, setIsLoteOpen] = useState(false);
 
   // Upload (PDF/XLSX)
   const [feedback, setFeedback] = useState(null);
@@ -240,6 +243,14 @@ export default function Professores() {
             <span role="img" aria-label="Pasta">📁</span> Incluir Professores
           </Button>
 
+          {/* Excluir em lote */}
+          <Button
+            onClick={() => setIsLoteOpen(true)}
+            className="bg-red-600 text-white hover:bg-red-700 flex items-center gap-2 px-6 py-2 rounded-lg font-bold shadow transition"
+          >
+            <TrashIcon className="w-5 h-5" /> Excluir Professores
+          </Button>
+
           {/* Feedback */}
           {feedback && (
             <FeedbackPanel
@@ -285,6 +296,385 @@ export default function Professores() {
         onDelete={() => handleConfirmExcluir("excluir")}
         onInactivate={() => handleConfirmExcluir("inativar")}
       />
+
+      {/* Modal: Exclusão em Lote */}
+      {isLoteOpen && (
+        <ModalExcluirLote
+          professores={professores}
+          onClose={() => setIsLoteOpen(false)}
+          onSuccess={() => {
+            reload();
+            setIsLoteOpen(false);
+            setMensagemSucesso('✅ Professores excluídos com sucesso!');
+            setTimeout(() => setMensagemSucesso(''), 3000);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// MODAL PREMIUM: Exclusão em Lote
+// ============================================================================
+function ModalExcluirLote({ professores, onClose, onSuccess }) {
+  const [selecionados, setSelecionados] = useState(new Set());
+  const [busca, setBusca] = useState("");
+  const [step, setStep] = useState("select"); // "select" | "confirm"
+  const [processing, setProcessing] = useState(false);
+  const [progresso, setProgresso] = useState({ current: 0, total: 0 });
+
+  const normalize = (s = "") => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+  const termo = normalize(busca);
+
+  const filtrados = professores.filter(p =>
+    normalize(p.nome).includes(termo) ||
+    (p.cpf || "").includes(busca) ||
+    normalize(p.turno || "").includes(termo) ||
+    normalize(p.disciplina_nome || "").includes(termo)
+  );
+
+  const toggleAll = () => {
+    if (filtrados.every(p => selecionados.has(p.id))) {
+      const next = new Set(selecionados);
+      filtrados.forEach(p => next.delete(p.id));
+      setSelecionados(next);
+    } else {
+      const next = new Set(selecionados);
+      filtrados.forEach(p => next.add(p.id));
+      setSelecionados(next);
+    }
+  };
+
+  const toggle = (id) => {
+    const next = new Set(selecionados);
+    next.has(id) ? next.delete(id) : next.add(id);
+    setSelecionados(next);
+  };
+
+  const handleExcluir = async () => {
+    const ids = [...selecionados];
+    setProgresso({ current: 0, total: ids.length });
+    setProcessing(true);
+    try {
+      await api.post('/api/professores/excluir-lote', { ids }, { timeout: 300000 });
+      onSuccess();
+    } catch (err) {
+      alert('Erro na exclusão em lote: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const allChecked = filtrados.length > 0 && filtrados.every(p => selecionados.has(p.id));
+  const qtd = selecionados.size;
+
+  return (
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center"
+      style={{ backgroundColor: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+      onClick={() => !processing && onClose()}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: '95%',
+          maxWidth: 620,
+          maxHeight: '90vh',
+          borderRadius: 20,
+          overflow: 'hidden',
+          background: 'linear-gradient(160deg, #fff 60%, #fef2f2 100%)',
+          boxShadow: '0 25px 60px rgba(0,0,0,0.3), 0 0 0 1px rgba(220,38,38,0.1)',
+          animation: 'profModalSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        <style>{`
+          @keyframes profModalSlideIn {
+            from { opacity: 0; transform: translateY(30px) scale(0.95); }
+            to   { opacity: 1; transform: translateY(0) scale(1); }
+          }
+          @keyframes profPulseRing {
+            0%   { transform: scale(0.8); opacity: 0; }
+            50%  { opacity: 0.4; }
+            100% { transform: scale(1.5); opacity: 0; }
+          }
+          @keyframes profSpin {
+            to { transform: rotate(360deg); }
+          }
+          .lote-row:hover { background: #fef2f2 !important; }
+          .lote-check { accent-color: #dc2626; width: 18px; height: 18px; cursor: pointer; }
+        `}</style>
+
+        {/* ── Header ── */}
+        <div style={{
+          background: step === 'confirm'
+            ? 'linear-gradient(135deg, #dc2626 0%, #991b1b 100%)'
+            : 'linear-gradient(135deg, #b91c1c 0%, #7f1d1d 100%)',
+          padding: '24px 24px 20px',
+          textAlign: 'center',
+          flexShrink: 0,
+        }}>
+          <div style={{ position: 'relative', display: 'inline-block', marginBottom: 10 }}>
+            <div style={{
+              position: 'absolute', inset: -8,
+              borderRadius: '50%',
+              border: '2px solid rgba(255,255,255,0.3)',
+              animation: 'profPulseRing 2s ease-out infinite',
+            }} />
+            <div style={{
+              width: 52, height: 52,
+              borderRadius: '50%',
+              background: 'rgba(255,255,255,0.2)',
+              backdropFilter: 'blur(4px)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 24,
+            }}>
+              {step === 'confirm' ? '🗑️' : '👥'}
+            </div>
+          </div>
+          <h3 style={{ color: '#fff', fontSize: 19, fontWeight: 700, margin: 0 }}>
+            {step === 'confirm' ? 'Confirmar Exclusão em Lote' : 'Excluir Professores em Lote'}
+          </h3>
+          <p style={{ color: 'rgba(255,255,255,0.75)', fontSize: 13, margin: '4px 0 0' }}>
+            {step === 'confirm'
+              ? `${qtd} professor(es) selecionado(s) para exclusão`
+              : 'Selecione os professores que deseja excluir'}
+          </p>
+        </div>
+
+        {/* ── Corpo ── */}
+        {step === 'select' && (
+          <div style={{ padding: '16px 20px 0', flexShrink: 0 }}>
+            {/* Busca + contador */}
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 12 }}>
+              <input
+                type="text"
+                placeholder="🔍 Filtrar por nome, CPF, turno..."
+                value={busca}
+                onChange={e => setBusca(e.target.value)}
+                style={{
+                  flex: 1, padding: '8px 14px', borderRadius: 10,
+                  border: '1px solid #d1d5db', fontSize: 13,
+                  outline: 'none',
+                }}
+              />
+              {qtd > 0 && (
+                <span style={{
+                  background: 'linear-gradient(135deg, #dc2626, #b91c1c)',
+                  color: '#fff', fontWeight: 700, fontSize: 12,
+                  padding: '4px 12px', borderRadius: 20,
+                  boxShadow: '0 2px 8px rgba(220,38,38,0.3)',
+                }}>
+                  {qtd} selecionado{qtd > 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
+
+            {/* Selecionar todos */}
+            <label style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '8px 12px', borderRadius: 10,
+              background: '#f3f4f6', cursor: 'pointer',
+              fontSize: 13, fontWeight: 600, color: '#374151',
+              marginBottom: 8,
+            }}>
+              <input
+                type="checkbox"
+                className="lote-check"
+                checked={allChecked}
+                onChange={toggleAll}
+              />
+              Selecionar todos ({filtrados.length})
+            </label>
+          </div>
+        )}
+
+        {/* Lista de professores */}
+        {step === 'select' && (
+          <div style={{
+            flex: 1, overflowY: 'auto', padding: '0 20px 16px',
+            maxHeight: 380,
+          }}>
+            {filtrados.map(p => (
+              <label
+                key={p.id}
+                className="lote-row"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 12,
+                  padding: '10px 12px', borderRadius: 10,
+                  cursor: 'pointer', transition: 'background 0.15s',
+                  borderBottom: '1px solid #f3f4f6',
+                }}
+              >
+                <input
+                  type="checkbox"
+                  className="lote-check"
+                  checked={selecionados.has(p.id)}
+                  onChange={() => toggle(p.id)}
+                />
+                <div style={{
+                  width: 36, height: 36, borderRadius: '50%',
+                  background: selecionados.has(p.id)
+                    ? 'linear-gradient(135deg, #dc2626, #f87171)'
+                    : 'linear-gradient(135deg, #3b82f6, #60a5fa)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#fff', fontWeight: 700, fontSize: 14,
+                  flexShrink: 0, transition: 'background 0.2s',
+                }}>
+                  {(p.nome || '?')[0]}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{
+                    fontWeight: 600, color: '#1f2937', fontSize: 13,
+                    margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>
+                    {p.nome}
+                  </p>
+                  <p style={{ color: '#6b7280', fontSize: 11, margin: '2px 0 0' }}>
+                    {p.cpf}
+                    {p.turno ? ` · ${p.turno.toUpperCase()}` : ''}
+                    {p.disciplina_nome ? ` · ${p.disciplina_nome}` : ''}
+                  </p>
+                </div>
+              </label>
+            ))}
+            {filtrados.length === 0 && (
+              <p style={{ textAlign: 'center', color: '#9ca3af', fontSize: 13, padding: 20 }}>
+                Nenhum professor encontrado.
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Confirmação */}
+        {step === 'confirm' && (
+          <div style={{ padding: '20px 24px' }}>
+            <div style={{
+              padding: '12px 16px', borderRadius: 12,
+              background: '#fef2f2', border: '1px solid #fecaca',
+              marginBottom: 14,
+            }}>
+              <p style={{ fontWeight: 700, color: '#1f2937', fontSize: 15, margin: 0 }}>
+                {qtd} professor(es) selecionado(s)
+              </p>
+              <div style={{ maxHeight: 160, overflowY: 'auto', marginTop: 8 }}>
+                {professores.filter(p => selecionados.has(p.id)).map(p => (
+                  <p key={p.id} style={{ fontSize: 12, color: '#6b7280', margin: '3px 0' }}>
+                    • {p.nome} ({p.cpf})
+                  </p>
+                ))}
+              </div>
+            </div>
+
+            <div style={{
+              padding: '10px 14px', borderRadius: 10,
+              background: '#fef2f2', border: '1px solid #fecaca',
+              display: 'flex', alignItems: 'flex-start', gap: 8,
+            }}>
+              <span style={{ fontSize: 16, lineHeight: '20px' }}>💡</span>
+              <p style={{ color: '#991b1b', fontSize: 12, margin: 0, lineHeight: 1.5 }}>
+                Serão removidos também os registros de <strong>modulação</strong>,{' '}
+                <strong>preferências</strong> e <strong>grades de horário</strong> vinculados.
+                Esta ação é <strong>permanente e irreversível</strong>.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* ── Footer ── */}
+        <div style={{
+          padding: '0 24px 24px',
+          display: 'flex', gap: 10, justifyContent: 'flex-end',
+          flexShrink: 0,
+        }}>
+          {step === 'select' && (
+            <>
+              <button
+                onClick={onClose}
+                style={{
+                  padding: '10px 24px', borderRadius: 10,
+                  border: '1px solid #d1d5db', background: '#fff',
+                  color: '#374151', fontWeight: 600, fontSize: 14,
+                  cursor: 'pointer', transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => { e.target.style.background = '#f3f4f6'; }}
+                onMouseLeave={e => { e.target.style.background = '#fff'; }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => setStep('confirm')}
+                disabled={qtd === 0}
+                style={{
+                  padding: '10px 28px', borderRadius: 10,
+                  border: 'none',
+                  background: qtd === 0
+                    ? 'linear-gradient(135deg, #d1d5db, #9ca3af)'
+                    : 'linear-gradient(135deg, #dc2626, #b91c1c)',
+                  color: '#fff', fontWeight: 700, fontSize: 14,
+                  cursor: qtd === 0 ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s',
+                  boxShadow: qtd === 0 ? 'none' : '0 4px 14px rgba(220,38,38,0.4)',
+                  display: 'flex', alignItems: 'center', gap: 8,
+                }}
+              >
+                Continuar ({qtd})
+              </button>
+            </>
+          )}
+
+          {step === 'confirm' && (
+            <>
+              <button
+                onClick={() => !processing && setStep('select')}
+                disabled={processing}
+                style={{
+                  padding: '10px 24px', borderRadius: 10,
+                  border: '1px solid #d1d5db', background: '#fff',
+                  color: '#374151', fontWeight: 600, fontSize: 14,
+                  cursor: processing ? 'not-allowed' : 'pointer',
+                  opacity: processing ? 0.5 : 1,
+                }}
+              >
+                Voltar
+              </button>
+              <button
+                onClick={handleExcluir}
+                disabled={processing}
+                style={{
+                  padding: '10px 28px', borderRadius: 10,
+                  border: 'none',
+                  background: processing
+                    ? 'linear-gradient(135deg, #9ca3af, #6b7280)'
+                    : 'linear-gradient(135deg, #dc2626, #b91c1c)',
+                  color: '#fff', fontWeight: 700, fontSize: 14,
+                  cursor: processing ? 'not-allowed' : 'pointer',
+                  boxShadow: processing ? 'none' : '0 4px 14px rgba(220,38,38,0.4)',
+                  display: 'flex', alignItems: 'center', gap: 8,
+                }}
+              >
+                {processing ? (
+                  <>
+                    <span style={{
+                      width: 16, height: 16,
+                      border: '2px solid rgba(255,255,255,0.3)',
+                      borderTopColor: '#fff',
+                      borderRadius: '50%',
+                      display: 'inline-block',
+                      animation: 'profSpin 0.6s linear infinite',
+                    }} />
+                    Excluindo...
+                  </>
+                ) : (
+                  `Sim, Excluir ${qtd} Professor${qtd > 1 ? 'es' : ''}`
+                )}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

@@ -32,6 +32,7 @@ export default function ResponsaveisDisciplinar() {
   const [email, setEmail] = useState("");
   const [telefone, setTelefone] = useState("");
   const [telefoneSecundario, setTelefoneSecundario] = useState("");
+  const [endereco, setEndereco] = useState("");
   const [alunoId, setAlunoId] = useState("");
   const [alunoNome, setAlunoNome] = useState("");
   const [relacionamento, setRelacionamento] = useState("RESPONSAVEL");
@@ -52,6 +53,10 @@ export default function ResponsaveisDisciplinar() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deletingItem, setDeletingItem] = useState(null);
   const [excluindo, setExcluindo] = useState(false);
+
+  // Modal Confirmação de Vínculo (ao editar e vincular novo estudante)
+  const [isConfirmVinculoOpen, setIsConfirmVinculoOpen] = useState(false);
+  const [pendingSaveData, setPendingSaveData] = useState(null);
 
   // Modal Consentimento de Imagem
   const [isConsentModalOpen, setIsConsentModalOpen] = useState(false);
@@ -98,7 +103,7 @@ export default function ResponsaveisDisciplinar() {
   // Debounce e busca de alunos
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
-      if (!isModalOpen || editingId || buscaAlunoQuery.length < 2) {
+      if (!isModalOpen || buscaAlunoQuery.length < 2) {
         setAlunosOptions([]);
         return;
       }
@@ -117,17 +122,21 @@ export default function ResponsaveisDisciplinar() {
     return () => clearTimeout(delayDebounceFn);
   }, [buscaAlunoQuery, isModalOpen, editingId]);
 
+  // Remove acentos para busca inteligente (ex: "joao" encontra "JOÃO")
+  const removerAcentos = (str) =>
+    str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
   const responsaveisFiltrados = useMemo(() => {
     const lista = [...responsaveis].sort((a, b) =>
       a.nome.localeCompare(b.nome, "pt-BR", { sensitivity: "base" })
     );
     if (!buscaTela.trim()) return lista;
-    const termo = buscaTela.toLowerCase().trim();
-    const termoNumerico = termo.replace(/\D/g, ""); // Remove non-digits for CPF/Phone search
+    const termo = removerAcentos(buscaTela.toLowerCase().trim());
+    const termoNumerico = buscaTela.trim().replace(/\D/g, ""); // Remove non-digits for CPF/Phone search
 
     return lista.filter((r) => {
-      const matchNome = r.nome.toLowerCase().includes(termo);
-      const matchAluno = r.alunos_vinculados && r.alunos_vinculados.toLowerCase().includes(termo);
+      const matchNome = removerAcentos(r.nome.toLowerCase()).includes(termo);
+      const matchAluno = r.alunos_vinculados && removerAcentos(r.alunos_vinculados.toLowerCase()).includes(termo);
       const matchCpf = r.cpf && termoNumerico && r.cpf.replace(/\D/g, "").includes(termoNumerico);
       const matchTelefone = r.telefone_celular && termoNumerico && r.telefone_celular.replace(/\D/g, "").includes(termoNumerico);
       const matchTelefoneSec = r.telefone_secundario && termoNumerico && r.telefone_secundario.replace(/\D/g, "").includes(termoNumerico);
@@ -143,6 +152,7 @@ export default function ResponsaveisDisciplinar() {
     setEmail("");
     setTelefone("");
     setTelefoneSecundario("");
+    setEndereco("");
     setAlunoId("");
     setAlunoNome("");
     setRelacionamento("RESPONSAVEL");
@@ -158,9 +168,12 @@ export default function ResponsaveisDisciplinar() {
     setEmail(item.email || "");
     setTelefone(item.telefone_celular || "");
     setTelefoneSecundario(item.telefone_secundario || "");
-    // Edição apenas atualiza dados do responsável, não o aluno.
+    setEndereco(item.endereco || "");
     setAlunoId("");
     setAlunoNome("");
+    setBuscaAlunoQuery("");
+    setShowDropdown(false);
+    setRelacionamento("RESPONSAVEL");
     setIsModalOpen(true);
   };
 
@@ -280,48 +293,87 @@ export default function ResponsaveisDisciplinar() {
     return true;
   };
 
+  // ── Campos obrigatórios: Nome, CPF, Telefone Principal, Endereço ──
+  // Telefone 2 (Secundário) e E-mail são opcionais
+  const isEditing = !!editingId;
+  const allFieldsFilled = nome.trim() && cpf.trim() && telefone.trim() && endereco.trim();
+  const canSave = allFieldsFilled && (isEditing || alunoId);
+  // Campos vazios para feedback visual (apenas obrigatórios)
+  const camposVazios = {
+    nome: !nome.trim(),
+    cpf: !cpf.trim(),
+    telefone: !telefone.trim(),
+    endereco: !endereco.trim(),
+  };
+  const qtdVazios = Object.values(camposVazios).filter(Boolean).length;
+
   const handleSave = async (e) => {
     e.preventDefault();
     if (!nome.trim()) return alert("O nome não pode estar vazio.");
     if (!cpf.trim()) return alert("O CPF é obrigatório.");
     if (!validarCPF(cpf)) return alert("CPF inválido. Verifique os dígitos e tente novamente.");
     if (!telefone.trim()) return alert("O Telefone Principal é obrigatório.");
-    
+    if (!endereco.trim()) return alert("O Endereço é obrigatório.");
+
     // Na criação do registro, é obrigatório vincular um estudante.
     if (!editingId && !alunoId) {
        return alert("O vínculo com um estudante é obrigatório.");
     }
 
+    // Se está editando e selecionou um novo aluno, pedir confirmação
+    if (editingId && alunoId) {
+      setPendingSaveData({
+        nome: nome.trim(),
+        cpf: cpf.trim() || null,
+        email: email.trim() || null,
+        telefone_celular: telefone.trim() || null,
+        telefone_secundario: telefoneSecundario.trim() || null,
+        endereco: endereco.trim() || null,
+        aluno_id: alunoId,
+        relacionamento,
+        alunoNome,
+      });
+      setIsConfirmVinculoOpen(true);
+      return;
+    }
+
+    await executeSave();
+  };
+
+  const executeSave = async (overrideData) => {
     setSalvando(true);
     try {
+      const payload = overrideData || {
+        nome: nome.trim(),
+        cpf: cpf.trim() || null,
+        email: email.trim() || null,
+        telefone_celular: telefone.trim() || null,
+        telefone_secundario: telefoneSecundario.trim() || null,
+        endereco: endereco.trim() || null,
+        aluno_id: alunoId || null,
+        relacionamento,
+      };
+
       if (editingId) {
-        await api.put(`/api/responsaveis/${editingId}`, { 
-          nome: nome.trim(), 
-          cpf: cpf.trim() || null, 
-          email: email.trim() || null, 
-          telefone_celular: telefone.trim() || null,
-          telefone_secundario: telefoneSecundario.trim() || null,
-          aluno_id: alunoId || null,
-          relacionamento 
-        });
+        await api.put(`/api/responsaveis/${editingId}`, payload);
       } else {
-        await api.post("/api/responsaveis", { 
-          nome: nome.trim(), 
-          cpf: cpf.trim() || null, 
-          email: email.trim() || null, 
-          telefone_celular: telefone.trim() || null,
-          telefone_secundario: telefoneSecundario.trim() || null,
-          aluno_id: alunoId || null,
-          relacionamento // Usando o estado selecionado ('MÃE', 'PAI', etc.)
-        });
+        await api.post("/api/responsaveis", payload);
       }
       setIsModalOpen(false);
+      setIsConfirmVinculoOpen(false);
+      setPendingSaveData(null);
       fetchResponsaveis();
     } catch (err) {
       alert(err?.response?.data?.error || "Erro ao salvar.");
     } finally {
       setSalvando(false);
     }
+  };
+
+  const handleConfirmVinculo = async () => {
+    if (!pendingSaveData) return;
+    const { alunoNome: _, ...payload } = pendingSaveData;
+    await executeSave(payload);
   };
 
   const handleDelete = async () => {
@@ -528,13 +580,30 @@ export default function ResponsaveisDisciplinar() {
                   <Dialog.Title as="h3" className="text-xl font-bold text-gray-800 mb-1">
                     {editingId ? "Editar Responsável" : "Novo Responsável"}
                   </Dialog.Title>
-                  <p className="text-sm text-gray-500 mb-6">
+                  <p className="text-sm text-gray-500 mb-2">
                     {editingId ? "Atualize os dados de contato." : "Crie e vincule um responsável a um aluno."}
                   </p>
 
+                  {/* Aviso de campos obrigatórios */}
+                  {qtdVazios > 0 && (
+                    <div className="mb-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
+                      <div className="mt-0.5 flex-shrink-0">
+                        <svg className="w-5 h-5 text-amber-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.007H12v-.007Z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-amber-800">Campos obrigatórios pendentes</p>
+                        <p className="text-xs text-amber-600 mt-0.5">
+                          Para salvar, preencha {qtdVazios === 1 ? 'o' : 'os'} <strong>{qtdVazios} campo{qtdVazios > 1 ? 's' : ''} obrigatório{qtdVazios > 1 ? 's' : ''}</strong> restante{qtdVazios > 1 ? 's' : ''}.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   <form onSubmit={handleSave} className="space-y-4">
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                      <label className={`block text-sm font-semibold mb-1.5 ${camposVazios.nome ? 'text-red-600' : 'text-gray-700'}`}>
                         Nome Completo *
                       </label>
                       <input
@@ -550,7 +619,7 @@ export default function ResponsaveisDisciplinar() {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                        <label className={`block text-sm font-semibold mb-1.5 ${camposVazios.cpf ? 'text-red-600' : 'text-gray-700'}`}>
                           CPF *
                         </label>
                         <input
@@ -564,7 +633,7 @@ export default function ResponsaveisDisciplinar() {
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                        <label className={`block text-sm font-semibold mb-1.5 ${camposVazios.telefone ? 'text-red-600' : 'text-gray-700'}`}>
                           Telefone Principal *
                         </label>
                         <input
@@ -581,8 +650,9 @@ export default function ResponsaveisDisciplinar() {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                        <label className="block text-sm font-semibold mb-1.5 text-gray-700">
                           Telefone 2 (Secundário)
+                          <span className="text-xs font-normal text-gray-400 ml-1">— opcional</span>
                         </label>
                         <input
                           type="text"
@@ -594,8 +664,9 @@ export default function ResponsaveisDisciplinar() {
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                        <label className="block text-sm font-semibold mb-1.5 text-gray-700">
                           E-mail
+                          <span className="text-xs font-normal text-gray-400 ml-1">— opcional</span>
                         </label>
                         <input
                           type="email"
@@ -605,6 +676,20 @@ export default function ResponsaveisDisciplinar() {
                           className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all text-gray-700"
                         />
                       </div>
+                    </div>
+
+                    {/* Endereço */}
+                    <div>
+                      <label className={`block text-sm font-semibold mb-1.5 ${camposVazios.endereco ? 'text-red-600' : 'text-gray-700'}`}>
+                        Endereço *
+                      </label>
+                      <input
+                        type="text"
+                        value={endereco}
+                        onChange={(e) => setEndereco(e.target.value)}
+                        placeholder="Ex: QD 03 CJ F Lt 01 — Arapoanga, Planaltina-DF"
+                        className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all text-gray-700"
+                      />
                     </div>
 
                     {/* Vínculo de Aluno (Adicionar novo vínculo) */}
@@ -706,8 +791,8 @@ export default function ResponsaveisDisciplinar() {
                       </button>
                       <button
                         type="submit"
-                        disabled={salvando}
-                        className="px-6 py-2.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-sm shadow-blue-600/30 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        disabled={salvando || !canSave}
+                        className={"px-6 py-2.5 text-sm font-semibold text-white rounded-xl shadow-sm transition-all active:scale-95 disabled:cursor-not-allowed flex items-center gap-2 " + (!canSave ? "bg-gray-300 shadow-gray-300/30" : "bg-blue-600 hover:bg-blue-700 shadow-blue-600/30 disabled:opacity-50")}
                       >
                         {salvando && (
                           <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -716,6 +801,75 @@ export default function ResponsaveisDisciplinar() {
                       </button>
                     </div>
                   </form>
+                </Dialog.Panel>
+              </Transition.Child>
+            </div>
+          </div>
+        </Dialog>
+      </Transition>
+
+      {/* ── MODAL CONFIRMAÇÃO DE NOVO VÍNCULO ────── */}
+      <Transition appear show={isConfirmVinculoOpen} as={Fragment}>
+        <Dialog as="div" className="relative z-[60]" onClose={() => { setIsConfirmVinculoOpen(false); setPendingSaveData(null); }}>
+          <Transition.Child
+            as={Fragment}
+            enter="ease-out duration-300"
+            enterFrom="opacity-0"
+            enterTo="opacity-100"
+            leave="ease-in duration-200"
+            leaveFrom="opacity-100"
+            leaveTo="opacity-0"
+          >
+            <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm" />
+          </Transition.Child>
+
+          <div className="fixed inset-0 overflow-y-auto">
+            <div className="flex min-h-full items-center justify-center p-4">
+              <Transition.Child
+                as={Fragment}
+                enter="ease-out duration-300"
+                enterFrom="opacity-0 scale-95"
+                enterTo="opacity-100 scale-100"
+                leave="ease-in duration-200"
+                leaveFrom="opacity-100 scale-100"
+                leaveTo="opacity-0 scale-95"
+              >
+                <Dialog.Panel className="w-full max-w-sm transform overflow-hidden rounded-2xl bg-white p-7 shadow-2xl transition-all border border-gray-100 text-center">
+                  <div className="mx-auto w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center mb-4">
+                    <UserGroupIcon className="w-6 h-6 text-blue-600" />
+                  </div>
+                  <Dialog.Title as="h3" className="text-lg font-bold text-gray-800 mb-2">
+                    Confirmar Novo Vínculo
+                  </Dialog.Title>
+                  <p className="text-sm text-gray-600 mb-1">
+                    Deseja vincular o estudante
+                  </p>
+                  <p className="text-sm font-bold text-blue-700 bg-blue-50 inline-block px-3 py-1 rounded-lg mb-3">
+                    {pendingSaveData?.alunoNome}
+                  </p>
+                  <p className="text-sm text-gray-600 mb-6">
+                    a este responsável?
+                  </p>
+                  <div className="flex justify-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => { setIsConfirmVinculoOpen(false); setPendingSaveData(null); }}
+                      className="px-5 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleConfirmVinculo}
+                      disabled={salvando}
+                      className="px-6 py-2.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-sm transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2"
+                    >
+                      {salvando && (
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      )}
+                      Sim, Vincular
+                    </button>
+                  </div>
                 </Dialog.Panel>
               </Transition.Child>
             </div>

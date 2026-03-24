@@ -7,6 +7,9 @@ import Alunos from "./features/secretaria/alunos";
 import AlunosDisciplinar from "./features/disciplinar/alunos";
 import AjustesDisciplinar from "./features/disciplinar/ajustes";
 import ResponsaveisDisciplinar from "./features/disciplinar/responsaveis/index.jsx";
+import MetadadosDisciplinar from "./features/disciplinar/metadados";
+import RegimentosDisciplinar from "./features/disciplinar/regimentos";
+import SuporteDisciplinar from "./features/disciplinar/suporte";
 import Boletim from "./features/boletim/Boletim";
 import FichaAluno from "./features/alunos/FichaAluno";
 import FotoAluno from "./features/alunos/FotoAluno";
@@ -257,8 +260,23 @@ export default function App() {
           <Route path="/disciplinar/ajustes" element={<AjustesDisciplinar />} />
           <Route path="/disciplinar/responsaveis" element={<ResponsaveisDisciplinar />} />
 
-          {/* Disciplinar — Gestão de Equipe */}
-          <Route path="/disciplinar/equipe" element={<GestaoEquipe />} />
+          {/* Disciplinar — Gestão de Equipe (apenas Diretor Pedagógico e Comandante) */}
+          <Route path="/disciplinar/equipe" element={
+            (() => {
+              const p = String(localStorage.getItem('perfil') || '').toLowerCase().trim();
+              if (p === 'diretor' || p === 'militar') return <GestaoEquipe />;
+              return <Navigate to="/disciplinar/alunos" replace />;
+            })()
+          } />
+
+          {/* Disciplinar — Metadados (Dashboard Analítico) */}
+          <Route path="/disciplinar/metadados" element={<MetadadosDisciplinar />} />
+
+          {/* Disciplinar — Regimentos (Biblioteca de Documentos) */}
+          <Route path="/disciplinar/regimentos" element={<RegimentosDisciplinar />} />
+
+          {/* Disciplinar — Suporte (Em breve) */}
+          <Route path="/disciplinar/suporte" element={<SuporteDisciplinar />} />
 
           {/* Monitoramento */}
           <Route

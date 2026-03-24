@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { XMarkIcon, PencilSquareIcon, TrashIcon, EyeIcon, ClipboardDocumentCheckIcon, PrinterIcon } from "@heroicons/react/24/outline";
+import { XMarkIcon, PencilSquareIcon, TrashIcon, EyeIcon, ClipboardDocumentCheckIcon, PrinterIcon, DocumentTextIcon } from "@heroicons/react/24/outline";
 import { AcademicCapIcon } from "@heroicons/react/24/solid";
 import api from "../../services/api";
 import ModalNovaOcorrencia from "./ModalNovaOcorrencia";
+import ModalTACE from "./ModalTACE";
+import ModalConfirmTACE from "../disciplinar/alunos/ModalConfirmTACE";
 
 export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
     const [novaOcorrenciaOpen, setNovaOcorrenciaOpen] = useState(false);
@@ -26,6 +28,12 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
     const [ocorrenciaParaExcluir, setOcorrenciaParaExcluir] = useState(null);
     const [excluindo, setExcluindo] = useState(false);
 
+    // Estado do Modal de Confirmação TACE (Art. 22 § 2º)
+    const [confirmTaceOpen, setConfirmTaceOpen] = useState(false);
+
+    // Estado do Modal do TACE (preenchimento)
+    const [taceModalOpen, setTaceModalOpen] = useState(false);
+
     useEffect(() => {
         if (open && aluno?.id) {
             fetchOcorrencias();
@@ -47,6 +55,11 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
     const handleOpenComparecimento = (oc) => {
         if (oc.status === 'FINALIZADA' || oc.status === 'Finalizado') {
             setInfoMensagem("Esta ocorrência já está finalizada.");
+            setModalInfoOpen(true);
+            return;
+        }
+        if (oc.status === 'CANCELADA') {
+            setInfoMensagem("Esta ocorrência foi cancelada e não pode ser finalizada.");
             setModalInfoOpen(true);
             return;
         }
@@ -73,6 +86,11 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
     const handleOpenEdit = (oc) => {
         if (oc.status === 'FINALIZADA' || oc.status === 'Finalizado') {
             setInfoMensagem("Ocorrências com o status 'Finalizada' não podem mais ser editadas.");
+            setModalInfoOpen(true);
+            return;
+        }
+        if (oc.status === 'CANCELADA') {
+            setInfoMensagem("Ocorrências com o status 'Cancelada' não podem mais ser editadas.");
             setModalInfoOpen(true);
             return;
         }
@@ -143,6 +161,25 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
     };
 
     const comportamento = getComportamento(pontuacaoCalculada);
+
+    // Abre o PDF do TACE
+    const abrirTacePDF = () => {
+        const token = localStorage.getItem("token");
+        const escolaId = localStorage.getItem("escola_id");
+        const url = `${api.defaults.baseURL}/tace/${aluno.id}?token=${encodeURIComponent(token)}&escola_id=${encodeURIComponent(escolaId)}`;
+        window.open(url, "_blank");
+    };
+
+    // Handler "Gerar TACE" com verificação de elegibilidade
+    const handleGerarTACE = () => {
+        if (pontuacaoCalculada >= 5.0) {
+            // Comportamento Regular ou melhor → exige confirmação
+            setConfirmTaceOpen(true);
+        } else {
+            // Insuficiente ou Incompatível → abre modal TACE direto
+            setTaceModalOpen(true);
+        }
+    };
     // ==================================================================
 
     if (!open || !aluno) return null;
@@ -166,7 +203,7 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden">
                 {/* Header do Modal */}
                 <div className="px-6 py-4 border-b flex justify-between items-center bg-gray-50">
                     <div className="flex items-center gap-3">
@@ -224,7 +261,15 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
                             </div>
                         </div>
 
-                        <div className="flex-shrink-0">
+                        <div className="flex-shrink-0 flex flex-col gap-2">
+                            <button
+                                onClick={handleGerarTACE}
+                                className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-900 to-blue-700 text-amber-100 font-medium rounded-lg hover:from-blue-800 hover:to-blue-600 transition shadow-sm"
+                                title="Gerar Termo de Ajuste de Conduta Escolar (PDF)"
+                            >
+                                <DocumentTextIcon className="h-5 w-5" />
+                                Gerar TACE
+                            </button>
                             <button
                                 onClick={() => {
                                     setOcorrenciaSelecionada(null);
@@ -288,8 +333,11 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
                                                 )}
                                             </td>
                                             <td className="px-4 py-3">
-                                                <span className={`px-2 py-1 text-xs font-medium rounded-full border ${oc.status === 'FINALIZADA' || oc.status === 'Finalizado'
+                                                <span className={`px-2 py-1 text-xs font-medium rounded-full border ${
+                                                    oc.status === 'FINALIZADA' || oc.status === 'Finalizado'
                                                     ? 'text-green-700 bg-green-100 border-green-200'
+                                                    : oc.status === 'CANCELADA'
+                                                    ? 'text-red-700 bg-red-100 border-red-200'
                                                     : 'text-blue-700 bg-blue-100 border-blue-200'
                                                     }`}>
                                                     {oc.status}
@@ -309,8 +357,15 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
                                                     </button>
                                                     <button
                                                         onClick={() => handleOpenComparecimento(oc)}
-                                                        className={`${oc.status === 'FINALIZADA' || oc.status === 'Finalizado' ? 'text-green-600 hover:text-green-800' : 'text-orange-500 hover:text-orange-700'}`}
-                                                        title={oc.convocar_responsavel ? "Registrar Comparecimento" : "Finalizar Registro"}
+                                                        disabled={oc.status === 'CANCELADA'}
+                                                        className={`${
+                                                            oc.status === 'CANCELADA'
+                                                            ? 'text-gray-300 cursor-not-allowed'
+                                                            : oc.status === 'FINALIZADA' || oc.status === 'Finalizado'
+                                                            ? 'text-green-600 hover:text-green-800'
+                                                            : 'text-orange-500 hover:text-orange-700'
+                                                        }`}
+                                                        title={oc.status === 'CANCELADA' ? 'Registro cancelado — não pode ser finalizado' : oc.convocar_responsavel ? "Registrar Comparecimento" : "Finalizar Registro"}
                                                     >
                                                         <ClipboardDocumentCheckIcon className="h-5 w-5" />
                                                     </button>
@@ -496,6 +551,28 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
                     </div>
                 </div>
             )}
+
+            {/* Modal de Confirmação TACE (Art. 22 § 2º) */}
+            <ModalConfirmTACE
+                open={confirmTaceOpen}
+                onClose={() => setConfirmTaceOpen(false)}
+                onConfirm={() => {
+                    setConfirmTaceOpen(false);
+                    setTaceModalOpen(true);
+                }}
+                aluno={aluno}
+                pontuacao={pontuacaoCalculada}
+            />
+
+            {/* Modal TACE (preenchimento dos campos) */}
+            <ModalTACE
+                open={taceModalOpen}
+                onClose={() => setTaceModalOpen(false)}
+                aluno={aluno}
+                onSaved={() => {
+                    fetchOcorrencias();
+                }}
+            />
         </div>
     );
 }

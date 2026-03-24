@@ -6,7 +6,9 @@ import {
   DocumentTextIcon,
   TrashIcon,
   PencilSquareIcon,
+  ClipboardDocumentListIcon,
 } from "@heroicons/react/24/solid";
+import { DocumentTextIcon as DocumentTextOutline } from "@heroicons/react/24/outline";
 import FichaAluno from "../../alunos/FichaAluno"; // ✅ usa o componente existente
 
 // ────────────────────────────────────────────────────────────────
@@ -43,6 +45,8 @@ export default function AlunoTable({
   onDelete,
   onEditar,
   onBoletim,
+  onTACE,
+  onRelatorioDisciplinar,
   mostrarFicha = true,
   mostrarBoletim = true,
 }) {
@@ -110,6 +114,26 @@ export default function AlunoTable({
                       onClick={() => abrirFicha(aluno.codigo)}
                     >
                       <IdentificationIcon className="w-5 h-5" />
+                    </button>
+                  )}
+
+                  {onRelatorioDisciplinar && (
+                    <button
+                      className="text-blue-600 hover:text-blue-800 transition"
+                      title="Relatório de Registros Disciplinares"
+                      onClick={() => onRelatorioDisciplinar(aluno)}
+                    >
+                      <ClipboardDocumentListIcon className="w-5 h-5" />
+                    </button>
+                  )}
+
+                  {onTACE && (
+                    <button
+                      className="text-amber-600 hover:text-amber-800 transition"
+                      title="T.A.C.E. — Termo de Ajuste de Conduta Escolar"
+                      onClick={() => onTACE(aluno)}
+                    >
+                      <DocumentTextOutline className="w-5 h-5" />
                     </button>
                   )}
 

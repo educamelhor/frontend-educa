@@ -183,13 +183,11 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {}, a
           {/* Data de Nascimento */}
           <div>
             <label className="block font-medium mb-1">Data de Nascimento</label>
-            {/* PROVISÓRIO: Campo desabilitado e não obrigatório temporariamente para não travar os cadastros (solicitação em 11/03/2026) */}
             <Input
               type="date"
               value={dataNascimento}
               onChange={(e) => setDataNascimento(e.target.value)}
-              disabled={true}
-              className="w-full bg-gray-100 cursor-not-allowed"
+              className="w-full"
             />
           </div>
 

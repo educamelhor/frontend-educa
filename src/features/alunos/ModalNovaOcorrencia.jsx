@@ -20,6 +20,7 @@ export default function ModalNovaOcorrencia({ open, onClose, aluno, onOcorrencia
     const [tipoSelecionado, setTipoSelecionado] = useState("");
     const [motivo, setMotivo] = useState("");
     const [descricao, setDescricao] = useState("");
+    const [registroInterno, setRegistroInterno] = useState("");
     const [convocarResponsavel, setConvocarResponsavel] = useState(false);
     const [diasSuspensao, setDiasSuspensao] = useState("");
     const [salvando, setSalvando] = useState(false);
@@ -84,6 +85,7 @@ export default function ModalNovaOcorrencia({ open, onClose, aluno, onOcorrencia
 
                 setMotivo(ocorrenciaInicial.motivo || "");
                 setDescricao(ocorrenciaInicial.descricao || "");
+                setRegistroInterno(ocorrenciaInicial.registro_interno || "");
                 setConvocarResponsavel(Boolean(ocorrenciaInicial.convocar_responsavel));
                 setDiasSuspensao(ocorrenciaInicial.dias_suspensao != null ? String(ocorrenciaInicial.dias_suspensao) : "");
             } else {
@@ -92,6 +94,7 @@ export default function ModalNovaOcorrencia({ open, onClose, aluno, onOcorrencia
                 setTipoSelecionado("");
                 setMotivo("");
                 setDescricao("");
+                setRegistroInterno("");
                 setConvocarResponsavel(false);
                 setDiasSuspensao("");
                 setNextRegistro("Carregando...");
@@ -104,12 +107,32 @@ export default function ModalNovaOcorrencia({ open, onClose, aluno, onOcorrencia
         }
     }, [open, ocorrenciaInicial, aluno]);
 
+    // Medidas que OBRIGAM convocação de responsável (Art. 16, § 1º)
+    const MEDIDAS_CONVOCACAO_OBRIGATORIA = ["Suspensão", "Ações Educativas", "Transferência"];
+    const convocacaoObrigatoria = MEDIDAS_CONVOCACAO_OBRIGATORIA.includes(medidaSelecionada);
+
+    // Sempre que medidaSelecionada mudar → forçar convocarResponsavel se obrigatória
+    React.useEffect(() => {
+        if (MEDIDAS_CONVOCACAO_OBRIGATORIA.includes(medidaSelecionada)) {
+            setConvocarResponsavel(true);
+        }
+    }, [medidaSelecionada]);
+
     if (!open) return null;
 
     const handleMedidaChange = (label) => {
         setMedidaSelecionada(label);
         setMotivo("");
         setDiasSuspensao("");
+
+        // Se a medida exige convocação obrigatória, marcar automaticamente
+        if (MEDIDAS_CONVOCACAO_OBRIGATORIA.includes(label)) {
+            setConvocarResponsavel(true);
+        } else {
+            // Liberar para decisão do militar
+            setConvocarResponsavel(false);
+        }
+
         // Auto-determinar o tipo (cada medida tem exatamente 1 tipo)
         const def = getDefinicao(label);
         if (def) {
@@ -157,6 +180,7 @@ export default function ModalNovaOcorrencia({ open, onClose, aluno, onOcorrencia
             if (editMode && ocorrenciaInicial) {
                 await api.put(`/api/alunos/${aluno.id}/ocorrencias/${ocorrenciaInicial.id}`, {
                     descricao,
+                    registroInterno,
                     convocarResponsavel
                 });
             } else {
@@ -165,6 +189,7 @@ export default function ModalNovaOcorrencia({ open, onClose, aluno, onOcorrencia
                     data,
                     motivo,
                     tipoOcorrencia: tipoSelecionado,
+                    registroInterno,
                     descricao,
                     convocarResponsavel
                 };
@@ -294,21 +319,44 @@ export default function ModalNovaOcorrencia({ open, onClose, aluno, onOcorrencia
                         ></textarea>
                     </div>
 
+                    {/* Registro Interno — comunicação interna entre militares, não é impresso */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Registro Interno
+                            {!readonly && (
+                                <span className="ml-1 text-xs text-gray-400 font-normal">(uso interno — não será impresso)</span>
+                            )}
+                        </label>
+                        <textarea
+                            disabled={readonly}
+                            rows="3"
+                            placeholder="Anotações internas entre militares..."
+                            value={registroInterno}
+                            onChange={(e) => setRegistroInterno(e.target.value)}
+                            className={`w-full border rounded p-2 focus:ring focus:border-blue-300 outline-none resize-none ${readonly ? 'bg-gray-100 text-gray-600 placeholder-gray-400 cursor-not-allowed' : ''}`}
+                        ></textarea>
+                    </div>
+
                     {/* Checkbox Convocar Responsável */}
                     <div className="flex flex-col gap-2">
                         <div className="flex items-center gap-2">
                             <input
                                 type="checkbox"
                                 id="convocarResp"
-                                disabled={readonly}
+                                disabled={readonly || convocacaoObrigatoria}
                                 checked={convocarResponsavel}
                                 onChange={(e) => setConvocarResponsavel(e.target.checked)}
-                                className={`w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded ${readonly ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
+                                className={`w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded ${readonly || convocacaoObrigatoria ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
                             />
-                            <label htmlFor="convocarResp" className={`text-sm font-medium text-gray-700 select-none ${readonly ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
+                            <label htmlFor="convocarResp" className={`text-sm font-medium text-gray-700 select-none ${readonly || convocacaoObrigatoria ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
                                 Convocar Responsável
                             </label>
                         </div>
+                        {convocacaoObrigatoria && !readonly && (
+                            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 ml-6">
+                                Convocação obrigatória conforme <strong>Art. 16, § 1º</strong>
+                            </p>
+                        )}
 
                         {/* Dias de Suspensão — só aparece quando Medida = Suspensão */}
                         {medidaSelecionada === "Suspensão" && (

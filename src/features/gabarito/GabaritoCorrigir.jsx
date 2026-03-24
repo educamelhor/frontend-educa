@@ -49,7 +49,7 @@ export default function GabaritoCorrigir() {
   function handleAvaliacaoSalva(avaliacao) {
     setAvaliacaoAtiva(avaliacao);
     setModalOficialOpen(false);
-    showToast(`Gabarito "${avaliacao.titulo}" configurado!`, "success");
+    showToast(`Gabarito oficial "${avaliacao.titulo}" salvo com sucesso!`, "success");
   }
 
   // ─── Upload de arquivo (click ou drag) ───
@@ -268,14 +268,32 @@ export default function GabaritoCorrigir() {
 
     setSalvando(true);
     try {
-      const resp = await api.post("/gabaritos/corrigir", {
-        respostasAluno,
-        gabaritoOficial: avaliacaoAtiva.gabarito,
-        codigoAluno: alunoInfo.codigo,
-        nome: alunoInfo.nome,
-        turma: alunoInfo.turma,
-        nomeGabarito: avaliacaoAtiva.titulo,
-      });
+      const payload = {
+        avaliacao_id: avaliacaoAtiva.id,
+        codigo_aluno: alunoInfo.codigo,
+        respostas_aluno: respostasAluno,
+        acertos: correcao.acertos,
+        total_questoes: correcao.totalQuestoes,
+        nota: correcao.nota,
+        detalhes: correcao.resultado,
+      };
+
+      // Calcular acertos por disciplina se tiver configuração
+      if (avaliacaoAtiva.disciplinas_config && avaliacaoAtiva.disciplinas_config.length > 0) {
+        const acertosPorDisc = {};
+        for (const dc of avaliacaoAtiva.disciplinas_config) {
+          let acertosDisc = 0;
+          let totalDisc = 0;
+          for (let q = dc.de; q <= dc.ate; q++) {
+            totalDisc++;
+            if (correcao.resultado[q - 1]?.acertou) acertosDisc++;
+          }
+          acertosPorDisc[dc.nome] = { acertos: acertosDisc, total: totalDisc };
+        }
+        payload.acertos_por_disciplina = acertosPorDisc;
+      }
+
+      const resp = await api.post("/gabaritos/corrigir", payload);
 
       const data = resp.data;
       if (data.saved || data.success) {
@@ -358,24 +376,40 @@ export default function GabaritoCorrigir() {
                   background: "rgba(6, 182, 212, 0.06)", 
                   border: "1px solid rgba(6, 182, 212, 0.15)", 
                   borderRadius: "10px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
                 }}>
-                  <div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
                     <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--gab-text-primary)" }}>
                       {avaliacaoAtiva.titulo}
                     </div>
-                    <div style={{ fontSize: "0.78rem", color: "var(--gab-text-muted)", marginTop: 4 }}>
-                      {avaliacaoAtiva.gabarito.length} questões · {avaliacaoAtiva.numAlternativas} alternativas · Nota {avaliacaoAtiva.notaTotal}
-                    </div>
+                    <button
+                      className="gab-btn gab-btn-ghost gab-btn-sm"
+                      onClick={() => setModalOficialOpen(true)}
+                    >
+                      Alterar
+                    </button>
                   </div>
-                  <button
-                    className="gab-btn gab-btn-ghost gab-btn-sm"
-                    onClick={() => setModalOficialOpen(true)}
-                  >
-                    Alterar
-                  </button>
+                  <div style={{ fontSize: "0.78rem", color: "var(--gab-text-muted)", marginBottom: 4 }}>
+                    {avaliacaoAtiva.numQuestoes} questões · {avaliacaoAtiva.numAlternativas} alternativas · Nota {avaliacaoAtiva.notaTotal}
+                    {avaliacaoAtiva.bimestre ? ` · ${avaliacaoAtiva.bimestre}` : ""}
+                  </div>
+                  {/* Disciplinas tags */}
+                  {avaliacaoAtiva.disciplinas_config && avaliacaoAtiva.disciplinas_config.length > 0 && (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
+                      {avaliacaoAtiva.disciplinas_config.map((dc, i) => (
+                        <span key={i} style={{
+                          padding: "2px 8px", borderRadius: 6, fontSize: "0.68rem", fontWeight: 600,
+                          background: "rgba(139, 92, 246, 0.08)", border: "1px solid rgba(139, 92, 246, 0.2)",
+                          color: "var(--gab-purple-light)",
+                        }}>
+                          {dc.nome} (Q{dc.de}–Q{dc.ate})
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {/* ID da avaliação salva */}
+                  <div style={{ fontSize: "0.68rem", color: "var(--gab-text-muted)", marginTop: 6, opacity: 0.7 }}>
+                    Avaliação ID: {avaliacaoAtiva.id} · Vinculada ao banco de dados
+                  </div>
                 </div>
                 {/* Mini preview do gabarito */}
                 <div style={{ 

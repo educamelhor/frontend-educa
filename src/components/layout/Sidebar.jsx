@@ -510,12 +510,38 @@ export default function Sidebar() {
                     <UserGroupIcon className="h-5 w-5 mr-2" /> Responsáveis
                   </Link>
                 </li>
+                {(perfil === 'diretor' || perfil === 'militar') && (
                 <li>
                   <Link
                     to="/disciplinar/equipe"
                     className={getSubmenuLinkClasses('/disciplinar/equipe')}
                   >
                     <UsersIcon className="h-5 w-5 mr-2" /> Gestão de Equipe
+                  </Link>
+                </li>
+                )}
+                <li>
+                  <Link
+                    to="/disciplinar/regimentos"
+                    className={getSubmenuLinkClasses('/disciplinar/regimentos')}
+                  >
+                    <DocumentTextIcon className="h-5 w-5 mr-2" /> Regimentos
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/disciplinar/metadados"
+                    className={getSubmenuLinkClasses('/disciplinar/metadados')}
+                  >
+                    <TableCellsIcon className="h-5 w-5 mr-2" /> Metadados
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/disciplinar/suporte"
+                    className={getSubmenuLinkClasses('/disciplinar/suporte')}
+                  >
+                    <WrenchIcon className="h-5 w-5 mr-2" /> Suporte
                   </Link>
                 </li>
               </ul>

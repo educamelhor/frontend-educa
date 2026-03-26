@@ -5,6 +5,7 @@
 // - Debounce no filtro de busca
 // - Paginação
 // - Colunas: RE | Aluno | Responsável | CPF | Ações
+// - Compartilha o modal premium com o módulo Disciplinar
 // ────────────────────────────────────────────────────────────────
 
 import React, { useState, useEffect } from "react";
@@ -13,8 +14,12 @@ import {
   EyeIcon,
   PencilSquareIcon,
   TrashIcon,
+  ExclamationTriangleIcon,
 } from "@heroicons/react/24/solid";
+import { Dialog, Transition } from "@headlessui/react";
+import { Fragment } from "react";
 import api from "../../../services/api";
+import ResponsavelModal from "../../../components/shared/ResponsavelModal";
 
 // ── Helper: ano letivo padrão (espelha lógica do backend) ──
 function anoLetivoPadrao() {
@@ -45,6 +50,14 @@ export default function ListaResponsaveis() {
   // ── Ano Letivo ──
   const [anosLetivos, setAnosLetivos] = useState([]);
   const [anoLetivo, setAnoLetivo] = useState(anoLetivoPadrao());
+
+  // ── Modal View/Edit (shared component) ──
+  const [modal, setModal] = useState({ open: false, mode: "view", id: null });
+
+  // ── Modal Exclusão ──
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deletingItem, setDeletingItem] = useState(null);
+  const [excluindo, setExcluindo] = useState(false);
 
   // ── Debounce (400ms) ──
   useEffect(() => {
@@ -98,6 +111,39 @@ export default function ListaResponsaveis() {
   }, [page, debouncedFiltro, anoLetivo]);
 
   const totalPages = Math.max(1, Math.ceil(total / limit));
+
+  // ── Handlers ──
+  function openView(reg) {
+    setModal({ open: true, mode: "view", id: reg.responsavel_id });
+  }
+
+  function openEdit(reg) {
+    setModal({ open: true, mode: "edit", id: reg.responsavel_id });
+  }
+
+  function closeModal() {
+    setModal({ open: false, mode: "view", id: null });
+  }
+
+  function openDeleteModal(reg) {
+    setDeletingItem(reg);
+    setIsDeleteModalOpen(true);
+  }
+
+  async function handleDelete() {
+    if (!deletingItem) return;
+    setExcluindo(true);
+    try {
+      await api.delete(`/api/responsaveis/${deletingItem.responsavel_id}`);
+      setIsDeleteModalOpen(false);
+      setDeletingItem(null);
+      fetchResponsaveis();
+    } catch (err) {
+      alert(err?.response?.data?.error || "Erro ao excluir.");
+    } finally {
+      setExcluindo(false);
+    }
+  }
 
   // ────────────────────────────────────────────────────────────────
   // Render
@@ -188,19 +234,22 @@ export default function ListaResponsaveis() {
                   <td className="p-2 border text-center">
                     <div className="flex justify-center gap-2">
                       <button
-                        className="text-blue-600 hover:text-blue-800"
+                        onClick={() => openView(reg)}
+                        className="text-blue-600 hover:text-blue-800 transition-colors"
                         title="Visualizar"
                       >
                         <EyeIcon className="w-5 h-5" />
                       </button>
                       <button
-                        className="text-indigo-600 hover:text-indigo-800"
+                        onClick={() => openEdit(reg)}
+                        className="text-indigo-600 hover:text-indigo-800 transition-colors"
                         title="Editar"
                       >
                         <PencilSquareIcon className="w-5 h-5" />
                       </button>
                       <button
-                        className="text-red-600 hover:text-red-800"
+                        onClick={() => openDeleteModal(reg)}
+                        className="text-red-600 hover:text-red-800 transition-colors"
                         title="Remover vínculo"
                       >
                         <TrashIcon className="w-5 h-5" />
@@ -234,6 +283,78 @@ export default function ListaResponsaveis() {
           Próxima
         </button>
       </div>
+
+      {/* ── Shared Modal (View / Edit) ── */}
+      <ResponsavelModal
+        open={modal.open}
+        mode={modal.mode}
+        responsavelId={modal.id}
+        onClose={closeModal}
+        onSaved={fetchResponsaveis}
+      />
+
+      {/* ── MODAL EXCLUIR VÍNCULO ── */}
+      <Transition appear show={isDeleteModalOpen} as={Fragment}>
+        <Dialog as="div" className="relative z-50" onClose={() => setIsDeleteModalOpen(false)}>
+          <Transition.Child
+            as={Fragment}
+            enter="ease-out duration-300" enterFrom="opacity-0" enterTo="opacity-100"
+            leave="ease-in duration-200" leaveFrom="opacity-100" leaveTo="opacity-0"
+          >
+            <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm" />
+          </Transition.Child>
+
+          <div className="fixed inset-0 overflow-y-auto">
+            <div className="flex min-h-full items-center justify-center p-4">
+              <Transition.Child
+                as={Fragment}
+                enter="ease-out duration-300" enterFrom="opacity-0 scale-95" enterTo="opacity-100 scale-100"
+                leave="ease-in duration-200" leaveFrom="opacity-100 scale-100" leaveTo="opacity-0 scale-95"
+              >
+                <Dialog.Panel className="w-full max-w-sm transform overflow-hidden rounded-2xl bg-white p-7 text-center shadow-2xl transition-all border border-gray-100">
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-red-50 mb-4 ring-8 ring-red-50/50">
+                    <ExclamationTriangleIcon className="h-6 w-6 text-red-600" />
+                  </div>
+                  <Dialog.Title as="h3" className="text-xl font-bold text-gray-800 mb-2">
+                    Remover Vínculo?
+                  </Dialog.Title>
+                  <p className="text-sm text-gray-500 mb-6 px-2">
+                    Tem certeza que deseja remover o vínculo de{" "}
+                    <span className="font-semibold text-gray-700">{deletingItem?.responsavel}</span>{" "}
+                    com <span className="font-semibold text-gray-700">{deletingItem?.aluno}</span>?
+                  </p>
+
+                  <div className="bg-orange-50 text-orange-800 text-xs px-4 py-3 rounded-lg mb-6 text-left leading-relaxed">
+                    <span className="font-semibold block mb-0.5">Aviso:</span>
+                    Esta ação apenas remove o acesso da sua escola aos dados deste responsável. O cadastro global permanecerá intacto.
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setIsDeleteModalOpen(false)}
+                      className="flex-1 px-4 py-2.5 bg-white border-2 border-gray-200 text-gray-700 font-semibold text-sm rounded-xl hover:bg-gray-50 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="button"
+                      disabled={excluindo}
+                      onClick={handleDelete}
+                      className="flex-1 px-4 py-2.5 bg-red-600 text-white font-semibold text-sm rounded-xl hover:bg-red-700 shadow-sm shadow-red-600/30 active:scale-95 disabled:opacity-50 transition-all flex justify-center items-center gap-2"
+                    >
+                      {excluindo && (
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      )}
+                      Sim, Remover
+                    </button>
+                  </div>
+                </Dialog.Panel>
+              </Transition.Child>
+            </div>
+          </div>
+        </Dialog>
+      </Transition>
     </div>
   );
 }

@@ -52,9 +52,9 @@ export default function GabaritoResultados() {
     if (resultados.length === 0) {
       return { total: 0, mediaAcertos: 0, mediaNota: 0, melhorNota: 0, piorNota: 0, aprovados: 0, reprovados: 0, pctAproveitamento: 0 };
     }
-    const notas = resultados.map(r => r.nota || 0);
-    const acertos = resultados.map(r => r.acertos || 0);
-    const totalQ = resultados[0]?.total_questoes || 1;
+    const notas = resultados.map(r => Number(r.nota) || 0);
+    const acertos = resultados.map(r => Number(r.acertos) || 0);
+    const totalQ = Number(resultados[0]?.total_questoes) || 1;
     const aprovados = acertos.filter(a => (a / totalQ) * 100 >= 60).length;
     return {
       total: resultados.length,
@@ -71,7 +71,7 @@ export default function GabaritoResultados() {
   // ─── Acertos por questão ───
   const acertosPorQuestao = useMemo(() => {
     if (resultados.length === 0) return [];
-    const totalQ = resultados[0]?.total_questoes || 0;
+    const totalQ = Number(resultados[0]?.total_questoes) || 0;
     const counts = new Array(totalQ).fill(0);
     resultados.forEach(r => {
       const det = r.detalhes || [];
@@ -439,7 +439,7 @@ export default function GabaritoResultados() {
                     </thead>
                     <tbody>
                       {resultados.map((r, idx) => {
-                        const pctAcerto = r.total_questoes > 0 ? (r.acertos / r.total_questoes) * 100 : 0;
+                        const pctAcerto = Number(r.total_questoes) > 0 ? (Number(r.acertos) / Number(r.total_questoes)) * 100 : 0;
                         return (
                           <tr key={r.id || idx}>
                             <td style={{ textAlign: "center", color: "var(--gab-text-muted)", fontSize: "0.75rem" }}>
@@ -457,7 +457,7 @@ export default function GabaritoResultados() {
                             </td>
                             <td>
                               <span className={`gab-nota-badge ${getColorClass(pctAcerto)}`} style={{ padding: "4px 10px", fontSize: "0.85rem" }}>
-                                {(r.nota || 0).toFixed(1)}
+                                {Number(r.nota || 0).toFixed(1)}
                               </span>
                             </td>
                             <td>

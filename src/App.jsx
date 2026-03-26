@@ -365,10 +365,11 @@ export default function App() {
             path="/pedagogico/correcoes/redacao"
             element={<Redacao />}
           />
-          <Route
-            path="/pedagogico/correcoes/gabarito"
-            element={<Gabarito />}
-          />
+          {/* Pedagógico > Gabarito (3 Etapas) */}
+          <Route path="/pedagogico/gabarito" element={<Gabarito etapa="imprimir" />} />
+          <Route path="/pedagogico/gabarito/imprimir" element={<Gabarito etapa="imprimir" />} />
+          <Route path="/pedagogico/gabarito/corrigir" element={<Gabarito etapa="corrigir" />} />
+          <Route path="/pedagogico/gabarito/resultados" element={<Gabarito etapa="resultados" />} />
 
           {/* ⭐ MÓDULO GABARITO (Novo — Premium) */}
           <Route path="/gabarito" element={<GabaritoModule />} />

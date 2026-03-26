@@ -29,6 +29,7 @@ import {
 export default function Sidebar() {
   const [openGroup, setOpenGroup] = useState(null);
   const [openCorrecoes, setOpenCorrecoes] = useState(false);
+  const [openGabaritoPed, setOpenGabaritoPed] = useState(false);
   const location = useLocation();
 
   // ─────────────────────────────────────────────────────────────
@@ -78,7 +79,13 @@ export default function Sidebar() {
       setOpenGroup('secretaria');
     }
     else if (p.startsWith('/disciplinar')) setOpenGroup('disciplinar');
-    else if (p.startsWith('/pedagogico')) setOpenGroup('pedagogico');
+    else if (p.startsWith('/pedagogico')) {
+      setOpenGroup('pedagogico');
+      // Auto-abrir submenu Correções se estiver em rota de correções
+      if (p.startsWith('/pedagogico/correcoes')) setOpenCorrecoes(true);
+      // Auto-abrir submenu Gabarito se estiver em rota de gabarito
+      if (p.startsWith('/pedagogico/gabarito')) setOpenGabaritoPed(true);
+    }
     else if (p.startsWith('/professores')) setOpenGroup('professores');
     else if (p.startsWith('/impressao')) setOpenGroup('impressao');
     else if (p.startsWith('/monitoramento')) setOpenGroup('monitoramento');
@@ -174,58 +181,76 @@ export default function Sidebar() {
 
             {/* GRUPO: Professores (fora de Secretaria) */}
             {isProfessor ? (
-            /* ── Professor: mostra APENAS o grupo Professores, sempre aberto ── */
+            /* ── Professor: mostra grupo Professores sempre aberto + Gabarito ── */
             <>
-            <button
-              className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-2 transition"
-              onClick={() => setOpenGroup(openGroup === 'professores' ? null : 'professores')}
-              type="button"
+            {/* Título do grupo Professores (sem toggle, sempre aberto) */}
+            <div
+              className="flex items-center w-full py-2 px-3 rounded mt-2"
+              style={{ background: 'rgba(255,255,255,0.05)' }}
             >
               <AcademicCapIcon className="h-5 w-5 mr-2" />
-              <span className="flex-1 text-left">Professores</span>
-              {openGroup === 'professores' ? (
-                <ChevronDownIcon className="h-4 w-4" />
-              ) : (
-                <ChevronRightIcon className="h-4 w-4" />
-              )}
-            </button>
+              <span className="flex-1 text-left font-semibold">Professores</span>
+            </div>
 
-            {openGroup === 'professores' && (
-              <ul className="ml-4 mb-2">
-                <li>
-                  <Link
-                    to="/professores/planos"
-                    className={getSubmenuLinkClasses('/professores/planos')}
-                  >
-                    <PencilSquareIcon className="h-5 w-5 mr-2" /> Planos
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    to="/professores/avaliacoes"
-                    className={getSubmenuLinkClasses('/professores/avaliacoes')}
-                  >
-                    <TableCellsIcon className="h-5 w-5 mr-2" /> Avaliações
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    to="/professores/conteudos"
-                    className={getSubmenuLinkClasses('/professores/conteudos')}
-                  >
-                    <BookOpenIcon className="h-5 w-5 mr-2" /> Conteúdos
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    to="/professores/provas"
-                    className={getSubmenuLinkClasses('/professores/provas')}
-                  >
-                    <DocumentTextIcon className="h-5 w-5 mr-2" /> Provas
-                  </Link>
-                </li>
-              </ul>
-            )}
+            {/* Submenus sempre visíveis */}
+            <ul className="ml-4 mb-2">
+              <li>
+                <Link
+                  to="/professores/planos"
+                  className={getSubmenuLinkClasses('/professores/planos')}
+                >
+                  <PencilSquareIcon className="h-5 w-5 mr-2" /> Planos
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/professores/avaliacoes"
+                  className={getSubmenuLinkClasses('/professores/avaliacoes')}
+                >
+                  <TableCellsIcon className="h-5 w-5 mr-2" /> Avaliações
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/professores/conteudos"
+                  className={getSubmenuLinkClasses('/professores/conteudos')}
+                >
+                  <BookOpenIcon className="h-5 w-5 mr-2" /> Conteúdos
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/professores/provas"
+                  className={getSubmenuLinkClasses('/professores/provas')}
+                >
+                  <DocumentTextIcon className="h-5 w-5 mr-2" /> Provas
+                </Link>
+              </li>
+            </ul>
+
+            {/* ⭐ GABARITO — Módulo separado para Professor */}
+            <Link
+              to="/gabarito"
+              className={getMainLinkClasses('/gabarito')}
+              style={{
+                marginTop: 4,
+                background: isActive('/gabarito')
+                  ? 'linear-gradient(90deg, rgba(6,182,212,0.15), transparent)'
+                  : undefined,
+              }}
+            >
+              <CheckCircleIcon className="h-5 w-5 mr-2" style={{ color: isActive('/gabarito') ? '#22d3ee' : undefined }} />
+              <span className="flex-1 text-left" style={{ fontWeight: 700 }}>Gabarito</span>
+              <span style={{
+                fontSize: '0.55rem',
+                fontWeight: 800,
+                background: 'linear-gradient(135deg, #06b6d4, #8b5cf6)',
+                color: '#fff',
+                padding: '2px 6px',
+                borderRadius: '8px',
+                letterSpacing: '0.5px',
+              }}>NOVO</span>
+            </Link>
             </>
             ) : !isDisciplinar && (
             <>
@@ -467,6 +492,73 @@ export default function Sidebar() {
             {/* ───────────────────────────────
                 GRUPO: Disciplinar
             ─────────────────────────────── */}
+            {isDisciplinar ? (
+            /* ── Disciplinar/Militar: submenus sempre visíveis ── */
+            <>
+            <div
+              className="flex items-center w-full py-2 px-3 rounded mt-6"
+              style={{ background: 'rgba(255,255,255,0.05)' }}
+            >
+              <ClipboardDocumentListIcon className="h-5 w-5 mr-2" />
+              <span className="flex-1 text-left font-semibold">Disciplinar</span>
+            </div>
+
+            <ul className="ml-4 mb-2">
+                <li>
+                  <Link
+                    to="/disciplinar/alunos"
+                    className={getSubmenuLinkClasses('/disciplinar/alunos')}
+                  >
+                    <UsersIcon className="h-5 w-5 mr-2" /> Alunos
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/disciplinar/responsaveis"
+                    className={getSubmenuLinkClasses('/disciplinar/responsaveis')}
+                  >
+                    <UserGroupIcon className="h-5 w-5 mr-2" /> Responsáveis
+                  </Link>
+                </li>
+                {(perfil === 'diretor' || perfil === 'militar') && (
+                <li>
+                  <Link
+                    to="/disciplinar/equipe"
+                    className={getSubmenuLinkClasses('/disciplinar/equipe')}
+                  >
+                    <UsersIcon className="h-5 w-5 mr-2" /> Gestão de Equipe
+                  </Link>
+                </li>
+                )}
+                <li>
+                  <Link
+                    to="/disciplinar/regimentos"
+                    className={getSubmenuLinkClasses('/disciplinar/regimentos')}
+                  >
+                    <DocumentTextIcon className="h-5 w-5 mr-2" /> Regimentos
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/disciplinar/metadados"
+                    className={getSubmenuLinkClasses('/disciplinar/metadados')}
+                  >
+                    <TableCellsIcon className="h-5 w-5 mr-2" /> Metadados
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/disciplinar/suporte"
+                    className={getSubmenuLinkClasses('/disciplinar/suporte')}
+                  >
+                    <WrenchIcon className="h-5 w-5 mr-2" /> Suporte
+                  </Link>
+                </li>
+              </ul>
+            </>
+            ) : (
+            /* ── Outros perfis (diretor, coordenador): toggle colapsável ── */
+            <>
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-6 transition"
               onClick={() => setOpenGroup(openGroup === 'disciplinar' ? null : 'disciplinar')}
@@ -545,6 +637,8 @@ export default function Sidebar() {
                   </Link>
                 </li>
               </ul>
+            )}
+            </>
             )}
           </>
         )}
@@ -688,6 +782,7 @@ export default function Sidebar() {
                 if (openGroup === 'pedagogico') {
                   setOpenGroup(null);
                   setOpenCorrecoes(false);
+                  setOpenGabaritoPed(false);
                 } else {
                   setOpenGroup('pedagogico');
                 }
@@ -774,12 +869,50 @@ export default function Sidebar() {
                           <PencilSquareIcon className="h-5 w-5 mr-2" /> Redação
                         </Link>
                       </li>
+                    </ul>
+                  )}
+                </li>
+
+                {/* Submenu Gabarito (3 etapas) */}
+                <li>
+                  <button
+                    className="flex items-center w-full py-2 pl-6 pr-3 rounded hover:bg-blue-700 transition"
+                    onClick={() => setOpenGabaritoPed((v) => !v)}
+                    type="button"
+                  >
+                    <CheckCircleIcon className="h-5 w-5 mr-2" />
+                    <span className="flex-1 text-left">Gabarito</span>
+                    {openGabaritoPed ? (
+                      <ChevronDownIcon className="h-4 w-4" />
+                    ) : (
+                      <ChevronRightIcon className="h-4 w-4" />
+                    )}
+                  </button>
+
+                  {openGabaritoPed && (
+                    <ul className="ml-8 mb-2">
                       <li>
                         <Link
-                          to="/pedagogico/correcoes/gabarito"
-                          className={getSubmenuLinkClasses('/pedagogico/correcoes/gabarito')}
+                          to="/pedagogico/gabarito/imprimir"
+                          className={getSubmenuLinkClasses('/pedagogico/gabarito/imprimir')}
                         >
-                          <DocumentTextIcon className="h-5 w-5 mr-2" /> Gabarito
+                          <PrinterIcon className="h-5 w-5 mr-2" /> Imprimir
+                        </Link>
+                      </li>
+                      <li>
+                        <Link
+                          to="/pedagogico/gabarito/corrigir"
+                          className={getSubmenuLinkClasses('/pedagogico/gabarito/corrigir')}
+                        >
+                          <CheckCircleIcon className="h-5 w-5 mr-2" /> Corrigir
+                        </Link>
+                      </li>
+                      <li>
+                        <Link
+                          to="/pedagogico/gabarito/resultados"
+                          className={getSubmenuLinkClasses('/pedagogico/gabarito/resultados')}
+                        >
+                          <ChartBarIcon className="h-5 w-5 mr-2" /> Resultados
                         </Link>
                       </li>
                     </ul>

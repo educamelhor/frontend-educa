@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   PlusIcon,
   PencilSquareIcon,
   TrashIcon,
+  EyeIcon,
   MagnifyingGlassIcon,
   UserGroupIcon,
-  CheckCircleIcon,
   ExclamationTriangleIcon,
   DevicePhoneMobileIcon,
   ShieldCheckIcon,
@@ -15,48 +15,22 @@ import { CheckCircleIcon as CheckCircleSolidIcon } from "@heroicons/react/24/sol
 import { Dialog, Transition } from "@headlessui/react";
 import { Fragment } from "react";
 import api from "../../../services/api";
+import ResponsavelModal from "../../../components/shared/ResponsavelModal";
 
 export default function ResponsaveisDisciplinar() {
   const [responsaveis, setResponsaveis] = useState([]);
   const [loading, setLoading] = useState(true);
 
-
-
-  // Modal Novo / Editar
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingId, setEditingId] = useState(null);
-  
-  // Form fields
-  const [nome, setNome] = useState("");
-  const [cpf, setCpf] = useState("");
-  const [email, setEmail] = useState("");
-  const [telefone, setTelefone] = useState("");
-  const [telefoneSecundario, setTelefoneSecundario] = useState("");
-  const [endereco, setEndereco] = useState("");
-  const [alunoId, setAlunoId] = useState("");
-  const [alunoNome, setAlunoNome] = useState("");
-  const [relacionamento, setRelacionamento] = useState("RESPONSAVEL");
-
-  const [salvando, setSalvando] = useState(false);
+  // ── Shared Modal (View / Edit / New) ──
+  const [sharedModal, setSharedModal] = useState({ open: false, mode: "view", id: null });
 
   // Pesquisa Restrita na tela
   const [buscaTela, setBuscaTela] = useState("");
-
-  // Pesquisa Aluno (Autocomplete)
-  const [buscandoAlunos, setBuscandoAlunos] = useState(false);
-  const [alunosOptions, setAlunosOptions] = useState([]);
-  const [buscaAlunoQuery, setBuscaAlunoQuery] = useState("");
-  const [showDropdown, setShowDropdown] = useState(false);
-  const dropdownRef = useRef(null);
 
   // Modal Exclusão
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deletingItem, setDeletingItem] = useState(null);
   const [excluindo, setExcluindo] = useState(false);
-
-  // Modal Confirmação de Vínculo (ao editar e vincular novo estudante)
-  const [isConfirmVinculoOpen, setIsConfirmVinculoOpen] = useState(false);
-  const [pendingSaveData, setPendingSaveData] = useState(null);
 
   // Modal Consentimento de Imagem
   const [isConsentModalOpen, setIsConsentModalOpen] = useState(false);
@@ -73,16 +47,6 @@ export default function ResponsaveisDisciplinar() {
   const [printAlunos, setPrintAlunos] = useState([]);
   const [carregandoPrintAlunos, setCarregandoPrintAlunos] = useState(false);
 
-  // Fechar dropdown de aluno se clicar fora
-  useEffect(() => {
-    function handleClickOutside(event) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setShowDropdown(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   const fetchResponsaveis = async () => {
     setLoading(true);
@@ -99,28 +63,6 @@ export default function ResponsaveisDisciplinar() {
   useEffect(() => {
     fetchResponsaveis();
   }, []);
-
-  // Debounce e busca de alunos
-  useEffect(() => {
-    const delayDebounceFn = setTimeout(async () => {
-      if (!isModalOpen || buscaAlunoQuery.length < 2) {
-        setAlunosOptions([]);
-        return;
-      }
-      setBuscandoAlunos(true);
-      try {
-        const { data } = await api.get(`/api/responsaveis/buscar-alunos?busca=${buscaAlunoQuery}`);
-        setAlunosOptions(data);
-        setShowDropdown(true);
-      } catch (err) {
-        console.error("Erro ao buscar alunos", err);
-      } finally {
-        setBuscandoAlunos(false);
-      }
-    }, 500);
-
-    return () => clearTimeout(delayDebounceFn);
-  }, [buscaAlunoQuery, isModalOpen, editingId]);
 
   // Remove acentos para busca inteligente (ex: "joao" encontra "JOÃO")
   const removerAcentos = (str) =>
@@ -146,35 +88,19 @@ export default function ResponsaveisDisciplinar() {
   }, [responsaveis, buscaTela]);
 
   const openNewModal = () => {
-    setEditingId(null);
-    setNome("");
-    setCpf("");
-    setEmail("");
-    setTelefone("");
-    setTelefoneSecundario("");
-    setEndereco("");
-    setAlunoId("");
-    setAlunoNome("");
-    setRelacionamento("RESPONSAVEL");
-    setBuscaAlunoQuery("");
-    setShowDropdown(false);
-    setIsModalOpen(true);
+    setSharedModal({ open: true, mode: "edit", id: null });
+  };
+
+  const openViewModal = (item) => {
+    setSharedModal({ open: true, mode: "view", id: item.id });
   };
 
   const openEditModal = (item) => {
-    setEditingId(item.id);
-    setNome(item.nome);
-    setCpf(item.cpf || "");
-    setEmail(item.email || "");
-    setTelefone(item.telefone_celular || "");
-    setTelefoneSecundario(item.telefone_secundario || "");
-    setEndereco(item.endereco || "");
-    setAlunoId("");
-    setAlunoNome("");
-    setBuscaAlunoQuery("");
-    setShowDropdown(false);
-    setRelacionamento("RESPONSAVEL");
-    setIsModalOpen(true);
+    setSharedModal({ open: true, mode: "edit", id: item.id });
+  };
+
+  const closeSharedModal = () => {
+    setSharedModal({ open: false, mode: "view", id: null });
   };
 
   const openDeleteModal = (item) => {
@@ -244,136 +170,16 @@ export default function ResponsaveisDisciplinar() {
     }
   };
 
-  const gerarTermoPDF = (responsavelId, alunoId) => {
-    // Abre o PDF em nova aba via API autenticada
+  const gerarTermoPDF = (respId, alId) => {
     const token = localStorage.getItem("token");
     const escolaId = localStorage.getItem("escola_id");
-    // baseURL já termina com /api, então NÃO duplicar
-    const url = `${api.defaults.baseURL}/termo-consentimento/${responsavelId}/${alunoId}`;
-    
-    // Busca via fetch com token + escola para abrir o PDF
+    const url = `${api.defaults.baseURL}/termo-consentimento/${respId}/${alId}`;
     fetch(url, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "x-escola-id": escolaId,
-      },
+      headers: { Authorization: `Bearer ${token}`, "x-escola-id": escolaId },
     })
-      .then((r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return r.blob();
-      })
-      .then((blob) => {
-        const blobUrl = URL.createObjectURL(blob);
-        window.open(blobUrl, "_blank");
-      })
-      .catch((err) => {
-        console.error("Erro ao gerar PDF:", err);
-        alert("Erro ao gerar o Termo de Consentimento.");
-      });
-  };
-
-  // ── Validação matemática de CPF (dígitos verificadores) ──
-  const validarCPF = (cpfRaw) => {
-    const digits = cpfRaw.replace(/\D/g, "");
-    if (digits.length !== 11) return false;
-    // Rejeita CPFs com todos os dígitos iguais (ex: 111.111.111-11)
-    if (/^(\d)\1{10}$/.test(digits)) return false;
-    // Cálculo do 1º dígito verificador
-    let soma = 0;
-    for (let i = 0; i < 9; i++) soma += parseInt(digits.charAt(i)) * (10 - i);
-    let resto = (soma * 10) % 11;
-    if (resto === 10) resto = 0;
-    if (resto !== parseInt(digits.charAt(9))) return false;
-    // Cálculo do 2º dígito verificador
-    soma = 0;
-    for (let i = 0; i < 10; i++) soma += parseInt(digits.charAt(i)) * (11 - i);
-    resto = (soma * 10) % 11;
-    if (resto === 10) resto = 0;
-    if (resto !== parseInt(digits.charAt(10))) return false;
-    return true;
-  };
-
-  // ── Campos obrigatórios: Nome, CPF, Telefone Principal, Endereço ──
-  // Telefone 2 (Secundário) e E-mail são opcionais
-  const isEditing = !!editingId;
-  const allFieldsFilled = nome.trim() && cpf.trim() && telefone.trim() && endereco.trim();
-  const canSave = allFieldsFilled && (isEditing || alunoId);
-  // Campos vazios para feedback visual (apenas obrigatórios)
-  const camposVazios = {
-    nome: !nome.trim(),
-    cpf: !cpf.trim(),
-    telefone: !telefone.trim(),
-    endereco: !endereco.trim(),
-  };
-  const qtdVazios = Object.values(camposVazios).filter(Boolean).length;
-
-  const handleSave = async (e) => {
-    e.preventDefault();
-    if (!nome.trim()) return alert("O nome não pode estar vazio.");
-    if (!cpf.trim()) return alert("O CPF é obrigatório.");
-    if (!validarCPF(cpf)) return alert("CPF inválido. Verifique os dígitos e tente novamente.");
-    if (!telefone.trim()) return alert("O Telefone Principal é obrigatório.");
-    if (!endereco.trim()) return alert("O Endereço é obrigatório.");
-
-    // Na criação do registro, é obrigatório vincular um estudante.
-    if (!editingId && !alunoId) {
-       return alert("O vínculo com um estudante é obrigatório.");
-    }
-
-    // Se está editando e selecionou um novo aluno, pedir confirmação
-    if (editingId && alunoId) {
-      setPendingSaveData({
-        nome: nome.trim(),
-        cpf: cpf.trim() || null,
-        email: email.trim() || null,
-        telefone_celular: telefone.trim() || null,
-        telefone_secundario: telefoneSecundario.trim() || null,
-        endereco: endereco.trim() || null,
-        aluno_id: alunoId,
-        relacionamento,
-        alunoNome,
-      });
-      setIsConfirmVinculoOpen(true);
-      return;
-    }
-
-    await executeSave();
-  };
-
-  const executeSave = async (overrideData) => {
-    setSalvando(true);
-    try {
-      const payload = overrideData || {
-        nome: nome.trim(),
-        cpf: cpf.trim() || null,
-        email: email.trim() || null,
-        telefone_celular: telefone.trim() || null,
-        telefone_secundario: telefoneSecundario.trim() || null,
-        endereco: endereco.trim() || null,
-        aluno_id: alunoId || null,
-        relacionamento,
-      };
-
-      if (editingId) {
-        await api.put(`/api/responsaveis/${editingId}`, payload);
-      } else {
-        await api.post("/api/responsaveis", payload);
-      }
-      setIsModalOpen(false);
-      setIsConfirmVinculoOpen(false);
-      setPendingSaveData(null);
-      fetchResponsaveis();
-    } catch (err) {
-      alert(err?.response?.data?.error || "Erro ao salvar.");
-    } finally {
-      setSalvando(false);
-    }
-  };
-
-  const handleConfirmVinculo = async () => {
-    if (!pendingSaveData) return;
-    const { alunoNome: _, ...payload } = pendingSaveData;
-    await executeSave(payload);
+      .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.blob(); })
+      .then((blob) => { window.open(URL.createObjectURL(blob), "_blank"); })
+      .catch((err) => { console.error("Erro ao gerar PDF:", err); alert("Erro ao gerar o Termo de Consentimento."); });
   };
 
   const handleDelete = async () => {
@@ -508,6 +314,13 @@ export default function ResponsaveisDisciplinar() {
                     <td className="px-6 py-4 text-center align-middle">
                       <div className="flex items-center justify-center gap-2">
                         <button
+                          onClick={() => openViewModal(item)}
+                          className="p-1.5 text-gray-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors"
+                          title="Visualizar dados"
+                        >
+                          <EyeIcon className="w-4 h-4" />
+                        </button>
+                        <button
                           onClick={() => openConsentModal(item)}
                           className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
                           title="Termo de Consentimento de Imagem"
@@ -550,332 +363,14 @@ export default function ResponsaveisDisciplinar() {
         </div>
       </div>
 
-      {/* ── MODAL NOVO/EDITAR ────────────────────── */}
-      <Transition appear show={isModalOpen} as={Fragment}>
-        <Dialog as="div" className="relative z-50" onClose={() => setIsModalOpen(false)}>
-          <Transition.Child
-            as={Fragment}
-            enter="ease-out duration-300"
-            enterFrom="opacity-0"
-            enterTo="opacity-100"
-            leave="ease-in duration-200"
-            leaveFrom="opacity-100"
-            leaveTo="opacity-0"
-          >
-            <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm" />
-          </Transition.Child>
-
-          <div className="fixed inset-0 overflow-y-auto">
-            <div className="flex min-h-full items-center justify-center p-4">
-              <Transition.Child
-                as={Fragment}
-                enter="ease-out duration-300"
-                enterFrom="opacity-0 scale-95"
-                enterTo="opacity-100 scale-100"
-                leave="ease-in duration-200"
-                leaveFrom="opacity-100 scale-100"
-                leaveTo="opacity-0 scale-95"
-              >
-                <Dialog.Panel className="w-full max-w-lg transform overflow-visible rounded-2xl bg-white p-7 shadow-2xl transition-all border border-gray-100">
-                  <Dialog.Title as="h3" className="text-xl font-bold text-gray-800 mb-1">
-                    {editingId ? "Editar Responsável" : "Novo Responsável"}
-                  </Dialog.Title>
-                  <p className="text-sm text-gray-500 mb-2">
-                    {editingId ? "Atualize os dados de contato." : "Crie e vincule um responsável a um aluno."}
-                  </p>
-
-                  {/* Aviso de campos obrigatórios */}
-                  {qtdVazios > 0 && (
-                    <div className="mb-4 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
-                      <div className="mt-0.5 flex-shrink-0">
-                        <svg className="w-5 h-5 text-amber-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.007H12v-.007Z" />
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-amber-800">Campos obrigatórios pendentes</p>
-                        <p className="text-xs text-amber-600 mt-0.5">
-                          Para salvar, preencha {qtdVazios === 1 ? 'o' : 'os'} <strong>{qtdVazios} campo{qtdVazios > 1 ? 's' : ''} obrigatório{qtdVazios > 1 ? 's' : ''}</strong> restante{qtdVazios > 1 ? 's' : ''}.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  <form onSubmit={handleSave} className="space-y-4">
-                    <div>
-                      <label className={`block text-sm font-semibold mb-1.5 ${camposVazios.nome ? 'text-red-600' : 'text-gray-700'}`}>
-                        Nome Completo *
-                      </label>
-                      <input
-                        type="text"
-                        autoFocus
-                        required
-                        value={nome}
-                        onChange={(e) => setNome(e.target.value)}
-                        placeholder="Ex: Maria José da Silva"
-                        className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all font-medium"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className={`block text-sm font-semibold mb-1.5 ${camposVazios.cpf ? 'text-red-600' : 'text-gray-700'}`}>
-                          CPF *
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          maxLength="14"
-                          value={cpf}
-                          onChange={(e) => setCpf(formatCpf(e.target.value))}
-                          placeholder="000.000.000-00"
-                          className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all text-gray-700"
-                        />
-                      </div>
-                      <div>
-                        <label className={`block text-sm font-semibold mb-1.5 ${camposVazios.telefone ? 'text-red-600' : 'text-gray-700'}`}>
-                          Telefone Principal *
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          maxLength="15"
-                          value={telefone}
-                          onChange={(e) => setTelefone(formatTelefone(e.target.value))}
-                          placeholder="(00) 00000-0000"
-                          className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all text-gray-700"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-semibold mb-1.5 text-gray-700">
-                          Telefone 2 (Secundário)
-                          <span className="text-xs font-normal text-gray-400 ml-1">— opcional</span>
-                        </label>
-                        <input
-                          type="text"
-                          maxLength="15"
-                          value={telefoneSecundario}
-                          onChange={(e) => setTelefoneSecundario(formatTelefone(e.target.value))}
-                          placeholder="(00) 00000-0000"
-                          className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all text-gray-700"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-semibold mb-1.5 text-gray-700">
-                          E-mail
-                          <span className="text-xs font-normal text-gray-400 ml-1">— opcional</span>
-                        </label>
-                        <input
-                          type="email"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          placeholder="maria@email.com"
-                          className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all text-gray-700"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Endereço */}
-                    <div>
-                      <label className={`block text-sm font-semibold mb-1.5 ${camposVazios.endereco ? 'text-red-600' : 'text-gray-700'}`}>
-                        Endereço *
-                      </label>
-                      <input
-                        type="text"
-                        value={endereco}
-                        onChange={(e) => setEndereco(e.target.value)}
-                        placeholder="Ex: QD 03 CJ F Lt 01 — Arapoanga, Planaltina-DF"
-                        className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all text-gray-700"
-                      />
-                    </div>
-
-                    {/* Vínculo de Aluno (Adicionar novo vínculo) */}
-                    <div className="pt-2 border-t border-gray-100" ref={dropdownRef}>
-                      <label className="block text-sm font-semibold text-gray-700 mb-1.5 mt-2">
-                        {editingId ? "Novo Vínculo de Estudante (Opcional)" : "Vincular Estudante *"}
-                      </label>
-                        {alunoId ? (
-                          <div className="flex items-center justify-between bg-blue-50 border border-blue-100 px-4 py-2.5 rounded-xl">
-                            <div className="flex items-center gap-2">
-                              <CheckCircleIcon className="w-5 h-5 text-blue-600" />
-                              <span className="text-sm font-semibold text-blue-900">{alunoNome}</span>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setAlunoId("");
-                                setAlunoNome("");
-                                setBuscaAlunoQuery("");
-                              }}
-                              className="text-xs text-blue-600 hover:text-blue-800 underline font-medium"
-                            >
-                              Remover
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="relative">
-                            <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                            <input
-                              type="text"
-                              value={buscaAlunoQuery}
-                              onChange={(e) => setBuscaAlunoQuery(e.target.value)}
-                              placeholder="Pesquise o nome do estudante..."
-                              className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all"
-                            />
-                            {/* Autocomplete Dropdown */}
-                            {showDropdown && (buscaAlunoQuery.length >= 2) && (
-                              <ul className="absolute z-10 w-full mt-1 max-h-48 overflow-auto bg-white border border-gray-200 rounded-xl shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                                {buscandoAlunos ? (
-                                  <li className="relative cursor-default select-none px-4 py-3 text-sm text-gray-500 text-center flex justify-center gap-2 items-center">
-                                    <div className="w-4 h-4 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin" /> Buscando...
-                                  </li>
-                                ) : alunosOptions.length === 0 ? (
-                                  <li className="relative cursor-default select-none px-4 py-3 text-sm text-gray-500 text-center">
-                                    Nenhum aluno encontrado.
-                                  </li>
-                                ) : (
-                                  alunosOptions.map((al) => (
-                                    <li
-                                      key={al.id}
-                                      onClick={() => {
-                                        setAlunoId(al.id);
-                                        setAlunoNome(al.estudante);
-                                        setShowDropdown(false);
-                                      }}
-                                      className="relative cursor-pointer select-none px-4 py-2.5 hover:bg-blue-50 text-gray-700 text-sm border-b border-gray-50 last:border-0"
-                                    >
-                                      <div className="font-semibold">{al.estudante}</div>
-                                      {al.codigo && <div className="text-xs text-gray-400">Código: {al.codigo}</div>}
-                                    </li>
-                                  ))
-                                )}
-                              </ul>
-                            )}
-                          </div>
-                        )}
-                        
-                        {alunoId && (
-                           <div className="mt-4">
-                            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                              Grau de Parentesco / Vínculo *
-                            </label>
-                            <select
-                              value={relacionamento}
-                              onChange={(e) => setRelacionamento(e.target.value)}
-                              className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition-all font-medium text-gray-700 appearance-none bg-[url('data:image/svg+xml;charset=US-ASCII,%3Csvg%20width%3D%2220%22%20height%3D%2220%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%3Cpath%20d%3D%22M5%207l5%205%205-5%22%20stroke%3D%22%239CA3AF%22%20stroke-width%3D%222%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E')] bg-[length:20px_20px] bg-no-repeat bg-[position:right_10px_center]"
-                            >
-                              <option value="MAE">Mãe</option>
-                              <option value="PAI">Pai</option>
-                              <option value="RESPONSAVEL">Responsável Legal (Padrão)</option>
-                              <option value="AVO">Avô / Avó</option>
-                              <option value="TIA">Tio / Tia</option>
-                              <option value="OUTRO">Outro</option>
-                            </select>
-                           </div>
-                        )}
-                        <p className="text-xs text-gray-400 mt-2.5 ml-1">
-                          Você poderá gerenciar mais vínculos posteriormente.
-                        </p>
-                      </div>
-
-                    <div className="mt-8 flex justify-end gap-3 pt-4">
-                      <button
-                        type="button"
-                        onClick={() => setIsModalOpen(false)}
-                        className="px-5 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
-                      >
-                        Cancelar
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={salvando || !canSave}
-                        className={"px-6 py-2.5 text-sm font-semibold text-white rounded-xl shadow-sm transition-all active:scale-95 disabled:cursor-not-allowed flex items-center gap-2 " + (!canSave ? "bg-gray-300 shadow-gray-300/30" : "bg-blue-600 hover:bg-blue-700 shadow-blue-600/30 disabled:opacity-50")}
-                      >
-                        {salvando && (
-                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        )}
-                        Salvar
-                      </button>
-                    </div>
-                  </form>
-                </Dialog.Panel>
-              </Transition.Child>
-            </div>
-          </div>
-        </Dialog>
-      </Transition>
-
-      {/* ── MODAL CONFIRMAÇÃO DE NOVO VÍNCULO ────── */}
-      <Transition appear show={isConfirmVinculoOpen} as={Fragment}>
-        <Dialog as="div" className="relative z-[60]" onClose={() => { setIsConfirmVinculoOpen(false); setPendingSaveData(null); }}>
-          <Transition.Child
-            as={Fragment}
-            enter="ease-out duration-300"
-            enterFrom="opacity-0"
-            enterTo="opacity-100"
-            leave="ease-in duration-200"
-            leaveFrom="opacity-100"
-            leaveTo="opacity-0"
-          >
-            <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm" />
-          </Transition.Child>
-
-          <div className="fixed inset-0 overflow-y-auto">
-            <div className="flex min-h-full items-center justify-center p-4">
-              <Transition.Child
-                as={Fragment}
-                enter="ease-out duration-300"
-                enterFrom="opacity-0 scale-95"
-                enterTo="opacity-100 scale-100"
-                leave="ease-in duration-200"
-                leaveFrom="opacity-100 scale-100"
-                leaveTo="opacity-0 scale-95"
-              >
-                <Dialog.Panel className="w-full max-w-sm transform overflow-hidden rounded-2xl bg-white p-7 shadow-2xl transition-all border border-gray-100 text-center">
-                  <div className="mx-auto w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center mb-4">
-                    <UserGroupIcon className="w-6 h-6 text-blue-600" />
-                  </div>
-                  <Dialog.Title as="h3" className="text-lg font-bold text-gray-800 mb-2">
-                    Confirmar Novo Vínculo
-                  </Dialog.Title>
-                  <p className="text-sm text-gray-600 mb-1">
-                    Deseja vincular o estudante
-                  </p>
-                  <p className="text-sm font-bold text-blue-700 bg-blue-50 inline-block px-3 py-1 rounded-lg mb-3">
-                    {pendingSaveData?.alunoNome}
-                  </p>
-                  <p className="text-sm text-gray-600 mb-6">
-                    a este responsável?
-                  </p>
-                  <div className="flex justify-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => { setIsConfirmVinculoOpen(false); setPendingSaveData(null); }}
-                      className="px-5 py-2.5 text-sm font-semibold text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleConfirmVinculo}
-                      disabled={salvando}
-                      className="px-6 py-2.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-sm transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2"
-                    >
-                      {salvando && (
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      )}
-                      Sim, Vincular
-                    </button>
-                  </div>
-                </Dialog.Panel>
-              </Transition.Child>
-            </div>
-          </div>
-        </Dialog>
-      </Transition>
+      {/* ── SHARED MODAL (View / Edit / New) ── */}
+      <ResponsavelModal
+        open={sharedModal.open}
+        mode={sharedModal.mode}
+        responsavelId={sharedModal.id}
+        onClose={closeSharedModal}
+        onSaved={fetchResponsaveis}
+      />
 
       {/* ── MODAL EXCLUIR VÍNCULO ─────────────────── */}
       <Transition appear show={isDeleteModalOpen} as={Fragment}>

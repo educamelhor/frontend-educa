@@ -70,12 +70,12 @@ export default function GabaritoCorrigir() {
     if (file.type.startsWith("image/")) {
       setPreviewUrl(URL.createObjectURL(file));
     } else {
-      // Para PDF, usamos um placeholder
+      // Para PDF, limpa preview de imagem (mostrará placeholder de PDF)
       setPreviewUrl(null);
     }
 
-    // Detectar aluno via OCR
-    detectarAluno(file);
+    showToast(`Arquivo "${file.name}" carregado com sucesso!`, "success");
+    // Aluno será identificado via QR Code durante a correção OMR
   }
 
   function handleInputChange(e) {
@@ -113,6 +113,7 @@ export default function GabaritoCorrigir() {
 
       if (!data.text) {
         setAlunoInfo({ codigo: "-", nome: "NÃO DETECTADO", turma: "-" });
+        showToast("OCR não detectou texto no arquivo.", "error");
         setLoadingAluno(false);
         return;
       }
@@ -121,6 +122,7 @@ export default function GabaritoCorrigir() {
       const codigo = extrairCodigo(data.text);
       if (!codigo) {
         setAlunoInfo({ codigo: "-", nome: "CÓDIGO NÃO DETECTADO", turma: "-" });
+        showToast("Código do aluno não encontrado na imagem.", "error");
         setLoadingAluno(false);
         return;
       }
@@ -141,8 +143,10 @@ export default function GabaritoCorrigir() {
       } catch {
         setAlunoInfo({ codigo, nome: "ERRO AO BUSCAR", turma: "-" });
       }
-    } catch {
-      setAlunoInfo({ codigo: "-", nome: "ERRO OCR", turma: "-" });
+    } catch (err) {
+      console.warn("OCR indisponível:", err?.message || err);
+      setAlunoInfo(null);
+      showToast("Detecção automática do aluno indisponível. Prossiga com a correção.", "error");
     }
     setLoadingAluno(false);
   }
@@ -226,6 +230,26 @@ export default function GabaritoCorrigir() {
       const dataBolhas = await respBolhas.json();
       const respostas = dataBolhas.respostas || [];
       setRespostasAluno(respostas);
+
+      // 2b. Identificar aluno via QR Code (lido pelo OMR)
+      if (dataBolhas.qrData && dataBolhas.qrData.re) {
+        const codigo = dataBolhas.qrData.re;
+        try {
+          const respAluno = await api.get(`/alunos/por-codigo/${codigo}`);
+          const dataAluno = respAluno.data;
+          if (dataAluno.nome) {
+            setAlunoInfo({
+              codigo: String(codigo).toUpperCase(),
+              nome: String(dataAluno.nome).toUpperCase(),
+              turma: String(dataAluno.turma || "").toUpperCase(),
+            });
+          } else {
+            setAlunoInfo({ codigo: String(codigo).toUpperCase(), nome: dataBolhas.qrData.nome || "NÃO ENCONTRADO", turma: dataBolhas.qrData.turma || "-" });
+          }
+        } catch {
+          setAlunoInfo({ codigo: String(codigo).toUpperCase(), nome: dataBolhas.qrData.nome || "ERRO AO BUSCAR", turma: dataBolhas.qrData.turma || "-" });
+        }
+      }
 
       // 3. Comparar com gabarito oficial
       const gabOficial = avaliacaoAtiva.gabarito;
@@ -490,28 +514,59 @@ export default function GabaritoCorrigir() {
               style={{ display: "none" }}
             />
 
-            {previewUrl ? (
+            {arquivo ? (
               <div className="gab-flex gab-flex-col gab-gap-16">
-                {/* Preview da imagem */}
-                <div style={{
-                  background: "rgba(0,0,0,0.3)",
-                  borderRadius: "12px",
-                  overflow: "hidden",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  maxHeight: "320px",
-                }}>
-                  <img
-                    src={previewUrl}
-                    alt="Preview do gabarito"
-                    style={{
-                      maxWidth: "100%",
-                      maxHeight: "320px",
-                      objectFit: "contain",
-                    }}
-                  />
-                </div>
+                {/* Preview da imagem OU placeholder de PDF */}
+                {previewUrl ? (
+                  <div style={{
+                    background: "rgba(0,0,0,0.3)",
+                    borderRadius: "12px",
+                    overflow: "hidden",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    maxHeight: "320px",
+                  }}>
+                    <img
+                      src={previewUrl}
+                      alt="Preview do gabarito"
+                      style={{
+                        maxWidth: "100%",
+                        maxHeight: "320px",
+                        objectFit: "contain",
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <div style={{
+                    background: "rgba(245, 158, 11, 0.06)",
+                    border: "1px solid rgba(245, 158, 11, 0.15)",
+                    borderRadius: "12px",
+                    padding: "24px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "16px",
+                  }}>
+                    <div style={{
+                      width: 48, height: 48, borderRadius: "10px",
+                      background: "rgba(245, 158, 11, 0.1)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      flexShrink: 0,
+                    }}>
+                      <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="#f59e0b" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--gab-text-primary)" }}>
+                        {arquivo.name}
+                      </div>
+                      <div style={{ fontSize: "0.75rem", color: "var(--gab-text-muted)", marginTop: 2 }}>
+                        PDF · {(arquivo.size / 1024).toFixed(0)} KB
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Info do aluno detectado */}
                 {loadingAluno && (
@@ -607,7 +662,7 @@ export default function GabaritoCorrigir() {
         </div>
 
         {/* ═══ COLUNA DIREITA ═══ */}
-        <div className="gab-flex gab-flex-col gab-gap-20">
+        <div style={{ display: "flex", flexDirection: "column", gap: 20, minWidth: 0 }}>
 
           {correcao ? (
             <>
@@ -660,11 +715,11 @@ export default function GabaritoCorrigir() {
               </div>
 
               {/* Card: Tabela Comparativa */}
-              <div className="gab-card" style={{ padding: 0, animation: "gab-slide-up 0.6s ease-out" }}>
+              <div className="gab-card" style={{ padding: 0, animation: "gab-slide-up 0.6s ease-out", overflow: "hidden" }}>
                 <div style={{ padding: "18px 24px 12px" }}>
                   <div className="gab-card-title">Detalhamento Questão a Questão</div>
                 </div>
-                <div className="gab-table-wrap" style={{ border: "none", borderRadius: 0 }}>
+                <div className="gab-table-wrap" style={{ border: "none", borderRadius: 0, overflowX: "auto" }}>
                   <table className="gab-table">
                     <thead>
                       <tr>

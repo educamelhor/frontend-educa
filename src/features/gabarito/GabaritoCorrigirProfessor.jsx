@@ -286,7 +286,9 @@ export default function GabaritoCorrigirProfessor() {
       }));
     } catch (err) {
       console.error("Erro ao corrigir:", err);
-      const msg = err.response?.data?.error || "Erro ao corrigir gabarito.";
+      const errData = err.response?.data;
+      if (errData?.debug) console.error("[DEBUG corrigir]", JSON.stringify(errData.debug, null, 2));
+      const msg = errData?.error || "Erro ao corrigir gabarito.";
       showToast(msg, "error");
     }
     setLoadingCorrecao(false);

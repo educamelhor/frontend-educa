@@ -287,8 +287,23 @@ export default function GabaritoCorrigirProfessor() {
     } catch (err) {
       console.error("Erro ao corrigir:", err);
       const errData = err.response?.data;
+      const status = err.response?.status;
       if (errData?.debug) console.error("[DEBUG corrigir]", JSON.stringify(errData.debug, null, 2));
-      const msg = errData?.error || "Erro ao corrigir gabarito.";
+
+      let msg = errData?.error || "Erro ao corrigir gabarito.";
+      let detail = errData?.detail || "";
+
+      // Mensagens amigáveis por tipo de erro
+      if (status === 503) {
+        msg = "⚠️ O serviço de leitura automática (OMR) está temporariamente indisponível. Tente novamente em alguns minutos.";
+      } else if (status === 404 && msg.includes("disco")) {
+        msg = "📁 O arquivo escaneado não foi encontrado no servidor. O coordenador precisa re-enviar os gabaritos desta turma.";
+      } else if (status === 502) {
+        msg = "⚠️ O serviço de processamento retornou um erro. Tente novamente ou contate o administrador.";
+      }
+
+      // Exibir como erro persistente no painel de correção (via correcao state)
+      setCorrecao({ _error: true, errorMsg: msg, errorDetail: detail, errorStatus: status });
       showToast(msg, "error");
     }
     setLoadingCorrecao(false);
@@ -698,8 +713,47 @@ export default function GabaritoCorrigirProfessor() {
             </div>
           )}
 
+          {/* Estado de erro na correção */}
+          {correcao?._error && arquivoSelecionado && (
+            <div className="gab-card" style={{ animation: "gab-slide-up 0.3s ease-out", border: "1px solid rgba(239,68,68,0.3)" }}>
+              <div style={{ textAlign: "center", padding: "32px 24px" }}>
+                <div style={{
+                  width: 64, height: 64, borderRadius: "50%", margin: "0 auto 16px",
+                  background: "rgba(239,68,68,0.08)", border: "2px solid rgba(239,68,68,0.15)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: "1.8rem",
+                }}>
+                  {correcao.errorStatus === 503 ? "🔌" : correcao.errorStatus === 404 ? "📁" : "⚠️"}
+                </div>
+                <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "#f87171", marginBottom: 8 }}>
+                  {correcao.errorStatus === 503 ? "Serviço Indisponível" 
+                    : correcao.errorStatus === 404 ? "Arquivo Não Encontrado"
+                    : "Erro na Correção"}
+                </div>
+                <div style={{ fontSize: "0.82rem", color: "var(--gab-text-muted)", lineHeight: 1.6, maxWidth: 400, margin: "0 auto" }}>
+                  {correcao.errorMsg}
+                </div>
+                {correcao.errorDetail && (
+                  <div style={{ fontSize: "0.68rem", color: "rgba(148,163,184,0.6)", marginTop: 10, fontFamily: "monospace" }}>
+                    {correcao.errorDetail}
+                  </div>
+                )}
+                <button
+                  onClick={() => { setCorrecao(null); corrigirArquivo(arquivoSelecionado); }}
+                  style={{
+                    marginTop: 20, padding: "8px 24px", borderRadius: 8, fontSize: "0.78rem", fontWeight: 700,
+                    background: "rgba(239,68,68,0.1)", color: "#f87171", border: "1px solid rgba(239,68,68,0.2)",
+                    cursor: "pointer", transition: "all 0.2s", fontFamily: "var(--gab-font-body)",
+                  }}
+                >
+                  🔄 Tentar Novamente
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Resultado da correção */}
-          {correcao && arquivoSelecionado && (
+          {correcao && !correcao._error && arquivoSelecionado && (
             <>
               {/* Header do aluno */}
               <div className="gab-card" style={{ padding: "16px 24px", animation: "gab-slide-up 0.3s ease-out" }}>

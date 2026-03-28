@@ -172,11 +172,25 @@ export default function GabaritoCorrigirProfessor() {
     try {
       const resp = await api.get(`/api/gabarito-lotes/${turmaAtiva.id}/alunos-turma`);
       const data = resp.data;
-      // Filtrar alunos já vinculados a outros gabaritos neste lote
-      const codigosUsados = alunos
-        .filter(a => a.id !== arq.id && a.codigo_aluno && !pareceNomeArquivo(a.nome_aluno))
-        .map(a => a.codigo_aluno);
-      const disponiveis = (data.alunos || []).filter(al => !codigosUsados.includes(al.codigo));
+
+      // Coletar códigos E nomes de alunos já identificados em OUTROS gabaritos
+      // (via QR automático ou vinculação manual — qualquer gabarito com nome real)
+      const codigosUsados = new Set();
+      const nomesUsados = new Set();
+      for (const a of alunos) {
+        if (a.id === arq.id) continue; // pular o gabarito que estamos editando
+        if (!pareceNomeArquivo(a.nome_aluno)) {
+          // Aluno já identificado — excluir da lista
+          if (a.codigo_aluno) codigosUsados.add(a.codigo_aluno);
+          if (a.nome_aluno) nomesUsados.add(a.nome_aluno.toUpperCase().trim());
+        }
+      }
+
+      // Filtrar: mostrar apenas alunos que NÃO estão em nenhum gabarito
+      const disponiveis = (data.alunos || []).filter(al =>
+        !codigosUsados.has(al.codigo) &&
+        !nomesUsados.has(al.estudante.toUpperCase().trim())
+      );
       setAlunosTurma(disponiveis);
     } catch (err) {
       console.error("Erro ao buscar alunos da turma:", err);
@@ -1093,8 +1107,15 @@ export default function GabaritoCorrigirProfessor() {
                 }}>👤</div>
                 <div>
                   <div style={{ fontSize: "0.88rem", fontWeight: 700, color: "#e2e8f0" }}>Vincular Aluno</div>
-                  <div style={{ fontSize: "0.65rem", color: "rgba(148,163,184,0.7)", marginTop: 1 }}>
-                    Arquivo: {vinculoModal.arquivo_nome}
+                  <div style={{ fontSize: "0.62rem", color: "rgba(148,163,184,0.7)", marginTop: 1, display: "flex", alignItems: "center", gap: 6 }}>
+                    <span>{vinculoModal.arquivo_nome}</span>
+                    <span style={{
+                      padding: "1px 6px", borderRadius: 4, fontSize: "0.58rem", fontWeight: 700,
+                      background: "rgba(6,182,212,0.1)", border: "1px solid rgba(6,182,212,0.15)",
+                      color: "#22d3ee",
+                    }}>
+                      {alunosTurma.length} {alunosTurma.length === 1 ? "aluno restante" : "alunos restantes"}
+                    </span>
                   </div>
                 </div>
               </div>

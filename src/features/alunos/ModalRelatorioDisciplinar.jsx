@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { XMarkIcon, PencilSquareIcon, TrashIcon, EyeIcon, ClipboardDocumentCheckIcon, PrinterIcon, DocumentTextIcon } from "@heroicons/react/24/outline";
-import { AcademicCapIcon } from "@heroicons/react/24/solid";
+import {
+    XMarkIcon, PencilSquareIcon, TrashIcon, EyeIcon, ClipboardDocumentCheckIcon,
+    PrinterIcon, DocumentTextIcon, ExclamationTriangleIcon, ExclamationCircleIcon,
+    CheckCircleIcon, UserIcon, IdentificationIcon, ClipboardDocumentListIcon,
+    NoSymbolIcon,
+} from "@heroicons/react/24/outline";
+import { AcademicCapIcon, ShieldExclamationIcon } from "@heroicons/react/24/solid";
 import api from "../../services/api";
 import ModalNovaOcorrencia from "./ModalNovaOcorrencia";
 import ModalTACE from "./ModalTACE";
@@ -33,6 +38,13 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
 
     // Estado do Modal do TACE (preenchimento)
     const [taceModalOpen, setTaceModalOpen] = useState(false);
+
+    // Estados — Impressão de Registro Individual
+    const [loadingImpressao, setLoadingImpressao] = useState(false);
+    const [modalStatusNaoImprime, setModalStatusNaoImprime] = useState(false);
+    const [statusNaoImprime, setStatusNaoImprime] = useState("");
+    const [validacaoRegistroOpen, setValidacaoRegistroOpen] = useState(false);
+    const [camposAusentesRegistro, setCamposAusentesRegistro] = useState([]);
 
     useEffect(() => {
         if (open && aluno?.id) {
@@ -178,6 +190,40 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
         } else {
             // Insuficiente ou Incompatível → abre modal TACE direto
             setTaceModalOpen(true);
+        }
+    };
+    // ==================================================================
+
+    // ==================== IMPRESSÃO INDIVIDUAL ====================
+    const handleImprimirRegistro = async (oc) => {
+        // 1) Status CANCELADA ou REGISTRADA → modal premium informando
+        const statusUpper = String(oc.status || "").toUpperCase();
+        if (statusUpper === "CANCELADA" || statusUpper === "REGISTRADA") {
+            setStatusNaoImprime(oc.status);
+            setModalStatusNaoImprime(true);
+            return;
+        }
+
+        // 2) Status FINALIZADA → validar + gerar PDF
+        setLoadingImpressao(true);
+        try {
+            const validRes = await api.get(`/api/relatorio-disciplinar/validar/${aluno.id}/registro/${oc.id}`);
+            if (!validRes.data.valido) {
+                setCamposAusentesRegistro(validRes.data.ausentes || []);
+                setValidacaoRegistroOpen(true);
+                return;
+            }
+
+            // Tudo OK → abrir PDF do registro individual
+            const token = localStorage.getItem("token");
+            const escolaId = localStorage.getItem("escola_id");
+            const url = `${api.defaults.baseURL}/relatorio-disciplinar/${aluno.id}/registro/${oc.id}?token=${encodeURIComponent(token)}&escola_id=${encodeURIComponent(escolaId)}`;
+            window.open(url, "_blank");
+        } catch (err) {
+            console.error("Erro ao imprimir registro disciplinar:", err);
+            alert("Erro ao gerar impressão do registro disciplinar.");
+        } finally {
+            setLoadingImpressao(false);
         }
     };
     // ==================================================================
@@ -346,12 +392,10 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
                                             <td className="px-4 py-3 text-center">
                                                 <div className="flex justify-center gap-2">
                                                     <button
-                                                        onClick={() => {
-                                                            setInfoMensagem("Em breve essa funcionalidade será ativada.");
-                                                            setModalInfoOpen(true);
-                                                        }}
-                                                        className="text-gray-500 hover:text-gray-800"
-                                                        title="Imprimir"
+                                                        onClick={() => handleImprimirRegistro(oc)}
+                                                        disabled={loadingImpressao}
+                                                        className={`transition ${loadingImpressao ? 'text-gray-300 cursor-wait' : 'text-gray-500 hover:text-gray-800'}`}
+                                                        title="Imprimir Registro"
                                                     >
                                                         <PrinterIcon className="h-5 w-5" />
                                                     </button>
@@ -573,6 +617,235 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
                     fetchOcorrencias();
                 }}
             />
+
+            {/* Loading overlay Impressão de Registro */}
+            {loadingImpressao && (
+                <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/30 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl shadow-2xl px-8 py-6 flex flex-col items-center gap-3"
+                         style={{ animation: "fadeScaleIn 0.2s ease-out" }}>
+                        <style>{`
+                            @keyframes fadeScaleIn {
+                                from { opacity: 0; transform: scale(0.95); }
+                                to   { opacity: 1; transform: scale(1); }
+                            }
+                        `}</style>
+                        <div className="w-10 h-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+                        <p className="text-sm font-medium text-gray-600">Validando dados para impressão...</p>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Premium — Status Não Permite Impressão (CANCELADA / REGISTRADA) */}
+            {modalStatusNaoImprime && (
+                <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                    <style>{`
+                        @keyframes premiumSlideIn {
+                            from { opacity: 0; transform: scale(0.92) translateY(20px); }
+                            to   { opacity: 1; transform: scale(1) translateY(0); }
+                        }
+                        @keyframes shimmerGlow {
+                            0%, 100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.2); }
+                            50%      { box-shadow: 0 0 20px 4px rgba(251, 191, 36, 0.1); }
+                        }
+                    `}</style>
+                    <div
+                        className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+                        style={{ animation: "premiumSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards" }}
+                    >
+                        {/* Header gradiente premium */}
+                        <div className="relative overflow-hidden">
+                            <div className="absolute inset-0 bg-gradient-to-br from-amber-900 via-yellow-900 to-orange-950" />
+                            <div className="absolute -top-10 -right-10 w-40 h-40 bg-amber-400/10 rounded-full blur-3xl" />
+                            <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-orange-400/8 rounded-full blur-2xl" />
+
+                            <div className="relative z-10 px-6 py-5 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div
+                                        className="p-2.5 rounded-xl bg-white/10 backdrop-blur-sm border border-white/10"
+                                        style={{ animation: "shimmerGlow 2s ease-in-out infinite" }}
+                                    >
+                                        <NoSymbolIcon className="h-7 w-7 text-amber-300" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-lg font-bold text-white tracking-tight">
+                                            Impressão Indisponível
+                                        </h2>
+                                        <p className="text-amber-300/70 text-xs mt-0.5">
+                                            Registro com status: {statusNaoImprime}
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setModalStatusNaoImprime(false)}
+                                    className="p-2 rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition"
+                                    title="Fechar"
+                                >
+                                    <XMarkIcon className="h-5 w-5" />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Corpo */}
+                        <div className="px-6 py-5 space-y-4">
+                            <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200/60">
+                                <ExclamationTriangleIcon className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                                <div className="text-sm text-amber-800 leading-relaxed">
+                                    <p className="font-semibold mb-1">Apenas registros com status &ldquo;Finalizada&rdquo; podem ser impressos.</p>
+                                    <p className="text-amber-700 text-xs">
+                                        Registros com status <strong>&ldquo;{statusNaoImprime}&rdquo;</strong> não
+                                        possuem impressão disponível no sistema. Para imprimir, o registro precisa
+                                        ser finalizado pela equipe gestora.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="px-6 py-4 bg-gray-50/80 border-t border-gray-100 flex items-center justify-end">
+                            <button
+                                onClick={() => setModalStatusNaoImprime(false)}
+                                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-800 to-amber-600 text-white font-semibold text-sm
+                                    shadow-md shadow-amber-900/20
+                                    hover:from-amber-700 hover:to-amber-500 hover:shadow-lg
+                                    active:scale-[0.97]
+                                    transition-all duration-200
+                                    flex items-center gap-2"
+                            >
+                                <CheckCircleIcon className="h-5 w-5" />
+                                Entendido
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Validação Registro Individual — Dados Ausentes */}
+            {validacaoRegistroOpen && (
+                <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                    <style>{`
+                        @keyframes alertSlideIn2 {
+                            from { opacity: 0; transform: scale(0.92) translateY(20px); }
+                            to   { opacity: 1; transform: scale(1) translateY(0); }
+                        }
+                        @keyframes pulseRing2 {
+                            0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.3); }
+                            50%      { box-shadow: 0 0 24px 6px rgba(239, 68, 68, 0.15); }
+                        }
+                        @keyframes slideField2 {
+                            from { opacity: 0; transform: translateX(-12px); }
+                            to   { opacity: 1; transform: translateX(0); }
+                        }
+                    `}</style>
+                    <div
+                        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden"
+                        style={{ animation: "alertSlideIn2 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards" }}
+                    >
+                        {/* Header gradiente vermelho */}
+                        <div className="relative overflow-hidden">
+                            <div className="absolute inset-0 bg-gradient-to-br from-red-900 via-rose-900 to-orange-950" />
+                            <div className="absolute -top-10 -right-10 w-40 h-40 bg-red-500/10 rounded-full blur-3xl" />
+                            <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-orange-500/8 rounded-full blur-2xl" />
+
+                            <div className="relative z-10 px-6 py-5 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div
+                                        className="p-2.5 rounded-xl bg-white/10 backdrop-blur-sm border border-white/10"
+                                        style={{ animation: "pulseRing2 2s ease-in-out infinite" }}
+                                    >
+                                        <ShieldExclamationIcon className="h-7 w-7 text-red-300" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-lg font-bold text-white tracking-tight">
+                                            Dados Incompletos
+                                        </h2>
+                                        <p className="text-red-300/70 text-xs mt-0.5">
+                                            A impressão do registro não pode ser gerada
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => setValidacaoRegistroOpen(false)}
+                                    className="p-2 rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition"
+                                    title="Fechar"
+                                >
+                                    <XMarkIcon className="h-5 w-5" />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Corpo — Lista de campos ausentes */}
+                        <div className="px-6 py-5 space-y-4 max-h-[50vh] overflow-y-auto">
+                            <div className="flex items-start gap-3 p-3.5 rounded-xl bg-amber-50 border border-amber-200/60">
+                                <ExclamationTriangleIcon className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                                <p className="text-xs text-amber-700 leading-relaxed">
+                                    <strong>Atenção:</strong> A impressão do registro disciplinar
+                                    só poderá ser gerada quando todos os dados abaixo estiverem preenchidos.
+                                </p>
+                            </div>
+
+                            {camposAusentesRegistro.map((grupo, gi) => {
+                                const iconMap = {
+                                    Estudante: <UserIcon className="h-4 w-4 text-blue-600" />,
+                                    'Responsável Legal': <IdentificationIcon className="h-4 w-4 text-purple-600" />,
+                                    'Registro Disciplinar': <ClipboardDocumentListIcon className="h-4 w-4 text-orange-600" />,
+                                };
+                                const bgMap = {
+                                    Estudante: 'bg-blue-100',
+                                    'Responsável Legal': 'bg-purple-100',
+                                    'Registro Disciplinar': 'bg-orange-100',
+                                };
+                                return (
+                                    <div
+                                        key={gi}
+                                        className="rounded-xl border border-gray-100 overflow-hidden"
+                                        style={{ animation: `slideField2 0.3s ease-out ${gi * 0.1}s both` }}
+                                    >
+                                        <div className="flex items-center gap-2.5 px-4 py-3 bg-gradient-to-r from-gray-50 to-slate-50 border-b border-gray-100">
+                                            <div className={`p-1.5 rounded-lg ${bgMap[grupo.categoria] || 'bg-gray-100'}`}>
+                                                {iconMap[grupo.categoria] || <ExclamationCircleIcon className="h-4 w-4 text-gray-600" />}
+                                            </div>
+                                            <span className="text-sm font-bold text-gray-700 uppercase tracking-wide">
+                                                {grupo.categoria}
+                                            </span>
+                                            <span className="ml-auto text-[10px] font-semibold text-red-500 bg-red-50 px-2 py-0.5 rounded-full border border-red-100">
+                                                {grupo.campos.length} {grupo.campos.length === 1 ? "campo" : "campos"}
+                                            </span>
+                                        </div>
+                                        <div className="divide-y divide-gray-50">
+                                            {grupo.campos.map((campo, ci) => (
+                                                <div
+                                                    key={ci}
+                                                    className="flex items-center gap-3 px-4 py-2.5 hover:bg-red-50/30 transition"
+                                                    style={{ animation: `slideField2 0.3s ease-out ${(gi * 0.1) + (ci * 0.05)}s both` }}
+                                                >
+                                                    <ExclamationCircleIcon className="h-4 w-4 text-red-400 flex-shrink-0" />
+                                                    <span className="text-sm text-gray-700">{campo}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* Footer */}
+                        <div className="px-6 py-4 bg-gray-50/80 border-t border-gray-100 flex items-center justify-end">
+                            <button
+                                onClick={() => setValidacaoRegistroOpen(false)}
+                                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-900 to-blue-700 text-white font-semibold text-sm
+                                    shadow-md shadow-blue-900/20
+                                    hover:from-blue-800 hover:to-blue-600 hover:shadow-lg
+                                    active:scale-[0.97]
+                                    transition-all duration-200
+                                    flex items-center gap-2"
+                            >
+                                <CheckCircleIcon className="h-5 w-5" />
+                                Entendido
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

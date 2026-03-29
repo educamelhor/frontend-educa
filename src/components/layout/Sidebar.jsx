@@ -155,6 +155,30 @@ export default function Sidebar() {
               </ul>
             )}
 
+            {/* LINK: Plataforma - Usage Insights */}
+            <Link
+              to="/plataforma/usage"
+              className={getMainLinkClasses('/plataforma/usage')}
+              style={{
+                marginTop: 4,
+                background: isActive('/plataforma/usage')
+                  ? 'linear-gradient(90deg, rgba(99,102,241,0.15), transparent)'
+                  : undefined,
+              }}
+            >
+              <ChartBarIcon className="h-5 w-5 mr-2" style={{ color: isActive('/plataforma/usage') ? '#a78bfa' : undefined }} />
+              <span className="flex-1 text-left" style={{ fontWeight: 600 }}>Usage Insights</span>
+              <span style={{
+                fontSize: '0.55rem',
+                fontWeight: 800,
+                background: 'linear-gradient(135deg, #6366f1, #a855f7)',
+                color: '#fff',
+                padding: '2px 6px',
+                borderRadius: '8px',
+                letterSpacing: '0.5px',
+              }}>NOVO</span>
+            </Link>
+
             {/* LINK: Plataforma - Auditoria RBAC */}
             <Link to="/plataforma/auditoria-rbac" className={getMainLinkClasses('/plataforma/auditoria-rbac')}>
               <ChartBarIcon className="h-5 w-5 mr-2" />

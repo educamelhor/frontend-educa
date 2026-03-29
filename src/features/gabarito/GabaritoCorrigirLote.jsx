@@ -67,6 +67,12 @@ export default function GabaritoCorrigirLote() {
   const [deleteLoteModal, setDeleteLoteModal] = useState(null); // lote para confirmar exclusão
   const [deletingLoteId, setDeletingLoteId] = useState(null);
 
+  // ─── Importar Notas para Diário ───
+  const [importStatus, setImportStatus] = useState(null); // dados de status da importação
+  const [importModalOpen, setImportModalOpen] = useState(false); // modal de confirmação
+  const [importando, setImportando] = useState(false);
+  const [importResultado, setImportResultado] = useState(null); // resultado após importação
+
   // ─── Toast ───
   function showToast(msg, type = "success") {
     setToast({ msg, type });
@@ -177,6 +183,36 @@ export default function GabaritoCorrigirLote() {
     } catch (err) {
       console.error("Erro ao carregar lotes:", err);
     }
+    // Verificar status de importação
+    verificarStatusImportacao(avaliacaoId);
+  }
+
+  // ─── Verificar se a avaliação está pronta para importação ───
+  async function verificarStatusImportacao(avaliacaoId) {
+    try {
+      const resp = await api.get(`/api/gabarito-avaliacoes/${avaliacaoId}/status-importacao`);
+      setImportStatus(resp.data);
+    } catch {
+      setImportStatus(null);
+    }
+  }
+
+  // ─── Importar notas para diário ───
+  async function handleImportarNotas() {
+    if (!avaliacaoAtiva) return;
+    setImportando(true);
+    try {
+      const resp = await api.post(`/api/gabarito-avaliacoes/${avaliacaoAtiva.id}/importar-notas`);
+      setImportResultado(resp.data);
+      setImportModalOpen(false);
+      showToast(resp.data.message, "success");
+      // Atualizar status
+      verificarStatusImportacao(avaliacaoAtiva.id);
+    } catch (err) {
+      const msg = err.response?.data?.error || "Erro ao importar notas.";
+      showToast(msg, "error");
+    }
+    setImportando(false);
   }
 
   // ─── Upload de pasta ───
@@ -804,6 +840,257 @@ export default function GabaritoCorrigirLote() {
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          )}
+
+          {/* ═══ CARD: IMPORTAR NOTAS PARA DIÁRIO ═══ */}
+          {importStatus && avaliacaoAtiva?.tipo === "prova_padronizada" && lotes.length > 0 && (
+            <div className="gab-card" style={{
+              border: importStatus.jaImportou
+                ? "1px solid rgba(16,185,129,0.25)"
+                : importStatus.pronta
+                ? "1px solid rgba(139,92,246,0.3)"
+                : "1px solid rgba(255,255,255,0.06)",
+              background: importStatus.jaImportou
+                ? "rgba(16,185,129,0.03)"
+                : importStatus.pronta
+                ? "rgba(139,92,246,0.03)"
+                : undefined,
+            }}>
+              <div className="gab-card-header">
+                <div className="gab-card-icon" style={{
+                  background: importStatus.jaImportou
+                    ? "rgba(16,185,129,0.1)"
+                    : "rgba(139,92,246,0.1)",
+                  color: importStatus.jaImportou
+                    ? "var(--gab-green-light, #10b981)"
+                    : "var(--gab-purple-light, #a78bfa)",
+                }}>
+                  <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                  </svg>
+                </div>
+                <div className="gab-card-title">
+                  {importStatus.jaImportou ? "✓ Notas Importadas para o Diário" : "Importar Notas para o Diário"}
+                </div>
+              </div>
+
+              {/* Status Info */}
+              <div style={{
+                display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+                gap: 10, marginBottom: 16,
+              }}>
+                <div style={{
+                  padding: "10px 14px", borderRadius: 10,
+                  background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)",
+                }}>
+                  <div style={{ fontSize: "0.65rem", color: "var(--gab-text-muted)", marginBottom: 2 }}>LOTES</div>
+                  <div style={{ fontSize: "1rem", fontWeight: 800, color: importStatus.todosFinalizados ? "var(--gab-green-light)" : "var(--gab-amber-light, #f59e0b)" }}>
+                    {importStatus.lotesFinalizados}/{importStatus.totalLotes}
+                    <span style={{ fontSize: "0.65rem", fontWeight: 400, marginLeft: 4 }}>finalizados</span>
+                  </div>
+                </div>
+                <div style={{
+                  padding: "10px 14px", borderRadius: 10,
+                  background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)",
+                }}>
+                  <div style={{ fontSize: "0.65rem", color: "var(--gab-text-muted)", marginBottom: 2 }}>ALUNOS</div>
+                  <div style={{ fontSize: "1rem", fontWeight: 800, color: "var(--gab-cyan-light, #22d3ee)" }}>
+                    {importStatus.totalRespostas}
+                    <span style={{ fontSize: "0.65rem", fontWeight: 400, marginLeft: 4 }}>corrigidos</span>
+                  </div>
+                </div>
+                <div style={{
+                  padding: "10px 14px", borderRadius: 10,
+                  background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)",
+                }}>
+                  <div style={{ fontSize: "0.65rem", color: "var(--gab-text-muted)", marginBottom: 2 }}>DISCIPLINAS</div>
+                  <div style={{ fontSize: "1rem", fontWeight: 800, color: "var(--gab-purple-light, #a78bfa)" }}>
+                    {importStatus.disciplinas?.length || 0}
+                  </div>
+                </div>
+                <div style={{
+                  padding: "10px 14px", borderRadius: 10,
+                  background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)",
+                }}>
+                  <div style={{ fontSize: "0.65rem", color: "var(--gab-text-muted)", marginBottom: 2 }}>BIMESTRE</div>
+                  <div style={{ fontSize: "1rem", fontWeight: 800, color: "var(--gab-text-primary)" }}>
+                    {importStatus.bimestre || "—"}
+                  </div>
+                </div>
+              </div>
+
+              {/* Disciplinas tags */}
+              {importStatus.disciplinas?.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
+                  {importStatus.disciplinas.map((dc, i) => (
+                    <span key={i} style={{
+                      padding: "3px 10px", borderRadius: 6, fontSize: "0.7rem", fontWeight: 600,
+                      background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.15)",
+                      color: "var(--gab-purple-light, #a78bfa)",
+                    }}>
+                      {dc.nome} (Q{dc.de}–{dc.ate})
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Mensagem sobre a regra de importação */}
+              {!importStatus.jaImportou && (
+                <div style={{
+                  padding: "10px 14px", borderRadius: 10, fontSize: "0.75rem",
+                  background: "rgba(6,182,212,0.04)", border: "1px solid rgba(6,182,212,0.1)",
+                  color: "var(--gab-text-muted)", marginBottom: 16, lineHeight: 1.5,
+                }}>
+                  📋 A <strong style={{ color: "var(--gab-text-primary)" }}>nota total</strong> de cada aluno será lançada igualmente em 
+                  <strong style={{ color: "var(--gab-purple-light)" }}> {importStatus.disciplinas?.length || 0} disciplina(s)</strong> no diário 
+                  do <strong style={{ color: "var(--gab-text-primary)" }}>{importStatus.bimestre || "bimestre"}</strong>.
+                </div>
+              )}
+
+              {/* Botão de ação */}
+              {importStatus.jaImportou ? (
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 10, padding: "12px 16px",
+                  borderRadius: 10, background: "rgba(16,185,129,0.06)",
+                  border: "1px solid rgba(16,185,129,0.15)",
+                }}>
+                  <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="var(--gab-green-light, #10b981)" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div>
+                    <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--gab-green-light, #10b981)" }}>
+                      Notas já foram importadas para o diário
+                    </div>
+                    <div style={{ fontSize: "0.72rem", color: "var(--gab-text-muted)", marginTop: 2 }}>
+                      As notas desta prova padronizada já foram transferidas para o diário dos professores.
+                    </div>
+                  </div>
+                </div>
+              ) : !importStatus.todosFinalizados ? (
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 10, padding: "12px 16px",
+                  borderRadius: 10, background: "rgba(245,158,11,0.06)",
+                  border: "1px solid rgba(245,158,11,0.15)",
+                }}>
+                  <span style={{ fontSize: "1.2rem" }}>⏳</span>
+                  <div>
+                    <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--gab-amber-light, #f59e0b)" }}>
+                      Correção em andamento
+                    </div>
+                    <div style={{ fontSize: "0.72rem", color: "var(--gab-text-muted)", marginTop: 2 }}>
+                      Finalize a correção de todos os lotes ({importStatus.lotesFinalizados}/{importStatus.totalLotes}) para habilitar a importação.
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  className="gab-btn gab-btn-sm"
+                  onClick={() => setImportModalOpen(true)}
+                  style={{
+                    width: "100%", padding: "14px 20px", fontSize: "0.9rem", fontWeight: 700,
+                    background: "linear-gradient(135deg, #8b5cf6, #6d28d9)",
+                    border: "none", borderRadius: 12, cursor: "pointer",
+                    color: "#fff", transition: "all 0.3s",
+                    boxShadow: "0 4px 20px rgba(139,92,246,0.3)",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+                  }}
+                >
+                  <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                  </svg>
+                  Importar Notas para o Diário
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* ─── Modal de Resultado da Importação ─── */}
+          {importResultado && (
+            <div style={{
+              position: "fixed", inset: 0, zIndex: 9998,
+              background: "rgba(0,0,0,0.6)", backdropFilter: "blur(6px)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }} onClick={() => setImportResultado(null)}>
+              <div onClick={e => e.stopPropagation()} style={{
+                background: "var(--gab-surface, #1a1f2e)", borderRadius: 20,
+                border: "1px solid rgba(16,185,129,0.2)", padding: "32px",
+                width: "100%", maxWidth: 520, maxHeight: "85vh", overflowY: "auto",
+                boxShadow: "0 25px 80px rgba(0,0,0,0.5)",
+              }}>
+                {/* Header */}
+                <div style={{ textAlign: "center", marginBottom: 24 }}>
+                  <div style={{
+                    width: 56, height: 56, borderRadius: "50%", margin: "0 auto 12px",
+                    background: "linear-gradient(135deg, #10b981, #059669)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: "1.5rem",
+                  }}>✓</div>
+                  <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--gab-text-primary)" }}>
+                    Importação Concluída!
+                  </div>
+                  <div style={{ fontSize: "0.8rem", color: "var(--gab-text-muted)", marginTop: 4 }}>
+                    {importResultado.message}
+                  </div>
+                </div>
+
+                {/* Resumo em grid */}
+                <div style={{
+                  display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 20,
+                }}>
+                  {[
+                    { label: "Alunos", value: importResultado.resumo?.alunosImportados, color: "#22d3ee" },
+                    { label: "Notas inseridas", value: importResultado.resumo?.notasInseridas, color: "#10b981" },
+                    { label: "Notas atualizadas", value: importResultado.resumo?.notasAtualizadas, color: "#f59e0b" },
+                  ].map((item, i) => (
+                    <div key={i} style={{
+                      padding: "12px", borderRadius: 10, textAlign: "center",
+                      background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)",
+                    }}>
+                      <div style={{ fontSize: "1.3rem", fontWeight: 800, color: item.color }}>{item.value || 0}</div>
+                      <div style={{ fontSize: "0.65rem", color: "var(--gab-text-muted)", marginTop: 2 }}>{item.label}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Disciplinas + Bimestre */}
+                <div style={{
+                  padding: "10px 14px", borderRadius: 10, fontSize: "0.78rem",
+                  background: "rgba(139,92,246,0.04)", border: "1px solid rgba(139,92,246,0.1)",
+                  color: "var(--gab-text-muted)", marginBottom: 16,
+                }}>
+                  <strong style={{ color: "var(--gab-purple-light)" }}>Disciplinas:</strong> {importResultado.resumo?.disciplinas || "—"}
+                  <br />
+                  <strong style={{ color: "var(--gab-text-primary)" }}>Bimestre:</strong> {importResultado.resumo?.bimestre || "—"}
+                </div>
+
+                {/* Erros (se houver) */}
+                {importResultado.resumo?.erros > 0 && (
+                  <div style={{
+                    padding: "10px 14px", borderRadius: 10, fontSize: "0.75rem",
+                    background: "rgba(245,158,11,0.04)", border: "1px solid rgba(245,158,11,0.15)",
+                    color: "var(--gab-text-muted)", marginBottom: 16,
+                  }}>
+                    <div style={{ fontWeight: 700, color: "var(--gab-amber-light, #f59e0b)", marginBottom: 6 }}>
+                      ⚠️ {importResultado.resumo.erros} aluno(s) não importado(s):
+                    </div>
+                    {importResultado.resumo.detalheErros?.map((e, i) => (
+                      <div key={i} style={{ marginBottom: 3 }}>
+                        • <strong>{e.codigo}</strong>{e.nome ? ` (${e.nome})` : ""}: {e.motivo}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Botão fechar */}
+                <button
+                  className="gab-btn gab-btn-primary"
+                  onClick={() => setImportResultado(null)}
+                  style={{ width: "100%", padding: "12px", fontSize: "0.88rem" }}
+                >
+                  Fechar
+                </button>
               </div>
             </div>
           )}
@@ -1589,6 +1876,104 @@ export default function GabaritoCorrigirLote() {
               fontSize: "0.72rem", color: "var(--gab-text-muted)", textAlign: "center",
             }}>
               Clique no nome do professor para vinculá-lo à turma <strong>{profModalLote.turma_nome}</strong>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ MODAL: CONFIRMAÇÃO DE IMPORTAÇÃO ═══ */}
+      {importModalOpen && importStatus && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 9997,
+          background: "rgba(0,0,0,0.6)", backdropFilter: "blur(6px)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }} onClick={() => !importando && setImportModalOpen(false)}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: "var(--gab-surface, #1a1f2e)", borderRadius: 20,
+            border: "1px solid rgba(139,92,246,0.2)", padding: "32px",
+            width: "100%", maxWidth: 480,
+            boxShadow: "0 25px 80px rgba(0,0,0,0.5)",
+          }}>
+            {/* Header */}
+            <div style={{ textAlign: "center", marginBottom: 20 }}>
+              <div style={{
+                width: 56, height: 56, borderRadius: "50%", margin: "0 auto 12px",
+                background: "linear-gradient(135deg, rgba(139,92,246,0.15), rgba(139,92,246,0.25))",
+                border: "2px solid rgba(139,92,246,0.3)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: "1.5rem",
+              }}>📒</div>
+              <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--gab-text-primary)" }}>
+                Confirmar Importação
+              </div>
+              <div style={{ fontSize: "0.8rem", color: "var(--gab-text-muted)", marginTop: 4 }}>
+                As notas serão transferidas para o diário dos professores
+              </div>
+            </div>
+
+            {/* Resumo antes de importar */}
+            <div style={{
+              padding: "16px", borderRadius: 12, marginBottom: 20,
+              background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)",
+              fontSize: "0.82rem", lineHeight: 1.8,
+            }}>
+              <div><strong style={{ color: "var(--gab-text-primary)" }}>Avaliação:</strong> {avaliacaoAtiva?.titulo}</div>
+              <div><strong style={{ color: "var(--gab-text-primary)" }}>Bimestre:</strong> {importStatus.bimestre || "—"}</div>
+              <div><strong style={{ color: "var(--gab-text-primary)" }}>Alunos:</strong> {importStatus.totalRespostas} corrigidos</div>
+              <div><strong style={{ color: "var(--gab-text-primary)" }}>Nota total:</strong> {importStatus.notaTotal}</div>
+              <div style={{ marginTop: 6 }}>
+                <strong style={{ color: "var(--gab-purple-light)" }}>Disciplinas destino:</strong>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
+                  {importStatus.disciplinas?.map((dc, i) => (
+                    <span key={i} style={{
+                      padding: "2px 8px", borderRadius: 6, fontSize: "0.7rem", fontWeight: 600,
+                      background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.15)",
+                      color: "var(--gab-purple-light, #a78bfa)",
+                    }}>
+                      {dc.nome}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Aviso */}
+            <div style={{
+              padding: "10px 14px", borderRadius: 10, fontSize: "0.75rem",
+              background: "rgba(245,158,11,0.04)", border: "1px solid rgba(245,158,11,0.15)",
+              color: "var(--gab-amber-light, #f59e0b)", marginBottom: 20,
+            }}>
+              ⚠️ A mesma nota total de cada aluno será lançada em <strong>todas as {importStatus.disciplinas?.length} disciplinas</strong>. Notas existentes serão atualizadas.
+            </div>
+
+            {/* Botões */}
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                className="gab-btn gab-btn-ghost"
+                onClick={() => setImportModalOpen(false)}
+                disabled={importando}
+                style={{ flex: 1, padding: "12px" }}
+              >
+                Cancelar
+              </button>
+              <button
+                className="gab-btn"
+                onClick={handleImportarNotas}
+                disabled={importando}
+                style={{
+                  flex: 2, padding: "12px", fontWeight: 700,
+                  background: "linear-gradient(135deg, #8b5cf6, #6d28d9)",
+                  border: "none", borderRadius: 10, cursor: importando ? "wait" : "pointer",
+                  color: "#fff", fontSize: "0.88rem",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                }}
+              >
+                {importando ? (
+                  <><div className="gab-spinner" /> Importando...</>
+                ) : (
+                  <>📒 Confirmar Importação</>
+                )}
+              </button>
             </div>
           </div>
         </div>

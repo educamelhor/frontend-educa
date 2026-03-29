@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import api from "../../../services/api";
 import {
   CheckCircleIcon,
@@ -7,6 +7,8 @@ import {
   ExclamationCircleIcon,
   ExclamationTriangleIcon,
   ClipboardDocumentListIcon,
+  LockClosedIcon,
+  ArrowDownTrayIcon,
 } from "@heroicons/react/24/outline";
 
 
@@ -15,6 +17,13 @@ import {
  * ------------------------------------------------------------
  * Onde o professor registra as notas/pontos baseado no Plano de Avaliação (PAP).
  * Os dados vêm diretamente do plano criado no submenu "Planos".
+ * 
+ * Fluxo:
+ * 1. Professor seleciona disciplina/bimestre/turma
+ * 2. Sistema carrega o plano (PAP) + alunos + notas já salvas
+ * 3. Professor lança notas → SALVAR DIÁRIO persiste no banco
+ * 4. Quando o diário está completo → EXPORTAR PARA BOLETIM
+ * 5. Após exportação, diário fica em modo readonly
  * ------------------------------------------------------------
  */
 
@@ -42,6 +51,15 @@ export default function Avaliacoes() {
   const [contextMenu, setContextMenu] = useState(null);
   const [salvando, setSalvando] = useState(false);
   const [mensagemSistema, setMensagemSistema] = useState(null);
+
+  // ---------------------------
+  // Estados de Fechamento / Exportação
+  // ---------------------------
+  const [diarioFechado, setDiarioFechado] = useState(false);
+  const [fechamentoInfo, setFechamentoInfo] = useState(null);
+  const [modalExportar, setModalExportar] = useState(false);
+  const [exportando, setExportando] = useState(false);
+  const [resultadoExportacao, setResultadoExportacao] = useState(null);
 
   const showMsg = (type, text) => {
     setMensagemSistema({ type, text });
@@ -98,6 +116,8 @@ export default function Avaliacoes() {
       setAlunos([]);
       setPlano(null);
       setPlanoStatus(null);
+      setDiarioFechado(false);
+      setFechamentoInfo(null);
       return;
     }
 
@@ -118,7 +138,6 @@ export default function Avaliacoes() {
 
         // 2) Verifica se o plano existe e qual seu status
         if (!planoEncontrado) {
-          // Plano nem existe — professor precisa criar no submenu Planos
           setPlano(null);
           setPlanoStatus("PENDENTE");
           setAlunos([]);
@@ -157,8 +176,36 @@ export default function Avaliacoes() {
           setAlunos([]);
         }
 
-        // Limpa notas ao trocar de contexto
-        setNotas({});
+        // 5) Carregar notas já salvas do banco
+        try {
+          const resNotas = await api.get(`/avaliacoes/${planoCompleto.id}/notas-diario`, {
+            params: { turma_id: turmaSelecionada }
+          });
+          if (resNotas.data?.ok) {
+            setNotas(resNotas.data.notas || {});
+            setCoresCelulas(resNotas.data.cores || {});
+          } else {
+            setNotas({});
+            setCoresCelulas({});
+          }
+        } catch {
+          setNotas({});
+          setCoresCelulas({});
+        }
+
+        // 6) Verificar status de fechamento do diário
+        try {
+          const resStatus = await api.get(`/avaliacoes/${planoCompleto.id}/status-diario`, {
+            params: { turma_id: turmaSelecionada }
+          });
+          if (resStatus.data?.ok) {
+            setDiarioFechado(resStatus.data.fechado);
+            setFechamentoInfo(resStatus.data.fechamento);
+          }
+        } catch {
+          setDiarioFechado(false);
+          setFechamentoInfo(null);
+        }
 
       } catch (err) {
         console.error("Erro ao carregar dados", err);
@@ -177,6 +224,7 @@ export default function Avaliacoes() {
   const getNotaKey = (alunoId, itemIdx, opIdx) => `${alunoId}_${itemIdx}_${opIdx}`;
 
   const handleNotaChange = (alunoId, itemIdx, opIdx, maxVal, val) => {
+    if (diarioFechado) return; // readonly
     let cleanVal = val.replace(",", ".");
     if (cleanVal === "") {
       setNotas(prev => { const n = { ...prev }; delete n[getNotaKey(alunoId, itemIdx, opIdx)]; return n; });
@@ -197,6 +245,7 @@ export default function Avaliacoes() {
   };
 
   const handleContextMenu = (e, alunoId, itemIdx, opIdx, maxVal) => {
+    if (diarioFechado) return; // readonly
     e.preventDefault();
     setContextMenu({
       alunoId, itemIdx, opIdx, maxVal,
@@ -206,7 +255,7 @@ export default function Avaliacoes() {
   };
 
   const handleSelectColor = (color) => {
-    if (!contextMenu) return;
+    if (!contextMenu || diarioFechado) return;
     const { alunoId, itemIdx, opIdx, maxVal } = contextMenu;
     const key = getNotaKey(alunoId, itemIdx, opIdx);
 
@@ -236,14 +285,73 @@ export default function Avaliacoes() {
     return total.toFixed(2);
   };
 
+  // ---------------------------
+  // SALVAR DIÁRIO NO BANCO
+  // ---------------------------
   const salvarAvaliacoes = async () => {
+    if (!plano?.id || !turmaSelecionada || diarioFechado) return;
     setSalvando(true);
-    // TODO: futuramente persistir notas no banco
-    setTimeout(() => {
-      setSalvando(false);
-      showMsg("success", "Registros salvos com sucesso!");
-    }, 800);
+    try {
+      const resp = await api.post(`/avaliacoes/${plano.id}/salvar-notas`, {
+        turma_id: turmaSelecionada,
+        notas,
+        cores: coresCelulas,
+      });
+      if (resp.data?.ok) {
+        showMsg("success", `Diário salvo com sucesso! (${resp.data.total} notas)`);
+      } else {
+        showMsg("error", resp.data?.error || "Erro ao salvar.");
+      }
+    } catch (err) {
+      const msg = err.response?.data?.error || "Erro ao salvar o diário.";
+      showMsg("error", msg);
+    }
+    setSalvando(false);
   };
+
+  // ---------------------------
+  // EXPORTAR NOTAS PARA BOLETIM
+  // ---------------------------
+  const handleExportarBoletim = async () => {
+    if (!plano?.id || !turmaSelecionada) return;
+    setExportando(true);
+    try {
+      // Primeiro salvar as notas atuais
+      await api.post(`/avaliacoes/${plano.id}/salvar-notas`, {
+        turma_id: turmaSelecionada,
+        notas,
+        cores: coresCelulas,
+      });
+
+      // Depois exportar
+      const resp = await api.post(`/avaliacoes/${plano.id}/exportar-boletim`, {
+        turma_id: turmaSelecionada,
+      });
+      if (resp.data?.ok) {
+        setResultadoExportacao(resp.data);
+        setDiarioFechado(true);
+        setModalExportar(false);
+        showMsg("success", resp.data.message);
+      }
+    } catch (err) {
+      const msg = err.response?.data?.error || "Erro ao exportar notas.";
+      showMsg("error", msg);
+    }
+    setExportando(false);
+  };
+
+  // Conta quantos alunos têm pelo menos 1 nota
+  const alunosComNota = alunos.filter(a => {
+    if (!plano?.itens) return false;
+    const arrItens = Array.isArray(plano.itens) ? plano.itens : JSON.parse(plano.itens || "[]");
+    return arrItens.some((item, itemIdx) => {
+      const freq = Number(item.oportunidades) || 1;
+      for (let opIdx = 0; opIdx < freq; opIdx++) {
+        if (notas[getNotaKey(a.id, itemIdx, opIdx)] !== undefined) return true;
+      }
+      return false;
+    });
+  }).length;
 
   // ---------------------------
   // Construção do header dinâmico
@@ -460,33 +568,66 @@ export default function Avaliacoes() {
          </div>
       )}
 
+      {/* ───────────────── BANNER DIÁRIO FECHADO ───────────────── */}
+      {diarioFechado && plano && (
+        <section className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-2xl shadow-sm border border-emerald-200 p-6 flex items-center gap-5">
+          <div className="p-3 bg-gradient-to-br from-emerald-400 to-green-500 rounded-xl shadow-md flex-shrink-0">
+            <LockClosedIcon className="w-7 h-7 text-white" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-lg font-black text-emerald-800 flex items-center gap-2">
+              📗 Diário Fechado — Notas Exportadas para o Boletim
+            </h3>
+            <p className="text-sm text-emerald-600 mt-1">
+              As notas de <strong>{disciplinaSelecionada}</strong> — <strong>{turmaObj?.nome}</strong> — <strong>{bimestreSelecionado}</strong> foram 
+              exportadas para o boletim{fechamentoInfo?.fechado_em ? ` em ${new Date(fechamentoInfo.fechado_em).toLocaleDateString("pt-BR")}` : ""}.
+              {fechamentoInfo?.total_alunos ? ` (${fechamentoInfo.total_alunos} alunos)` : ""}
+            </p>
+            <p className="text-xs text-emerald-500 mt-1 font-medium">
+              O diário está em modo somente leitura. Para reabrir, solicite à Secretaria.
+            </p>
+          </div>
+        </section>
+      )}
+
       {/* ───────────────── MENSAGEM DE PLANO NÃO DISPONÍVEL ───────────────── */}
       {renderMensagemPlanoNaoDisponivel()}
 
       {/* ───────────────── GRID DE AVALIAÇÃO ───────────────── */}
       {selecaoCompleta && plano && (
         <section className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-200 flex flex-col relative transition-all duration-500 ease-in-out">
-            <div className="bg-slate-800 text-white p-6 flex items-center justify-between">
+            <div className={`${diarioFechado ? 'bg-emerald-800' : 'bg-slate-800'} text-white p-6 flex items-center justify-between transition-colors duration-300`}>
                 <div>
                    <h3 className="text-xl font-bold flex items-center gap-2">
-                      <TableCellsIcon className="w-6 h-6 text-indigo-400" />
-                      Lançamento de Notas
+                      {diarioFechado ? (
+                        <LockClosedIcon className="w-6 h-6 text-emerald-400" />
+                      ) : (
+                        <TableCellsIcon className="w-6 h-6 text-indigo-400" />
+                      )}
+                      {diarioFechado ? "Diário Fechado (Somente Leitura)" : "Lançamento de Notas"}
                    </h3>
                    <div className="flex gap-4 mt-2 text-sm text-slate-300 font-medium">
                        <span><strong className="text-white">Turma:</strong> {turmaObj?.nome || "Carregando"}</span>
                        <span><strong className="text-white">Disciplina:</strong> {disciplinaSelecionada}</span>
                        <span><strong className="text-white">Bimestre:</strong> {bimestreSelecionado}</span>
                    </div>
-                   <div className="mt-1">
+                   <div className="mt-1 flex items-center gap-2">
                       <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                        diarioFechado ? "bg-emerald-500/20 text-emerald-300" :
                         planoStatus === "APROVADO" ? "bg-blue-500/20 text-blue-300" : "bg-green-500/20 text-green-300"
                       }`}>
-                        Plano {planoStatus}
+                        {diarioFechado ? "FECHADO" : `Plano ${planoStatus}`}
                       </span>
+                      {!diarioFechado && alunosComNota > 0 && (
+                        <span className="text-xs font-medium text-slate-400">
+                          · {alunosComNota}/{alunos.length} alunos com nota
+                        </span>
+                      )}
                    </div>
                 </div>
-                <div>
-                    {!carregandoDados && plano && (
+                <div className="flex items-center gap-3">
+                    {/* BOTÃO SALVAR */}
+                    {!carregandoDados && plano && !diarioFechado && (
                         <button
                           onClick={salvarAvaliacoes}
                           disabled={salvando}
@@ -494,6 +635,16 @@ export default function Avaliacoes() {
                         >
                             <CheckCircleIcon className="w-5 h-5" />
                             {salvando ? "SALVANDO..." : "SALVAR DIÁRIO"}
+                        </button>
+                    )}
+                    {/* BOTÃO EXPORTAR PARA BOLETIM */}
+                    {!carregandoDados && plano && !diarioFechado && alunosComNota > 0 && (
+                        <button
+                          onClick={() => setModalExportar(true)}
+                          className="flex items-center gap-2 px-5 py-3 rounded-lg bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-400 hover:to-indigo-500 font-bold text-white shadow-lg transition-all active:scale-95 border border-purple-400/30"
+                        >
+                            <ArrowDownTrayIcon className="w-5 h-5" />
+                            EXPORTAR BOLETIM
                         </button>
                     )}
                 </div>
@@ -552,7 +703,7 @@ export default function Avaliacoes() {
                                         const percentage = (total / 10) * 100;
 
                                         return (
-                                        <tr key={aluno.id} className="hover:bg-indigo-50/30 transition-colors border-b border-slate-100 group">
+                                        <tr key={aluno.id} className={`hover:bg-indigo-50/30 transition-colors border-b border-slate-100 group ${diarioFechado ? 'opacity-90' : ''}`}>
                                             <td className="px-6 py-3 text-center text-sm font-semibold text-slate-400">{index + 1}</td>
                                             <td className="px-6 py-3 font-bold text-slate-700 sticky left-0 bg-white group-hover:bg-indigo-50/30 transition-colors border-r border-slate-100 z-10 flex flex-col">
                                                 <span>{aluno.nome}</span>
@@ -584,13 +735,21 @@ export default function Avaliacoes() {
                                                        step="0.1"
                                                        value={displayVal}
                                                        onChange={(e) => handleNotaChange(aluno.id, col.itemIdx, col.opIdx, col.maxVal, e.target.value)}
-                                                       className={`w-full text-center py-2.5 font-bold border border-transparent rounded-lg hover:border-slate-300 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200 outline-none transition-all placeholder:text-slate-300 ${bgClass}`}
+                                                       readOnly={diarioFechado}
+                                                       tabIndex={diarioFechado ? -1 : 0}
+                                                       className={`w-full text-center py-2.5 font-bold border border-transparent rounded-lg outline-none transition-all placeholder:text-slate-300 ${bgClass} ${
+                                                         diarioFechado 
+                                                           ? 'cursor-not-allowed bg-slate-50' 
+                                                           : 'hover:border-slate-300 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200'
+                                                       }`}
                                                        placeholder="-"
                                                     />
                                                     {/* Tooltip de suporte no hover */}
-                                                    <div className="absolute opacity-0 group-hover/cell:opacity-100 -top-8 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg pointer-events-none transition-opacity whitespace-nowrap z-50">
-                                                        Max: {col.maxVal}
-                                                    </div>
+                                                    {!diarioFechado && (
+                                                      <div className="absolute opacity-0 group-hover/cell:opacity-100 -top-8 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg pointer-events-none transition-opacity whitespace-nowrap z-50">
+                                                          Max: {col.maxVal}
+                                                      </div>
+                                                    )}
                                                 </td>
                                             )})}
 
@@ -625,14 +784,20 @@ export default function Avaliacoes() {
             </div>
 
             <div className="bg-slate-50 border-t border-slate-200 p-4 flex items-center justify-between text-xs text-slate-500 font-medium">
-                <span>Pressione <strong>Tab</strong> ou use as setas para navegar rapidamente pelas células. <strong className="text-indigo-600">Dica: Clique com o botão direito</strong> em qualquer célula para dar nota rápida por cores.</span>
+                {diarioFechado ? (
+                  <span className="flex items-center gap-1.5 text-emerald-600 font-bold">
+                    <LockClosedIcon className="w-4 h-4" /> Diário fechado. Notas exportadas para o boletim.
+                  </span>
+                ) : (
+                  <span>Pressione <strong>Tab</strong> ou use as setas para navegar rapidamente pelas células. <strong className="text-indigo-600">Dica: Clique com o botão direito</strong> em qualquer célula para dar nota rápida por cores.</span>
+                )}
                 <span className="flex items-center gap-1.5"><DocumentCheckIcon className="w-4 h-4"/> Os dados são salvos separadamente por bimestre.</span>
             </div>
         </section>
       )}
 
       {/* MODAL CONTEXTUAL DE CORES */}
-      {contextMenu && (
+      {contextMenu && !diarioFechado && (
         <>
           <div
             className="fixed inset-0 z-[100]"
@@ -672,6 +837,160 @@ export default function Avaliacoes() {
             </div>
           </div>
         </>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════ */}
+      {/* MODAL: CONFIRMAÇÃO EXPORTAR PARA BOLETIM               */}
+      {/* ═══════════════════════════════════════════════════════ */}
+      {modalExportar && plano && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+             onClick={() => !exportando && setModalExportar(false)}>
+          <div onClick={e => e.stopPropagation()}
+               className="bg-white rounded-2xl shadow-2xl border border-gray-100 w-full max-w-lg mx-4 overflow-hidden transform transition-all">
+            
+            {/* Header */}
+            <div className="bg-gradient-to-r from-purple-600 to-indigo-700 p-6 text-center">
+              <div className="w-16 h-16 rounded-full bg-white/10 backdrop-blur-sm border-2 border-white/20 mx-auto mb-3 flex items-center justify-center text-3xl">
+                📗
+              </div>
+              <h3 className="text-xl font-black text-white">
+                Exportar Notas para o Boletim
+              </h3>
+              <p className="text-purple-200 text-sm mt-1 font-medium">
+                Atenção: esta ação é irreversível pelo professor
+              </p>
+            </div>
+
+            {/* Body */}
+            <div className="p-6">
+              {/* Resumo */}
+              <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 mb-4 space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Disciplina:</span>
+                  <span className="font-bold text-gray-800">{disciplinaSelecionada}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Turma:</span>
+                  <span className="font-bold text-gray-800">{turmaObj?.nome}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Bimestre:</span>
+                  <span className="font-bold text-gray-800">{bimestreSelecionado}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Alunos com notas:</span>
+                  <span className="font-bold text-indigo-600">{alunosComNota} de {alunos.length}</span>
+                </div>
+              </div>
+
+              {/* Warning */}
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
+                <div className="flex items-start gap-3">
+                  <ExclamationTriangleIcon className="w-6 h-6 text-amber-500 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-amber-800">
+                    <p className="font-bold mb-1">⚠️ Ao confirmar:</p>
+                    <ul className="space-y-1 text-amber-700">
+                      <li>• O <strong>TOTAL</strong> de cada aluno será lançado no boletim</li>
+                      <li>• O diário ficará <strong>fechado e somente leitura</strong></li>
+                      <li>• Você <strong>não poderá mais editar</strong> as notas deste bimestre</li>
+                      <li>• Para reabrir, será necessário solicitar à <strong>Secretaria</strong></li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {/* Alunos sem nota */}
+              {alunosComNota < alunos.length && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4 text-sm text-red-700 flex items-center gap-2">
+                  <ExclamationCircleIcon className="w-5 h-5 flex-shrink-0" />
+                  <span>
+                    <strong>{alunos.length - alunosComNota} aluno(s)</strong> ainda não possuem nenhuma nota lançada.
+                    Esses alunos serão exportados com nota <strong>0.00</strong>.
+                  </span>
+                </div>
+              )}
+
+              {/* Botões */}
+              <div className="flex gap-3 mt-2">
+                <button
+                  onClick={() => setModalExportar(false)}
+                  disabled={exportando}
+                  className="flex-1 py-3 rounded-xl font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-all border border-gray-200 disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleExportarBoletim}
+                  disabled={exportando}
+                  className="flex-[2] py-3 rounded-xl font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 transition-all shadow-lg shadow-purple-500/25 flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {exportando ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                      Exportando...
+                    </>
+                  ) : (
+                    <>📗 Confirmar Exportação</>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════ */}
+      {/* MODAL: RESULTADO DA EXPORTAÇÃO                         */}
+      {/* ═══════════════════════════════════════════════════════ */}
+      {resultadoExportacao && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+             onClick={() => setResultadoExportacao(null)}>
+          <div onClick={e => e.stopPropagation()}
+               className="bg-white rounded-2xl shadow-2xl border border-gray-100 w-full max-w-md mx-4 overflow-hidden">
+            
+            {/* Header */}
+            <div className="bg-gradient-to-r from-emerald-500 to-green-600 p-6 text-center">
+              <div className="w-16 h-16 rounded-full bg-white/10 backdrop-blur-sm border-2 border-white/20 mx-auto mb-3 flex items-center justify-center text-3xl">
+                ✅
+              </div>
+              <h3 className="text-xl font-black text-white">
+                Exportação Concluída!
+              </h3>
+              <p className="text-green-100 text-sm mt-1">
+                {resultadoExportacao.message}
+              </p>
+            </div>
+
+            {/* Body */}
+            <div className="p-6">
+              <div className="grid grid-cols-3 gap-3 mb-4">
+                {[
+                  { label: "Alunos", value: resultadoExportacao.resumo?.totalAlunos, color: "text-indigo-600" },
+                  { label: "Inseridas", value: resultadoExportacao.resumo?.notasInseridas, color: "text-emerald-600" },
+                  { label: "Atualizadas", value: resultadoExportacao.resumo?.notasAtualizadas, color: "text-amber-600" },
+                ].map((item, i) => (
+                  <div key={i} className="bg-slate-50 rounded-xl p-3 text-center border border-slate-200">
+                    <div className={`text-2xl font-black ${item.color}`}>{item.value || 0}</div>
+                    <div className="text-xs text-gray-500 mt-1 font-medium">{item.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="bg-slate-50 rounded-xl border border-slate-200 p-3 mb-4 text-sm text-gray-600 space-y-1">
+                <div><strong>Disciplina:</strong> {resultadoExportacao.resumo?.disciplina}</div>
+                <div><strong>Bimestre:</strong> {resultadoExportacao.resumo?.bimestre}</div>
+                <div><strong>Ano:</strong> {resultadoExportacao.resumo?.ano}</div>
+              </div>
+
+              <button
+                onClick={() => setResultadoExportacao(null)}
+                className="w-full py-3 rounded-xl font-bold text-white bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 transition-all shadow-lg"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>

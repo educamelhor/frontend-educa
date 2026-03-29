@@ -44,6 +44,8 @@ import GestaoEquipe from "./features/direcao/gestao-acessos/GestaoEquipe.jsx";
 import PlataformaEscolas from "./features/plataforma/PlataformaEscolas.jsx";
 import PlataformaDiretores from "./features/plataforma/PlataformaDiretores.jsx";
 import PlataformaAuditoriaRBAC from "./features/plataforma/PlataformaAuditoriaRBAC.jsx";
+import PlataformaUsageInsights from "./features/plataforma/PlataformaUsageInsights.jsx";
+import UsageEscolaDetalhe from "./features/plataforma/UsageEscolaDetalhe.jsx";
 import BoletimTurmas from "./features/impressao/BoletimTurmas";
 import PrintBoletinsTurma from "./features/impressao/PrintBoletinsTurma";
 import LoginProfessor from "./features/login/LoginProfessor";
@@ -239,6 +241,22 @@ export default function App() {
             element={
               <RequireCeo>
                 <PlataformaAuditoriaRBAC />
+              </RequireCeo>
+            }
+          />
+          <Route
+            path="/plataforma/usage"
+            element={
+              <RequireCeo>
+                <PlataformaUsageInsights />
+              </RequireCeo>
+            }
+          />
+          <Route
+            path="/plataforma/usage/:id"
+            element={
+              <RequireCeo>
+                <UsageEscolaDetalhe />
               </RequireCeo>
             }
           />

@@ -9,7 +9,8 @@ import AjustesDisciplinar from "./features/disciplinar/ajustes";
 import ResponsaveisDisciplinar from "./features/disciplinar/responsaveis/index.jsx";
 import MetadadosDisciplinar from "./features/disciplinar/metadados";
 import RegimentosDisciplinar from "./features/disciplinar/regimentos";
-import SuporteDisciplinar from "./features/disciplinar/suporte";
+import ManualDisciplinar from "./features/disciplinar/manual";
+import SuporteSAC from "./features/disciplinar/suporte";
 import Boletim from "./features/boletim/Boletim";
 import FichaAluno from "./features/alunos/FichaAluno";
 import FotoAluno from "./features/alunos/FotoAluno";
@@ -293,8 +294,10 @@ export default function App() {
           {/* Disciplinar — Regimentos (Biblioteca de Documentos) */}
           <Route path="/disciplinar/regimentos" element={<RegimentosDisciplinar />} />
 
-          {/* Disciplinar — Suporte (Em breve) */}
-          <Route path="/disciplinar/suporte" element={<SuporteDisciplinar />} />
+          {/* Disciplinar — Manual (tutorial do módulo) */}
+          <Route path="/disciplinar/manual" element={<ManualDisciplinar />} />
+          {/* Disciplinar — Suporte (antigo path, redireciona) */}
+          <Route path="/disciplinar/suporte" element={<SuporteSAC />} />
 
           {/* Monitoramento */}
           <Route

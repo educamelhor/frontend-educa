@@ -24,6 +24,7 @@ import {
   ChartBarIcon,
   WrenchIcon,
   TableCellsIcon,
+  QuestionMarkCircleIcon,
 } from '@heroicons/react/24/outline';
 
 export default function Sidebar() {
@@ -572,10 +573,18 @@ export default function Sidebar() {
                 </li>
                 <li>
                   <Link
+                    to="/disciplinar/manual"
+                    className={getSubmenuLinkClasses('/disciplinar/manual')}
+                  >
+                    <BookOpenIcon className="h-5 w-5 mr-2" /> Manual
+                  </Link>
+                </li>
+                <li>
+                  <Link
                     to="/disciplinar/suporte"
                     className={getSubmenuLinkClasses('/disciplinar/suporte')}
                   >
-                    <WrenchIcon className="h-5 w-5 mr-2" /> Suporte
+                    <QuestionMarkCircleIcon className="h-5 w-5 mr-2" /> Suporte
                   </Link>
                 </li>
               </ul>
@@ -654,10 +663,18 @@ export default function Sidebar() {
                 </li>
                 <li>
                   <Link
+                    to="/disciplinar/manual"
+                    className={getSubmenuLinkClasses('/disciplinar/manual')}
+                  >
+                    <BookOpenIcon className="h-5 w-5 mr-2" /> Manual
+                  </Link>
+                </li>
+                <li>
+                  <Link
                     to="/disciplinar/suporte"
                     className={getSubmenuLinkClasses('/disciplinar/suporte')}
                   >
-                    <WrenchIcon className="h-5 w-5 mr-2" /> Suporte
+                    <QuestionMarkCircleIcon className="h-5 w-5 mr-2" /> Suporte
                   </Link>
                 </li>
               </ul>

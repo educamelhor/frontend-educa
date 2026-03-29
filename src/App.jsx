@@ -47,6 +47,7 @@ import PlataformaDiretores from "./features/plataforma/PlataformaDiretores.jsx";
 import PlataformaAuditoriaRBAC from "./features/plataforma/PlataformaAuditoriaRBAC.jsx";
 import PlataformaUsageInsights from "./features/plataforma/PlataformaUsageInsights.jsx";
 import UsageEscolaDetalhe from "./features/plataforma/UsageEscolaDetalhe.jsx";
+import PlataformaSuporte from "./features/plataforma/PlataformaSuporte.jsx";
 import BoletimTurmas from "./features/impressao/BoletimTurmas";
 import PrintBoletinsTurma from "./features/impressao/PrintBoletinsTurma";
 import LoginProfessor from "./features/login/LoginProfessor";
@@ -258,6 +259,14 @@ export default function App() {
             element={
               <RequireCeo>
                 <UsageEscolaDetalhe />
+              </RequireCeo>
+            }
+          />
+          <Route
+            path="/plataforma/suporte"
+            element={
+              <RequireCeo>
+                <PlataformaSuporte />
               </RequireCeo>
             }
           />
@@ -474,6 +483,7 @@ export default function App() {
           <Route path="/direcao/responsaveis" element={<ResponsaveisDisciplinar />} />
 
           <Route path="*" element={<Navigate to="/home" replace />} />
+
         </Route>
 
       </Routes>

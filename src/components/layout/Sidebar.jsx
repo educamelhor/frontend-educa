@@ -185,6 +185,30 @@ export default function Sidebar() {
               <ChartBarIcon className="h-5 w-5 mr-2" />
               Auditoria RBAC
             </Link>
+
+            {/* LINK: Plataforma - Suporte Técnico (SAC) */}
+            <Link
+              to="/plataforma/suporte"
+              className={getMainLinkClasses('/plataforma/suporte')}
+              style={{
+                marginTop: 4,
+                background: isActive('/plataforma/suporte')
+                  ? 'linear-gradient(90deg, rgba(99,102,241,0.15), transparent)'
+                  : undefined,
+              }}
+            >
+              <QuestionMarkCircleIcon className="h-5 w-5 mr-2" style={{ color: isActive('/plataforma/suporte') ? '#a78bfa' : undefined }} />
+              <span className="flex-1 text-left" style={{ fontWeight: 600 }}>Suporte Técnico</span>
+              <span style={{
+                fontSize: '0.55rem',
+                fontWeight: 800,
+                background: 'linear-gradient(135deg, #6366f1, #a855f7)',
+                color: '#fff',
+                padding: '2px 6px',
+                borderRadius: '8px',
+                letterSpacing: '0.5px',
+              }}>SAC</span>
+            </Link>
           </>
         ) : (
           <>

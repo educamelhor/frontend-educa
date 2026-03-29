@@ -31,6 +31,18 @@ const PERFIL_COLORS = {
   default: { bg: "rgba(100,116,139,0.12)", color: "#64748b", border: "rgba(100,116,139,0.25)" },
 };
 
+// ── Paleta de temas para cards de escola ──
+const CARD_THEMES = [
+  { bg: "linear-gradient(135deg, #ede9fe 0%, #f5f3ff 50%, #eef2ff 100%)",  accent: "#7c3aed", accentLight: "rgba(124,58,237,0.10)", border: "rgba(124,58,237,0.18)",  hoverShadow: "rgba(124,58,237,0.18)",  hoverBorder: "rgba(124,58,237,0.35)",  barGrad: "linear-gradient(90deg, #7c3aed, #a78bfa)" },
+  { bg: "linear-gradient(135deg, #dbeafe 0%, #eff6ff 50%, #e0f2fe 100%)",  accent: "#2563eb", accentLight: "rgba(37,99,235,0.10)",  border: "rgba(37,99,235,0.18)",   hoverShadow: "rgba(37,99,235,0.18)",   hoverBorder: "rgba(37,99,235,0.35)",   barGrad: "linear-gradient(90deg, #2563eb, #60a5fa)" },
+  { bg: "linear-gradient(135deg, #d1fae5 0%, #ecfdf5 50%, #f0fdf4 100%)",  accent: "#059669", accentLight: "rgba(5,150,105,0.10)",  border: "rgba(5,150,105,0.18)",   hoverShadow: "rgba(5,150,105,0.18)",   hoverBorder: "rgba(5,150,105,0.35)",   barGrad: "linear-gradient(90deg, #059669, #34d399)" },
+  { bg: "linear-gradient(135deg, #fce7f3 0%, #fdf2f8 50%, #fff1f2 100%)",  accent: "#db2777", accentLight: "rgba(219,39,119,0.10)", border: "rgba(219,39,119,0.18)",  hoverShadow: "rgba(219,39,119,0.18)",  hoverBorder: "rgba(219,39,119,0.35)",  barGrad: "linear-gradient(90deg, #db2777, #f472b6)" },
+  { bg: "linear-gradient(135deg, #ccfbf1 0%, #f0fdfa 50%, #ecfeff 100%)",  accent: "#0d9488", accentLight: "rgba(13,148,136,0.10)", border: "rgba(13,148,136,0.18)",  hoverShadow: "rgba(13,148,136,0.18)",  hoverBorder: "rgba(13,148,136,0.35)",  barGrad: "linear-gradient(90deg, #0d9488, #2dd4bf)" },
+  { bg: "linear-gradient(135deg, #fef3c7 0%, #fffbeb 50%, #fefce8 100%)",  accent: "#d97706", accentLight: "rgba(217,119,6,0.10)",  border: "rgba(217,119,6,0.18)",   hoverShadow: "rgba(217,119,6,0.18)",   hoverBorder: "rgba(217,119,6,0.35)",   barGrad: "linear-gradient(90deg, #d97706, #fbbf24)" },
+  { bg: "linear-gradient(135deg, #e0e7ff 0%, #eef2ff 50%, #f5f3ff 100%)",  accent: "#4f46e5", accentLight: "rgba(79,70,229,0.10)",  border: "rgba(79,70,229,0.18)",   hoverShadow: "rgba(79,70,229,0.18)",   hoverBorder: "rgba(79,70,229,0.35)",   barGrad: "linear-gradient(90deg, #4f46e5, #818cf8)" },
+  { bg: "linear-gradient(135deg, #fae8ff 0%, #fdf4ff 50%, #fdf2f8 100%)",  accent: "#a21caf", accentLight: "rgba(162,28,175,0.10)", border: "rgba(162,28,175,0.18)",  hoverShadow: "rgba(162,28,175,0.18)",  hoverBorder: "rgba(162,28,175,0.35)",  barGrad: "linear-gradient(90deg, #a21caf, #d946ef)" },
+];
+
 export default function PlataformaUsageInsights() {
   const navigate = useNavigate();
   const [escolas, setEscolas] = useState([]);
@@ -124,14 +136,14 @@ export default function PlataformaUsageInsights() {
       gap: 16,
       marginBottom: 32,
     },
-    kpiCard: {
-      background: "rgba(255,255,255,0.8)",
-      backdropFilter: "blur(12px)",
+    kpiCard: (color) => ({
       borderRadius: 16,
       padding: "20px 24px",
-      border: "1px solid rgba(226,232,240,0.8)",
-      boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
-    },
+      border: `1px solid ${color}20`,
+      boxShadow: `0 2px 8px ${color}08`,
+      background: `linear-gradient(135deg, ${color}08 0%, ${color}04 100%)`,
+      backdropFilter: "blur(12px)",
+    }),
     kpiLabel: {
       fontSize: "0.75rem",
       fontWeight: 600,
@@ -181,20 +193,12 @@ export default function PlataformaUsageInsights() {
       gap: 20,
     },
     card: {
-      background: "#fff",
       borderRadius: 20,
       padding: 0,
-      border: "1px solid rgba(226,232,240,0.9)",
-      boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
       cursor: "pointer",
-      transition: "all 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+      transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
       overflow: "hidden",
       position: "relative",
-    },
-    cardHover: {
-      transform: "translateY(-3px)",
-      boxShadow: "0 12px 32px rgba(99,102,241,0.12)",
-      borderColor: "rgba(99,102,241,0.3)",
     },
     cardHeader: {
       padding: "20px 24px 12px",
@@ -340,7 +344,7 @@ export default function PlataformaUsageInsights() {
           { label: "Acessos (7 dias)", value: fmtNum(totalGlobal.acessos7d), icon: "📈", color: "#8b5cf6" },
           { label: "Acessos (30 dias)", value: fmtNum(totalGlobal.acessos30d), icon: "📊", color: "#ec4899" },
         ].map((k, i) => (
-          <div key={i} style={styles.kpiCard}>
+          <div key={i} style={styles.kpiCard(k.color)}>
             <div style={styles.kpiLabel}>{k.icon} {k.label}</div>
             <div style={{ ...styles.kpiValue, color: k.color }}>{k.value}</div>
           </div>
@@ -378,8 +382,9 @@ export default function PlataformaUsageInsights() {
         </div>
       ) : (
         <div style={styles.grid}>
-          {escolasFiltradas.map((esc) => (
+          {escolasFiltradas.map((esc, idx) => (
             <SchoolCard key={esc.id} escola={esc} styles={styles} navigate={navigate}
+              colorIndex={idx}
               maxAcessos={Math.max(...escolasFiltradas.map(e => e.acessos_30d || 0), 1)} />
           ))}
         </div>
@@ -389,34 +394,38 @@ export default function PlataformaUsageInsights() {
 }
 
 // ── Card da Escola (separado para gerenciar hover) ──
-function SchoolCard({ escola: esc, styles, navigate, maxAcessos }) {
+function SchoolCard({ escola: esc, styles, navigate, maxAcessos, colorIndex = 0 }) {
   const [hover, setHover] = useState(false);
 
+  const theme = CARD_THEMES[colorIndex % CARD_THEMES.length];
   const tipos = parseTipo(esc.tipo);
   const pct = maxAcessos > 0 ? Math.round(((esc.acessos_30d || 0) / maxAcessos) * 100) : 0;
 
-  // Cor dinâmica do progresso baseada na intensidade de uso
-  const progressColor = pct > 70 ? "#10b981" : pct > 30 ? "#6366f1" : pct > 0 ? "#f59e0b" : "#e2e8f0";
-
   return (
     <div
-      style={{ ...styles.card, ...(hover ? styles.cardHover : {}) }}
+      style={{
+        ...styles.card,
+        background: theme.bg,
+        border: `1px solid ${hover ? theme.hoverBorder : theme.border}`,
+        boxShadow: hover
+          ? `0 14px 36px ${theme.hoverShadow}, 0 0 0 1px ${theme.hoverBorder}`
+          : `0 2px 8px ${theme.hoverShadow}`,
+        transform: hover ? "translateY(-4px)" : "translateY(0)",
+      }}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       onClick={() => navigate(`/plataforma/usage/${esc.id}`)}
     >
       {/* Accent bar */}
       <div style={{
-        height: 3,
-        background: hover
-          ? "linear-gradient(90deg, #6366f1, #a855f7, #ec4899)"
-          : "linear-gradient(90deg, #e2e8f0, #e2e8f0)",
-        transition: "all 0.3s",
+        height: 4,
+        background: hover ? theme.barGrad : `${theme.accent}30`,
+        transition: "all 0.35s ease",
       }} />
 
       <div style={styles.cardHeader}>
         <div style={{ flex: 1 }}>
-          <div style={styles.cardName}>{esc.nome}</div>
+          <div style={{ ...styles.cardName, color: hover ? theme.accent : "#1e293b" }}>{esc.nome}</div>
           <div style={styles.cardSub}>
             ID #{esc.id}
             {esc.cidade ? ` • ${esc.cidade}` : ""}
@@ -428,8 +437,8 @@ function SchoolCard({ escola: esc, styles, navigate, maxAcessos }) {
                 <span key={t} style={{
                   fontSize: "0.65rem", fontWeight: 600,
                   padding: "2px 8px", borderRadius: 6,
-                  background: t === "CCMDF" ? "rgba(234,179,8,0.12)" : "rgba(99,102,241,0.08)",
-                  color: t === "CCMDF" ? "#ca8a04" : "#6366f1",
+                  background: t === "CCMDF" ? "rgba(234,179,8,0.15)" : `${theme.accent}12`,
+                  color: t === "CCMDF" ? "#ca8a04" : theme.accent,
                 }}>
                   {t === "CCMDF" ? "🎖️ CCMDF" : t}
                 </span>
@@ -450,8 +459,8 @@ function SchoolCard({ escola: esc, styles, navigate, maxAcessos }) {
             { v: esc.total_professores, l: "Professores" },
             { v: esc.total_turmas, l: "Turmas" },
           ].map((m, i) => (
-            <div key={i} style={styles.metricBox}>
-              <div style={styles.metricValue}>{fmtNum(m.v)}</div>
+            <div key={i} style={{ ...styles.metricBox, background: "rgba(255,255,255,0.7)" }}>
+              <div style={{ ...styles.metricValue, color: theme.accent }}>{fmtNum(m.v)}</div>
               <div style={styles.metricLabel}>{m.l}</div>
             </div>
           ))}
@@ -462,35 +471,35 @@ function SchoolCard({ escola: esc, styles, navigate, maxAcessos }) {
           display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8,
         }}>
           {[
-            { v: esc.acessos_24h, l: "24h", color: "#f59e0b" },
-            { v: esc.acessos_7d, l: "7 dias", color: "#8b5cf6" },
-            { v: esc.acessos_30d, l: "30 dias", color: "#6366f1" },
+            { v: esc.acessos_24h, l: "24h" },
+            { v: esc.acessos_7d, l: "7 dias" },
+            { v: esc.acessos_30d, l: "30 dias" },
           ].map((m, i) => (
             <div key={i} style={{
               textAlign: "center", padding: "6px 4px", borderRadius: 8,
-              background: `${m.color}08`, border: `1px solid ${m.color}15`,
+              background: "rgba(255,255,255,0.55)", border: `1px solid ${theme.accent}15`,
             }}>
-              <div style={{ fontSize: "1rem", fontWeight: 800, color: m.color }}>{fmtNum(m.v)}</div>
+              <div style={{ fontSize: "1rem", fontWeight: 800, color: theme.accent }}>{fmtNum(m.v)}</div>
               <div style={{ fontSize: "0.6rem", color: "#94a3b8", fontWeight: 600, textTransform: "uppercase" }}>Acessos {m.l}</div>
             </div>
           ))}
         </div>
 
         {/* Progress bar */}
-        <div style={styles.progressBar}>
+        <div style={{ ...styles.progressBar, background: `${theme.accent}10` }}>
           <div style={{
             ...styles.progressFill,
             width: `${pct}%`,
-            background: `linear-gradient(90deg, ${progressColor}, ${progressColor}cc)`,
+            background: theme.barGrad,
           }} />
         </div>
       </div>
 
-      <div style={styles.cardFooter}>
+      <div style={{ ...styles.cardFooter, background: "rgba(255,255,255,0.45)", borderTop: `1px solid ${theme.accent}10` }}>
         <span>
           🕐 Último acesso: {fmtDate(esc.ultimo_acesso)}
         </span>
-        <span style={{ fontWeight: 600, color: "#6366f1" }}>
+        <span style={{ fontWeight: 600, color: theme.accent, transition: "all 0.2s", letterSpacing: hover ? "0.5px" : 0 }}>
           Ver detalhes →
         </span>
       </div>

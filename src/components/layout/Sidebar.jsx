@@ -461,6 +461,14 @@ export default function Sidebar() {
                     <UserGroupIcon className="h-5 w-5 mr-2" /> Responsáveis
                   </Link>
                 </li>
+                <li>
+                  <Link
+                    to="/direcao/cadastro"
+                    className={getSubmenuLinkClasses('/direcao/cadastro', true)}
+                  >
+                    <UsersIcon className="h-5 w-5 mr-2" /> Cadastro
+                  </Link>
+                </li>
               </ul>
             )}
           </>

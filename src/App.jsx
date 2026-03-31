@@ -40,6 +40,7 @@ import Ferramentas from "./features/ferramentas";
 // ✅ Direção (Diretor) — Devices EDUCA-CAPTURE
 import DiretorPedagogico from "./features/direcao/diretor/DiretorPedagogico.jsx";
 import GestaoEquipe from "./features/direcao/gestao-acessos/GestaoEquipe.jsx";
+import CadastroMembros from "./features/direcao/cadastro/CadastroMembros.jsx";
 
 // ✅ PLATAFORMA (CEO) — v1
 import PlataformaEscolas from "./features/plataforma/PlataformaEscolas.jsx";
@@ -481,6 +482,13 @@ export default function App() {
 
           {/* Direção — Responsáveis (cópia do Disciplinar) */}
           <Route path="/direcao/responsaveis" element={<ResponsaveisDisciplinar />} />
+
+          {/* Direção — Cadastro de Membros */}
+          <Route path="/direcao/cadastro" element={
+            <RequirePerm perm="capture_devices.gerenciar">
+              <CadastroMembros />
+            </RequirePerm>
+          } />
 
           <Route path="*" element={<Navigate to="/home" replace />} />
 

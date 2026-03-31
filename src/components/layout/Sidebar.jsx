@@ -25,6 +25,7 @@ import {
   WrenchIcon,
   TableCellsIcon,
   QuestionMarkCircleIcon,
+  Cog6ToothIcon,
 } from '@heroicons/react/24/outline';
 
 export default function Sidebar() {
@@ -69,6 +70,9 @@ export default function Sidebar() {
 
   // Direção (Diretor) — Devices EDUCA-CAPTURE
   const canDirecaoDevices = isScopeEscola && !isDisciplinar && !isProfessor && hasPerm('capture_devices.gerenciar');
+
+  // Governança — Diretor e Vice-Diretor
+  const canGovernanca = isScopeEscola && !isDisciplinar && !isProfessor && (perfil === 'diretor' || perfil === 'vice_diretor');
 
 
   // ─────────────────────────────────────────────────────────────
@@ -208,6 +212,21 @@ export default function Sidebar() {
                 borderRadius: '8px',
                 letterSpacing: '0.5px',
               }}>SAC</span>
+            </Link>
+
+            {/* LINK: Plataforma - Governança */}
+            <Link
+              to="/plataforma/governanca"
+              className={getMainLinkClasses('/plataforma/governanca')}
+              style={{
+                marginTop: 4,
+                background: isActive('/plataforma/governanca')
+                  ? 'linear-gradient(90deg, rgba(99,102,241,0.15), transparent)'
+                  : undefined,
+              }}
+            >
+              <Cog6ToothIcon className="h-5 w-5 mr-2" style={{ color: isActive('/plataforma/governanca') ? '#a78bfa' : undefined }} />
+              <span className="flex-1 text-left" style={{ fontWeight: 600 }}>Governança</span>
             </Link>
           </>
         ) : (
@@ -425,7 +444,7 @@ export default function Sidebar() {
             GRUPO: Direção (Diretor)
             (Dispositivos EDUCA-CAPTURE)
         ─────────────────────────────── */}
-        {canDirecaoDevices && (
+        {(canDirecaoDevices || canGovernanca) && (
           <>
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-2 transition"
@@ -469,6 +488,21 @@ export default function Sidebar() {
                     <UsersIcon className="h-5 w-5 mr-2" /> Cadastro
                   </Link>
                 </li>
+                {canGovernanca && (
+                <li>
+                  <Link
+                    to="/direcao/governanca"
+                    className={getSubmenuLinkClasses('/direcao/governanca', true)}
+                    style={{
+                      background: isActive('/direcao/governanca', true)
+                        ? 'linear-gradient(90deg, rgba(99,102,241,0.18), transparent)'
+                        : undefined,
+                    }}
+                  >
+                    <Cog6ToothIcon className="h-5 w-5 mr-2" style={{ color: isActive('/direcao/governanca', true) ? '#a78bfa' : undefined }} /> Governança
+                  </Link>
+                </li>
+                )}
               </ul>
             )}
           </>

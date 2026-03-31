@@ -41,6 +41,7 @@ import Ferramentas from "./features/ferramentas";
 import DiretorPedagogico from "./features/direcao/diretor/DiretorPedagogico.jsx";
 import GestaoEquipe from "./features/direcao/gestao-acessos/GestaoEquipe.jsx";
 import CadastroMembros from "./features/direcao/cadastro/CadastroMembros.jsx";
+import Governanca from "./features/direcao/governanca/Governanca.jsx";
 
 // ✅ PLATAFORMA (CEO) — v1
 import PlataformaEscolas from "./features/plataforma/PlataformaEscolas.jsx";
@@ -49,6 +50,7 @@ import PlataformaAuditoriaRBAC from "./features/plataforma/PlataformaAuditoriaRB
 import PlataformaUsageInsights from "./features/plataforma/PlataformaUsageInsights.jsx";
 import UsageEscolaDetalhe from "./features/plataforma/UsageEscolaDetalhe.jsx";
 import PlataformaSuporte from "./features/plataforma/PlataformaSuporte.jsx";
+import PlataformaGovernanca from "./features/plataforma/PlataformaGovernanca.jsx";
 import BoletimTurmas from "./features/impressao/BoletimTurmas";
 import PrintBoletinsTurma from "./features/impressao/PrintBoletinsTurma";
 import LoginProfessor from "./features/login/LoginProfessor";
@@ -271,6 +273,14 @@ export default function App() {
               </RequireCeo>
             }
           />
+          <Route
+            path="/plataforma/governanca"
+            element={
+              <RequireCeo>
+                <PlataformaGovernanca />
+              </RequireCeo>
+            }
+          />
         </Route>
 
         {/* Rotas protegidas do SISTEMA ESCOLAR */}
@@ -488,6 +498,15 @@ export default function App() {
             <RequirePerm perm="capture_devices.gerenciar">
               <CadastroMembros />
             </RequirePerm>
+          } />
+
+          {/* Direção — Governança (Configurações da Escola) */}
+          <Route path="/direcao/governanca" element={
+            (() => {
+              const p = String(localStorage.getItem('perfil') || '').toLowerCase().trim();
+              if (p === 'diretor' || p === 'vice_diretor') return <Governanca />;
+              return <Navigate to="/home" replace />;
+            })()
           } />
 
           <Route path="*" element={<Navigate to="/home" replace />} />

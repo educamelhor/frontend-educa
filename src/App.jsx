@@ -152,6 +152,21 @@ function parseJwtPayload(token) {
     return children;
   }
 
+  // ✅ Guard: Diretor / Vice-Diretor only
+  function RequireDiretor({ children }) {
+    const p = String(localStorage.getItem('perfil') || '').toLowerCase().trim();
+    if (p === 'diretor' || p === 'vice_diretor') return children;
+    return <Navigate to="/home" replace />;
+  }
+
+  // ✅ Guard: Diretor / Militar only (Disciplinar equipe)
+  function RequireDiretorMilitar({ children }) {
+    const p = String(localStorage.getItem('perfil') || '').toLowerCase().trim();
+    if (p === 'diretor' || p === 'militar') return children;
+    return <Navigate to="/disciplinar/alunos" replace />;
+  }
+
+
   // ✅ Guard simples (v1): só libera PLATAFORMA para SUPER_ADMIN/ADMIN_GLOBAL
   function RequireCeo({ children }) {
 
@@ -301,11 +316,9 @@ export default function App() {
 
           {/* Disciplinar — Gestão de Equipe (apenas Diretor Pedagógico e Comandante) */}
           <Route path="/disciplinar/equipe" element={
-            (() => {
-              const p = String(localStorage.getItem('perfil') || '').toLowerCase().trim();
-              if (p === 'diretor' || p === 'militar') return <GestaoEquipe />;
-              return <Navigate to="/disciplinar/alunos" replace />;
-            })()
+            <RequireDiretorMilitar>
+              <GestaoEquipe />
+            </RequireDiretorMilitar>
           } />
 
           {/* Disciplinar — Metadados (Dashboard Analítico) */}
@@ -502,11 +515,9 @@ export default function App() {
 
           {/* Direção — Governança (Configurações da Escola) */}
           <Route path="/direcao/governanca" element={
-            (() => {
-              const p = String(localStorage.getItem('perfil') || '').toLowerCase().trim();
-              if (p === 'diretor' || p === 'vice_diretor') return <Governanca />;
-              return <Navigate to="/home" replace />;
-            })()
+            <RequireDiretor>
+              <Governanca />
+            </RequireDiretor>
           } />
 
           <Route path="*" element={<Navigate to="/home" replace />} />

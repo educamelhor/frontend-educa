@@ -6,7 +6,7 @@
 // ============================================================================
 
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   UsersIcon,
   AcademicCapIcon,
@@ -33,6 +33,7 @@ export default function Sidebar() {
   const [openCorrecoes, setOpenCorrecoes] = useState(false);
   const [openGabaritoPed, setOpenGabaritoPed] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
 
   // ─────────────────────────────────────────────────────────────
   // RBAC (perfis/permissoes) — lidos do localStorage
@@ -490,17 +491,29 @@ export default function Sidebar() {
                 </li>
                 {canGovernanca && (
                 <li>
-                  <Link
-                    to="/direcao/governanca"
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setOpenGroup('direcao');
+                      navigate('/direcao/governanca');
+                    }}
                     className={getSubmenuLinkClasses('/direcao/governanca', true)}
                     style={{
                       background: isActive('/direcao/governanca', true)
                         ? 'linear-gradient(90deg, rgba(99,102,241,0.18), transparent)'
                         : undefined,
+                      width: '100%',
+                      border: 'none',
+                      color: 'inherit',
+                      font: 'inherit',
+                      cursor: 'pointer',
+                      textAlign: 'left',
                     }}
                   >
                     <Cog6ToothIcon className="h-5 w-5 mr-2" style={{ color: isActive('/direcao/governanca', true) ? '#a78bfa' : undefined }} /> Governança
-                  </Link>
+                  </button>
                 </li>
                 )}
               </ul>

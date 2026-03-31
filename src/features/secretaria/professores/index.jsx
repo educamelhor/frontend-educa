@@ -62,6 +62,20 @@ export default function Professores() {
     }
   };
 
+  const handleAtivarProfessor = async (id) => {
+    try {
+      await api.put(`/api/professores/ativar/${id}`);
+      setMensagemSucesso("✅ Professor reativado com sucesso!");
+      reload();
+      setTimeout(() => setMensagemSucesso(""), 3000);
+      return true;
+    } catch (err) {
+      console.error("Erro ao ativar professor:", err);
+      alert("Falha ao ativar professor: " + (err.response?.data?.message || err.message));
+      return false;
+    }
+  };
+
   // ─────────────────────────────────────────────────────────────
   // Formulário: novo e edição
   const abrirForm = () => {
@@ -278,15 +292,16 @@ export default function Professores() {
         onEdit={abrirEdicao}
       />
 
-      {/* Modal: Form */}
-      <Modal open={isFormOpen} onClose={() => setIsFormOpen(false)}>
+      {/* Modal: Form Premium */}
+      {isFormOpen && (
         <ProfessorForm
           open={isFormOpen}
           onClose={() => setIsFormOpen(false)}
           onSubmit={handleSaveProfessor}
+          onActivate={handleAtivarProfessor}
           professor={professorSelecionado}
         />
-      </Modal>
+      )}
 
       {/* Modal: Excluir/Inativar */}
       <ModalExcluirOuInativar

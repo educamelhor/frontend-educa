@@ -1,16 +1,20 @@
 // src/features/professores/ProfessorForm.jsx
 // ============================================================================
-// Formulário de Professor
+// Formulário de Professor - DESIGN PREMIUM
 // - Suporta criação e edição.
 // - NOVO CADASTRO: obrigatórios = CPF, Nome, Turno, Disciplina, Aulas.
-//   • Data de Nascimento e Sexo ficam DESABILITADOS (preenchidos pelo professor ao criar login).
-// - EDIÇÃO: editáveis = Turno, Disciplina, Aulas; demais bloqueados.
-// - ✅ Fix mantido: Select de "Turno" SEMPRE exibe a opção selecionada (normalização + fallback).
-// ============================================================================
-
 import React, { useState, useEffect, useMemo } from "react";
-import Input from "../../../components/ui/Input";
 import { Button } from "../../../components/ui/Button";
+import { 
+  AcademicCapIcon, 
+  XMarkIcon, 
+  IdentificationIcon, 
+  UserIcon, 
+  CalendarDaysIcon, 
+  ClockIcon, 
+  BookOpenIcon, 
+  HashtagIcon 
+} from "@heroicons/react/24/solid";
 import api from "../../../services/api";
 
 // ─────────────────────────────────────────────────────────────
@@ -19,7 +23,7 @@ const toStr = (v) => (v == null ? "" : String(v));
 const norm = (v) => toStr(v).trim().toUpperCase();
 
 // ─────────────────────────────────────────────────────────────
-// Validação de CPF (apenas para novo cadastro)
+// Validação de CPF
 function validarCPF(cpf) {
   cpf = cpf.replace(/[^\d]+/g, "");
   if (cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) return false;
@@ -40,32 +44,24 @@ function validarCPF(cpf) {
 }
 // ─────────────────────────────────────────────────────────────
 
-export default function ProfessorForm({ open, onClose, onSubmit, professor }) {
-  // ⚙️ Estado do formulário
+export default function ProfessorForm({ open, onClose, onSubmit, onActivate, professor }) {
   const [form, setForm] = useState({
-    cpf: "",
-    nome: "",
-    data_nascimento: "",
-    sexo: "",
     turno: "",
     disciplina_id: "",
     aulas: 0,
+    status: "",
   });
 
   const [erros, setErros] = useState({});
   const [enviando, setEnviando] = useState(false);
 
-  // Listas do backend
   const [disciplinas, setDisciplinas] = useState([]);
-  const [turnos, setTurnos] = useState([]); // guardamos como strings já normalizadas
+  const [turnos, setTurnos] = useState([]);
 
   const isEditMode = !!professor;
 
-  // ─────────────────────────────────────────────────────────────
-  // Preenche o formulário quando abre
   useEffect(() => {
     if (!open) return;
-
     if (professor) {
       setForm({
         id: professor.id ?? null,
@@ -76,8 +72,8 @@ export default function ProfessorForm({ open, onClose, onSubmit, professor }) {
         turno: norm(professor.turno),
         disciplina_id: professor.disciplina_id ?? "",
         aulas: professor.aulas ?? 0,
+        status: professor.status ?? "ativo",
       });
-      setErros({});
     } else {
       setForm({
         cpf: "",
@@ -87,13 +83,12 @@ export default function ProfessorForm({ open, onClose, onSubmit, professor }) {
         turno: "",
         disciplina_id: "",
         aulas: 0,
+        status: "ativo",
       });
-      setErros({});
     }
+    setErros({});
   }, [open, professor]);
 
-  // ─────────────────────────────────────────────────────────────
-  // Busca listas auxiliares
   useEffect(() => {
     if (!open) return;
     const token = localStorage.getItem("token");
@@ -105,112 +100,57 @@ export default function ProfessorForm({ open, onClose, onSubmit, professor }) {
           headers: { Authorization: `Bearer ${token}` },
         });
         setDisciplinas(resDisc.data || []);
-      } catch (e) {
-        console.error("Erro ao carregar disciplinas:", e);
-      }
-
-      try {
+        
         const resTurnos = await api.get("/api/turnos", {
           headers: { Authorization: `Bearer ${token}` },
         });
-
-        // Normaliza para strings em UPPERCASE e remove vazios/duplicados
         const listaBruta = Array.isArray(resTurnos.data) ? resTurnos.data : [];
-        const normalizados = listaBruta
-          .map((t) =>
-            typeof t === "string" ? norm(t) : norm(t?.nome ?? t?.turno ?? "")
-          )
-          .filter(Boolean);
-
-        const defaults = ["MATUTINO", "VESPERTINO", "NOTURNO", "INTEGRAL"];
-        const base = normalizados.length ? normalizados : defaults;
-
-        // remove duplicados preservando ordem
-        const uniq = Array.from(new Set(base));
+        const normalizados = listaBruta.map(t => typeof t === "string" ? norm(t) : norm(t?.nome ?? t?.turno ?? "")).filter(Boolean);
+        const uniq = Array.from(new Set(normalizados.length ? normalizados : ["MATUTINO", "VESPERTINO", "NOTURNO", "INTEGRAL"]));
         setTurnos(uniq);
-      } catch {
-        setTurnos(["MATUTINO", "VESPERTINO", "NOTURNO", "INTEGRAL"]);
+      } catch (e) {
+        console.error("Erro ao carregar dados auxiliares:", e);
       }
     })();
   }, [open]);
 
-  // 🔁 Quando a lista de turnos mudar, garante que o valor do form exista nas opções.
-  useEffect(() => {
-    if (!open) return;
-    if (!turnos.length) return;
-
-    setForm((prev) => {
-      const val = norm(prev.turno);
-      if (!val) return prev; // deixa vazio para o usuário escolher
-      const found = turnos.includes(val) ? val : "";
-      return found === prev.turno ? prev : { ...prev, turno: found };
-    });
-  }, [turnos, open]);
-
-  // ─────────────────────────────────────────────────────────────
-  // Máscara de CPF
-  const mascaraCPF = (value) =>
-    value
-      .replace(/\D/g, "")
-      .replace(/(\d{3})(\d)/, "$1.$2")
-      .replace(/(\d{3})(\d)/, "$1.$2")
-      .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+  const mascaraCPF = (value) => value.replace(/\D/g, "").replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d)/, "$1.$2").replace(/(\d{3})(\d{1,2})$/, "$1-$2");
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setForm((prev) => ({
       ...prev,
-      [name]:
-        name === "cpf"
-          ? mascaraCPF(value)
-          : name === "nome"
-          ? value.toUpperCase()
-          : name === "turno"
-          ? norm(value)
-          : value,
+      [name]: name === "cpf" ? mascaraCPF(value) : name === "nome" ? value.toUpperCase() : name === "turno" ? norm(value) : value,
     }));
   };
 
-  // ─────────────────────────────────────────────────────────────
-  // Opções de turno prontas para render (memo para evitar recomputo)
-  const turnoOptions = useMemo(() => {
-    const base = turnos.length
-      ? turnos
-      : ["MATUTINO", "VESPERTINO", "NOTURNO", "INTEGRAL"];
-    return base.map((t) => ({ value: norm(t), label: norm(t) }));
-  }, [turnos]);
+  const turnoOptions = useMemo(() => turnos.map((t) => ({ value: norm(t), label: norm(t) })), [turnos]);
 
-  // ─────────────────────────────────────────────────────────────
-  // Validação
   const validar = () => {
     const novosErros = {};
-
     if (isEditMode) {
-      // EDIÇÃO → só Turno, Disciplina, Aulas
       if (!form.turno) novosErros.turno = "Selecione o turno";
       if (!form.disciplina_id) novosErros.disciplina_id = "Selecione uma disciplina";
-      if (form.aulas < 0 || form.aulas > 30) {
-        novosErros.aulas = "Informe um valor entre 0 e 30";
-      }
+      if (form.aulas < 0 || form.aulas > 30) novosErros.aulas = "Informe um valor entre 0 e 30";
       return novosErros;
     }
-
-    // NOVO CADASTRO → CPF, Nome, Turno, Disciplina, Aulas
     if (!form.cpf) novosErros.cpf = "CPF obrigatório";
     else if (!validarCPF(form.cpf)) novosErros.cpf = "CPF inválido";
-
     if (!form.nome) novosErros.nome = "Nome obrigatório";
     if (!form.turno) novosErros.turno = "Selecione o turno";
     if (!form.disciplina_id) novosErros.disciplina_id = "Selecione uma disciplina";
-
-    if (form.aulas === "" || form.aulas === null || form.aulas === undefined) {
-      novosErros.aulas = "Informe a carga de aulas";
-    } else if (Number(form.aulas) < 0 || Number(form.aulas) > 30) {
-      novosErros.aulas = "Informe um valor entre 0 e 30";
+    if (form.aulas === "" || form.aulas === null || form.aulas === undefined || Number(form.aulas) < 0 || Number(form.aulas) > 30) {
+      novosErros.aulas = "Carga horária inválida (0-30)";
     }
-
-    // ⚠️ Data de Nascimento e Sexo NÃO são obrigatórios no novo cadastro (bloqueados)
     return novosErros;
+  };
+
+  const handleAtivar = async () => {
+    if (!professor?.id) return;
+    setEnviando(true);
+    const ok = await onActivate(professor.id);
+    setEnviando(false);
+    if (ok) onClose();
   };
 
   const handleSubmit = async (e) => {
@@ -228,143 +168,194 @@ export default function ProfessorForm({ open, onClose, onSubmit, professor }) {
 
   if (!open) return null;
 
-  // ─────────────────────────────────────────────────────────────
-  // Render
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      {/* CPF (editável no novo cadastro; somente leitura na edição) */}
-      <div>
-        <label className="block mb-1">CPF</label>
-        <Input
-          name="cpf"
-          value={form.cpf}
-          onChange={handleChange}
-          readOnly={isEditMode}
-          className={isEditMode ? "bg-gray-100 text-gray-600 cursor-not-allowed" : ""}
-        />
-        {erros.cpf && <p className="text-red-600 text-sm">{erros.cpf}</p>}
-      </div>
-
-      {/* Nome (editável no novo cadastro; somente leitura na edição) */}
-      <div>
-        <label className="block mb-1">Nome</label>
-        <Input
-          name="nome"
-          value={form.nome}
-          onChange={handleChange}
-          readOnly={isEditMode}
-          className={isEditMode ? "bg-gray-100 text-gray-600 cursor-not-allowed" : ""}
-        />
-        {erros.nome && <p className="text-red-600 text-sm">{erros.nome}</p>}
-      </div>
-
-      {/* Data Nascimento (sempre bloqueado; será preenchido pelo professor no login) */}
-      <div>
-        <label className="block mb-1">Data de Nascimento</label>
-        <Input
-          type="date"
-          name="data_nascimento"
-          value={form.data_nascimento ? form.data_nascimento.substring(0, 10) : ""}
-          onChange={handleChange}
-          disabled
-          className="bg-gray-100 text-gray-600 cursor-not-allowed"
-          title="Preenchido pelo professor no próprio login"
-        />
-        {/* Não validar/mostrar erro neste campo no novo cadastro */}
-      </div>
-
-      {/* Sexo (sempre bloqueado; será preenchido pelo professor no login) */}
-      <div>
-        <label className="block mb-1">Sexo</label>
-        <select
-          name="sexo"
-          value={form.sexo}
-          onChange={handleChange}
-          disabled
-          className="w-full border rounded p-2 bg-gray-100 text-gray-600 cursor-not-allowed"
-          title="Preenchido pelo professor no próprio login"
-        >
-          <option value="">— Selecionado no login do professor —</option>
-          <option value="M">Masculino</option>
-          <option value="F">Feminino</option>
-        </select>
-        {/* Não validar/mostrar erro neste campo no novo cadastro */}
-      </div>
-
-      {/* Turno (editável) */}
-      <div>
-        <label className="block mb-1">Turno</label>
-        <select
-          name="turno"
-          value={form.turno || ""}
-          onChange={handleChange}
-          className="w-full border rounded p-2 text-gray-900"
-        >
-          <option value="">— Selecione o turno —</option>
-          {turnoOptions.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-        {erros.turno && <p className="text-red-600 text-sm">{erros.turno}</p>}
-      </div>
-
-      {/* Disciplina (editável) */}
-      <div>
-        <label className="block mb-1">Disciplina</label>
-        <select
-          name="disciplina_id"
-          value={form.disciplina_id}
-          onChange={handleChange}
-          className="w-full border rounded p-2"
-        >
-          <option value="">— Selecione a disciplina —</option>
-          {disciplinas.map((d) => {
-            const label = d.disciplina ?? d.nome ?? "—";
-            return (
-              <option key={d.id} value={d.id}>
-                {label}
-              </option>
-            );
-          })}
-        </select>
-        {erros.disciplina_id && (
-          <p className="text-red-600 text-sm">{erros.disciplina_id}</p>
-        )}
-      </div>
-
-      {/* Aulas (editável) */}
-      <div>
-        <label className="block mb-1">Aulas (0 a 30)</label>
-        <Input
-          type="number"
-          name="aulas"
-          min={0}
-          max={30}
-          value={form.aulas}
-          onChange={handleChange}
-        />
-        {erros.aulas && <p className="text-red-600 text-sm">{erros.aulas}</p>}
-      </div>
-
-      {/* Botões */}
-      <div className="flex justify-end gap-2 mt-6">
-        <Button
+    <div 
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div 
+        className="bg-white rounded-2xl shadow-2xl overflow-hidden max-w-3xl w-full flex flex-col transform transition-all duration-300"
+        onClick={(e) => e.stopPropagation()}
+      >
+      {/* 🔹 CABEÇALHO PREMIUM */}
+      <div className="bg-gradient-to-r from-blue-900 to-blue-700 p-6 flex justify-between items-center text-white shadow-lg relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-32 h-32 bg-white/10 rounded-full -translate-x-16 -translate-y-16 blur-2xl"></div>
+        <div className="flex items-center gap-3 relative z-10">
+          <div className="bg-white/20 p-2 rounded-xl backdrop-blur-md">
+            <IdentificationIcon className="w-8 h-8 text-white" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-bold tracking-tight">
+              {isEditMode ? "Editar Docente" : "Cadastrar Professor"}
+            </h2>
+            <p className="text-blue-100 text-sm opacity-90">
+              {isEditMode ? "Atualize as informações no sistema" : "Realize o pré-cadastro de um novo docente"}
+            </p>
+          </div>
+        </div>
+        <button
           type="button"
           onClick={onClose}
-          className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded transition"
+          className="bg-white/10 hover:bg-white/20 p-2 rounded-full transition-all duration-200 z-10 group"
         >
-          Cancelar
-        </Button>
-        <Button
-          type="submit"
-          disabled={enviando}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition"
-        >
-          {enviando ? "Salvando…" : "Salvar"}
-        </Button>
+          <XMarkIcon className="w-6 h-6 text-white group-hover:scale-110 transition-transform" />
+        </button>
       </div>
-    </form>
+
+      <form onSubmit={handleSubmit} className="p-6 md:p-8 space-y-6 bg-gray-50/50 overflow-y-auto overflow-x-hidden max-h-[80vh]">
+        {/* IDENTIFICAÇÃO */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-1">
+            <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 ml-1">
+              <HashtagIcon className="w-4 h-4 text-blue-600" /> CPF
+            </label>
+            <input
+              name="cpf"
+              value={form.cpf}
+              onChange={handleChange}
+              readOnly={isEditMode}
+              className={`w-full px-3 border h-11 rounded-xl shadow-sm border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none ${isEditMode ? "bg-gray-100/50 text-gray-500 cursor-not-allowed border-none font-medium" : "bg-white"}`}
+            />
+            {erros.cpf && <p className="text-red-500 text-xs mt-1 ml-1 font-medium italic">{erros.cpf}</p>}
+          </div>
+
+          <div className="space-y-1">
+            <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 ml-1">
+              <UserIcon className="w-4 h-4 text-blue-600" /> Nome Completo
+            </label>
+            <input
+              name="nome"
+              value={form.nome}
+              onChange={handleChange}
+              readOnly={isEditMode}
+              className={`w-full px-3 border h-11 rounded-xl shadow-sm border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none ${isEditMode ? "bg-gray-100/50 text-gray-500 cursor-not-allowed border-none font-medium" : "bg-white"}`}
+            />
+            {erros.nome && <p className="text-red-500 text-xs mt-1 ml-1 font-medium italic">{erros.nome}</p>}
+          </div>
+        </div>
+
+        {/* DADOS COMPLEMENTARES */}
+        <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100/50 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-1 opacity-75">
+            <label className="flex items-center gap-1.5 text-[10px] font-bold text-blue-800 ml-1 uppercase tracking-wider">
+              <CalendarDaysIcon className="w-3.5 h-3.5" /> Data de Nascimento
+            </label>
+            <input
+              type="date"
+              name="data_nascimento"
+              value={form.data_nascimento ? form.data_nascimento.substring(0, 10) : ""}
+              disabled
+              className="w-full px-3 border outline-none h-10 rounded-lg bg-gray-100/30 text-gray-400 border-blue-200 border-dashed cursor-not-allowed text-xs"
+            />
+          </div>
+
+          <div className="space-y-1 opacity-75">
+            <label className="flex items-center gap-1.5 text-[10px] font-bold text-blue-800 ml-1 uppercase tracking-wider">
+              <UserIcon className="w-3.5 h-3.5" /> Gênero
+            </label>
+            <select
+              name="sexo"
+              value={form.sexo}
+              disabled
+              className="w-full h-10 border rounded-lg bg-gray-100/30 text-gray-400 border-blue-200 border-dashed cursor-not-allowed text-xs px-3"
+            >
+              <option value="">Aguardando login...</option>
+              <option value="M">Masculino</option>
+              <option value="F">Feminino</option>
+            </select>
+          </div>
+        </div>
+
+        {/* MODULAÇÃO */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="space-y-1">
+            <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 ml-1">
+              <ClockIcon className="w-4 h-4 text-blue-600" /> Turno
+            </label>
+            <select
+              name="turno"
+              value={form.turno || ""}
+              onChange={handleChange}
+              className="w-full h-11 border border-gray-200 rounded-xl bg-white shadow-sm focus:ring-2 focus:ring-blue-500 focus:outline-none px-3 transition-all font-medium text-gray-700"
+            >
+              <option value="">Selecione...</option>
+              {turnoOptions.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            {erros.turno && <p className="text-red-500 text-xs mt-1 ml-1 font-medium italic">{erros.turno}</p>}
+          </div>
+
+          <div className="space-y-1">
+            <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 ml-1">
+              <BookOpenIcon className="w-4 h-4 text-blue-600" /> Disciplina
+            </label>
+            <select
+              name="disciplina_id"
+              value={form.disciplina_id}
+              onChange={handleChange}
+              className="w-full h-11 border border-gray-200 rounded-xl bg-white shadow-sm focus:ring-2 focus:ring-blue-500 focus:outline-none px-3 transition-all font-medium text-gray-700"
+            >
+              <option value="">Selecione...</option>
+              {disciplinas.map((d) => (
+                <option key={d.id} value={d.id}>{(d.disciplina ?? d.nome ?? "—").toUpperCase()}</option>
+              ))}
+            </select>
+            {erros.disciplina_id && <p className="text-red-500 text-xs mt-1 ml-1 font-medium italic">{erros.disciplina_id}</p>}
+          </div>
+
+          <div className="space-y-1">
+            <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 ml-1">
+              <AcademicCapIcon className="w-4 h-4 text-blue-600" /> Aulas
+            </label>
+            <input
+              type="number"
+              name="aulas"
+              min={0}
+              max={30}
+              value={form.aulas}
+              onChange={handleChange}
+              className="w-full px-3 border outline-none h-11 rounded-xl shadow-sm border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all font-bold text-center text-blue-700"
+            />
+            {erros.aulas && <p className="text-red-500 text-xs mt-1 ml-1 font-medium italic">{erros.aulas}</p>}
+          </div>
+        </div>
+
+        {/* RODAPÉ */}
+        <div className="pt-6 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div className="w-full sm:w-auto">
+            {isEditMode && form.status === "inativo" && (
+              <Button
+                type="button"
+                onClick={handleAtivar}
+                disabled={enviando}
+                className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl font-bold shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2 transition-all hover:-translate-y-0.5"
+              >
+                <AcademicCapIcon className="w-5 h-5 text-white" />
+                REATIVAR DOCENTE
+              </Button>
+            )}
+          </div>
+
+          <div className="flex gap-3 w-full sm:w-auto justify-end">
+            <Button
+              type="button"
+              onClick={onClose}
+              className="px-6 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-600 font-bold hover:bg-gray-50 transition-all"
+            >
+              CANCELAR
+            </Button>
+            <Button
+              type="submit"
+              disabled={enviando}
+              className="px-8 py-2.5 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 shadow-lg shadow-blue-500/40 transition-all hover:-translate-y-0.5"
+            >
+              {enviando ? "SALVANDO..." : "SALVAR"}
+            </Button>
+          </div>
+        </div>
+      </form>
+      </div>
+    </div>
   );
 }

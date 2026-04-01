@@ -73,6 +73,9 @@ export default function GabaritoCorrigirLote() {
   const [importando, setImportando] = useState(false);
   const [importResultado, setImportResultado] = useState(null); // resultado após importação
 
+  // ─── Governança (Avaliação Padrão Bimestral) ───
+  const [avaliacaoConfig, setAvaliacaoConfig] = useState(null);
+
   // ─── Toast ───
   function showToast(msg, type = "success") {
     setToast({ msg, type });
@@ -134,6 +137,23 @@ export default function GabaritoCorrigirLote() {
         console.error("Erro ao carregar avaliações:", err);
       }
       setLoadingAvaliacoes(false);
+    })();
+  }, []);
+
+  // ─── Buscar config de governança ───
+  useEffect(() => {
+    (async () => {
+      try {
+        const escolaId = localStorage.getItem("escola_id");
+        if (escolaId) {
+          const resp = await api.get("/api/governanca/avaliacao-config", {
+            params: { escola_id: escolaId },
+          });
+          setAvaliacaoConfig(resp.data?.config || null);
+        }
+      } catch {
+        setAvaliacaoConfig(null);
+      }
     })();
   }, []);
 
@@ -845,7 +865,7 @@ export default function GabaritoCorrigirLote() {
           )}
 
           {/* ═══ CARD: IMPORTAR NOTAS PARA DIÁRIO ═══ */}
-          {importStatus && avaliacaoAtiva?.tipo === "prova_padronizada" && lotes.length > 0 && (
+          {importStatus && (avaliacaoAtiva?.tipo === "prova_padronizada" || avaliacaoConfig?.["escola.avaliacao_padrao_bimestral"] === "1") && lotes.length > 0 && (
             <div className="gab-card" style={{
               border: importStatus.jaImportou
                 ? "1px solid rgba(16,185,129,0.25)"
@@ -943,9 +963,19 @@ export default function GabaritoCorrigirLote() {
                   background: "rgba(6,182,212,0.04)", border: "1px solid rgba(6,182,212,0.1)",
                   color: "var(--gab-text-muted)", marginBottom: 16, lineHeight: 1.5,
                 }}>
-                  📋 A <strong style={{ color: "var(--gab-text-primary)" }}>nota total</strong> de cada aluno será lançada igualmente em 
-                  <strong style={{ color: "var(--gab-purple-light)" }}> {importStatus.disciplinas?.length || 0} disciplina(s)</strong> no diário 
-                  do <strong style={{ color: "var(--gab-text-primary)" }}>{importStatus.bimestre || "bimestre"}</strong>.
+                  {avaliacaoConfig?.["nota.avaliacao_padrao.bimestral"] === "1" ? (
+                    <>
+                      📋 A <strong style={{ color: "var(--gab-text-primary)" }}>nota total</strong> de cada aluno será lançada igualmente em 
+                      <strong style={{ color: "var(--gab-purple-light)" }}> {importStatus.disciplinas?.length || 0} disciplina(s)</strong> no diário 
+                      do <strong style={{ color: "var(--gab-text-primary)" }}>{importStatus.bimestre || "bimestre"}</strong>.
+                      <br /><span style={{ color: "var(--gab-amber-light, #f59e0b)", fontWeight: 600 }}>Modo: Nota por área ativado</span> — todas as disciplinas recebem a mesma nota total.
+                    </>
+                  ) : (
+                    <>
+                      📋 Cada disciplina receberá sua <strong style={{ color: "var(--gab-text-primary)" }}>nota proporcional</strong> baseada nos acertos por faixa de questões 
+                      no diário do <strong style={{ color: "var(--gab-text-primary)" }}>{importStatus.bimestre || "bimestre"}</strong>.
+                    </>
+                  )}
                 </div>
               )}
 

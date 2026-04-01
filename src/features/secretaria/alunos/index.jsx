@@ -20,7 +20,8 @@ import ImportPDF from "./ImportPDF";
 import Input from "../../../components/ui/Input";
 import styles from "./styles.module.css";
 import api from "../../../services/api";
-import ModalBoletim from "../../boletim/ModalBoletim";
+import BoletimPrint from "../../boletim/BoletimPrint";
+import BoletimAnual from "../../boletim/BoletimAnual";
 
 // Helper: ano letivo com data de corte 31/jan (espelha a lógica do backend)
 function anoLetivoPadrao() {
@@ -74,6 +75,10 @@ export default function Alunos() {
 
   const [modalBoletimOpen, setModalBoletimOpen] = useState(false);
   const [codigoAlunoBoletim, setCodigoAlunoBoletim] = useState(null);
+  // Controla qual variante do boletim exibir: "anual" ou "2anos"
+  const [boletimVariante, setBoletimVariante] = useState("anual");
+  const [boletimConfigLoading, setBoletimConfigLoading] = useState(false);
+  const [boletimConfigData, setBoletimConfigData] = useState(null);
 
   // ────────────────────────────────────────────────────────────────
   // Persistência "manter filtro"
@@ -225,9 +230,26 @@ export default function Alunos() {
     setAlunoParaExcluirOuInativar(aluno);
   }
 
-  function handleBoletim(codigo) {
+  async function handleBoletim(codigo) {
     setCodigoAlunoBoletim(codigo);
+    setBoletimConfigLoading(true);
     setModalBoletimOpen(true);
+
+    try {
+      const escolaId = localStorage.getItem("escola_id");
+      const res = await api.get("/api/governanca/boletim-config", {
+        params: { escola_id: escolaId },
+      });
+      const cfg = res.data?.config || {};
+      setBoletimConfigData(cfg);
+      // Se exibir_ano_anterior = "1" → mostra boletim de 2 anos, senão anual
+      setBoletimVariante(cfg["boletim.exibir_ano_anterior"] === "1" ? "2anos" : "anual");
+    } catch {
+      // Fallback: se não conseguir buscar config, usa anual
+      setBoletimVariante("anual");
+    } finally {
+      setBoletimConfigLoading(false);
+    }
   }
 
   // ────────────────────────────────────────────────────────────────
@@ -366,7 +388,6 @@ export default function Alunos() {
         onEditar={handleEditar}
         onDelete={handleExcluir}
         loading={loading}
-        mostrarBoletim={true}
         onBoletim={handleBoletim}
         // (Se não for modo "inativos", a tabela pode ocultar inativos)
         somenteAtivos={!isBuscaInativos(debouncedFiltro)}
@@ -436,13 +457,79 @@ export default function Alunos() {
         }}
       />
 
-      {/* Modal Boletim */}
+      {/* Modal Boletim Inteligente (anual / 2 anos — definido pela governança) */}
       {modalBoletimOpen && (
-        <ModalBoletim
-          open={modalBoletimOpen}
-          codigo={codigoAlunoBoletim}
-          onClose={() => setModalBoletimOpen(false)}
-        />
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.55)",
+            backdropFilter: "blur(4px)",
+            zIndex: 50,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setModalBoletimOpen(false);
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              maxWidth: "1100px",
+              width: "95%",
+              maxHeight: "95vh",
+              overflowY: "auto",
+              borderRadius: "16px",
+              boxShadow: "0 24px 80px rgba(0,0,0,0.2)",
+              padding: "0.5rem",
+              position: "relative",
+            }}
+          >
+            {/* Botão Fechar */}
+            <button
+              onClick={() => setModalBoletimOpen(false)}
+              style={{
+                position: "absolute",
+                top: "12px",
+                right: "16px",
+                fontSize: "1.5rem",
+                fontWeight: "bold",
+                color: "#64748b",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                zIndex: 10,
+                transition: "color 0.15s ease",
+                lineHeight: 1,
+              }}
+              onMouseEnter={(e) => (e.target.style.color = "#ef4444")}
+              onMouseLeave={(e) => (e.target.style.color = "#64748b")}
+              title="Fechar"
+              type="button"
+            >
+              ×
+            </button>
+
+            {boletimConfigLoading ? (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "80px 0" }}>
+                <span style={{ fontSize: "1.1rem", color: "#64748b" }}>Carregando configurações...</span>
+              </div>
+            ) : boletimVariante === "2anos" ? (
+              <BoletimPrint
+                codigo={codigoAlunoBoletim}
+                exibirBotaoImprimir={false}
+              />
+            ) : (
+              <BoletimAnual
+                codigo={codigoAlunoBoletim}
+                exibirBotaoImprimir={false}
+                boletimConfig={boletimConfigData}
+              />
+            )}
+          </div>
+        </div>
       )}
 
       {/* Modal Importação */}

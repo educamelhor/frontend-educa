@@ -7,6 +7,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import api from '../../services/api';
 import {
   UsersIcon,
   AcademicCapIcon,
@@ -74,6 +75,39 @@ export default function Sidebar() {
 
   // Governança — Diretor e Vice-Diretor
   const canGovernanca = isScopeEscola && !isDisciplinar && !isProfessor && (perfil === 'diretor' || perfil === 'vice_diretor');
+
+  // ── Governança: controle de acesso ao Gabarito ──
+  const [avaliacaoGovConfig, setAvaliacaoGovConfig] = useState(null);
+
+  useEffect(() => {
+    if (!isScopeEscola || isDisciplinar || isProfessor) return;
+    const escolaId = localStorage.getItem('escola_id');
+    if (!escolaId) return;
+    (async () => {
+      try {
+        const resp = await api.get('/api/governanca/avaliacao-config', {
+          params: { escola_id: escolaId },
+        });
+        setAvaliacaoGovConfig(resp.data?.config || null);
+      } catch {
+        setAvaliacaoGovConfig(null);
+      }
+    })();
+  }, []);
+
+  // Quem pode ver o módulo Gabarito?
+  // - Diretor / vice_diretor / secretaria: SEMPRE
+  // - Coordenador: se coordenador.acessa_gabarito === '1'
+  // - Supervisor: se supervisor.acessa_gabarito === '1'
+  const isCoord = perfil === 'coordenador';
+  const isSuperv = perfil === 'supervisor';
+  const canGabarito = (() => {
+    if (isDisciplinar || isProfessor) return false;
+    if (!isScopeEscola) return false;
+    if (isCoord) return avaliacaoGovConfig?.['coordenador.acessa_gabarito'] === '1';
+    if (isSuperv) return avaliacaoGovConfig?.['supervisor.acessa_gabarito'] === '1';
+    return true; // diretor, vice_diretor, secretaria, etc.
+  })();
 
 
   // ─────────────────────────────────────────────────────────────
@@ -393,7 +427,7 @@ export default function Sidebar() {
             )}
 
             {/* ⭐ MÓDULO GABARITO — Destaque Premium */}
-            {!isDisciplinar && !isProfessor && (
+            {canGabarito && (
             <>
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-2 transition"
@@ -993,7 +1027,8 @@ export default function Sidebar() {
                   )}
                 </li>
 
-                {/* Submenu Gabarito (3 etapas) */}
+                {/* Submenu Gabarito (3 etapas) — controlado pela governança */}
+                {canGabarito && (
                 <li>
                   <button
                     className="flex items-center w-full py-2 pl-6 pr-3 rounded hover:bg-blue-700 transition"
@@ -1038,6 +1073,7 @@ export default function Sidebar() {
                     </ul>
                   )}
                 </li>
+                )}
 
                 <li>
                   <Link

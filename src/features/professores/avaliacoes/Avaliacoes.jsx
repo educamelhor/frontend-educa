@@ -61,6 +61,9 @@ export default function Avaliacoes() {
   const [exportando, setExportando] = useState(false);
   const [resultadoExportacao, setResultadoExportacao] = useState(null);
 
+  // Governança: avaliação padrão bimestral (bloqueia edição manual)
+  const [avaliacaoPadrao, setAvaliacaoPadrao] = useState(false);
+
   const showMsg = (type, text) => {
     setMensagemSistema({ type, text });
     setTimeout(() => setMensagemSistema(null), 4500);
@@ -124,6 +127,20 @@ export default function Avaliacoes() {
     const carregarGrid = async () => {
       setCarregandoDados(true);
       try {
+        // 0) Buscar config de governança (avaliação padrão)
+        try {
+          const escolaId = localStorage.getItem("escola_id");
+          if (escolaId) {
+            const cfgRes = await api.get("/api/governanca/avaliacao-config", {
+              params: { escola_id: escolaId },
+            });
+            const cfg = cfgRes.data?.config || {};
+            setAvaliacaoPadrao(cfg["escola.avaliacao_padrao_bimestral"] === "1");
+          }
+        } catch {
+          setAvaliacaoPadrao(false);
+        }
+
         const turmaObj = turmas.find(t => String(t.id) === String(turmaSelecionada));
         const turmaNome = turmaObj ? turmaObj.nome : "";
 
@@ -224,7 +241,7 @@ export default function Avaliacoes() {
   const getNotaKey = (alunoId, itemIdx, opIdx) => `${alunoId}_${itemIdx}_${opIdx}`;
 
   const handleNotaChange = (alunoId, itemIdx, opIdx, maxVal, val) => {
-    if (diarioFechado) return; // readonly
+    if (diarioFechado || avaliacaoPadrao) return; // readonly
     let cleanVal = val.replace(",", ".");
     if (cleanVal === "") {
       setNotas(prev => { const n = { ...prev }; delete n[getNotaKey(alunoId, itemIdx, opIdx)]; return n; });
@@ -245,7 +262,7 @@ export default function Avaliacoes() {
   };
 
   const handleContextMenu = (e, alunoId, itemIdx, opIdx, maxVal) => {
-    if (diarioFechado) return; // readonly
+    if (diarioFechado || avaliacaoPadrao) return; // readonly
     e.preventDefault();
     setContextMenu({
       alunoId, itemIdx, opIdx, maxVal,
@@ -255,7 +272,7 @@ export default function Avaliacoes() {
   };
 
   const handleSelectColor = (color) => {
-    if (!contextMenu || diarioFechado) return;
+    if (!contextMenu || diarioFechado || avaliacaoPadrao) return;
     const { alunoId, itemIdx, opIdx, maxVal } = contextMenu;
     const key = getNotaKey(alunoId, itemIdx, opIdx);
 
@@ -289,7 +306,7 @@ export default function Avaliacoes() {
   // SALVAR DIÁRIO NO BANCO
   // ---------------------------
   const salvarAvaliacoes = async () => {
-    if (!plano?.id || !turmaSelecionada || diarioFechado) return;
+    if (!plano?.id || !turmaSelecionada || diarioFechado || avaliacaoPadrao) return;
     setSalvando(true);
     try {
       const resp = await api.post(`/avaliacoes/${plano.id}/salvar-notas`, {
@@ -568,6 +585,28 @@ export default function Avaliacoes() {
          </div>
       )}
 
+      {/* ───────────────── BANNER AVALIAÇÃO PADRONIZADA ───────────────── */}
+      {avaliacaoPadrao && plano && !diarioFechado && (
+        <section className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl shadow-sm border border-amber-200 p-6 flex items-center gap-5">
+          <div className="p-3 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl shadow-md flex-shrink-0">
+            <LockClosedIcon className="w-7 h-7 text-white" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-lg font-black text-amber-800 flex items-center gap-2">
+              📝 Avaliação Padrão Bimestral Ativada
+            </h3>
+            <p className="text-sm text-amber-700 mt-1">
+              Esta escola adota o sistema de <strong>avaliação padrão bimestral (semana de prova)</strong>.
+              As notas de <strong>{disciplinaSelecionada}</strong> serão importadas automaticamente
+              a partir da correção dos gabaritos padronizados.
+            </p>
+            <p className="text-xs text-amber-600 mt-1 font-medium">
+              O diário está em modo somente leitura. A coluna de Avaliação Bimestral será preenchida pelo coordenador/supervisor.
+            </p>
+          </div>
+        </section>
+      )}
+
       {/* ───────────────── BANNER DIÁRIO FECHADO ───────────────── */}
       {diarioFechado && plano && (
         <section className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-2xl shadow-sm border border-emerald-200 p-6 flex items-center gap-5">
@@ -596,15 +635,17 @@ export default function Avaliacoes() {
       {/* ───────────────── GRID DE AVALIAÇÃO ───────────────── */}
       {selecaoCompleta && plano && (
         <section className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-200 flex flex-col relative transition-all duration-500 ease-in-out">
-            <div className={`${diarioFechado ? 'bg-emerald-800' : 'bg-slate-800'} text-white p-6 flex items-center justify-between transition-colors duration-300`}>
+            <div className={`${diarioFechado ? 'bg-emerald-800' : avaliacaoPadrao ? 'bg-amber-800' : 'bg-slate-800'} text-white p-6 flex items-center justify-between transition-colors duration-300`}>
                 <div>
                    <h3 className="text-xl font-bold flex items-center gap-2">
                       {diarioFechado ? (
                         <LockClosedIcon className="w-6 h-6 text-emerald-400" />
+                      ) : avaliacaoPadrao ? (
+                        <LockClosedIcon className="w-6 h-6 text-amber-400" />
                       ) : (
                         <TableCellsIcon className="w-6 h-6 text-indigo-400" />
                       )}
-                      {diarioFechado ? "Diário Fechado (Somente Leitura)" : "Lançamento de Notas"}
+                      {diarioFechado ? "Diário Fechado (Somente Leitura)" : avaliacaoPadrao ? "Avaliação Padronizada (Somente Leitura)" : "Lançamento de Notas"}
                    </h3>
                    <div className="flex gap-4 mt-2 text-sm text-slate-300 font-medium">
                        <span><strong className="text-white">Turma:</strong> {turmaObj?.nome || "Carregando"}</span>
@@ -627,7 +668,7 @@ export default function Avaliacoes() {
                 </div>
                 <div className="flex items-center gap-3">
                     {/* BOTÃO SALVAR */}
-                    {!carregandoDados && plano && !diarioFechado && (
+                    {!carregandoDados && plano && !diarioFechado && !avaliacaoPadrao && (
                         <button
                           onClick={salvarAvaliacoes}
                           disabled={salvando}
@@ -638,7 +679,7 @@ export default function Avaliacoes() {
                         </button>
                     )}
                     {/* BOTÃO EXPORTAR PARA BOLETIM */}
-                    {!carregandoDados && plano && !diarioFechado && alunosComNota > 0 && (
+                    {!carregandoDados && plano && !diarioFechado && !avaliacaoPadrao && alunosComNota > 0 && (
                         <button
                           onClick={() => setModalExportar(true)}
                           className="flex items-center gap-2 px-5 py-3 rounded-lg bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-400 hover:to-indigo-500 font-bold text-white shadow-lg transition-all active:scale-95 border border-purple-400/30"
@@ -703,7 +744,7 @@ export default function Avaliacoes() {
                                         const percentage = (total / 10) * 100;
 
                                         return (
-                                        <tr key={aluno.id} className={`hover:bg-indigo-50/30 transition-colors border-b border-slate-100 group ${diarioFechado ? 'opacity-90' : ''}`}>
+                                        <tr key={aluno.id} className={`hover:bg-indigo-50/30 transition-colors border-b border-slate-100 group ${(diarioFechado || avaliacaoPadrao) ? 'opacity-90' : ''}`}>
                                             <td className="px-6 py-3 text-center text-sm font-semibold text-slate-400">{index + 1}</td>
                                             <td className="px-6 py-3 font-bold text-slate-700 sticky left-0 bg-white group-hover:bg-indigo-50/30 transition-colors border-r border-slate-100 z-10 flex flex-col">
                                                 <span>{aluno.nome}</span>
@@ -735,17 +776,17 @@ export default function Avaliacoes() {
                                                        step="0.1"
                                                        value={displayVal}
                                                        onChange={(e) => handleNotaChange(aluno.id, col.itemIdx, col.opIdx, col.maxVal, e.target.value)}
-                                                       readOnly={diarioFechado}
-                                                       tabIndex={diarioFechado ? -1 : 0}
+                                                       readOnly={diarioFechado || avaliacaoPadrao}
+                                                       tabIndex={(diarioFechado || avaliacaoPadrao) ? -1 : 0}
                                                        className={`w-full text-center py-2.5 font-bold border border-transparent rounded-lg outline-none transition-all placeholder:text-slate-300 ${bgClass} ${
-                                                         diarioFechado 
+                                                         (diarioFechado || avaliacaoPadrao)
                                                            ? 'cursor-not-allowed bg-slate-50' 
                                                            : 'hover:border-slate-300 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200'
                                                        }`}
                                                        placeholder="-"
                                                     />
                                                     {/* Tooltip de suporte no hover */}
-                                                    {!diarioFechado && (
+                                                    {!diarioFechado && !avaliacaoPadrao && (
                                                       <div className="absolute opacity-0 group-hover/cell:opacity-100 -top-8 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg pointer-events-none transition-opacity whitespace-nowrap z-50">
                                                           Max: {col.maxVal}
                                                       </div>
@@ -788,6 +829,10 @@ export default function Avaliacoes() {
                   <span className="flex items-center gap-1.5 text-emerald-600 font-bold">
                     <LockClosedIcon className="w-4 h-4" /> Diário fechado. Notas exportadas para o boletim.
                   </span>
+                ) : avaliacaoPadrao ? (
+                  <span className="flex items-center gap-1.5 text-amber-600 font-bold">
+                    <LockClosedIcon className="w-4 h-4" /> Avaliação padronizada. Diário em somente leitura.
+                  </span>
                 ) : (
                   <span>Pressione <strong>Tab</strong> ou use as setas para navegar rapidamente pelas células. <strong className="text-indigo-600">Dica: Clique com o botão direito</strong> em qualquer célula para dar nota rápida por cores.</span>
                 )}
@@ -797,7 +842,7 @@ export default function Avaliacoes() {
       )}
 
       {/* MODAL CONTEXTUAL DE CORES */}
-      {contextMenu && !diarioFechado && (
+      {contextMenu && !diarioFechado && !avaliacaoPadrao && (
         <>
           <div
             className="fixed inset-0 z-[100]"

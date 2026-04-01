@@ -12,6 +12,7 @@ import RegimentosDisciplinar from "./features/disciplinar/regimentos";
 import ManualDisciplinar from "./features/disciplinar/manual";
 import SuporteSAC from "./features/disciplinar/suporte";
 import Boletim from "./features/boletim/Boletim";
+import BoletimAnual from "./features/boletim/BoletimAnual";
 import FichaAluno from "./features/alunos/FichaAluno";
 import FotoAluno from "./features/alunos/FotoAluno";
 import Professores from "./features/secretaria/professores";
@@ -382,6 +383,7 @@ export default function App() {
 
 
           <Route path="/alunos/:codigo/boletim" element={<Boletim />} />
+          <Route path="/alunos/:codigo/boletim-anual" element={<BoletimAnual />} />
           <Route path="/alunos/:codigo/ficha" element={<FichaAluno />} />
           <Route path="/alunos/:codigo/foto-lote" element={<FotoAluno />} />
 

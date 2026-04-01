@@ -135,12 +135,7 @@ export default function GabaritoCorrigirProfessor() {
   const [correcao, setCorrecao] = useState(null);
   const [loadingCorrecao, setLoadingCorrecao] = useState(false);
 
-  // ─── Vincular aluno manualmente ───
-  const [vinculoModal, setVinculoModal] = useState(null); // arquivo para vincular
-  const [alunosTurma, setAlunosTurma] = useState([]); // alunos disponíveis na turma
-  const [loadingAlunosTurma, setLoadingAlunosTurma] = useState(false);
-  const [filtroAluno, setFiltroAluno] = useState("");
-  const [vinculando, setVinculando] = useState(false);
+  // (Vincular aluno manualmente — removido do professor, agora é responsabilidade do coordenador/supervisor)
 
   // ─── Professor ID ───
   const [professorIds, setProfessorIds] = useState([]);
@@ -162,78 +157,7 @@ export default function GabaritoCorrigirProfessor() {
       || /^Arquivo \d+$/.test(nome);
   }
 
-  // ─── Abrir modal para vincular aluno manualmente ───
-  async function abrirVinculoModal(arq) {
-    if (!turmaAtiva) return;
-    setVinculoModal(arq);
-    setFiltroAluno("");
-    setLoadingAlunosTurma(true);
 
-    try {
-      const resp = await api.get(`/api/gabarito-lotes/${turmaAtiva.id}/alunos-turma`);
-      const data = resp.data;
-
-      // Coletar códigos E nomes de alunos já identificados em OUTROS gabaritos
-      // (via QR automático ou vinculação manual — qualquer gabarito com nome real)
-      const codigosUsados = new Set();
-      const nomesUsados = new Set();
-      for (const a of alunos) {
-        if (a.id === arq.id) continue; // pular o gabarito que estamos editando
-        if (!pareceNomeArquivo(a.nome_aluno)) {
-          // Aluno já identificado — excluir da lista
-          if (a.codigo_aluno) codigosUsados.add(a.codigo_aluno);
-          if (a.nome_aluno) nomesUsados.add(a.nome_aluno.toUpperCase().trim());
-        }
-      }
-
-      // Filtrar: mostrar apenas alunos que NÃO estão em nenhum gabarito
-      const disponiveis = (data.alunos || []).filter(al =>
-        !codigosUsados.has(al.codigo) &&
-        !nomesUsados.has(al.estudante.toUpperCase().trim())
-      );
-      setAlunosTurma(disponiveis);
-    } catch (err) {
-      console.error("Erro ao buscar alunos da turma:", err);
-      showToast("Erro ao buscar alunos da turma.", "error");
-    }
-    setLoadingAlunosTurma(false);
-  }
-
-  // ─── Vincular aluno ao gabarito ───
-  async function vincularAluno(aluno) {
-    if (!vinculoModal) return;
-    setVinculando(true);
-
-    try {
-      await api.put(`/api/gabarito-lotes/arquivos/${vinculoModal.id}/vincular-aluno`, {
-        codigo_aluno: aluno.codigo,
-        nome_aluno: aluno.estudante,
-      });
-
-      // Atualizar na lista local
-      setAlunos(prev => prev.map(a =>
-        a.id === vinculoModal.id
-          ? { ...a, codigo_aluno: aluno.codigo, nome_aluno: aluno.estudante }
-          : a
-      ));
-
-      // Atualizar arquivo selecionado se for o mesmo
-      if (arquivoSelecionado?.id === vinculoModal.id) {
-        setArquivoSelecionado(prev => ({
-          ...prev,
-          codigo_aluno: aluno.codigo,
-          nome_aluno: aluno.estudante,
-        }));
-      }
-
-      showToast(`Aluno "${aluno.estudante}" vinculado com sucesso!`, "success");
-      setVinculoModal(null);
-    } catch (err) {
-      console.error("Erro ao vincular aluno:", err);
-      showToast(err.response?.data?.error || "Erro ao vincular aluno.", "error");
-    }
-    setVinculando(false);
-  }
 
   // ─── Resolver professor_ids via endpoint autenticado ───
   useEffect(() => {
@@ -691,15 +615,7 @@ export default function GabaritoCorrigirProfessor() {
                                       fontSize: "0.82rem", fontWeight: 700,
                                       color: pareceNomeArquivo(arq.nome_aluno) ? "var(--gab-amber-light, #f59e0b)" : "var(--gab-text-primary)",
                                       whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-                                      cursor: pareceNomeArquivo(arq.nome_aluno) ? "pointer" : "default",
                                     }}
-                                    onClick={(e) => {
-                                      if (pareceNomeArquivo(arq.nome_aluno)) {
-                                        e.stopPropagation();
-                                        abrirVinculoModal(arq);
-                                      }
-                                    }}
-                                    title={pareceNomeArquivo(arq.nome_aluno) ? "Clique para vincular aluno manualmente" : ""}
                                   >
                                     {pareceNomeArquivo(arq.nome_aluno) ? (
                                       <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -722,14 +638,12 @@ export default function GabaritoCorrigirProfessor() {
                                     </div>
                                   ) : pareceNomeArquivo(arq.nome_aluno) ? (
                                     <div
-                                      onClick={(e) => { e.stopPropagation(); abrirVinculoModal(arq); }}
                                       style={{
-                                        fontSize: "0.62rem", color: "var(--gab-cyan-light)", marginTop: 2,
-                                        cursor: "pointer", textDecoration: "underline",
-                                        textDecorationStyle: "dotted",
+                                        fontSize: "0.62rem", color: "var(--gab-text-muted)", marginTop: 2,
+                                        fontStyle: "italic",
                                       }}
                                     >
-                                      👤 Vincular aluno manualmente
+                                      ℹ️ Solicite ao coordenador a identificação deste aluno
                                     </div>
                                   ) : null}
                                 </div>
@@ -1063,178 +977,7 @@ export default function GabaritoCorrigirProfessor() {
           )}
         </div>
       </div>
-
-      {/* ═══════════════════════════════════════════════════ */}
-      {/* MODAL: Vincular Aluno Manualmente                 */}
-      {/* ═══════════════════════════════════════════════════ */}
-      {vinculoModal && (
-        <div
-          onClick={() => setVinculoModal(null)}
-          style={{
-            position: "fixed", inset: 0, zIndex: 9999,
-            background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            padding: 20,
-          }}
-        >
-          <style>{`@keyframes gab-vinculo-pop { from { opacity:0; transform:scale(0.9) translateY(20px); } to { opacity:1; transform:scale(1) translateY(0); } }`}</style>
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: "100%", maxWidth: 480, maxHeight: "80vh",
-              borderRadius: 16, overflow: "hidden",
-              background: "linear-gradient(145deg, #1a1f35, #0f1321)",
-              border: "1px solid rgba(6,182,212,0.2)",
-              boxShadow: "0 32px 80px rgba(0,0,0,0.5), 0 0 40px rgba(6,182,212,0.06), inset 0 1px 0 rgba(255,255,255,0.04)",
-              animation: "gab-vinculo-pop 0.3s cubic-bezier(0.34,1.56,0.64,1)",
-              display: "flex", flexDirection: "column",
-            }}
-          >
-            {/* Header */}
-            <div style={{
-              padding: "16px 20px",
-              background: "linear-gradient(135deg, rgba(245,158,11,0.06), rgba(6,182,212,0.04))",
-              borderBottom: "1px solid rgba(255,255,255,0.05)",
-              display: "flex", alignItems: "center", justifyContent: "space-between",
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <div style={{
-                  width: 36, height: 36, borderRadius: 10,
-                  background: "linear-gradient(135deg, rgba(245,158,11,0.15), rgba(6,182,212,0.1))",
-                  border: "1px solid rgba(245,158,11,0.2)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: "1rem",
-                }}>👤</div>
-                <div>
-                  <div style={{ fontSize: "0.88rem", fontWeight: 700, color: "#e2e8f0" }}>Vincular Aluno</div>
-                  <div style={{ fontSize: "0.62rem", color: "rgba(148,163,184,0.7)", marginTop: 1, display: "flex", alignItems: "center", gap: 6 }}>
-                    <span>{vinculoModal.arquivo_nome}</span>
-                    <span style={{
-                      padding: "1px 6px", borderRadius: 4, fontSize: "0.58rem", fontWeight: 700,
-                      background: "rgba(6,182,212,0.1)", border: "1px solid rgba(6,182,212,0.15)",
-                      color: "#22d3ee",
-                    }}>
-                      {alunosTurma.length} {alunosTurma.length === 1 ? "aluno restante" : "alunos restantes"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <button
-                onClick={() => setVinculoModal(null)}
-                style={{
-                  width: 32, height: 32, borderRadius: 8,
-                  background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.15)",
-                  color: "#f87171", fontSize: "0.9rem", cursor: "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  transition: "all 0.2s",
-                }}
-              >✕</button>
-            </div>
-
-            {/* Busca */}
-            <div style={{ padding: "12px 20px 8px" }}>
-              <input
-                type="text"
-                placeholder="🔍 Buscar aluno pelo nome..."
-                value={filtroAluno}
-                onChange={(e) => setFiltroAluno(e.target.value)}
-                autoFocus
-                style={{
-                  width: "100%", padding: "10px 14px", borderRadius: 10, fontSize: "0.82rem",
-                  background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
-                  color: "var(--gab-text-primary, #e2e8f0)", outline: "none",
-                  fontFamily: "var(--gab-font-body)",
-                  transition: "border-color 0.2s",
-                }}
-                onFocus={(e) => { e.target.style.borderColor = "rgba(6,182,212,0.4)"; }}
-                onBlur={(e) => { e.target.style.borderColor = "rgba(255,255,255,0.08)"; }}
-              />
-            </div>
-
-            {/* Lista de alunos */}
-            <div style={{ flex: 1, overflowY: "auto", padding: "4px 12px 16px" }}>
-              {loadingAlunosTurma ? (
-                <div style={{ textAlign: "center", padding: 30 }}>
-                  <div className="gab-spinner" style={{ margin: "0 auto 8px" }} />
-                  <div style={{ fontSize: "0.78rem", color: "var(--gab-text-muted)" }}>Buscando alunos...</div>
-                </div>
-              ) : alunosTurma.length === 0 ? (
-                <div style={{ textAlign: "center", padding: 30 }}>
-                  <div style={{ fontSize: "1.5rem", marginBottom: 6 }}>📭</div>
-                  <div style={{ fontSize: "0.82rem", color: "var(--gab-text-muted)" }}>
-                    Nenhum aluno encontrado nesta turma.
-                  </div>
-                </div>
-              ) : (
-                alunosTurma
-                  .filter(al => !filtroAluno || al.estudante.toLowerCase().includes(filtroAluno.toLowerCase()))
-                  .map(aluno => (
-                    <div
-                      key={aluno.id}
-                      onClick={() => !vinculando && vincularAluno(aluno)}
-                      style={{
-                        display: "flex", alignItems: "center", gap: 12,
-                        padding: "10px 14px", borderRadius: 10, marginBottom: 3,
-                        cursor: vinculando ? "not-allowed" : "pointer",
-                        background: "rgba(255,255,255,0.02)",
-                        border: "1px solid rgba(255,255,255,0.04)",
-                        transition: "all 0.15s",
-                        opacity: vinculando ? 0.5 : 1,
-                      }}
-                      onMouseEnter={(e) => {
-                        if (!vinculando) {
-                          e.currentTarget.style.background = "rgba(6,182,212,0.06)";
-                          e.currentTarget.style.borderColor = "rgba(6,182,212,0.2)";
-                        }
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = "rgba(255,255,255,0.02)";
-                        e.currentTarget.style.borderColor = "rgba(255,255,255,0.04)";
-                      }}
-                    >
-                      {/* Avatar */}
-                      <div style={{
-                        width: 34, height: 34, borderRadius: 8, flexShrink: 0,
-                        background: "linear-gradient(135deg, rgba(6,182,212,0.12), rgba(139,92,246,0.08))",
-                        border: "1px solid rgba(6,182,212,0.15)",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: "0.82rem", fontWeight: 800, color: "#22d3ee",
-                      }}>
-                        {aluno.estudante.charAt(0).toUpperCase()}
-                      </div>
-                      {/* Info */}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{
-                          fontSize: "0.82rem", fontWeight: 700, color: "var(--gab-text-primary)",
-                          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-                        }}>
-                          {aluno.estudante}
-                        </div>
-                        <div style={{ fontSize: "0.65rem", color: "var(--gab-text-muted)", marginTop: 1 }}>
-                          RE: {aluno.codigo}
-                        </div>
-                      </div>
-                      {/* Arrow */}
-                      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="rgba(148,163,184,0.4)" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                      </svg>
-                    </div>
-                  ))
-              )}
-              {/* Mensagem se filtro vazio */}
-              {!loadingAlunosTurma && alunosTurma.length > 0
-                && filtroAluno
-                && alunosTurma.filter(al => al.estudante.toLowerCase().includes(filtroAluno.toLowerCase())).length === 0 && (
-                <div style={{ textAlign: "center", padding: 20 }}>
-                  <div style={{ fontSize: "0.78rem", color: "var(--gab-text-muted)" }}>
-                    Nenhum aluno encontrado com "{filtroAluno}"
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }
+

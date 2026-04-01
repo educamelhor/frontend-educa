@@ -63,6 +63,13 @@ export default function GabaritoCorrigirLote() {
   const [modalAlunosData, setModalAlunosData] = useState([]); // arquivos/alunos
   const [modalAlunosLoading, setModalAlunosLoading] = useState(false);
 
+  // ─── Vincular aluno manualmente (coordenador) ───
+  const [vinculoArquivo, setVinculoArquivo] = useState(null); // arquivo selecionado para vincular
+  const [alunosTurmaDisp, setAlunosTurmaDisp] = useState([]); // alunos disponíveis
+  const [loadingAlunosTurma, setLoadingAlunosTurma] = useState(false);
+  const [filtroVinculo, setFiltroVinculo] = useState("");
+  const [vinculandoAluno, setVinculandoAluno] = useState(false);
+
   // ─── Excluir lote (turma) ───
   const [deleteLoteModal, setDeleteLoteModal] = useState(null); // lote para confirmar exclusão
   const [deletingLoteId, setDeletingLoteId] = useState(null);
@@ -343,6 +350,76 @@ export default function GabaritoCorrigirLote() {
       showToast("Erro ao carregar arquivos do lote.", "error");
     }
     setModalAlunosLoading(false);
+  }
+
+  // ─── Helper: detectar se nome parece nome de arquivo (não aluno) ───
+  function pareceNomeArquivo(nome) {
+    if (!nome) return true;
+    return /\.(pdf|jpg|jpeg|png)$/i.test(nome)
+      || /^\d{8}[_\-]/.test(nome)
+      || /^ARQ_\d+$/.test(nome)
+      || /^Arquivo \d+$/.test(nome);
+  }
+
+  // ─── Abrir painel de vinculação manual (coordenador) ───
+  async function abrirVinculoAluno(arq) {
+    if (!modalAlunosLote) return;
+    setVinculoArquivo(arq);
+    setFiltroVinculo("");
+    setLoadingAlunosTurma(true);
+
+    try {
+      const resp = await api.get(`/api/gabarito-lotes/${modalAlunosLote.id}/alunos-turma`);
+      const data = resp.data;
+
+      // Excluir alunos já identificados em outros gabaritos
+      const codigosUsados = new Set();
+      const nomesUsados = new Set();
+      for (const a of modalAlunosData) {
+        if (a.id === arq.id) continue;
+        if (!pareceNomeArquivo(a.nome_aluno)) {
+          if (a.codigo_aluno) codigosUsados.add(a.codigo_aluno);
+          if (a.nome_aluno) nomesUsados.add(a.nome_aluno.toUpperCase().trim());
+        }
+      }
+
+      const disponiveis = (data.alunos || []).filter(al =>
+        !codigosUsados.has(al.codigo) &&
+        !nomesUsados.has(al.estudante.toUpperCase().trim())
+      );
+      setAlunosTurmaDisp(disponiveis);
+    } catch (err) {
+      console.error("Erro ao buscar alunos da turma:", err);
+      showToast("Erro ao buscar alunos da turma.", "error");
+    }
+    setLoadingAlunosTurma(false);
+  }
+
+  // ─── Vincular aluno ao gabarito (coordenador) ───
+  async function executarVinculo(aluno) {
+    if (!vinculoArquivo) return;
+    setVinculandoAluno(true);
+
+    try {
+      await api.put(`/api/gabarito-lotes/arquivos/${vinculoArquivo.id}/vincular-aluno`, {
+        codigo_aluno: aluno.codigo,
+        nome_aluno: aluno.estudante,
+      });
+
+      // Atualizar na lista do modal
+      setModalAlunosData(prev => prev.map(a =>
+        a.id === vinculoArquivo.id
+          ? { ...a, codigo_aluno: aluno.codigo, nome_aluno: aluno.estudante }
+          : a
+      ));
+
+      showToast(`Aluno "${aluno.estudante}" vinculado com sucesso!`, "success");
+      setVinculoArquivo(null);
+    } catch (err) {
+      console.error("Erro ao vincular aluno:", err);
+      showToast(err.response?.data?.error || "Erro ao vincular aluno.", "error");
+    }
+    setVinculandoAluno(false);
   }
 
   // ─── Excluir lote (turma) ───
@@ -1597,17 +1674,44 @@ export default function GabaritoCorrigirLote() {
 
                       {/* Nome / Código */}
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{
-                          fontSize: "0.85rem", fontWeight: 700, color: "var(--gab-text-primary)",
-                          whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
-                        }}>
-                          {arq.nome_aluno || arq.arquivo_nome || "Aluno não identificado"}
+                        <div
+                          style={{
+                            fontSize: "0.85rem", fontWeight: 700,
+                            color: pareceNomeArquivo(arq.nome_aluno) ? "var(--gab-amber-light, #f59e0b)" : "var(--gab-text-primary)",
+                            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                          }}
+                        >
+                          {pareceNomeArquivo(arq.nome_aluno) ? (
+                            <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                              <span style={{
+                                fontSize: "0.6rem", padding: "1px 5px", borderRadius: 4,
+                                background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)",
+                                color: "var(--gab-amber-light)", fontWeight: 700, flexShrink: 0,
+                              }}>⚠ QR</span>
+                              <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+                                {arq.nome_aluno || arq.arquivo_nome || "Aluno não identificado"}
+                              </span>
+                            </span>
+                          ) : (
+                            arq.nome_aluno || arq.arquivo_nome || "Aluno não identificado"
+                          )}
                         </div>
-                        {arq.codigo_aluno && (
+                        {arq.codigo_aluno && !pareceNomeArquivo(arq.nome_aluno) ? (
                           <div style={{ fontSize: "0.7rem", color: "var(--gab-text-muted)", marginTop: 1 }}>
                             RE: {arq.codigo_aluno}
                           </div>
-                        )}
+                        ) : pareceNomeArquivo(arq.nome_aluno) ? (
+                          <div
+                            onClick={(e) => { e.stopPropagation(); abrirVinculoAluno(arq); }}
+                            style={{
+                              fontSize: "0.65rem", color: "var(--gab-cyan-light)", marginTop: 2,
+                              cursor: "pointer", textDecoration: "underline",
+                              textDecorationStyle: "dotted",
+                            }}
+                          >
+                            👤 Vincular aluno manualmente
+                          </div>
+                        ) : null}
                       </div>
 
                       {/* Nota (se corrigido) */}
@@ -1633,6 +1737,119 @@ export default function GabaritoCorrigirLote() {
                 })
               )}
             </div>
+
+            {/* ═══ Painel inline: Vincular Aluno ═══ */}
+            {vinculoArquivo && (
+              <div style={{
+                borderTop: "1px solid rgba(245,158,11,0.2)",
+                background: "linear-gradient(135deg, rgba(245,158,11,0.04), rgba(6,182,212,0.03))",
+                padding: "14px 16px 12px",
+              }}>
+                {/* Header do painel */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: "0.9rem" }}>👤</span>
+                    <div>
+                      <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--gab-text-primary)" }}>
+                        Vincular aluno ao gabarito
+                      </div>
+                      <div style={{ fontSize: "0.62rem", color: "var(--gab-text-muted)", marginTop: 1 }}>
+                        {vinculoArquivo.arquivo_nome} · {alunosTurmaDisp.length} aluno(s) disponível(is)
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setVinculoArquivo(null)}
+                    style={{
+                      background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.15)",
+                      color: "#f87171", fontSize: "0.75rem", fontWeight: 700, cursor: "pointer",
+                      borderRadius: 6, padding: "4px 10px", fontFamily: "var(--gab-font-body)",
+                    }}
+                  >✕ Cancelar</button>
+                </div>
+
+                {/* Busca */}
+                <input
+                  type="text"
+                  placeholder="🔍 Buscar aluno pelo nome..."
+                  value={filtroVinculo}
+                  onChange={(e) => setFiltroVinculo(e.target.value)}
+                  autoFocus
+                  style={{
+                    width: "100%", padding: "8px 12px", borderRadius: 8, fontSize: "0.78rem",
+                    background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
+                    color: "var(--gab-text-primary)", outline: "none", marginBottom: 8,
+                    fontFamily: "var(--gab-font-body)",
+                  }}
+                />
+
+                {/* Lista de alunos disponíveis */}
+                <div style={{ maxHeight: 200, overflowY: "auto" }}>
+                  {loadingAlunosTurma ? (
+                    <div style={{ textAlign: "center", padding: 20 }}>
+                      <div className="gab-spinner" style={{ margin: "0 auto 8px", width: 20, height: 20 }} />
+                      <div style={{ fontSize: "0.72rem", color: "var(--gab-text-muted)" }}>Buscando alunos...</div>
+                    </div>
+                  ) : alunosTurmaDisp.length === 0 ? (
+                    <div style={{ textAlign: "center", padding: 16, fontSize: "0.78rem", color: "var(--gab-text-muted)" }}>
+                      Todos os alunos já foram vinculados.
+                    </div>
+                  ) : (
+                    alunosTurmaDisp
+                      .filter(al => !filtroVinculo || al.estudante.toLowerCase().includes(filtroVinculo.toLowerCase()))
+                      .map(aluno => (
+                        <div
+                          key={aluno.id}
+                          onClick={() => !vinculandoAluno && executarVinculo(aluno)}
+                          style={{
+                            display: "flex", alignItems: "center", gap: 10,
+                            padding: "8px 12px", borderRadius: 8, marginBottom: 2,
+                            cursor: vinculandoAluno ? "not-allowed" : "pointer",
+                            background: "rgba(255,255,255,0.02)",
+                            border: "1px solid rgba(255,255,255,0.04)",
+                            transition: "all 0.15s",
+                            opacity: vinculandoAluno ? 0.5 : 1,
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!vinculandoAluno) {
+                              e.currentTarget.style.background = "rgba(6,182,212,0.06)";
+                              e.currentTarget.style.borderColor = "rgba(6,182,212,0.2)";
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = "rgba(255,255,255,0.02)";
+                            e.currentTarget.style.borderColor = "rgba(255,255,255,0.04)";
+                          }}
+                        >
+                          <div style={{
+                            width: 30, height: 30, borderRadius: 8, flexShrink: 0,
+                            background: "linear-gradient(135deg, rgba(6,182,212,0.12), rgba(139,92,246,0.08))",
+                            border: "1px solid rgba(6,182,212,0.15)",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: "0.75rem", fontWeight: 800, color: "#22d3ee",
+                          }}>
+                            {aluno.estudante.charAt(0).toUpperCase()}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{
+                              fontSize: "0.78rem", fontWeight: 700, color: "var(--gab-text-primary)",
+                              whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                            }}>
+                              {aluno.estudante}
+                            </div>
+                            <div style={{ fontSize: "0.62rem", color: "var(--gab-text-muted)", marginTop: 1 }}>
+                              RE: {aluno.codigo}
+                            </div>
+                          </div>
+                          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="rgba(148,163,184,0.4)" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                          </svg>
+                        </div>
+                      ))
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Footer */}
             <div style={{

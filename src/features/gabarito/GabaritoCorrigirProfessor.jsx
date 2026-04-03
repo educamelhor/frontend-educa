@@ -135,7 +135,12 @@ export default function GabaritoCorrigirProfessor() {
   const [correcao, setCorrecao] = useState(null);
   const [loadingCorrecao, setLoadingCorrecao] = useState(false);
 
-  // (Vincular aluno manualmente — removido do professor, agora é responsabilidade do coordenador/supervisor)
+  // ─── Ajuste manual de questão ───
+  const [ajusteModal, setAjusteModal] = useState(null); // { questao, resposta, correto, acertou }
+  const [ajusteTipo, setAjusteTipo] = useState("acerto"); // 'acerto' | 'erro'
+  const [ajusteJustificativa, setAjusteJustificativa] = useState("");
+  const [ajusteSalvando, setAjusteSalvando] = useState(false);
+  const [ajustesManuais, setAjustesManuais] = useState([]); // lista de ajustes do arquivo atual
 
   // ─── Professor ID ───
   const [professorIds, setProfessorIds] = useState([]);
@@ -145,6 +150,49 @@ export default function GabaritoCorrigirProfessor() {
   function showToast(msg, type = "success") {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3500);
+  }
+
+  // ─── Abrir modal de ajuste manual ───
+  function abrirAjusteManual(q) {
+    if (!arquivoSelecionado || !correcao) return;
+    const existente = ajustesManuais.find(a => a.questao_numero === q.numero);
+    setAjusteModal(q);
+    setAjusteTipo(existente ? existente.tipo_ajuste : (q.acertou ? "erro" : "acerto"));
+    setAjusteJustificativa(existente ? (existente.justificativa || "") : "");
+  }
+
+  // ─── Salvar ajuste manual ───
+  async function salvarAjuste() {
+    if (!ajusteModal || !arquivoSelecionado) return;
+    setAjusteSalvando(true);
+    try {
+      const resp = await api.post(`/api/gabarito-lotes/arquivos/${arquivoSelecionado.id}/ajuste-manual`, {
+        questao_numero: ajusteModal.numero,
+        tipo_ajuste: ajusteTipo,
+        justificativa: ajusteJustificativa || null,
+      });
+      if (resp.data.ok) {
+        showToast(`✏️ Ajuste na questão ${String(ajusteModal.numero).padStart(2, "0")} enviado para aprovação do coordenador.`, "success");
+        // Atualizar lista de ajustes local
+        setAjustesManuais(prev => {
+          const sem = prev.filter(a => a.questao_numero !== ajusteModal.numero);
+          return [...sem, resp.data.ajuste];
+        });
+        setAjusteModal(null);
+      }
+    } catch (err) {
+      console.error("Erro ao salvar ajuste:", err);
+      showToast(err.response?.data?.error || "Erro ao salvar ajuste.", "error");
+    }
+    setAjusteSalvando(false);
+  }
+
+  // ─── Carregar ajustes existentes de um arquivo ───
+  async function carregarAjustes(arqId) {
+    try {
+      const resp = await api.get(`/api/gabarito-lotes/arquivos/${arqId}/ajustes-manuais`);
+      setAjustesManuais(resp.data || []);
+    } catch { setAjustesManuais([]); }
   }
 
   // ─── Helper: detectar se nome parece nome de arquivo (não aluno) ───
@@ -277,6 +325,9 @@ export default function GabaritoCorrigirProfessor() {
       setCorrecao({ resultado, acertos, totalQuestoes, nota, notaTotal, acertosPorDisciplina });
       showToast(`Correção concluída! ${acertos}/${totalQuestoes} acertos`, "success");
 
+      // Carregar ajustes manuais existentes para este arquivo
+      carregarAjustes(arq.id);
+
       // Atualizar status + nome do aluno na lista local (backend já salvou)
       setAlunos(prev => prev.map(a =>
         a.id === arq.id
@@ -346,6 +397,9 @@ export default function GabaritoCorrigirProfessor() {
         notaTotal: data.notaTotal || av.nota_total || 10,
         acertosPorDisciplina: data.acertosPorDisciplina || null,
       });
+
+      // Carregar ajustes manuais existentes
+      carregarAjustes(arq.id);
     } catch (err) {
       console.error("Erro ao carregar correção:", err);
       showToast("Erro ao carregar resultado.", "error");
@@ -886,9 +940,27 @@ export default function GabaritoCorrigirProfessor() {
                     <thead>
                       <tr>
                         <th style={{ width: 120 }}></th>
-                        {correcao.resultado.map(q => (
-                          <th key={q.numero}>{String(q.numero).padStart(2, "0")}</th>
-                        ))}
+                        {correcao.resultado.map(q => {
+                          const temAjuste = ajustesManuais.find(a => a.questao_numero === q.numero);
+                          return (
+                            <th
+                              key={q.numero}
+                              onClick={() => abrirAjusteManual(q)}
+                              style={{
+                                cursor: "pointer", position: "relative",
+                                transition: "all 0.15s",
+                                background: temAjuste ? "rgba(245,158,11,0.08)" : "inherit",
+                                borderBottom: temAjuste ? "2px solid var(--gab-amber-light, #f59e0b)" : undefined,
+                              }}
+                              title={temAjuste ? `✏️ Ajuste ${temAjuste.status}: ${temAjuste.tipo_ajuste}` : "Clique para ajustar esta questão"}
+                            >
+                              <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 2 }}>
+                                {String(q.numero).padStart(2, "0")}
+                                {temAjuste && <span style={{ fontSize: "0.55rem" }}>✏️</span>}
+                              </span>
+                            </th>
+                          );
+                        })}
                       </tr>
                     </thead>
                     <tbody>
@@ -901,7 +973,12 @@ export default function GabaritoCorrigirProfessor() {
                       <tr>
                         <td className="row-label">Aluno</td>
                         {correcao.resultado.map(q => (
-                          <td key={q.numero}>
+                          <td key={q.numero} style={{
+                            color: q.resposta === "N" ? "var(--gab-amber-light, #f59e0b)" : "inherit",
+                            fontWeight: q.resposta === "N" ? 700 : 400,
+                          }}
+                            title={q.resposta === "N" ? "Nulo — múltiplas marcações" : ""}
+                          >
                             {q.resposta || <span style={{ color: "var(--gab-text-muted)", fontStyle: "italic" }}>—</span>}
                           </td>
                         ))}
@@ -912,6 +989,8 @@ export default function GabaritoCorrigirProfessor() {
                           <td key={q.numero}>
                             {q.acertou ? (
                               <span className="gab-acerto">✓</span>
+                            ) : q.resposta === "N" ? (
+                              <span style={{ color: "var(--gab-amber-light, #f59e0b)", fontWeight: 700, fontSize: "1rem" }} title="Nulo — múltiplas marcações">⊘</span>
                             ) : (
                               <span className="gab-erro">✗</span>
                             )}
@@ -977,6 +1056,231 @@ export default function GabaritoCorrigirProfessor() {
           )}
         </div>
       </div>
+
+      {/* ═══ MODAL: Ajuste Manual de Questão ═══ */}
+      {ajusteModal && (
+        <div
+          style={{
+            position: "fixed", inset: 0, zIndex: 9999,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)",
+            animation: "gab-fade-in 0.2s ease-out",
+          }}
+          onClick={() => setAjusteModal(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%", maxWidth: 440,
+              background: "linear-gradient(145deg, #1a1f2e 0%, #151926 100%)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              borderRadius: 16, boxShadow: "0 24px 64px rgba(0,0,0,0.5)",
+              animation: "gab-slide-up 0.3s ease-out",
+              overflow: "hidden",
+            }}
+          >
+            {/* Header */}
+            <div style={{
+              padding: "20px 24px 16px",
+              background: "linear-gradient(135deg, rgba(245,158,11,0.06) 0%, rgba(139,92,246,0.04) 100%)",
+              borderBottom: "1px solid rgba(255,255,255,0.06)",
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{
+                  width: 40, height: 40, borderRadius: 10,
+                  background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: "1rem",
+                }}>✏️</div>
+                <div>
+                  <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--gab-text-primary)" }}>
+                    Ajuste Manual — Questão {String(ajusteModal.numero).padStart(2, "0")}
+                  </div>
+                  <div style={{ fontSize: "0.7rem", color: "var(--gab-text-muted)", marginTop: 2 }}>
+                    Sugerido pelo professor · Requer aprovação do coordenador
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setAjusteModal(null)}
+                style={{ background: "none", border: "none", color: "var(--gab-text-muted)", cursor: "pointer", padding: 4 }}
+              >
+                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Context: leitura OMR vs gabarito */}
+            <div style={{ padding: "16px 24px", display: "flex", gap: 12 }}>
+              <div style={{
+                flex: 1, padding: "12px 14px", borderRadius: 10,
+                background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
+              }}>
+                <div style={{ fontSize: "0.62rem", color: "var(--gab-text-muted)", textTransform: "uppercase", fontWeight: 700, marginBottom: 4 }}>
+                  Gabarito Oficial
+                </div>
+                <div style={{ fontSize: "1.3rem", fontWeight: 800, color: "var(--gab-cyan-light, #22d3ee)" }}>
+                  {ajusteModal.correto || "—"}
+                </div>
+              </div>
+              <div style={{
+                flex: 1, padding: "12px 14px", borderRadius: 10,
+                background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
+              }}>
+                <div style={{ fontSize: "0.62rem", color: "var(--gab-text-muted)", textTransform: "uppercase", fontWeight: 700, marginBottom: 4 }}>
+                  Leitura OMR (Aluno)
+                </div>
+                <div style={{
+                  fontSize: "1.3rem", fontWeight: 800,
+                  color: ajusteModal.resposta === "N" ? "var(--gab-amber-light)" : ajusteModal.acertou ? "var(--gab-green-light)" : "var(--gab-red-light)",
+                }}>
+                  {ajusteModal.resposta || "—"}
+                </div>
+              </div>
+              <div style={{
+                flex: 1, padding: "12px 14px", borderRadius: 10,
+                background: ajusteModal.acertou ? "rgba(16,185,129,0.06)" : "rgba(239,68,68,0.06)",
+                border: `1px solid ${ajusteModal.acertou ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.15)"}`,
+              }}>
+                <div style={{ fontSize: "0.62rem", color: "var(--gab-text-muted)", textTransform: "uppercase", fontWeight: 700, marginBottom: 4 }}>
+                  Resultado OMR
+                </div>
+                <div style={{
+                  fontSize: "1.3rem", fontWeight: 800,
+                  color: ajusteModal.acertou ? "var(--gab-green-light)" : "var(--gab-red-light)",
+                }}>
+                  {ajusteModal.acertou ? "✓" : "✗"}
+                </div>
+              </div>
+            </div>
+
+            {/* Toggle: Acerto / Erro */}
+            <div style={{ padding: "0 24px 16px" }}>
+              <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--gab-text-secondary)", marginBottom: 8 }}>
+                DECISÃO DO PROFESSOR
+              </div>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button
+                  onClick={() => setAjusteTipo("acerto")}
+                  style={{
+                    flex: 1, padding: "14px", borderRadius: 12,
+                    background: ajusteTipo === "acerto"
+                      ? "linear-gradient(135deg, rgba(16,185,129,0.15) 0%, rgba(16,185,129,0.08) 100%)"
+                      : "rgba(255,255,255,0.03)",
+                    border: `2px solid ${ajusteTipo === "acerto" ? "#10b981" : "rgba(255,255,255,0.06)"}`,
+                    color: ajusteTipo === "acerto" ? "#34d399" : "var(--gab-text-muted)",
+                    cursor: "pointer", fontSize: "0.85rem", fontWeight: 700,
+                    transition: "all 0.2s", textAlign: "center",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                  }}
+                >
+                  <span style={{ fontSize: "1.2rem" }}>✓</span>
+                  O aluno ACERTOU
+                </button>
+                <button
+                  onClick={() => setAjusteTipo("erro")}
+                  style={{
+                    flex: 1, padding: "14px", borderRadius: 12,
+                    background: ajusteTipo === "erro"
+                      ? "linear-gradient(135deg, rgba(239,68,68,0.15) 0%, rgba(239,68,68,0.08) 100%)"
+                      : "rgba(255,255,255,0.03)",
+                    border: `2px solid ${ajusteTipo === "erro" ? "#ef4444" : "rgba(255,255,255,0.06)"}`,
+                    color: ajusteTipo === "erro" ? "#f87171" : "var(--gab-text-muted)",
+                    cursor: "pointer", fontSize: "0.85rem", fontWeight: 700,
+                    transition: "all 0.2s", textAlign: "center",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                  }}
+                >
+                  <span style={{ fontSize: "1.2rem" }}>✗</span>
+                  O aluno ERROU
+                </button>
+              </div>
+            </div>
+
+            {/* Justificativa */}
+            <div style={{ padding: "0 24px 16px" }}>
+              <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--gab-text-secondary)", marginBottom: 8 }}>
+                JUSTIFICATIVA (descreva a divergência)
+              </div>
+              <textarea
+                value={ajusteJustificativa}
+                onChange={(e) => setAjusteJustificativa(e.target.value)}
+                placeholder="Ex: O aluno marcou a alternativa C corretamente, mas a leitura OMR registrou B por conta de uma mancha na folha."
+                rows={3}
+                style={{
+                  width: "100%", padding: "12px 14px", borderRadius: 10,
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  color: "var(--gab-text-primary)", fontSize: "0.82rem",
+                  fontFamily: "var(--gab-font-body, inherit)",
+                  resize: "vertical", outline: "none",
+                  transition: "border-color 0.2s",
+                  boxSizing: "border-box",
+                }}
+                onFocus={(e) => e.target.style.borderColor = "rgba(245,158,11,0.4)"}
+                onBlur={(e) => e.target.style.borderColor = "rgba(255,255,255,0.08)"}
+              />
+            </div>
+
+            {/* Info: status do ajuste */}
+            <div style={{
+              margin: "0 24px 16px", padding: "10px 14px", borderRadius: 8,
+              background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.12)",
+              fontSize: "0.7rem", color: "var(--gab-amber-light, #f59e0b)",
+              display: "flex", alignItems: "center", gap: 8,
+            }}>
+              <span>⚡</span>
+              <span>Este ajuste ficará com status <strong>pendente</strong> até o coordenador aprovar ou rejeitar.</span>
+            </div>
+
+            {/* Botões */}
+            <div style={{
+              padding: "16px 24px 20px",
+              borderTop: "1px solid rgba(255,255,255,0.06)",
+              display: "flex", justifyContent: "flex-end", gap: 10,
+            }}>
+              <button
+                onClick={() => setAjusteModal(null)}
+                style={{
+                  padding: "10px 20px", borderRadius: 10,
+                  background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)",
+                  color: "var(--gab-text-secondary)", cursor: "pointer",
+                  fontSize: "0.82rem", fontWeight: 600,
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={salvarAjuste}
+                disabled={ajusteSalvando}
+                style={{
+                  padding: "10px 24px", borderRadius: 10,
+                  background: "linear-gradient(135deg, #f59e0b, #d97706)",
+                  border: "none", color: "#fff", cursor: ajusteSalvando ? "wait" : "pointer",
+                  fontSize: "0.82rem", fontWeight: 700,
+                  display: "flex", alignItems: "center", gap: 8,
+                  opacity: ajusteSalvando ? 0.7 : 1,
+                  boxShadow: "0 4px 14px rgba(245,158,11,0.3)",
+                }}
+              >
+                {ajusteSalvando ? (
+                  <>
+                    <div className="gab-spinner" style={{ width: 14, height: 14 }} />
+                    Salvando...
+                  </>
+                ) : (
+                  <>
+                    <span>✏️</span>
+                    Salvar Ajuste
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

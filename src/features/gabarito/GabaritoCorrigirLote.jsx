@@ -70,6 +70,12 @@ export default function GabaritoCorrigirLote() {
   const [filtroVinculo, setFiltroVinculo] = useState("");
   const [vinculandoAluno, setVinculandoAluno] = useState(false);
 
+  // ─── Visualização da imagem do gabarito (coordenador) ───
+  const [previewArquivo, setPreviewArquivo] = useState(null); // arquivo cuja imagem está sendo exibida
+  const [previewImgUrl, setPreviewImgUrl] = useState(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewFullscreen, setPreviewFullscreen] = useState(false);
+
   // ─── Excluir lote (turma) ───
   const [deleteLoteModal, setDeleteLoteModal] = useState(null); // lote para confirmar exclusão
   const [deletingLoteId, setDeletingLoteId] = useState(null);
@@ -82,6 +88,12 @@ export default function GabaritoCorrigirLote() {
 
   // ─── Governança (Avaliação Padrão Bimestral) ───
   const [avaliacaoConfig, setAvaliacaoConfig] = useState(null);
+
+  // ─── Revisão de ajustes manuais (coordenador) ───
+  const [ajustesReviewArquivo, setAjustesReviewArquivo] = useState(null); // arquivo cujos ajustes estão sendo revisados
+  const [ajustesList, setAjustesList] = useState([]); // ajustes do arquivo
+  const [ajustesLoading, setAjustesLoading] = useState(false);
+  const [decidindoAjusteId, setDecidindoAjusteId] = useState(null);
 
   // ─── Toast ───
   function showToast(msg, type = "success") {
@@ -336,20 +348,112 @@ export default function GabaritoCorrigirLote() {
     setUploadProgress(null);
   }
 
+  // ─── Estado: progresso do processamento QR automático ───
+  const [qrAutoProgress, setQrAutoProgress] = useState(null); // { total, processados, identificados, erros, fase }
+
   // ─── Abrir lote (turma) — modal de visualização (coordenador) ───
+  // Agora dispara automaticamente o processamento QR para arquivos pendentes
   async function abrirLote(lote) {
     setModalAlunosLote(lote);
     setModalAlunosData([]);
     setModalAlunosLoading(true);
+    setQrAutoProgress(null);
 
     try {
+      // 1. Carregar arquivos atuais
       const resp = await api.get(`/api/gabarito-lotes/${lote.id}/arquivos`);
-      setModalAlunosData(resp.data || []);
+      const arquivosAtuais = resp.data || [];
+
+      // 2. Verificar se existem arquivos pendentes (sem QR processado)
+      const pendentes = arquivosAtuais.filter(a => a.status === "pendente");
+
+      if (pendentes.length > 0) {
+        // Mostrar os arquivos já carregados enquanto processa
+        setModalAlunosData(arquivosAtuais);
+        setModalAlunosLoading(false);
+        setQrAutoProgress({ total: pendentes.length, processados: 0, identificados: 0, erros: 0, fase: "processando" });
+
+        let qrData = null;
+        let qrOk = false;
+
+        try {
+          // 3. Disparar processamento QR automático
+          // Timeout longo: cada arquivo leva ~5-10s no OMR (download + crop + bolhas)
+          // Para 30 arquivos → até 5 minutos
+          const qrResp = await api.post(
+            `/api/gabarito-lotes/${lote.id}/processar-qr`,
+            {},
+            { timeout: 300000 } // 5 minutos
+          );
+          qrData = qrResp.data || {};
+          qrOk = true;
+        } catch (qrErr) {
+          console.error("Erro ao processar QR automático:", qrErr);
+          // Mesmo com erro (timeout, 503, etc.), o backend pode ter processado parcialmente.
+          // Vamos recarregar a lista de qualquer forma.
+          if (qrErr.response?.status === 503) {
+            showToast("⚠️ Serviço OMR indisponível. Os alunos serão identificados quando o professor clicar em Corrigir.", "error");
+          }
+          // Não mostramos toast genérico aqui — vamos verificar o resultado real abaixo
+        }
+
+        // 4. SEMPRE recarregar lista atualizada (mesmo se houve erro/timeout)
+        // O backend pode ter processado parcial ou totalmente antes do timeout
+        try {
+          const respAtualizada = await api.get(`/api/gabarito-lotes/${lote.id}/arquivos`);
+          const listaAtualizada = respAtualizada.data || [];
+          setModalAlunosData(listaAtualizada);
+
+          // Contar resultado real (comparar antes/depois)
+          const identificadosAgora = listaAtualizada.filter(a => a.status === "identificado" || a.status === "corrigido").length;
+          const identificadosAntes = arquivosAtuais.filter(a => a.status === "identificado" || a.status === "corrigido").length;
+          const novosIdentificados = identificadosAgora - identificadosAntes;
+          const errosAgora = listaAtualizada.filter(a => a.status === "erro").length;
+          const novosErros = errosAgora - arquivosAtuais.filter(a => a.status === "erro").length;
+          const aindaPendentes = listaAtualizada.filter(a => a.status === "pendente").length;
+
+          // Usar dados do backend se disponíveis, senão calcular do resultado real
+          const identFinal = qrOk ? (qrData?.identificados || novosIdentificados) : novosIdentificados;
+          const errosFinal = qrOk ? (qrData?.erros || novosErros) : novosErros;
+
+          setQrAutoProgress({
+            total: pendentes.length,
+            processados: qrOk ? (qrData?.processados || pendentes.length) : (novosIdentificados + novosErros),
+            identificados: identFinal,
+            erros: errosFinal,
+            fase: "concluido",
+          });
+
+          // Toast baseado no resultado REAL
+          if (identFinal > 0) {
+            showToast(
+              `✅ ${identFinal} aluno(s) identificado(s)!${errosFinal > 0 ? ` (${errosFinal} não identificado${errosFinal > 1 ? "s" : ""})` : ""}${aindaPendentes > 0 ? ` · ${aindaPendentes} ainda pendente(s)` : ""}`,
+              "success"
+            );
+          } else if (errosFinal > 0) {
+            showToast(`⚠️ ${errosFinal} arquivo(s) com falha na leitura. Verifique a qualidade do escaneamento.`, "error");
+          } else if (aindaPendentes > 0 && !qrOk) {
+            showToast("⏳ Processamento ainda em andamento. Reabra o modal em alguns segundos.", "success");
+          }
+        } catch (reloadErr) {
+          console.error("Erro ao recarregar lista:", reloadErr);
+        }
+
+        // Atualizar contadores do lote na lista principal
+        carregarLotes(avaliacaoAtiva.id);
+
+        // Limpar progresso após 4 segundos
+        setTimeout(() => setQrAutoProgress(null), 4000);
+      } else {
+        // Sem pendentes — apenas exibir a lista
+        setModalAlunosData(arquivosAtuais);
+        setModalAlunosLoading(false);
+      }
     } catch (err) {
       console.error("Erro ao carregar arquivos:", err);
       showToast("Erro ao carregar arquivos do lote.", "error");
+      setModalAlunosLoading(false);
     }
-    setModalAlunosLoading(false);
   }
 
   // ─── Helper: detectar se nome parece nome de arquivo (não aluno) ───
@@ -359,6 +463,95 @@ export default function GabaritoCorrigirLote() {
       || /^\d{8}[_\-]/.test(nome)
       || /^ARQ_\d+$/.test(nome)
       || /^Arquivo \d+$/.test(nome);
+  }
+
+  // ─── Fechar modal de alunos (limpa tudo) ───
+  function fecharModalAlunos() {
+    setModalAlunosLote(null);
+    setModalAlunosData([]);
+    setVinculoArquivo(null);
+    if (previewImgUrl) URL.revokeObjectURL(previewImgUrl);
+    setPreviewArquivo(null);
+    setPreviewImgUrl(null);
+    setPreviewFullscreen(false);
+    setQrAutoProgress(null);
+    setAjustesReviewArquivo(null);
+    setAjustesList([]);
+  }
+
+  // ─── Abrir revisão de ajustes manuais (coordenador) ───
+  async function abrirRevisaoAjustes(arq) {
+    setAjustesReviewArquivo(arq);
+    setAjustesLoading(true);
+    try {
+      const resp = await api.get(`/api/gabarito-lotes/arquivos/${arq.id}/ajustes-manuais`);
+      setAjustesList(resp.data || []);
+    } catch { setAjustesList([]); }
+    setAjustesLoading(false);
+  }
+
+  // ─── Decidir ajuste (coordenador: aprovar/rejeitar) ───
+  async function decidirAjuste(ajusteId, decisao) {
+    setDecidindoAjusteId(ajusteId);
+    try {
+      const resp = await api.put(`/api/gabarito-lotes/ajustes/${ajusteId}/decidir`, { decisao });
+      if (resp.data.ok) {
+        showToast(
+          decisao === "aprovado"
+            ? `✅ Ajuste aprovado. Nova nota: ${resp.data.nota?.toFixed(1) || "recalculada"}`
+            : "❌ Ajuste rejeitado.",
+          "success"
+        );
+        // Atualizar lista de ajustes
+        setAjustesList(prev => prev.map(a =>
+          a.id === ajusteId ? { ...a, status: decisao } : a
+        ));
+        // Se recalculou nota, atualizar na lista de alunos
+        if (resp.data.recalculado && ajustesReviewArquivo) {
+          setModalAlunosData(prev => prev.map(a =>
+            a.id === ajustesReviewArquivo.id
+              ? { ...a, nota: resp.data.nota, acertos: resp.data.acertos }
+              : a
+          ));
+        }
+        // Refresh lotes para atualizar badge
+        if (avaliacaoAtiva) carregarLotes(avaliacaoAtiva.id);
+      }
+    } catch (err) {
+      showToast(err.response?.data?.error || "Erro ao processar decisão.", "error");
+    }
+    setDecidindoAjusteId(null);
+  }
+
+  // ─── Abrir preview da imagem do gabarito (apenas visualização) ───
+  async function abrirPreviewVinculo(arq) {
+    if (!modalAlunosLote) return;
+
+    // Se já está aberto para este arquivo, fechar
+    if (previewArquivo?.id === arq.id) {
+      if (previewImgUrl) URL.revokeObjectURL(previewImgUrl);
+      setPreviewArquivo(null);
+      setPreviewImgUrl(null);
+      return;
+    }
+
+    // Abrir preview (apenas imagem, sem vinculação)
+    setPreviewArquivo(arq);
+    setPreviewImgUrl(null);
+    setPreviewLoading(true);
+
+    try {
+      const resp = await api.get(`/api/gabarito-lotes/arquivos/${arq.id}/imagem`, {
+        responseType: "blob",
+        timeout: 60000,
+      });
+      const blobUrl = URL.createObjectURL(resp.data);
+      setPreviewImgUrl(blobUrl);
+    } catch (err) {
+      console.error("Erro ao carregar imagem do gabarito:", err);
+      setPreviewImgUrl(null);
+    }
+    setPreviewLoading(false);
   }
 
   // ─── Abrir painel de vinculação manual (coordenador) ───
@@ -415,6 +608,13 @@ export default function GabaritoCorrigirLote() {
 
       showToast(`Aluno "${aluno.estudante}" vinculado com sucesso!`, "success");
       setVinculoArquivo(null);
+
+      // Fechar preview de imagem (se estava aberto para este arquivo)
+      if (previewArquivo?.id === vinculoArquivo.id) {
+        if (previewImgUrl) URL.revokeObjectURL(previewImgUrl);
+        setPreviewArquivo(null);
+        setPreviewImgUrl(null);
+      }
     } catch (err) {
       console.error("Erro ao vincular aluno:", err);
       showToast(err.response?.data?.error || "Erro ao vincular aluno.", "error");
@@ -840,6 +1040,8 @@ export default function GabaritoCorrigirLote() {
                 {lotes.map(lote => {
                   const total = lote.total_arquivos_real || lote.total_arquivos || 0;
                   const corrigidos = lote.total_corrigidos_real || lote.total_corrigidos || 0;
+                  const identificados = lote.total_identificados || 0;
+                  const pendentes = total - corrigidos - identificados - (lote.total_erros || 0);
                   const pct = total > 0 ? Math.round((corrigidos / total) * 100) : 0;
                   const isFinalizado = lote.status === "finalizado";
 
@@ -876,11 +1078,25 @@ export default function GabaritoCorrigirLote() {
                           }}>
                             {isFinalizado ? "FINALIZADO" : `${pct}%`}
                           </span>
+                          {Number(lote.ajustes_pendentes) > 0 && (
+                            <span style={{
+                              padding: "2px 8px", borderRadius: 10, fontSize: "0.6rem", fontWeight: 700,
+                              background: "rgba(245,158,11,0.12)", color: "#fbbf24",
+                              border: "1px solid rgba(245,158,11,0.25)",
+                              display: "flex", alignItems: "center", gap: 3,
+                              animation: "gab-fade-in 0.3s ease-out",
+                            }}>
+                              ✏️ {lote.ajustes_pendentes} ajuste{Number(lote.ajustes_pendentes) > 1 ? "s" : ""}
+                            </span>
+                          )}
                         </div>
                       </div>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
                         <div style={{ fontSize: "0.75rem", color: "var(--gab-text-muted)" }}>
-                          {total} gabaritos · {corrigidos} corrigidos
+                          {total} gabaritos
+                          {identificados > 0 && <> · <span style={{ color: "var(--gab-cyan-light, #22d3ee)" }}>{identificados} identificados</span></>}
+                          {corrigidos > 0 && <> · <span style={{ color: "var(--gab-green-light, #10b981)" }}>{corrigidos} corrigidos</span></>}
+                          {pendentes > 0 && <> · <span style={{ color: "var(--gab-amber-light, #f59e0b)" }}>{pendentes} pendentes</span></>}
                         </div>
                         {/* Botão (+) Upload avulso */}
                         <button
@@ -1369,7 +1585,13 @@ export default function GabaritoCorrigirLote() {
                         <tr>
                           <td style={{ fontWeight: 700, position: "sticky", left: 0, background: "var(--gab-surface, #1a1f2e)", zIndex: 1 }}>ALUNO</td>
                           {correcao.resultado.map(q => (
-                            <td key={q.numero} style={{ textAlign: "center" }}>{q.resposta || "—"}</td>
+                            <td key={q.numero} style={{
+                              textAlign: "center",
+                              color: q.resposta === "N" ? "var(--gab-amber-light, #f59e0b)" : "inherit",
+                              fontWeight: q.resposta === "N" ? 700 : 400,
+                            }}
+                              title={q.resposta === "N" ? "Nulo — múltiplas marcações" : ""}
+                            >{q.resposta || "—"}</td>
                           ))}
                         </tr>
                         <tr>
@@ -1377,9 +1599,13 @@ export default function GabaritoCorrigirLote() {
                           {correcao.resultado.map(q => (
                             <td key={q.numero} style={{
                               textAlign: "center", fontWeight: 700, fontSize: "1rem",
-                              color: q.acertou ? "var(--gab-green-light, #10b981)" : "var(--gab-red-light, #ef4444)",
+                              color: q.acertou
+                                ? "var(--gab-green-light, #10b981)"
+                                : q.resposta === "N"
+                                  ? "var(--gab-amber-light, #f59e0b)"
+                                  : "var(--gab-red-light, #ef4444)",
                             }}>
-                              {q.acertou ? "✓" : "✗"}
+                              {q.acertou ? "✓" : q.resposta === "N" ? "⊘" : "✗"}
                             </td>
                           ))}
                         </tr>
@@ -1580,7 +1806,7 @@ export default function GabaritoCorrigirLote() {
             background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)",
             animation: "gab-fade-in 0.25s ease-out",
           }}
-          onClick={() => setModalAlunosLote(null)}
+          onClick={fecharModalAlunos}
         >
           <div
             onClick={(e) => e.stopPropagation()}
@@ -1613,14 +1839,20 @@ export default function GabaritoCorrigirLote() {
                   </div>
                   <div style={{ fontSize: "0.78rem", color: "var(--gab-text-muted)", marginTop: 2 }}>
                     {(() => {
-                      const corr = modalAlunosData.filter(a => a.status === "corrigido").length;
                       const total = modalAlunosData.length;
-                      return `${total} gabarito${total !== 1 ? "s" : ""} · ${corr} corrigido${corr !== 1 ? "s" : ""}`;
+                      const corr = modalAlunosData.filter(a => a.status === "corrigido").length;
+                      const ident = modalAlunosData.filter(a => a.status === "identificado").length;
+                      const pend = modalAlunosData.filter(a => a.status === "pendente").length;
+                      const parts = [`${total} gabarito${total !== 1 ? "s" : ""}`];
+                      if (ident > 0) parts.push(`${ident} identificado${ident !== 1 ? "s" : ""}`);
+                      if (corr > 0) parts.push(`${corr} corrigido${corr !== 1 ? "s" : ""}`);
+                      if (pend > 0) parts.push(`${pend} pendente${pend !== 1 ? "s" : ""}`);
+                      return parts.join(" · ");
                     })()}
                   </div>
                 </div>
                 <button
-                  onClick={() => setModalAlunosLote(null)}
+                  onClick={fecharModalAlunos}
                   style={{ background: "none", border: "none", color: "var(--gab-text-muted)", cursor: "pointer", padding: 4 }}
                 >
                   <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -1630,12 +1862,67 @@ export default function GabaritoCorrigirLote() {
               </div>
             </div>
 
+            {/* ─── Banner de Processamento QR Automático ─── */}
+            {qrAutoProgress && (
+              <div style={{
+                padding: "10px 20px", flexShrink: 0,
+                background: qrAutoProgress.fase === "concluido"
+                  ? "linear-gradient(135deg, rgba(16,185,129,0.08), rgba(6,182,212,0.05))"
+                  : "linear-gradient(135deg, rgba(6,182,212,0.08), rgba(139,92,246,0.05))",
+                borderBottom: "1px solid rgba(6,182,212,0.1)",
+                display: "flex", alignItems: "center", gap: 12,
+                animation: "gabSlideIn 0.3s ease-out",
+              }}>
+                {qrAutoProgress.fase === "processando" ? (
+                  <>
+                    <div className="gab-spinner" style={{ width: 18, height: 18, flexShrink: 0 }} />
+                    <div>
+                      <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--gab-cyan-light, #22d3ee)" }}>
+                        🔍 Identificando alunos automaticamente...
+                      </div>
+                      <div style={{ fontSize: "0.65rem", color: "var(--gab-text-muted)", marginTop: 1 }}>
+                        Lendo QR Code de {qrAutoProgress.total} gabarito(s) — aguarde, pode levar alguns segundos
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div style={{
+                      width: 22, height: 22, borderRadius: "50%", flexShrink: 0,
+                      background: qrAutoProgress.erros > 0
+                        ? "rgba(245,158,11,0.15)"
+                        : "rgba(16,185,129,0.15)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: "0.7rem",
+                    }}>
+                      {qrAutoProgress.erros > 0 ? "⚠️" : "✅"}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{
+                        fontSize: "0.75rem", fontWeight: 700,
+                        color: qrAutoProgress.erros > 0
+                          ? "var(--gab-amber-light, #f59e0b)"
+                          : "var(--gab-green-light, #10b981)",
+                      }}>
+                        {qrAutoProgress.identificados} aluno(s) identificado(s)
+                        {qrAutoProgress.erros > 0 && ` · ${qrAutoProgress.erros} não identificado(s)`}
+                      </div>
+                      <div style={{ fontSize: "0.62rem", color: "var(--gab-text-muted)", marginTop: 1 }}>
+                        Processamento QR concluído — lista atualizada automaticamente
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
             {/* Lista de alunos */}
             <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "8px 12px" }}>
               {modalAlunosLoading ? (
                 <div style={{ textAlign: "center", padding: 40 }}>
                   <div className="gab-spinner" style={{ margin: "0 auto 12px" }} />
-                  <div style={{ color: "var(--gab-text-muted)", fontSize: "0.82rem" }}>Carregando alunos...</div>
+                  <div style={{ color: "var(--gab-text-muted)", fontSize: "0.82rem" }}>Carregando gabaritos...</div>
+                  <div style={{ color: "var(--gab-text-muted)", fontSize: "0.68rem", marginTop: 4 }}>Os alunos serão identificados automaticamente via QR Code</div>
                 </div>
               ) : modalAlunosData.length === 0 ? (
                 <div style={{ textAlign: "center", padding: 40, color: "var(--gab-text-muted)", fontSize: "0.85rem" }}>
@@ -1643,6 +1930,7 @@ export default function GabaritoCorrigirLote() {
                 </div>
               ) : (
                 modalAlunosData.map((arq, idx) => {
+                  const naoIdentificado = pareceNomeArquivo(arq.nome_aluno);
                   const statusMap = {
                     corrigido: { label: "Corrigido", bg: "rgba(16,185,129,0.12)", color: "#34d399", border: "rgba(16,185,129,0.25)" },
                     identificado: { label: "Identificado", bg: "rgba(6,182,212,0.1)", color: "#22d3ee", border: "rgba(6,182,212,0.2)" },
@@ -1650,6 +1938,7 @@ export default function GabaritoCorrigirLote() {
                     erro: { label: "Erro", bg: "rgba(239,68,68,0.1)", color: "#f87171", border: "rgba(239,68,68,0.2)" },
                   };
                   const st = statusMap[arq.status] || statusMap.pendente;
+                  const isPreviewAtivo = previewArquivo?.id === arq.id;
 
                   return (
                     <div
@@ -1658,6 +1947,9 @@ export default function GabaritoCorrigirLote() {
                         display: "flex", alignItems: "center", gap: 14,
                         padding: "12px 16px", borderRadius: 12,
                         borderBottom: "1px solid rgba(255,255,255,0.03)",
+                        background: isPreviewAtivo ? "rgba(245,158,11,0.06)" : "transparent",
+                        border: isPreviewAtivo ? "1px solid rgba(245,158,11,0.2)" : "1px solid transparent",
+                        transition: "all 0.2s",
                       }}
                     >
                       {/* Número */}
@@ -1677,11 +1969,11 @@ export default function GabaritoCorrigirLote() {
                         <div
                           style={{
                             fontSize: "0.85rem", fontWeight: 700,
-                            color: pareceNomeArquivo(arq.nome_aluno) ? "var(--gab-amber-light, #f59e0b)" : "var(--gab-text-primary)",
+                            color: naoIdentificado ? "var(--gab-amber-light, #f59e0b)" : "var(--gab-text-primary)",
                             whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                           }}
                         >
-                          {pareceNomeArquivo(arq.nome_aluno) ? (
+                          {naoIdentificado ? (
                             <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
                               <span style={{
                                 fontSize: "0.6rem", padding: "1px 5px", borderRadius: 4,
@@ -1696,11 +1988,11 @@ export default function GabaritoCorrigirLote() {
                             arq.nome_aluno || arq.arquivo_nome || "Aluno não identificado"
                           )}
                         </div>
-                        {arq.codigo_aluno && !pareceNomeArquivo(arq.nome_aluno) ? (
+                        {arq.codigo_aluno && !naoIdentificado ? (
                           <div style={{ fontSize: "0.7rem", color: "var(--gab-text-muted)", marginTop: 1 }}>
                             RE: {arq.codigo_aluno}
                           </div>
-                        ) : pareceNomeArquivo(arq.nome_aluno) ? (
+                        ) : naoIdentificado ? (
                           <div
                             onClick={(e) => { e.stopPropagation(); abrirVinculoAluno(arq); }}
                             style={{
@@ -1716,27 +2008,181 @@ export default function GabaritoCorrigirLote() {
 
                       {/* Nota (se corrigido) */}
                       {arq.status === "corrigido" && arq.nota != null && (
-                        <div style={{
-                          fontSize: "0.82rem", fontWeight: 800, color: "#34d399",
-                          marginRight: 4,
-                        }}>
-                          {Number(arq.nota).toFixed(1)}
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginRight: 4 }}>
+                          <div style={{ fontSize: "0.82rem", fontWeight: 800, color: "#34d399" }}>
+                            {Number(arq.nota).toFixed(1)}
+                          </div>
+                          {/* Botão revisar ajustes (coordenador) — só aparece se há ajustes */}
+                          {Number(arq.ajustes_pendentes) > 0 && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); abrirRevisaoAjustes(arq); }}
+                            title={`${arq.ajustes_pendentes} ajuste(s) pendente(s)`}
+                            style={{
+                              padding: "2px 6px", borderRadius: 6, fontSize: "0.58rem", fontWeight: 700,
+                              background: ajustesReviewArquivo?.id === arq.id
+                                ? "linear-gradient(135deg, #f59e0b, #d97706)"
+                                : "rgba(245,158,11,0.12)",
+                              color: ajustesReviewArquivo?.id === arq.id ? "#fff" : "#fbbf24",
+                              border: `1px solid ${ajustesReviewArquivo?.id === arq.id ? "transparent" : "rgba(245,158,11,0.25)"}`,
+                              cursor: "pointer", transition: "all 0.2s",
+                              display: "flex", alignItems: "center", gap: 2,
+                            }}
+                          >
+                            ✏️
+                          </button>
+                          )}
                         </div>
                       )}
 
-                      {/* Badge de status */}
-                      <span style={{
-                        padding: "3px 10px", borderRadius: 8, fontSize: "0.65rem", fontWeight: 700,
-                        background: st.bg, color: st.color, border: `1px solid ${st.border}`,
-                        whiteSpace: "nowrap", flexShrink: 0,
-                      }}>
-                        {st.label}
-                      </span>
+                      {/* Badge: Visualizar (para não identificados) ou status normal */}
+                      {naoIdentificado && (arq.status === "identificado" || arq.status === "pendente" || arq.status === "erro") ? (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); abrirPreviewVinculo(arq); }}
+                          style={{
+                            padding: "4px 12px", borderRadius: 8, fontSize: "0.65rem", fontWeight: 700,
+                            background: isPreviewAtivo
+                              ? "linear-gradient(135deg, #f59e0b, #d97706)"
+                              : "rgba(245,158,11,0.12)",
+                            color: isPreviewAtivo ? "#fff" : "#fbbf24",
+                            border: `1px solid ${isPreviewAtivo ? "transparent" : "rgba(245,158,11,0.25)"}`,
+                            whiteSpace: "nowrap", flexShrink: 0,
+                            cursor: "pointer", transition: "all 0.2s",
+                            fontFamily: "var(--gab-font-body)",
+                            display: "flex", alignItems: "center", gap: 4,
+                            boxShadow: isPreviewAtivo ? "0 2px 8px rgba(245,158,11,0.3)" : "none",
+                          }}
+                        >
+                          👁 Visualizar
+                        </button>
+                      ) : (
+                        <span style={{
+                          padding: "3px 10px", borderRadius: 8, fontSize: "0.65rem", fontWeight: 700,
+                          background: st.bg, color: st.color, border: `1px solid ${st.border}`,
+                          whiteSpace: "nowrap", flexShrink: 0,
+                        }}>
+                          {st.label}
+                        </span>
+                      )}
                     </div>
                   );
                 })
               )}
             </div>
+
+            {/* ═══ Painel inline: Preview da Imagem + Vincular Aluno ═══ */}
+            {previewArquivo && (
+              <div style={{
+                borderTop: "1px solid rgba(245,158,11,0.25)",
+                background: "linear-gradient(145deg, rgba(15,19,33,0.98), rgba(26,31,46,0.98))",
+                padding: 0,
+              }}>
+                {/* Header do preview */}
+                <div style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: "12px 18px",
+                  background: "linear-gradient(135deg, rgba(245,158,11,0.08), rgba(6,182,212,0.04))",
+                  borderBottom: "1px solid rgba(245,158,11,0.12)",
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{
+                      width: 32, height: 32, borderRadius: 8,
+                      background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.2)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: "0.85rem",
+                    }}>📄</div>
+                    <div>
+                      <div style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--gab-amber-light, #f59e0b)" }}>
+                        Gabarito Escaneado
+                      </div>
+                      <div style={{ fontSize: "0.62rem", color: "var(--gab-text-muted)", marginTop: 1 }}>
+                        {previewArquivo.arquivo_nome} — clique na imagem para ampliar
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    {previewImgUrl && (
+                      <button
+                        onClick={() => setPreviewFullscreen(true)}
+                        title="Ampliar imagem"
+                        style={{
+                          width: 30, height: 30, borderRadius: 7,
+                          background: "rgba(6,182,212,0.08)", border: "1px solid rgba(6,182,212,0.15)",
+                          color: "var(--gab-cyan-light)", cursor: "pointer",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: "0.75rem", transition: "all 0.2s",
+                        }}
+                      >🔍</button>
+                    )}
+                    <button
+                      onClick={() => { if (previewImgUrl) URL.revokeObjectURL(previewImgUrl); setPreviewArquivo(null); setPreviewImgUrl(null); }}
+                      style={{
+                        width: 30, height: 30, borderRadius: 7,
+                        background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.15)",
+                        color: "#f87171", cursor: "pointer",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: "0.8rem", fontWeight: 700, transition: "all 0.2s",
+                      }}
+                    >✕</button>
+                  </div>
+                </div>
+
+                {/* Imagem do gabarito */}
+                <div style={{ padding: "10px 18px" }}>
+                  {previewLoading ? (
+                    <div style={{
+                      textAlign: "center", padding: "30px 0",
+                      background: "rgba(0,0,0,0.15)", borderRadius: 10,
+                    }}>
+                      <div className="gab-spinner" style={{ margin: "0 auto 8px", width: 24, height: 24 }} />
+                      <div style={{ fontSize: "0.72rem", color: "var(--gab-text-muted)" }}>Carregando gabarito escaneado...</div>
+                    </div>
+                  ) : previewImgUrl ? (
+                    <div
+                      onClick={() => setPreviewFullscreen(true)}
+                      style={{
+                        borderRadius: 10, overflow: "hidden",
+                        border: "1px solid rgba(245,158,11,0.15)",
+                        cursor: "pointer", position: "relative",
+                        maxHeight: 220,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        background: "rgba(0,0,0,0.2)",
+                        transition: "all 0.25s",
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(245,158,11,0.4)"; e.currentTarget.style.boxShadow = "0 4px 20px rgba(245,158,11,0.1)"; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(245,158,11,0.15)"; e.currentTarget.style.boxShadow = "none"; }}
+                    >
+                      <img
+                        src={previewImgUrl}
+                        alt="Gabarito escaneado"
+                        style={{ width: "100%", objectFit: "contain", display: "block", maxHeight: 220 }}
+                        draggable={false}
+                      />
+                      <div style={{
+                        position: "absolute", inset: 0, borderRadius: 10,
+                        background: "linear-gradient(180deg, transparent 60%, rgba(0,0,0,0.5) 100%)",
+                        display: "flex", alignItems: "flex-end", justifyContent: "center",
+                        paddingBottom: 8, pointerEvents: "none",
+                      }}>
+                        <span style={{
+                          fontSize: "0.6rem", fontWeight: 700, color: "rgba(255,255,255,0.8)",
+                          background: "rgba(0,0,0,0.4)", padding: "3px 10px", borderRadius: 16,
+                          backdropFilter: "blur(4px)",
+                        }}>🔍 Clique para ampliar</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{
+                      textAlign: "center", padding: "20px 0",
+                      background: "rgba(239,68,68,0.04)", borderRadius: 10,
+                      border: "1px solid rgba(239,68,68,0.1)",
+                    }}>
+                      <div style={{ fontSize: "0.78rem", color: "#f87171" }}>Erro ao carregar imagem</div>
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            )}
 
             {/* ═══ Painel inline: Vincular Aluno ═══ */}
             {vinculoArquivo && (
@@ -1851,13 +2297,165 @@ export default function GabaritoCorrigirLote() {
               </div>
             )}
 
+            {/* ═══ Painel inline: Revisão de Ajustes Manuais (Coordenador) ═══ */}
+            {ajustesReviewArquivo && (
+              <div style={{
+                borderTop: "1px solid rgba(245,158,11,0.2)",
+                background: "linear-gradient(135deg, rgba(245,158,11,0.03), rgba(139,92,246,0.02))",
+                padding: "14px 16px 12px",
+              }}>
+                {/* Header */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: "0.9rem" }}>✏️</span>
+                    <div>
+                      <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--gab-text-primary)" }}>
+                        Ajustes Manuais — {ajustesReviewArquivo.nome_aluno || ajustesReviewArquivo.arquivo_nome}
+                      </div>
+                      <div style={{ fontSize: "0.6rem", color: "var(--gab-text-muted)", marginTop: 1 }}>
+                        Sugestões do professor · Aprove ou rejeite cada ajuste
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    <button
+                      onClick={() => abrirPreviewVinculo(ajustesReviewArquivo)}
+                      title="Ver imagem do gabarito"
+                      style={{
+                        padding: "4px 10px", borderRadius: 6, fontSize: "0.62rem", fontWeight: 700,
+                        background: previewArquivo?.id === ajustesReviewArquivo?.id
+                          ? "linear-gradient(135deg, #06b6d4, #0891b2)"
+                          : "rgba(6,182,212,0.08)",
+                        color: previewArquivo?.id === ajustesReviewArquivo?.id ? "#fff" : "#22d3ee",
+                        border: `1px solid ${previewArquivo?.id === ajustesReviewArquivo?.id ? "transparent" : "rgba(6,182,212,0.2)"}`,
+                        cursor: "pointer", transition: "all 0.2s",
+                        display: "flex", alignItems: "center", gap: 4,
+                        fontFamily: "var(--gab-font-body)",
+                      }}
+                    >
+                      👁 Ver Gabarito
+                    </button>
+                    <button
+                      onClick={() => { setAjustesReviewArquivo(null); setAjustesList([]); }}
+                      style={{ background: "none", border: "none", color: "var(--gab-text-muted)", cursor: "pointer", padding: 4 }}
+                    >✕</button>
+                  </div>
+                </div>
+
+                {ajustesLoading ? (
+                  <div style={{ textAlign: "center", padding: "16px 0" }}>
+                    <div className="gab-spinner" />
+                  </div>
+                ) : ajustesList.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: "12px 0", fontSize: "0.75rem", color: "var(--gab-text-muted)" }}>
+                    Nenhum ajuste manual foi solicitado para este aluno.
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {ajustesList.map(aj => {
+                      const isPendente = aj.status === "pendente";
+                      const isAprovado = aj.status === "aprovado";
+                      const isRejeitado = aj.status === "rejeitado";
+                      return (
+                        <div key={aj.id} style={{
+                          padding: "10px 12px", borderRadius: 10,
+                          background: isAprovado ? "rgba(16,185,129,0.05)" : isRejeitado ? "rgba(239,68,68,0.05)" : "rgba(255,255,255,0.03)",
+                          border: `1px solid ${isAprovado ? "rgba(16,185,129,0.15)" : isRejeitado ? "rgba(239,68,68,0.15)" : "rgba(255,255,255,0.06)"}`,
+                        }}>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              <span style={{
+                                width: 28, height: 28, borderRadius: 7,
+                                background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)",
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                fontSize: "0.7rem", fontWeight: 800, color: "var(--gab-amber-light)",
+                              }}>
+                                Q{String(aj.questao_numero).padStart(2, "0")}
+                              </span>
+                              <div>
+                                <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--gab-text-primary)" }}>
+                                  Professor sugere: <span style={{
+                                    color: aj.tipo_ajuste === "acerto" ? "#34d399" : "#f87171",
+                                    fontWeight: 800,
+                                  }}>
+                                    {aj.tipo_ajuste === "acerto" ? "✓ ACERTO" : "✗ ERRO"}
+                                  </span>
+                                </div>
+                                {aj.professor_nome && (
+                                  <div style={{ fontSize: "0.6rem", color: "var(--gab-text-muted)", marginTop: 1 }}>
+                                    por {aj.professor_nome}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            {/* Status */}
+                            {!isPendente && (
+                              <span style={{
+                                padding: "2px 8px", borderRadius: 6, fontSize: "0.58rem", fontWeight: 700,
+                                background: isAprovado ? "rgba(16,185,129,0.1)" : "rgba(239,68,68,0.1)",
+                                color: isAprovado ? "#34d399" : "#f87171",
+                                border: `1px solid ${isAprovado ? "rgba(16,185,129,0.2)" : "rgba(239,68,68,0.2)"}`,
+                              }}>
+                                {isAprovado ? "APROVADO" : "REJEITADO"}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Justificativa */}
+                          {aj.justificativa && (
+                            <div style={{
+                              padding: "6px 10px", borderRadius: 6,
+                              background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)",
+                              fontSize: "0.68rem", color: "var(--gab-text-secondary)",
+                              marginBottom: 8, fontStyle: "italic",
+                            }}>
+                              "{aj.justificativa}"
+                            </div>
+                          )}
+
+                          {/* Ações (apenas se pendente) */}
+                          {isPendente && (
+                            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                              <button
+                                onClick={() => decidirAjuste(aj.id, "rejeitado")}
+                                disabled={decidindoAjusteId === aj.id}
+                                style={{
+                                  padding: "6px 14px", borderRadius: 8, fontSize: "0.7rem", fontWeight: 700,
+                                  background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.15)",
+                                  color: "#f87171", cursor: "pointer", transition: "all 0.2s",
+                                }}
+                              >
+                                ✗ Rejeitar
+                              </button>
+                              <button
+                                onClick={() => decidirAjuste(aj.id, "aprovado")}
+                                disabled={decidindoAjusteId === aj.id}
+                                style={{
+                                  padding: "6px 14px", borderRadius: 8, fontSize: "0.7rem", fontWeight: 700,
+                                  background: "linear-gradient(135deg, rgba(16,185,129,0.15), rgba(16,185,129,0.08))",
+                                  border: "1px solid rgba(16,185,129,0.2)",
+                                  color: "#34d399", cursor: "pointer", transition: "all 0.2s",
+                                }}
+                              >
+                                ✓ Aprovar
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Footer */}
             <div style={{
               padding: "12px 28px 16px", borderTop: "1px solid rgba(255,255,255,0.04)",
               display: "flex", justifyContent: "center",
             }}>
               <button
-                onClick={() => setModalAlunosLote(null)}
+                onClick={fecharModalAlunos}
                 style={{
                   padding: "10px 32px", borderRadius: 10, fontSize: "0.85rem", fontWeight: 700,
                   background: "rgba(255,255,255,0.06)", color: "var(--gab-text-primary)",
@@ -1867,6 +2465,60 @@ export default function GabaritoCorrigirLote() {
               >
                 Fechar
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ Fullscreen: Imagem do Gabarito ampliada ═══ */}
+      {previewFullscreen && previewImgUrl && (
+        <div
+          onClick={() => setPreviewFullscreen(false)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 10001,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            background: "rgba(0,0,0,0.92)", backdropFilter: "blur(12px)",
+            animation: "gab-fade-in 0.2s ease-out",
+            cursor: "zoom-out",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: "relative",
+              maxWidth: "95vw", maxHeight: "95vh",
+              animation: "gab-slide-up 0.3s ease-out",
+            }}
+          >
+            <img
+              src={previewImgUrl}
+              alt="Gabarito ampliado"
+              style={{
+                maxWidth: "95vw", maxHeight: "90vh",
+                objectFit: "contain", borderRadius: 12,
+                boxShadow: "0 24px 80px rgba(0,0,0,0.6)",
+              }}
+              draggable={false}
+            />
+            {/* Header com nome do arquivo */}
+            <div style={{
+              position: "absolute", top: -40, left: 0, right: 0,
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "0 4px",
+            }}>
+              <div style={{ fontSize: "0.8rem", fontWeight: 700, color: "rgba(255,255,255,0.7)" }}>
+                📄 {previewArquivo?.arquivo_nome}
+              </div>
+              <button
+                onClick={() => setPreviewFullscreen(false)}
+                style={{
+                  width: 32, height: 32, borderRadius: 8,
+                  background: "rgba(239,68,68,0.2)", border: "1px solid rgba(239,68,68,0.3)",
+                  color: "#f87171", cursor: "pointer", fontSize: "0.9rem", fontWeight: 700,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  transition: "all 0.2s",
+                }}
+              >✕</button>
             </div>
           </div>
         </div>

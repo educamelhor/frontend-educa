@@ -253,12 +253,15 @@ export default function GabaritoCorrigir() {
 
       // 3. Comparar com gabarito oficial
       const gabOficial = avaliacaoAtiva.gabarito;
-      const resultado = respostas.map((resp, idx) => ({
-        numero: idx + 1,
-        resposta: resp,
-        correto: gabOficial[idx] || "",
-        acertou: resp === gabOficial[idx],
-      }));
+      const resultado = respostas.map((resp, idx) => {
+        const isNulo = resp === "N";
+        return {
+          numero: idx + 1,
+          resposta: resp,
+          correto: gabOficial[idx] || "",
+          acertou: !isNulo && resp === gabOficial[idx],
+        };
+      });
 
       const acertos = resultado.filter((q) => q.acertou).length;
       const totalQuestoes = gabOficial.length;
@@ -741,7 +744,12 @@ export default function GabaritoCorrigir() {
                       <tr>
                         <td className="row-label">Aluno</td>
                         {correcao.resultado.map((q) => (
-                          <td key={q.numero}>
+                          <td key={q.numero} style={{
+                            color: q.resposta === "N" ? "var(--gab-amber-light, #f59e0b)" : "inherit",
+                            fontWeight: q.resposta === "N" ? 700 : 400,
+                          }}
+                            title={q.resposta === "N" ? "Nulo — múltiplas marcações" : ""}
+                          >
                             {q.resposta || (
                               <span style={{ color: "var(--gab-text-muted)", fontStyle: "italic", fontSize: "0.75rem" }}>—</span>
                             )}
@@ -754,6 +762,8 @@ export default function GabaritoCorrigir() {
                           <td key={q.numero}>
                             {q.acertou ? (
                               <span className="gab-acerto">✓</span>
+                            ) : q.resposta === "N" ? (
+                              <span style={{ color: "var(--gab-amber-light, #f59e0b)", fontWeight: 700, fontSize: "1rem" }} title="Nulo — múltiplas marcações">⊘</span>
                             ) : (
                               <span className="gab-erro">✗</span>
                             )}
@@ -776,38 +786,49 @@ export default function GabaritoCorrigir() {
                   <div className="gab-card-title">Respostas Extraídas (OCR)</div>
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))", gap: 8 }}>
-                  {respostasAluno.map((resp, idx) => (
-                    <div
-                      key={idx}
-                      style={{
-                        padding: "8px",
-                        borderRadius: "8px",
-                        background: correcao.resultado[idx]?.acertou
-                          ? "rgba(16, 185, 129, 0.08)"
-                          : "rgba(239, 68, 68, 0.08)",
-                        border: `1px solid ${correcao.resultado[idx]?.acertou
-                          ? "rgba(16, 185, 129, 0.2)"
-                          : "rgba(239, 68, 68, 0.2)"
-                        }`,
-                        textAlign: "center",
-                        fontSize: "0.8rem",
-                        fontWeight: 600,
-                      }}
-                    >
-                      <span style={{ color: "var(--gab-text-muted)", fontSize: "0.65rem", display: "block" }}>
-                        {String(idx + 1).padStart(2, "0")}
-                      </span>
-                      <span style={{
-                        color: correcao.resultado[idx]?.acertou
-                          ? "var(--gab-green-light)"
-                          : "var(--gab-red-light)",
-                        fontFamily: "var(--gab-font-display)",
-                        fontSize: "1rem",
-                      }}>
-                        {resp || "—"}
-                      </span>
-                    </div>
-                  ))}
+                  {respostasAluno.map((resp, idx) => {
+                    const isNulo = resp === "N";
+                    const acertou = correcao.resultado[idx]?.acertou;
+                    return (
+                      <div
+                        key={idx}
+                        style={{
+                          padding: "8px",
+                          borderRadius: "8px",
+                          background: isNulo
+                            ? "rgba(245, 158, 11, 0.08)"
+                            : acertou
+                              ? "rgba(16, 185, 129, 0.08)"
+                              : "rgba(239, 68, 68, 0.08)",
+                          border: `1px solid ${isNulo
+                            ? "rgba(245, 158, 11, 0.2)"
+                            : acertou
+                              ? "rgba(16, 185, 129, 0.2)"
+                              : "rgba(239, 68, 68, 0.2)"
+                          }`,
+                          textAlign: "center",
+                          fontSize: "0.8rem",
+                          fontWeight: 600,
+                        }}
+                        title={isNulo ? "Nulo — múltiplas marcações" : ""}
+                      >
+                        <span style={{ color: "var(--gab-text-muted)", fontSize: "0.65rem", display: "block" }}>
+                          {String(idx + 1).padStart(2, "0")}
+                        </span>
+                        <span style={{
+                          color: isNulo
+                            ? "var(--gab-amber-light, #f59e0b)"
+                            : acertou
+                              ? "var(--gab-green-light)"
+                              : "var(--gab-red-light)",
+                          fontFamily: "var(--gab-font-display)",
+                          fontSize: "1rem",
+                        }}>
+                          {resp || "—"}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </>

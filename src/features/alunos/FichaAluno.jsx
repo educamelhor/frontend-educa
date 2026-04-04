@@ -6,6 +6,7 @@ import { Button } from "../../components/ui/Button";
 import * as faceapi from "face-api.js";
 import { AcademicCapIcon } from "@heroicons/react/24/solid";
 import ModalRelatorioDisciplinar from "./ModalRelatorioDisciplinar";
+import ModalRelatorioPedagogico from "./ModalRelatorioPedagogico";
 
 /* =========================================================
    FICHA DO ESTUDANTE
@@ -29,6 +30,7 @@ export default function FichaAluno({ codigo: codigoProp }) {
   const [uploading, setUploading] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const [modalRelatorioOpen, setModalRelatorioOpen] = useState(false);
+  const [modalPedagogicoOpen, setModalPedagogicoOpen] = useState(false);
 
   // 🔐 trava anti-reentrada de upload
   const isUploadingRef = useRef(false);
@@ -392,9 +394,14 @@ export default function FichaAluno({ codigo: codigoProp }) {
 
         {/* Seções futuras */}
         <div className="grid grid-cols-2 gap-4">
-          <div className="bg-blue-50 p-4 rounded shadow">
-            <h2 className="text-lg font-semibold mb-2">Relatório Pedagógico</h2>
-            <p className="text-gray-600">Nenhum relatório disponível.</p>
+          <div
+            className="bg-emerald-50 p-4 rounded shadow cursor-pointer hover:bg-emerald-100 transition border border-transparent hover:border-emerald-200"
+            onClick={() => setModalPedagogicoOpen(true)}
+            role="button"
+            tabIndex={0}
+          >
+            <h2 className="text-lg font-semibold mb-2 text-emerald-900">Relatório Pedagógico</h2>
+            <p className="text-gray-600">Clique para visualizar o histórico pedagógico.</p>
           </div>
           <div
             className="bg-blue-50 p-4 rounded shadow cursor-pointer hover:bg-blue-100 transition border border-transparent hover:border-blue-200"
@@ -411,6 +418,12 @@ export default function FichaAluno({ codigo: codigoProp }) {
         <ModalRelatorioDisciplinar
           open={modalRelatorioOpen}
           onClose={() => setModalRelatorioOpen(false)}
+          aluno={aluno}
+        />
+
+        <ModalRelatorioPedagogico
+          open={modalPedagogicoOpen}
+          onClose={() => setModalPedagogicoOpen(false)}
           aluno={aluno}
         />
       </div>

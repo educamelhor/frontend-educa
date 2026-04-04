@@ -205,7 +205,7 @@ export default function ModalExcluirOuInativar({
                   {professor.nome}
                 </p>
                 <p style={{ color: "#6b7280", fontSize: 13, margin: "3px 0 0" }}>
-                  CPF: {professor.cpf}
+                  CPF: {(() => { const d = String(professor.cpf || "").replace(/\D/g, "").padStart(11, "0"); return d.length === 11 ? d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4") : professor.cpf; })()}
                 </p>
                 <p style={{ color: "#6b7280", fontSize: 12, margin: "2px 0 0" }}>
                   {professor.turno ? professor.turno.toUpperCase() : "—"}

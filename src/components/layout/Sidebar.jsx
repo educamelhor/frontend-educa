@@ -118,7 +118,7 @@ export default function Sidebar() {
     if (p.startsWith('/secretaria')) {
       setOpenGroup('secretaria');
     }
-    else if (p.startsWith('/disciplinar')) setOpenGroup('disciplinar');
+    else if (p.startsWith('/disciplinar') && !/^\/(disciplinar\/(regimentos|manual|suporte))/.test(p)) setOpenGroup('disciplinar');
     else if (p.startsWith('/pedagogico')) {
       setOpenGroup('pedagogico');
       // Auto-abrir submenu Correções se estiver em rota de correções
@@ -670,34 +670,10 @@ export default function Sidebar() {
                 )}
                 <li>
                   <Link
-                    to="/disciplinar/regimentos"
-                    className={getSubmenuLinkClasses('/disciplinar/regimentos')}
-                  >
-                    <DocumentTextIcon className="h-5 w-5 mr-2" /> Regimentos
-                  </Link>
-                </li>
-                <li>
-                  <Link
                     to="/disciplinar/metadados"
                     className={getSubmenuLinkClasses('/disciplinar/metadados')}
                   >
                     <TableCellsIcon className="h-5 w-5 mr-2" /> Metadados
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    to="/disciplinar/manual"
-                    className={getSubmenuLinkClasses('/disciplinar/manual')}
-                  >
-                    <BookOpenIcon className="h-5 w-5 mr-2" /> Manual
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    to="/disciplinar/suporte"
-                    className={getSubmenuLinkClasses('/disciplinar/suporte')}
-                  >
-                    <QuestionMarkCircleIcon className="h-5 w-5 mr-2" /> Suporte
                   </Link>
                 </li>
               </ul>
@@ -760,40 +736,46 @@ export default function Sidebar() {
                 )}
                 <li>
                   <Link
-                    to="/disciplinar/regimentos"
-                    className={getSubmenuLinkClasses('/disciplinar/regimentos')}
-                  >
-                    <DocumentTextIcon className="h-5 w-5 mr-2" /> Regimentos
-                  </Link>
-                </li>
-                <li>
-                  <Link
                     to="/disciplinar/metadados"
                     className={getSubmenuLinkClasses('/disciplinar/metadados')}
                   >
                     <TableCellsIcon className="h-5 w-5 mr-2" /> Metadados
                   </Link>
                 </li>
-                <li>
-                  <Link
-                    to="/disciplinar/manual"
-                    className={getSubmenuLinkClasses('/disciplinar/manual')}
-                  >
-                    <BookOpenIcon className="h-5 w-5 mr-2" /> Manual
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    to="/disciplinar/suporte"
-                    className={getSubmenuLinkClasses('/disciplinar/suporte')}
-                  >
-                    <QuestionMarkCircleIcon className="h-5 w-5 mr-2" /> Suporte
-                  </Link>
-                </li>
               </ul>
             )}
             </>
             )}
+          </>
+        )}
+
+        {/* ───────────────────────────────
+            MENUS INDEPENDENTES: Regimentos, Manual, Suporte
+            (Acessíveis a qualquer usuário logado)
+        ─────────────────────────────── */}
+        {isScopeEscola && (
+          <>
+            <Link
+              to="/disciplinar/regimentos"
+              className={getMainLinkClasses('/disciplinar/regimentos')}
+              style={{ marginTop: 8 }}
+            >
+              <DocumentTextIcon className="h-5 w-5 mr-2" /> Regimentos
+            </Link>
+
+            <Link
+              to="/disciplinar/manual"
+              className={getMainLinkClasses('/disciplinar/manual')}
+            >
+              <BookOpenIcon className="h-5 w-5 mr-2" /> Manual
+            </Link>
+
+            <Link
+              to="/disciplinar/suporte"
+              className={getMainLinkClasses('/disciplinar/suporte')}
+            >
+              <QuestionMarkCircleIcon className="h-5 w-5 mr-2" /> Suporte
+            </Link>
           </>
         )}
 

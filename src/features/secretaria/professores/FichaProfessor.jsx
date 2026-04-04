@@ -97,7 +97,7 @@ export default function FichaProfessor() {
               <strong>Nome:</strong> {professor.nome}
             </p>
             <p>
-              <strong>CPF:</strong> {professor.cpf}
+              <strong>CPF:</strong> {(() => { const d = String(professor.cpf || "").replace(/\D/g, "").padStart(11, "0"); return d.length === 11 ? d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4") : professor.cpf; })()}
             </p>
             <p>
               <strong>Data de Nascimento:</strong> {professor.data_nascimento}

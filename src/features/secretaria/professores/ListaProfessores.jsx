@@ -13,6 +13,13 @@ import Modal from '../../../components/ui/Modal';
 import ProfessorForm from '../professores/ProfessorForm';
 import { PencilSquareIcon } from "@heroicons/react/24/solid";
 
+// Util: formata CPF 000.000.000-00
+function formatarCPF(cpf = "") {
+  const d = String(cpf).replace(/\D/g, "").padStart(11, "0");
+  if (d.length !== 11) return cpf;
+  return d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+}
+
 // ─────────────────────────────────────────────────────────────
 export default function ListaProfessores() {
   // Estados principais
@@ -199,7 +206,7 @@ export default function ListaProfessores() {
                     const discLabel = getDiscLabel(p);
                     return (
                       <tr key={p.id} className="hover:bg-blue-50">
-                        <td className="p-2 border text-center">{p.cpf}</td>
+                        <td className="p-2 border text-center">{formatarCPF(p.cpf)}</td>
                         <td className="p-2 border uppercase">{p.nome}</td>
                         <td className="p-2 border text-center">
                           {p.data_nascimento
@@ -368,7 +375,7 @@ export default function ListaProfessores() {
                       {toDelete.nome}
                     </p>
                     <p style={{ color: '#6b7280', fontSize: 13, margin: '2px 0 0' }}>
-                      CPF: {toDelete.cpf}
+                      CPF: {formatarCPF(toDelete.cpf)}
                       {toDelete.turno ? ` · ${toDelete.turno.toUpperCase()}` : ''}
                       {getDiscLabel(toDelete) !== '—' ? ` · ${getDiscLabel(toDelete)}` : ''}
                     </p>

@@ -586,7 +586,7 @@ const UPLOADS_CDN = (() => {
                 <div>
                   <h3 className="text-lg font-bold text-gray-900">Foto do perfil</h3>
                   <p className="text-sm text-gray-600">
-                    {userName} {cpf ? <span className="text-gray-400">• CPF {cpf}</span> : null}
+                    {userName} {cpf ? <span className="text-gray-400">• CPF {String(cpf).replace(/\D/g, "").replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")}</span> : null}
                   </p>
                 </div>
               </div>

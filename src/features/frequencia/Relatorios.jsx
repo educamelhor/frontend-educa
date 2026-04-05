@@ -9,7 +9,10 @@ import api from "../../services/api";
 
 export default function Relatorios() {
   const escolaId = localStorage.getItem("escola_id");
+  const [turnos, setTurnos] = useState([]);
+  const [turno, setTurno] = useState("");
   const [turmas, setTurmas] = useState([]);
+  const [turmasFiltradas, setTurmasFiltradas] = useState([]);
   const [turmaId, setTurmaId] = useState("");
   const [periodo, setPeriodo] = useState("bimestre_atual");
   const [dados, setDados] = useState([]);
@@ -17,18 +20,33 @@ export default function Relatorios() {
   const [gerado, setGerado] = useState(false);
 
   useEffect(() => {
+    api.get("/turnos")
+      .then(r => setTurnos(Array.isArray(r.data) ? r.data : []))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
     if (!escolaId) return;
-    api.get("/api/turmas", { params: { escola_id: escolaId } })
-      .then(r => setTurmas(r.data || []))
+    api.get("/turmas")
+      .then(r => { setTurmas(r.data || []); setTurmasFiltradas(r.data || []); })
       .catch(() => {});
   }, [escolaId]);
+
+  useEffect(() => {
+    if (turno) {
+      setTurmasFiltradas(turmas.filter(t => (t.turno || "").toLowerCase() === turno.toLowerCase()));
+    } else {
+      setTurmasFiltradas(turmas);
+    }
+    setTurmaId("");
+  }, [turno, turmas]);
 
   const gerarRelatorio = async () => {
     setLoading(true);
     try {
       const params = { escola_id: escolaId, periodo };
       if (turmaId) params.turma_id = turmaId;
-      const r = await api.get("/api/frequencia/relatorios/faltosos", { params });
+      const r = await api.get("/frequencia/relatorios/faltosos", { params });
       setDados(r.data || []);
       setGerado(true);
     } catch {
@@ -83,13 +101,24 @@ export default function Relatorios() {
         display: "flex", flexWrap: "wrap", gap: 14, alignItems: "flex-end",
       }}>
         <div>
+          <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: 6, display: "block" }}>Turno</label>
+          <select
+            value={turno} onChange={e => setTurno(e.target.value)}
+            style={{ padding: "10px 14px", borderRadius: 10, border: "1.5px solid #d1d5db", background: "#f8fafc", fontSize: "0.88rem", fontWeight: 600, minWidth: 160 }}
+          >
+            <option value="">Todos os turnos</option>
+            {turnos.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+
+        <div>
           <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: 6, display: "block" }}>Turma</label>
           <select
             value={turmaId} onChange={e => setTurmaId(e.target.value)}
             style={{ padding: "10px 14px", borderRadius: 10, border: "1.5px solid #d1d5db", background: "#f8fafc", fontSize: "0.88rem", fontWeight: 600, minWidth: 200 }}
           >
-            <option value="">Todas as turmas</option>
-            {turmas.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
+            <option value="">Todas as turmas ({turmasFiltradas.length})</option>
+            {turmasFiltradas.map(t => <option key={t.id} value={t.id}>{t.turma || t.nome}</option>)}
           </select>
         </div>
 

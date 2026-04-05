@@ -10,7 +10,10 @@ import api from "../../services/api";
 
 export default function ConselhoTutelar() {
   const escolaId = localStorage.getItem("escola_id");
+  const [turnos, setTurnos] = useState([]);
+  const [turno, setTurno] = useState("");
   const [turmas, setTurmas] = useState([]);
+  const [turmasFiltradas, setTurmasFiltradas] = useState([]);
   const [turmaId, setTurmaId] = useState("");
   const [alunos, setAlunos] = useState([]);
   const [alunoId, setAlunoId] = useState("");
@@ -19,23 +22,38 @@ export default function ConselhoTutelar() {
   const [encaminhamentos, setEncaminhamentos] = useState([]);
 
   useEffect(() => {
+    api.get("/turnos")
+      .then(r => setTurnos(Array.isArray(r.data) ? r.data : []))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
     if (!escolaId) return;
-    api.get("/api/turmas", { params: { escola_id: escolaId } })
-      .then(r => setTurmas(r.data || []))
+    api.get("/turmas")
+      .then(r => { setTurmas(r.data || []); setTurmasFiltradas(r.data || []); })
       .catch(() => {});
   }, [escolaId]);
 
   useEffect(() => {
+    if (turno) {
+      setTurmasFiltradas(turmas.filter(t => (t.turno || "").toLowerCase() === turno.toLowerCase()));
+    } else {
+      setTurmasFiltradas(turmas);
+    }
+    setTurmaId(""); setAlunoId("");
+  }, [turno, turmas]);
+
+  useEffect(() => {
     if (!turmaId) { setAlunos([]); return; }
-    api.get("/api/alunos", { params: { turma_id: turmaId } })
-      .then(r => setAlunos(r.data || []))
-      .catch(() => {});
+    api.get(`/turmas/${turmaId}/alunos`)
+      .then(r => setAlunos(r.data?.alunos || r.data || []))
+      .catch(() => setAlunos([]));
   }, [turmaId]);
 
   // Carregar encaminhamentos existentes
   useEffect(() => {
     if (!escolaId) return;
-    api.get("/api/frequencia/conselho-tutelar/encaminhamentos", { params: { escola_id: escolaId } })
+    api.get("/frequencia/conselho-tutelar/encaminhamentos", { params: { escola_id: escolaId } })
       .then(r => setEncaminhamentos(r.data || []))
       .catch(() => setEncaminhamentos([]));
   }, [escolaId]);
@@ -44,7 +62,7 @@ export default function ConselhoTutelar() {
     if (!alunoId) return;
     setLoading(true);
     try {
-      const r = await api.get("/api/frequencia/conselho-tutelar/relatorio", {
+      const r = await api.get("/frequencia/conselho-tutelar/relatorio", {
         params: { escola_id: escolaId, aluno_id: alunoId },
       });
       setRelatorio(r.data || null);
@@ -58,14 +76,14 @@ export default function ConselhoTutelar() {
   const registrarEncaminhamento = async () => {
     if (!alunoId) return;
     try {
-      await api.post("/api/frequencia/conselho-tutelar/encaminhamentos", {
+      await api.post("/frequencia/conselho-tutelar/encaminhamentos", {
         escola_id: escolaId,
         aluno_id: alunoId,
         turma_id: turmaId,
       });
       alert("Encaminhamento registrado com sucesso!");
       // Reload
-      const r = await api.get("/api/frequencia/conselho-tutelar/encaminhamentos", { params: { escola_id: escolaId } });
+      const r = await api.get("/frequencia/conselho-tutelar/encaminhamentos", { params: { escola_id: escolaId } });
       setEncaminhamentos(r.data || []);
     } catch (err) {
       alert("Erro: " + (err.response?.data?.error || err.message));
@@ -112,11 +130,19 @@ export default function ConselhoTutelar() {
         </h3>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 14, alignItems: "flex-end" }}>
           <div>
+            <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: 6, display: "block" }}>Turno</label>
+            <select value={turno} onChange={e => { setTurno(e.target.value); setTurmaId(""); setAlunoId(""); setRelatorio(null); }}
+              style={{ padding: "10px 14px", borderRadius: 10, border: "1.5px solid #d1d5db", background: "#f8fafc", fontSize: "0.88rem", fontWeight: 600, minWidth: 160 }}>
+              <option value="">Todos os turnos</option>
+              {turnos.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+          <div>
             <label style={{ fontSize: "0.75rem", fontWeight: 700, color: "#374151", marginBottom: 6, display: "block" }}>Turma</label>
             <select value={turmaId} onChange={e => { setTurmaId(e.target.value); setAlunoId(""); setRelatorio(null); }}
               style={{ padding: "10px 14px", borderRadius: 10, border: "1.5px solid #d1d5db", background: "#f8fafc", fontSize: "0.88rem", fontWeight: 600, minWidth: 220 }}>
-              <option value="">Selecione a turma</option>
-              {turmas.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
+              <option value="">Selecione a turma ({turmasFiltradas.length})</option>
+              {turmasFiltradas.map(t => <option key={t.id} value={t.id}>{t.turma || t.nome}</option>)}
             </select>
           </div>
           <div>

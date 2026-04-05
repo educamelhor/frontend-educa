@@ -35,7 +35,10 @@ export default function Atestados() {
   const canRegister = ["diretor", "vice_diretor", "coordenador", "secretaria"].includes(perfil);
 
   // ── Estado ─────────────────────────────────
+  const [turnos, setTurnos] = useState([]);
+  const [turno, setTurno] = useState("");
   const [turmas, setTurmas] = useState([]);
+  const [turmasFiltradas, setTurmasFiltradas] = useState([]);
   const [turmaId, setTurmaId] = useState("");
   const [alunos, setAlunos] = useState([]);
   const [justificativas, setJustificativas] = useState([]);
@@ -54,20 +57,46 @@ export default function Atestados() {
     dias: 1,
   });
 
+  // ── Carregar turnos ────────────────────────
+  useEffect(() => {
+    api.get("/turnos")
+      .then(r => setTurnos(Array.isArray(r.data) ? r.data : []))
+      .catch(() => {});
+  }, []);
+
   // ── Carregar turmas ────────────────────────
   useEffect(() => {
     if (!escolaId) return;
-    api.get("/api/turmas", { params: { escola_id: escolaId } })
-      .then(r => setTurmas(r.data || []))
+    api.get("/turmas")
+      .then(r => {
+        const all = r.data || [];
+        setTurmas(all);
+        if (turno) {
+          setTurmasFiltradas(all.filter(t => (t.turno || "").toLowerCase() === turno.toLowerCase()));
+        } else {
+          setTurmasFiltradas(all);
+        }
+      })
       .catch(() => {});
   }, [escolaId]);
+
+  // ── Filtrar turmas por turno ───────────────
+  useEffect(() => {
+    if (turno) {
+      setTurmasFiltradas(turmas.filter(t => (t.turno || "").toLowerCase() === turno.toLowerCase()));
+    } else {
+      setTurmasFiltradas(turmas);
+    }
+    setTurmaId("");
+    setAlunos([]);
+  }, [turno, turmas]);
 
   // ── Carregar alunos da turma ───────────────
   useEffect(() => {
     if (!turmaId) { setAlunos([]); return; }
-    api.get("/api/alunos", { params: { turma_id: turmaId } })
-      .then(r => setAlunos(r.data || []))
-      .catch(() => {});
+    api.get(`/turmas/${turmaId}/alunos`)
+      .then(r => setAlunos(r.data?.alunos || r.data || []))
+      .catch(() => setAlunos([]));
   }, [turmaId]);
 
   // ── Carregar justificativas ────────────────
@@ -78,7 +107,7 @@ export default function Atestados() {
       const params = { escola_id: escolaId };
       if (turmaId) params.turma_id = turmaId;
       if (filtroTipo) params.tipo = filtroTipo;
-      const r = await api.get("/api/frequencia/justificativas", { params });
+      const r = await api.get("/frequencia/justificativas", { params });
       setJustificativas(r.data || []);
     } catch {
       setJustificativas([]);
@@ -94,7 +123,7 @@ export default function Atestados() {
     e.preventDefault();
     if (!form.aluno_id || !form.tipo || !form.data_inicio || !form.data_fim) return;
     try {
-      await api.post("/api/frequencia/justificativas", {
+      await api.post("/frequencia/justificativas", {
         ...form,
         escola_id: escolaId,
         turma_id: turmaId,
@@ -204,6 +233,21 @@ export default function Atestados() {
         display: "flex", flexWrap: "wrap", gap: 14, alignItems: "center",
       }}>
         <select
+          value={turno}
+          onChange={e => setTurno(e.target.value)}
+          style={{
+            padding: "10px 14px", borderRadius: 10, border: "1.5px solid #d1d5db",
+            background: "#f8fafc", fontSize: "0.88rem", fontWeight: 600, minWidth: 160,
+            cursor: "pointer", outline: "none",
+          }}
+        >
+          <option value="">Todos os turnos</option>
+          {turnos.map(t => (
+            <option key={t} value={t}>{t}</option>
+          ))}
+        </select>
+
+        <select
           value={turmaId}
           onChange={e => setTurmaId(e.target.value)}
           style={{
@@ -212,9 +256,9 @@ export default function Atestados() {
             cursor: "pointer", outline: "none",
           }}
         >
-          <option value="">Todas as turmas</option>
-          {turmas.map(t => (
-            <option key={t.id} value={t.id}>{t.nome}</option>
+          <option value="">Todas as turmas ({turmasFiltradas.length})</option>
+          {turmasFiltradas.map(t => (
+            <option key={t.id} value={t.id}>{t.turma || t.nome}</option>
           ))}
         </select>
 
@@ -427,7 +471,7 @@ export default function Atestados() {
                     }}
                   >
                     <option value="">Selecione...</option>
-                    {turmas.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
+                    {turmasFiltradas.map(t => <option key={t.id} value={t.id}>{t.turma || t.nome}</option>)}
                   </select>
                 </div>
                 <div>

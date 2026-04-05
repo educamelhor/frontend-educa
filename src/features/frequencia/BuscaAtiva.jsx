@@ -31,7 +31,10 @@ export default function BuscaAtiva() {
   const canRegister = ["diretor", "vice_diretor", "coordenador", "secretaria"].includes(perfil);
 
   const [registros, setRegistros] = useState([]);
+  const [turnos, setTurnos] = useState([]);
+  const [turno, setTurno] = useState("");
   const [turmas, setTurmas] = useState([]);
+  const [turmasFiltradas, setTurmasFiltradas] = useState([]);
   const [turmaId, setTurmaId] = useState("");
   const [alunos, setAlunos] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -41,17 +44,32 @@ export default function BuscaAtiva() {
   });
 
   useEffect(() => {
+    api.get("/turnos")
+      .then(r => setTurnos(Array.isArray(r.data) ? r.data : []))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
     if (!escolaId) return;
-    api.get("/api/turmas", { params: { escola_id: escolaId } })
-      .then(r => setTurmas(r.data || []))
+    api.get("/turmas")
+      .then(r => { setTurmas(r.data || []); setTurmasFiltradas(r.data || []); })
       .catch(() => {});
   }, [escolaId]);
 
   useEffect(() => {
+    if (turno) {
+      setTurmasFiltradas(turmas.filter(t => (t.turno || "").toLowerCase() === turno.toLowerCase()));
+    } else {
+      setTurmasFiltradas(turmas);
+    }
+    setTurmaId(""); setAlunos([]);
+  }, [turno, turmas]);
+
+  useEffect(() => {
     if (!turmaId) { setAlunos([]); return; }
-    api.get("/api/alunos", { params: { turma_id: turmaId } })
-      .then(r => setAlunos(r.data || []))
-      .catch(() => {});
+    api.get(`/turmas/${turmaId}/alunos`)
+      .then(r => setAlunos(r.data?.alunos || r.data || []))
+      .catch(() => setAlunos([]));
   }, [turmaId]);
 
   const carregarRegistros = useCallback(async () => {
@@ -60,7 +78,7 @@ export default function BuscaAtiva() {
     try {
       const params = { escola_id: escolaId };
       if (turmaId) params.turma_id = turmaId;
-      const r = await api.get("/api/frequencia/busca-ativa", { params });
+      const r = await api.get("/frequencia/busca-ativa", { params });
       setRegistros(r.data || []);
     } catch {
       setRegistros([]);
@@ -75,7 +93,7 @@ export default function BuscaAtiva() {
     e.preventDefault();
     if (!form.aluno_id || !form.meio_contato || !form.resultado) return;
     try {
-      await api.post("/api/frequencia/busca-ativa", {
+      await api.post("/frequencia/busca-ativa", {
         ...form,
         escola_id: escolaId,
         turma_id: turmaId,
@@ -158,11 +176,19 @@ export default function BuscaAtiva() {
         display: "flex", flexWrap: "wrap", gap: 14, alignItems: "center",
       }}>
         <select
+          value={turno} onChange={e => setTurno(e.target.value)}
+          style={{ padding: "10px 14px", borderRadius: 10, border: "1.5px solid #d1d5db", background: "#f8fafc", fontSize: "0.88rem", fontWeight: 600, minWidth: 160 }}
+        >
+          <option value="">Todos os turnos</option>
+          {turnos.map(t => <option key={t} value={t}>{t}</option>)}
+        </select>
+
+        <select
           value={turmaId} onChange={e => setTurmaId(e.target.value)}
           style={{ padding: "10px 14px", borderRadius: 10, border: "1.5px solid #d1d5db", background: "#f8fafc", fontSize: "0.88rem", fontWeight: 600, minWidth: 200 }}
         >
-          <option value="">Todas as turmas</option>
-          {turmas.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
+          <option value="">Todas as turmas ({turmasFiltradas.length})</option>
+          {turmasFiltradas.map(t => <option key={t.id} value={t.id}>{t.turma || t.nome}</option>)}
         </select>
 
         {canRegister && (
@@ -326,7 +352,7 @@ export default function BuscaAtiva() {
                     width: "100%", padding: "10px 14px", borderRadius: 10, border: "1.5px solid #d1d5db", background: "#f9fafb", fontSize: "0.88rem", fontWeight: 600,
                   }}>
                     <option value="">Selecione...</option>
-                    {turmas.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
+                    {turmasFiltradas.map(t => <option key={t.id} value={t.id}>{t.turma || t.nome}</option>)}
                   </select>
                 </div>
                 <div>

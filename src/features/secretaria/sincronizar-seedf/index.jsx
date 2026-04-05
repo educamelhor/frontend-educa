@@ -338,13 +338,14 @@ export default function SincronizarSEEDF() {
                       Última: {new Date(syncStatus.criado_em).toLocaleString("pt-BR", {
                         day: "2-digit", month: "2-digit", year: "numeric",
                         hour: "2-digit", minute: "2-digit",
+                        timeZone: "America/Sao_Paulo",
                       })}
                     </>
                   )}
                 </span>
               </div>
               {syncStatus.relatorio?.resumo && (
-                <div className="flex gap-4 text-sm">
+                <div className="flex flex-wrap gap-4 text-sm">
                   <span className="text-gray-500">
                     📥 <strong className="text-gray-800">{syncStatus.relatorio.resumo.pdfs_baixados}</strong> PDFs
                   </span>
@@ -357,6 +358,13 @@ export default function SincronizarSEEDF() {
                   <span className="text-orange-600">
                     ⏸ <strong>{syncStatus.relatorio.resumo.alunos_inativados || 0}</strong> inativados
                   </span>
+                  {typeof syncStatus.relatorio.resumo.turmas_vazias === "number" && (
+                    <span className={syncStatus.relatorio.resumo.turmas_vazias > 0 ? "text-red-600 font-semibold" : "text-emerald-600"}>
+                      {syncStatus.relatorio.resumo.turmas_vazias > 0
+                        ? `⚠ ${syncStatus.relatorio.resumo.turmas_vazias} turma(s) vazia(s)`
+                        : `✅ ${syncStatus.relatorio.resumo.turmas_ok || 0} turmas verificadas`}
+                    </span>
+                  )}
                 </div>
               )}
             </div>
@@ -410,24 +418,44 @@ export default function SincronizarSEEDF() {
             </div>
           )}
 
-          {/* Barra de progresso durante polling */}
-          {emAndamento && (
-            <div className="mt-4">
-              <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full animate-pulse"
-                  style={{
-                    background: "linear-gradient(90deg, #3b82f6, #8b5cf6)",
-                    width: "60%",
-                    transition: "width 1s ease",
-                  }}
-                />
+          {/* Barra de progresso real durante polling */}
+          {emAndamento && (() => {
+            const atual = syncStatus?.progresso_atual || 0;
+            const total = syncStatus?.progresso_total || 0;
+            const turma = syncStatus?.progresso_turma || null;
+            const pct = total > 0 ? Math.round((atual / total) * 100) : 0;
+            const indeterminado = total === 0;
+
+            return (
+              <div className="mt-4">
+                <div className="h-2.5 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      background: "linear-gradient(90deg, #3b82f6, #6366f1, #8b5cf6)",
+                      width: indeterminado ? "100%" : `${pct}%`,
+                      transition: indeterminado ? "none" : "width 1.2s cubic-bezier(0.4, 0, 0.2, 1)",
+                      opacity: indeterminado ? 0.4 : 1,
+                      backgroundSize: indeterminado ? "200% 100%" : "100% 100%",
+                      animation: indeterminado ? "progressShimmer 2s linear infinite" : "none",
+                    }}
+                  />
+                </div>
+                <div className="text-center mt-2">
+                  {indeterminado ? (
+                    <p className="text-xs text-gray-500">⏳ Conectando ao portal SEEDF...</p>
+                  ) : (
+                    <>
+                      <span className="text-lg font-bold" style={{ color: "#4f46e5" }}>{pct}%</span>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        Turma {atual} de {total}{turma ? <> — <span className="font-medium text-gray-700">{turma}</span></> : ""}
+                      </p>
+                    </>
+                  )}
+                </div>
               </div>
-              <p className="text-xs text-gray-500 mt-2">
-                ⏳ O agente está processando as turmas no portal SEEDF. Isso pode levar alguns minutos...
-              </p>
-            </div>
-          )}
+            );
+          })()}
         </div>
 
         {/* Info box */}
@@ -482,11 +510,13 @@ export default function SincronizarSEEDF() {
                       <div className="text-xs font-bold text-gray-800">
                         {new Date(log.criado_em).toLocaleDateString("pt-BR", {
                           day: "2-digit", month: "short",
+                          timeZone: "America/Sao_Paulo",
                         })}
                       </div>
                       <div className="text-[11px] text-gray-400">
                         {new Date(log.criado_em).toLocaleTimeString("pt-BR", {
                           hour: "2-digit", minute: "2-digit",
+                          timeZone: "America/Sao_Paulo",
                         })}
                       </div>
                     </div>
@@ -553,10 +583,25 @@ export default function SincronizarSEEDF() {
                               <div className="text-xs text-gray-500 mb-1">Finalizado em</div>
                               <div className="text-sm font-medium text-gray-800">
                                 {log.finalizado_em
-                                  ? new Date(log.finalizado_em).toLocaleString("pt-BR")
+                                  ? new Date(log.finalizado_em).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })
                                   : "–"}
                               </div>
                             </div>
+                            {/* Checklist de verificação */}
+                            {typeof resumo?.turmas_vazias === "number" && (
+                              <div className="col-span-2 sm:col-span-4">
+                                <div className="text-xs text-gray-500 mb-1">Checklist de Verificação</div>
+                                {resumo.turmas_vazias > 0 ? (
+                                  <div className="text-sm font-bold text-red-600">
+                                    ⚠ {resumo.turmas_vazias} turma(s) sem alunos
+                                  </div>
+                                ) : (
+                                  <div className="text-sm font-bold text-emerald-600">
+                                    ✅ Todas as {resumo.turmas_ok || 0} turmas verificadas com alunos
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                         ) : (
                           <p className="text-gray-400 text-center">Sem detalhes disponíveis.</p>

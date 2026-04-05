@@ -139,6 +139,12 @@ input[type=number].no-spinner {
   animation: pulse-border 2s infinite ease-in-out;
 }
 
+/* BARRA DE PROGRESSO — shimmer durante fase indeterminada */
+@keyframes progressShimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
 /* ===================================================================== */
 /* ESTILOS DE IMPRESSÃO PARA BOLETINS EM LOTE                           */
 /* ===================================================================== */

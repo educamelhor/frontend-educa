@@ -11,6 +11,8 @@
 //   3. Consulta API para verificar se a turma já existe
 //   4. Se existir → prossegue com importação
 //   5. Se NÃO existir → exibe modal premium instruindo o cadastro
+//   6. Se PDF detectar alunos ausentes → modal premium de confirmação
+//      de inativação (alunos transferidos)
 // -------------------------------------------------------
 
 import React, { useRef, useState } from "react";
@@ -24,6 +26,11 @@ export default function ImportPDF({ open, onClose, onFinish }) {
 
   // Estado do modal "turma não encontrada"
   const [turmaNaoEncontrada, setTurmaNaoEncontrada] = useState(null); // { nome }
+
+  // Estado do modal de confirmação de inativação
+  const [pendentesModal, setPendentesModal] = useState(null);
+  // { turma, pendentes: [{id, codigo, estudante}], selecionados: Set }
+  const [inativando, setInativando] = useState(false);
 
   if (!open) return null;
 
@@ -125,6 +132,54 @@ export default function ImportPDF({ open, onClose, onFinish }) {
   }
 
   // ─────────────────────────────────────────────
+  // Confirma inativação dos alunos selecionados
+  // ─────────────────────────────────────────────
+  async function handleConfirmarInativacao() {
+    if (!pendentesModal) return;
+    const ids = [...pendentesModal.selecionados];
+    if (ids.length === 0) {
+      setPendentesModal(null);
+      return;
+    }
+
+    setInativando(true);
+    try {
+      const { data } = await api.post("/api/alunos/inativar-lote", { alunoIds: ids });
+      const msg = data?.message || `${ids.length} aluno(s) inativado(s).`;
+      setPendentesModal(null);
+      onFinish && onFinish({
+        status: "sucesso",
+        message: msg,
+      });
+    } catch (err) {
+      console.error("Erro ao inativar:", err);
+      alert(err?.response?.data?.message || "Erro ao inativar alunos.");
+    } finally {
+      setInativando(false);
+    }
+  }
+
+  // ─────────────────────────────────────────────
+  // Toggle de seleção individual
+  // ─────────────────────────────────────────────
+  function toggleSelecionado(id) {
+    if (!pendentesModal) return;
+    const newSet = new Set(pendentesModal.selecionados);
+    if (newSet.has(id)) newSet.delete(id);
+    else newSet.add(id);
+    setPendentesModal({ ...pendentesModal, selecionados: newSet });
+  }
+
+  function toggleTodos() {
+    if (!pendentesModal) return;
+    const allSelected = pendentesModal.selecionados.size === pendentesModal.pendentes.length;
+    const newSet = allSelected
+      ? new Set()
+      : new Set(pendentesModal.pendentes.map(p => p.id));
+    setPendentesModal({ ...pendentesModal, selecionados: newSet });
+  }
+
+  // ─────────────────────────────────────────────
   // Seleção e envio do arquivo
   // ─────────────────────────────────────────────
   async function handleFileSelected(e) {
@@ -178,6 +233,7 @@ export default function ImportPDF({ open, onClose, onFinish }) {
         inativados,
         reativados,
         listaAlunos,
+        pendentesInativacao,
       } = data || {};
 
       if (ext === "pdf" && Array.isArray(listaAlunos) && listaAlunos.length) {
@@ -196,7 +252,20 @@ export default function ImportPDF({ open, onClose, onFinish }) {
         message: `Turma ${turmaNome} importada com sucesso.`,
       };
 
-      onFinish && onFinish(resultado);
+      // ── ALUNOS AUSENTES: abre modal de confirmação de inativação ──
+      if (Array.isArray(pendentesInativacao) && pendentesInativacao.length > 0) {
+        // Primeiro dispara o resultado de importação normal
+        onFinish && onFinish(resultado);
+
+        // Depois abre o modal de confirmação
+        setPendentesModal({
+          turma: turmaNome,
+          pendentes: pendentesInativacao,
+          selecionados: new Set(pendentesInativacao.map(p => p.id)),
+        });
+      } else {
+        onFinish && onFinish(resultado);
+      }
     } catch (err) {
       console.error("Erro na importação:", err);
       const erro = {
@@ -390,6 +459,185 @@ export default function ImportPDF({ open, onClose, onFinish }) {
                 className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-2.5 rounded-xl font-medium shadow-md hover:shadow-lg transition-all"
               >
                 Entendi
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════
+          MODAL PREMIUM: Confirmação de Inativação
+          Aparece quando o PDF identifica alunos no banco que
+          NÃO estão no PDF (possíveis transferências).
+          ═══════════════════════════════════════════════════════ */}
+      {pendentesModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4 backdrop-blur-[2px]">
+          <div
+            className="w-full max-w-xl rounded-2xl bg-white shadow-2xl overflow-hidden"
+            style={{ animation: "fadeInScale 0.3s ease-out" }}
+          >
+            {/* ── Header com gradiente de alerta ── */}
+            <div className="bg-gradient-to-r from-red-500 via-rose-500 to-orange-500 px-6 py-5">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm shadow-inner">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <line x1="17" y1="11" x2="22" y2="11" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white tracking-tight">
+                    Alunos Ausentes no PDF
+                  </h3>
+                  <p className="text-red-100 text-sm mt-0.5">
+                    Turma{" "}
+                    <span className="font-semibold text-white">
+                      {pendentesModal.turma}
+                    </span>{" "}
+                    — {pendentesModal.pendentes.length} aluno(s) não encontrado(s)
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Corpo ── */}
+            <div className="px-6 py-5 space-y-4">
+              {/* Explicação */}
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                <div className="flex items-start gap-2">
+                  <span className="text-amber-500 mt-0.5 shrink-0">⚠️</span>
+                  <p className="text-sm text-gray-700 leading-relaxed">
+                    Os alunos listados abaixo <strong>constam na turma</strong> no
+                    EDUCA.MELHOR, mas <strong>não foram encontrados no PDF</strong>{" "}
+                    importado do EducaDF. Isso pode significar que foram{" "}
+                    <strong>transferidos</strong> ou{" "}
+                    <strong>removidos</strong> da turma.
+                  </p>
+                </div>
+              </div>
+
+              {/* Lista de alunos com checkboxes */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-gray-500 font-medium uppercase tracking-wide">
+                    Selecione os alunos para inativar
+                  </span>
+                  <button
+                    onClick={toggleTodos}
+                    className="text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                  >
+                    {pendentesModal.selecionados.size === pendentesModal.pendentes.length
+                      ? "Desmarcar todos"
+                      : "Selecionar todos"}
+                  </button>
+                </div>
+
+                <div className="max-h-[240px] overflow-y-auto rounded-xl border border-gray-200 divide-y divide-gray-100">
+                  {pendentesModal.pendentes.map((aluno, idx) => {
+                    const selected = pendentesModal.selecionados.has(aluno.id);
+                    return (
+                      <label
+                        key={aluno.id}
+                        className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-all duration-150 ${
+                          selected
+                            ? "bg-red-50 hover:bg-red-100/80"
+                            : "bg-white hover:bg-gray-50"
+                        }`}
+                      >
+                        {/* Custom checkbox */}
+                        <div className="relative shrink-0">
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={() => toggleSelecionado(aluno.id)}
+                            className="sr-only"
+                          />
+                          <div
+                            className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all duration-150 ${
+                              selected
+                                ? "bg-red-500 border-red-500 shadow-sm"
+                                : "bg-white border-gray-300"
+                            }`}
+                          >
+                            {selected && (
+                              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                                <path d="M3 6L5 8L9 4" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Número da ordem */}
+                        <span className="flex items-center justify-center w-6 h-6 rounded-full bg-gray-100 text-gray-500 text-xs font-medium shrink-0">
+                          {idx + 1}
+                        </span>
+
+                        {/* Dados do aluno */}
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-medium truncate ${
+                            selected ? "text-red-800" : "text-gray-800"
+                          }`}>
+                            {aluno.estudante}
+                          </p>
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            RE: {aluno.codigo}
+                          </p>
+                        </div>
+
+                        {/* Badge de status */}
+                        {selected && (
+                          <span className="shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 border border-red-200">
+                            Inativar
+                          </span>
+                        )}
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Contador */}
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-500">
+                  <span className="font-semibold text-red-600">
+                    {pendentesModal.selecionados.size}
+                  </span>{" "}
+                  de {pendentesModal.pendentes.length} selecionado(s)
+                </span>
+                <span className="text-xs text-gray-400">
+                  Não selecionados permanecerão ativos
+                </span>
+              </div>
+            </div>
+
+            {/* ── Footer ── */}
+            <div className="px-6 pb-5 flex gap-3">
+              <Button
+                type="button"
+                onClick={() => setPendentesModal(null)}
+                disabled={inativando}
+                className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-5 py-2.5 rounded-xl font-medium border border-gray-300 disabled:opacity-60 transition-all"
+              >
+                Ignorar
+              </Button>
+              <Button
+                type="button"
+                onClick={handleConfirmarInativacao}
+                disabled={inativando || pendentesModal.selecionados.size === 0}
+                className="flex-1 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white px-5 py-2.5 rounded-xl font-medium shadow-md hover:shadow-lg disabled:opacity-60 transition-all"
+              >
+                {inativando ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Inativando...
+                  </span>
+                ) : (
+                  `Inativar ${pendentesModal.selecionados.size} Aluno(s)`
+                )}
               </Button>
             </div>
           </div>

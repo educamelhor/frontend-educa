@@ -61,6 +61,12 @@ import HorariosPage from "./features/secretaria/horarios/index.jsx";
 import LayoutGrade from "./features/secretaria/horarios/LayoutGrade.jsx";
 import ExecutarMock from "./features/secretaria/horarios/ExecutarMock.jsx";
 
+// ✅ MÓDULO FREQUÊNCIA
+import Atestados from "./features/frequencia/Atestados.jsx";
+import Relatorios from "./features/frequencia/Relatorios.jsx";
+import BuscaAtiva from "./features/frequencia/BuscaAtiva.jsx";
+import ConselhoTutelar from "./features/frequencia/ConselhoTutelar.jsx";
+
 // ✅ NOVO IMPORT — Configurações Pedagógicas
 import ConfiguracoesPedagogicas from "./features/secretaria/horarios/ConfiguracoesPedagogicas.jsx";
 
@@ -472,6 +478,12 @@ export default function App() {
             element={<ProvasProfessor />}
           />
 
+
+          {/* Frequência */}
+          <Route path="/frequencia/atestados" element={<Atestados />} />
+          <Route path="/frequencia/relatorios" element={<Relatorios />} />
+          <Route path="/frequencia/busca-ativa" element={<BuscaAtiva />} />
+          <Route path="/frequencia/conselho-tutelar" element={<ConselhoTutelar />} />
 
           {/* Impressão */}
           <Route

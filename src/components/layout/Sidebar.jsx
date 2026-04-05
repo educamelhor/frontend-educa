@@ -128,6 +128,7 @@ export default function Sidebar() {
     }
     else if (p.startsWith('/professores')) setOpenGroup('professores');
     else if (p.startsWith('/impressao')) setOpenGroup('impressao');
+    else if (p.startsWith('/frequencia')) setOpenGroup('frequencia');
     else if (p.startsWith('/monitoramento')) setOpenGroup('monitoramento');
     else if (p.startsWith('/direcao')) setOpenGroup('direcao');
     else if (p.startsWith('/plataforma')) setOpenGroup('plataforma');
@@ -1099,6 +1100,75 @@ export default function Sidebar() {
 
         {isScopeEscola && !isDisciplinar && !isProfessor && (
           <>
+            {/* ───────────────────────────────
+                GRUPO: Frequência
+            ─────────────────────────────── */}
+            <button
+              className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-2 transition"
+              onClick={() => setOpenGroup(openGroup === 'frequencia' ? null : 'frequencia')}
+              type="button"
+              style={{
+                background: openGroup === 'frequencia'
+                  ? 'linear-gradient(90deg, rgba(16,185,129,0.15), transparent)'
+                  : undefined,
+              }}
+            >
+              <ClipboardDocumentListIcon className="h-5 w-5 mr-2" style={{ color: openGroup === 'frequencia' ? '#10b981' : undefined }} />
+              <span className="flex-1 text-left" style={{ fontWeight: 700 }}>Frequência</span>
+              <span style={{
+                fontSize: '0.5rem',
+                fontWeight: 800,
+                background: 'linear-gradient(135deg, #10b981, #0891b2)',
+                color: '#fff',
+                padding: '1px 5px',
+                borderRadius: '6px',
+                letterSpacing: '0.5px',
+                marginRight: 4,
+              }}>NOVO</span>
+              {openGroup === 'frequencia' ? (
+                <ChevronDownIcon className="h-4 w-4" />
+              ) : (
+                <ChevronRightIcon className="h-4 w-4" />
+              )}
+            </button>
+
+            {openGroup === 'frequencia' && (
+              <ul className="ml-4 mb-2">
+                <li>
+                  <Link
+                    to="/frequencia/atestados"
+                    className={getSubmenuLinkClasses('/frequencia/atestados')}
+                  >
+                    <DocumentTextIcon className="h-5 w-5 mr-2" /> Atestados
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/frequencia/relatorios"
+                    className={getSubmenuLinkClasses('/frequencia/relatorios')}
+                  >
+                    <ChartBarIcon className="h-5 w-5 mr-2" /> Relatórios
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/frequencia/busca-ativa"
+                    className={getSubmenuLinkClasses('/frequencia/busca-ativa')}
+                  >
+                    <UsersIcon className="h-5 w-5 mr-2" /> Busca Ativa
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/frequencia/conselho-tutelar"
+                    className={getSubmenuLinkClasses('/frequencia/conselho-tutelar')}
+                  >
+                    <ClipboardDocumentListIcon className="h-5 w-5 mr-2" /> Conselho Tutelar
+                  </Link>
+                </li>
+              </ul>
+            )}
+
             {/* ───────────────────────────────
                 GRUPO: Impressão
             ─────────────────────────────── */}

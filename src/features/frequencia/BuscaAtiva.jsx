@@ -1,0 +1,411 @@
+// src/features/frequencia/BuscaAtiva.jsx
+// ============================================================================
+// Módulo FREQUÊNCIA — Busca Ativa
+// Registra os contatos que a coordenação/direção fez com as famílias
+// de alunos com muitas faltas (antes de encaminhar ao Conselho Tutelar).
+// ============================================================================
+
+import React, { useState, useEffect, useCallback } from "react";
+import api from "../../services/api";
+
+const MEIOS_CONTATO = [
+  { value: "telefone", label: "Telefone", icon: "📞" },
+  { value: "whatsapp", label: "WhatsApp", icon: "💬" },
+  { value: "visita_domiciliar", label: "Visita Domiciliar", icon: "🏠" },
+  { value: "reuniao_escola", label: "Reunião na Escola", icon: "🤝" },
+  { value: "carta", label: "Carta / Ofício", icon: "✉️" },
+  { value: "email", label: "E-mail", icon: "📧" },
+];
+
+const RESULTADOS_CONTATO = [
+  { value: "sucesso", label: "Contato realizado com sucesso", cor: "#16a34a" },
+  { value: "sem_resposta", label: "Sem resposta", cor: "#d97706" },
+  { value: "numero_invalido", label: "Número inválido / desatualizado", cor: "#dc2626" },
+  { value: "compromisso_retorno", label: "Família se comprometeu com retorno", cor: "#2563eb" },
+  { value: "recusa", label: "Família recusou atendimento", cor: "#7c3aed" },
+];
+
+export default function BuscaAtiva() {
+  const escolaId = localStorage.getItem("escola_id");
+  const perfil = String(localStorage.getItem("perfil") || "").toLowerCase();
+  const canRegister = ["diretor", "vice_diretor", "coordenador", "secretaria"].includes(perfil);
+
+  const [registros, setRegistros] = useState([]);
+  const [turmas, setTurmas] = useState([]);
+  const [turmaId, setTurmaId] = useState("");
+  const [alunos, setAlunos] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [form, setForm] = useState({
+    aluno_id: "", meio_contato: "", resultado: "", observacao: "", data_contato: new Date().toISOString().split("T")[0],
+  });
+
+  useEffect(() => {
+    if (!escolaId) return;
+    api.get("/api/turmas", { params: { escola_id: escolaId } })
+      .then(r => setTurmas(r.data || []))
+      .catch(() => {});
+  }, [escolaId]);
+
+  useEffect(() => {
+    if (!turmaId) { setAlunos([]); return; }
+    api.get("/api/alunos", { params: { turma_id: turmaId } })
+      .then(r => setAlunos(r.data || []))
+      .catch(() => {});
+  }, [turmaId]);
+
+  const carregarRegistros = useCallback(async () => {
+    if (!escolaId) return;
+    setLoading(true);
+    try {
+      const params = { escola_id: escolaId };
+      if (turmaId) params.turma_id = turmaId;
+      const r = await api.get("/api/frequencia/busca-ativa", { params });
+      setRegistros(r.data || []);
+    } catch {
+      setRegistros([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [escolaId, turmaId]);
+
+  useEffect(() => { carregarRegistros(); }, [carregarRegistros]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.aluno_id || !form.meio_contato || !form.resultado) return;
+    try {
+      await api.post("/api/frequencia/busca-ativa", {
+        ...form,
+        escola_id: escolaId,
+        turma_id: turmaId,
+      });
+      setShowModal(false);
+      setForm({ aluno_id: "", meio_contato: "", resultado: "", observacao: "", data_contato: new Date().toISOString().split("T")[0] });
+      carregarRegistros();
+    } catch (err) {
+      alert("Erro ao registrar: " + (err.response?.data?.error || err.message));
+    }
+  };
+
+  const getMeioInfo = (val) => MEIOS_CONTATO.find(m => m.value === val);
+  const getResultadoInfo = (val) => RESULTADOS_CONTATO.find(r => r.value === val);
+
+  // Agrupar tentativas por aluno
+  const contagemPorAluno = {};
+  registros.forEach(r => {
+    if (!contagemPorAluno[r.aluno_id]) contagemPorAluno[r.aluno_id] = 0;
+    contagemPorAluno[r.aluno_id]++;
+  });
+
+  return (
+    <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+      {/* Header */}
+      <div style={{
+        background: "linear-gradient(135deg, #b45309 0%, #d97706 100%)",
+        borderRadius: 16, padding: "28px 32px", marginBottom: 24,
+        color: "#fff", position: "relative", overflow: "hidden",
+      }}>
+        <div style={{
+          position: "absolute", top: -40, right: -40, width: 180, height: 180,
+          background: "radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%)",
+          borderRadius: "50%",
+        }} />
+        <div style={{ display: "flex", alignItems: "center", gap: 16, position: "relative" }}>
+          <div style={{
+            width: 52, height: 52, borderRadius: 14,
+            background: "rgba(255,255,255,0.15)", backdropFilter: "blur(8px)",
+            display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26,
+          }}>🔍</div>
+          <div>
+            <h1 style={{ fontSize: "1.5rem", fontWeight: 800, margin: 0 }}>Busca Ativa</h1>
+            <p style={{ margin: 0, opacity: 0.8, fontSize: "0.88rem", marginTop: 2 }}>
+              Registro de contatos com famílias de alunos faltosos
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Cards resumo */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 14, marginBottom: 24 }}>
+        {[
+          { label: "Total Contatos", value: registros.length, icon: "📞", gradient: "linear-gradient(135deg, #d97706, #b45309)" },
+          { label: "Alunos em Busca", value: Object.keys(contagemPorAluno).length, icon: "👤", gradient: "linear-gradient(135deg, #dc2626, #b91c1c)" },
+          { label: "Com Sucesso", value: registros.filter(r => r.resultado === "sucesso").length, icon: "✅", gradient: "linear-gradient(135deg, #16a34a, #15803d)" },
+          { label: "Sem Resposta", value: registros.filter(r => r.resultado === "sem_resposta").length, icon: "⏳", gradient: "linear-gradient(135deg, #6366f1, #4f46e5)" },
+        ].map((card, i) => (
+          <div key={i} style={{
+            background: "#fff", borderRadius: 14, padding: "18px 20px",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.06)", border: "1px solid #e5e7eb",
+            display: "flex", alignItems: "center", gap: 14,
+          }}>
+            <div style={{
+              width: 44, height: 44, borderRadius: 12, background: card.gradient,
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20,
+            }}>{card.icon}</div>
+            <div>
+              <div style={{ fontSize: "1.4rem", fontWeight: 800, color: "#1e293b", lineHeight: 1 }}>{card.value}</div>
+              <div style={{ fontSize: "0.72rem", color: "#64748b", fontWeight: 600, marginTop: 2 }}>{card.label}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Filtros */}
+      <div style={{
+        background: "#fff", borderRadius: 14, padding: "18px 24px", marginBottom: 20,
+        boxShadow: "0 1px 3px rgba(0,0,0,0.06)", border: "1px solid #e5e7eb",
+        display: "flex", flexWrap: "wrap", gap: 14, alignItems: "center",
+      }}>
+        <select
+          value={turmaId} onChange={e => setTurmaId(e.target.value)}
+          style={{ padding: "10px 14px", borderRadius: 10, border: "1.5px solid #d1d5db", background: "#f8fafc", fontSize: "0.88rem", fontWeight: 600, minWidth: 200 }}
+        >
+          <option value="">Todas as turmas</option>
+          {turmas.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
+        </select>
+
+        {canRegister && (
+          <button
+            onClick={() => setShowModal(true)}
+            style={{
+              marginLeft: "auto",
+              padding: "10px 22px", borderRadius: 10, border: "none",
+              background: "linear-gradient(135deg, #b45309, #d97706)",
+              color: "#fff", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer",
+              display: "flex", alignItems: "center", gap: 8,
+              boxShadow: "0 2px 8px rgba(180,83,9,0.3)",
+            }}
+          >
+            <span style={{ fontSize: 18 }}>+</span> Registrar Contato
+          </button>
+        )}
+      </div>
+
+      {/* Timeline */}
+      <div style={{
+        background: "#fff", borderRadius: 14, padding: "24px 28px",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.06)", border: "1px solid #e5e7eb",
+      }}>
+        {loading ? (
+          <div style={{ padding: 40, textAlign: "center", color: "#94a3b8" }}>Carregando...</div>
+        ) : registros.length === 0 ? (
+          <div style={{ padding: 60, textAlign: "center", color: "#94a3b8" }}>
+            <div style={{ fontSize: 48, marginBottom: 12, opacity: 0.4 }}>🔍</div>
+            <p style={{ fontWeight: 600, fontSize: "1.05rem" }}>Nenhum registro de busca ativa</p>
+            <p style={{ fontSize: "0.85rem", marginTop: 4 }}>
+              Registre contatos com famílias de alunos faltosos
+            </p>
+          </div>
+        ) : (
+          <div style={{ position: "relative" }}>
+            {/* Linha vertical da timeline */}
+            <div style={{
+              position: "absolute", left: 20, top: 0, bottom: 0, width: 2,
+              background: "linear-gradient(to bottom, #d97706, #fbbf24, #d1d5db)",
+            }} />
+
+            {registros.map((r, i) => {
+              const meio = getMeioInfo(r.meio_contato);
+              const resultado = getResultadoInfo(r.resultado);
+              return (
+                <div key={r.id || i} style={{
+                  display: "flex", gap: 20, marginBottom: 24, position: "relative",
+                  paddingLeft: 48,
+                }}>
+                  {/* Dot */}
+                  <div style={{
+                    position: "absolute", left: 12, top: 4,
+                    width: 18, height: 18, borderRadius: "50%",
+                    background: resultado?.cor || "#6b7280",
+                    border: "3px solid #fff",
+                    boxShadow: `0 0 0 2px ${resultado?.cor || "#6b7280"}30`,
+                  }} />
+
+                  {/* Card */}
+                  <div style={{
+                    flex: 1, background: "#f8fafc", borderRadius: 12,
+                    padding: "16px 20px", border: "1px solid #e5e7eb",
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <span style={{ fontWeight: 700, fontSize: "0.95rem", color: "#1e293b" }}>
+                          {r.aluno_nome || "Aluno"}
+                        </span>
+                        <span style={{
+                          background: "#dbeafe", color: "#1d4ed8", padding: "2px 8px",
+                          borderRadius: 6, fontSize: "0.72rem", fontWeight: 700,
+                        }}>{r.turma_nome || ""}</span>
+                      </div>
+                      <span style={{ fontSize: "0.78rem", color: "#94a3b8" }}>
+                        {r.data_contato ? new Date(r.data_contato).toLocaleDateString("pt-BR") : ""}
+                      </span>
+                    </div>
+
+                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
+                      <span style={{
+                        display: "inline-flex", alignItems: "center", gap: 4,
+                        background: "#f1f5f9", padding: "4px 10px", borderRadius: 8,
+                        fontSize: "0.78rem", fontWeight: 600, color: "#475569",
+                      }}>{meio?.icon} {meio?.label || r.meio_contato}</span>
+
+                      <span style={{
+                        display: "inline-flex", alignItems: "center", gap: 4,
+                        background: `${resultado?.cor || "#6b7280"}12`,
+                        color: resultado?.cor || "#6b7280",
+                        padding: "4px 10px", borderRadius: 8,
+                        fontSize: "0.78rem", fontWeight: 700,
+                      }}>{resultado?.label || r.resultado}</span>
+                    </div>
+
+                    {r.observacao && (
+                      <p style={{ margin: 0, fontSize: "0.82rem", color: "#64748b", lineHeight: 1.5 }}>
+                        {r.observacao}
+                      </p>
+                    )}
+                    <div style={{ marginTop: 8, fontSize: "0.72rem", color: "#94a3b8" }}>
+                      Registrado por: {r.registrado_por_nome || "—"}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Modal Registrar Contato */}
+      {showModal && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+          backdropFilter: "blur(4px)", display: "flex", alignItems: "center",
+          justifyContent: "center", zIndex: 9999, padding: 20,
+          animation: "fadeIn 0.2s ease",
+        }}>
+          <div style={{
+            background: "#fff", borderRadius: 20, width: "100%", maxWidth: 560,
+            maxHeight: "90vh", overflow: "auto",
+            boxShadow: "0 25px 50px rgba(0,0,0,0.15)",
+            animation: "slideUp 0.3s ease",
+          }}>
+            <div style={{
+              background: "linear-gradient(135deg, #b45309, #d97706)",
+              padding: "24px 28px", borderRadius: "20px 20px 0 0",
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                <div style={{
+                  width: 44, height: 44, borderRadius: 12,
+                  background: "rgba(255,255,255,0.15)", display: "flex",
+                  alignItems: "center", justifyContent: "center", fontSize: 22,
+                }}>🔍</div>
+                <div>
+                  <h2 style={{ color: "#fff", fontWeight: 800, fontSize: "1.15rem", margin: 0 }}>
+                    Registrar Contato
+                  </h2>
+                  <p style={{ color: "rgba(255,255,255,0.7)", fontSize: "0.78rem", margin: 0, marginTop: 2 }}>
+                    Busca ativa — contato com a família
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowModal(false)}
+                style={{
+                  background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 10,
+                  width: 36, height: 36, cursor: "pointer", color: "#fff", fontSize: 18,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}
+              >✕</button>
+            </div>
+
+            <form onSubmit={handleSubmit} style={{ padding: "28px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
+                <div>
+                  <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "#374151", marginBottom: 6, display: "block" }}>Turma *</label>
+                  <select value={turmaId} onChange={e => setTurmaId(e.target.value)} required style={{
+                    width: "100%", padding: "10px 14px", borderRadius: 10, border: "1.5px solid #d1d5db", background: "#f9fafb", fontSize: "0.88rem", fontWeight: 600,
+                  }}>
+                    <option value="">Selecione...</option>
+                    {turmas.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "#374151", marginBottom: 6, display: "block" }}>Aluno *</label>
+                  <select value={form.aluno_id} onChange={e => setForm(f => ({ ...f, aluno_id: e.target.value }))} required style={{
+                    width: "100%", padding: "10px 14px", borderRadius: 10, border: "1.5px solid #d1d5db", background: "#f9fafb", fontSize: "0.88rem", fontWeight: 600,
+                  }}>
+                    <option value="">Selecione a turma primeiro</option>
+                    {alunos.map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
+                <div>
+                  <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "#374151", marginBottom: 6, display: "block" }}>Data do Contato *</label>
+                  <input type="date" value={form.data_contato} onChange={e => setForm(f => ({ ...f, data_contato: e.target.value }))} required
+                    style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1.5px solid #d1d5db", background: "#f9fafb", fontSize: "0.88rem", fontWeight: 600 }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "#374151", marginBottom: 6, display: "block" }}>Meio de Contato *</label>
+                  <select value={form.meio_contato} onChange={e => setForm(f => ({ ...f, meio_contato: e.target.value }))} required style={{
+                    width: "100%", padding: "10px 14px", borderRadius: 10, border: "1.5px solid #d1d5db", background: "#f9fafb", fontSize: "0.88rem", fontWeight: 600,
+                  }}>
+                    <option value="">Selecione...</option>
+                    {MEIOS_CONTATO.map(m => <option key={m.value} value={m.value}>{m.icon} {m.label}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "#374151", marginBottom: 8, display: "block" }}>Resultado *</label>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {RESULTADOS_CONTATO.map(r => (
+                    <button key={r.value} type="button" onClick={() => setForm(f => ({ ...f, resultado: r.value }))} style={{
+                      display: "flex", alignItems: "center", gap: 10,
+                      padding: "10px 14px", borderRadius: 10,
+                      border: form.resultado === r.value ? `2px solid ${r.cor}` : "1.5px solid #e5e7eb",
+                      background: form.resultado === r.value ? `${r.cor}10` : "#fff",
+                      cursor: "pointer", textAlign: "left", transition: "all 0.15s",
+                    }}>
+                      <div style={{
+                        width: 12, height: 12, borderRadius: "50%",
+                        background: form.resultado === r.value ? r.cor : "#d1d5db",
+                        transition: "background 0.15s",
+                      }} />
+                      <span style={{ fontSize: "0.85rem", fontWeight: 600, color: form.resultado === r.value ? r.cor : "#374151" }}>{r.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ marginBottom: 24 }}>
+                <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "#374151", marginBottom: 6, display: "block" }}>Observação</label>
+                <textarea value={form.observacao} onChange={e => setForm(f => ({ ...f, observacao: e.target.value }))}
+                  placeholder="Detalhes da conversa, compromissos firmados..."
+                  rows={3}
+                  style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1.5px solid #d1d5db", background: "#f9fafb", fontSize: "0.88rem", fontWeight: 500, resize: "vertical", fontFamily: "inherit" }} />
+              </div>
+
+              <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
+                <button type="button" onClick={() => setShowModal(false)} style={{
+                  padding: "10px 24px", borderRadius: 10, border: "1.5px solid #d1d5db", background: "#fff", fontWeight: 600, fontSize: "0.88rem", cursor: "pointer", color: "#6b7280",
+                }}>Cancelar</button>
+                <button type="submit" style={{
+                  padding: "10px 28px", borderRadius: 10, border: "none",
+                  background: "linear-gradient(135deg, #b45309, #d97706)",
+                  color: "#fff", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer",
+                }}>Registrar Contato</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px) } to { opacity: 1; transform: translateY(0) } }
+      `}</style>
+    </div>
+  );
+}

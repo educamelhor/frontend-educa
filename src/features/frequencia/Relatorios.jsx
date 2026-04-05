@@ -7,6 +7,8 @@
 import React, { useState, useEffect } from "react";
 import api from "../../services/api";
 
+const ANO_LETIVO = String(new Date().getFullYear());
+
 export default function Relatorios() {
   const escolaId = localStorage.getItem("escola_id");
   const [turnos, setTurnos] = useState([]);
@@ -28,7 +30,7 @@ export default function Relatorios() {
   useEffect(() => {
     if (!escolaId) return;
     api.get("/turmas")
-      .then(r => { setTurmas(r.data || []); setTurmasFiltradas(r.data || []); })
+      .then(r => { const all = (r.data || []).filter(t => String(t.ano) === ANO_LETIVO); setTurmas(all); setTurmasFiltradas(all); })
       .catch(() => {});
   }, [escolaId]);
 

@@ -29,6 +29,8 @@ const TIPOS_JUSTIFICATIVA = [
 // ─────────────────────────────────────────────
 // Componente principal
 // ─────────────────────────────────────────────
+const ANO_LETIVO = String(new Date().getFullYear());
+
 export default function Atestados() {
   const escolaId = localStorage.getItem("escola_id");
   const perfil = String(localStorage.getItem("perfil") || "").toLowerCase();
@@ -47,6 +49,10 @@ export default function Atestados() {
   const [filtroTipo, setFiltroTipo] = useState("");
   const [filtroAluno, setFiltroAluno] = useState("");
 
+  // ── Modal state (independente dos filtros da página) ──
+  const [modalTurmaId, setModalTurmaId] = useState("");
+  const [modalAlunos, setModalAlunos] = useState([]);
+
   // ── Form state ─────────────────────────────
   const [form, setForm] = useState({
     aluno_id: "",
@@ -64,12 +70,12 @@ export default function Atestados() {
       .catch(() => {});
   }, []);
 
-  // ── Carregar turmas ────────────────────────
+  // ── Carregar turmas (ano letivo atual) ─────
   useEffect(() => {
     if (!escolaId) return;
     api.get("/turmas")
       .then(r => {
-        const all = r.data || [];
+        const all = (r.data || []).filter(t => String(t.ano) === ANO_LETIVO);
         setTurmas(all);
         if (turno) {
           setTurmasFiltradas(all.filter(t => (t.turno || "").toLowerCase() === turno.toLowerCase()));
@@ -91,13 +97,13 @@ export default function Atestados() {
     setAlunos([]);
   }, [turno, turmas]);
 
-  // ── Carregar alunos da turma ───────────────
+  // ── Carregar alunos do MODAL ───────────────
   useEffect(() => {
-    if (!turmaId) { setAlunos([]); return; }
-    api.get(`/turmas/${turmaId}/alunos`)
-      .then(r => setAlunos(r.data?.alunos || r.data || []))
-      .catch(() => setAlunos([]));
-  }, [turmaId]);
+    if (!modalTurmaId) { setModalAlunos([]); return; }
+    api.get(`/turmas/${modalTurmaId}/alunos`)
+      .then(r => setModalAlunos(r.data?.alunos || r.data || []))
+      .catch(() => setModalAlunos([]));
+  }, [modalTurmaId]);
 
   // ── Carregar justificativas ────────────────
   const carregarJustificativas = useCallback(async () => {
@@ -126,10 +132,12 @@ export default function Atestados() {
       await api.post("/frequencia/justificativas", {
         ...form,
         escola_id: escolaId,
-        turma_id: turmaId,
+        turma_id: modalTurmaId,
       });
       setShowModal(false);
       setForm({ aluno_id: "", tipo: "", data_inicio: "", data_fim: "", observacao: "", dias: 1 });
+      setModalTurmaId("");
+      setModalAlunos([]);
       carregarJustificativas();
     } catch (err) {
       alert("Erro ao registrar: " + (err.response?.data?.error || err.message));
@@ -291,7 +299,12 @@ export default function Atestados() {
 
         {canRegister && (
           <button
-            onClick={() => setShowModal(true)}
+            onClick={() => {
+              setForm({ aluno_id: "", tipo: "", data_inicio: "", data_fim: "", observacao: "", dias: 1 });
+              setModalTurmaId("");
+              setModalAlunos([]);
+              setShowModal(true);
+            }}
             style={{
               padding: "10px 22px", borderRadius: 10, border: "none",
               background: "linear-gradient(135deg, #0f766e, #059669)",
@@ -461,8 +474,8 @@ export default function Atestados() {
                     Turma *
                   </label>
                   <select
-                    value={turmaId}
-                    onChange={e => setTurmaId(e.target.value)}
+                    value={modalTurmaId}
+                    onChange={e => { setModalTurmaId(e.target.value); setForm(f => ({ ...f, aluno_id: "" })); }}
                     required
                     style={{
                       width: "100%", padding: "10px 14px", borderRadius: 10,
@@ -489,7 +502,7 @@ export default function Atestados() {
                     }}
                   >
                     <option value="">Selecione a turma primeiro</option>
-                    {alunos.map(a => (
+                    {modalAlunos.map(a => (
                       <option key={a.id} value={a.id}>{a.nome}</option>
                     ))}
                   </select>
@@ -585,12 +598,12 @@ export default function Atestados() {
               {/* Observação */}
               <div style={{ marginBottom: 24 }}>
                 <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "#374151", marginBottom: 6, display: "block" }}>
-                  Observação
+                  Detalhes adicionais
                 </label>
                 <textarea
                   value={form.observacao}
                   onChange={e => setForm(f => ({ ...f, observacao: e.target.value }))}
-                  placeholder="CID, nome do médico, detalhes adicionais..."
+                  placeholder="Detalhes adicionais..."
                   rows={3}
                   style={{
                     width: "100%", padding: "10px 14px", borderRadius: 10,

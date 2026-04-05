@@ -25,6 +25,8 @@ const RESULTADOS_CONTATO = [
   { value: "recusa", label: "Família recusou atendimento", cor: "#7c3aed" },
 ];
 
+const ANO_LETIVO = String(new Date().getFullYear());
+
 export default function BuscaAtiva() {
   const escolaId = localStorage.getItem("escola_id");
   const perfil = String(localStorage.getItem("perfil") || "").toLowerCase();
@@ -39,6 +41,11 @@ export default function BuscaAtiva() {
   const [alunos, setAlunos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
+
+  // ── Modal state (independente dos filtros da página) ──
+  const [modalTurmaId, setModalTurmaId] = useState("");
+  const [modalAlunos, setModalAlunos] = useState([]);
+
   const [form, setForm] = useState({
     aluno_id: "", meio_contato: "", resultado: "", observacao: "", data_contato: new Date().toISOString().split("T")[0],
   });
@@ -52,7 +59,7 @@ export default function BuscaAtiva() {
   useEffect(() => {
     if (!escolaId) return;
     api.get("/turmas")
-      .then(r => { setTurmas(r.data || []); setTurmasFiltradas(r.data || []); })
+      .then(r => { const all = (r.data || []).filter(t => String(t.ano) === ANO_LETIVO); setTurmas(all); setTurmasFiltradas(all); })
       .catch(() => {});
   }, [escolaId]);
 
@@ -62,15 +69,16 @@ export default function BuscaAtiva() {
     } else {
       setTurmasFiltradas(turmas);
     }
-    setTurmaId(""); setAlunos([]);
+    setTurmaId("");
   }, [turno, turmas]);
 
+  // ── Carregar alunos do MODAL ───────────────
   useEffect(() => {
-    if (!turmaId) { setAlunos([]); return; }
-    api.get(`/turmas/${turmaId}/alunos`)
-      .then(r => setAlunos(r.data?.alunos || r.data || []))
-      .catch(() => setAlunos([]));
-  }, [turmaId]);
+    if (!modalTurmaId) { setModalAlunos([]); return; }
+    api.get(`/turmas/${modalTurmaId}/alunos`)
+      .then(r => setModalAlunos(r.data?.alunos || r.data || []))
+      .catch(() => setModalAlunos([]));
+  }, [modalTurmaId]);
 
   const carregarRegistros = useCallback(async () => {
     if (!escolaId) return;
@@ -96,10 +104,12 @@ export default function BuscaAtiva() {
       await api.post("/frequencia/busca-ativa", {
         ...form,
         escola_id: escolaId,
-        turma_id: turmaId,
+        turma_id: modalTurmaId,
       });
       setShowModal(false);
       setForm({ aluno_id: "", meio_contato: "", resultado: "", observacao: "", data_contato: new Date().toISOString().split("T")[0] });
+      setModalTurmaId("");
+      setModalAlunos([]);
       carregarRegistros();
     } catch (err) {
       alert("Erro ao registrar: " + (err.response?.data?.error || err.message));
@@ -193,7 +203,12 @@ export default function BuscaAtiva() {
 
         {canRegister && (
           <button
-            onClick={() => setShowModal(true)}
+            onClick={() => {
+              setForm({ aluno_id: "", meio_contato: "", resultado: "", observacao: "", data_contato: new Date().toISOString().split("T")[0] });
+              setModalTurmaId("");
+              setModalAlunos([]);
+              setShowModal(true);
+            }}
             style={{
               marginLeft: "auto",
               padding: "10px 22px", borderRadius: 10, border: "none",
@@ -348,7 +363,7 @@ export default function BuscaAtiva() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
                 <div>
                   <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "#374151", marginBottom: 6, display: "block" }}>Turma *</label>
-                  <select value={turmaId} onChange={e => setTurmaId(e.target.value)} required style={{
+                  <select value={modalTurmaId} onChange={e => { setModalTurmaId(e.target.value); setForm(f => ({ ...f, aluno_id: "" })); }} required style={{
                     width: "100%", padding: "10px 14px", borderRadius: 10, border: "1.5px solid #d1d5db", background: "#f9fafb", fontSize: "0.88rem", fontWeight: 600,
                   }}>
                     <option value="">Selecione...</option>
@@ -361,7 +376,7 @@ export default function BuscaAtiva() {
                     width: "100%", padding: "10px 14px", borderRadius: 10, border: "1.5px solid #d1d5db", background: "#f9fafb", fontSize: "0.88rem", fontWeight: 600,
                   }}>
                     <option value="">Selecione a turma primeiro</option>
-                    {alunos.map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
+                    {modalAlunos.map(a => <option key={a.id} value={a.id}>{a.nome}</option>)}
                   </select>
                 </div>
               </div>

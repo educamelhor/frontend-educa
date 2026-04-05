@@ -537,11 +537,10 @@ export default function Alunos() {
         open={isImportOpen}
         onClose={() => setImportOpen(false)}
         onFinish={async (res) => {
-          setImportOpen(false);
           await fetchAlunos();
           if (res && typeof res === "object") {
-            // Se for erro (status === "erro"), mostra apenas a mensagem
             if (res.status === "erro") {
+              setImportOpen(false);
               setResultadoImportacao({ message: res.message || "Erro na importação." });
             } else {
               setResultadoImportacao({
@@ -553,8 +552,11 @@ export default function Alunos() {
                 turma: res.turma || res.turmaNome || res.nomeTurma || undefined,
                 message: res.message,
               });
+              // NÃO fechar o ImportPDF aqui — ele pode ter o modal de pendentes aberto.
+              // O ImportPDF se auto-gerencia: se não houver pendentes, o usuário fechará manualmente.
             }
           } else {
+            setImportOpen(false);
             setResultadoImportacao({ message: "📥 Importação concluída." });
           }
         }}

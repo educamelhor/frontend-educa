@@ -139,6 +139,7 @@ export default function ImportPDF({ open, onClose, onFinish }) {
     const ids = [...pendentesModal.selecionados];
     if (ids.length === 0) {
       setPendentesModal(null);
+      onClose && onClose();
       return;
     }
 
@@ -151,6 +152,7 @@ export default function ImportPDF({ open, onClose, onFinish }) {
         status: "sucesso",
         message: msg,
       });
+      onClose && onClose();
     } catch (err) {
       console.error("Erro ao inativar:", err);
       alert(err?.response?.data?.message || "Erro ao inativar alunos.");
@@ -265,6 +267,7 @@ export default function ImportPDF({ open, onClose, onFinish }) {
         });
       } else {
         onFinish && onFinish(resultado);
+        onClose && onClose();
       }
     } catch (err) {
       console.error("Erro na importação:", err);
@@ -615,7 +618,7 @@ export default function ImportPDF({ open, onClose, onFinish }) {
             <div className="px-6 pb-5 flex gap-3">
               <Button
                 type="button"
-                onClick={() => setPendentesModal(null)}
+                onClick={() => { setPendentesModal(null); onClose && onClose(); }}
                 disabled={inativando}
                 className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-5 py-2.5 rounded-xl font-medium border border-gray-300 disabled:opacity-60 transition-all"
               >

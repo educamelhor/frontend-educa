@@ -240,8 +240,17 @@ export default function Avaliacoes() {
   // ---------------------------
   const getNotaKey = (alunoId, itemIdx, opIdx) => `${alunoId}_${itemIdx}_${opIdx}`;
 
+  // Verifica se um item específico é bloqueado (fixo_direcao + avaliacaoPadrao ativo)
+  const isItemBloqueado = (itemIdx) => {
+    if (!avaliacaoPadrao) return false;
+    const arrItens = Array.isArray(plano?.itens) ? plano.itens : JSON.parse(plano?.itens || "[]");
+    const item = arrItens[itemIdx];
+    return !!item?.fixo_direcao;
+  };
+
   const handleNotaChange = (alunoId, itemIdx, opIdx, maxVal, val) => {
-    if (diarioFechado || avaliacaoPadrao) return; // readonly
+    if (diarioFechado) return; // readonly
+    if (isItemBloqueado(itemIdx)) return; // apenas coluna padronizada bloqueada
     let cleanVal = val.replace(",", ".");
     if (cleanVal === "") {
       setNotas(prev => { const n = { ...prev }; delete n[getNotaKey(alunoId, itemIdx, opIdx)]; return n; });
@@ -262,7 +271,8 @@ export default function Avaliacoes() {
   };
 
   const handleContextMenu = (e, alunoId, itemIdx, opIdx, maxVal) => {
-    if (diarioFechado || avaliacaoPadrao) return; // readonly
+    if (diarioFechado) return; // readonly
+    if (isItemBloqueado(itemIdx)) return; // apenas coluna padronizada bloqueada
     e.preventDefault();
     setContextMenu({
       alunoId, itemIdx, opIdx, maxVal,
@@ -272,7 +282,7 @@ export default function Avaliacoes() {
   };
 
   const handleSelectColor = (color) => {
-    if (!contextMenu || diarioFechado || avaliacaoPadrao) return;
+    if (!contextMenu || diarioFechado) return;
     const { alunoId, itemIdx, opIdx, maxVal } = contextMenu;
     const key = getNotaKey(alunoId, itemIdx, opIdx);
 
@@ -306,7 +316,7 @@ export default function Avaliacoes() {
   // SALVAR DIÁRIO NO BANCO
   // ---------------------------
   const salvarAvaliacoes = async () => {
-    if (!plano?.id || !turmaSelecionada || diarioFechado || avaliacaoPadrao) return;
+    if (!plano?.id || !turmaSelecionada || diarioFechado) return;
     setSalvando(true);
     try {
       const resp = await api.post(`/avaliacoes/${plano.id}/salvar-notas`, {
@@ -597,11 +607,11 @@ export default function Avaliacoes() {
             </h3>
             <p className="text-sm text-amber-700 mt-1">
               Esta escola adota o sistema de <strong>avaliação padrão bimestral (semana de prova)</strong>.
-              As notas de <strong>{disciplinaSelecionada}</strong> serão importadas automaticamente
+              A coluna <strong>"Prova Bimestral"</strong> será preenchida automaticamente
               a partir da correção dos gabaritos padronizados.
             </p>
             <p className="text-xs text-amber-600 mt-1 font-medium">
-              O diário está em modo somente leitura. A coluna de Avaliação Bimestral será preenchida pelo coordenador/supervisor.
+              🔒 Apenas a coluna de Avaliação Bimestral está bloqueada. As demais colunas continuam editáveis normalmente.
             </p>
           </div>
         </section>
@@ -635,17 +645,15 @@ export default function Avaliacoes() {
       {/* ───────────────── GRID DE AVALIAÇÃO ───────────────── */}
       {selecaoCompleta && plano && (
         <section className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-200 flex flex-col relative transition-all duration-500 ease-in-out">
-            <div className={`${diarioFechado ? 'bg-emerald-800' : avaliacaoPadrao ? 'bg-amber-800' : 'bg-slate-800'} text-white p-6 flex items-center justify-between transition-colors duration-300`}>
+            <div className={`${diarioFechado ? 'bg-emerald-800' : 'bg-slate-800'} text-white p-6 flex items-center justify-between transition-colors duration-300`}>
                 <div>
                    <h3 className="text-xl font-bold flex items-center gap-2">
                       {diarioFechado ? (
                         <LockClosedIcon className="w-6 h-6 text-emerald-400" />
-                      ) : avaliacaoPadrao ? (
-                        <LockClosedIcon className="w-6 h-6 text-amber-400" />
                       ) : (
                         <TableCellsIcon className="w-6 h-6 text-indigo-400" />
                       )}
-                      {diarioFechado ? "Diário Fechado (Somente Leitura)" : avaliacaoPadrao ? "Avaliação Padronizada (Somente Leitura)" : "Lançamento de Notas"}
+                      {diarioFechado ? "Diário Fechado (Somente Leitura)" : "Lançamento de Notas"}
                    </h3>
                    <div className="flex gap-4 mt-2 text-sm text-slate-300 font-medium">
                        <span><strong className="text-white">Turma:</strong> {turmaObj?.nome || "Carregando"}</span>
@@ -668,7 +676,7 @@ export default function Avaliacoes() {
                 </div>
                 <div className="flex items-center gap-3">
                     {/* BOTÃO SALVAR */}
-                    {!carregandoDados && plano && !diarioFechado && !avaliacaoPadrao && (
+                    {!carregandoDados && plano && !diarioFechado && (
                         <button
                           onClick={salvarAvaliacoes}
                           disabled={salvando}
@@ -679,7 +687,7 @@ export default function Avaliacoes() {
                         </button>
                     )}
                     {/* BOTÃO EXPORTAR PARA BOLETIM */}
-                    {!carregandoDados && plano && !diarioFechado && !avaliacaoPadrao && alunosComNota > 0 && (
+                    {!carregandoDados && plano && !diarioFechado && alunosComNota > 0 && (
                         <button
                           onClick={() => setModalExportar(true)}
                           className="flex items-center gap-2 px-5 py-3 rounded-lg bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-400 hover:to-indigo-500 font-bold text-white shadow-lg transition-all active:scale-95 border border-purple-400/30"
@@ -744,7 +752,7 @@ export default function Avaliacoes() {
                                         const percentage = (total / 10) * 100;
 
                                         return (
-                                        <tr key={aluno.id} className={`hover:bg-indigo-50/30 transition-colors border-b border-slate-100 group ${(diarioFechado || avaliacaoPadrao) ? 'opacity-90' : ''}`}>
+                                        <tr key={aluno.id} className={`hover:bg-indigo-50/30 transition-colors border-b border-slate-100 group ${diarioFechado ? 'opacity-90' : ''}`}>
                                             <td className="px-6 py-3 text-center text-sm font-semibold text-slate-400">{index + 1}</td>
                                             <td className="px-6 py-3 font-bold text-slate-700 sticky left-0 bg-white group-hover:bg-indigo-50/30 transition-colors border-r border-slate-100 z-10 flex flex-col">
                                                 <span>{aluno.nome}</span>
@@ -756,6 +764,7 @@ export default function Avaliacoes() {
                                                 const val = notas[getNotaKey(aluno.id, col.itemIdx, col.opIdx)];
                                                 const displayVal = val !== undefined ? val : "";
                                                 const cor = coresCelulas[getNotaKey(aluno.id, col.itemIdx, col.opIdx)];
+                                                const cellBloqueada = diarioFechado || isItemBloqueado(col.itemIdx);
 
                                                 const bgClass =
                                                    cor === "red" ? "bg-red-200 text-red-900" :
@@ -767,7 +776,7 @@ export default function Avaliacoes() {
                                                 <td
                                                    key={`cell_${i}`}
                                                    onContextMenu={(e) => handleContextMenu(e, aluno.id, col.itemIdx, col.opIdx, col.maxVal)}
-                                                   className={`px-1 py-1 border-r border-slate-100 text-center relative group/cell transition-colors duration-300 ${cor === "red" ? "bg-red-100" : cor === "yellow" ? "bg-yellow-100" : cor === "green" ? "bg-green-100" : ""}`}
+                                                   className={`px-1 py-1 border-r border-slate-100 text-center relative group/cell transition-colors duration-300 ${cor === "red" ? "bg-red-100" : cor === "yellow" ? "bg-yellow-100" : cor === "green" ? "bg-green-100" : ""} ${cellBloqueada ? "bg-amber-50/40" : ""}`}
                                                 >
                                                     <input
                                                        type="number"
@@ -776,19 +785,24 @@ export default function Avaliacoes() {
                                                        step="0.1"
                                                        value={displayVal}
                                                        onChange={(e) => handleNotaChange(aluno.id, col.itemIdx, col.opIdx, col.maxVal, e.target.value)}
-                                                       readOnly={diarioFechado || avaliacaoPadrao}
-                                                       tabIndex={(diarioFechado || avaliacaoPadrao) ? -1 : 0}
+                                                       readOnly={cellBloqueada}
+                                                       tabIndex={cellBloqueada ? -1 : 0}
                                                        className={`w-full text-center py-2.5 font-bold border border-transparent rounded-lg outline-none transition-all placeholder:text-slate-300 ${bgClass} ${
-                                                         (diarioFechado || avaliacaoPadrao)
+                                                         cellBloqueada
                                                            ? 'cursor-not-allowed bg-slate-50' 
                                                            : 'hover:border-slate-300 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200'
                                                        }`}
                                                        placeholder="-"
                                                     />
                                                     {/* Tooltip de suporte no hover */}
-                                                    {!diarioFechado && !avaliacaoPadrao && (
+                                                    {!cellBloqueada && (
                                                       <div className="absolute opacity-0 group-hover/cell:opacity-100 -top-8 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg pointer-events-none transition-opacity whitespace-nowrap z-50">
                                                           Max: {col.maxVal}
+                                                      </div>
+                                                    )}
+                                                    {cellBloqueada && !diarioFechado && (
+                                                      <div className="absolute opacity-0 group-hover/cell:opacity-100 -top-8 left-1/2 transform -translate-x-1/2 bg-amber-700 text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg pointer-events-none transition-opacity whitespace-nowrap z-50">
+                                                          🔒 Preenchido via Gabarito
                                                       </div>
                                                     )}
                                                 </td>
@@ -831,7 +845,7 @@ export default function Avaliacoes() {
                   </span>
                 ) : avaliacaoPadrao ? (
                   <span className="flex items-center gap-1.5 text-amber-600 font-bold">
-                    <LockClosedIcon className="w-4 h-4" /> Avaliação padronizada. Diário em somente leitura.
+                    <LockClosedIcon className="w-4 h-4" /> Avaliação padronizada: coluna "Prova Bimestral" bloqueada (preenchida via Gabarito). Demais colunas editáveis.
                   </span>
                 ) : (
                   <span>Pressione <strong>Tab</strong> ou use as setas para navegar rapidamente pelas células. <strong className="text-indigo-600">Dica: Clique com o botão direito</strong> em qualquer célula para dar nota rápida por cores.</span>
@@ -842,7 +856,7 @@ export default function Avaliacoes() {
       )}
 
       {/* MODAL CONTEXTUAL DE CORES */}
-      {contextMenu && !diarioFechado && !avaliacaoPadrao && (
+      {contextMenu && !diarioFechado && (
         <>
           <div
             className="fixed inset-0 z-[100]"

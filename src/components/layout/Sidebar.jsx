@@ -268,7 +268,7 @@ export default function Sidebar() {
         ) : (
           <>
             {/* LINK: Home */}
-            {!isDisciplinar && !isProfessor && (
+            {!isDisciplinar && !isProfessor && !isCoord && (
             <Link to="/" className={getMainLinkClasses('/')}>
               <HomeIcon className="h-5 w-5 mr-2" />
               Home
@@ -276,7 +276,7 @@ export default function Sidebar() {
             )}
 
             {/* LINK: Estudantes */}
-            {!isDisciplinar && !isProfessor && (
+            {!isDisciplinar && !isProfessor && !isCoord && (
             <Link to="/alunos" className={getMainLinkClasses('/alunos')}>
               <UserGroupIcon className="h-5 w-5 mr-2" />
               Estudantes
@@ -356,7 +356,7 @@ export default function Sidebar() {
               }}>NOVO</span>
             </Link>
             </>
-            ) : !isDisciplinar && (
+            ) : !isDisciplinar && !isCoord && (
             <>
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-2 transition"
@@ -412,7 +412,7 @@ export default function Sidebar() {
             )}
 
             {/* LINK: Banco de Questões */}
-            {!isDisciplinar && !isProfessor && (
+            {!isDisciplinar && !isProfessor && !isCoord && (
             <Link to="/questoes" className={getMainLinkClasses('/questoes')}>
               <BookOpenIcon className="h-5 w-5 mr-2" />
               Banco de Questões
@@ -420,15 +420,15 @@ export default function Sidebar() {
             )}
 
             {/* LINK: Ferramentas */}
-            {!isDisciplinar && !isProfessor && (
+            {!isDisciplinar && !isProfessor && !isCoord && (
             <Link to="/ferramentas" className={getMainLinkClasses('/ferramentas')}>
               <WrenchIcon className="h-5 w-5 mr-2" />
               Ferramentas
             </Link>
             )}
 
-            {/* ⭐ MÓDULO GABARITO — Destaque Premium */}
-            {canGabarito && (
+            {/* ⭐ MÓDULO GABARITO — Destaque Premium (não exibir para coordenador standalone, já está em Pedagógico) */}
+            {canGabarito && !isCoord && (
             <>
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-2 transition"
@@ -626,7 +626,7 @@ export default function Sidebar() {
 
 
 
-        {isScopeEscola && !isProfessor && (
+        {isScopeEscola && !isProfessor && !isCoord && (
           <>
             {/* ───────────────────────────────
                 GRUPO: Disciplinar
@@ -780,7 +780,7 @@ export default function Sidebar() {
           </>
         )}
 
-        {isScopeEscola && !isDisciplinar && !isProfessor && (
+        {isScopeEscola && !isDisciplinar && !isProfessor && !isCoord && (
           <>
             {/* ───────────────────────────────
                 GRUPO: Secretaria
@@ -1168,7 +1168,11 @@ export default function Sidebar() {
                 </li>
               </ul>
             )}
+          </>
+        )}
 
+        {isScopeEscola && !isDisciplinar && !isProfessor && !isCoord && (
+          <>
             {/* ───────────────────────────────
                 GRUPO: Impressão
             ─────────────────────────────── */}

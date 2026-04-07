@@ -53,6 +53,7 @@ import UsageEscolaDetalhe from "./features/plataforma/UsageEscolaDetalhe.jsx";
 import PlataformaSuporte from "./features/plataforma/PlataformaSuporte.jsx";
 import PlataformaGovernanca from "./features/plataforma/PlataformaGovernanca.jsx";
 import BoletimTurmas from "./features/impressao/BoletimTurmas";
+import ListasImpressao from "./features/impressao/ListasImpressao";
 import PrintBoletinsTurma from "./features/impressao/PrintBoletinsTurma";
 import LoginProfessor from "./features/login/LoginProfessor";
 import CadastroUsuario from "./features/login/CadastroUsuario.jsx";
@@ -511,6 +512,10 @@ export default function App() {
           <Route
             path="/impressao/boletins"
             element={<BoletimTurmas />}
+          />
+          <Route
+            path="/impressao/listas"
+            element={<ListasImpressao />}
           />
 
           {/* Horários */}

@@ -6,12 +6,13 @@ import {
   PencilSquareIcon,
   TrashIcon,
   XMarkIcon,
+  Bars3Icon,
 } from "@heroicons/react/24/outline";
 
 import "@fontsource/montserrat/400.css";
 import "@fontsource/montserrat/700.css";
 
-export default function HeaderGlobal() {
+export default function HeaderGlobal({ onToggleSidebar, sidebarOpen }) {
   // Estados para dados dinâmicos do usuário
   const [nomeEscola, setNomeEscola] = useState("");
   const [userName, setUserName] = useState("");
@@ -438,10 +439,22 @@ const UPLOADS_CDN = (() => {
 
 
   return (
-    <div className="w-full px-8 py-5 bg-gradient-to-r from-blue-50 to-white shadow-md rounded-lg dark:from-gray-900 dark:to-gray-800 dark:shadow-lg flex justify-between items-center relative">
+    <div className="header-global">
+      {/* Hamburger mobile */}
+      <div className="header-hamburger">
+        <button
+          type="button"
+          onClick={onToggleSidebar}
+          className="h-10 w-10 rounded-lg bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 transition shadow"
+          title="Abrir menu"
+        >
+          <Bars3Icon className="h-6 w-6" />
+        </button>
+      </div>
+
       {/* Nome da Escola (dinâmico) */}
       <h1
-        className="text-4xl tracking-tight text-blue-900 dark:text-white"
+        className="header-escola-nome"
         style={{
           fontFamily: "'Montserrat', sans-serif",
           fontWeight: 700,
@@ -516,7 +529,7 @@ const UPLOADS_CDN = (() => {
 
 
         {/* Nome e perfil */}
-        <span className="text-blue-900 font-semibold">
+        <span className="header-user-info">
           {userName} <span className="text-sm text-gray-600">({
             {
               militar: "Comandante",
@@ -533,10 +546,10 @@ const UPLOADS_CDN = (() => {
         {/* Botão de sair */}
         <button
           onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 bg-red-500 hover:bg-red-600 text-white font-semibold px-4 py-2 rounded-lg shadow transition-colors"
+          className="header-logout-btn"
         >
           <ArrowRightOnRectangleIcon className="h-5 w-5" />
-          Sair
+          <span className="header-logout-text">Sair</span>
         </button>
       </div>
 

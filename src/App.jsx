@@ -1,5 +1,5 @@
-import React from "react";
-import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router-dom";
+import React, { useState, useCallback, useEffect } from "react";
+import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom";
 import Sidebar from "./components/layout/Sidebar";
 import HeaderGlobal from "./components/layout/HeaderGlobal";
 import Home from "./features/home/Home.jsx";
@@ -97,11 +97,29 @@ import BoletimEdicao from "./features/secretaria/boletim/BoletimEdicao.jsx";
 
 // Layout protegido para rotas autenticadas
 function ProtectedLayout() {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const location = useLocation();
+
+  // Fecha sidebar mobile ao mudar de rota
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
+
+  const toggleSidebar = useCallback(() => setSidebarOpen((v) => !v), []);
+  const closeSidebar = useCallback(() => setSidebarOpen(false), []);
+
   return (
-    <div className="flex h-screen">
-      <Sidebar />
-      <main className="flex-1 p-6 bg-blue-50 overflow-auto">
-        <HeaderGlobal />
+    <div className="flex h-screen relative">
+      {/* Overlay mobile */}
+      {sidebarOpen && (
+        <div
+          className="sidebar-overlay"
+          onClick={closeSidebar}
+        />
+      )}
+      <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} />
+      <main className="flex-1 p-3 md:p-6 bg-blue-50 overflow-auto w-full">
+        <HeaderGlobal onToggleSidebar={toggleSidebar} sidebarOpen={sidebarOpen} />
         <Outlet />
       </main>
     </div>

@@ -27,9 +27,10 @@ import {
   TableCellsIcon,
   QuestionMarkCircleIcon,
   Cog6ToothIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
 
-export default function Sidebar() {
+export default function Sidebar({ isOpen, onClose }) {
   const [openGroup, setOpenGroup] = useState(null);
   const [openCorrecoes, setOpenCorrecoes] = useState(false);
   const [openGabaritoPed, setOpenGabaritoPed] = useState(false);
@@ -156,8 +157,19 @@ export default function Sidebar() {
   // Renderização
   // ─────────────────────────────────────────────────────────────
   return (
-    <aside className="w-64 bg-blue-800 text-white flex-shrink-0 h-screen overflow-y-auto">
+    <aside className={`sidebar-aside ${isOpen ? 'sidebar-open' : ''}`}>
       <nav className="p-4">
+        {/* Botão fechar — visível apenas em mobile */}
+        <div className="sidebar-close-btn">
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-8 w-8 rounded-lg hover:bg-blue-700 flex items-center justify-center transition"
+            title="Fechar menu"
+          >
+            <XMarkIcon className="h-5 w-5" />
+          </button>
+        </div>
         {isScopePlataforma ? (
           <>
             {/* ─── GRUPO: Escolas (submenus) ─── */}

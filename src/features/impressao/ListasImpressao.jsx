@@ -1,11 +1,10 @@
 // src/features/impressao/ListasImpressao.jsx
 // ============================================================================
 // Módulo LISTAS — Geração de listas imprimíveis para coordenação/direção.
-// Tipos: Chamada, Assinatura (provas), Alunos Faltosos, Aniversariantes,
-//        Lista de Contatos (responsáveis), Lista em Branco.
+// PDF gerado no servidor (PDFKit) — idêntico ao Relatório Disciplinar.
 // ============================================================================
 
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import api from "../../services/api";
 import {
   ClipboardDocumentListIcon,
@@ -16,7 +15,11 @@ import {
   CakeIcon,
   PhoneIcon,
   DocumentTextIcon,
+  DocumentDuplicateIcon,
 } from "@heroicons/react/24/outline";
+
+// ─── Ano letivo atual ───
+const ANO_LETIVO = String(new Date().getFullYear());
 
 // ─── Normaliza texto para comparação ───
 const norm = (s) =>
@@ -34,7 +37,6 @@ const TIPOS_LISTA = [
     desc: "Frequência diária com campos para marcar presença/falta",
     icon: ClipboardDocumentListIcon,
     color: "from-blue-500 to-blue-700",
-    fields: ["Nº", "Estudante", "P", "F", "Observação"],
   },
   {
     id: "assinatura_prova",
@@ -42,7 +44,6 @@ const TIPOS_LISTA = [
     desc: "Folha de assinatura para dia de aplicação de provas/avaliações",
     icon: DocumentTextIcon,
     color: "from-indigo-500 to-indigo-700",
-    fields: ["Nº", "Estudante", "Assinatura"],
   },
   {
     id: "assinatura_geral",
@@ -50,23 +51,6 @@ const TIPOS_LISTA = [
     desc: "Folha de assinatura para reuniões, eventos ou entregas de material",
     icon: UserGroupIcon,
     color: "from-violet-500 to-violet-700",
-    fields: ["Nº", "Estudante", "Assinatura", "Responsável"],
-  },
-  {
-    id: "aniversariantes",
-    nome: "Aniversariantes do Mês",
-    desc: "Lista de alunos por mês de nascimento — ideal para ações pedagógicas",
-    icon: CakeIcon,
-    color: "from-pink-500 to-rose-600",
-    fields: ["Nº", "Estudante", "Data Nasc.", "Turma"],
-  },
-  {
-    id: "contatos",
-    nome: "Contatos (Responsáveis)",
-    desc: "Lista com telefone e e-mail dos responsáveis para comunicação",
-    icon: PhoneIcon,
-    color: "from-emerald-500 to-emerald-700",
-    fields: ["Nº", "Estudante", "Responsável", "Telefone"],
   },
   {
     id: "branco",
@@ -74,22 +58,15 @@ const TIPOS_LISTA = [
     desc: "Linhas vazias numeradas para preenchimento manual",
     icon: AcademicCapIcon,
     color: "from-gray-500 to-gray-700",
-    fields: ["Nº", "Nome", "Observação"],
   },
-];
-
-// ─── Meses ───
-const MESES = [
-  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
 ];
 
 export default function ListasImpressao() {
   // ─── Estado ───
   const [turmas, setTurmas] = useState([]);
-  const [alunos, setAlunos] = useState([]);
   const [loadingTurmas, setLoadingTurmas] = useState(false);
-  const [loadingAlunos, setLoadingAlunos] = useState(false);
+  const [gerando, setGerando] = useState(false);
+  const [gerandoTurno, setGerandoTurno] = useState(false);
 
   const [turnoSelecionado, setTurnoSelecionado] = useState(null);
   const [turmaSelecionada, setTurmaSelecionada] = useState(null);
@@ -100,15 +77,11 @@ export default function ListasImpressao() {
   const [dataAplicacao, setDataAplicacao] = useState(
     new Date().toISOString().slice(0, 10)
   );
-  const [mesSelecionado, setMesSelecionado] = useState(new Date().getMonth());
   const [qtdLinhasBranco, setQtdLinhasBranco] = useState(30);
 
-  const printRef = useRef(null);
-
-  const nomeEscola = localStorage.getItem("nome_escola") || "Escola";
   const turnos = ["Matutino", "Vespertino", "Noturno"];
 
-  // ─── Buscar turmas ───
+  // ─── Buscar turmas (filtradas pelo ano letivo atual) ───
   useEffect(() => {
     (async () => {
       setLoadingTurmas(true);
@@ -117,7 +90,11 @@ export default function ListasImpressao() {
         const { data } = await api.get("/api/turmas", {
           params: { escola_id },
         });
-        setTurmas(data);
+        // Filtra apenas turmas do ano letivo atual
+        const turmasAnoAtual = (data || []).filter(
+          (t) => String(t.ano) === ANO_LETIVO
+        );
+        setTurmas(turmasAnoAtual);
       } catch {
         setTurmas([]);
       } finally {
@@ -125,34 +102,6 @@ export default function ListasImpressao() {
       }
     })();
   }, []);
-
-  // ─── Buscar alunos quando selecionar turma ───
-  useEffect(() => {
-    if (!turmaSelecionada) {
-      setAlunos([]);
-      return;
-    }
-    (async () => {
-      setLoadingAlunos(true);
-      try {
-        const { data } = await api.get("/api/alunos", {
-          params: {
-            turma_id: turmaSelecionada.id,
-            status: "ativo",
-          },
-        });
-        // Ordena por nome
-        const sorted = (data || []).sort((a, b) =>
-          (a.nome || "").localeCompare(b.nome || "", "pt-BR")
-        );
-        setAlunos(sorted);
-      } catch {
-        setAlunos([]);
-      } finally {
-        setLoadingAlunos(false);
-      }
-    })();
-  }, [turmaSelecionada]);
 
   // ─── Turmas filtradas por turno ───
   const turmasFiltradas = useMemo(
@@ -167,303 +116,80 @@ export default function ListasImpressao() {
     [turmas, turnoSelecionado]
   );
 
-  // ─── Aniversariantes filtrados ───
-  const aniversariantes = useMemo(() => {
-    if (tipoLista?.id !== "aniversariantes") return [];
-    return alunos.filter((a) => {
-      if (!a.data_nascimento) return false;
-      const dt = new Date(a.data_nascimento);
-      return dt.getMonth() === mesSelecionado;
-    });
-  }, [alunos, mesSelecionado, tipoLista]);
+  // ═══ GERAR PDF (abre em nova aba via backend) ═══
+  const handleGerarPDF = async () => {
+    if (!tipoLista || !turmaSelecionada) return;
+    setGerando(true);
 
-  // ─── Data formatada ───
-  const dataFormatada = useMemo(() => {
-    if (!dataAplicacao) return "";
-    const [y, m, d] = dataAplicacao.split("-");
-    return `${d}/${m}/${y}`;
-  }, [dataAplicacao]);
+    try {
+      const params = new URLSearchParams({
+        tipo: tipoLista.id,
+        data: dataAplicacao,
+      });
 
-  // ═══ IMPRIMIR ═══
-  const handlePrint = () => {
-    const el = printRef.current;
-    if (!el) return;
+      if (tituloPersonalizado.trim()) {
+        params.set("titulo", tituloPersonalizado.trim());
+      }
 
-    const printWin = window.open("", "_blank");
-    if (!printWin) return alert("Habilite pop-ups para imprimir.");
+      if (tipoLista.id === "branco") {
+        params.set("linhas", String(qtdLinhasBranco));
+      }
 
-    printWin.document.write(`<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8"/>
-  <title>Lista — ${tipoLista?.nome || "Impressão"}</title>
-  <style>
-    @page { size: A4 portrait; margin: 12mm 10mm; }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px; color: #1e293b; }
-    .header { text-align: center; margin-bottom: 10px; border-bottom: 2px solid #1e40af; padding-bottom: 8px; }
-    .header h1 { font-size: 15px; font-weight: 800; color: #1e3a5f; letter-spacing: -0.02em; }
-    .header h2 { font-size: 13px; font-weight: 700; color: #334155; margin-top: 2px; }
-    .header .meta { font-size: 10px; color: #64748b; margin-top: 4px; display: flex; justify-content: space-between; }
-    table { width: 100%; border-collapse: collapse; margin-top: 6px; }
-    th { background: #e2e8f0; color: #1e293b; font-weight: 700; font-size: 10px; text-transform: uppercase;
-         letter-spacing: 0.04em; padding: 5px 6px; border: 1px solid #94a3b8; text-align: left; }
-    td { padding: 5px 6px; border: 1px solid #cbd5e1; font-size: 10.5px; }
-    tr:nth-child(even) td { background: #f8fafc; }
-    .sign-cell { min-width: 120px; }
-    .obs-cell { min-width: 100px; }
-    .footer { margin-top: 16px; text-align: center; font-size: 9px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 6px; }
-    .footer strong { color: #475569; }
-    .badge { display: inline-block; background: #dbeafe; color: #1e40af; font-size: 9px; font-weight: 700;
-             padding: 1px 6px; border-radius: 4px; }
-  </style>
-</head>
-<body>
-  ${el.innerHTML}
-</body>
-</html>`);
-    printWin.document.close();
+      // Chama API que retorna PDF inline
+      const response = await api.get(
+        `/api/listas-impressao/${turmaSelecionada.id}?${params.toString()}`,
+        { responseType: "blob" }
+      );
 
-    setTimeout(() => {
-      printWin.focus();
-      printWin.print();
-    }, 300);
+      // Cria URL do blob e abre em nova aba
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+
+      // Libera URL após 1 minuto
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (err) {
+      console.error("Erro ao gerar PDF:", err);
+      alert("Erro ao gerar o PDF. Verifique a conexão e tente novamente.");
+    } finally {
+      setGerando(false);
+    }
   };
 
-  // ═══ RENDER do conteúdo imprimível ═══
-  const renderPrintContent = () => {
-    if (!tipoLista || !turmaSelecionada) return null;
+  // ═══ GERAR PDF POR TURNO (todas as turmas) ═══
+  const handleGerarPDFTurno = async () => {
+    if (!tipoLista || !turnoSelecionado) return;
+    setGerandoTurno(true);
 
-    const tipo = tipoLista;
-    const turma = turmaSelecionada;
-    const titulo = tituloPersonalizado || tipo.nome;
+    try {
+      const params = new URLSearchParams({
+        tipo: tipoLista.id,
+        data: dataAplicacao,
+      });
 
-    const headerHTML = (
-      <>
-        <div className="header">
-          <h1>{nomeEscola}</h1>
-          <h2>{titulo}</h2>
-          <div className="meta">
-            <span><strong>Turma:</strong> {turma.turma} — {turma.turno}</span>
-            <span><strong>Data:</strong> {dataFormatada}</span>
-            <span><strong>Total:</strong> {tipo.id === "aniversariantes" ? aniversariantes.length : tipo.id === "branco" ? qtdLinhasBranco : alunos.length} aluno(s)</span>
-          </div>
-        </div>
-      </>
-    );
+      if (tituloPersonalizado.trim()) {
+        params.set("titulo", tituloPersonalizado.trim());
+      }
 
-    const footerHTML = (
-      <div className="footer">
-        <strong>EDUCA.MELHOR</strong> — {nomeEscola} — Impresso em {new Date().toLocaleDateString("pt-BR")} às {new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
-      </div>
-    );
+      if (tipoLista.id === "branco") {
+        params.set("linhas", String(qtdLinhasBranco));
+      }
 
-    // ─── CHAMADA ───
-    if (tipo.id === "chamada") {
-      return (
-        <>
-          {headerHTML}
-          <table>
-            <thead>
-              <tr>
-                <th style={{ width: "30px" }}>Nº</th>
-                <th>Estudante</th>
-                <th style={{ width: "30px", textAlign: "center" }}>P</th>
-                <th style={{ width: "30px", textAlign: "center" }}>F</th>
-                <th className="obs-cell">Observação</th>
-              </tr>
-            </thead>
-            <tbody>
-              {alunos.map((a, i) => (
-                <tr key={a.id}>
-                  <td style={{ textAlign: "center" }}>{i + 1}</td>
-                  <td>{a.nome}</td>
-                  <td style={{ textAlign: "center" }}></td>
-                  <td style={{ textAlign: "center" }}></td>
-                  <td></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <div style={{ marginTop: "12px", fontSize: "10px", color: "#64748b" }}>
-            <strong>Legenda:</strong> P = Presente &nbsp;|&nbsp; F = Falta
-          </div>
-          {footerHTML}
-        </>
+      const response = await api.get(
+        `/api/listas-impressao/por-turno/${encodeURIComponent(turnoSelecionado)}?${params.toString()}`,
+        { responseType: "blob" }
       );
-    }
 
-    // ─── ASSINATURA PROVA ───
-    if (tipo.id === "assinatura_prova") {
-      return (
-        <>
-          {headerHTML}
-          <table>
-            <thead>
-              <tr>
-                <th style={{ width: "30px" }}>Nº</th>
-                <th>Estudante</th>
-                <th className="sign-cell" style={{ textAlign: "center" }}>Assinatura</th>
-              </tr>
-            </thead>
-            <tbody>
-              {alunos.map((a, i) => (
-                <tr key={a.id} style={{ height: "28px" }}>
-                  <td style={{ textAlign: "center" }}>{i + 1}</td>
-                  <td>{a.nome}</td>
-                  <td></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <div style={{ marginTop: "20px", display: "flex", justifyContent: "space-between", fontSize: "10px" }}>
-            <div>
-              <div style={{ borderTop: "1px solid #334155", width: "200px", marginTop: "40px", textAlign: "center", paddingTop: "4px" }}>
-                Aplicador(a)
-              </div>
-            </div>
-            <div>
-              <div style={{ borderTop: "1px solid #334155", width: "200px", marginTop: "40px", textAlign: "center", paddingTop: "4px" }}>
-                Coordenador(a)
-              </div>
-            </div>
-          </div>
-          {footerHTML}
-        </>
-      );
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (err) {
+      console.error("Erro ao gerar PDF por turno:", err);
+      alert("Erro ao gerar o PDF por turno. Verifique a conexão e tente novamente.");
+    } finally {
+      setGerandoTurno(false);
     }
-
-    // ─── ASSINATURA GERAL ───
-    if (tipo.id === "assinatura_geral") {
-      return (
-        <>
-          {headerHTML}
-          <table>
-            <thead>
-              <tr>
-                <th style={{ width: "30px" }}>Nº</th>
-                <th>Estudante</th>
-                <th className="sign-cell" style={{ textAlign: "center" }}>Assinatura Aluno</th>
-                <th className="sign-cell" style={{ textAlign: "center" }}>Assinatura Responsável</th>
-              </tr>
-            </thead>
-            <tbody>
-              {alunos.map((a, i) => (
-                <tr key={a.id} style={{ height: "28px" }}>
-                  <td style={{ textAlign: "center" }}>{i + 1}</td>
-                  <td>{a.nome}</td>
-                  <td></td>
-                  <td></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {footerHTML}
-        </>
-      );
-    }
-
-    // ─── ANIVERSARIANTES ───
-    if (tipo.id === "aniversariantes") {
-      return (
-        <>
-          {headerHTML}
-          <div style={{ textAlign: "center", marginBottom: "8px" }}>
-            <span className="badge">🎂 {MESES[mesSelecionado]}</span>
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th style={{ width: "30px" }}>Nº</th>
-                <th>Estudante</th>
-                <th style={{ width: "90px" }}>Data Nasc.</th>
-                <th style={{ width: "100px" }}>Turma</th>
-              </tr>
-            </thead>
-            <tbody>
-              {aniversariantes.length > 0 ? (
-                aniversariantes.map((a, i) => (
-                  <tr key={a.id}>
-                    <td style={{ textAlign: "center" }}>{i + 1}</td>
-                    <td>{a.nome}</td>
-                    <td>{a.data_nascimento ? new Date(a.data_nascimento).toLocaleDateString("pt-BR") : "—"}</td>
-                    <td>{a.turma || turma.turma}</td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={4} style={{ textAlign: "center", color: "#94a3b8", padding: "12px" }}>
-                    Nenhum aniversariante em {MESES[mesSelecionado]}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-          {footerHTML}
-        </>
-      );
-    }
-
-    // ─── CONTATOS ───
-    if (tipo.id === "contatos") {
-      return (
-        <>
-          {headerHTML}
-          <table>
-            <thead>
-              <tr>
-                <th style={{ width: "30px" }}>Nº</th>
-                <th>Estudante</th>
-                <th>Responsável</th>
-                <th style={{ width: "120px" }}>Telefone</th>
-              </tr>
-            </thead>
-            <tbody>
-              {alunos.map((a, i) => (
-                <tr key={a.id}>
-                  <td style={{ textAlign: "center" }}>{i + 1}</td>
-                  <td>{a.nome}</td>
-                  <td>{a.responsavel || "—"}</td>
-                  <td>{a.telefone_responsavel || a.celular || "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {footerHTML}
-        </>
-      );
-    }
-
-    // ─── EM BRANCO ───
-    if (tipo.id === "branco") {
-      const linhas = Array.from({ length: qtdLinhasBranco }, (_, i) => i + 1);
-      return (
-        <>
-          {headerHTML}
-          <table>
-            <thead>
-              <tr>
-                <th style={{ width: "30px" }}>Nº</th>
-                <th>Nome</th>
-                <th className="obs-cell">Observação</th>
-              </tr>
-            </thead>
-            <tbody>
-              {linhas.map((n) => (
-                <tr key={n} style={{ height: "26px" }}>
-                  <td style={{ textAlign: "center" }}>{n}</td>
-                  <td></td>
-                  <td></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {footerHTML}
-        </>
-      );
-    }
-
-    return null;
   };
 
   // ─── STATUS ───
@@ -490,7 +216,7 @@ export default function ListasImpressao() {
               📋 Listas para Impressão
             </h1>
             <p className="mt-1 text-blue-200 text-sm md:text-base">
-              Selecione o tipo de lista, turno e turma para gerar e imprimir.
+              Selecione o tipo de lista, turno e turma para gerar o PDF.
             </p>
           </div>
         </div>
@@ -501,7 +227,7 @@ export default function ListasImpressao() {
             { n: 1, label: "Tipo" },
             { n: 2, label: "Turno" },
             { n: 3, label: "Turma" },
-            { n: 4, label: "Imprimir" },
+            { n: 4, label: "Gerar PDF" },
           ].map((s, i) => (
             <React.Fragment key={s.n}>
               {i > 0 && (
@@ -522,7 +248,7 @@ export default function ListasImpressao() {
             {step === 1 && "Escolha o tipo de lista"}
             {step === 2 && "Selecione o turno"}
             {step === 3 && "Selecione a turma"}
-            {step === 4 && "Pronto para imprimir!"}
+            {step === 4 && "Pronto para gerar!"}
           </span>
         </div>
       </div>
@@ -544,7 +270,6 @@ export default function ListasImpressao() {
                 onClick={() => {
                   setTipoLista(t);
                   setTurmaSelecionada(null);
-                  setAlunos([]);
                 }}
                 className={`group relative overflow-hidden rounded-xl border-2 text-left p-4 transition-all duration-200 ${
                   sel
@@ -588,7 +313,6 @@ export default function ListasImpressao() {
                 onClick={() => {
                   setTurnoSelecionado(turno);
                   setTurmaSelecionada(null);
-                  setAlunos([]);
                 }}
                 className={`px-6 py-3 rounded-xl font-bold text-sm transition-all shadow-sm ${
                   turnoSelecionado === turno
@@ -600,6 +324,83 @@ export default function ListasImpressao() {
               </button>
             ))}
           </div>
+
+          {/* ─── Card: Gerar PDF do Turno Completo ─── */}
+          <div className="mt-5 bg-gradient-to-br from-indigo-50 via-blue-50 to-purple-50 rounded-xl border-2 border-indigo-200 p-5 shadow-sm">
+            <div className="flex items-start gap-4">
+              <div className="hidden sm:flex h-12 w-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 items-center justify-center flex-shrink-0 shadow-lg shadow-indigo-300/40">
+                <DocumentDuplicateIcon className="h-6 w-6 text-white" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-bold text-indigo-900 flex items-center gap-2">
+                  📋 Gerar PDF do Turno Completo
+                  <span className="px-2 py-0.5 bg-indigo-600 text-white text-[10px] rounded-full font-bold uppercase tracking-wider">Novo</span>
+                </h3>
+                <p className="text-xs text-indigo-700/70 mt-1">
+                  Gera um único PDF com <strong>todas as {turmasFiltradas.length} turmas</strong> do turno <strong>{turnoSelecionado}</strong>, cada uma em sua própria página — incluindo capa com resumo do turno.
+                </p>
+
+                <div className="flex flex-wrap items-end gap-3 mt-3">
+                  {/* Título */}
+                  <div className="flex-1 min-w-[180px]">
+                    <label className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">Título da lista</label>
+                    <input
+                      type="text"
+                      value={tituloPersonalizado}
+                      onChange={(e) => setTituloPersonalizado(e.target.value)}
+                      placeholder={tipoLista.nome}
+                      className="mt-1 w-full px-3 py-1.5 rounded-lg border border-indigo-200 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white"
+                    />
+                  </div>
+
+                  {/* Data */}
+                  <div>
+                    <label className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">Data</label>
+                    <input
+                      type="date"
+                      value={dataAplicacao}
+                      onChange={(e) => setDataAplicacao(e.target.value)}
+                      className="mt-1 px-3 py-1.5 rounded-lg border border-indigo-200 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white"
+                    />
+                  </div>
+
+                  {/* Linhas (branco) */}
+                  {tipoLista.id === "branco" && (
+                    <div>
+                      <label className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">Linhas</label>
+                      <input
+                        type="number"
+                        min={5}
+                        max={60}
+                        value={qtdLinhasBranco}
+                        onChange={(e) => setQtdLinhasBranco(Number(e.target.value))}
+                        className="mt-1 w-16 px-2 py-1.5 rounded-lg border border-indigo-200 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white"
+                      />
+                    </div>
+                  )}
+
+                  {/* Botão */}
+                  <button
+                    onClick={handleGerarPDFTurno}
+                    disabled={gerandoTurno || turmasFiltradas.length === 0}
+                    className="flex items-center gap-2 px-5 py-2 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-blue-600 text-white font-bold text-sm shadow-lg hover:shadow-xl hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {gerandoTurno ? (
+                      <>
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-r-transparent"></div>
+                        Gerando...
+                      </>
+                    ) : (
+                      <>
+                        <DocumentDuplicateIcon className="h-5 w-5" />
+                        Gerar PDF — {turnoSelecionado}
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -609,6 +410,7 @@ export default function ListasImpressao() {
           <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
             <span className="h-7 w-7 rounded-lg bg-green-100 text-green-700 flex items-center justify-center text-sm font-extrabold">3</span>
             Turma
+            <span className="text-xs font-normal text-gray-400 ml-1">(Ano Letivo {ANO_LETIVO})</span>
           </h2>
           {loadingTurmas ? (
             <p className="text-gray-500">Carregando turmas...</p>
@@ -632,16 +434,20 @@ export default function ListasImpressao() {
               })}
             </div>
           ) : (
-            <p className="text-gray-500">Nenhuma turma para {turnoSelecionado}.</p>
+            <p className="text-gray-500">Nenhuma turma para {turnoSelecionado} no ano letivo {ANO_LETIVO}.</p>
           )}
         </div>
       )}
 
-      {/* ─── STEP 4: Configuração + Preview ─── */}
+      {/* ─── STEP 4: Configuração + Gerar PDF ─── */}
       {turmaSelecionada && tipoLista && (
         <div className="animate-fadeIn">
-          {/* Config bar */}
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 mb-6">
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 mb-6">
+            <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4 flex items-center gap-2">
+              <span className="h-6 w-6 rounded-md bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-extrabold">4</span>
+              Configurar e Gerar PDF
+            </h3>
+
             <div className="flex flex-wrap items-end gap-4">
               {/* Título personalizado */}
               <div className="flex-1 min-w-[200px]">
@@ -666,22 +472,6 @@ export default function ListasImpressao() {
                 />
               </div>
 
-              {/* Mês (aniversariantes) */}
-              {tipoLista.id === "aniversariantes" && (
-                <div>
-                  <label className="text-xs font-bold text-gray-600 uppercase tracking-wider">Mês</label>
-                  <select
-                    value={mesSelecionado}
-                    onChange={(e) => setMesSelecionado(Number(e.target.value))}
-                    className="mt-1 px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                  >
-                    {MESES.map((m, i) => (
-                      <option key={i} value={i}>{m}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
               {/* Qtd linhas (branco) */}
               {tipoLista.id === "branco" && (
                 <div>
@@ -697,45 +487,40 @@ export default function ListasImpressao() {
                 </div>
               )}
 
-              {/* Botão imprimir */}
+              {/* Botão Gerar PDF */}
               <button
-                onClick={handlePrint}
-                disabled={loadingAlunos}
+                onClick={handleGerarPDF}
+                disabled={gerando}
                 className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-bold text-sm shadow-lg hover:shadow-xl hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <PrinterIcon className="h-5 w-5" />
-                Imprimir
+                {gerando ? (
+                  <>
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-r-transparent"></div>
+                    Gerando...
+                  </>
+                ) : (
+                  <>
+                    <PrinterIcon className="h-5 w-5" />
+                    Gerar PDF
+                  </>
+                )}
               </button>
             </div>
+
+            {/* Resumo */}
+            <div className="mt-4 p-3 bg-gradient-to-r from-indigo-50 to-blue-50 rounded-lg border border-indigo-100">
+              <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-gray-600">
+                <span><strong className="text-indigo-700">Tipo:</strong> {tipoLista.nome}</span>
+                <span><strong className="text-indigo-700">Turma:</strong> {turmaSelecionada.turma}</span>
+                <span><strong className="text-indigo-700">Turno:</strong> {turmaSelecionada.turno || turnoSelecionado}</span>
+                <span><strong className="text-indigo-700">Ano Letivo:</strong> {ANO_LETIVO}</span>
+                <span><strong className="text-indigo-700">Data:</strong> {dataAplicacao.split("-").reverse().join("/")}</span>
+              </div>
+              <p className="mt-2 text-xs text-gray-500">
+                📄 O PDF será gerado com o cabeçalho institucional completo (logos e informações da escola) e aberto em uma nova aba para visualização e impressão.
+              </p>
+            </div>
           </div>
-
-          {/* Info */}
-          {loadingAlunos ? (
-            <div className="text-center py-12 text-gray-500">
-              <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-indigo-400 border-r-transparent mb-3"></div>
-              <p>Carregando alunos...</p>
-            </div>
-          ) : (
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 mb-6">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-sm font-bold text-gray-700">
-                  📄 Pré-visualização — {tipoLista.nome}
-                </span>
-                <span className="text-xs text-gray-500">
-                  {tipoLista.id === "aniversariantes" ? aniversariantes.length : tipoLista.id === "branco" ? qtdLinhasBranco : alunos.length} linha(s)
-                </span>
-              </div>
-
-              {/* Área imprimível (hidden mas DOM presente) */}
-              <div
-                ref={printRef}
-                className="border border-gray-100 rounded-lg p-4 bg-white max-h-[400px] overflow-auto text-[11px]"
-                style={{ fontFamily: "'Segoe UI', Arial, sans-serif" }}
-              >
-                {renderPrintContent()}
-              </div>
-            </div>
-          )}
         </div>
       )}
     </div>

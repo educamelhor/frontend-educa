@@ -349,6 +349,11 @@ export default function SincronizarSEEDF() {
                   <span className="text-gray-500">
                     📥 <strong className="text-gray-800">{syncStatus.relatorio.resumo.pdfs_baixados}</strong> PDFs
                   </span>
+                  {syncStatus.relatorio.resumo.alunos_localizados > 0 && (
+                    <span className="text-gray-600">
+                      👥 <strong className="text-gray-800">{syncStatus.relatorio.resumo.alunos_localizados}</strong> alunos localizados
+                    </span>
+                  )}
                   <span className="text-green-600">
                     ✅ <strong>{syncStatus.relatorio.resumo.alunos_inseridos || 0}</strong> inseridos
                   </span>
@@ -362,7 +367,9 @@ export default function SincronizarSEEDF() {
                     <span className={syncStatus.relatorio.resumo.turmas_vazias > 0 ? "text-red-600 font-semibold" : "text-emerald-600"}>
                       {syncStatus.relatorio.resumo.turmas_vazias > 0
                         ? `⚠ ${syncStatus.relatorio.resumo.turmas_vazias} turma(s) vazia(s)`
-                        : `✅ ${syncStatus.relatorio.resumo.turmas_ok || 0} turmas verificadas`}
+                        : (syncStatus.relatorio.resumo.turmas_ok || 0) > 0
+                          ? `✅ ${syncStatus.relatorio.resumo.turmas_ok} turmas verificadas`
+                          : `✅ 0 turmas verificadas`}
                     </span>
                   )}
                 </div>
@@ -556,6 +563,10 @@ export default function SincronizarSEEDF() {
                               <div className="text-lg font-bold text-gray-800">{resumo.pdfs_baixados ?? "–"}</div>
                             </div>
                             <div>
+                              <div className="text-xs text-gray-500 mb-1">Alunos localizados</div>
+                              <div className="text-lg font-bold text-gray-800">{resumo.alunos_localizados ?? "–"}</div>
+                            </div>
+                            <div>
                               <div className="text-xs text-gray-500 mb-1">Alunos inseridos</div>
                               <div className="text-lg font-bold text-green-600">{resumo.alunos_inseridos ?? 0}</div>
                             </div>
@@ -593,11 +604,15 @@ export default function SincronizarSEEDF() {
                                 <div className="text-xs text-gray-500 mb-1">Checklist de Verificação</div>
                                 {resumo.turmas_vazias > 0 ? (
                                   <div className="text-sm font-bold text-red-600">
-                                    ⚠ {resumo.turmas_vazias} turma(s) sem alunos
+                                    ⚠ {resumo.turmas_vazias} turma(s) sem alunos após importação
+                                  </div>
+                                ) : (resumo.turmas_ok || 0) > 0 ? (
+                                  <div className="text-sm font-bold text-emerald-600">
+                                    ✅ {resumo.turmas_ok} turmas confirmadas — {resumo.total_alunos_verificados || resumo.alunos_localizados || "–"} alunos no total
                                   </div>
                                 ) : (
-                                  <div className="text-sm font-bold text-emerald-600">
-                                    ✅ Todas as {resumo.turmas_ok || 0} turmas verificadas com alunos
+                                  <div className="text-sm font-medium text-gray-500">
+                                    ℹ️ Verificação não aplicável (nenhuma turma correspondente encontrada)
                                   </div>
                                 )}
                               </div>

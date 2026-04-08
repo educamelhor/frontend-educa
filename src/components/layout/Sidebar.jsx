@@ -28,6 +28,7 @@ import {
   QuestionMarkCircleIcon,
   Cog6ToothIcon,
   XMarkIcon,
+  BoltIcon,
 } from '@heroicons/react/24/outline';
 
 export default function Sidebar({ isOpen, onClose }) {
@@ -134,6 +135,7 @@ export default function Sidebar({ isOpen, onClose }) {
     else if (p.startsWith('/direcao')) setOpenGroup('direcao');
     else if (p.startsWith('/plataforma')) setOpenGroup('plataforma');
     else if (p.startsWith('/gabarito')) setOpenGroup('gabarito');
+    else if (p.startsWith('/agente-educa')) setOpenGroup('agente-educa');
     else setOpenGroup(null);
   }, [location.pathname]);
 
@@ -794,6 +796,51 @@ export default function Sidebar({ isOpen, onClose }) {
 
         {isScopeEscola && !isDisciplinar && !isProfessor && !isCoord && (
           <>
+            {/* ───────────────────────────────
+                GRUPO: Agente EDUCA
+            ─────────────────────────────── */}
+            <button
+              className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-6 transition"
+              onClick={() => setOpenGroup(openGroup === 'agente-educa' ? null : 'agente-educa')}
+              type="button"
+              style={{
+                background: openGroup === 'agente-educa'
+                  ? 'linear-gradient(90deg, rgba(234,179,8,0.15), transparent)'
+                  : undefined,
+              }}
+            >
+              <BoltIcon className="h-5 w-5 mr-2" style={{ color: openGroup === 'agente-educa' ? '#eab308' : undefined }} />
+              <span className="flex-1 text-left font-bold">Agente EDUCA</span>
+              <span style={{
+                fontSize: '0.55rem',
+                fontWeight: 800,
+                background: 'linear-gradient(135deg, #eab308, #f59e0b)',
+                color: '#fff',
+                padding: '2px 6px',
+                borderRadius: '8px',
+                letterSpacing: '0.5px',
+                marginRight: 4,
+              }}>PREMIUM</span>
+              {openGroup === 'agente-educa' ? (
+                <ChevronDownIcon className="h-4 w-4" />
+              ) : (
+                <ChevronRightIcon className="h-4 w-4" />
+              )}
+            </button>
+
+            {openGroup === 'agente-educa' && (
+              <ul className="ml-4 mb-2">
+                <li>
+                  <Link
+                    to="/agente-educa/credenciais"
+                    className={getSubmenuLinkClasses('/agente-educa/credenciais')}
+                  >
+                    <Cog6ToothIcon className="h-5 w-5 mr-2" /> Credenciais
+                  </Link>
+                </li>
+              </ul>
+            )}
+
             {/* ───────────────────────────────
                 GRUPO: Secretaria
             ─────────────────────────────── */}

@@ -61,6 +61,7 @@ import TabelaCodigos from "./features/secretaria/tabela-codigos";
 import HorariosPage from "./features/secretaria/horarios/index.jsx";
 import LayoutGrade from "./features/secretaria/horarios/LayoutGrade.jsx";
 import ExecutarMock from "./features/secretaria/horarios/ExecutarMock.jsx";
+import AgenteCredenciais from "./features/agente-educa/Credenciais";
 
 // ✅ MÓDULO FREQUÊNCIA
 import Atestados from "./features/frequencia/Atestados.jsx";
@@ -529,6 +530,9 @@ export default function App() {
           />
 
           <Route path="/ferramentas" element={<Ferramentas />} />
+
+          {/* Agente EDUCA */}
+          <Route path="/agente-educa/credenciais" element={<AgenteCredenciais />} />
 
           {/* Direção (Diretor) — Devices EDUCA-CAPTURE */}
           <Route

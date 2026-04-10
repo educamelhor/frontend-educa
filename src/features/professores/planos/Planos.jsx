@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import ModalAdicionarItemPlano from "./ModalAdicionarItemPlano";
+import ModalRecallTipoAvaliacao from "./ModalRecallTipoAvaliacao";
 import api from "../../../services/api";
 
 import {
@@ -91,11 +92,14 @@ export default function Planos() {
   const [confirmExcluirOpen, setConfirmExcluirOpen] = useState(false);
   const [confirmExcluirIndex, setConfirmExcluirIndex] = useState(null);
 
-  // ✅ Modal premium de governança (ENVIADO / APROVADO)
-  const [modalGovernanca, setModalGovernanca] = useState(null); // null | { tipo: "ENVIADO" | "APROVADO", turma: "..." }
+  // ✅ Modal premium de governança (ENVIADO / APROVADO / DEVOLVIDO)
+  const [modalGovernanca, setModalGovernanca] = useState(null); // null | { tipo: "ENVIADO" | "APROVADO", turma: "...", planoId }
+  const [solicitacaoEnviada, setSolicitacaoEnviada] = useState(false); // modal de confirmação após solicitar liberação
+  const [solicitandoLiberacao, setSolicitandoLiberacao] = useState(false);
 
   // Campos do modal
   const [atividade, setAtividade] = useState("");
+  const [tipoAvaliacao, setTipoAvaliacao] = useState("");
   const [dataInicio, setDataInicio] = useState("");
   const [dataFinal, setDataFinal] = useState("");
   const [notaTotal, setNotaTotal] = useState("");
@@ -449,7 +453,7 @@ export default function Planos() {
                              </button>
                            ) : isAprovado ? (
                              <button
-                               onClick={() => setModalGovernanca({ tipo: "APROVADO", turma })}
+                               onClick={() => setModalGovernanca({ tipo: "APROVADO", turma, planoId: id })}
                                className="text-sm px-4 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold rounded shadow-sm border border-blue-200 transition"
                              >
                                Editar
@@ -569,6 +573,7 @@ export default function Planos() {
                 setEditIndex(null);
 
                 setAtividade("");
+                setTipoAvaliacao("");
                 setDataInicio("");
                 setDataFinal("");
                 setNotaTotal("");
@@ -710,8 +715,9 @@ export default function Planos() {
 
                                 // abre modal preenchido com os dados do item
                                 setAtividade(item?.atividade || "");
-                                setDataInicio(item?.data_inicio || "");
-                                setDataFinal(item?.data_final || "");
+                                setTipoAvaliacao(item?.tipo_avaliacao || "");
+                                setDataInicio(item?.data_inicio || item?.data || "");
+                                setDataFinal(item?.data_final || item?.data || "");
                                 setNotaTotal(String(item?.nota_total ?? ""));
                                 setOportunidades(String(item?.oportunidades ?? "1"));
                                 setNotaInvertida(String(item?.nota_invertida ?? "0"));
@@ -1091,13 +1097,108 @@ export default function Planos() {
                 Fechar
               </button>
               <button
-                onClick={() => {
-                  showMsg("info", "Solicitação de liberação enviada para a Coordenação.");
-                  setModalGovernanca(null);
+                disabled={solicitandoLiberacao}
+                onClick={async () => {
+                  if (!modalGovernanca?.planoId) return;
+                  setSolicitandoLiberacao(true);
+                  try {
+                    const res = await api.post(`/avaliacoes/solicitar-liberacao/${modalGovernanca.planoId}`, {
+                      motivo: "Professor solicitou liberação para atualização do plano."
+                    });
+                    if (res.data?.ok) {
+                      setModalGovernanca(null);
+                      setSolicitacaoEnviada(true);
+                    } else {
+                      showMsg("error", res.data?.error || "Erro ao solicitar liberação.");
+                    }
+                  } catch (err) {
+                    console.error("Erro ao solicitar liberação:", err);
+                    showMsg("error", err?.response?.data?.error || "Erro ao solicitar liberação.");
+                  } finally {
+                    setSolicitandoLiberacao(false);
+                  }
                 }}
-                className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-500/25 transition-all active:scale-95"
+                className={`px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-500/25 transition-all active:scale-95 flex items-center gap-2 ${
+                  solicitandoLiberacao ? "opacity-70 cursor-not-allowed" : ""
+                }`}
               >
-                Solicitar Liberação
+                {solicitandoLiberacao ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Enviando...
+                  </>
+                ) : (
+                  "Solicitar Liberação"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═════════════════════════════════════════════════════════
+          MODAL PREMIUM DE CONFIRMAÇÃO — Solicitação de Liberação Registrada
+          ═════════════════════════════════════════════════════════ */}
+      {solicitacaoEnviada && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          onClick={() => setSolicitacaoEnviada(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden transform transition-all animate-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header gradiente azul premium */}
+            <div className="bg-gradient-to-r from-blue-500 via-indigo-600 to-blue-700 px-6 py-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-sm shadow-lg">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <h4 className="text-xl font-black text-white tracking-tight">Solicitação Registrada ✓</h4>
+                  <p className="text-blue-100 text-sm font-semibold mt-0.5">Enviada com sucesso</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Corpo */}
+            <div className="px-6 py-6">
+              <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-4 mb-4">
+                <div className="flex items-start gap-3">
+                  <span className="text-xl flex-shrink-0 mt-0.5">📨</span>
+                  <div>
+                    <p className="text-blue-900 font-bold text-sm">Sua solicitação de liberação foi registrada!</p>
+                    <p className="text-blue-700 text-sm mt-1 leading-relaxed">
+                      A <strong>Direção / Coordenação</strong> recebeu sua solicitação e irá analisar.
+                      Quando o plano for liberado, você poderá editá-lo normalmente.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <p className="text-gray-500 text-xs leading-relaxed italic">
+                Após a edição, o plano deverá ser reenviado para uma nova aprovação.
+              </p>
+
+              {/* Status visual */}
+              <div className="mt-4 flex items-center gap-3 bg-blue-50 border border-blue-100 rounded-xl p-4">
+                <div className="relative">
+                  <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                  <div className="absolute inset-0 w-3 h-3 bg-blue-500 rounded-full animate-ping"></div>
+                </div>
+                <span className="text-sm font-bold text-blue-700">Aguardando liberação da Direção</span>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 bg-gray-50 border-t flex justify-end">
+              <button
+                onClick={() => setSolicitacaoEnviada(false)}
+                className="px-8 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-bold rounded-xl shadow-lg shadow-blue-500/25 transition-all active:scale-95"
+              >
+                Entendi
               </button>
             </div>
           </div>
@@ -1207,6 +1308,8 @@ export default function Planos() {
 
         atividade={atividade}
         setAtividade={setAtividade}
+        tipoAvaliacao={tipoAvaliacao}
+        setTipoAvaliacao={setTipoAvaliacao}
         dataInicio={dataInicio}
         setDataInicio={setDataInicio}
         dataFinal={dataFinal}
@@ -1240,6 +1343,9 @@ export default function Planos() {
           if (!nome)
             return { ok: false, type: "warn", text: "Informe o nome da atividade avaliativa." };
 
+          if (!tipoAvaliacao)
+            return { ok: false, type: "warn", text: "Selecione o Tipo de Avaliação (obrigatório para sincronização com o EducaDF)." };
+
           // ✅ evita item com pontuação zero (ou negativa)
           if (Number.isNaN(nt) || nt <= 0)
             return { ok: false, type: "warn", text: "A nota total deve ser maior que 0." };
@@ -1267,8 +1373,10 @@ export default function Planos() {
 
           const payload = {
             atividade: nome,
+            tipo_avaliacao: tipoAvaliacao || "",
+            data: dataInicio || "",
             data_inicio: dataInicio || "",
-            data_final: dataFinal || "",
+            data_final: dataFinal || dataInicio || "",
             nota_total: nt,
             oportunidades: op,
             nota_invertida: Number.isNaN(ni) ? 0 : ni,
@@ -1291,6 +1399,9 @@ export default function Planos() {
           return { ok: true, type: "success", text: "Item adicionado com sucesso." };
         }}
       />
+
+      {/* ═══ Modal Recall — Tipo de Avaliação pendente ═══ */}
+      <ModalRecallTipoAvaliacao />
     </div>
   );
 }

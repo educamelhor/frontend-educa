@@ -313,7 +313,7 @@ export default function SolicitacoesConteudos() {
               <DocumentCheckIcon className="w-6 h-6 text-white/80" />
               <div>
                 <h3 className="text-lg font-bold text-white">Planos de Avaliação Pedagógica</h3>
-                <p className="text-indigo-200 text-xs font-medium">PAPs enviados pelos professores aguardando aprovação</p>
+                <p className="text-indigo-200 text-xs font-medium">PAPs enviados e solicitações de liberação dos professores</p>
               </div>
             </div>
             {ultimaAtualizacao && (
@@ -349,7 +349,8 @@ export default function SolicitacoesConteudos() {
                       <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Turma</th>
                       <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Disciplina</th>
                       <th className="px-6 py-3 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Bimestre</th>
-                      <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Enviado em</th>
+                      <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Recebido em</th>
                       <th className="px-6 py-3 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Ações</th>
                     </tr>
                   </thead>
@@ -382,6 +383,23 @@ export default function SolicitacoesConteudos() {
                         <td className="px-6 py-4 font-bold text-gray-700 text-sm">{sol.turmas}</td>
                         <td className="px-6 py-4 text-gray-600 text-sm">{sol.disciplina}</td>
                         <td className="px-6 py-4 text-gray-600 text-sm">{sol.bimestre}</td>
+                        <td className="px-6 py-4 text-center">
+                          {sol.status === "LIBERACAO_SOLICITADA" ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 text-[11px] font-bold border border-amber-200">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75M3.75 21.75h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                              </svg>
+                              Liberação
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-700 text-[11px] font-bold border border-indigo-200">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              Novo PAP
+                            </span>
+                          )}
+                        </td>
                         <td className="px-6 py-4 text-center text-xs text-gray-500">
                           {sol.updated_at ? new Date(sol.updated_at).toLocaleDateString("pt-BR") : "—"}
                         </td>

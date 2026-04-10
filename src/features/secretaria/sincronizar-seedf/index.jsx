@@ -5,8 +5,9 @@
 // ============================================================================
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../../../services/api";
-import ModalCredenciaisSEEDF from "./ModalCredenciaisSEEDF";
+import ModalSincronizarTurma from "./ModalSincronizarTurma";
 
 // ─────────────────────────────────────────────
 // Ícones inline (SVG puro) — evita dependência
@@ -36,6 +37,11 @@ const IconDownload = () => (
     <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
   </svg>
 );
+const IconTurma = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z" />
+  </svg>
+);
 
 // ─────────────────────────────────────────────
 // Status badge com cores e animação
@@ -45,6 +51,7 @@ function StatusBadge({ status }) {
     em_andamento: { label: "Em andamento", bg: "bg-yellow-100 text-yellow-800 border-yellow-300", dot: "bg-yellow-500 animate-pulse" },
     sucesso:      { label: "Sucesso", bg: "bg-green-100 text-green-800 border-green-300", dot: "bg-green-500" },
     parcial:      { label: "Parcial", bg: "bg-orange-100 text-orange-800 border-orange-300", dot: "bg-orange-500" },
+    parcial_timeout: { label: "Timeout", bg: "bg-amber-100 text-amber-800 border-amber-300", dot: "bg-amber-500 animate-pulse" },
     falha:        { label: "Falha", bg: "bg-red-100 text-red-800 border-red-300", dot: "bg-red-500" },
     falha_scraping: { label: "Falha no download", bg: "bg-red-100 text-red-800 border-red-300", dot: "bg-red-500" },
     falha_importacao: { label: "Falha na importação", bg: "bg-red-100 text-red-800 border-red-300", dot: "bg-red-500" },
@@ -73,30 +80,23 @@ export default function SincronizarSEEDF() {
   const [expandedLog, setExpandedLog] = useState(null);
   const pollingRef = useRef(null);
 
-  // ── Credenciais SEEDF ──
-  const [credenciais, setCredenciais] = useState(null);         // lista de creds
-  const [credLoading, setCredLoading] = useState(true);
-  const [showCredModal, setShowCredModal] = useState(false);
-  const [credMotivo, setCredMotivo] = useState(null);           // 'sem_credenciais' | 'login_falhou'
+  const navigate = useNavigate();
 
-  // ── Carregar credenciais ──
+  // ── Credenciais SEEDF (leitura do Agente EDUCA) ──
+  const [credenciais, setCredenciais] = useState(null);
+  const [credLoading, setCredLoading] = useState(true);
+  const [showTurmaModal, setShowTurmaModal] = useState(false);
+
+  // ── Carregar credenciais (somente leitura — gerência no Agente EDUCA) ──
   const carregarCredenciais = useCallback(async () => {
     setCredLoading(true);
     try {
       const res = await api.get("/api/agente/credenciais");
       const creds = res.data?.credenciais || [];
       setCredenciais(creds);
-
-      // Se não há credenciais ativas, abre modal automaticamente
-      const ativas = creds.filter(c => c.ativo);
-      if (ativas.length === 0) {
-        setCredMotivo("sem_credenciais");
-        setShowCredModal(true);
-      }
-      return ativas;
+      return creds.filter(c => c.ativo);
     } catch (err) {
       console.warn("[SincSEEDF] Erro ao carregar credenciais:", err);
-      // Se o módulo agente não está ativo (feature flag OFF), não mostra erro
       if (err?.response?.status !== 404 && err?.response?.status !== 403) {
         setCredenciais([]);
       }
@@ -166,8 +166,7 @@ export default function SincronizarSEEDF() {
     // Verifica se há credenciais antes de sincronizar
     const ativas = (credenciais || []).filter(c => c.ativo);
     if (ativas.length === 0) {
-      setCredMotivo("sem_credenciais");
-      setShowCredModal(true);
+      navigate("/agente-educa/credenciais");
       return;
     }
 
@@ -183,26 +182,13 @@ export default function SincronizarSEEDF() {
         });
         iniciarPolling();
       } else {
-        // Se o erro indica login falhou, abre modal de credenciais
-        const msg = res.data?.message || "";
-        if (msg.toLowerCase().includes("login") || msg.toLowerCase().includes("credencial")) {
-          setCredMotivo("login_falhou");
-          setShowCredModal(true);
-        } else {
-          setError(msg || "Erro ao iniciar sincronização.");
-        }
+        setError(res.data?.message || "Erro ao iniciar sincronização.");
       }
     } catch (err) {
       if (err?.response?.status === 409) {
         setError("Já existe uma sincronização em andamento. Aguarde a conclusão.");
       } else {
-        const msg = err?.response?.data?.message || "";
-        if (msg.toLowerCase().includes("login") || msg.toLowerCase().includes("credencial")) {
-          setCredMotivo("login_falhou");
-          setShowCredModal(true);
-        } else {
-          setError(msg || "Erro ao iniciar sincronização.");
-        }
+        setError(err?.response?.data?.message || "Erro ao iniciar sincronização.");
       }
     } finally {
       setLoading(false);
@@ -216,15 +202,11 @@ export default function SincronizarSEEDF() {
 
   return (
     <div className="max-w-5xl mx-auto p-6">
-      {/* ═══════════════════════════════════════════════════
-          MODAL DE CREDENCIAIS
-      ═══════════════════════════════════════════════════ */}
-      <ModalCredenciaisSEEDF
-        open={showCredModal}
-        onClose={() => setShowCredModal(false)}
-        onSaved={() => carregarCredenciais()}
-        motivo={credMotivo}
-        credencialExistente={credAtivas[0] || null}
+      {/* ═══ MODAL SYNC TURMA ═══ */}
+      <ModalSincronizarTurma
+        open={showTurmaModal}
+        onClose={() => { setShowTurmaModal(false); carregarDados(); }}
+        onSyncStarted={() => carregarDados()}
       />
 
       {/* ═══════════════════════════════════════════════════
@@ -252,9 +234,7 @@ export default function SincronizarSEEDF() {
         </div>
       </div>
 
-      {/* ═══════════════════════════════════════════════════
-          CARD DE CREDENCIAIS
-      ═══════════════════════════════════════════════════ */}
+      {/* ═══ BANNER DE CREDENCIAIS (Somente leitura — gerenciadas no Agente EDUCA) ═══ */}
       <div
         className="rounded-2xl border overflow-hidden mb-6"
         style={{
@@ -285,19 +265,19 @@ export default function SincronizarSEEDF() {
                 {credLoading
                   ? "Verificando credenciais..."
                   : temCredenciais
-                    ? `Credencial configurada — matrícula ${credAtivas[0]?.educadf_login}`
+                    ? `Credencial conectada — matrícula ${credAtivas[0]?.educadf_login}`
                     : "Nenhuma credencial configurada"}
               </div>
               <div className="text-xs text-gray-500 mt-0.5">
                 {temCredenciais
-                  ? "O agente usará essa credencial para acessar o portal SEEDF"
-                  : "Configure as credenciais para habilitar a sincronização"}
+                  ? "Gerenciada pelo módulo Agente EDUCA"
+                  : "Configure suas credenciais no módulo Agente EDUCA para habilitar a sincronização"}
               </div>
             </div>
           </div>
           <button
-            id="btn-configurar-credenciais"
-            onClick={() => { setCredMotivo(null); setShowCredModal(true); }}
+            id="btn-ir-agente-educa"
+            onClick={() => navigate("/agente-educa/credenciais")}
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-all duration-200"
             style={{
               background: temCredenciais ? "#f1f5f9" : "linear-gradient(135deg, #3b82f6, #2563eb)",
@@ -307,10 +287,9 @@ export default function SincronizarSEEDF() {
             }}
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
             </svg>
-            {temCredenciais ? "Alterar" : "Configurar"}
+            {temCredenciais ? "Agente EDUCA" : "Configurar no Agente EDUCA"}
           </button>
         </div>
       </div>
@@ -346,19 +325,16 @@ export default function SincronizarSEEDF() {
               </div>
               {syncStatus.relatorio?.resumo && (
                 <div className="flex flex-wrap gap-4 text-sm">
-                  <span className="text-gray-500">
-                    📥 <strong className="text-gray-800">{syncStatus.relatorio.resumo.pdfs_baixados}</strong> PDFs
-                  </span>
                   {syncStatus.relatorio.resumo.alunos_localizados > 0 && (
                     <span className="text-gray-600">
-                      👥 <strong className="text-gray-800">{syncStatus.relatorio.resumo.alunos_localizados}</strong> alunos localizados
+                      👥 <strong className="text-gray-800">{syncStatus.relatorio.resumo.alunos_localizados}</strong> localizados
                     </span>
                   )}
                   <span className="text-green-600">
                     ✅ <strong>{syncStatus.relatorio.resumo.alunos_inseridos || 0}</strong> inseridos
                   </span>
-                  <span className="text-blue-600">
-                    🔄 <strong>{syncStatus.relatorio.resumo.alunos_reativados || 0}</strong> reativados
+                  <span className="text-purple-600">
+                    📋 <strong>{syncStatus.relatorio.resumo.alunos_jaExistiam ?? Math.max(0, (syncStatus.relatorio.resumo.alunos_localizados || 0) - (syncStatus.relatorio.resumo.alunos_inseridos || 0) - (syncStatus.relatorio.resumo.alunos_reativados || 0))}</strong> já existiam
                   </span>
                   <span className="text-orange-600">
                     ⏸ <strong>{syncStatus.relatorio.resumo.alunos_inativados || 0}</strong> inativados
@@ -372,6 +348,11 @@ export default function SincronizarSEEDF() {
                           : `✅ 0 turmas verificadas`}
                     </span>
                   )}
+                </div>
+              )}
+              {syncStatus.relatorio?.resumo?.motivo_parcial && (
+                <div className="mt-3 p-2.5 rounded-lg text-xs font-medium text-amber-800" style={{ background: "linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%)", border: "1px solid #fde68a" }}>
+                  ⚠️ {syncStatus.relatorio.resumo.motivo_parcial}
                 </div>
               )}
             </div>
@@ -404,6 +385,30 @@ export default function SincronizarSEEDF() {
                   Sincronizar Completo
                 </>
               )}
+            </button>
+
+            <button
+              id="btn-sincronizar-turma"
+              disabled={loading || emAndamento || !temCredenciais}
+              onClick={() => {
+                if (!temCredenciais) {
+                  navigate("/agente-educa/credenciais");
+                  return;
+                }
+                setShowTurmaModal(true);
+              }}
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-white font-semibold text-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                background: loading || emAndamento || !temCredenciais
+                  ? "#94a3b8"
+                  : "linear-gradient(135deg, #8b5cf6, #6d28d9)",
+                boxShadow: loading || emAndamento || !temCredenciais
+                  ? "none"
+                  : "0 4px 14px rgba(109,40,217,0.3)",
+              }}
+            >
+              <IconTurma />
+              Sincronizar Turma
             </button>
 
             <button
@@ -471,6 +476,7 @@ export default function SincronizarSEEDF() {
             <span className="text-blue-500 mt-0.5">ℹ️</span>
             <div>
               <strong>Sincronizar Completo</strong> baixa todas as turmas do portal SEEDF e importa automaticamente os estudantes.{" "}
+              <strong>Sincronizar Turma</strong> sincroniza apenas uma turma selecionada.{" "}
               <strong>Apenas Download</strong> baixa os PDFs sem importar — útil para conferência prévia.
             </div>
           </div>
@@ -534,9 +540,9 @@ export default function SincronizarSEEDF() {
                     {/* Resumo */}
                     {resumo && (
                       <div className="flex gap-3 text-xs text-gray-500 ml-auto">
-                        <span>📥 {resumo.pdfs_baixados ?? "–"} PDFs</span>
+                        <span>👥 {resumo.alunos_localizados ?? "–"} localizados</span>
                         <span className="text-green-600">+{resumo.alunos_inseridos ?? 0} inseridos</span>
-                        <span className="text-blue-600">🔄 {resumo.alunos_reativados ?? 0} reativados</span>
+                        <span className="text-purple-600">📋 {resumo.alunos_jaExistiam ?? "–"} já existiam</span>
                         {resumo.duracao_s && (
                           <span className="text-gray-400">⏱ {Math.round(resumo.duracao_s)}s</span>
                         )}
@@ -563,16 +569,16 @@ export default function SincronizarSEEDF() {
                               <div className="text-lg font-bold text-gray-800">{resumo.pdfs_baixados ?? "–"}</div>
                             </div>
                             <div>
-                              <div className="text-xs text-gray-500 mb-1">Alunos localizados</div>
+                              <div className="text-xs text-gray-500 mb-1">Localizados</div>
                               <div className="text-lg font-bold text-gray-800">{resumo.alunos_localizados ?? "–"}</div>
                             </div>
                             <div>
-                              <div className="text-xs text-gray-500 mb-1">Alunos inseridos</div>
+                              <div className="text-xs text-gray-500 mb-1">Inseridos</div>
                               <div className="text-lg font-bold text-green-600">{resumo.alunos_inseridos ?? 0}</div>
                             </div>
                             <div>
-                              <div className="text-xs text-gray-500 mb-1">Reativados</div>
-                              <div className="text-lg font-bold text-blue-600">{resumo.alunos_reativados ?? 0}</div>
+                              <div className="text-xs text-gray-500 mb-1">Já existiam</div>
+                              <div className="text-lg font-bold text-purple-600">{resumo.alunos_jaExistiam ?? Math.max(0, (resumo.alunos_localizados ?? 0) - (resumo.alunos_inseridos ?? 0) - (resumo.alunos_reativados ?? 0))}</div>
                             </div>
                             <div>
                               <div className="text-xs text-gray-500 mb-1">Inativados</div>
@@ -607,14 +613,42 @@ export default function SincronizarSEEDF() {
                                     ⚠ {resumo.turmas_vazias} turma(s) sem alunos após importação
                                   </div>
                                 ) : (resumo.turmas_ok || 0) > 0 ? (
-                                  <div className="text-sm font-bold text-emerald-600">
-                                    ✅ {resumo.turmas_ok} turmas confirmadas — {resumo.total_alunos_verificados || resumo.alunos_localizados || "–"} alunos no total
+                                <div className="text-sm font-bold text-emerald-600">
+                                    ✅ {resumo.turmas_ok ?? resumo.pdfs_baixados ?? 0} turma(s) sincronizada(s){resumo.turmas_total > (resumo.turmas_ok ?? resumo.pdfs_baixados ?? 0) ? ` de ${resumo.turmas_total}` : ""} — {resumo.alunos_localizados ?? resumo.total_alunos_verificados ?? 0} alunos no total
                                   </div>
                                 ) : (
                                   <div className="text-sm font-medium text-gray-500">
                                     ℹ️ Verificação não aplicável (nenhuma turma correspondente encontrada)
                                   </div>
                                 )}
+                              </div>
+                            )}
+                            {/* Motivo parcial — aviso prominente */}
+                            {resumo?.motivo_parcial && (
+                              <div className="col-span-2 sm:col-span-4">
+                                <div
+                                  className="p-3 rounded-lg text-sm font-medium flex items-start gap-2"
+                                  style={{
+                                    background: "linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%)",
+                                    border: "1px solid #fde68a",
+                                    color: "#92400e",
+                                  }}
+                                >
+                                  <span className="text-lg leading-none">⏱️</span>
+                                  <div>
+                                    <div className="font-bold text-amber-900 mb-0.5">Execução Parcial</div>
+                                    <div className="text-amber-800">{resumo.motivo_parcial}</div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                            {/* Turmas não processadas (separado de falhas) */}
+                            {(resumo?.pdfs_nao_processados || 0) > 0 && (
+                              <div className="col-span-2 sm:col-span-4">
+                                <div className="text-xs text-gray-500 mb-1">Não processadas (timeout)</div>
+                                <div className="text-lg font-bold text-amber-600">
+                                  {resumo.pdfs_nao_processados} turma(s) não foram processadas
+                                </div>
                               </div>
                             )}
                           </div>

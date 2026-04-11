@@ -55,6 +55,8 @@ export default function AgenteCredenciais() {
   const [ultimoTeste, setUltimoTeste]     = useState(null);
   const [feedback, setFeedback]           = useState(null);
   const [elapsedSec, setElapsedSec]       = useState(0);
+  const [modalErroOpen, setModalErroOpen] = useState(false);
+  const [erroMsg, setErroMsg]             = useState('');
 
   const pollingRef = useRef(null);
   const elapsedRef = useRef(null);
@@ -111,10 +113,12 @@ export default function AgenteCredenciais() {
         if (status === 'sucesso' && ok) {
           setStatusConexao('conectado');
           setUltimoTeste(new Date().toISOString());
-          setFeedback({ type: 'success', msg: '✅ Conexão estabelecida! O Agente EDUCA está pronto.' });
+          setFeedback({ type: 'success', msg: '✅ Conexão estabelecida! O Agente EDUCA está pronto para sincronizar.' });
         } else if (status === 'falha') {
           setStatusConexao('erro');
-          setFeedback({ type: 'error', msg: message || 'Falha no login. Verifique suas credenciais no portal EDUCADF.' });
+          setErroMsg(message || 'Não foi possível autenticar no portal EDUCADF.');
+          setModalErroOpen(true);
+          setFeedback(null);
         } else {
           // sem_teste ou sem_cache (não deveria ocorrer após disparar o teste)
           setStatusConexao('desconectado');
@@ -172,8 +176,10 @@ export default function AgenteCredenciais() {
       setFeedback({ type: 'info', msg: 'Credenciais salvas! Iniciando verificação no portal EDUCADF…' });
       handleTestar(newId);
     } catch (err) {
-      const msg = err?.response?.data?.message
-        || (err?.response?.status === 403 ? 'Sem permissão para gerenciar credenciais.' : 'Erro de comunicação com o servidor.');
+      const status = err?.response?.status;
+      let msg = err?.response?.data?.message || 'Erro de comunicação com o servidor.';
+      if (status === 403) msg = 'Sem permissão para gerenciar credenciais.';
+      if (status === 401) msg = 'Sessão expirada. Faça login novamente.';
       setFeedback({ type: 'error', msg });
     } finally {
       setSalvando(false);
@@ -423,5 +429,122 @@ export default function AgenteCredenciais() {
         </div>
       </div>
     </div>
+
+    {/* ══ Modal de Erro de Conexão — Premium ═══════════════════════════════════ */}
+    {modalErroOpen && (
+      <div
+        className="fixed inset-0 z-[90] flex items-center justify-center p-4"
+        style={{ background: 'rgba(15,23,42,0.75)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
+      >
+        <style>{`
+          @keyframes erroSlideIn { from { opacity:0; transform:scale(0.9) translateY(20px) } to { opacity:1; transform:scale(1) translateY(0) } }
+          @keyframes erroPulse { 0%,100% { box-shadow:0 0 0 0 rgba(239,68,68,0.3) } 50% { box-shadow:0 0 20px 4px rgba(239,68,68,0.12) } }
+        `}</style>
+        <div
+          className="bg-white w-full max-w-md overflow-hidden flex flex-col"
+          style={{ borderRadius: 20, boxShadow: '0 25px 50px -12px rgba(0,0,0,0.4), 0 0 0 1px rgba(0,0,0,0.06)', animation: 'erroSlideIn 0.3s cubic-bezier(0.16,1,0.3,1) forwards' }}
+        >
+          {/* Header */}
+          <div className="relative overflow-hidden flex-shrink-0" style={{ background: 'linear-gradient(135deg, #7f1d1d 0%, #991b1b 50%, #6b1414 100%)' }}>
+            <div style={{ position:'absolute', top:'-40%', right:'-15%', width:180, height:180, borderRadius:'50%', background:'radial-gradient(circle,rgba(239,68,68,0.2) 0%,transparent 70%)', pointerEvents:'none' }} />
+            <div className="relative z-10 px-6 py-5 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div style={{ padding:10, borderRadius:14, background:'linear-gradient(135deg,rgba(239,68,68,0.25),rgba(220,38,38,0.15))', border:'1px solid rgba(255,255,255,0.1)', animation:'erroPulse 2s ease-in-out infinite' }}>
+                  <ExclamationTriangleIcon className="h-6 w-6" style={{ color:'#fca5a5' }} />
+                </div>
+                <div>
+                  <h2 style={{ color:'#fff', fontSize:18, fontWeight:700, margin:0, letterSpacing:'-0.02em' }}>Falha na Conexão</h2>
+                  <p style={{ color:'rgba(252,165,165,0.8)', fontSize:11, margin:'3px 0 0' }}>Portal EDUCADF não autorizou o acesso</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setModalErroOpen(false)}
+                style={{ padding:8, borderRadius:10, background:'transparent', border:'none', cursor:'pointer', color:'rgba(255,255,255,0.4)', transition:'all 0.2s' }}
+                onMouseEnter={e => { e.currentTarget.style.color='#fff'; e.currentTarget.style.background='rgba(255,255,255,0.1)'; }}
+                onMouseLeave={e => { e.currentTarget.style.color='rgba(255,255,255,0.4)'; e.currentTarget.style.background='transparent'; }}
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+          </div>
+
+          {/* Corpo */}
+          <div className="px-6 py-5">
+            {/* Mensagem do erro */}
+            <div className="flex items-start gap-3 p-3 rounded-xl bg-red-50 border border-red-100 mb-5">
+              <ExclamationTriangleIcon className="h-4 w-4 text-red-500 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-red-700 leading-relaxed">{erroMsg || 'Não foi possível autenticar no portal EDUCADF.'}</p>
+            </div>
+
+            <p className="text-sm font-semibold text-slate-700 mb-3">Verifique os seguintes pontos:</p>
+
+            <div className="space-y-3">
+              {/* Item 1 — Perfil */}
+              <div className="flex items-start gap-3 p-3 rounded-xl bg-amber-50 border border-amber-100">
+                <div style={{ padding:'6px', borderRadius:8, background:'#f59e0b', flexShrink:0 }}>
+                  <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-amber-800">Perfil selecionado</p>
+                  <p className="text-xs text-amber-700 leading-relaxed mt-0.5">
+                    Confirme se você é <strong>Professor</strong>, <strong>Secretário/Servidor</strong> ou <strong>Gestor/Diretor</strong> no EDUCADF. Cada perfil usa uma tela de login diferente.
+                  </p>
+                </div>
+              </div>
+
+              {/* Item 2 — Usuário */}
+              <div className="flex items-start gap-3 p-3 rounded-xl bg-blue-50 border border-blue-100">
+                <div style={{ padding:'6px', borderRadius:8, background:'#3b82f6', flexShrink:0 }}>
+                  <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0" /></svg>
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-blue-800">Usuário (matrícula ou CPF)</p>
+                  <p className="text-xs text-blue-700 leading-relaxed mt-0.5">
+                    O campo usuário deve ser sua <strong>matrícula funcional</strong> ou <strong>CPF</strong> (somente números), exatamente como consta no portal EDUCADF.
+                  </p>
+                </div>
+              </div>
+
+              {/* Item 3 — Senha */}
+              <div className="flex items-start gap-3 p-3 rounded-xl bg-purple-50 border border-purple-100">
+                <div style={{ padding:'6px', borderRadius:8, background:'#7c3aed', flexShrink:0 }}>
+                  <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-purple-800">Senha</p>
+                  <p className="text-xs text-purple-700 leading-relaxed mt-0.5">
+                    Confirme a senha usada em <strong>educadf.se.df.gov.br</strong>. Verifique se não está com Caps Lock ativado.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex gap-3 mt-5">
+              <button
+                onClick={() => setModalErroOpen(false)}
+                className="flex-1"
+                style={{ padding:'11px', borderRadius:12, border:'1.5px solid #e5e7eb', fontSize:14, fontWeight:500, color:'#6b7280', cursor:'pointer', background:'transparent', transition:'all 0.2s' }}
+                onMouseEnter={e => e.currentTarget.style.background='#f1f5f9'}
+                onMouseLeave={e => e.currentTarget.style.background='transparent'}
+              >
+                Fechar
+              </button>
+              <button
+                onClick={() => { setModalErroOpen(false); setFeedback(null); }}
+                className="flex-[2]"
+                style={{ padding:'12px', borderRadius:12, border:'none', fontSize:14, fontWeight:600, color:'#fff', cursor:'pointer', background:'linear-gradient(135deg,#1e3a5f,#0f2847)', boxShadow:'0 4px 14px rgba(15,40,71,0.3)', transition:'all 0.2s', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}
+                onMouseEnter={e => { e.currentTarget.style.transform='translateY(-1px)'; e.currentTarget.style.boxShadow='0 6px 20px rgba(15,40,71,0.4)'; }}
+                onMouseLeave={e => { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow='0 4px 14px rgba(15,40,71,0.3)'; }}
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                Tentar Novamente
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+  </div>
   );
 }

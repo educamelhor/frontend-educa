@@ -151,7 +151,10 @@ export default function FOColetivo() {
     setLoadingTurmas(true);
     try {
       const resp = await api.get('/api/turmas');
-      setTurmas(resp.data || []);
+      const anoAtual = new Date().getFullYear();
+      // Filtra apenas turmas do ano letivo atual (campo `ano`)
+      const ativas = (resp.data || []).filter(t => !t.ano || Number(t.ano) === anoAtual);
+      setTurmas(ativas);
     } catch (err) {
       console.error('[FOColetivo] Erro ao carregar turmas:', err);
     } finally {
@@ -444,7 +447,6 @@ export default function FOColetivo() {
                     {turmasFiltradas.map(t => (
                       <option key={t.id} value={t.id}>
                         {t.turma || t.nome || `Turma ${t.id}`}
-                        {t.turno ? ` — ${t.turno.charAt(0).toUpperCase() + t.turno.slice(1)}` : ''}
                       </option>
                     ))}
                   </select>

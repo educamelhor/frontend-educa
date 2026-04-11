@@ -111,6 +111,10 @@ export default function Sidebar({ isOpen, onClose }) {
     return true; // diretor, vice_diretor, secretaria, etc.
   })();
 
+  // ── Agente EDUCA: disponível a TODOS exceto militar e comandante (CCMDF) ──
+  const isMilitar = perfil === 'militar' || perfil === 'comandante';
+  const canAgenteEduca = isScopeEscola && !isMilitar;
+
 
   // ─────────────────────────────────────────────────────────────
   // Abre automaticamente o grupo correto conforme a rota atual
@@ -794,7 +798,7 @@ export default function Sidebar({ isOpen, onClose }) {
           </>
         )}
 
-        {isScopeEscola && !isDisciplinar && !isProfessor && !isCoord && (
+        {canAgenteEduca && (
           <>
             {/* ───────────────────────────────
                 GRUPO: Agente EDUCA

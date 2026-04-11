@@ -50,7 +50,12 @@ const MEDIDAS_DROPDOWN = [
   { label: 'Transferência',       medida: 'Transferência' },
 ];
 
-const TURNOS = ['Matutino', 'Vespertino', 'Noturno', 'Integral'];
+const TURNOS = [
+  { label: 'Matutino',   value: 'matutino' },
+  { label: 'Vespertino', value: 'vespertino' },
+  { label: 'Noturno',    value: 'noturno' },
+  { label: 'Integral',   value: 'integral' },
+];
 
 // Medidas que OBRIGAM convocação
 const MEDIDAS_OBRIGATORIAS = ['Suspensão', 'Ações Educativas', 'Transferência'];
@@ -417,7 +422,7 @@ export default function FOColetivo() {
                     onBlur={e => { e.target.style.border='1.5px solid #e2e8f0'; e.target.style.background='#f8fafc'; }}
                   >
                     <option value="">— Todos os turnos —</option>
-                    {TURNOS.map(t => <option key={t} value={t}>{t}</option>)}
+                    {TURNOS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
                   </select>
                   <ChevronDownIcon style={{ position:'absolute', right:14, top:'50%', transform:'translateY(-50%)', width:16, height:16, color:'#94a3b8', pointerEvents:'none' }} />
                 </div>
@@ -437,7 +442,10 @@ export default function FOColetivo() {
                   >
                     <option value="">— Selecione a turma —</option>
                     {turmasFiltradas.map(t => (
-                      <option key={t.id} value={t.id}>{t.nome}{t.turno ? ` (${t.turno})` : ''}</option>
+                      <option key={t.id} value={t.id}>
+                        {t.turma || t.nome || `Turma ${t.id}`}
+                        {t.turno ? ` — ${t.turno.charAt(0).toUpperCase() + t.turno.slice(1)}` : ''}
+                      </option>
                     ))}
                   </select>
                   <ChevronDownIcon style={{ position:'absolute', right:14, top:'50%', transform:'translateY(-50%)', width:16, height:16, color:'#94a3b8', pointerEvents:'none' }} />
@@ -450,7 +458,7 @@ export default function FOColetivo() {
               <div className="fo-fade-in mt-6">
                 <div className="flex items-center justify-between mb-3">
                   <p style={{ fontSize:13, fontWeight:600, color:'#374151', margin:0 }}>
-                    {loadingAlunos ? 'Carregando alunos…' : `${alunosTurma.length} aluno(s) em ${turmaAtual?.nome || ''}`}
+                    {loadingAlunos ? 'Carregando alunos…' : `${alunosTurma.length} aluno(s) em ${turmaAtual?.turma || turmaAtual?.nome || ''}`}
                   </p>
                   {!loadingAlunos && alunosTurma.length > 0 && !medidaConfirmada && (
                     <span style={{ fontSize:11, color:'#f59e0b', fontWeight:600, background:'#fffbeb', padding:'3px 10px', borderRadius:20, border:'1px solid #fde68a' }}>

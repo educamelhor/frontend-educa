@@ -32,7 +32,13 @@ import {
 } from '@heroicons/react/24/outline';
 
 export default function Sidebar({ isOpen, onClose }) {
-  const [openGroup, setOpenGroup] = useState(null);
+  // Para perfis militares o grupo Disciplinar fica sempre expandido
+  const [openGroup, setOpenGroup] = useState(
+    () => {
+      const p = String(localStorage.getItem('perfil') || '').toLowerCase().trim();
+      return (p === 'militar' || p === 'comandante') ? 'disciplinar' : null;
+    }
+  );
   const [openCorrecoes, setOpenCorrecoes] = useState(false);
   const [openGabaritoPed, setOpenGabaritoPed] = useState(false);
   const location = useLocation();
@@ -717,7 +723,8 @@ export default function Sidebar({ isOpen, onClose }) {
             <>
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-6 transition"
-              onClick={() => setOpenGroup(openGroup === 'disciplinar' ? null : 'disciplinar')}
+              // Militares: submenu sempre fixo, não permite colapsar
+              onClick={() => !isMilitar && setOpenGroup(openGroup === 'disciplinar' ? null : 'disciplinar')}
               type="button"
             >
               <ClipboardDocumentListIcon className="h-5 w-5 mr-2" />

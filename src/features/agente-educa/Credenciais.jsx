@@ -213,6 +213,7 @@ export default function AgenteCredenciais() {
   }
 
   return (
+    <>
     <div className="max-w-4xl mx-auto pb-12">
 
       {/* ══ Hero Banner ══════════════════════════════════════════════════ */}
@@ -545,6 +546,6 @@ export default function AgenteCredenciais() {
         </div>
       </div>
     )}
-  </div>
+    </>
   );
 }

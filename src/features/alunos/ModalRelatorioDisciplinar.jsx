@@ -3,7 +3,7 @@ import {
     XMarkIcon, PencilSquareIcon, TrashIcon, EyeIcon, ClipboardDocumentCheckIcon,
     PrinterIcon, DocumentTextIcon, ExclamationTriangleIcon, ExclamationCircleIcon,
     CheckCircleIcon, UserIcon, IdentificationIcon, ClipboardDocumentListIcon,
-    NoSymbolIcon,
+    NoSymbolIcon, PhoneIcon, UserGroupIcon,
 } from "@heroicons/react/24/outline";
 import { AcademicCapIcon, ShieldExclamationIcon } from "@heroicons/react/24/solid";
 import api from "../../services/api";
@@ -23,6 +23,7 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
     const [modalComparecimentoOpen, setModalComparecimentoOpen] = useState(false);
     const [ocorrenciaParaComparecimento, setOcorrenciaParaComparecimento] = useState(null);
     const [registrandoComparecimento, setRegistrandoComparecimento] = useState(false);
+    const [modoFinalizacao, setModoFinalizacao] = useState('presenca'); // 'presenca' | 'telefone' | 'nao_compareceu'
 
     // Estado do Modal de Informação (Padrão)
     const [modalInfoOpen, setModalInfoOpen] = useState(false);
@@ -45,6 +46,9 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
     const [statusNaoImprime, setStatusNaoImprime] = useState("");
     const [validacaoRegistroOpen, setValidacaoRegistroOpen] = useState(false);
     const [camposAusentesRegistro, setCamposAusentesRegistro] = useState([]);
+    // Modal de aviso — status não finalizado (REGISTRADA) → permite imprimir mesmo assim
+    const [modalImprimirNaoFinalOpen, setModalImprimirNaoFinalOpen] = useState(false);
+    const [ocorrenciaParaImprimir, setOcorrenciaParaImprimir] = useState(null);
 
     useEffect(() => {
         if (open && aluno?.id) {
@@ -75,6 +79,7 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
             setModalInfoOpen(true);
             return;
         }
+        setModoFinalizacao(oc.convocar_responsavel ? 'presenca' : 'presenca');
         setOcorrenciaParaComparecimento(oc);
         setModalComparecimentoOpen(true);
     };
@@ -83,7 +88,10 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
         if (!ocorrenciaParaComparecimento) return;
         setRegistrandoComparecimento(true);
         try {
-            await api.put(`/api/alunos/${aluno.id}/ocorrencias/${ocorrenciaParaComparecimento.id}/comparecimento`);
+            await api.put(
+                `/api/alunos/${aluno.id}/ocorrencias/${ocorrenciaParaComparecimento.id}/comparecimento`,
+                { modo: modoFinalizacao }
+            );
             fetchOcorrencias();
             setModalComparecimentoOpen(false);
             setOcorrenciaParaComparecimento(null);
@@ -195,26 +203,20 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
     // ==================================================================
 
     // ==================== IMPRESSÃO INDIVIDUAL ====================
-    const handleImprimirRegistro = async (oc) => {
-        // 1) Status CANCELADA ou REGISTRADA → modal premium informando
-        const statusUpper = String(oc.status || "").toUpperCase();
-        if (statusUpper === "CANCELADA" || statusUpper === "REGISTRADA") {
-            setStatusNaoImprime(oc.status);
-            setModalStatusNaoImprime(true);
-            return;
-        }
-
-        // 2) Status FINALIZADA → validar + gerar PDF
+    // Executa a impressão (PDF) de um registro — chamado diretamente ou via modal de confirmação
+    // skipValidacao = true quando o usuário já confirmou "Imprimir mesmo assim"
+    const executarImpressao = async (oc, { skipValidacao = false } = {}) => {
         setLoadingImpressao(true);
         try {
-            const validRes = await api.get(`/api/relatorio-disciplinar/validar/${aluno.id}/registro/${oc.id}`);
-            if (!validRes.data.valido) {
-                setCamposAusentesRegistro(validRes.data.ausentes || []);
-                setValidacaoRegistroOpen(true);
-                return;
+            // Só valida se não for impressão forçada (o usuário já aceitou o aviso)
+            if (!skipValidacao) {
+                const validRes = await api.get(`/api/relatorio-disciplinar/validar/${aluno.id}/registro/${oc.id}`);
+                if (!validRes.data.valido) {
+                    setCamposAusentesRegistro(validRes.data.ausentes || []);
+                    setValidacaoRegistroOpen(true);
+                    return;
+                }
             }
-
-            // Tudo OK → abrir PDF do registro individual
             const token = localStorage.getItem("token");
             const escolaId = localStorage.getItem("escola_id");
             const url = `${api.defaults.baseURL}/relatorio-disciplinar/${aluno.id}/registro/${oc.id}?token=${encodeURIComponent(token)}&escola_id=${encodeURIComponent(escolaId)}`;
@@ -225,6 +227,27 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
         } finally {
             setLoadingImpressao(false);
         }
+    };
+
+    const handleImprimirRegistro = async (oc) => {
+        const statusUpper = String(oc.status || "").toUpperCase();
+
+        // CANCELADA → bloqueia definitivamente
+        if (statusUpper === "CANCELADA") {
+            setStatusNaoImprime(oc.status);
+            setModalStatusNaoImprime(true);
+            return;
+        }
+
+        // REGISTRADA → avisa mas permita imprimir
+        if (statusUpper === "REGISTRADA") {
+            setOcorrenciaParaImprimir(oc);
+            setModalImprimirNaoFinalOpen(true);
+            return;
+        }
+
+        // FINALIZADA → fluxo normal
+        await executarImpressao(oc);
     };
     // ==================================================================
 
@@ -458,62 +481,146 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
                 editMode={editMode}
             />
 
-            {/* Modal de Confirmação de Comparecimento */}
+            {/* Modal Premium — Finalizar Registro / Comparecimento */}
             {modalComparecimentoOpen && ocorrenciaParaComparecimento && (
-                <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60">
-                    <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden flex flex-col">
-                        <div className="px-6 py-4 border-b flex justify-between items-center bg-gray-50">
-                            <h2 className="text-lg font-bold text-gray-800">
-                                {ocorrenciaParaComparecimento.convocar_responsavel ? "Confirmar Presença" : "Finalizar Registro"}
-                            </h2>
+                <div
+                    className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+                    style={{ background: "rgba(15,23,42,0.65)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}
+                >
+                    <style>{`
+                        @keyframes compSlideIn { from { opacity:0; transform:scale(0.92) translateY(20px) } to { opacity:1; transform:scale(1) translateY(0) } }
+                        @keyframes compPulse { 0%,100% { box-shadow:0 0 0 0 rgba(34,197,94,0.25) } 50% { box-shadow:0 0 20px 4px rgba(34,197,94,0.12) } }
+                    `}</style>
+                    <div
+                        className="bg-white w-full max-w-md overflow-hidden flex flex-col"
+                        style={{ borderRadius: 20, boxShadow: "0 25px 50px -12px rgba(0,0,0,0.35), 0 0 0 1px rgba(0,0,0,0.06)", animation: "compSlideIn 0.3s cubic-bezier(0.16,1,0.3,1) forwards" }}
+                    >
+                        {/* Header premium */}
+                        <div className="relative overflow-hidden flex-shrink-0" style={{ background: "linear-gradient(135deg, #14532d 0%, #166534 50%, #0f3a1f 100%)" }}>
+                            <div style={{ position:"absolute",top:"-40%",right:"-15%",width:180,height:180,borderRadius:"50%",background:"radial-gradient(circle,rgba(34,197,94,0.15) 0%,transparent 70%)",pointerEvents:"none" }} />
+                            <div style={{ position:"absolute",bottom:"-30%",left:"-10%",width:140,height:140,borderRadius:"50%",background:"radial-gradient(circle,rgba(16,185,129,0.08) 0%,transparent 70%)",pointerEvents:"none" }} />
+                            <div className="relative z-10 px-6 py-5 flex items-center justify-between">
+                                <div className="flex items-center gap-4">
+                                    <div style={{ padding:10, borderRadius:14, background:"linear-gradient(135deg, rgba(34,197,94,0.2), rgba(16,185,129,0.15))", border:"1px solid rgba(255,255,255,0.1)", animation:"compPulse 2.5s ease-in-out infinite" }}>
+                                        <ClipboardDocumentCheckIcon className="h-6 w-6" style={{ color:"#86efac" }} />
+                                    </div>
+                                    <div>
+                                        <h2 style={{ color:"#fff", fontSize:18, fontWeight:700, margin:0, letterSpacing:"-0.02em", lineHeight:1.3 }}>Finalizar Registro</h2>
+                                        <p style={{ color:"rgba(167,243,208,0.8)", fontSize:12, margin:"4px 0 0", lineHeight:1.5 }}>Registro nº {ocorrenciaParaComparecimento.registro || ocorrenciaParaComparecimento.id}</p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => { setModalComparecimentoOpen(false); setOcorrenciaParaComparecimento(null); }}
+                                    style={{ padding:8, borderRadius:10, background:"transparent", border:"none", cursor:"pointer", color:"rgba(255,255,255,0.4)", transition:"all 0.2s" }}
+                                    onMouseEnter={e => { e.currentTarget.style.background="rgba(255,255,255,0.1)"; e.currentTarget.style.color="#fff"; }}
+                                    onMouseLeave={e => { e.currentTarget.style.background="transparent"; e.currentTarget.style.color="rgba(255,255,255,0.4)"; }}
+                                    title="Fechar"
+                                >
+                                    <XMarkIcon className="h-5 w-5" />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Corpo — Cards de seleção */}
+                        <div className="px-6 py-5 space-y-3 overflow-y-auto" style={{ maxHeight: "55vh" }}>
+                            <p className="text-sm text-gray-600 mb-1">Selecione o modo de finalização:</p>
+
+                            {/* Card 1 — Confirmar Presença */}
                             <button
-                                onClick={() => {
-                                    setModalComparecimentoOpen(false);
-                                    setOcorrenciaParaComparecimento(null);
+                                type="button"
+                                onClick={() => setModoFinalizacao('presenca')}
+                                className="w-full text-left"
+                                style={{
+                                    padding: "14px 16px", borderRadius: 14, cursor: "pointer",
+                                    border: modoFinalizacao === 'presenca' ? "2px solid #16a34a" : "1.5px solid #e5e7eb",
+                                    background: modoFinalizacao === 'presenca' ? "linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)" : "#fff",
+                                    transition: "all 0.2s", display: "flex", alignItems: "flex-start", gap: 12
                                 }}
-                                className="text-gray-400 hover:text-gray-600 transition"
-                                title="Fechar"
                             >
-                                <XMarkIcon className="h-5 w-5" />
+                                <div style={{ padding:8, borderRadius:10, background: modoFinalizacao === 'presenca' ? "#16a34a" : "#f3f4f6", flexShrink:0, transition:"all 0.2s" }}>
+                                    <CheckCircleIcon className="h-5 w-5" style={{ color: modoFinalizacao === 'presenca' ? "#fff" : "#9ca3af" }} />
+                                </div>
+                                <div>
+                                    <p style={{ fontWeight:600, fontSize:14, color: modoFinalizacao === 'presenca' ? "#15803d" : "#374151", margin:0 }}>Confirmar presença</p>
+                                    <p style={{ fontSize:11, color:"#6b7280", margin:"3px 0 0", lineHeight:1.4 }}>O responsável compareceu presencialmente. A data/hora será registrada.</p>
+                                </div>
+                            </button>
+
+                            {/* Card 2 — Contato via Telefone */}
+                            <button
+                                type="button"
+                                onClick={() => setModoFinalizacao('telefone')}
+                                className="w-full text-left"
+                                style={{
+                                    padding: "14px 16px", borderRadius: 14, cursor: "pointer",
+                                    border: modoFinalizacao === 'telefone' ? "2px solid #2563eb" : "1.5px solid #e5e7eb",
+                                    background: modoFinalizacao === 'telefone' ? "linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)" : "#fff",
+                                    transition: "all 0.2s", display: "flex", alignItems: "flex-start", gap: 12
+                                }}
+                            >
+                                <div style={{ padding:8, borderRadius:10, background: modoFinalizacao === 'telefone' ? "#2563eb" : "#f3f4f6", flexShrink:0, transition:"all 0.2s" }}>
+                                    <PhoneIcon className="h-5 w-5" style={{ color: modoFinalizacao === 'telefone' ? "#fff" : "#9ca3af" }} />
+                                </div>
+                                <div>
+                                    <p style={{ fontWeight:600, fontSize:14, color: modoFinalizacao === 'telefone' ? "#1d4ed8" : "#374151", margin:0 }}>Finalizar após contato via telefone</p>
+                                    <p style={{ fontSize:11, color:"#6b7280", margin:"3px 0 0", lineHeight:1.4 }}>Responsável contatado por telefone. Será anotado no registro interno.</p>
+                                </div>
+                            </button>
+
+                            {/* Card 3 — Responsável Não Compareceu */}
+                            <button
+                                type="button"
+                                onClick={() => setModoFinalizacao('nao_compareceu')}
+                                className="w-full text-left"
+                                style={{
+                                    padding: "14px 16px", borderRadius: 14, cursor: "pointer",
+                                    border: modoFinalizacao === 'nao_compareceu' ? "2px solid #dc2626" : "1.5px solid #e5e7eb",
+                                    background: modoFinalizacao === 'nao_compareceu' ? "linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%)" : "#fff",
+                                    transition: "all 0.2s", display: "flex", alignItems: "flex-start", gap: 12
+                                }}
+                            >
+                                <div style={{ padding:8, borderRadius:10, background: modoFinalizacao === 'nao_compareceu' ? "#dc2626" : "#f3f4f6", flexShrink:0, transition:"all 0.2s" }}>
+                                    <UserGroupIcon className="h-5 w-5" style={{ color: modoFinalizacao === 'nao_compareceu' ? "#fff" : "#9ca3af" }} />
+                                </div>
+                                <div>
+                                    <p style={{ fontWeight:600, fontSize:14, color: modoFinalizacao === 'nao_compareceu' ? "#b91c1c" : "#374151", margin:0 }}>Responsável não compareceu</p>
+                                    <p style={{ fontSize:11, color:"#6b7280", margin:"3px 0 0", lineHeight:1.4 }}>Encerra o registro sem comparecimento. Ficará registrado no histórico.</p>
+                                </div>
                             </button>
                         </div>
-                        <div className="p-6">
-                            {ocorrenciaParaComparecimento.convocar_responsavel ? (
-                                <>
-                                    <p className="text-gray-700 mb-4">
-                                        Confirma a presença do responsável referente ao registro disciplinar <strong>{ocorrenciaParaComparecimento.registro || ocorrenciaParaComparecimento.id}</strong>?
-                                    </p>
-                                    <p className="text-sm text-gray-500 mb-6">
-                                        Ao confirmar, a data atual será salva no histórico e o registro será encerrado.
-                                    </p>
-                                </>
-                            ) : (
-                                <>
-                                    <p className="text-gray-700 mb-4">
-                                        Não houve convocação de responsável para o registro <strong>{ocorrenciaParaComparecimento.registro || ocorrenciaParaComparecimento.id}</strong>. Deseja finalizá-lo mesmo assim?
-                                    </p>
-                                    <p className="text-sm text-gray-500 mb-6">
-                                        Ao confirmar, o registro será encerrado permanentemente.
-                                    </p>
-                                </>
-                            )}
 
-                            <div className="flex justify-end gap-3">
+                        {/* Footer premium */}
+                        <div style={{ padding:"16px 24px 20px", borderTop:"1px solid #f1f5f9", background:"#fafbfc", flexShrink:0 }}>
+                            <div style={{ display:"flex", gap:10, justifyContent:"flex-end" }}>
                                 <button
-                                    onClick={() => {
-                                        setModalComparecimentoOpen(false);
-                                        setOcorrenciaParaComparecimento(null);
-                                    }}
-                                    className="px-4 py-2 border rounded text-gray-700 hover:bg-gray-100 transition"
+                                    type="button"
+                                    onClick={() => { setModalComparecimentoOpen(false); setOcorrenciaParaComparecimento(null); }}
+                                    style={{ flex:1, padding:"11px", borderRadius:12, border:"1.5px solid #e5e7eb", fontSize:14, fontWeight:500, color:"#6b7280", cursor:"pointer", background:"transparent", transition:"all 0.2s" }}
+                                    onMouseEnter={e => e.currentTarget.style.background="#f1f5f9"}
+                                    onMouseLeave={e => e.currentTarget.style.background="transparent"}
                                 >
                                     Cancelar
                                 </button>
                                 <button
+                                    type="button"
                                     onClick={handleConfirmarComparecimento}
                                     disabled={registrandoComparecimento}
-                                    className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition shadow-sm disabled:opacity-50"
+                                    style={{
+                                        flex:2, padding:"12px", borderRadius:12, border:"none", fontSize:14, fontWeight:600, color:"#fff",
+                                        cursor: registrandoComparecimento ? "not-allowed" : "pointer",
+                                        background: registrandoComparecimento ? "#9ca3af" : "linear-gradient(135deg, #14532d, #166534)",
+                                        boxShadow: registrandoComparecimento ? "none" : "0 4px 14px rgba(20,83,45,0.3)",
+                                        transition:"all 0.2s", display:"flex", alignItems:"center", justifyContent:"center", gap:6,
+                                        opacity: registrandoComparecimento ? 0.7 : 1
+                                    }}
+                                    onMouseEnter={e => { if(!registrandoComparecimento) { e.currentTarget.style.boxShadow="0 6px 20px rgba(20,83,45,0.4)"; e.currentTarget.style.transform="translateY(-1px)"; } }}
+                                    onMouseLeave={e => { e.currentTarget.style.boxShadow="0 4px 14px rgba(20,83,45,0.3)"; e.currentTarget.style.transform="translateY(0)"; }}
                                 >
-                                    {registrandoComparecimento ? "Confirmando..." : (ocorrenciaParaComparecimento.convocar_responsavel ? "Confirmar Presença" : "Finalizar")}
+                                    {registrandoComparecimento ? (
+                                        <><div style={{ width:16, height:16, border:"2px solid rgba(255,255,255,0.3)", borderTop:"2px solid #fff", borderRadius:"50%", animation:"spin 0.8s linear infinite" }} />Finalizando...</>
+                                    ) : (
+                                        <><CheckCircleIcon className="h-5 w-5" />Finalizar Registro</>
+                                    )}
                                 </button>
                             </div>
                         </div>
@@ -521,36 +628,67 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
                 </div>
             )}
 
-            {/* Modal de Informação (Aviso) */}
+            {/* Modal de Informação (Aviso) — Premium */}
             {modalInfoOpen && (
-                <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60">
-                    <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden flex flex-col">
-                        <div className="px-6 py-4 border-b flex justify-between items-center bg-gray-50">
-                            <h2 className="text-lg font-bold text-gray-800">Aviso</h2>
-                            <button
-                                onClick={() => setModalInfoOpen(false)}
-                                className="text-gray-400 hover:text-gray-600 transition"
-                                title="Fechar"
-                            >
-                                <XMarkIcon className="h-5 w-5" />
-                            </button>
-                        </div>
-                        <div className="p-6">
-                            <p className="text-gray-700 mb-6 text-center">
-                                {infoMensagem}
-                            </p>
-                            <div className="flex justify-center">
+                <div
+                    className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+                    style={{ background: "rgba(15,23,42,0.65)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}
+                >
+                    <style>{`
+                        @keyframes infoAvisoIn { from { opacity:0; transform:scale(0.92) translateY(18px) } to { opacity:1; transform:scale(1) translateY(0) } }
+                        @keyframes infoAvisoPulse { 0%,100% { box-shadow:0 0 0 0 rgba(59,130,246,0.25) } 50% { box-shadow:0 0 18px 4px rgba(59,130,246,0.12) } }
+                    `}</style>
+                    <div
+                        className="bg-white w-full max-w-sm overflow-hidden flex flex-col"
+                        style={{ borderRadius: 20, boxShadow: "0 25px 50px -12px rgba(0,0,0,0.35), 0 0 0 1px rgba(0,0,0,0.06)", animation: "infoAvisoIn 0.3s cubic-bezier(0.16,1,0.3,1) forwards" }}
+                    >
+                        {/* Header premium */}
+                        <div className="relative overflow-hidden flex-shrink-0" style={{ background: "linear-gradient(135deg, #1e3a5f 0%, #0f2847 50%, #0a1628 100%)" }}>
+                            <div style={{ position:"absolute", top:"-40%", right:"-15%", width:160, height:160, borderRadius:"50%", background:"radial-gradient(circle,rgba(59,130,246,0.15) 0%,transparent 70%)", pointerEvents:"none" }} />
+                            <div style={{ position:"absolute", bottom:"-30%", left:"-10%", width:120, height:120, borderRadius:"50%", background:"radial-gradient(circle,rgba(16,185,129,0.08) 0%,transparent 70%)", pointerEvents:"none" }} />
+                            <div className="relative z-10 px-6 py-5 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div style={{ padding:10, borderRadius:12, background:"linear-gradient(135deg,rgba(59,130,246,0.2),rgba(16,185,129,0.15))", border:"1px solid rgba(255,255,255,0.1)", animation:"infoAvisoPulse 2.5s ease-in-out infinite" }}>
+                                        <ExclamationTriangleIcon className="h-6 w-6" style={{ color:"#93c5fd" }} />
+                                    </div>
+                                    <div>
+                                        <h2 style={{ color:"#fff", fontSize:17, fontWeight:700, margin:0, letterSpacing:"-0.02em", lineHeight:1.3 }}>Aviso</h2>
+                                        <p style={{ color:"rgba(148,163,184,0.8)", fontSize:11, margin:"3px 0 0" }}>Informação do sistema</p>
+                                    </div>
+                                </div>
                                 <button
                                     onClick={() => setModalInfoOpen(false)}
-                                    className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition shadow-sm"
+                                    style={{ padding:8, borderRadius:10, background:"transparent", border:"none", cursor:"pointer", color:"rgba(255,255,255,0.4)", transition:"all 0.2s" }}
+                                    onMouseEnter={e => { e.currentTarget.style.background="rgba(255,255,255,0.1)"; e.currentTarget.style.color="#fff"; }}
+                                    onMouseLeave={e => { e.currentTarget.style.background="transparent"; e.currentTarget.style.color="rgba(255,255,255,0.4)"; }}
+                                    title="Fechar"
                                 >
-                                    Entendido
+                                    <XMarkIcon className="h-5 w-5" />
                                 </button>
                             </div>
+                        </div>
+
+                        {/* Corpo */}
+                        <div className="px-6 py-6">
+                            <div className="flex items-start gap-3 p-4 rounded-xl bg-blue-50 border border-blue-100 mb-5">
+                                <ExclamationTriangleIcon className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                                <p className="text-sm text-blue-800 leading-relaxed">{infoMensagem}</p>
+                            </div>
+                            <button
+                                onClick={() => setModalInfoOpen(false)}
+                                className="w-full"
+                                style={{ padding:"12px", borderRadius:12, border:"none", fontSize:14, fontWeight:600, color:"#fff", cursor:"pointer", background:"linear-gradient(135deg, #1e3a5f, #0f2847)", boxShadow:"0 4px 14px rgba(15,40,71,0.3)", transition:"all 0.2s", display:"flex", alignItems:"center", justifyContent:"center", gap:6 }}
+                                onMouseEnter={e => { e.currentTarget.style.boxShadow="0 6px 20px rgba(15,40,71,0.4)"; e.currentTarget.style.transform="translateY(-1px)"; }}
+                                onMouseLeave={e => { e.currentTarget.style.boxShadow="0 4px 14px rgba(15,40,71,0.3)"; e.currentTarget.style.transform="translateY(0)"; }}
+                            >
+                                <CheckCircleIcon className="h-5 w-5" />
+                                Entendido
+                            </button>
                         </div>
                     </div>
                 </div>
             )}
+
 
             {/* Modal de Confirmação de Exclusão */}
             {modalExcluirOpen && ocorrenciaParaExcluir && (
@@ -635,7 +773,7 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
                 </div>
             )}
 
-            {/* Modal Premium — Status Não Permite Impressão (CANCELADA / REGISTRADA) */}
+            {/* Modal Premium — Status Não Permite Impressão (APENAS CANCELADA) */}
             {modalStatusNaoImprime && (
                 <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
                     <style>{`
@@ -690,11 +828,10 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
                             <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200/60">
                                 <ExclamationTriangleIcon className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
                                 <div className="text-sm text-amber-800 leading-relaxed">
-                                    <p className="font-semibold mb-1">Apenas registros com status &ldquo;Finalizada&rdquo; podem ser impressos.</p>
+                                    <p className="font-semibold mb-1">Registros cancelados não podem ser impressos.</p>
                                     <p className="text-amber-700 text-xs">
-                                        Registros com status <strong>&ldquo;{statusNaoImprime}&rdquo;</strong> não
-                                        possuem impressão disponível no sistema. Para imprimir, o registro precisa
-                                        ser finalizado pela equipe gestora.
+                                        Registros com status <strong>&ldquo;{statusNaoImprime}&rdquo;</strong> não possuem
+                                        impressão disponível no sistema.
                                     </p>
                                 </div>
                             </div>
@@ -713,6 +850,112 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
                             >
                                 <CheckCircleIcon className="h-5 w-5" />
                                 Entendido
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal Informativo — Impressão com Status NÃO Finalizado (REGISTRADA) */}
+            {modalImprimirNaoFinalOpen && ocorrenciaParaImprimir && (
+                <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                    <style>{`
+                        @keyframes infoSlideIn {
+                            from { opacity: 0; transform: scale(0.92) translateY(20px); }
+                            to   { opacity: 1; transform: scale(1) translateY(0); }
+                        }
+                        @keyframes infoPulse {
+                            0%, 100% { box-shadow: 0 0 0 0 rgba(59,130,246,0.25); }
+                            50%      { box-shadow: 0 0 20px 4px rgba(59,130,246,0.12); }
+                        }
+                    `}</style>
+                    <div
+                        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden"
+                        style={{ animation: "infoSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards" }}
+                    >
+                        {/* Header premium — azul informativo */}
+                        <div className="relative overflow-hidden">
+                            <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, #1e3a5f 0%, #0f2847 50%, #0a1628 100%)" }} />
+                            <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full" style={{ background: "radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 70%)", pointerEvents: "none" }} />
+                            <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full" style={{ background: "radial-gradient(circle, rgba(239,68,68,0.08) 0%, transparent 70%)", pointerEvents: "none" }} />
+
+                            <div className="relative z-10 px-6 py-5 flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div
+                                        className="p-2.5 rounded-xl border"
+                                        style={{ background: "rgba(255,255,255,0.1)", borderColor: "rgba(255,255,255,0.1)", animation: "infoPulse 2.5s ease-in-out infinite" }}
+                                    >
+                                        <PrinterIcon className="h-7 w-7 text-blue-300" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-lg font-bold text-white tracking-tight">
+                                            Registro não finalizado
+                                        </h2>
+                                        <p className="text-blue-300/70 text-xs mt-0.5">
+                                            Status: <span className="font-semibold text-blue-200">{ocorrenciaParaImprimir.status}</span>
+                                             &nbsp;· Registro nº {ocorrenciaParaImprimir.registro || ocorrenciaParaImprimir.id}
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => { setModalImprimirNaoFinalOpen(false); setOcorrenciaParaImprimir(null); }}
+                                    className="p-2 rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition"
+                                    title="Fechar"
+                                >
+                                    <XMarkIcon className="h-5 w-5" />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Corpo informativo */}
+                        <div className="px-6 py-5 space-y-4">
+                            <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200/60">
+                                <ExclamationTriangleIcon className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                                <div className="text-sm text-amber-800 leading-relaxed space-y-1">
+                                    <p className="font-semibold">Este registro ainda não possui status &ldquo;Finalizado&rdquo;.</p>
+                                    <p className="text-amber-700 text-xs">
+                                        O documento impresso refletirá o estado atual do registro, sem a assinatura de finalização.
+                                        Recomenda-se finalizar o registro antes de imprimir para garantir a integridade documental.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-start gap-3 p-4 rounded-xl border" style={{ background: "linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%)", borderColor: "#bfdbfe" }}>
+                                <span className="text-xl flex-shrink-0" style={{ lineHeight: 1, marginTop: 2 }}>📱</span>
+                                <p className="text-xs leading-relaxed" style={{ color: "#1e40af" }}>
+                                    <strong>Novidade em breve:</strong> Assim que o aplicativo{" "}
+                                    <strong className="text-blue-700">EDUCA-MOBILE</strong> estiver disponível,
+                                    a impressão física será desnecessária — o responsável receberá a notificação do
+                                    registro <strong>imediatamente</strong> pelo aplicativo, garantindo comunicação
+                                    instantânea e rastreável.
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Footer com CANCELAR e IMPRIMIR */}
+                        <div className="px-6 py-4 bg-gray-50/80 border-t border-gray-100 flex items-center justify-end gap-3">
+                            <button
+                                onClick={() => { setModalImprimirNaoFinalOpen(false); setOcorrenciaParaImprimir(null); }}
+                                className="px-5 py-2.5 rounded-xl border border-gray-200 text-gray-700 font-medium text-sm
+                                    hover:bg-gray-100 active:scale-[0.97] transition-all duration-200"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    const oc = ocorrenciaParaImprimir;
+                                    setModalImprimirNaoFinalOpen(false);
+                                    setOcorrenciaParaImprimir(null);
+                                    await executarImpressao(oc, { skipValidacao: true });
+                                }}
+                                className="px-6 py-2.5 rounded-xl text-white font-semibold text-sm flex items-center gap-2
+                                    active:scale-[0.97] transition-all duration-200"
+                                style={{ background: "linear-gradient(135deg, #1e3a5f, #0f2847)", boxShadow: "0 4px 14px rgba(15,40,71,0.3)" }}
+                                onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 6px 20px rgba(15,40,71,0.4)"; e.currentTarget.style.transform = "translateY(-1px)"; }}
+                                onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 4px 14px rgba(15,40,71,0.3)"; e.currentTarget.style.transform = "translateY(0)"; }}
+                            >
+                                <PrinterIcon className="h-5 w-5" />
+                                Imprimir mesmo assim
                             </button>
                         </div>
                     </div>

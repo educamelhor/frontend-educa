@@ -1,6 +1,14 @@
-import React, { useState } from "react";
-import { XMarkIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
+import React, { useState, useEffect } from "react";
+import { XMarkIcon, MagnifyingGlassIcon, ShieldExclamationIcon, PencilSquareIcon } from "@heroicons/react/24/outline";
 import api from "../../services/api";
+
+// CSS de animações premium (injeção única)
+const ANIM_ID = "modal-nova-ocorrencia-anims";
+const ANIM_CSS = `
+@keyframes novaOcFadeIn { from { opacity: 0 } to { opacity: 1 } }
+@keyframes novaOcSlideUp { from { opacity: 0; transform: translateY(24px) scale(0.97) } to { opacity: 1; transform: translateY(0) scale(1) } }
+@keyframes novaOcPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.25) } 50% { box-shadow: 0 0 20px 4px rgba(239,68,68,0.12) } }
+`;
 
 // Mapeamento das opções do dropdown "Medida Disciplinar"
 // Para Elogios, separamos Individual/Coletivo pois compartilham o mesmo medida_disciplinar="Elogio" no BD
@@ -15,6 +23,14 @@ const MEDIDAS_DROPDOWN = [
 ];
 
 export default function ModalNovaOcorrencia({ open, onClose, aluno, onOcorrenciaCriada, ocorrenciaInicial = null, readonly = false, editMode = false }) {
+    // Injeta animações premium uma única vez
+    useEffect(() => {
+        if (document.getElementById(ANIM_ID)) return;
+        const el = document.createElement("style");
+        el.id = ANIM_ID;
+        el.textContent = ANIM_CSS;
+        document.head.appendChild(el);
+    }, []);
     const [data, setData] = useState("");
     const [medidaSelecionada, setMedidaSelecionada] = useState("");
     const [tipoSelecionado, setTipoSelecionado] = useState("");
@@ -209,25 +225,54 @@ export default function ModalNovaOcorrencia({ open, onClose, aluno, onOcorrencia
         }
     };
 
+    const tituloModal = readonly ? "Detalhes da Medida Disciplinar" : editMode ? "Editar Medida Disciplinar" : "Nova Medida Disciplinar";
+    const subtituloModal = readonly ? "Visualização — somente leitura" : editMode ? "Ajuste os dados e salve as alterações" : "Registre uma nova medida disciplinar";
+
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
-                {/* Header fixo */}
-                <div className="px-5 py-3 border-b flex justify-between items-center bg-gray-50 flex-shrink-0">
-                    <h2 className="text-lg font-bold text-gray-800">
-                        {readonly ? "Detalhes da Medida Disciplinar" : editMode ? "Editar Medida Disciplinar" : "Nova Medida Disciplinar"}
-                    </h2>
-                    <button
-                        onClick={onClose}
-                        className="text-gray-400 hover:text-gray-600 transition"
-                        title="Fechar"
-                    >
-                        <XMarkIcon className="h-6 w-6" />
-                    </button>
+        <div
+            className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+            style={{ background: "rgba(15,23,42,0.65)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)", animation: "novaOcFadeIn 0.2s ease-out" }}
+        >
+            <div
+                className="bg-white w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col"
+                style={{ borderRadius: "20px", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.35), 0 0 0 1px rgba(0,0,0,0.06)", animation: "novaOcSlideUp 0.3s ease-out" }}
+            >
+                {/* ═══ HEADER PREMIUM ═══ */}
+                <div className="relative overflow-hidden flex-shrink-0" style={{ background: "linear-gradient(135deg, #1e3a5f 0%, #0f2847 50%, #0a1628 100%)" }}>
+                    {/* Glows decorativos */}
+                    <div style={{ position: "absolute", top: "-40%", right: "-15%", width: 180, height: 180, borderRadius: "50%", background: "radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 70%)", pointerEvents: "none" }} />
+                    <div style={{ position: "absolute", bottom: "-30%", left: "-10%", width: 140, height: 140, borderRadius: "50%", background: "radial-gradient(circle, rgba(239,68,68,0.08) 0%, transparent 70%)", pointerEvents: "none" }} />
+
+                    <div className="relative z-10 px-6 py-5 flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                            <div
+                                style={{ padding: 10, borderRadius: 14, background: "linear-gradient(135deg, rgba(59,130,246,0.2), rgba(239,68,68,0.15))", border: "1px solid rgba(255,255,255,0.1)", animation: "novaOcPulse 2.5s ease-in-out infinite" }}
+                            >
+                                {readonly ? <ShieldExclamationIcon className="h-6 w-6" style={{ color: "#93c5fd" }} /> : <PencilSquareIcon className="h-6 w-6" style={{ color: "#93c5fd" }} />}
+                            </div>
+                            <div>
+                                <h2 style={{ color: "#ffffff", fontSize: 18, fontWeight: 700, margin: 0, letterSpacing: "-0.02em", lineHeight: 1.3 }}>
+                                    {tituloModal}
+                                </h2>
+                                <p style={{ color: "rgba(148,163,184,0.9)", fontSize: 12, margin: "4px 0 0", lineHeight: 1.5 }}>
+                                    {subtituloModal}
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={onClose}
+                            style={{ padding: 8, borderRadius: 10, background: "transparent", border: "none", cursor: "pointer", color: "rgba(255,255,255,0.4)", transition: "all 0.2s" }}
+                            onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; e.currentTarget.style.color = "#fff"; }}
+                            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "rgba(255,255,255,0.4)"; }}
+                            title="Fechar"
+                        >
+                            <XMarkIcon className="h-5 w-5" />
+                        </button>
+                    </div>
                 </div>
 
-                {/* Corpo com scroll */}
-                <form id="formOcorrencia" onSubmit={handleSubmit} className="px-5 py-4 overflow-y-auto space-y-3 flex-1 min-h-0">
+                {/* ═══ CORPO COM SCROLL ═══ */}
+                <form id="formOcorrencia" onSubmit={handleSubmit} className="px-6 py-5 overflow-y-auto space-y-4 flex-1 min-h-0">
                     {/* Registro + Data na mesma linha */}
                     <div className="grid grid-cols-2 gap-3">
                         <div>
@@ -393,26 +438,29 @@ export default function ModalNovaOcorrencia({ open, onClose, aluno, onOcorrencia
                     </div>
                 </form>
 
-                {/* Footer fixo com botões */}
-                <div className="px-5 py-3 border-t bg-gray-50 flex items-center flex-shrink-0">
+                {/* ═══ FOOTER PREMIUM ═══ */}
+                <div style={{ padding: "16px 24px 20px", borderTop: "1px solid #f1f5f9", background: "#fafbfc", flexShrink: 0 }}>
+                    {/* Info EDUCA-MOBILE se não for readonly */}
                     {!readonly && (
-                        <button
-                            type="button"
-                            onClick={() => { setConsultaOpen(true); setBuscaConsulta(""); }}
-                            className="text-sm text-blue-600 hover:text-blue-800 hover:underline transition font-medium"
-                        >
-                            Consultar Medidas Disciplinares
-                        </button>
+                        <div style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "9px 13px", borderRadius: 10, background: "linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%)", border: "1px solid #bfdbfe", marginBottom: 14, fontSize: 11, color: "#1e40af", lineHeight: 1.5 }}>
+                            <span style={{ fontSize: 14, lineHeight: 1, flexShrink: 0, marginTop: 1 }}>🤖</span>
+                            <span>
+                                Consultar Medidas Disciplinares disponíveis: <button type="button" onClick={() => { setConsultaOpen(true); setBuscaConsulta(""); }} style={{ background: "none", border: "none", padding: 0, color: "#1d4ed8", fontWeight: 700, cursor: "pointer", textDecoration: "underline" }}>abrir tabela</button>
+                            </span>
+                        </div>
                     )}
-                    <div className="flex gap-3 ml-auto">
+
+                    <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
                         {readonly ? (
                             <>
-                                {(ocorrenciaInicial?.status === 'FINALIZADA' || 
+                                {(ocorrenciaInicial?.status === 'FINALIZADA' ||
                                   (ocorrenciaInicial?.status === 'REGISTRADA' && ocorrenciaInicial?.convocar_responsavel)) && (
                                     <button
                                         type="button"
                                         onClick={() => setConfirmCancelOpen(true)}
-                                        className="px-4 py-2 border border-red-300 text-red-600 rounded hover:bg-red-50 transition font-medium"
+                                        style={{ flex: 1, padding: "11px 16px", borderRadius: 12, border: "1.5px solid #fecaca", fontSize: 14, fontWeight: 600, color: "#b91c1c", cursor: "pointer", background: "transparent", transition: "all 0.2s" }}
+                                        onMouseEnter={e => e.currentTarget.style.background = "#fef2f2"}
+                                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                                     >
                                         Registrar Cancelamento
                                     </button>
@@ -420,7 +468,9 @@ export default function ModalNovaOcorrencia({ open, onClose, aluno, onOcorrencia
                                 <button
                                     type="button"
                                     onClick={onClose}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+                                    style={{ flex: 2, padding: "12px 16px", borderRadius: 12, border: "none", fontSize: 14, fontWeight: 600, color: "#fff", cursor: "pointer", background: "linear-gradient(135deg, #1e3a5f, #0f2847)", boxShadow: "0 4px 14px rgba(15,40,71,0.3)", transition: "all 0.2s" }}
+                                    onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 6px 20px rgba(15,40,71,0.4)"; e.currentTarget.style.transform = "translateY(-1px)"; }}
+                                    onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 4px 14px rgba(15,40,71,0.3)"; e.currentTarget.style.transform = "translateY(0)"; }}
                                 >
                                     Fechar Detalhes
                                 </button>
@@ -430,7 +480,9 @@ export default function ModalNovaOcorrencia({ open, onClose, aluno, onOcorrencia
                                 <button
                                     type="button"
                                     onClick={onClose}
-                                    className="px-4 py-2 border rounded text-gray-700 hover:bg-gray-100 transition"
+                                    style={{ flex: 1, padding: "11px", borderRadius: 12, border: "1.5px solid #e5e7eb", fontSize: 14, fontWeight: 500, color: "#6b7280", cursor: "pointer", background: "transparent", transition: "all 0.2s" }}
+                                    onMouseEnter={e => e.currentTarget.style.background = "#f1f5f9"}
+                                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                                 >
                                     Cancelar
                                 </button>
@@ -438,9 +490,15 @@ export default function ModalNovaOcorrencia({ open, onClose, aluno, onOcorrencia
                                     type="submit"
                                     form="formOcorrencia"
                                     disabled={salvando}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition disabled:opacity-50"
+                                    style={{ flex: 2, padding: "12px", borderRadius: 12, border: "none", fontSize: 14, fontWeight: 600, color: "#fff", cursor: salvando ? "not-allowed" : "pointer", background: salvando ? "#9ca3af" : "linear-gradient(135deg, #1e3a5f, #0f2847)", boxShadow: salvando ? "none" : "0 4px 14px rgba(15,40,71,0.3)", transition: "all 0.2s", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, opacity: salvando ? 0.7 : 1 }}
+                                    onMouseEnter={e => { if (!salvando) { e.currentTarget.style.boxShadow = "0 6px 20px rgba(15,40,71,0.4)"; e.currentTarget.style.transform = "translateY(-1px)"; } }}
+                                    onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 4px 14px rgba(15,40,71,0.3)"; e.currentTarget.style.transform = "translateY(0)"; }}
                                 >
-                                    {salvando ? (editMode ? "Salvando..." : "Registrando...") : (editMode ? "Salvar Alterações" : "Registrar")}
+                                    {salvando ? (
+                                        <><div style={{ width: 16, height: 16, border: "2px solid rgba(255,255,255,0.3)", borderTop: "2px solid #fff", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />{editMode ? "Salvando..." : "Registrando..."}</>
+                                    ) : (
+                                        <><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>{editMode ? "Salvar Alterações" : "Registrar"}</>
+                                    )}
                                 </button>
                             </>
                         )}

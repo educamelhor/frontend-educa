@@ -815,7 +815,12 @@ export default function Planos() {
                     }
                   } catch (err) {
                     console.error(err);
-                    showMsg("error", "Erro ao salvar rascunho.");
+                    const errData = err?.response?.data;
+                    if (err?.response?.status === 409 && errData?.item_bloqueado) {
+                      showMsg("error", errData.error || `Não é possível remover "${errData.item_bloqueado}" — há notas lançadas nessa atividade.`);
+                    } else {
+                      showMsg("error", "Erro ao salvar rascunho.");
+                    }
                   }
                 }}
                 disabled={!papKeyAtiva || papStatus === "BLOQUEADO_TEMPO" || papStatus === "APROVADO" || papStatus === "ENVIADO"}
@@ -868,7 +873,12 @@ export default function Planos() {
                     }
                   } catch (err) {
                     console.error(err);
-                    showMsg("error", "Erro ao enviar PAP.");
+                    const errData = err?.response?.data;
+                    if (err?.response?.status === 409 && errData?.item_bloqueado) {
+                      showMsg("error", errData.error || `Não é possível remover "${errData.item_bloqueado}" — há notas lançadas nessa atividade.`);
+                    } else {
+                      showMsg("error", "Erro ao enviar PAP.");
+                    }
                   }
                 }}
                 disabled={!papKeyAtiva || papStatus === "BLOQUEADO_TEMPO" || papStatus === "APROVADO" || papStatus === "ENVIADO"}

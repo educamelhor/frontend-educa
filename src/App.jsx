@@ -6,6 +6,7 @@ import Home from "./features/home/Home.jsx";
 import Alunos from "./features/secretaria/alunos";
 import AlunosDisciplinar from "./features/disciplinar/alunos";
 import AjustesDisciplinar from "./features/disciplinar/ajustes";
+import FOColetivo from "./features/disciplinar/fo-coletivo/FOColetivo";
 import ResponsaveisDisciplinar from "./features/disciplinar/responsaveis/index.jsx";
 import MetadadosDisciplinar from "./features/disciplinar/metadados";
 import RegimentosDisciplinar from "./features/disciplinar/regimentos";
@@ -81,16 +82,6 @@ import MonitoramentoAlertasTeste from "./features/monitoramento/MonitoramentoAle
 import Monitoramento from "./features/monitoramento/Monitoramento.jsx";
 import MonitoramentoPainel from "./features/monitoramento/MonitoramentoPainel.jsx";
 
-// ⭐️ NOVO: Módulo Monitoramento > Visitantes
-
-
-{/*
-   import VisitantesRegistrar from "./features/monitoramento/visitantes/VisitantesRegistrar.jsx";
-  import VisitantesHistorico from "./features/monitoramento/visitantes/VisitantesHistorico.jsx";
-*/}
-
-
-
 // ⭐️ NOVO IMPORT: Embeddings — Gerar
 import EmbeddingsGerar from "./features/monitoramento/EmbeddingsGerar.jsx";
 
@@ -102,7 +93,6 @@ function ProtectedLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
 
-  // Fecha sidebar mobile ao mudar de rota
   useEffect(() => {
     setSidebarOpen(false);
   }, [location.pathname]);
@@ -112,12 +102,8 @@ function ProtectedLayout() {
 
   return (
     <div className="flex h-screen relative">
-      {/* Overlay mobile */}
       {sidebarOpen && (
-        <div
-          className="sidebar-overlay"
-          onClick={closeSidebar}
-        />
+        <div className="sidebar-overlay" onClick={closeSidebar} />
       )}
       <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} />
       <main className="flex-1 p-3 md:p-6 bg-blue-50 overflow-auto w-full">
@@ -128,443 +114,205 @@ function ProtectedLayout() {
   );
 }
 
-// Rotas protegidas (agora exige scope="escola")
 function parseJwtPayload(token) {
   try {
     const parts = String(token || "").split(".");
     if (parts.length < 2) return null;
-
-    // base64url -> base64
     const b64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
     const json = decodeURIComponent(
-      atob(b64)
-        .split("")
-        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
-        .join("")
+      atob(b64).split("").map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2)).join("")
     );
-
     return JSON.parse(json);
   } catch {
     return null;
   }
 }
 
-  function RequireAuth({ children }) {
-    const token = localStorage.getItem("token");
-    if (!token) return <Navigate to="/login" replace />;
-
-    const payload = parseJwtPayload(token);
-    const scope = String(payload?.scope || "").toLowerCase();
-
-    // ✅ contrato deste módulo: apenas "escola" entra no sistema escolar
-    if (scope !== "escola") {
-      try { localStorage.removeItem("token"); } catch { }
-      return <Navigate to="/login" replace />;
-    }
-
-    return children;
+function RequireAuth({ children }) {
+  const token = localStorage.getItem("token");
+  if (!token) return <Navigate to="/login" replace />;
+  const payload = parseJwtPayload(token);
+  const scope = String(payload?.scope || "").toLowerCase();
+  if (scope !== "escola") {
+    try { localStorage.removeItem("token"); } catch { }
+    return <Navigate to="/login" replace />;
   }
+  return children;
+}
 
-  function RequirePlatformAuth({ children }) {
-    const token = localStorage.getItem("token");
-    if (!token) return <Navigate to="/login" replace />;
+function RequirePlatformAuth({ children }) {
+  const token = localStorage.getItem("token");
+  if (!token) return <Navigate to="/login" replace />;
+  const payload = parseJwtPayload(token);
+  const scope = String(payload?.scope || "").toLowerCase();
+  if (scope !== "plataforma") return <Navigate to="/login" replace />;
+  return children;
+}
 
-    const payload = parseJwtPayload(token);
-    const scope = String(payload?.scope || "").toLowerCase();
+function RequireDiretor({ children }) {
+  const p = String(localStorage.getItem('perfil') || '').toLowerCase().trim();
+  if (p === 'diretor' || p === 'vice_diretor') return children;
+  return <Navigate to="/home" replace />;
+}
 
-    if (scope !== "plataforma") {
-      return <Navigate to="/login" replace />;
-    }
+function RequireDiretorMilitar({ children }) {
+  const p = String(localStorage.getItem('perfil') || '').toLowerCase().trim();
+  if (p === 'diretor' || p === 'militar') return children;
+  return <Navigate to="/disciplinar/alunos" replace />;
+}
 
-    return children;
-  }
-
-  // ✅ Guard: Diretor / Vice-Diretor only
-  function RequireDiretor({ children }) {
-    const p = String(localStorage.getItem('perfil') || '').toLowerCase().trim();
-    if (p === 'diretor' || p === 'vice_diretor') return children;
-    return <Navigate to="/home" replace />;
-  }
-
-  // ✅ Guard: Diretor / Militar only (Disciplinar equipe)
-  function RequireDiretorMilitar({ children }) {
-    const p = String(localStorage.getItem('perfil') || '').toLowerCase().trim();
-    if (p === 'diretor' || p === 'militar') return children;
-    return <Navigate to="/disciplinar/alunos" replace />;
-  }
-
-
-  // ✅ Guard simples (v1): só libera PLATAFORMA para SUPER_ADMIN/ADMIN_GLOBAL
-  function RequireCeo({ children }) {
-
+function RequireCeo({ children }) {
   const perfil = String(localStorage.getItem("perfil") || "").toUpperCase();
-
   let permissoes = [];
   try {
     const raw = localStorage.getItem("permissoes");
     const arr = raw ? JSON.parse(raw) : [];
     permissoes = Array.isArray(arr) ? arr : [];
-  } catch {
-    permissoes = [];
-  }
-
-  const ok =
-    perfil === "SUPER_ADMIN" ||
-    perfil === "ADMIN_GLOBAL" ||
-    permissoes.includes("plataforma.visualizar");
-
+  } catch { permissoes = []; }
+  const ok = perfil === "SUPER_ADMIN" || perfil === "ADMIN_GLOBAL" || permissoes.includes("plataforma.visualizar");
   if (ok) return children;
-
   return (
     <div className="bg-white rounded-xl shadow p-6 border border-red-200">
       <h2 className="text-xl font-bold text-red-700">Acesso restrito</h2>
-      <p className="mt-2 text-gray-700">
-        A área <b>Plataforma (CEO)</b> só pode ser acessada por <b>SUPER_ADMIN</b> /
-        <b> ADMIN_GLOBAL</b> (ou por quem tiver a permissão <code>plataforma.visualizar</code>).
-      </p>
-      <p className="mt-2 text-gray-700">
-        Seu perfil atual é: <b>{perfil || "N/D"}</b>.
-      </p>
+      <p className="mt-2 text-gray-700">A área <b>Plataforma (CEO)</b> só pode ser acessada por <b>SUPER_ADMIN</b> / <b>ADMIN_GLOBAL</b>.</p>
+      <p className="mt-2 text-gray-700">Seu perfil atual é: <b>{perfil || "N/D"}</b>.</p>
     </div>
   );
 }
 
-
-// Guard por permissão (RBAC)
 function RequirePerm({ perm, children }) {
   let permissoes = [];
   try {
     const raw = localStorage.getItem("permissoes");
     const arr = raw ? JSON.parse(raw) : [];
     permissoes = Array.isArray(arr) ? arr : [];
-  } catch {
-    permissoes = [];
-  }
-
-  const ok = permissoes.includes(perm);
-  return ok ? children : <Navigate to="/home" replace />;
+  } catch { permissoes = []; }
+  return permissoes.includes(perm) ? children : <Navigate to="/home" replace />;
 }
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Rotas públicas - sem menu/header */}
+        {/* Rotas públicas */}
         <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/ativar-diretor" element={<AtivarDiretor />} />
         <Route path="/login-professor" element={<LoginProfessor />} />
         <Route path="/cadastro" element={<CadastroUsuario />} />
-
-        {/* 🔓 Rota pública de impressão */}
         <Route path="/print/boletins" element={<PrintBoletinsTurma />} />
 
         {/* Rotas protegidas da PLATAFORMA */}
-        <Route
-          element={
-            <RequirePlatformAuth>
-              <ProtectedLayout />
-            </RequirePlatformAuth>
-          }
-        >
-          <Route
-            path="/plataforma/escolas"
-            element={
-              <RequireCeo>
-                <PlataformaEscolas />
-              </RequireCeo>
-            }
-          />
-          <Route
-            path="/plataforma/diretores"
-            element={
-              <RequireCeo>
-                <PlataformaDiretores />
-              </RequireCeo>
-            }
-          />
-          <Route
-            path="/plataforma/auditoria-rbac"
-            element={
-              <RequireCeo>
-                <PlataformaAuditoriaRBAC />
-              </RequireCeo>
-            }
-          />
-          <Route
-            path="/plataforma/usage"
-            element={
-              <RequireCeo>
-                <PlataformaUsageInsights />
-              </RequireCeo>
-            }
-          />
-          <Route
-            path="/plataforma/usage/:id"
-            element={
-              <RequireCeo>
-                <UsageEscolaDetalhe />
-              </RequireCeo>
-            }
-          />
-          <Route
-            path="/plataforma/suporte"
-            element={
-              <RequireCeo>
-                <PlataformaSuporte />
-              </RequireCeo>
-            }
-          />
-          <Route
-            path="/plataforma/governanca"
-            element={
-              <RequireCeo>
-                <PlataformaGovernanca />
-              </RequireCeo>
-            }
-          />
+        <Route element={<RequirePlatformAuth><ProtectedLayout /></RequirePlatformAuth>}>
+          <Route path="/plataforma/escolas"       element={<RequireCeo><PlataformaEscolas /></RequireCeo>} />
+          <Route path="/plataforma/diretores"     element={<RequireCeo><PlataformaDiretores /></RequireCeo>} />
+          <Route path="/plataforma/auditoria-rbac" element={<RequireCeo><PlataformaAuditoriaRBAC /></RequireCeo>} />
+          <Route path="/plataforma/usage"          element={<RequireCeo><PlataformaUsageInsights /></RequireCeo>} />
+          <Route path="/plataforma/usage/:id"      element={<RequireCeo><UsageEscolaDetalhe /></RequireCeo>} />
+          <Route path="/plataforma/suporte"        element={<RequireCeo><PlataformaSuporte /></RequireCeo>} />
+          <Route path="/plataforma/governanca"     element={<RequireCeo><PlataformaGovernanca /></RequireCeo>} />
         </Route>
 
         {/* Rotas protegidas do SISTEMA ESCOLAR */}
-        <Route
-          element={
-            <RequireAuth>
-              <ProtectedLayout />
-            </RequireAuth>
-          }
-        >
+        <Route element={<RequireAuth><ProtectedLayout /></RequireAuth>}>
           <Route path="/home" element={<Home />} />
-
           <Route path="/alunos" element={<Alunos />} />
 
-          <Route path="/disciplinar/alunos" element={<AlunosDisciplinar />} />
-          <Route path="/disciplinar/ajustes" element={<AjustesDisciplinar />} />
+          {/* ── Disciplinar ──────────────────────────────────────────────── */}
+          <Route path="/disciplinar/alunos"       element={<AlunosDisciplinar />} />
+          <Route path="/disciplinar/ajustes"      element={<AjustesDisciplinar />} />
           <Route path="/disciplinar/responsaveis" element={<ResponsaveisDisciplinar />} />
-
-          {/* Disciplinar — Gestão de Equipe (apenas Diretor Pedagógico e Comandante) */}
+          {/* F.O. Coletivo — Registro em Lote */}
+          <Route path="/disciplinar/fo-coletivo"  element={<FOColetivo />} />
+          {/* Gestão de Equipe (apenas Diretor e Militar) */}
           <Route path="/disciplinar/equipe" element={
-            <RequireDiretorMilitar>
-              <GestaoEquipe />
-            </RequireDiretorMilitar>
+            <RequireDiretorMilitar><GestaoEquipe /></RequireDiretorMilitar>
           } />
-
-          {/* Disciplinar — Metadados (Dashboard Analítico) */}
-          <Route path="/disciplinar/metadados" element={<MetadadosDisciplinar />} />
-
-          {/* Disciplinar — Regimentos (Biblioteca de Documentos) */}
+          <Route path="/disciplinar/metadados"  element={<MetadadosDisciplinar />} />
           <Route path="/disciplinar/regimentos" element={<RegimentosDisciplinar />} />
+          <Route path="/disciplinar/manual"     element={<ManualDisciplinar />} />
+          <Route path="/disciplinar/suporte"    element={<SuporteSAC />} />
 
-          {/* Disciplinar — Manual (tutorial do módulo) */}
-          <Route path="/disciplinar/manual" element={<ManualDisciplinar />} />
-          {/* Disciplinar — Suporte (antigo path, redireciona) */}
-          <Route path="/disciplinar/suporte" element={<SuporteSAC />} />
+          {/* ── Monitoramento ────────────────────────────────────────────── */}
+          <Route path="/monitoramento" element={<RequirePerm perm="monitoramento.visualizar"><Monitoramento /></RequirePerm>} />
+          <Route path="/monitoramento/alertas-teste" element={<RequirePerm perm="monitoramento.visualizar"><MonitoramentoAlertasTeste /></RequirePerm>} />
+          <Route path="/monitoramento/painel"    element={<RequirePerm perm="monitoramento.visualizar"><MonitoramentoPainel /></RequirePerm>} />
+          <Route path="/monitoramento/embeddings" element={<RequirePerm perm="monitoramento.visualizar"><EmbeddingsGerar /></RequirePerm>} />
 
-          {/* Monitoramento */}
-          <Route
-            path="/monitoramento"
-            element={
-              <RequirePerm perm="monitoramento.visualizar">
-                <Monitoramento />
-              </RequirePerm>
-            }
-          />
-          <Route
-            path="/monitoramento/alertas-teste"
-            element={
-              <RequirePerm perm="monitoramento.visualizar">
-                <MonitoramentoAlertasTeste />
-              </RequirePerm>
-            }
-          />
-          <Route
-            path="/monitoramento/painel"
-            element={
-              <RequirePerm perm="monitoramento.visualizar">
-                <MonitoramentoPainel />
-              </RequirePerm>
-            }
-          />
-
-          {/* Visitantes */}
-          {/*
-                    <Route
-                      path="/monitoramento/visitantes/registrar"
-                      element={<VisitantesRegistrar />}
-                    />
-                    <Route
-                      path="/monitoramento/visitantes/historico"
-                      element={<VisitantesHistorico />}
-                    />
-                  */}
-
-          {/* Embeddings */}
-          <Route
-            path="/monitoramento/embeddings"
-            element={
-              <RequirePerm perm="monitoramento.visualizar">
-                <EmbeddingsGerar />
-              </RequirePerm>
-            }
-          />
-
-
-          <Route path="/alunos/:codigo/boletim" element={<Boletim />} />
+          {/* ── Alunos individuais ───────────────────────────────────────── */}
+          <Route path="/alunos/:codigo/boletim"       element={<Boletim />} />
           <Route path="/alunos/:codigo/boletim-anual" element={<BoletimAnual />} />
-          <Route path="/alunos/:codigo/ficha" element={<FichaAluno />} />
-          <Route path="/alunos/:codigo/foto-lote" element={<FotoAluno />} />
-
+          <Route path="/alunos/:codigo/ficha"         element={<FichaAluno />} />
+          <Route path="/alunos/:codigo/foto-lote"     element={<FotoAluno />} />
           <Route path="/questoes" element={<BancoQuestoes />} />
 
-          {/* Secretaria */}
+          {/* ── Secretaria ───────────────────────────────────────────────── */}
           <Route path="/secretaria/professores" element={<Professores />} />
-          <Route
-            path="/secretaria/professores/:id/ficha"
-            element={<FichaProfessor />}
-          />
+          <Route path="/secretaria/professores/:id/ficha" element={<FichaProfessor />} />
+          <Route path="/secretaria/boletim"    element={<BoletimEdicao />} />
+          <Route path="/secretaria/*"          element={<Secretaria />} />
+          <Route path="/secretaria/modulacao"  element={<Modulacao />} />
+          <Route path="/secretaria/horarios"   element={<HorariosPage />} />
+          <Route path="/secretaria/horarios/configuracoes-pedagogicas" element={<ConfiguracoesPedagogicas />} />
+          <Route path="/secretaria/tabela-codigos" element={<TabelaCodigos />} />
 
-          {/* ⭐️ ROTA DO BOLETIM (SECRETARIA) */}
-          <Route path="/secretaria/boletim" element={<BoletimEdicao />} />
-
-          <Route path="/secretaria/*" element={<Secretaria />} />
-          <Route path="/secretaria/modulacao" element={<Modulacao />} />
-
-          {/* ✅ AJUSTE: Horários agora abre direto no EscopoStep */}
-          <Route path="/secretaria/horarios" element={<HorariosPage />} />
-
-          {/* ✅ NOVA ROTA — Configurações Pedagógicas */}
-          <Route
-            path="/secretaria/horarios/configuracoes-pedagogicas"
-            element={<ConfiguracoesPedagogicas />}
-          />
-
-          <Route
-            path="/secretaria/tabela-codigos"
-            element={<TabelaCodigos />}
-          />
-
-          {/* Pedagógico */}
-          <Route
-            path="/pedagogico/correcoes/redacao"
-            element={<Redacao />}
-          />
-          {/* Pedagógico > Gabarito (3 Etapas) */}
-          <Route path="/pedagogico/gabarito" element={<Gabarito etapa="imprimir" />} />
-          <Route path="/pedagogico/gabarito/imprimir" element={<Gabarito etapa="imprimir" />} />
-          <Route path="/pedagogico/gabarito/corrigir" element={<Gabarito etapa="corrigir" />} />
+          {/* ── Pedagógico ───────────────────────────────────────────────── */}
+          <Route path="/pedagogico/correcoes/redacao" element={<Redacao />} />
+          <Route path="/pedagogico/gabarito"           element={<Gabarito etapa="imprimir" />} />
+          <Route path="/pedagogico/gabarito/imprimir"  element={<Gabarito etapa="imprimir" />} />
+          <Route path="/pedagogico/gabarito/corrigir"  element={<Gabarito etapa="corrigir" />} />
           <Route path="/pedagogico/gabarito/resultados" element={<Gabarito etapa="resultados" />} />
-
-          {/* ⭐ MÓDULO GABARITO (Novo — Premium) */}
-          <Route path="/gabarito" element={<GabaritoModule />} />
-          <Route path="/gabarito/gerar" element={<GabaritoModule />} />
-          <Route path="/gabarito/corrigir" element={<GabaritoModule />} />
+          <Route path="/gabarito"           element={<GabaritoModule />} />
+          <Route path="/gabarito/gerar"     element={<GabaritoModule />} />
+          <Route path="/gabarito/corrigir"  element={<GabaritoModule />} />
           <Route path="/gabarito/resultados" element={<GabaritoModule />} />
-          <Route
-            path="/pedagogico/conselho"
-            element={<ConselhoClasse />}
-          />
+          <Route path="/pedagogico/conselho" element={<ConselhoClasse />} />
+          <Route path="/pedagogico/conteudos" element={
+            <RequirePerm perm="conteudos.visualizar"><ConteudosAdmin /></RequirePerm>
+          } />
+          <Route path="/pedagogico/coordenacao/solicitacoes" element={<SolicitacoesConteudos />} />
 
-          <Route
-            path="/pedagogico/conteudos"
-            element={
-              <RequirePerm perm="conteudos.visualizar">
-                <ConteudosAdmin />
-              </RequirePerm>
-            }
-          />
+          {/* ── Professores ──────────────────────────────────────────────── */}
+          <Route path="/professores/planos"     element={<Planos />} />
+          <Route path="/professores/avaliacoes" element={<Avaliacoes />} />
+          <Route path="/professores/conteudos"  element={<ConteudosProfessor />} />
+          <Route path="/professores/provas"     element={<ProvasProfessor />} />
 
-
-          <Route
-            path="/pedagogico/coordenacao/solicitacoes"
-            element={<SolicitacoesConteudos />}
-          />
-
-          <Route
-            path="/professores/planos"
-            element={<Planos />}
-          />
-
-          <Route
-            path="/professores/avaliacoes"
-            element={<Avaliacoes />}
-          />
-
-          <Route
-            path="/professores/conteudos"
-            element={<ConteudosProfessor />}
-          />
-
-          <Route
-            path="/professores/provas"
-            element={<ProvasProfessor />}
-          />
-
-
-          {/* Frequência */}
-          <Route path="/frequencia/atestados" element={<Atestados />} />
-          <Route path="/frequencia/relatorios" element={<Relatorios />} />
-          <Route path="/frequencia/busca-ativa" element={<BuscaAtiva />} />
+          {/* ── Frequência ───────────────────────────────────────────────── */}
+          <Route path="/frequencia/atestados"       element={<Atestados />} />
+          <Route path="/frequencia/relatorios"      element={<Relatorios />} />
+          <Route path="/frequencia/busca-ativa"     element={<BuscaAtiva />} />
           <Route path="/frequencia/conselho-tutelar" element={<ConselhoTutelar />} />
 
-          {/* Impressão */}
-          <Route
-            path="/impressao/gabaritos"
-            element={<GerarGabaritos />}
-          />
-          <Route
-            path="/impressao/boletins"
-            element={<BoletimTurmas />}
-          />
-          <Route
-            path="/impressao/listas"
-            element={<ListasImpressao />}
-          />
+          {/* ── Impressão ────────────────────────────────────────────────── */}
+          <Route path="/impressao/gabaritos" element={<GerarGabaritos />} />
+          <Route path="/impressao/boletins"  element={<BoletimTurmas />} />
+          <Route path="/impressao/listas"    element={<ListasImpressao />} />
 
-          {/* Horários */}
-          <Route
-            path="/secretaria/horarios/layout"
-            element={<LayoutGrade />}
-          />
-          <Route
-            path="/secretaria/horarios/mock"
-            element={<ExecutarMock />}
-          />
+          {/* ── Horários ─────────────────────────────────────────────────── */}
+          <Route path="/secretaria/horarios/layout" element={<LayoutGrade />} />
+          <Route path="/secretaria/horarios/mock"   element={<ExecutarMock />} />
 
+          {/* ── Ferramentas ──────────────────────────────────────────────── */}
           <Route path="/ferramentas" element={<Ferramentas />} />
 
-          {/* Agente EDUCA */}
+          {/* ── Agente EDUCA ─────────────────────────────────────────────── */}
           <Route path="/agente-educa/credenciais" element={<AgenteCredenciais />} />
 
-          {/* Direção (Diretor) — Devices EDUCA-CAPTURE */}
-          <Route
-            path="/direcao/diretor"
-            element={
-              <RequirePerm perm="capture_devices.gerenciar">
-                <DiretorPedagogico />
-              </RequirePerm>
-            }
-          />
-
-          {/* Direção — Responsáveis (cópia do Disciplinar) */}
-          <Route path="/direcao/responsaveis" element={<ResponsaveisDisciplinar />} />
-
-          {/* Direção — Cadastro de Membros */}
-          <Route path="/direcao/cadastro" element={
-            <RequirePerm perm="capture_devices.gerenciar">
-              <CadastroMembros />
-            </RequirePerm>
+          {/* ── Direção ──────────────────────────────────────────────────── */}
+          <Route path="/direcao/diretor" element={
+            <RequirePerm perm="capture_devices.gerenciar"><DiretorPedagogico /></RequirePerm>
           } />
-
-          {/* Direção — Governança (Configurações da Escola) */}
+          <Route path="/direcao/responsaveis" element={<ResponsaveisDisciplinar />} />
+          <Route path="/direcao/cadastro" element={
+            <RequirePerm perm="capture_devices.gerenciar"><CadastroMembros /></RequirePerm>
+          } />
           <Route path="/direcao/governanca" element={
-            <RequireDiretor>
-              <Governanca />
-            </RequireDiretor>
+            <RequireDiretor><Governanca /></RequireDiretor>
           } />
 
           <Route path="*" element={<Navigate to="/home" replace />} />
-
         </Route>
-
       </Routes>
     </BrowserRouter>
   );

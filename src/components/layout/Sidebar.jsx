@@ -689,6 +689,21 @@ export default function Sidebar({ isOpen, onClose }) {
                 )}
                 <li>
                   <Link
+                    to="/disciplinar/fo-coletivo"
+                    className={getSubmenuLinkClasses('/disciplinar/fo-coletivo')}
+                    style={{
+                      background: isActive('/disciplinar/fo-coletivo')
+                        ? 'linear-gradient(90deg, rgba(239,68,68,0.15), transparent)'
+                        : undefined,
+                    }}
+                  >
+                    <BoltIcon className="h-5 w-5 mr-2" style={{ color: isActive('/disciplinar/fo-coletivo') ? '#f87171' : undefined }} />
+                    <span className="flex-1">F.O. Coletivo</span>
+                    <span style={{ fontSize:'0.5rem', fontWeight:800, background:'linear-gradient(135deg,#ef4444,#dc2626)', color:'#fff', padding:'1px 5px', borderRadius:'6px', letterSpacing:'0.5px' }}>NOVO</span>
+                  </Link>
+                </li>
+                <li>
+                  <Link
                     to="/disciplinar/metadados"
                     className={getSubmenuLinkClasses('/disciplinar/metadados')}
                   >
@@ -753,6 +768,21 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
                 )}
+                <li>
+                  <Link
+                    to="/disciplinar/fo-coletivo"
+                    className={getSubmenuLinkClasses('/disciplinar/fo-coletivo')}
+                    style={{
+                      background: isActive('/disciplinar/fo-coletivo')
+                        ? 'linear-gradient(90deg, rgba(239,68,68,0.15), transparent)'
+                        : undefined,
+                    }}
+                  >
+                    <BoltIcon className="h-5 w-5 mr-2" style={{ color: isActive('/disciplinar/fo-coletivo') ? '#f87171' : undefined }} />
+                    <span className="flex-1">F.O. Coletivo</span>
+                    <span style={{ fontSize:'0.5rem', fontWeight:800, background:'linear-gradient(135deg,#ef4444,#dc2626)', color:'#fff', padding:'1px 5px', borderRadius:'6px', letterSpacing:'0.5px' }}>NOVO</span>
+                  </Link>
+                </li>
                 <li>
                   <Link
                     to="/disciplinar/metadados"

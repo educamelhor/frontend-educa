@@ -1,0 +1,14 @@
+{
+  "name": "educa-worker-camera",
+  "version": "1.0.0",
+  "description": "Worker local da escola — envia frames da câmera Intelbras para o backend na nuvem",
+  "type": "module",
+  "main": "worker.js",
+  "scripts": {
+    "start": "node worker.js",
+    "start:watch": "node --watch worker.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

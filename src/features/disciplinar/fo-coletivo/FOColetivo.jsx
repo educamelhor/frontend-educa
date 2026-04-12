@@ -115,6 +115,10 @@ export default function FOColetivo() {
   const [consultaOpen, setConsultaOpen]   = useState(false);
   const [buscaConsulta, setBuscaConsulta] = useState('');
 
+  // Ref para indicar que a seleção da tabela já preencheu o motivo — evita que
+  // o useEffect de filtragem sobrescreva o campo com string vazia.
+  const selecionandoDaTabela = useRef(false);
+
   // ── Efeitos iniciais ─────────────────────────────────────────────────────
   useEffect(() => {
     carregarTurmas();
@@ -143,7 +147,18 @@ export default function FOColetivo() {
     let filtered = registrosOcorrencias.filter(r => r.medida_disciplinar === def.medida);
     if (def.tipoFixo) filtered = filtered.filter(r => r.tipo_ocorrencia === def.tipoFixo);
     setRegistrosFiltrados(filtered);
-    setMedidaForm(f => ({ ...f, motivo: '', tipoSelecionado: def.tipoFixo || '' }));
+    // Quando a mudança de medida veio de uma seleção na tabela, o motivo já foi
+    // preenchido atomicamente — NÃO deve ser resetado aqui.
+    if (selecionandoDaTabela.current) {
+      selecionandoDaTabela.current = false;
+      // Apenas atualiza tipoSelecionado se ainda não estiver definido
+      setMedidaForm(f => ({
+        ...f,
+        tipoSelecionado: f.tipoSelecionado || def.tipoFixo || '',
+      }));
+    } else {
+      setMedidaForm(f => ({ ...f, motivo: '', tipoSelecionado: def.tipoFixo || '' }));
+    }
   }, [medidaForm.medidaSelecionada, registrosOcorrencias]);
 
   // ── Loaders ──────────────────────────────────────────────────────────────
@@ -218,8 +233,18 @@ export default function FOColetivo() {
       if (m.tipoFixo) return m.tipoFixo === registro.tipo_ocorrencia;
       return true;
     });
-    if (def) setMedidaForm(f => ({ ...f, medidaSelecionada: def.label }));
-    setMedidaForm(f => ({ ...f, motivo: registro.descricao_ocorrencia || '', tipoSelecionado: registro.tipo_ocorrencia || '' }));
+
+    // Sinaliza para o useEffect que NÃO deve resetar o motivo nesta rodada
+    selecionandoDaTabela.current = true;
+
+    // Atualiza ambos os campos em um único setState atômico
+    setMedidaForm(f => ({
+      ...f,
+      medidaSelecionada: def ? def.label : f.medidaSelecionada,
+      motivo: registro.descricao_ocorrencia || '',
+      tipoSelecionado: registro.tipo_ocorrencia || '',
+    }));
+
     setConsultaOpen(false);
   }
 

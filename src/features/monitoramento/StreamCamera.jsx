@@ -71,78 +71,36 @@ export default function StreamCamera({ cameraId, titulo, registros }) {
   }
 
   // ----------------------------------------------------------------------------
-  // 0) Obter stream_token curto (necessário para <img src="...mjpeg">)
+  // 0) stream_token removido: agora usamos /ingest/snapshot/:id.jpg direto,
+  //    sem dependência do monitoramento_stream.js (que precisa de ffmpeg-static)
+  // ----------------------------------------------------------------------------
+  // (mantido vazio para compatibilidade com modoAoVivo)
+
+
+  // ----------------------------------------------------------------------------
+  // ----------------------------------------------------------------------------
+  // 1) Atualizar URL da imagem — usa /ingest/snapshot/:id.jpg (sem stream_token)
   // ----------------------------------------------------------------------------
   useEffect(() => {
-    // FASE ATUAL: somente câmera 1 deve pedir stream_token
-    if (cameraId !== 1) return;
-
-    let cancelado = false;
-
-    async function obterStreamToken() {
-      try {
-        const authToken = localStorage.getItem("token") || "";
-        if (!authToken) return;
-
-        const resp = await fetch(`${API_BASE_PROTECTED}/stream/token?ttl=90`, {
-          headers: { Authorization: `Bearer ${authToken}` },
-        });
-
-        if (!resp.ok) return;
-        const json = await resp.json();
-        if (!json?.ok || !json?.stream_token) return;
-
-        if (!cancelado) setStreamToken(json.stream_token);
-      } catch (e) {
-        console.error("[StreamCamera] falha ao obter stream_token:", e);
-      }
-    }
-
-    obterStreamToken();
-    const id = setInterval(obterStreamToken, 60_000); // renova antes de expirar (ttl=90s)
-    return () => {
-      cancelado = true;
-      clearInterval(id);
-    };
-  }, [cameraId]);
-
-  // ----------------------------------------------------------------------------
-  // 1) Atualizar URL da imagem conforme modo (snapshot ou stream)
-  //    Para cameraId === 1, usar o MJPEG/IMG do backend com stream_token + fallback.
-  //    Para demais câmeras, manter a rota protegida existente.
-  // ----------------------------------------------------------------------------
-  useEffect(() => {
-    // FASE ATUAL DO PROJETO: apenas câmera 1.
-    // Objetivo: zero requests de stream/snapshot para cams 2 e 3.
     if (cameraId !== 1) {
       setImgSrc("");
       return;
     }
 
-    if (!streamToken) return;
+    const escolaDir =
+      localStorage.getItem("escola_dir") ||
+      localStorage.getItem("escola_apelido") ||
+      "cef04_ccmdf";
 
-    // sempre reseta o decoder do <img> antes de trocar de modo (JPG <-> MJPEG)
+    // Sempre reseta o src antes de trocar
     setImgSrc("");
 
-    // AO VIVO (MJPEG): NÃO pode recriar o src continuamente
-    if (modoAoVivo) {
-      const url = `${API_BASE_PROTECTED}/1.mjpeg?token=${encodeURIComponent(
-        streamToken
-      )}&fallback=1&fps=5`;
+    // Monta URL direta para o frame do worker (sem stream_token, sem ffmpeg-static)
+    const buildSnapshotUrl = (tick) =>
+      `${API_ORIGIN}/api/monitoramento/ingest/snapshot/${cameraId}.jpg` +
+      `?escola_dir=${encodeURIComponent(escolaDir)}&_=${tick}`;
 
-      // next tick para garantir que o reset do src foi aplicado
-      const t = setTimeout(() => setImgSrc(url), 0);
-      return () => clearTimeout(t);
-    }
-
-    // Snapshot (JPG): cache-bust para "quase-vídeo"
-    // ATENÇÃO: o próximo tick será disparado SOMENTE após o onLoad (evita "cancelled")
-    const buildJpgUrl = (tick) =>
-      `${API_BASE_PROTECTED}/1.jpg?token=${encodeURIComponent(
-        streamToken
-      )}&fallback=1&_=${tick}`;
-
-    setImgSrc(buildJpgUrl(snapTick));
+    setImgSrc(buildSnapshotUrl(snapTick));
 
     return () => {
       if (snapTimerRef.current) {
@@ -150,7 +108,7 @@ export default function StreamCamera({ cameraId, titulo, registros }) {
         snapTimerRef.current = null;
       }
     };
-  }, [cameraId, modoAoVivo, streamToken, snapTick]);
+  }, [cameraId, snapTick]);
 
 
   // ----------------------------------------------------------------------------

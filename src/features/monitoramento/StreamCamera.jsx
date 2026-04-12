@@ -18,9 +18,13 @@ import React, { useEffect, useRef, useState } from "react";
 export default function StreamCamera({ cameraId, titulo, registros }) {
   // Em DEV (Vite:5173), as rotas /api/* precisam apontar para o backend (3000),
   // senão o request vai para 5173 e dá 404.
+  // Em PROD, aponta para o backend DigitalOcean (mesma lógica do api.js).
+  const _host = window.location.hostname;
+  const _isLocal = _host === "localhost" || _host === "127.0.0.1";
   const API_ORIGIN =
     import.meta.env.VITE_API_ORIGIN ||
-    (window.location.port === "5173" ? "http://localhost:3000" : window.location.origin);
+    import.meta.env.VITE_API_BASE_URL ||
+    (_isLocal ? "http://localhost:3000" : "https://educa-backend-docker-659zo.ondigitalocean.app");
 
   const API_BASE_PROTECTED = `${API_ORIGIN}/api/monitoramento`;
   const API_BASE_PUBLIC    = `${API_ORIGIN}/api/monitoramento-public`;

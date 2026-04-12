@@ -1,8 +1,7 @@
 // src/features/frequencia/Atestados.jsx
 // ============================================================================
 // Módulo FREQUÊNCIA — Atestados e Justificativas de Faltas
-// Permite coordenadores/diretores registrar justificativas de faltas dos alunos.
-// Professores conseguem visualizar e importar para seus diários.
+// Permite coordenadores/diretores registrar, editar e excluir justificativas.
 // ============================================================================
 
 import React, { useState, useEffect, useCallback } from "react";
@@ -26,17 +25,18 @@ const TIPOS_JUSTIFICATIVA = [
   { value: "intercambio", label: "Intercâmbio — Decreto nº 47.210 de 09/05/2025", icon: "✈️", cor: "#0d9488" },
 ];
 
+const FORM_VAZIO = { aluno_id: "", tipo: "", data_inicio: "", data_fim: "", observacao: "", dias: 1 };
+const ANO_LETIVO = String(new Date().getFullYear());
+
 // ─────────────────────────────────────────────
 // Componente principal
 // ─────────────────────────────────────────────
-const ANO_LETIVO = String(new Date().getFullYear());
-
 export default function Atestados() {
   const escolaId = localStorage.getItem("escola_id");
   const perfil = String(localStorage.getItem("perfil") || "").toLowerCase();
   const canRegister = ["diretor", "vice_diretor", "coordenador", "secretaria"].includes(perfil);
 
-  // ── Estado ─────────────────────────────────
+  // ── Filtros ─────────────────────────────────
   const [turnos, setTurnos] = useState([]);
   const [turno, setTurno] = useState("");
   const [turmas, setTurmas] = useState([]);
@@ -45,59 +45,49 @@ export default function Atestados() {
   const [alunos, setAlunos] = useState([]);
   const [justificativas, setJustificativas] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [showModal, setShowModal] = useState(false);
   const [filtroTipo, setFiltroTipo] = useState("");
   const [filtroAluno, setFiltroAluno] = useState("");
 
-  // ── Modal state (independente dos filtros da página) ──
+  // ── Modal (novo/editar) ──────────────────────
+  const [showModal, setShowModal] = useState(false);
+  const [editandoId, setEditandoId] = useState(null); // null = novo, number = editar
   const [modalTurmaId, setModalTurmaId] = useState("");
   const [modalAlunos, setModalAlunos] = useState([]);
+  const [form, setForm] = useState(FORM_VAZIO);
+  const [salvando, setSalvando] = useState(false);
+  const [erroModal, setErroModal] = useState("");
 
-  // ── Form state ─────────────────────────────
-  const [form, setForm] = useState({
-    aluno_id: "",
-    tipo: "",
-    data_inicio: "",
-    data_fim: "",
-    observacao: "",
-    dias: 1,
-  });
+  // ── Modal de exclusão ────────────────────────
+  const [excluindoId, setExcluindoId] = useState(null);
+  const [confirmandoExclusao, setConfirmandoExclusao] = useState(false);
+  const [itemParaExcluir, setItemParaExcluir] = useState(null);
 
-  // ── Carregar turnos ────────────────────────
+  // ── Turnos ──────────────────────────────────
   useEffect(() => {
     api.get("/turnos")
       .then(r => setTurnos(Array.isArray(r.data) ? r.data : []))
       .catch(() => {});
   }, []);
 
-  // ── Carregar turmas (ano letivo atual) ─────
+  // ── Turmas ──────────────────────────────────
   useEffect(() => {
     if (!escolaId) return;
     api.get("/turmas")
       .then(r => {
         const all = (r.data || []).filter(t => String(t.ano) === ANO_LETIVO);
         setTurmas(all);
-        if (turno) {
-          setTurmasFiltradas(all.filter(t => (t.turno || "").toLowerCase() === turno.toLowerCase()));
-        } else {
-          setTurmasFiltradas(all);
-        }
+        setTurmasFiltradas(turno ? all.filter(t => (t.turno || "").toLowerCase() === turno.toLowerCase()) : all);
       })
       .catch(() => {});
   }, [escolaId]);
 
-  // ── Filtrar turmas por turno ───────────────
   useEffect(() => {
-    if (turno) {
-      setTurmasFiltradas(turmas.filter(t => (t.turno || "").toLowerCase() === turno.toLowerCase()));
-    } else {
-      setTurmasFiltradas(turmas);
-    }
+    setTurmasFiltradas(turno ? turmas.filter(t => (t.turno || "").toLowerCase() === turno.toLowerCase()) : turmas);
     setTurmaId("");
     setAlunos([]);
   }, [turno, turmas]);
 
-  // ── Carregar alunos do MODAL ───────────────
+  // ── Alunos do modal ─────────────────────────
   useEffect(() => {
     if (!modalTurmaId) { setModalAlunos([]); return; }
     api.get(`/turmas/${modalTurmaId}/alunos`)
@@ -105,7 +95,7 @@ export default function Atestados() {
       .catch(() => setModalAlunos([]));
   }, [modalTurmaId]);
 
-  // ── Carregar justificativas ────────────────
+  // ── Justificativas ──────────────────────────
   const carregarJustificativas = useCallback(async () => {
     if (!escolaId) return;
     setLoading(true);
@@ -124,27 +114,7 @@ export default function Atestados() {
 
   useEffect(() => { carregarJustificativas(); }, [carregarJustificativas]);
 
-  // ── Registrar justificativa ────────────────
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!form.aluno_id || !form.tipo || !form.data_inicio || !form.data_fim) return;
-    try {
-      await api.post("/frequencia/justificativas", {
-        ...form,
-        escola_id: escolaId,
-        turma_id: modalTurmaId,
-      });
-      setShowModal(false);
-      setForm({ aluno_id: "", tipo: "", data_inicio: "", data_fim: "", observacao: "", dias: 1 });
-      setModalTurmaId("");
-      setModalAlunos([]);
-      carregarJustificativas();
-    } catch (err) {
-      alert("Erro ao registrar: " + (err.response?.data?.error || err.message));
-    }
-  };
-
-  // Calcular dias automaticamente
+  // ── Calcular dias ────────────────────────────
   useEffect(() => {
     if (form.data_inicio && form.data_fim) {
       const d1 = new Date(form.data_inicio);
@@ -154,19 +124,105 @@ export default function Atestados() {
     }
   }, [form.data_inicio, form.data_fim]);
 
-  // ── Info do tipo selecionado ───────────────
+  // ── Abrir modal novo ─────────────────────────
+  const abrirModalNovo = () => {
+    setEditandoId(null);
+    setForm(FORM_VAZIO);
+    setModalTurmaId("");
+    setModalAlunos([]);
+    setErroModal("");
+    setShowModal(true);
+  };
+
+  // ── Abrir modal editar ───────────────────────
+  const abrirModalEditar = (j) => {
+    setEditandoId(j.id);
+    setForm({
+      aluno_id: j.aluno_id,
+      tipo: j.tipo,
+      data_inicio: j.data_inicio ? j.data_inicio.slice(0, 10) : "",
+      data_fim: j.data_fim ? j.data_fim.slice(0, 10) : "",
+      observacao: j.observacao || "",
+      dias: j.dias || 1,
+    });
+    setModalTurmaId(String(j.turma_id || ""));
+    setErroModal("");
+    setShowModal(true);
+  };
+
+  // ── Salvar (novo ou editar) ──────────────────
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.aluno_id || !form.tipo || !form.data_inicio || !form.data_fim) return;
+    setSalvando(true);
+    setErroModal("");
+    try {
+      if (editandoId) {
+        // Editar
+        await api.put(`/frequencia/justificativas/${editandoId}`, {
+          tipo: form.tipo,
+          data_inicio: form.data_inicio,
+          data_fim: form.data_fim,
+          dias: form.dias,
+          observacao: form.observacao,
+        });
+      } else {
+        // Novo
+        await api.post("/frequencia/justificativas", {
+          ...form,
+          escola_id: escolaId,
+          turma_id: modalTurmaId,
+        });
+      }
+      setShowModal(false);
+      setForm(FORM_VAZIO);
+      setModalTurmaId("");
+      setModalAlunos([]);
+      carregarJustificativas();
+    } catch (err) {
+      const status = err.response?.status;
+      const msg = err.response?.data?.message || err.response?.data?.error || err.message;
+      if (status === 409) {
+        setErroModal("⚠️ " + msg);
+      } else {
+        setErroModal("❌ Erro ao salvar: " + msg);
+      }
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  // ── Excluir ──────────────────────────────────
+  const confirmarExclusao = (j) => {
+    setItemParaExcluir(j);
+    setConfirmandoExclusao(true);
+  };
+
+  const executarExclusao = async () => {
+    if (!itemParaExcluir) return;
+    setExcluindoId(itemParaExcluir.id);
+    try {
+      await api.delete(`/frequencia/justificativas/${itemParaExcluir.id}`);
+      setConfirmandoExclusao(false);
+      setItemParaExcluir(null);
+      carregarJustificativas();
+    } catch (err) {
+      alert("Erro ao excluir: " + (err.response?.data?.error || err.message));
+    } finally {
+      setExcluindoId(null);
+    }
+  };
+
+  // ── Info do tipo ─────────────────────────────
   const getTypeInfo = (val) => TIPOS_JUSTIFICATIVA.find(t => t.value === val);
 
-  // Filtrar justificativas por aluno
   const justificativasFiltradas = justificativas.filter(j => {
     if (filtroAluno) {
-      const nome = (j.aluno_nome || "").toLowerCase();
-      if (!nome.includes(filtroAluno.toLowerCase())) return false;
+      if (!(j.aluno_nome || "").toLowerCase().includes(filtroAluno.toLowerCase())) return false;
     }
     return true;
   });
 
-  // Estatísticas
   const stats = {
     total: justificativas.length,
     medico: justificativas.filter(j => j.tipo === "atestado_medico").length,
@@ -174,22 +230,19 @@ export default function Atestados() {
     outros: justificativas.filter(j => !["atestado_medico", "atestado_acompanhamento"].includes(j.tipo)).length,
   };
 
+  // ── Render ───────────────────────────────────
   return (
     <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+
       {/* ═══ HEADER ═══ */}
       <div style={{
         background: "linear-gradient(135deg, #1e3a5f 0%, #0f766e 100%)",
-        borderRadius: 16,
-        padding: "28px 32px",
-        marginBottom: 24,
-        color: "#fff",
-        position: "relative",
-        overflow: "hidden",
+        borderRadius: 16, padding: "28px 32px", marginBottom: 24,
+        color: "#fff", position: "relative", overflow: "hidden",
       }}>
         <div style={{
           position: "absolute", top: -40, right: -40, width: 180, height: 180,
-          background: "radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%)",
-          borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%)", borderRadius: "50%",
         }} />
         <div style={{ display: "flex", alignItems: "center", gap: 16, position: "relative" }}>
           <div style={{
@@ -208,7 +261,7 @@ export default function Atestados() {
         </div>
       </div>
 
-      {/* ═══ CARDS ESTATÍSTICAS ═══ */}
+      {/* ═══ CARDS ═══ */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14, marginBottom: 24 }}>
         {[
           { label: "Total Registros", value: stats.total, icon: "📊", gradient: "linear-gradient(135deg, #6366f1, #8b5cf6)" },
@@ -222,9 +275,8 @@ export default function Atestados() {
             display: "flex", alignItems: "center", gap: 14,
           }}>
             <div style={{
-              width: 44, height: 44, borderRadius: 12,
-              background: card.gradient, display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 20, color: "#fff", flexShrink: 0,
+              width: 44, height: 44, borderRadius: 12, background: card.gradient,
+              display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, color: "#fff", flexShrink: 0,
             }}>{card.icon}</div>
             <div>
               <div style={{ fontSize: "1.4rem", fontWeight: 800, color: "#1e293b", lineHeight: 1 }}>{card.value}</div>
@@ -240,105 +292,55 @@ export default function Atestados() {
         boxShadow: "0 1px 3px rgba(0,0,0,0.06)", border: "1px solid #e5e7eb",
         display: "flex", flexWrap: "wrap", gap: 14, alignItems: "center",
       }}>
-        <select
-          value={turno}
-          onChange={e => setTurno(e.target.value)}
-          style={{
-            padding: "10px 14px", borderRadius: 10, border: "1.5px solid #d1d5db",
-            background: "#f8fafc", fontSize: "0.88rem", fontWeight: 600, minWidth: 160,
-            cursor: "pointer", outline: "none",
-          }}
-        >
+        <select value={turno} onChange={e => setTurno(e.target.value)}
+          style={{ padding: "10px 14px", borderRadius: 10, border: "1.5px solid #d1d5db", background: "#f8fafc", fontSize: "0.88rem", fontWeight: 600, minWidth: 160, cursor: "pointer", outline: "none" }}>
           <option value="">Todos os turnos</option>
-          {turnos.map(t => (
-            <option key={t} value={t}>{t}</option>
-          ))}
+          {turnos.map(t => <option key={t} value={t}>{t}</option>)}
         </select>
 
-        <select
-          value={turmaId}
-          onChange={e => setTurmaId(e.target.value)}
-          style={{
-            padding: "10px 14px", borderRadius: 10, border: "1.5px solid #d1d5db",
-            background: "#f8fafc", fontSize: "0.88rem", fontWeight: 600, minWidth: 200,
-            cursor: "pointer", outline: "none",
-          }}
-        >
+        <select value={turmaId} onChange={e => setTurmaId(e.target.value)}
+          style={{ padding: "10px 14px", borderRadius: 10, border: "1.5px solid #d1d5db", background: "#f8fafc", fontSize: "0.88rem", fontWeight: 600, minWidth: 200, cursor: "pointer", outline: "none" }}>
           <option value="">Todas as turmas ({turmasFiltradas.length})</option>
-          {turmasFiltradas.map(t => (
-            <option key={t.id} value={t.id}>{t.turma || t.nome}</option>
-          ))}
+          {turmasFiltradas.map(t => <option key={t.id} value={t.id}>{t.turma || t.nome}</option>)}
         </select>
 
-        <select
-          value={filtroTipo}
-          onChange={e => setFiltroTipo(e.target.value)}
-          style={{
-            padding: "10px 14px", borderRadius: 10, border: "1.5px solid #d1d5db",
-            background: "#f8fafc", fontSize: "0.88rem", fontWeight: 600, minWidth: 200,
-            cursor: "pointer", outline: "none",
-          }}
-        >
+        <select value={filtroTipo} onChange={e => setFiltroTipo(e.target.value)}
+          style={{ padding: "10px 14px", borderRadius: 10, border: "1.5px solid #d1d5db", background: "#f8fafc", fontSize: "0.88rem", fontWeight: 600, minWidth: 200, cursor: "pointer", outline: "none" }}>
           <option value="">Todos os tipos</option>
-          {TIPOS_JUSTIFICATIVA.map(t => (
-            <option key={t.value} value={t.value}>{t.icon} {t.label}</option>
-          ))}
+          {TIPOS_JUSTIFICATIVA.map(t => <option key={t.value} value={t.value}>{t.icon} {t.label}</option>)}
         </select>
 
-        <input
-          type="text"
-          placeholder="🔍 Buscar aluno..."
-          value={filtroAluno}
+        <input type="text" placeholder="🔍 Buscar aluno..." value={filtroAluno}
           onChange={e => setFiltroAluno(e.target.value)}
-          style={{
-            padding: "10px 14px", borderRadius: 10, border: "1.5px solid #d1d5db",
-            background: "#f8fafc", fontSize: "0.88rem", flex: 1, minWidth: 180,
-            outline: "none",
-          }}
-        />
+          style={{ padding: "10px 14px", borderRadius: 10, border: "1.5px solid #d1d5db", background: "#f8fafc", fontSize: "0.88rem", flex: 1, minWidth: 180, outline: "none" }} />
 
         {canRegister && (
-          <button
-            onClick={() => {
-              setForm({ aluno_id: "", tipo: "", data_inicio: "", data_fim: "", observacao: "", dias: 1 });
-              setModalTurmaId("");
-              setModalAlunos([]);
-              setShowModal(true);
-            }}
-            style={{
-              padding: "10px 22px", borderRadius: 10, border: "none",
-              background: "linear-gradient(135deg, #0f766e, #059669)",
-              color: "#fff", fontWeight: 700, fontSize: "0.88rem",
-              cursor: "pointer", display: "flex", alignItems: "center", gap: 8,
-              boxShadow: "0 2px 8px rgba(15,118,110,0.3)",
-              transition: "all 0.2s",
-            }}
-            onMouseEnter={e => e.target.style.transform = "translateY(-1px)"}
-            onMouseLeave={e => e.target.style.transform = "translateY(0)"}
-          >
+          <button onClick={abrirModalNovo} style={{
+            padding: "10px 22px", borderRadius: 10, border: "none",
+            background: "linear-gradient(135deg, #0f766e, #059669)",
+            color: "#fff", fontWeight: 700, fontSize: "0.88rem",
+            cursor: "pointer", display: "flex", alignItems: "center", gap: 8,
+            boxShadow: "0 2px 8px rgba(15,118,110,0.3)", transition: "all 0.2s",
+          }}
+            onMouseEnter={e => e.currentTarget.style.transform = "translateY(-1px)"}
+            onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}>
             <span style={{ fontSize: 18 }}>+</span> Registrar Justificativa
           </button>
         )}
       </div>
 
-      {/* ═══ TABELA DE JUSTIFICATIVAS ═══ */}
-      <div style={{
-        background: "#fff", borderRadius: 14, overflow: "hidden",
-        boxShadow: "0 1px 3px rgba(0,0,0,0.06)", border: "1px solid #e5e7eb",
-      }}>
+      {/* ═══ TABELA ═══ */}
+      <div style={{ background: "#fff", borderRadius: 14, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.06)", border: "1px solid #e5e7eb" }}>
         {loading ? (
           <div style={{ padding: 60, textAlign: "center", color: "#94a3b8" }}>
-            <div style={{ fontSize: 32, marginBottom: 12, animation: "spin 1s linear infinite" }}>⏳</div>
-            Carregando justificativas...
+            <div style={{ fontSize: 32, marginBottom: 12 }}>⏳</div>Carregando...
           </div>
         ) : justificativasFiltradas.length === 0 ? (
           <div style={{ padding: 60, textAlign: "center", color: "#94a3b8" }}>
             <div style={{ fontSize: 48, marginBottom: 12, opacity: 0.4 }}>📋</div>
             <p style={{ fontWeight: 600, fontSize: "1.05rem" }}>Nenhuma justificativa registrada</p>
             <p style={{ fontSize: "0.85rem", marginTop: 4 }}>
-              {canRegister
-                ? "Clique em \"Registrar Justificativa\" para adicionar"
-                : "Aguardando registros da coordenação/direção"}
+              {canRegister ? "Clique em \"Registrar Justificativa\" para adicionar" : "Aguardando registros da coordenação/direção"}
             </p>
           </div>
         ) : (
@@ -346,11 +348,11 @@ export default function Atestados() {
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ background: "#f8fafc", borderBottom: "2px solid #e2e8f0" }}>
-                  {["Aluno", "Turma", "Tipo", "Período", "Dias", "Observação", "Registrado por", "Data Registro"].map(h => (
+                  {["Aluno", "Turma", "Tipo", "Período", "Dias", "Observação", "Registrado por", "Data Registro", ...(canRegister ? ["Ações"] : [])].map(h => (
                     <th key={h} style={{
-                      padding: "12px 16px", textAlign: "left", fontSize: "0.75rem",
-                      fontWeight: 700, color: "#475569", textTransform: "uppercase",
-                      letterSpacing: "0.05em",
+                      padding: "12px 16px", textAlign: h === "Ações" ? "center" : "left",
+                      fontSize: "0.75rem", fontWeight: 700, color: "#475569",
+                      textTransform: "uppercase", letterSpacing: "0.05em",
                     }}>{h}</th>
                   ))}
                 </tr>
@@ -359,26 +361,17 @@ export default function Atestados() {
                 {justificativasFiltradas.map((j, i) => {
                   const typeInfo = getTypeInfo(j.tipo);
                   return (
-                    <tr key={j.id || i} style={{
-                      borderBottom: "1px solid #f1f5f9",
-                      transition: "background 0.15s",
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.background = "#f8fafc"}
-                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-                    >
-                      <td style={{ padding: "14px 16px", fontWeight: 600, color: "#1e293b", fontSize: "0.88rem" }}>
-                        {j.aluno_nome || "—"}
-                      </td>
-                      <td style={{ padding: "14px 16px", color: "#64748b", fontSize: "0.85rem" }}>
-                        {j.turma_nome || "—"}
-                      </td>
+                    <tr key={j.id || i} style={{ borderBottom: "1px solid #f1f5f9", transition: "background 0.15s" }}
+                      onMouseEnter={e => e.currentTarget.style.background = "#f8fafc"}
+                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                      <td style={{ padding: "14px 16px", fontWeight: 600, color: "#1e293b", fontSize: "0.88rem" }}>{j.aluno_nome || "—"}</td>
+                      <td style={{ padding: "14px 16px", color: "#64748b", fontSize: "0.85rem" }}>{j.turma_nome || "—"}</td>
                       <td style={{ padding: "14px 16px" }}>
                         <span style={{
                           display: "inline-flex", alignItems: "center", gap: 6,
                           background: `${typeInfo?.cor || "#6b7280"}15`,
                           color: typeInfo?.cor || "#6b7280",
-                          padding: "4px 10px", borderRadius: 8, fontSize: "0.78rem",
-                          fontWeight: 700, whiteSpace: "nowrap",
+                          padding: "4px 10px", borderRadius: 8, fontSize: "0.78rem", fontWeight: 700, whiteSpace: "nowrap",
                         }}>
                           <span>{typeInfo?.icon || "📋"}</span>
                           {typeInfo?.label || j.tipo}
@@ -390,24 +383,51 @@ export default function Atestados() {
                         {j.data_fim ? new Date(j.data_fim).toLocaleDateString("pt-BR") : "—"}
                       </td>
                       <td style={{ padding: "14px 16px", textAlign: "center" }}>
-                        <span style={{
-                          background: "#dbeafe", color: "#1d4ed8",
-                          padding: "3px 10px", borderRadius: 8, fontWeight: 700,
-                          fontSize: "0.82rem",
-                        }}>{j.dias || 1}</span>
+                        <span style={{ background: "#dbeafe", color: "#1d4ed8", padding: "3px 10px", borderRadius: 8, fontWeight: 700, fontSize: "0.82rem" }}>{j.dias || 1}</span>
                       </td>
-                      <td style={{
-                        padding: "14px 16px", color: "#64748b", fontSize: "0.82rem",
-                        maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                      }}>
+                      <td style={{ padding: "14px 16px", color: "#64748b", fontSize: "0.82rem", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {j.observacao || "—"}
                       </td>
-                      <td style={{ padding: "14px 16px", color: "#64748b", fontSize: "0.82rem" }}>
-                        {j.registrado_por_nome || "—"}
-                      </td>
+                      <td style={{ padding: "14px 16px", color: "#64748b", fontSize: "0.82rem" }}>{j.registrado_por_nome || "—"}</td>
                       <td style={{ padding: "14px 16px", color: "#94a3b8", fontSize: "0.8rem", whiteSpace: "nowrap" }}>
                         {j.criado_em ? new Date(j.criado_em).toLocaleDateString("pt-BR") : "—"}
                       </td>
+                      {canRegister && (
+                        <td style={{ padding: "14px 16px", textAlign: "center" }}>
+                          <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
+                            {/* Botão Editar */}
+                            <button
+                              onClick={() => abrirModalEditar(j)}
+                              title="Editar justificativa"
+                              style={{
+                                padding: "6px 12px", borderRadius: 8, border: "1.5px solid #d1d5db",
+                                background: "#fff", color: "#374151", fontSize: "0.78rem",
+                                fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 5,
+                                transition: "all 0.15s",
+                              }}
+                              onMouseEnter={e => { e.currentTarget.style.background = "#eff6ff"; e.currentTarget.style.borderColor = "#2563eb"; e.currentTarget.style.color = "#2563eb"; }}
+                              onMouseLeave={e => { e.currentTarget.style.background = "#fff"; e.currentTarget.style.borderColor = "#d1d5db"; e.currentTarget.style.color = "#374151"; }}>
+                              ✏️ Editar
+                            </button>
+                            {/* Botão Excluir */}
+                            <button
+                              onClick={() => confirmarExclusao(j)}
+                              disabled={excluindoId === j.id}
+                              title="Excluir justificativa"
+                              style={{
+                                padding: "6px 12px", borderRadius: 8, border: "1.5px solid #fecaca",
+                                background: "#fff", color: "#dc2626", fontSize: "0.78rem",
+                                fontWeight: 600, cursor: excluindoId === j.id ? "not-allowed" : "pointer",
+                                display: "flex", alignItems: "center", gap: 5, transition: "all 0.15s",
+                                opacity: excluindoId === j.id ? 0.5 : 1,
+                              }}
+                              onMouseEnter={e => { if (excluindoId !== j.id) { e.currentTarget.style.background = "#fef2f2"; e.currentTarget.style.borderColor = "#dc2626"; } }}
+                              onMouseLeave={e => { e.currentTarget.style.background = "#fff"; e.currentTarget.style.borderColor = "#fecaca"; }}>
+                              🗑️ Excluir
+                            </button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
@@ -417,7 +437,7 @@ export default function Atestados() {
         )}
       </div>
 
-      {/* ═══ MODAL PREMIUM — Registrar Justificativa ═══ */}
+      {/* ═══ MODAL — Registrar / Editar ═══ */}
       {showModal && (
         <div style={{
           position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
@@ -431,9 +451,11 @@ export default function Atestados() {
             boxShadow: "0 25px 50px rgba(0,0,0,0.15)",
             animation: "slideUp 0.3s ease",
           }}>
-            {/* Header do modal */}
+            {/* Header */}
             <div style={{
-              background: "linear-gradient(135deg, #1e3a5f, #0f766e)",
+              background: editandoId
+                ? "linear-gradient(135deg, #1e40af, #2563eb)"
+                : "linear-gradient(135deg, #1e3a5f, #0f766e)",
               padding: "24px 28px", borderRadius: "20px 20px 0 0",
               display: "flex", alignItems: "center", justifyContent: "space-between",
             }}>
@@ -442,107 +464,80 @@ export default function Atestados() {
                   width: 44, height: 44, borderRadius: 12,
                   background: "rgba(255,255,255,0.15)", display: "flex",
                   alignItems: "center", justifyContent: "center", fontSize: 22,
-                }}>📋</div>
+                }}>{editandoId ? "✏️" : "📋"}</div>
                 <div>
                   <h2 style={{ color: "#fff", fontWeight: 800, fontSize: "1.15rem", margin: 0 }}>
-                    Registrar Justificativa
+                    {editandoId ? "Editar Justificativa" : "Registrar Justificativa"}
                   </h2>
                   <p style={{ color: "rgba(255,255,255,0.7)", fontSize: "0.78rem", margin: 0, marginTop: 2 }}>
-                    Preencha os dados da justificativa de falta
+                    {editandoId ? "Atualize os dados do registro" : "Preencha os dados da justificativa de falta"}
                   </p>
                 </div>
               </div>
-              <button
-                onClick={() => setShowModal(false)}
-                style={{
-                  background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 10,
-                  width: 36, height: 36, cursor: "pointer", color: "#fff",
-                  fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center",
-                  transition: "background 0.2s",
-                }}
-                onMouseEnter={e => e.target.style.background = "rgba(255,255,255,0.25)"}
-                onMouseLeave={e => e.target.style.background = "rgba(255,255,255,0.15)"}
-              >✕</button>
+              <button onClick={() => setShowModal(false)} style={{
+                background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 10,
+                width: 36, height: 36, cursor: "pointer", color: "#fff",
+                fontSize: 18, display: "flex", alignItems: "center", justifyContent: "center",
+              }}>✕</button>
             </div>
 
-            {/* Body do modal */}
+            {/* Body */}
             <form onSubmit={handleSubmit} style={{ padding: "28px" }}>
-              {/* Turma + Aluno */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
-                <div>
-                  <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "#374151", marginBottom: 6, display: "block" }}>
-                    Turma *
-                  </label>
-                  <select
-                    value={modalTurmaId}
-                    onChange={e => { setModalTurmaId(e.target.value); setForm(f => ({ ...f, aluno_id: "" })); }}
-                    required
-                    style={{
-                      width: "100%", padding: "10px 14px", borderRadius: 10,
-                      border: "1.5px solid #d1d5db", background: "#f9fafb",
-                      fontSize: "0.88rem", fontWeight: 600, outline: "none",
-                    }}
-                  >
-                    <option value="">Selecione...</option>
-                    {turmasFiltradas.map(t => <option key={t.id} value={t.id}>{t.turma || t.nome}</option>)}
-                  </select>
+
+              {/* Erro / duplicata */}
+              {erroModal && (
+                <div style={{
+                  padding: "12px 16px", borderRadius: 10, marginBottom: 20,
+                  background: erroModal.startsWith("⚠️") ? "#fffbeb" : "#fef2f2",
+                  border: `1.5px solid ${erroModal.startsWith("⚠️") ? "#fde68a" : "#fecaca"}`,
+                  color: erroModal.startsWith("⚠️") ? "#92400e" : "#991b1b",
+                  fontSize: "0.85rem", fontWeight: 600,
+                }}>{erroModal}</div>
+              )}
+
+              {/* Turma + Aluno — só no modo NOVO */}
+              {!editandoId && (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
+                  <div>
+                    <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "#374151", marginBottom: 6, display: "block" }}>Turma *</label>
+                    <select value={modalTurmaId}
+                      onChange={e => { setModalTurmaId(e.target.value); setForm(f => ({ ...f, aluno_id: "" })); }}
+                      required
+                      style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1.5px solid #d1d5db", background: "#f9fafb", fontSize: "0.88rem", fontWeight: 600, outline: "none" }}>
+                      <option value="">Selecione...</option>
+                      {turmasFiltradas.map(t => <option key={t.id} value={t.id}>{t.turma || t.nome}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "#374151", marginBottom: 6, display: "block" }}>Aluno *</label>
+                    <select value={form.aluno_id}
+                      onChange={e => setForm(f => ({ ...f, aluno_id: e.target.value }))}
+                      required
+                      style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1.5px solid #d1d5db", background: "#f9fafb", fontSize: "0.88rem", fontWeight: 600, outline: "none" }}>
+                      <option value="">Selecione a turma primeiro</option>
+                      {modalAlunos.map(a => <option key={a.id} value={a.id}>{a.nome || a.estudante}</option>)}
+                    </select>
+                  </div>
                 </div>
-                <div>
-                  <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "#374151", marginBottom: 6, display: "block" }}>
-                    Aluno *
-                  </label>
-                  <select
-                    value={form.aluno_id}
-                    onChange={e => setForm(f => ({ ...f, aluno_id: e.target.value }))}
-                    required
-                    style={{
-                      width: "100%", padding: "10px 14px", borderRadius: 10,
-                      border: "1.5px solid #d1d5db", background: "#f9fafb",
-                      fontSize: "0.88rem", fontWeight: 600, outline: "none",
-                    }}
-                  >
-                    <option value="">Selecione a turma primeiro</option>
-                    {modalAlunos.map(a => (
-                      <option key={a.id} value={a.id}>{a.nome}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+              )}
 
               {/* Tipo de Justificativa */}
               <div style={{ marginBottom: 20 }}>
-                <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "#374151", marginBottom: 10, display: "block" }}>
-                  Tipo de Justificativa *
-                </label>
-                <div style={{
-                  display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
-                  gap: 8,
-                }}>
+                <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "#374151", marginBottom: 10, display: "block" }}>Tipo de Justificativa *</label>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 8 }}>
                   {TIPOS_JUSTIFICATIVA.map(tipo => (
-                    <button
-                      key={tipo.value}
-                      type="button"
-                      onClick={() => setForm(f => ({ ...f, tipo: tipo.value }))}
+                    <button key={tipo.value} type="button"
+                      onClick={() => { setForm(f => ({ ...f, tipo: tipo.value })); setErroModal(""); }}
                       style={{
                         display: "flex", alignItems: "center", gap: 10,
                         padding: "10px 14px", borderRadius: 10,
-                        border: form.tipo === tipo.value
-                          ? `2px solid ${tipo.cor}`
-                          : "1.5px solid #e5e7eb",
-                        background: form.tipo === tipo.value
-                          ? `${tipo.cor}10`
-                          : "#fff",
-                        cursor: "pointer", textAlign: "left",
-                        transition: "all 0.15s",
+                        border: form.tipo === tipo.value ? `2px solid ${tipo.cor}` : "1.5px solid #e5e7eb",
+                        background: form.tipo === tipo.value ? `${tipo.cor}10` : "#fff",
+                        cursor: "pointer", textAlign: "left", transition: "all 0.15s",
                         transform: form.tipo === tipo.value ? "scale(1.02)" : "scale(1)",
-                      }}
-                    >
+                      }}>
                       <span style={{ fontSize: 18 }}>{tipo.icon}</span>
-                      <span style={{
-                        fontSize: "0.76rem", fontWeight: 600,
-                        color: form.tipo === tipo.value ? tipo.cor : "#374151",
-                        lineHeight: 1.3,
-                      }}>{tipo.label}</span>
+                      <span style={{ fontSize: "0.76rem", fontWeight: 600, color: form.tipo === tipo.value ? tipo.cor : "#374151", lineHeight: 1.3 }}>{tipo.label}</span>
                     </button>
                   ))}
                 </div>
@@ -551,101 +546,123 @@ export default function Atestados() {
               {/* Período + Dias */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 100px", gap: 16, marginBottom: 20 }}>
                 <div>
-                  <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "#374151", marginBottom: 6, display: "block" }}>
-                    Data Início *
-                  </label>
-                  <input
-                    type="date"
-                    value={form.data_inicio}
+                  <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "#374151", marginBottom: 6, display: "block" }}>Data Início *</label>
+                  <input type="date" value={form.data_inicio}
                     onChange={e => setForm(f => ({ ...f, data_inicio: e.target.value }))}
                     required
-                    style={{
-                      width: "100%", padding: "10px 14px", borderRadius: 10,
-                      border: "1.5px solid #d1d5db", background: "#f9fafb",
-                      fontSize: "0.88rem", fontWeight: 600, outline: "none",
-                    }}
-                  />
+                    style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1.5px solid #d1d5db", background: "#f9fafb", fontSize: "0.88rem", fontWeight: 600, outline: "none" }} />
                 </div>
                 <div>
-                  <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "#374151", marginBottom: 6, display: "block" }}>
-                    Data Fim *
-                  </label>
-                  <input
-                    type="date"
-                    value={form.data_fim}
+                  <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "#374151", marginBottom: 6, display: "block" }}>Data Fim *</label>
+                  <input type="date" value={form.data_fim}
                     onChange={e => setForm(f => ({ ...f, data_fim: e.target.value }))}
                     required
-                    style={{
-                      width: "100%", padding: "10px 14px", borderRadius: 10,
-                      border: "1.5px solid #d1d5db", background: "#f9fafb",
-                      fontSize: "0.88rem", fontWeight: 600, outline: "none",
-                    }}
-                  />
+                    style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1.5px solid #d1d5db", background: "#f9fafb", fontSize: "0.88rem", fontWeight: 600, outline: "none" }} />
                 </div>
                 <div>
-                  <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "#374151", marginBottom: 6, display: "block" }}>
-                    Dias
-                  </label>
+                  <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "#374151", marginBottom: 6, display: "block" }}>Dias</label>
                   <div style={{
                     width: "100%", padding: "10px 14px", borderRadius: 10,
                     border: "1.5px solid #dbeafe", background: "#eff6ff",
-                    fontSize: "1rem", fontWeight: 800, color: "#1d4ed8",
-                    textAlign: "center",
+                    fontSize: "1rem", fontWeight: 800, color: "#1d4ed8", textAlign: "center",
                   }}>{form.dias}</div>
                 </div>
               </div>
 
               {/* Observação */}
               <div style={{ marginBottom: 24 }}>
-                <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "#374151", marginBottom: 6, display: "block" }}>
-                  Detalhes adicionais
-                </label>
-                <textarea
-                  value={form.observacao}
+                <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "#374151", marginBottom: 6, display: "block" }}>Detalhes adicionais</label>
+                <textarea value={form.observacao}
                   onChange={e => setForm(f => ({ ...f, observacao: e.target.value }))}
-                  placeholder="Detalhes adicionais..."
-                  rows={3}
-                  style={{
-                    width: "100%", padding: "10px 14px", borderRadius: 10,
-                    border: "1.5px solid #d1d5db", background: "#f9fafb",
-                    fontSize: "0.88rem", fontWeight: 500, outline: "none",
-                    resize: "vertical", fontFamily: "inherit",
-                  }}
-                />
+                  placeholder="Detalhes adicionais..." rows={3}
+                  style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1.5px solid #d1d5db", background: "#f9fafb", fontSize: "0.88rem", fontWeight: 500, outline: "none", resize: "vertical", fontFamily: "inherit" }} />
               </div>
 
               {/* Botões */}
               <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  style={{
-                    padding: "10px 24px", borderRadius: 10,
-                    border: "1.5px solid #d1d5db", background: "#fff",
-                    fontWeight: 600, fontSize: "0.88rem", cursor: "pointer",
-                    color: "#6b7280",
-                  }}
-                >Cancelar</button>
-                <button
-                  type="submit"
-                  style={{
-                    padding: "10px 28px", borderRadius: 10, border: "none",
-                    background: "linear-gradient(135deg, #0f766e, #059669)",
-                    color: "#fff", fontWeight: 700, fontSize: "0.88rem",
-                    cursor: "pointer", boxShadow: "0 2px 8px rgba(5,150,105,0.3)",
-                  }}
-                >Registrar Justificativa</button>
+                <button type="button" onClick={() => setShowModal(false)} style={{
+                  padding: "10px 24px", borderRadius: 10, border: "1.5px solid #d1d5db", background: "#fff",
+                  fontWeight: 600, fontSize: "0.88rem", cursor: "pointer", color: "#6b7280",
+                }}>Cancelar</button>
+                <button type="submit" disabled={salvando} style={{
+                  padding: "10px 28px", borderRadius: 10, border: "none",
+                  background: salvando ? "#9ca3af" : editandoId
+                    ? "linear-gradient(135deg, #1e40af, #2563eb)"
+                    : "linear-gradient(135deg, #0f766e, #059669)",
+                  color: "#fff", fontWeight: 700, fontSize: "0.88rem",
+                  cursor: salvando ? "not-allowed" : "pointer",
+                  boxShadow: salvando ? "none" : "0 2px 8px rgba(5,150,105,0.3)",
+                  display: "flex", alignItems: "center", gap: 8,
+                }}>
+                  {salvando ? "⏳ Salvando..." : editandoId ? "💾 Salvar Alterações" : "✅ Registrar Justificativa"}
+                </button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* ═══ CSS Animations ═══ */}
+      {/* ═══ MODAL — Confirmar Exclusão ═══ */}
+      {confirmandoExclusao && itemParaExcluir && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)",
+          backdropFilter: "blur(4px)", display: "flex", alignItems: "center",
+          justifyContent: "center", zIndex: 10000, padding: 20,
+          animation: "fadeIn 0.2s ease",
+        }}>
+          <div style={{
+            background: "#fff", borderRadius: 20, width: "100%", maxWidth: 440,
+            boxShadow: "0 25px 50px rgba(0,0,0,0.2)", overflow: "hidden",
+            animation: "slideUp 0.3s ease",
+          }}>
+            {/* Header vermelho */}
+            <div style={{ background: "linear-gradient(135deg, #dc2626, #b91c1c)", padding: "20px 24px", display: "flex", alignItems: "center", gap: 14 }}>
+              <div style={{ width: 44, height: 44, borderRadius: 12, background: "rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>🗑️</div>
+              <div>
+                <h3 style={{ color: "#fff", fontWeight: 800, fontSize: "1rem", margin: 0 }}>Confirmar Exclusão</h3>
+                <p style={{ color: "rgba(255,255,255,0.75)", fontSize: "0.75rem", margin: 0, marginTop: 2 }}>Essa ação não pode ser desfeita</p>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: "24px 28px" }}>
+              <p style={{ color: "#374151", fontSize: "0.95rem", margin: "0 0 8px", fontWeight: 600 }}>
+                Deseja excluir a justificativa abaixo?
+              </p>
+              <div style={{ background: "#fef2f2", border: "1.5px solid #fecaca", borderRadius: 10, padding: "12px 16px", marginTop: 12 }}>
+                <p style={{ margin: 0, fontWeight: 700, color: "#991b1b", fontSize: "0.88rem" }}>{itemParaExcluir.aluno_nome}</p>
+                <p style={{ margin: "4px 0 0", fontSize: "0.82rem", color: "#6b7280" }}>
+                  {getTypeInfo(itemParaExcluir.tipo)?.label || itemParaExcluir.tipo} &nbsp;·&nbsp;
+                  {itemParaExcluir.data_inicio ? new Date(itemParaExcluir.data_inicio).toLocaleDateString("pt-BR") : "—"}
+                  {" → "}
+                  {itemParaExcluir.data_fim ? new Date(itemParaExcluir.data_fim).toLocaleDateString("pt-BR") : "—"}
+                  &nbsp;·&nbsp; {itemParaExcluir.dias || 1} dia(s)
+                </p>
+              </div>
+
+              <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
+                <button onClick={() => { setConfirmandoExclusao(false); setItemParaExcluir(null); }} style={{
+                  flex: 1, padding: "10px", borderRadius: 10, border: "1.5px solid #d1d5db",
+                  background: "#fff", fontWeight: 600, fontSize: "0.88rem", cursor: "pointer", color: "#6b7280",
+                }}>Cancelar</button>
+                <button onClick={executarExclusao} disabled={!!excluindoId} style={{
+                  flex: 1, padding: "10px", borderRadius: 10, border: "none",
+                  background: excluindoId ? "#9ca3af" : "linear-gradient(135deg, #dc2626, #b91c1c)",
+                  color: "#fff", fontWeight: 700, fontSize: "0.88rem",
+                  cursor: excluindoId ? "not-allowed" : "pointer",
+                  boxShadow: excluindoId ? "none" : "0 2px 8px rgba(220,38,38,0.35)",
+                }}>
+                  {excluindoId ? "⏳ Excluindo..." : "🗑️ Confirmar Exclusão"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`
         @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
         @keyframes slideUp { from { opacity: 0; transform: translateY(20px) } to { opacity: 1; transform: translateY(0) } }
-        @keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
       `}</style>
     </div>
   );

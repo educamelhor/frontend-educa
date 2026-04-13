@@ -882,10 +882,9 @@ export default function Sidebar({ isOpen, onClose }) {
               </ul>
             )}
 
+            {/* ─── GRUPO: Secretaria (Professor NÃO tem acesso) ─── */}
             {!isProfessor && (
-            {/* ───────────────────────────────
-                GRUPO: Secretaria
-            ─────────────────────────────── */}
+            <>
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-6 transition"
               onClick={() => setOpenGroup(openGroup === 'secretaria' ? null : 'secretaria')}
@@ -1033,7 +1032,7 @@ export default function Sidebar({ isOpen, onClose }) {
                 </li>
               </ul>
             )}
-            <>
+            </>
             )}
           </>
         )}

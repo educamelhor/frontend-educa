@@ -110,12 +110,17 @@ export default function Sidebar({ isOpen, onClose }) {
   const isCoord = perfil === 'coordenador';
   const isSuperv = perfil === 'supervisor';
   const canGabarito = (() => {
-    if (isDisciplinar || isProfessor) return false;
+    if (isDisciplinar) return false;          // militar/comandante: sem acesso
     if (!isScopeEscola) return false;
+    if (perfil === 'secretaria') return false; // secretário: sem acesso ao Gabarito
+    if (isProfessor) return true;              // professor: acesso limitado (Corrigir + Resultados)
     if (isCoord) return avaliacaoGovConfig?.['coordenador.acessa_gabarito'] === '1';
     if (isSuperv) return avaliacaoGovConfig?.['supervisor.acessa_gabarito'] === '1';
-    return true; // diretor, vice_diretor, secretaria, etc.
+    return true; // diretor, vice_diretor, etc.
   })();
+
+  // Governança: perfis com acesso administrativo completo ao Gabarito (Gerar + Corrigir Lote)
+  const canGabaritoAdmin = canGabarito && !isProfessor && !isCoord;
 
   // ── Agente EDUCA: disponível a TODOS exceto militar e comandante (CCMDF) ──
   const isMilitar = perfil === 'militar' || perfil === 'comandante';
@@ -135,8 +140,7 @@ export default function Sidebar({ isOpen, onClose }) {
       setOpenGroup('pedagogico');
       // Auto-abrir submenu Correções se estiver em rota de correções
       if (p.startsWith('/pedagogico/correcoes')) setOpenCorrecoes(true);
-      // Auto-abrir submenu Gabarito se estiver em rota de gabarito
-      if (p.startsWith('/pedagogico/gabarito')) setOpenGabaritoPed(true);
+      // (Gabarito migrado para menu unificado /gabarito)
     }
     else if (p.startsWith('/professores')) setOpenGroup('professores');
     else if (p.startsWith('/impressao')) setOpenGroup('impressao');
@@ -356,29 +360,6 @@ export default function Sidebar({ isOpen, onClose }) {
               </li>
             </ul>
 
-            {/* ⭐ GABARITO — Módulo separado para Professor */}
-            <Link
-              to="/gabarito"
-              className={getMainLinkClasses('/gabarito')}
-              style={{
-                marginTop: 4,
-                background: isActive('/gabarito')
-                  ? 'linear-gradient(90deg, rgba(6,182,212,0.15), transparent)'
-                  : undefined,
-              }}
-            >
-              <CheckCircleIcon className="h-5 w-5 mr-2" style={{ color: isActive('/gabarito') ? '#22d3ee' : undefined }} />
-              <span className="flex-1 text-left" style={{ fontWeight: 700 }}>Gabarito</span>
-              <span style={{
-                fontSize: '0.55rem',
-                fontWeight: 800,
-                background: 'linear-gradient(135deg, #06b6d4, #8b5cf6)',
-                color: '#fff',
-                padding: '2px 6px',
-                borderRadius: '8px',
-                letterSpacing: '0.5px',
-              }}>NOVO</span>
-            </Link>
             </>
             ) : !isDisciplinar && !isCoord && (
             <>
@@ -450,10 +431,17 @@ export default function Sidebar({ isOpen, onClose }) {
               Ferramentas
             </Link>
             )}
+          </>
+        )}
 
-            {/* ⭐ MÓDULO GABARITO — Destaque Premium (não exibir para coordenador standalone, já está em Pedagógico) */}
-            {canGabarito && !isCoord && (
-            <>
+        {/* ═══════════════════════════════
+            MÓDULO GABARITO UNIFICADO
+            Professor/Coord: Corrigir + Resultados
+            Direção/Supervisor: TODAS as etapas
+            Secretário/Militar: sem acesso
+        ═══════════════════════════════ */}
+        {canGabarito && (
+          <>
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-2 transition"
               onClick={() => setOpenGroup(openGroup === 'gabarito' ? null : 'gabarito')}
@@ -485,17 +473,47 @@ export default function Sidebar({ isOpen, onClose }) {
 
             {openGroup === 'gabarito' && (
               <ul className="ml-4 mb-2">
+                {/* Gerar / Imprimir — somente direção/supervisor */}
+                {canGabaritoAdmin && (
+                <li>
+                  <Link
+                    to="/gabarito/gerar"
+                    className={getSubmenuLinkClasses('/gabarito/gerar')}
+                  >
+                    <PrinterIcon className="h-5 w-5 mr-2" /> Gerar / Imprimir
+                  </Link>
+                </li>
+                )}
+                {/* Corrigir Lote — somente direção/supervisor */}
+                {canGabaritoAdmin && (
+                <li>
+                  <Link
+                    to="/gabarito/corrigir-lote"
+                    className={getSubmenuLinkClasses('/gabarito/corrigir-lote')}
+                  >
+                    <ClipboardDocumentListIcon className="h-5 w-5 mr-2" /> Corrigir Lote
+                  </Link>
+                </li>
+                )}
+                {/* Corrigir — todos com canGabarito */}
                 <li>
                   <Link
                     to="/gabarito"
                     className={getSubmenuLinkClasses('/gabarito', true)}
                   >
-                    <CheckCircleIcon className="h-5 w-5 mr-2" /> Painel
+                    <CheckCircleIcon className="h-5 w-5 mr-2" /> Corrigir
+                  </Link>
+                </li>
+                {/* Resultados — todos com canGabarito */}
+                <li>
+                  <Link
+                    to="/gabarito/resultados"
+                    className={getSubmenuLinkClasses('/gabarito/resultados')}
+                  >
+                    <ChartBarIcon className="h-5 w-5 mr-2" /> Resultados
                   </Link>
                 </li>
               </ul>
-            )}
-            </>
             )}
           </>
         )}
@@ -1139,53 +1157,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   )}
                 </li>
 
-                {/* Submenu Gabarito (3 etapas) — controlado pela governança */}
-                {canGabarito && (
-                <li>
-                  <button
-                    className="flex items-center w-full py-2 pl-6 pr-3 rounded hover:bg-blue-700 transition"
-                    onClick={() => setOpenGabaritoPed((v) => !v)}
-                    type="button"
-                  >
-                    <CheckCircleIcon className="h-5 w-5 mr-2" />
-                    <span className="flex-1 text-left">Gabarito</span>
-                    {openGabaritoPed ? (
-                      <ChevronDownIcon className="h-4 w-4" />
-                    ) : (
-                      <ChevronRightIcon className="h-4 w-4" />
-                    )}
-                  </button>
-
-                  {openGabaritoPed && (
-                    <ul className="ml-8 mb-2">
-                      <li>
-                        <Link
-                          to="/pedagogico/gabarito/imprimir"
-                          className={getSubmenuLinkClasses('/pedagogico/gabarito/imprimir')}
-                        >
-                          <PrinterIcon className="h-5 w-5 mr-2" /> Imprimir
-                        </Link>
-                      </li>
-                      <li>
-                        <Link
-                          to="/pedagogico/gabarito/corrigir"
-                          className={getSubmenuLinkClasses('/pedagogico/gabarito/corrigir')}
-                        >
-                          <CheckCircleIcon className="h-5 w-5 mr-2" /> Corrigir
-                        </Link>
-                      </li>
-                      <li>
-                        <Link
-                          to="/pedagogico/gabarito/resultados"
-                          className={getSubmenuLinkClasses('/pedagogico/gabarito/resultados')}
-                        >
-                          <ChartBarIcon className="h-5 w-5 mr-2" /> Resultados
-                        </Link>
-                      </li>
-                    </ul>
-                  )}
-                </li>
-                )}
+                {/* Gabarito migrado para menu unificado (/gabarito) */}
 
                 <li>
                   <Link

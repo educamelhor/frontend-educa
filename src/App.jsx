@@ -258,14 +258,18 @@ export default function App() {
 
           {/* ── Pedagógico ───────────────────────────────────────────────── */}
           <Route path="/pedagogico/correcoes/redacao" element={<Redacao />} />
-          <Route path="/pedagogico/gabarito"           element={<Gabarito etapa="imprimir" />} />
-          <Route path="/pedagogico/gabarito/imprimir"  element={<Gabarito etapa="imprimir" />} />
-          <Route path="/pedagogico/gabarito/corrigir"  element={<Gabarito etapa="corrigir" />} />
-          <Route path="/pedagogico/gabarito/resultados" element={<Gabarito etapa="resultados" />} />
-          <Route path="/gabarito"           element={<GabaritoModule />} />
-          <Route path="/gabarito/gerar"     element={<GabaritoModule />} />
-          <Route path="/gabarito/corrigir"  element={<GabaritoModule />} />
-          <Route path="/gabarito/resultados" element={<GabaritoModule />} />
+          {/* Rotas legadas pedagógico/gabarito → redirecionam para /gabarito */}
+          <Route path="/pedagogico/gabarito"            element={<Navigate to="/gabarito" replace />} />
+          <Route path="/pedagogico/gabarito/imprimir"   element={<Navigate to="/gabarito/gerar" replace />} />
+          <Route path="/pedagogico/gabarito/corrigir"   element={<Navigate to="/gabarito/corrigir-lote" replace />} />
+          <Route path="/pedagogico/gabarito/resultados" element={<Navigate to="/gabarito/resultados" replace />} />
+
+          {/* ── Gabarito Unificado ─────────────────────────────────────────── */}
+          <Route path="/gabarito"              element={<GabaritoModule />} />
+          <Route path="/gabarito/gerar"        element={<GabaritoModule />} />
+          <Route path="/gabarito/corrigir-lote" element={<GabaritoModule />} />
+          <Route path="/gabarito/corrigir"     element={<GabaritoModule />} />
+          <Route path="/gabarito/resultados"   element={<GabaritoModule />} />
           <Route path="/pedagogico/conselho" element={<ConselhoClasse />} />
           <Route path="/pedagogico/conteudos" element={
             <RequirePerm perm="conteudos.visualizar"><ConteudosAdmin /></RequirePerm>

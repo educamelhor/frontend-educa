@@ -101,10 +101,10 @@ export default function GabaritoCorrigirLote() {
     setTimeout(() => setToast(null), 4000);
   }
 
-  // ─── Buscar professores da escola ───
+  // ─── Buscar corretores disponíveis (professores + coord + direção + supervisor) ───
   async function fetchProfessores() {
     try {
-      const resp = await api.get("/professores");
+      const resp = await api.get("/api/gabarito-lotes/corretores-disponiveis");
       const ativos = (resp.data || []).filter(p => p.status === "ativo");
       setProfessores(ativos);
     } catch {
@@ -2681,19 +2681,19 @@ export default function GabaritoCorrigirLote() {
               {professores.length === 0 ? (
                 <div style={{ textAlign: "center", padding: 40 }}>
                   <div className="gab-spinner" style={{ margin: "0 auto 12px" }} />
-                  <div style={{ color: "var(--gab-text-muted)", fontSize: "0.82rem" }}>Carregando professores...</div>
+                  <div style={{ color: "var(--gab-text-muted)", fontSize: "0.82rem" }}>Carregando corretores...</div>
                 </div>
               ) : professoresDisponiveis.length === 0 ? (
                 <div style={{ textAlign: "center", padding: 40, color: "var(--gab-text-muted)", fontSize: "0.85rem" }}>
-                  {profFiltro ? "Nenhum professor encontrado." : "Todos os professores já foram vinculados."}
+                  {profFiltro ? "Nenhum corretor encontrado." : "Todos os corretores já foram vinculados."}
                 </div>
               ) : (
                 professoresDisponiveis.map(prof => (
                   <button
-                    key={prof.id}
+                    key={prof.id || prof.usuario_id || prof.nome}
                     type="button"
-                    onClick={() => vincularProfessor(profModalLote.id, prof.id)}
-                    disabled={vinculandoProf}
+                    onClick={() => vincularProfessor(profModalLote.id, prof.id || prof.usuario_id)}
+                    disabled={vinculandoProf || (!prof.id && !prof.usuario_id)}
                     style={{
                       display: "flex", alignItems: "center", gap: 14, width: "100%",
                       padding: "12px 16px", borderRadius: 12, textAlign: "left",
@@ -2753,7 +2753,23 @@ export default function GabaritoCorrigirLote() {
                       }}>
                         {prof.nome}
                       </div>
-                      <div style={{ display: "flex", gap: 8, fontSize: "0.72rem", color: "var(--gab-text-muted)", marginTop: 2 }}>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: "0.72rem", color: "var(--gab-text-muted)", marginTop: 2 }}>
+                        {prof.perfil && (
+                          <span style={{
+                            fontSize: "0.62rem", fontWeight: 700, textTransform: "uppercase",
+                            padding: "1px 6px", borderRadius: 6, letterSpacing: "0.4px",
+                            background: prof.perfil === "professor" ? "rgba(16,185,129,0.12)" :
+                              prof.perfil === "coordenador" ? "rgba(139,92,246,0.12)" :
+                              prof.perfil === "diretor" || prof.perfil === "vice_diretor" ? "rgba(245,158,11,0.12)" :
+                              "rgba(6,182,212,0.12)",
+                            color: prof.perfil === "professor" ? "#10b981" :
+                              prof.perfil === "coordenador" ? "#8b5cf6" :
+                              prof.perfil === "diretor" || prof.perfil === "vice_diretor" ? "#f59e0b" :
+                              "#06b6d4",
+                          }}>
+                            {prof.perfil === "vice_diretor" ? "Vice-Diretor" : prof.perfil}
+                          </span>
+                        )}
                         {prof.disciplina_nome && <span>{prof.disciplina_nome}</span>}
                         {prof.turno && <span>· {prof.turno}</span>}
                       </div>
@@ -2774,7 +2790,7 @@ export default function GabaritoCorrigirLote() {
               padding: "12px 28px 16px", borderTop: "1px solid rgba(255,255,255,0.04)",
               fontSize: "0.72rem", color: "var(--gab-text-muted)", textAlign: "center",
             }}>
-              Clique no nome do professor para vinculá-lo à turma <strong>{profModalLote.turma_nome}</strong>
+              Clique no nome do corretor para vinculá-lo à turma <strong>{profModalLote.turma_nome}</strong>
             </div>
           </div>
         </div>

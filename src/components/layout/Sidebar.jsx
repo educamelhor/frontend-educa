@@ -1,8 +1,8 @@
-// src/components/layout/Sidebar.jsx
+﻿// src/components/layout/Sidebar.jsx
 // ============================================================================
-// Sidebar de navegação principal do sistema.
-// Estrutura organizada em grupos: Secretaria, Pedagógico, Impressão, etc.
-// Inclui controle de abertura automática de grupos conforme rota ativa.
+// Sidebar de navegaÃ§Ã£o principal do sistema.
+// Estrutura organizada em grupos: Secretaria, PedagÃ³gico, ImpressÃ£o, etc.
+// Inclui controle de abertura automÃ¡tica de grupos conforme rota ativa.
 // ============================================================================
 
 import React, { useState, useEffect } from 'react';
@@ -44,9 +44,9 @@ export default function Sidebar({ isOpen, onClose }) {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // ─────────────────────────────────────────────────────────────
-  // RBAC (perfis/permissoes) — lidos do localStorage
-  // ─────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // RBAC (perfis/permissoes) â€” lidos do localStorage
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const getPermissoes = () => {
     try {
       const raw = localStorage.getItem('permissoes');
@@ -66,25 +66,25 @@ export default function Sidebar({ isOpen, onClose }) {
 
   const hasPerm = (perm) => getPermissoes().includes(perm);
 
-  // ── Perfil do usuário logado ──
+  // â”€â”€ Perfil do usuÃ¡rio logado â”€â”€
   const getPerfil = () =>
     String(localStorage.getItem('perfil') || '').toLowerCase().trim();
   const perfil = getPerfil();
   const isDisciplinar = perfil === 'disciplinar' || perfil === 'diretor_disciplinar' || perfil === 'militar';
   const isProfessor = perfil === 'professor';
 
-  // Começando pelos 3 módulos solicitados
+  // ComeÃ§ando pelos 3 mÃ³dulos solicitados
   const canConteudos = isScopeEscola && !isDisciplinar && !isProfessor && hasPerm('conteudos.visualizar');
   const canAvaliacoes = isScopeEscola && !isDisciplinar && !isProfessor && hasPerm('avaliacoes.visualizar');
   const canMonitoramento = isScopeEscola && !isDisciplinar && !isProfessor && hasPerm('monitoramento.visualizar');
 
-  // Direção (Diretor) — Devices EDUCA-CAPTURE
+  // DireÃ§Ã£o (Diretor) â€” Devices EDUCA-CAPTURE
   const canDirecaoDevices = isScopeEscola && !isDisciplinar && !isProfessor && hasPerm('capture_devices.gerenciar');
 
-  // Governança — Diretor e Vice-Diretor
+  // GovernanÃ§a â€” Diretor e Vice-Diretor
   const canGovernanca = isScopeEscola && !isDisciplinar && !isProfessor && (perfil === 'diretor' || perfil === 'vice_diretor');
 
-  // ── Governança: controle de acesso ao Gabarito ──
+  // â”€â”€ GovernanÃ§a: controle de acesso ao Gabarito â”€â”€
   const [avaliacaoGovConfig, setAvaliacaoGovConfig] = useState(null);
 
   useEffect(() => {
@@ -103,7 +103,7 @@ export default function Sidebar({ isOpen, onClose }) {
     })();
   }, []);
 
-  // Quem pode ver o módulo Gabarito?
+  // Quem pode ver o mÃ³dulo Gabarito?
   // - Diretor / vice_diretor / secretaria: SEMPRE
   // - Coordenador: se coordenador.acessa_gabarito === '1'
   // - Supervisor: se supervisor.acessa_gabarito === '1'
@@ -117,14 +117,14 @@ export default function Sidebar({ isOpen, onClose }) {
     return true; // diretor, vice_diretor, secretaria, etc.
   })();
 
-  // ── Agente EDUCA: disponível a TODOS exceto militar e comandante (CCMDF) ──
+  // â”€â”€ Agente EDUCA: disponÃ­vel a TODOS exceto militar e comandante (CCMDF) â”€â”€
   const isMilitar = perfil === 'militar' || perfil === 'comandante';
   const canAgenteEduca = isScopeEscola && !isMilitar;
 
 
-  // ─────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Abre automaticamente o grupo correto conforme a rota atual
-  // ─────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     const p = location.pathname;
     if (p.startsWith('/secretaria')) {
@@ -133,7 +133,7 @@ export default function Sidebar({ isOpen, onClose }) {
     else if (p.startsWith('/disciplinar') && !/^\/(disciplinar\/(regimentos|manual|suporte))/.test(p)) setOpenGroup('disciplinar');
     else if (p.startsWith('/pedagogico')) {
       setOpenGroup('pedagogico');
-      // Auto-abrir submenu Correções se estiver em rota de correções
+      // Auto-abrir submenu CorreÃ§Ãµes se estiver em rota de correÃ§Ãµes
       if (p.startsWith('/pedagogico/correcoes')) setOpenCorrecoes(true);
       // Auto-abrir submenu Gabarito se estiver em rota de gabarito
       if (p.startsWith('/pedagogico/gabarito')) setOpenGabaritoPed(true);
@@ -149,9 +149,9 @@ export default function Sidebar({ isOpen, onClose }) {
     else setOpenGroup(null);
   }, [location.pathname]);
 
-  // ─────────────────────────────────────────────────────────────
-  // Utilidades de estilização
-  // ─────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // Utilidades de estilizaÃ§Ã£o
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const isActive = (to, exact = false) =>
     exact ? location.pathname === to : location.pathname.startsWith(to);
 
@@ -165,13 +165,13 @@ export default function Sidebar({ isOpen, onClose }) {
     `flex items-center py-2 pl-6 pr-3 rounded hover:bg-blue-700 transition ${isActive(to, exact) ? 'text-green-400 font-bold bg-blue-700' : ''
     }`;
 
-  // ─────────────────────────────────────────────────────────────
-  // Renderização
-  // ─────────────────────────────────────────────────────────────
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // RenderizaÃ§Ã£o
+  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   return (
     <aside className={`sidebar-aside ${isOpen ? 'sidebar-open' : ''}`}>
       <nav className="p-4">
-        {/* Botão fechar — visível apenas em mobile */}
+        {/* BotÃ£o fechar â€” visÃ­vel apenas em mobile */}
         <div className="sidebar-close-btn">
           <button
             type="button"
@@ -184,7 +184,7 @@ export default function Sidebar({ isOpen, onClose }) {
         </div>
         {isScopePlataforma ? (
           <>
-            {/* ─── GRUPO: Escolas (submenus) ─── */}
+            {/* â”€â”€â”€ GRUPO: Escolas (submenus) â”€â”€â”€ */}
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 transition"
               onClick={() => setOpenGroup(openGroup === 'plataforma' ? null : 'plataforma')}
@@ -250,7 +250,7 @@ export default function Sidebar({ isOpen, onClose }) {
               Auditoria RBAC
             </Link>
 
-            {/* LINK: Plataforma - Suporte Técnico (SAC) */}
+            {/* LINK: Plataforma - Suporte TÃ©cnico (SAC) */}
             <Link
               to="/plataforma/suporte"
               className={getMainLinkClasses('/plataforma/suporte')}
@@ -262,7 +262,7 @@ export default function Sidebar({ isOpen, onClose }) {
               }}
             >
               <QuestionMarkCircleIcon className="h-5 w-5 mr-2" style={{ color: isActive('/plataforma/suporte') ? '#a78bfa' : undefined }} />
-              <span className="flex-1 text-left" style={{ fontWeight: 600 }}>Suporte Técnico</span>
+              <span className="flex-1 text-left" style={{ fontWeight: 600 }}>Suporte TÃ©cnico</span>
               <span style={{
                 fontSize: '0.55rem',
                 fontWeight: 800,
@@ -274,7 +274,7 @@ export default function Sidebar({ isOpen, onClose }) {
               }}>SAC</span>
             </Link>
 
-            {/* LINK: Plataforma - Governança */}
+            {/* LINK: Plataforma - GovernanÃ§a */}
             <Link
               to="/plataforma/governanca"
               className={getMainLinkClasses('/plataforma/governanca')}
@@ -286,7 +286,7 @@ export default function Sidebar({ isOpen, onClose }) {
               }}
             >
               <Cog6ToothIcon className="h-5 w-5 mr-2" style={{ color: isActive('/plataforma/governanca') ? '#a78bfa' : undefined }} />
-              <span className="flex-1 text-left" style={{ fontWeight: 600 }}>Governança</span>
+              <span className="flex-1 text-left" style={{ fontWeight: 600 }}>GovernanÃ§a</span>
             </Link>
           </>
         ) : (
@@ -309,9 +309,9 @@ export default function Sidebar({ isOpen, onClose }) {
 
             {/* GRUPO: Professores (fora de Secretaria) */}
             {isProfessor ? (
-            /* ── Professor: mostra grupo Professores sempre aberto + Gabarito ── */
+            /* â”€â”€ Professor: mostra grupo Professores sempre aberto + Gabarito â”€â”€ */
             <>
-            {/* Título do grupo Professores (sem toggle, sempre aberto) */}
+            {/* TÃ­tulo do grupo Professores (sem toggle, sempre aberto) */}
             <div
               className="flex items-center w-full py-2 px-3 rounded mt-2"
               style={{ background: 'rgba(255,255,255,0.05)' }}
@@ -320,7 +320,7 @@ export default function Sidebar({ isOpen, onClose }) {
               <span className="flex-1 text-left font-semibold">Professores</span>
             </div>
 
-            {/* Submenus sempre visíveis */}
+            {/* Submenus sempre visÃ­veis */}
             <ul className="ml-4 mb-2">
               <li>
                 <Link
@@ -335,7 +335,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   to="/professores/avaliacoes"
                   className={getSubmenuLinkClasses('/professores/avaliacoes')}
                 >
-                  <TableCellsIcon className="h-5 w-5 mr-2" /> Avaliações
+                  <TableCellsIcon className="h-5 w-5 mr-2" /> AvaliaÃ§Ãµes
                 </Link>
               </li>
               <li>
@@ -343,7 +343,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   to="/professores/conteudos"
                   className={getSubmenuLinkClasses('/professores/conteudos')}
                 >
-                  <BookOpenIcon className="h-5 w-5 mr-2" /> Conteúdos
+                  <BookOpenIcon className="h-5 w-5 mr-2" /> ConteÃºdos
                 </Link>
               </li>
               <li>
@@ -356,7 +356,7 @@ export default function Sidebar({ isOpen, onClose }) {
               </li>
             </ul>
 
-            {/* ⭐ GABARITO — Módulo separado para Professor */}
+            {/* â­ GABARITO â€” MÃ³dulo separado para Professor */}
             <Link
               to="/gabarito"
               className={getMainLinkClasses('/gabarito')}
@@ -411,7 +411,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     to="/professores/avaliacoes"
                     className={getSubmenuLinkClasses('/professores/avaliacoes')}
                   >
-                    <TableCellsIcon className="h-5 w-5 mr-2" /> Avaliações
+                    <TableCellsIcon className="h-5 w-5 mr-2" /> AvaliaÃ§Ãµes
                   </Link>
                 </li>
                 <li>
@@ -419,7 +419,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     to="/professores/conteudos"
                     className={getSubmenuLinkClasses('/professores/conteudos')}
                   >
-                    <BookOpenIcon className="h-5 w-5 mr-2" /> Conteúdos
+                    <BookOpenIcon className="h-5 w-5 mr-2" /> ConteÃºdos
                   </Link>
                 </li>
                 <li>
@@ -435,11 +435,11 @@ export default function Sidebar({ isOpen, onClose }) {
             </>
             )}
 
-            {/* LINK: Banco de Questões */}
+            {/* LINK: Banco de QuestÃµes */}
             {!isDisciplinar && !isProfessor && !isCoord && (
             <Link to="/questoes" className={getMainLinkClasses('/questoes')}>
               <BookOpenIcon className="h-5 w-5 mr-2" />
-              Banco de Questões
+              Banco de QuestÃµes
             </Link>
             )}
 
@@ -451,7 +451,7 @@ export default function Sidebar({ isOpen, onClose }) {
             </Link>
             )}
 
-            {/* ⭐ MÓDULO GABARITO — Destaque Premium (não exibir para coordenador standalone, já está em Pedagógico) */}
+            {/* â­ MÃ“DULO GABARITO â€” Destaque Premium (nÃ£o exibir para coordenador standalone, jÃ¡ estÃ¡ em PedagÃ³gico) */}
             {canGabarito && !isCoord && (
             <>
             <button
@@ -500,10 +500,10 @@ export default function Sidebar({ isOpen, onClose }) {
           </>
         )}
 
-        {/* ───────────────────────────────
-            GRUPO: Direção (Diretor)
+        {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+            GRUPO: DireÃ§Ã£o (Diretor)
             (Dispositivos EDUCA-CAPTURE)
-        ─────────────────────────────── */}
+        â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         {(canDirecaoDevices || canGovernanca) && (
           <>
             <button
@@ -514,7 +514,7 @@ export default function Sidebar({ isOpen, onClose }) {
               type="button"
             >
               <ClipboardDocumentListIcon className="h-5 w-5 mr-2" />
-              <span className="flex-1 text-left">Direção</span>
+              <span className="flex-1 text-left">DireÃ§Ã£o</span>
               {openGroup === 'direcao' ? (
                 <ChevronDownIcon className="h-4 w-4" />
               ) : (
@@ -537,7 +537,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     to="/direcao/responsaveis"
                     className={getSubmenuLinkClasses('/direcao/responsaveis', true)}
                   >
-                    <UserGroupIcon className="h-5 w-5 mr-2" /> Responsáveis
+                    <UserGroupIcon className="h-5 w-5 mr-2" /> ResponsÃ¡veis
                   </Link>
                 </li>
                 <li>
@@ -571,7 +571,7 @@ export default function Sidebar({ isOpen, onClose }) {
                       textAlign: 'left',
                     }}
                   >
-                    <Cog6ToothIcon className="h-5 w-5 mr-2" style={{ color: isActive('/direcao/governanca', true) ? '#a78bfa' : undefined }} /> Governança
+                    <Cog6ToothIcon className="h-5 w-5 mr-2" style={{ color: isActive('/direcao/governanca', true) ? '#a78bfa' : undefined }} /> GovernanÃ§a
                   </button>
                 </li>
                 )}
@@ -580,10 +580,10 @@ export default function Sidebar({ isOpen, onClose }) {
           </>
         )}
 
-        {/* ───────────────────────────────
+        {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             GRUPO: Monitoramento
-            (Painel + Visitantes: Registrar / Histórico)
-        ─────────────────────────────── */}
+            (Painel + Visitantes: Registrar / HistÃ³rico)
+        â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         {canMonitoramento && (
           <>
             <button
@@ -605,7 +605,7 @@ export default function Sidebar({ isOpen, onClose }) {
             {openGroup === 'monitoramento' && (
               <ul className="ml-4 mb-2">
                 <li>
-                  {/* Match EXATO para não ficar ativo em /monitoramento/visitantes/... */}
+                  {/* Match EXATO para nÃ£o ficar ativo em /monitoramento/visitantes/... */}
                   <Link
                     to="/monitoramento"
                     className={getSubmenuLinkClasses('/monitoramento', true)}
@@ -619,7 +619,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     to="/monitoramento/visitantes/registrar"
                     className={getSubmenuLinkClasses('/monitoramento/visitantes/registrar')}
                   >
-                    <PencilSquareIcon className="h-5 w-5 mr-2" /> Visitantes — Registrar
+                    <PencilSquareIcon className="h-5 w-5 mr-2" /> Visitantes â€” Registrar
                   </Link>
                 </li>
                 <li>
@@ -627,7 +627,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     to="/monitoramento/visitantes/historico"
                     className={getSubmenuLinkClasses('/monitoramento/visitantes/historico')}
                   >
-                    <ClockIcon className="h-5 w-5 mr-2" /> Visitantes — Histórico
+                    <ClockIcon className="h-5 w-5 mr-2" /> Visitantes â€” HistÃ³rico
                   </Link>
                 </li>
                 <li>
@@ -635,7 +635,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     to="/monitoramento/embeddings"
                     className={getSubmenuLinkClasses('/monitoramento/embeddings')}
                   >
-                    <ChartBarIcon className="h-5 w-5 mr-2" /> Embeddings — Gerar
+                    <ChartBarIcon className="h-5 w-5 mr-2" /> Embeddings â€” Gerar
                   </Link>
                 </li>
               </ul>
@@ -652,11 +652,11 @@ export default function Sidebar({ isOpen, onClose }) {
 
         {isScopeEscola && !isProfessor && !isCoord && (
           <>
-            {/* ───────────────────────────────
+            {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                 GRUPO: Disciplinar
-            ─────────────────────────────── */}
+            â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             {isDisciplinar ? (
-            /* ── Disciplinar/Militar: submenus sempre visíveis ── */
+            /* â”€â”€ Disciplinar/Militar: submenus sempre visÃ­veis â”€â”€ */
             <>
             <div
               className="flex items-center w-full py-2 px-3 rounded mt-6"
@@ -680,7 +680,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     to="/disciplinar/responsaveis"
                     className={getSubmenuLinkClasses('/disciplinar/responsaveis')}
                   >
-                    <UserGroupIcon className="h-5 w-5 mr-2" /> Responsáveis
+                    <UserGroupIcon className="h-5 w-5 mr-2" /> ResponsÃ¡veis
                   </Link>
                 </li>
                 {(perfil === 'diretor' || perfil === 'militar') && (
@@ -689,7 +689,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     to="/disciplinar/equipe"
                     className={getSubmenuLinkClasses('/disciplinar/equipe')}
                   >
-                    <UsersIcon className="h-5 w-5 mr-2" /> Gestão de Equipe
+                    <UsersIcon className="h-5 w-5 mr-2" /> GestÃ£o de Equipe
                   </Link>
                 </li>
                 )}
@@ -719,11 +719,11 @@ export default function Sidebar({ isOpen, onClose }) {
               </ul>
             </>
             ) : (
-            /* ── Outros perfis (diretor, coordenador): toggle colapsável ── */
+            /* â”€â”€ Outros perfis (diretor, coordenador): toggle colapsÃ¡vel â”€â”€ */
             <>
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-6 transition"
-              // Militares: submenu sempre fixo, não permite colapsar
+              // Militares: submenu sempre fixo, nÃ£o permite colapsar
               onClick={() => !isMilitar && setOpenGroup(openGroup === 'disciplinar' ? null : 'disciplinar')}
               type="button"
             >
@@ -746,8 +746,8 @@ export default function Sidebar({ isOpen, onClose }) {
                     <UsersIcon className="h-5 w-5 mr-2" /> Alunos
                   </Link>
                 </li>
-                {/* ── DESABILITADO no EDUCA.MELHOR_escola ──
-                    Será recriado futuramente no EDUCA.MELHOR_ceo
+                {/* â”€â”€ DESABILITADO no EDUCA.MELHOR_escola â”€â”€
+                    SerÃ¡ recriado futuramente no EDUCA.MELHOR_ceo
                 <li>
                   <Link
                     to="/disciplinar/ajustes"
@@ -756,13 +756,13 @@ export default function Sidebar({ isOpen, onClose }) {
                     <WrenchIcon className="h-5 w-5 mr-2" /> Ajustes
                   </Link>
                 </li>
-                ── FIM DESABILITADO ── */}
+                â”€â”€ FIM DESABILITADO â”€â”€ */}
                 <li>
                   <Link
                     to="/disciplinar/responsaveis"
                     className={getSubmenuLinkClasses('/disciplinar/responsaveis')}
                   >
-                    <UserGroupIcon className="h-5 w-5 mr-2" /> Responsáveis
+                    <UserGroupIcon className="h-5 w-5 mr-2" /> ResponsÃ¡veis
                   </Link>
                 </li>
                 {(perfil === 'diretor' || perfil === 'militar') && (
@@ -771,7 +771,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     to="/disciplinar/equipe"
                     className={getSubmenuLinkClasses('/disciplinar/equipe')}
                   >
-                    <UsersIcon className="h-5 w-5 mr-2" /> Gestão de Equipe
+                    <UsersIcon className="h-5 w-5 mr-2" /> GestÃ£o de Equipe
                   </Link>
                 </li>
                 )}
@@ -805,10 +805,10 @@ export default function Sidebar({ isOpen, onClose }) {
           </>
         )}
 
-        {/* ───────────────────────────────
+        {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             MENUS INDEPENDENTES: Regimentos, Manual, Suporte
-            (Acessíveis a qualquer usuário logado)
-        ─────────────────────────────── */}
+            (AcessÃ­veis a qualquer usuÃ¡rio logado)
+        â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         {isScopeEscola && (
           <>
             <Link
@@ -837,9 +837,9 @@ export default function Sidebar({ isOpen, onClose }) {
 
         {canAgenteEduca && (
           <>
-            {/* ───────────────────────────────
+            {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                 GRUPO: Agente EDUCA
-            ─────────────────────────────── */}
+            â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-6 transition"
               onClick={() => setOpenGroup(openGroup === 'agente-educa' ? null : 'agente-educa')}
@@ -882,164 +882,156 @@ export default function Sidebar({ isOpen, onClose }) {
               </ul>
             )}
 
-            {/* ───────────────────────────────
+            {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
                 GRUPO: Secretaria
-            ─────────────────────────────── */}
-            <button
-              className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-6 transition"
-              onClick={() => setOpenGroup(openGroup === 'secretaria' ? null : 'secretaria')}
-              type="button"
-            >
-              <PencilSquareIcon className="h-5 w-5 mr-2" />
-              <span className="flex-1 text-left">Secretaria</span>
-              {openGroup === 'secretaria' ? (
-                <ChevronDownIcon className="h-4 w-4" />
-              ) : (
-                <ChevronRightIcon className="h-4 w-4" />
-              )}
-            </button>
+                (Professores NÃƒO tÃªm acesso â€” apenas secretaria, coordenaÃ§Ã£o, direÃ§Ã£o)
+            â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+            {!isProfessor && (
+              <>
+                <button
+                  className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-6 transition"
+                  onClick={() => setOpenGroup(openGroup === 'secretaria' ? null : 'secretaria')}
+                  type="button"
+                >
+                  <PencilSquareIcon className="h-5 w-5 mr-2" />
+                  <span className="flex-1 text-left">Secretaria</span>
+                  {openGroup === 'secretaria' ? (
+                    <ChevronDownIcon className="h-4 w-4" />
+                  ) : (
+                    <ChevronRightIcon className="h-4 w-4" />
+                  )}
+                </button>
 
+                {openGroup === 'secretaria' && (
+                  <ul className="ml-4 mb-2">
+                    <li>
+                      <Link
+                        to="/secretaria/alunos"
+                        className={getSubmenuLinkClasses('/secretaria/alunos')}
+                      >
+                        <UsersIcon className="h-5 w-5 mr-2" /> Alunos
+                      </Link>
+                    </li>
 
+                    <li>
+                      <Link
+                        to="/secretaria/responsaveis"
+                        className={getSubmenuLinkClasses('/secretaria/responsaveis')}
+                      >
+                        <UserGroupIcon className="h-5 w-5 mr-2" /> ResponsÃ¡veis
+                      </Link>
+                    </li>
 
+                    <li>
+                      <Link
+                        to="/secretaria/cargas-horarias"
+                        className={getSubmenuLinkClasses('/secretaria/cargas-horarias')}
+                      >
+                        <ClockIcon className="h-5 w-5 mr-2" /> Cargas HorÃ¡rias
+                      </Link>
+                    </li>
 
+                    <li>
+                      <Link
+                        to="/secretaria/disciplinas"
+                        className={getSubmenuLinkClasses('/secretaria/disciplinas')}
+                      >
+                        <BookOpenIcon className="h-5 w-5 mr-2" /> Disciplinas
+                      </Link>
+                    </li>
 
+                    <li>
+                      <Link
+                        to="/secretaria/modulacao"
+                        className={getSubmenuLinkClasses('/secretaria/modulacao')}
+                      >
+                        <ClockIcon className="h-5 w-5 mr-2" /> ModulaÃ§Ã£o
+                      </Link>
+                    </li>
 
+                    <li>
+                      <Link
+                        to="/secretaria/horarios"
+                        className={getSubmenuLinkClasses('/secretaria/horarios')}
+                      >
+                        <ClockIcon className="h-5 w-5 mr-2" /> HorÃ¡rios
+                      </Link>
+                    </li>
 
+                    <li>
+                      <Link
+                        to="/secretaria/professores"
+                        className={getSubmenuLinkClasses('/secretaria/professores')}
+                      >
+                        <UsersIcon className="h-5 w-5 mr-2" /> Professores
+                      </Link>
+                    </li>
 
+                    <li>
+                      <Link
+                        to="/secretaria/turmas"
+                        className={getSubmenuLinkClasses('/secretaria/turmas')}
+                      >
+                        <AcademicCapIcon className="h-5 w-5 mr-2" /> Turmas
+                      </Link>
+                    </li>
 
+                    {/* NOVO SUBMENU: Boletim */}
+                    <li>
+                      <Link
+                        to="/secretaria/boletim"
+                        className={getSubmenuLinkClasses('/secretaria/boletim')}
+                      >
+                        <DocumentTextIcon className="h-5 w-5 mr-2" /> Boletim
+                      </Link>
+                    </li>
 
+                    <li>
+                      <Link
+                        to="/secretaria/tabela-codigos"
+                        className={getSubmenuLinkClasses('/secretaria/tabela-codigos')}
+                      >
+                        <TableCellsIcon className="h-5 w-5 mr-2" /> Tabela CÃ³digos
+                      </Link>
+                    </li>
 
-
-
-            {openGroup === 'secretaria' && (
-              <ul className="ml-4 mb-2">
-                <li>
-                  <Link
-                    to="/secretaria/alunos"
-                    className={getSubmenuLinkClasses('/secretaria/alunos')}
-                  >
-                    <UsersIcon className="h-5 w-5 mr-2" /> Alunos
-                  </Link>
-                </li>
-
-                <li>
-                  <Link
-                    to="/secretaria/responsaveis"
-                    className={getSubmenuLinkClasses('/secretaria/responsaveis')}
-                  >
-                    <UserGroupIcon className="h-5 w-5 mr-2" /> Responsáveis
-                  </Link>
-                </li>
-
-                <li>
-                  <Link
-                    to="/secretaria/cargas-horarias"
-                    className={getSubmenuLinkClasses('/secretaria/cargas-horarias')}
-                  >
-                    <ClockIcon className="h-5 w-5 mr-2" /> Cargas Horárias
-                  </Link>
-                </li>
-
-                <li>
-                  <Link
-                    to="/secretaria/disciplinas"
-                    className={getSubmenuLinkClasses('/secretaria/disciplinas')}
-                  >
-                    <BookOpenIcon className="h-5 w-5 mr-2" /> Disciplinas
-                  </Link>
-                </li>
-
-                <li>
-                  <Link
-                    to="/secretaria/modulacao"
-                    className={getSubmenuLinkClasses('/secretaria/modulacao')}
-                  >
-                    <ClockIcon className="h-5 w-5 mr-2" /> Modulação
-                  </Link>
-                </li>
-
-                <li>
-                  <Link
-                    to="/secretaria/horarios"
-                    className={getSubmenuLinkClasses('/secretaria/horarios')}
-                  >
-                    <ClockIcon className="h-5 w-5 mr-2" /> Horários
-                  </Link>
-                </li>
-
-                <li>
-                  <Link
-                    to="/secretaria/professores"
-                    className={getSubmenuLinkClasses('/secretaria/professores')}
-                  >
-                    <UsersIcon className="h-5 w-5 mr-2" /> Professores
-                  </Link>
-                </li>
-
-                <li>
-                  <Link
-                    to="/secretaria/turmas"
-                    className={getSubmenuLinkClasses('/secretaria/turmas')}
-                  >
-                    <AcademicCapIcon className="h-5 w-5 mr-2" /> Turmas
-                  </Link>
-                </li>
-
-                {/* NOVO SUBMENU: Boletim */}
-                <li>
-                  <Link
-                    to="/secretaria/boletim"
-                    className={getSubmenuLinkClasses('/secretaria/boletim')}
-                  >
-                    <DocumentTextIcon className="h-5 w-5 mr-2" /> Boletim
-                  </Link>
-                </li>
-
-                <li>
-                  <Link
-                    to="/secretaria/tabela-codigos"
-                    className={getSubmenuLinkClasses('/secretaria/tabela-codigos')}
-                  >
-                    <TableCellsIcon className="h-5 w-5 mr-2" /> Tabela Códigos
-                  </Link>
-                </li>
-
-                {/* Sincronizar SEEDF */}
-                <li>
-                  <Link
-                    to="/secretaria/sincronizar-seedf"
-                    className={getSubmenuLinkClasses('/secretaria/sincronizar-seedf')}
-                    style={{
-                      background: isActive('/secretaria/sincronizar-seedf')
-                        ? 'linear-gradient(90deg, rgba(59,130,246,0.15), transparent)'
-                        : undefined,
-                    }}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    <span className="flex-1">Sincronizar SEEDF</span>
-                    <span style={{
-                      fontSize: '0.5rem',
-                      fontWeight: 800,
-                      background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
-                      color: '#fff',
-                      padding: '1px 5px',
-                      borderRadius: '6px',
-                      letterSpacing: '0.5px',
-                    }}>NOVO</span>
-                  </Link>
-                </li>
-              </ul>
+                    {/* Sincronizar SEEDF */}
+                    <li>
+                      <Link
+                        to="/secretaria/sincronizar-seedf"
+                        className={getSubmenuLinkClasses('/secretaria/sincronizar-seedf')}
+                        style={{
+                          background: isActive('/secretaria/sincronizar-seedf')
+                            ? 'linear-gradient(90deg, rgba(59,130,246,0.15), transparent)'
+                            : undefined,
+                        }}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        <span className="flex-1">Sincronizar SEEDF</span>
+                        <span style={{
+                          fontSize: '0.5rem',
+                          fontWeight: 800,
+                          background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+                          color: '#fff',
+                          padding: '1px 5px',
+                          borderRadius: '6px',
+                          letterSpacing: '0.5px',
+                        }}>NOVO</span>
+                      </Link>
+                    </li>
+                  </ul>
+                )}
+              </>
             )}
-          </>
         )}
 
         {isScopeEscola && !isDisciplinar && !isProfessor && (
           <>
-            {/* ───────────────────────────────
-                GRUPO: Pedagógico
-            ─────────────────────────────── */}
+            {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                GRUPO: PedagÃ³gico
+            â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-2 transition"
               onClick={() => {
@@ -1054,7 +1046,7 @@ export default function Sidebar({ isOpen, onClose }) {
               type="button"
             >
               <ClipboardDocumentListIcon className="h-5 w-5 mr-2" />
-              <span className="flex-1 text-left">Pedagógico</span>
+              <span className="flex-1 text-left">PedagÃ³gico</span>
               {openGroup === 'pedagogico' ? (
                 <ChevronDownIcon className="h-4 w-4" />
               ) : (
@@ -1082,7 +1074,7 @@ export default function Sidebar({ isOpen, onClose }) {
                       to="/pedagogico/conteudos"
                       className={getSubmenuLinkClasses('/pedagogico/conteudos')}
                     >
-                      <BookOpenIcon className="h-5 w-5 mr-2" /> Conteúdos
+                      <BookOpenIcon className="h-5 w-5 mr-2" /> ConteÃºdos
                     </Link>
                   </li>
                 )}
@@ -1092,7 +1084,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     to="/pedagogico/coordenacao/solicitacoes"
                     className={getSubmenuLinkClasses('/pedagogico/coordenacao/solicitacoes')}
                   >
-                    <ClipboardDocumentListIcon className="h-5 w-5 mr-2" /> Solicitações
+                    <ClipboardDocumentListIcon className="h-5 w-5 mr-2" /> SolicitaÃ§Ãµes
                   </Link>
                 </li>
 
@@ -1107,7 +1099,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
 
-                {/* Submenu Correções */}
+                {/* Submenu CorreÃ§Ãµes */}
                 <li>
                   <button
                     className="flex items-center w-full py-2 pl-6 pr-3 rounded hover:bg-blue-700 transition"
@@ -1115,7 +1107,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     type="button"
                   >
                     <BookOpenIcon className="h-5 w-5 mr-2" />
-                    <span className="flex-1 text-left">Correções</span>
+                    <span className="flex-1 text-left">CorreÃ§Ãµes</span>
                     {openCorrecoes ? (
                       <ChevronDownIcon className="h-4 w-4" />
                     ) : (
@@ -1130,14 +1122,14 @@ export default function Sidebar({ isOpen, onClose }) {
                           to="/pedagogico/correcoes/redacao"
                           className={getSubmenuLinkClasses('/pedagogico/correcoes/redacao')}
                         >
-                          <PencilSquareIcon className="h-5 w-5 mr-2" /> Redação
+                          <PencilSquareIcon className="h-5 w-5 mr-2" /> RedaÃ§Ã£o
                         </Link>
                       </li>
                     </ul>
                   )}
                 </li>
 
-                {/* Submenu Gabarito (3 etapas) — controlado pela governança */}
+                {/* Submenu Gabarito (3 etapas) â€” controlado pela governanÃ§a */}
                 {canGabarito && (
                 <li>
                   <button
@@ -1190,7 +1182,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     to="/pedagogico/graficos"
                     className={getSubmenuLinkClasses('/pedagogico/graficos')}
                   >
-                    <ChartBarIcon className="h-5 w-5 mr-2" /> Gráficos
+                    <ChartBarIcon className="h-5 w-5 mr-2" /> GrÃ¡ficos
                   </Link>
                 </li>
               </ul>
@@ -1200,9 +1192,9 @@ export default function Sidebar({ isOpen, onClose }) {
 
         {isScopeEscola && !isDisciplinar && !isProfessor && (
           <>
-            {/* ───────────────────────────────
-                GRUPO: Frequência
-            ─────────────────────────────── */}
+            {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                GRUPO: FrequÃªncia
+            â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-2 transition"
               onClick={() => setOpenGroup(openGroup === 'frequencia' ? null : 'frequencia')}
@@ -1214,7 +1206,7 @@ export default function Sidebar({ isOpen, onClose }) {
               }}
             >
               <ClipboardDocumentListIcon className="h-5 w-5 mr-2" style={{ color: openGroup === 'frequencia' ? '#10b981' : undefined }} />
-              <span className="flex-1 text-left" style={{ fontWeight: 700 }}>Frequência</span>
+              <span className="flex-1 text-left" style={{ fontWeight: 700 }}>FrequÃªncia</span>
               <span style={{
                 fontSize: '0.5rem',
                 fontWeight: 800,
@@ -1247,7 +1239,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     to="/frequencia/relatorios"
                     className={getSubmenuLinkClasses('/frequencia/relatorios')}
                   >
-                    <ChartBarIcon className="h-5 w-5 mr-2" /> Relatórios
+                    <ChartBarIcon className="h-5 w-5 mr-2" /> RelatÃ³rios
                   </Link>
                 </li>
                 <li>
@@ -1273,16 +1265,16 @@ export default function Sidebar({ isOpen, onClose }) {
 
         {isScopeEscola && !isDisciplinar && !isProfessor && !isCoord && (
           <>
-            {/* ───────────────────────────────
-                GRUPO: Impressão
-            ─────────────────────────────── */}
+            {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+                GRUPO: ImpressÃ£o
+            â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-2 transition"
               onClick={() => setOpenGroup(openGroup === 'impressao' ? null : 'impressao')}
               type="button"
             >
               <PrinterIcon className="h-5 w-5 mr-2" />
-              <span className="flex-1 text-left">Impressão</span>
+              <span className="flex-1 text-left">ImpressÃ£o</span>
               {openGroup === 'impressao' ? (
                 <ChevronDownIcon className="h-4 w-4" />
               ) : (
@@ -1321,10 +1313,10 @@ export default function Sidebar({ isOpen, onClose }) {
           </>
         )}
 
-        {/* ───────────────────────────────
+        {/* â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             Plataforma (CEO)
-            ✅ REMOVIDO do Sistema Escolar: a plataforma é uma SPA separada
-        ─────────────────────────────── */}
+            âœ… REMOVIDO do Sistema Escolar: a plataforma Ã© uma SPA separada
+        â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
 
       </nav>
     </aside>

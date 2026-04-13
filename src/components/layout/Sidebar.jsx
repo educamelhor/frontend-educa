@@ -1,4 +1,4 @@
-﻿// src/components/layout/Sidebar.jsx
+// src/components/layout/Sidebar.jsx
 // ============================================================================
 // Sidebar de navegaÃ§Ã£o principal do sistema.
 // Estrutura organizada em grupos: Secretaria, PedagÃ³gico, ImpressÃ£o, etc.

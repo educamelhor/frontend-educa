@@ -41,6 +41,13 @@ export default function BuscaAtiva() {
   const [alunos, setAlunos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+  const [erroModal, setErroModal] = useState("");
+
+  // ── Exclusão ───────────────────────────────────
+  const [excluindoId, setExcluindoId] = useState(null);
+  const [confirmandoExclusao, setConfirmandoExclusao] = useState(false);
+  const [itemParaExcluir, setItemParaExcluir] = useState(null);
 
   // ── Modal state (independente dos filtros da página) ──
   const [modalTurmaId, setModalTurmaId] = useState("");
@@ -100,6 +107,8 @@ export default function BuscaAtiva() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.aluno_id || !form.meio_contato || !form.resultado) return;
+    setSalvando(true);
+    setErroModal("");
     try {
       await api.post("/frequencia/busca-ativa", {
         ...form,
@@ -112,7 +121,36 @@ export default function BuscaAtiva() {
       setModalAlunos([]);
       carregarRegistros();
     } catch (err) {
-      alert("Erro ao registrar: " + (err.response?.data?.error || err.message));
+      const status = err.response?.status;
+      const msg = err.response?.data?.message || err.response?.data?.error || err.message;
+      if (status === 409) {
+        setErroModal("⚠️ " + msg);
+      } else {
+        setErroModal("❌ Erro ao registrar: " + msg);
+      }
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  // ── Exclusão ─────────────────────────────────
+  const confirmarExclusao = (registro) => {
+    setItemParaExcluir(registro);
+    setConfirmandoExclusao(true);
+  };
+
+  const executarExclusao = async () => {
+    if (!itemParaExcluir) return;
+    setExcluindoId(itemParaExcluir.id);
+    try {
+      await api.delete(`/frequencia/busca-ativa/${itemParaExcluir.id}`);
+      setConfirmandoExclusao(false);
+      setItemParaExcluir(null);
+      carregarRegistros();
+    } catch (err) {
+      alert("Erro ao excluir: " + (err.response?.data?.error || err.message));
+    } finally {
+      setExcluindoId(null);
     }
   };
 
@@ -207,6 +245,7 @@ export default function BuscaAtiva() {
               setForm({ aluno_id: "", meio_contato: "", resultado: "", observacao: "", data_contato: new Date().toISOString().split("T")[0] });
               setModalTurmaId("");
               setModalAlunos([]);
+              setErroModal("");
               setShowModal(true);
             }}
             style={{
@@ -278,9 +317,30 @@ export default function BuscaAtiva() {
                           borderRadius: 6, fontSize: "0.72rem", fontWeight: 700,
                         }}>{r.turma_nome || ""}</span>
                       </div>
-                      <span style={{ fontSize: "0.78rem", color: "#94a3b8" }}>
-                        {r.data_contato ? new Date(r.data_contato).toLocaleDateString("pt-BR") : ""}
-                      </span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <span style={{ fontSize: "0.78rem", color: "#94a3b8" }}>
+                          {r.data_contato ? new Date(r.data_contato).toLocaleDateString("pt-BR") : ""}
+                        </span>
+                        {canRegister && (
+                          <button
+                            onClick={() => confirmarExclusao(r)}
+                            disabled={excluindoId === r.id}
+                            title="Excluir registro"
+                            style={{
+                              padding: "4px 10px", borderRadius: 8, border: "1.5px solid #fecaca",
+                              background: "#fff", color: "#dc2626", fontSize: "0.75rem",
+                              fontWeight: 600, cursor: excluindoId === r.id ? "not-allowed" : "pointer",
+                              opacity: excluindoId === r.id ? 0.5 : 1,
+                              display: "flex", alignItems: "center", gap: 4,
+                              transition: "all 0.15s",
+                            }}
+                            onMouseEnter={e => { if (excluindoId !== r.id) { e.currentTarget.style.background = "#fef2f2"; e.currentTarget.style.borderColor = "#dc2626"; }}}
+                            onMouseLeave={e => { e.currentTarget.style.background = "#fff"; e.currentTarget.style.borderColor = "#fecaca"; }}
+                          >
+                            🗑️ Excluir
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
@@ -360,6 +420,18 @@ export default function BuscaAtiva() {
             </div>
 
             <form onSubmit={handleSubmit} style={{ padding: "28px" }}>
+
+              {/* Erro / duplicata */}
+              {erroModal && (
+                <div style={{
+                  padding: "12px 16px", borderRadius: 10, marginBottom: 20,
+                  background: erroModal.startsWith("⚠️") ? "#fffbeb" : "#fef2f2",
+                  border: `1.5px solid ${erroModal.startsWith("⚠️") ? "#fde68a" : "#fecaca"}`,
+                  color: erroModal.startsWith("⚠️") ? "#92400e" : "#991b1b",
+                  fontSize: "0.85rem", fontWeight: 600,
+                }}>{erroModal}</div>
+              )}
+
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
                 <div>
                   <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "#374151", marginBottom: 6, display: "block" }}>Turma *</label>
@@ -432,13 +504,70 @@ export default function BuscaAtiva() {
                 <button type="button" onClick={() => setShowModal(false)} style={{
                   padding: "10px 24px", borderRadius: 10, border: "1.5px solid #d1d5db", background: "#fff", fontWeight: 600, fontSize: "0.88rem", cursor: "pointer", color: "#6b7280",
                 }}>Cancelar</button>
-                <button type="submit" style={{
+                <button type="submit" disabled={salvando} style={{
                   padding: "10px 28px", borderRadius: 10, border: "none",
-                  background: "linear-gradient(135deg, #b45309, #d97706)",
-                  color: "#fff", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer",
-                }}>Registrar Contato</button>
+                  background: salvando ? "#9ca3af" : "linear-gradient(135deg, #b45309, #d97706)",
+                  color: "#fff", fontWeight: 700, fontSize: "0.88rem",
+                  cursor: salvando ? "not-allowed" : "pointer",
+                  boxShadow: salvando ? "none" : "0 2px 8px rgba(180,83,9,0.3)",
+                  display: "flex", alignItems: "center", gap: 8,
+                }}>{salvando ? "⏳ Salvando..." : "✅ Registrar Contato"}</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ MODAL — Confirmar Exclusão ═══ */}
+      {confirmandoExclusao && itemParaExcluir && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)",
+          backdropFilter: "blur(4px)", display: "flex", alignItems: "center",
+          justifyContent: "center", zIndex: 10000, padding: 20,
+          animation: "fadeIn 0.2s ease",
+        }}>
+          <div style={{
+            background: "#fff", borderRadius: 20, width: "100%", maxWidth: 440,
+            boxShadow: "0 25px 50px rgba(0,0,0,0.2)", overflow: "hidden",
+            animation: "slideUp 0.3s ease",
+          }}>
+            <div style={{ background: "linear-gradient(135deg, #dc2626, #b91c1c)", padding: "20px 24px", display: "flex", alignItems: "center", gap: 14 }}>
+              <div style={{ width: 44, height: 44, borderRadius: 12, background: "rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>🗑️</div>
+              <div>
+                <h3 style={{ color: "#fff", fontWeight: 800, fontSize: "1rem", margin: 0 }}>Confirmar Exclusão</h3>
+                <p style={{ color: "rgba(255,255,255,0.75)", fontSize: "0.75rem", margin: 0, marginTop: 2 }}>Essa ação não pode ser desfeita</p>
+              </div>
+            </div>
+            <div style={{ padding: "24px 28px" }}>
+              <p style={{ color: "#374151", fontSize: "0.95rem", margin: "0 0 8px", fontWeight: 600 }}>
+                Deseja excluir o contato abaixo?
+              </p>
+              <div style={{ background: "#fef2f2", border: "1.5px solid #fecaca", borderRadius: 10, padding: "12px 16px", marginTop: 12 }}>
+                <p style={{ margin: 0, fontWeight: 700, color: "#991b1b", fontSize: "0.88rem" }}>{itemParaExcluir.aluno_nome}</p>
+                <p style={{ margin: "4px 0 0", fontSize: "0.82rem", color: "#6b7280" }}>
+                  {getMeioInfo(itemParaExcluir.meio_contato)?.label || itemParaExcluir.meio_contato}
+                  &nbsp;·&nbsp;
+                  {getResultadoInfo(itemParaExcluir.resultado)?.label || itemParaExcluir.resultado}
+                  &nbsp;·&nbsp;
+                  {itemParaExcluir.data_contato ? new Date(itemParaExcluir.data_contato).toLocaleDateString("pt-BR") : ""}
+                </p>
+              </div>
+              <div style={{ display: "flex", gap: 12, marginTop: 20 }}>
+                <button onClick={() => { setConfirmandoExclusao(false); setItemParaExcluir(null); }} style={{
+                  flex: 1, padding: "10px", borderRadius: 10, border: "1.5px solid #d1d5db",
+                  background: "#fff", fontWeight: 600, fontSize: "0.88rem", cursor: "pointer", color: "#6b7280",
+                }}>Cancelar</button>
+                <button onClick={executarExclusao} disabled={!!excluindoId} style={{
+                  flex: 1, padding: "10px", borderRadius: 10, border: "none",
+                  background: excluindoId ? "#9ca3af" : "linear-gradient(135deg, #dc2626, #b91c1c)",
+                  color: "#fff", fontWeight: 700, fontSize: "0.88rem",
+                  cursor: excluindoId ? "not-allowed" : "pointer",
+                  boxShadow: excluindoId ? "none" : "0 2px 8px rgba(220,38,38,0.35)",
+                }}>
+                  {excluindoId ? "⏳ Excluindo..." : "🗑️ Confirmar Exclusão"}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

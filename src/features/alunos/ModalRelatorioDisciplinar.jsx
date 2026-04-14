@@ -213,6 +213,7 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
                 const validRes = await api.get(`/api/relatorio-disciplinar/validar/${aluno.id}/registro/${oc.id}`);
                 if (!validRes.data.valido) {
                     setCamposAusentesRegistro(validRes.data.ausentes || []);
+                    setOcorrenciaParaImprimir(oc); // salva para permitir imprimir mesmo assim
                     setValidacaoRegistroOpen(true);
                     return;
                 }
@@ -239,9 +240,15 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
             return;
         }
 
-        // REGISTRADA ou FINALIZADA → exibe modal informativo e o usuário decide
-        setOcorrenciaParaImprimir(oc);
-        setModalImprimirNaoFinalOpen(true);
+        // REGISTRADA → avisa (registro não finalizado) e usuário decide
+        if (statusUpper === "REGISTRADA") {
+            setOcorrenciaParaImprimir(oc);
+            setModalImprimirNaoFinalOpen(true);
+            return;
+        }
+
+        // FINALIZADA → valida dados; se faltar dados mostra modal com opção de imprimir mesmo assim
+        await executarImpressao(oc);
     };
     // ==================================================================
 
@@ -1081,19 +1088,32 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
                         </div>
 
                         {/* Footer */}
-                        <div className="px-6 py-4 bg-gray-50/80 border-t border-gray-100 flex items-center justify-end">
+                        <div className="px-6 py-4 bg-gray-50/80 border-t border-gray-100 flex items-center justify-end gap-3">
                             <button
-                                onClick={() => setValidacaoRegistroOpen(false)}
-                                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-900 to-blue-700 text-white font-semibold text-sm
-                                    shadow-md shadow-blue-900/20
-                                    hover:from-blue-800 hover:to-blue-600 hover:shadow-lg
-                                    active:scale-[0.97]
-                                    transition-all duration-200
-                                    flex items-center gap-2"
+                                onClick={() => { setValidacaoRegistroOpen(false); setOcorrenciaParaImprimir(null); }}
+                                className="px-5 py-2.5 rounded-xl border border-gray-200 text-gray-700 font-medium text-sm
+                                    hover:bg-gray-100 active:scale-[0.97] transition-all duration-200"
                             >
-                                <CheckCircleIcon className="h-5 w-5" />
                                 Entendido
                             </button>
+                            {ocorrenciaParaImprimir && (
+                                <button
+                                    onClick={async () => {
+                                        const oc = ocorrenciaParaImprimir;
+                                        setValidacaoRegistroOpen(false);
+                                        setOcorrenciaParaImprimir(null);
+                                        await executarImpressao(oc, { skipValidacao: true });
+                                    }}
+                                    className="px-6 py-2.5 rounded-xl text-white font-semibold text-sm flex items-center gap-2
+                                        active:scale-[0.97] transition-all duration-200"
+                                    style={{ background: "linear-gradient(135deg, #1e3a5f, #0f2847)", boxShadow: "0 4px 14px rgba(15,40,71,0.3)" }}
+                                    onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 6px 20px rgba(15,40,71,0.4)"; e.currentTarget.style.transform = "translateY(-1px)"; }}
+                                    onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 4px 14px rgba(15,40,71,0.3)"; e.currentTarget.style.transform = "translateY(0)"; }}
+                                >
+                                    <PrinterIcon className="h-5 w-5" />
+                                    Imprimir mesmo assim
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>

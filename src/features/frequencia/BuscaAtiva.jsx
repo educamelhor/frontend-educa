@@ -27,6 +27,20 @@ const RESULTADOS_CONTATO = [
 
 const ANO_LETIVO = String(new Date().getFullYear());
 
+// Retorna a data de hoje como string 'YYYY-MM-DD' no fuso local (evita bug UTC -3h)
+const hojeLocal = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+// Formata 'YYYY-MM-DD' ou ISO para 'DD/MM/YYYY' sem passar pelo objeto Date (evita bug UTC)
+const fmtDataBR = (str) => {
+  if (!str) return '';
+  const s = String(str).split('T')[0];
+  const [y, m, d] = s.split('-');
+  return d && m && y ? `${d}/${m}/${y}` : str;
+};
+
 export default function BuscaAtiva() {
   const escolaId = localStorage.getItem("escola_id");
   const perfil = String(localStorage.getItem("perfil") || "").toLowerCase();
@@ -54,7 +68,7 @@ export default function BuscaAtiva() {
   const [modalAlunos, setModalAlunos] = useState([]);
 
   const [form, setForm] = useState({
-    aluno_id: "", meio_contato: "", resultado: "", observacao: "", data_contato: new Date().toISOString().split("T")[0],
+    aluno_id: "", meio_contato: "", resultado: "", observacao: "", data_contato: hojeLocal(),
   });
 
   useEffect(() => {
@@ -116,7 +130,7 @@ export default function BuscaAtiva() {
         turma_id: modalTurmaId,
       });
       setShowModal(false);
-      setForm({ aluno_id: "", meio_contato: "", resultado: "", observacao: "", data_contato: new Date().toISOString().split("T")[0] });
+      setForm({ aluno_id: "", meio_contato: "", resultado: "", observacao: "", data_contato: hojeLocal() });
       setModalTurmaId("");
       setModalAlunos([]);
       carregarRegistros();
@@ -242,7 +256,7 @@ export default function BuscaAtiva() {
         {canRegister && (
           <button
             onClick={() => {
-              setForm({ aluno_id: "", meio_contato: "", resultado: "", observacao: "", data_contato: new Date().toISOString().split("T")[0] });
+              setForm({ aluno_id: "", meio_contato: "", resultado: "", observacao: "", data_contato: hojeLocal() });
               setModalTurmaId("");
               setModalAlunos([]);
               setErroModal("");
@@ -319,7 +333,7 @@ export default function BuscaAtiva() {
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                         <span style={{ fontSize: "0.78rem", color: "#94a3b8" }}>
-                          {r.data_contato ? new Date(r.data_contato).toLocaleDateString("pt-BR") : ""}
+                          {fmtDataBR(r.data_contato)}
                         </span>
                         {canRegister && (
                           <button
@@ -549,7 +563,7 @@ export default function BuscaAtiva() {
                   &nbsp;·&nbsp;
                   {getResultadoInfo(itemParaExcluir.resultado)?.label || itemParaExcluir.resultado}
                   &nbsp;·&nbsp;
-                  {itemParaExcluir.data_contato ? new Date(itemParaExcluir.data_contato).toLocaleDateString("pt-BR") : ""}
+                  {fmtDataBR(itemParaExcluir.data_contato)}
                 </p>
               </div>
               <div style={{ display: "flex", gap: 12, marginTop: 20 }}>

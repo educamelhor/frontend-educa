@@ -511,7 +511,7 @@ export default function HistoricoDisciplinar() {
             {paginacao.total} registro{paginacao.total !== 1 ? "s" : ""} encontrado{paginacao.total !== 1 ? "s" : ""}
           </div>
         )}
-        {/* ModalRelatorioDisciplinar - Relatorio Disciplinar inline */
+        {/* ModalRelatorioDisciplinar - Relatorio Disciplinar inline */}
         <ModalRelatorioDisciplinar
           open={fichaOpen}
           onClose={() => { setFichaOpen(false); setFichaCodigo(null); }}

@@ -122,7 +122,6 @@ export default function HistoricoDisciplinar() {
   const abrirRelatorio = (alunoId) => {
     navigate(`/disciplinar/alunos?aluno=${alunoId}&tab=disciplinar`);
   };
-  };
 
   // ── KPI Cards ─────────────────────────────────────────────────────────
   const kpiCards = [

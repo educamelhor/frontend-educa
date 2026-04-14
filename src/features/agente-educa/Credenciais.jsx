@@ -140,8 +140,18 @@ export default function AgenteCredenciais() {
       startPolling(credId);
     } catch (err) {
       setStatusConexao('erro');
-      setFeedback({ type: 'error', msg: 'Não foi possível iniciar o teste. Verifique se o backend está ativo.' });
-      console.error('[AgenteCredenciais] Erro ao disparar teste:', err);
+      const status = err?.response?.status;
+      const backendMsg = err?.response?.data?.message || err?.response?.data?.error;
+      let msg = 'Não foi possível iniciar o teste.';
+      if (status === 401) msg = 'Sessão expirada. Faça login novamente.';
+      else if (status === 403) msg = 'Sem permissão para testar credenciais.';
+      else if (status === 404) msg = 'Credencial não encontrada. Salve novamente e tente.';
+      else if (status === 400) msg = backendMsg || 'Parâmetros inválidos na requisição.';
+      else if (status === 500) msg = backendMsg ? `Erro interno: ${backendMsg}` : 'Erro interno no servidor.';
+      else if (backendMsg) msg = backendMsg;
+      else if (!status) msg = 'Não foi possível contactar o servidor. Verifique sua conexão.';
+      setFeedback({ type: 'error', msg });
+      console.error('[AgenteCredenciais] Erro ao disparar teste:', { status, backendMsg, err });
     }
   }, [startPolling]);
 

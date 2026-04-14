@@ -728,6 +728,21 @@ export default function Sidebar({ isOpen, onClose }) {
                 </li>
                 <li>
                   <Link
+                    to="/disciplinar/historico"
+                    className={getSubmenuLinkClasses('/disciplinar/historico')}
+                    style={{
+                      background: isActive('/disciplinar/historico')
+                        ? 'linear-gradient(90deg, rgba(245,158,11,0.15), transparent)'
+                        : undefined,
+                    }}
+                  >
+                    <ClockIcon className="h-5 w-5 mr-2" style={{ color: isActive('/disciplinar/historico') ? '#f59e0b' : undefined }} />
+                    <span className="flex-1">Histórico</span>
+                    <span style={{ fontSize:'0.5rem', fontWeight:800, background:'linear-gradient(135deg,#f59e0b,#ea580c)', color:'#fff', padding:'1px 5px', borderRadius:'6px', letterSpacing:'0.5px' }}>NOVO</span>
+                  </Link>
+                </li>
+                <li>
+                  <Link
                     to="/disciplinar/metadados"
                     className={getSubmenuLinkClasses('/disciplinar/metadados')}
                   >
@@ -806,6 +821,21 @@ export default function Sidebar({ isOpen, onClose }) {
                     <BoltIcon className="h-5 w-5 mr-2" style={{ color: isActive('/disciplinar/fo-coletivo') ? '#f87171' : undefined }} />
                     <span className="flex-1">F.O. Coletivo</span>
                     <span style={{ fontSize:'0.5rem', fontWeight:800, background:'linear-gradient(135deg,#ef4444,#dc2626)', color:'#fff', padding:'1px 5px', borderRadius:'6px', letterSpacing:'0.5px' }}>NOVO</span>
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/disciplinar/historico"
+                    className={getSubmenuLinkClasses('/disciplinar/historico')}
+                    style={{
+                      background: isActive('/disciplinar/historico')
+                        ? 'linear-gradient(90deg, rgba(245,158,11,0.15), transparent)'
+                        : undefined,
+                    }}
+                  >
+                    <ClockIcon className="h-5 w-5 mr-2" style={{ color: isActive('/disciplinar/historico') ? '#f59e0b' : undefined }} />
+                    <span className="flex-1">Histórico</span>
+                    <span style={{ fontSize:'0.5rem', fontWeight:800, background:'linear-gradient(135deg,#f59e0b,#ea580c)', color:'#fff', padding:'1px 5px', borderRadius:'6px', letterSpacing:'0.5px' }}>NOVO</span>
                   </Link>
                 </li>
                 <li>

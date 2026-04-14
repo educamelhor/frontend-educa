@@ -12,6 +12,7 @@ import MetadadosDisciplinar from "./features/disciplinar/metadados";
 import RegimentosDisciplinar from "./features/disciplinar/regimentos";
 import ManualDisciplinar from "./features/disciplinar/manual";
 import SuporteSAC from "./features/disciplinar/suporte";
+import HistoricoDisciplinar from "./features/disciplinar/historico";
 import Boletim from "./features/boletim/Boletim";
 import BoletimAnual from "./features/boletim/BoletimAnual";
 import FichaAluno from "./features/alunos/FichaAluno";
@@ -228,6 +229,7 @@ export default function App() {
           <Route path="/disciplinar/equipe" element={
             <RequireDiretorMilitar><GestaoEquipe /></RequireDiretorMilitar>
           } />
+          <Route path="/disciplinar/historico"  element={<HistoricoDisciplinar />} />
           <Route path="/disciplinar/metadados"  element={<MetadadosDisciplinar />} />
           <Route path="/disciplinar/regimentos" element={<RegimentosDisciplinar />} />
           <Route path="/disciplinar/manual"     element={<ManualDisciplinar />} />

@@ -924,26 +924,28 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
                                         </>
                                     ) : (
                                         <>
-                                            <p className="font-semibold">Este registro ainda não possui status &ldquo;Finalizado&rdquo;.</p>
+                                            <p className="font-semibold">Ocorrência em andamento — processo ainda não encerrado</p>
                                             <p className="text-amber-700 text-xs">
-                                                O documento impresso refletirá o estado atual do registro, sem a assinatura de finalização.
-                                                Recomenda-se finalizar o registro antes de imprimir para garantir a integridade documental.
+                                                Este registro está com status <strong>REGISTRADA</strong>, o que indica que o processo disciplinar ainda não foi
+                                                concluído. O documento gerado <strong>não conterá a data de ciência do responsável</strong> nem o
+                                                encerramento formal da ocorrência, podendo comprometer sua validade documental.
                                             </p>
                                         </>
                                     )}
                                 </div>
                             </div>
 
-                            <div className="flex items-start gap-3 p-4 rounded-xl border" style={{ background: "linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%)", borderColor: "#bfdbfe" }}>
-                                <span className="text-xl flex-shrink-0" style={{ lineHeight: 1, marginTop: 2 }}>📱</span>
-                                <p className="text-xs leading-relaxed" style={{ color: "#1e40af" }}>
-                                    <strong>Novidade em breve:</strong> Assim que o aplicativo{" "}
-                                    <strong className="text-blue-700">EDUCA-MOBILE</strong> estiver disponível,
-                                    a impressão física será desnecessária — o responsável receberá a notificação do
-                                    registro <strong>imediatamente</strong> pelo aplicativo, garantindo comunicação
-                                    instantânea e rastreável.
-                                </p>
-                            </div>
+                            {String(ocorrenciaParaImprimir.status || '').toUpperCase() !== 'FINALIZADA' && (
+                                <div className="flex items-start gap-3 p-4 rounded-xl border" style={{ background: "linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%)", borderColor: "#bbf7d0" }}>
+                                    <span className="text-lg flex-shrink-0" style={{ lineHeight: 1, marginTop: 2 }}>✅</span>
+                                    <p className="text-xs leading-relaxed" style={{ color: "#166534" }}>
+                                        <strong>Recomendação:</strong> Antes de imprimir, utilize o botão{" "}
+                                        <strong>Finalizar Registro</strong> para concluir o processo com o responsável.
+                                        Registros finalizados possuem <strong>validade documental completa</strong> e
+                                        rastreabilidade institucional garantida.
+                                    </p>
+                                </div>
+                            )}
                         </div>
 
                         {/* Footer com CANCELAR e IMPRIMIR */}
@@ -1015,10 +1017,10 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
                                     </div>
                                     <div>
                                         <h2 className="text-lg font-bold text-white tracking-tight">
-                                            Dados Incompletos
+                                            Cadastro do Responsável Incompleto
                                         </h2>
                                         <p className="text-red-300/70 text-xs mt-0.5">
-                                            A impressão do registro não pode ser gerada
+                                            Dados ausentes identificados no registro
                                         </p>
                                     </div>
                                 </div>
@@ -1037,8 +1039,9 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
                             <div className="flex items-start gap-3 p-3.5 rounded-xl bg-amber-50 border border-amber-200/60">
                                 <ExclamationTriangleIcon className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
                                 <p className="text-xs text-amber-700 leading-relaxed">
-                                    <strong>Atenção:</strong> A impressão do registro disciplinar
-                                    só poderá ser gerada quando todos os dados abaixo estiverem preenchidos.
+                                    <strong>Cadastro incompleto.</strong> O documento PDF deste registro pode ser gerado, porém
+                                    estará <strong>parcialmente preenchido</strong> — os dados abaixo estão ausentes e não constarão
+                                    na impressão. Atualize o cadastro do responsável para garantir um documento completo e com validade institucional.
                                 </p>
                             </div>
 

@@ -48,7 +48,6 @@ export default function HistoricoDisciplinar() {
   const [apiError, setApiError] = useState(null);
   const [taceOpen, setTaceOpen] = useState(false);
   const [taceAluno, setTaceAluno] = useState(null);
-  const [loadingModal, setLoadingModal] = useState(false);
   // Filtros
   const [filtroStatus, setFiltroStatus] = useState("");
   const [filtroTurma, setFiltroTurma] = useState("");
@@ -118,14 +117,18 @@ export default function HistoricoDisciplinar() {
 
   const temFiltrosAtivos = filtroStatus || filtroTurma || filtroTurno || filtroAluno || filtroTipo || filtroResponsavel || filtroDataInicio || filtroDataFim;
 
-  // Buscar aluno e abrir ModalTACE in-place no Historico
-  const abrirRelatorio = async (alunoId) => {
-    setLoadingModal(true);
-    try { const r = await api.get(`/alunos/${alunoId}`); setTaceAluno(r.data); setTaceOpen(true); }
-    catch (err) { console.error("Erro ao abrir relatorio:", err); alert("Erro ao carregar dados do aluno."); }
-    finally { setLoadingModal(false); }
+  // Abrir ModalTACE construindo aluno a partir dos dados do registro (sem fetch extra)
+  const abrirRelatorio = (registro) => {
+    setTaceAluno({
+      id: registro.aluno_id,
+      codigo: registro.aluno_codigo,
+      estudante: registro.aluno_nome,
+      turma: registro.turma_nome,
+      turno: registro.turma_turno,
+      foto: null,
+    });
+    setTaceOpen(true);
   };
-
 
   // ── KPI Cards ─────────────────────────────────────────────────────────
   const kpiCards = [
@@ -437,7 +440,7 @@ export default function HistoricoDisciplinar() {
                   key={r.id}
                   className="disc-card"
                   style={{ "--border-left-color": borderColor, "::before": {} }}
-                  onClick={() => abrirRelatorio(r.aluno_id)}
+                  onClick={() => abrirRelatorio(r)}
                 >
                   <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 4, background: borderColor, borderRadius: "14px 0 0 14px" }} />
                   <div className="disc-card-avatar" style={{ background: avatarBg }}>
@@ -485,7 +488,7 @@ export default function HistoricoDisciplinar() {
                     </div>
                     <button
                       className="disc-card-action"
-                      onClick={(e) => { e.stopPropagation(); abrirRelatorio(r.aluno_id); }}
+                      onClick={(e) => { e.stopPropagation(); abrirRelatorio(r); }}
                     >
                       📄 Ver Relatório
                     </button>
@@ -523,14 +526,6 @@ export default function HistoricoDisciplinar() {
           aluno={taceAluno}
           onSaved={() => fetchHistorico()}
         />
-        {loadingModal && (
-          <div style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.45)" }}>
-            <div style={{ background: "#1e293b", borderRadius: 16, padding: "28px 40px", display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
-              <div style={{ width: 36, height: 36, border: "4px solid #334155", borderTopColor: "#f97316", borderRadius: "50%", animation: "disc-spin 0.8s linear infinite" }} />
-              <p style={{ color: "#cbd5e1", fontSize: "0.85rem" }}>Carregando...</p>
-            </div>
-          </div>
-        )}
       </>
     );
 }

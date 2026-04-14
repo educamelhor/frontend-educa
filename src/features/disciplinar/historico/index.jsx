@@ -4,7 +4,6 @@
 // KPI Cards + Filtros + Lista paginada + Redirecionamento para Relatório
 // ============================================================================
 import React, { useState, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
 import api from "../../../services/api";
 
 // ── Helpers ─────────────────────────────────────────────────────────────
@@ -36,7 +35,6 @@ const TIPO_MAP = {
 };
 
 export default function HistoricoDisciplinar() {
-  const navigate = useNavigate();
 
   // State
   const [registros, setRegistros] = useState([]);
@@ -46,6 +44,8 @@ export default function HistoricoDisciplinar() {
   const [turnosLista, setTurnosLista] = useState([]);
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState(null);
+  const [loadingRelatorio, setLoadingRelatorio] = useState(false);
+  const [relatorioError, setRelatorioError] = useState(null);
 
   // Filtros
   const [filtroStatus, setFiltroStatus] = useState("");
@@ -116,9 +116,27 @@ export default function HistoricoDisciplinar() {
 
   const temFiltrosAtivos = filtroStatus || filtroTurma || filtroTurno || filtroAluno || filtroTipo || filtroResponsavel || filtroDataInicio || filtroDataFim;
 
-  // ── Navigate to student disciplinary report ───────────────────────────
-  const abrirRelatorio = (alunoId) => {
-    navigate(`/disciplinar/alunos?aluno=${alunoId}&tab=disciplinar`);
+  // ── Gerar PDF Relatório Disciplinar (igual ao fluxo em Alunos) ─────────
+  const abrirRelatorio = async (alunoId) => {
+    setLoadingRelatorio(true);
+    setRelatorioError(null);
+    try {
+      const validRes = await api.get(`/relatorio-disciplinar/validar/${alunoId}`);
+      if (!validRes.data.valido) {
+        setRelatorioError(validRes.data.ausentes || []);
+        return;
+      }
+      const token = localStorage.getItem("token");
+      const escolaId = localStorage.getItem("escola_id");
+      const base = api.defaults.baseURL || "";
+      const url = `${base}/relatorio-disciplinar/${alunoId}?token=${encodeURIComponent(token)}&escola_id=${encodeURIComponent(escolaId)}`;
+      window.open(url, "_blank");
+    } catch (err) {
+      console.error("Erro ao gerar relatório:", err);
+      alert("Erro ao gerar o Relatório de Registros Disciplinares.");
+    } finally {
+      setLoadingRelatorio(false);
+    }
   };
 
   // ── KPI Cards ─────────────────────────────────────────────────────────
@@ -510,6 +528,44 @@ export default function HistoricoDisciplinar() {
           </div>
         )}
       </div>
-    </>
-  );
+        {/* ── Loading Relatório ───────────────────────────────── */}
+        {loadingRelatorio && (
+          <div style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.45)", backdropFilter: "blur(4px)" }}>
+            <div style={{ background: "#1e293b", borderRadius: 16, padding: "28px 40px", display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 36, height: 36, border: "4px solid #334155", borderTopColor: "#f97316", borderRadius: "50%", animation: "disc-spin 0.8s linear infinite" }} />
+              <p style={{ color: "#cbd5e1", fontSize: "0.85rem", fontWeight: 500 }}>Gerando Relatório Disciplinar...</p>
+            </div>
+          </div>
+        )}
+
+        {/* ── Modal Dados Incompletos ─────────────────────────── */}
+        {relatorioError && (
+          <div style={{ position: "fixed", inset: 0, zIndex: 70, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}>
+            <div style={{ background: "#1e293b", borderRadius: 16, padding: 28, maxWidth: 440, width: "90%", boxShadow: "0 24px 48px rgba(0,0,0,0.5)" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+                <span style={{ fontSize: 24 }}>⚠️</span>
+                <div>
+                  <div style={{ color: "#f87171", fontWeight: 700, fontSize: "1rem" }}>Dados Incompletos</div>
+                  <div style={{ color: "#94a3b8", fontSize: "0.78rem" }}>O PDF não pode ser gerado ainda</div>
+                </div>
+              </div>
+              {Array.isArray(relatorioError) && relatorioError.map((grupo, i) => (
+                <div key={i} style={{ background: "#0f172a", borderRadius: 8, padding: "10px 14px", marginBottom: 8 }}>
+                  <div style={{ color: "#f97316", fontWeight: 600, fontSize: "0.78rem", marginBottom: 6 }}>{grupo.categoria}</div>
+                  {(grupo.campos || []).map((c, j) => (
+                    <div key={j} style={{ color: "#94a3b8", fontSize: "0.75rem", paddingLeft: 8 }}>• {c}</div>
+                  ))}
+                </div>
+              ))}
+              <button
+                onClick={() => setRelatorioError(null)}
+                style={{ marginTop: 16, width: "100%", padding: "10px", background: "#f97316", border: "none", borderRadius: 8, color: "#fff", fontWeight: 600, cursor: "pointer" }}
+              >
+                Entendido
+              </button>
+            </div>
+          </div>
+        )}
+      </>
+    );
 }

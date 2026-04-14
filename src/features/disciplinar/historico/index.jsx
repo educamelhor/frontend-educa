@@ -517,6 +517,7 @@ export default function HistoricoDisciplinar() {
           onClose={() => { setFichaOpen(false); setFichaCodigo(null); }}
           aluno={fichaCodigo}
         />
+      </div>
       </>
     );
 }

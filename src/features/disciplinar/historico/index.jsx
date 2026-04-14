@@ -60,10 +60,10 @@ export default function HistoricoDisciplinar() {
 
   // ── Fetch Turmas ──────────────────────────────────────────────────────
   useEffect(() => {
+    const ANO_LETIVO = String(new Date().getFullYear());
     api.get("/api/turmas")
       .then((r) => {
-        const data = r.data || [];
-        // Deduplica turnos para o select de turnos
+        const data = (r.data || []).filter((t) => String(t.ano) === ANO_LETIVO);
         const turnos = [...new Set(data.map((t) => t.turno).filter(Boolean))];
         setTurmasLista(data);
         setTurnosLista(turnos);

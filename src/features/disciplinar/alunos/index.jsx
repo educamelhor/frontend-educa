@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
     ExclamationTriangleIcon,
     ExclamationCircleIcon,
@@ -155,6 +156,19 @@ export default function AlunosDisciplinar() {
     useEffect(() => {
         fetchAlunos();
     }, [page, debouncedFiltro, anoLetivo]);
+
+    // Auto-abrir modal Relatório Disciplinar via ?aluno=ID&tab=disciplinar
+    const [searchParams] = useSearchParams();
+    useEffect(() => {
+        const alunoId = searchParams.get("aluno");
+        const tab = searchParams.get("tab");
+        if (!alunoId || tab !== "disciplinar" || alunos.length === 0) return;
+        const found = alunos.find((a) => String(a.id) === String(alunoId));
+        if (found) {
+            setTaceAluno(found);
+            setTaceOpen(true);
+        }
+    }, [alunos, searchParams]);
 
     // ───────────────────────────────────────────────────────
     // Handler do clique no ícone TACE

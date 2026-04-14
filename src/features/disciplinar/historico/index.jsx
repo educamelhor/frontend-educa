@@ -4,6 +4,7 @@
 // KPI Cards + Filtros + Lista paginada + Redirecionamento para Relatório
 // ============================================================================
 import React, { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../../../services/api";
 
 // ── Helpers ─────────────────────────────────────────────────────────────
@@ -35,6 +36,7 @@ const TIPO_MAP = {
 };
 
 export default function HistoricoDisciplinar() {
+  const navigate = useNavigate();
 
   // State
   const [registros, setRegistros] = useState([]);
@@ -116,27 +118,10 @@ export default function HistoricoDisciplinar() {
 
   const temFiltrosAtivos = filtroStatus || filtroTurma || filtroTurno || filtroAluno || filtroTipo || filtroResponsavel || filtroDataInicio || filtroDataFim;
 
-  // ── Gerar PDF Relatório Disciplinar (igual ao fluxo em Alunos) ─────────
-  const abrirRelatorio = async (alunoId) => {
-    setLoadingRelatorio(true);
-    setRelatorioError(null);
-    try {
-      const validRes = await api.get(`/relatorio-disciplinar/validar/${alunoId}`);
-      if (!validRes.data.valido) {
-        setRelatorioError(validRes.data.ausentes || []);
-        return;
-      }
-      const token = localStorage.getItem("token");
-      const escolaId = localStorage.getItem("escola_id");
-      const base = api.defaults.baseURL || "";
-      const url = `${base}/relatorio-disciplinar/${alunoId}?token=${encodeURIComponent(token)}&escola_id=${encodeURIComponent(escolaId)}`;
-      window.open(url, "_blank");
-    } catch (err) {
-      console.error("Erro ao gerar relatório:", err);
-      alert("Erro ao gerar o Relatório de Registros Disciplinares.");
-    } finally {
-      setLoadingRelatorio(false);
-    }
+  // -- Navegar para Alunos e abrir modal Relatorio Disciplinar -----------
+  const abrirRelatorio = (alunoId) => {
+    navigate(`/disciplinar/alunos?aluno=${alunoId}&tab=disciplinar`);
+  };
   };
 
   // ── KPI Cards ─────────────────────────────────────────────────────────

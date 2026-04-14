@@ -4,7 +4,7 @@
 // KPI Cards + Filtros + Lista paginada + Redirecionamento para Relatório
 // ============================================================================
 import React, { useState, useEffect, useCallback } from "react";
-import FichaAluno from "../../alunos/FichaAluno";
+import ModalRelatorioDisciplinar from "../../alunos/ModalRelatorioDisciplinar";
 import api from "../../../services/api";
 
 // ── Helpers ─────────────────────────────────────────────────────────────
@@ -117,9 +117,9 @@ export default function HistoricoDisciplinar() {
 
   const temFiltrosAtivos = filtroStatus || filtroTurma || filtroTurno || filtroAluno || filtroTipo || filtroResponsavel || filtroDataInicio || filtroDataFim;
 
-  // Abrir FichaAluno com o codigo do aluno direto do registro
+  // Abrir ModalRelatorioDisciplinar com dados do aluno montados do registro
   const abrirRelatorio = (registro) => {
-    setFichaCodigo(registro.aluno_codigo);
+    setFichaCodigo({ id: registro.aluno_id, codigo: registro.aluno_codigo, estudante: registro.aluno_nome, turma: registro.turma_nome, turno: registro.turma_turno, foto: null });
     setFichaOpen(true);
   };
 
@@ -511,19 +511,12 @@ export default function HistoricoDisciplinar() {
             {paginacao.total} registro{paginacao.total !== 1 ? "s" : ""} encontrado{paginacao.total !== 1 ? "s" : ""}
           </div>
         )}
-      </div>
-        {/* FichaAluno - Relatorio Disciplinar inline */}
-        {fichaOpen && fichaCodigo && (
-          <div style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.5)" }}>
-            <div style={{ background: "#fff", borderRadius: 12, width: "90vw", maxWidth: 1000, maxHeight: "90vh", overflowY: "auto", position: "relative" }}>
-              <button
-                onClick={() => { setFichaOpen(false); setFichaCodigo(null); }}
-                style={{ position: "absolute", top: 10, right: 14, zIndex: 10, padding: "4px 14px", borderRadius: 6, background: "#e2e8f0", border: "none", cursor: "pointer", fontWeight: 700, fontSize: "1rem" }}
-              >?</button>
-              <FichaAluno codigo={fichaCodigo} />
-            </div>
-          </div>
-        )}
+        {/* ModalRelatorioDisciplinar - Relatorio Disciplinar inline */
+        <ModalRelatorioDisciplinar
+          open={fichaOpen}
+          onClose={() => { setFichaOpen(false); setFichaCodigo(null); }}
+          aluno={fichaCodigo}
+        />
       </>
     );
 }

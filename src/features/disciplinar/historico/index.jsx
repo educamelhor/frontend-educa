@@ -45,6 +45,7 @@ export default function HistoricoDisciplinar() {
   const [turmasLista, setTurmasLista] = useState([]);
   const [turnosLista, setTurnosLista] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [apiError, setApiError] = useState(null);
 
   // Filtros
   const [filtroStatus, setFiltroStatus] = useState("");
@@ -74,6 +75,7 @@ export default function HistoricoDisciplinar() {
   // ── Fetch Histórico ───────────────────────────────────────────────────
   const fetchHistorico = useCallback(async () => {
     setLoading(true);
+    setApiError(null);
     try {
       const params = new URLSearchParams();
       params.append("page", page);
@@ -87,11 +89,15 @@ export default function HistoricoDisciplinar() {
       if (filtroDataInicio) params.append("data_inicio", filtroDataInicio);
       if (filtroDataFim) params.append("data_fim", filtroDataFim);
 
-      const resp = await api.get(`/api/registros-ocorrencias/historico?${params.toString()}`);
+      // Nota: api.js já adiciona /api na base URL, não duplicar o prefixo
+      const resp = await api.get(`/registros-ocorrencias/historico?${params.toString()}`);
       setRegistros(resp.data.registros || []);
       setKpis(resp.data.kpis || {});
       setPaginacao(resp.data.paginacao || {});
     } catch (err) {
+      const msg = err?.response?.data?.error || err?.response?.data?.message || err?.message || String(err);
+      const status = err?.response?.status || "";
+      setApiError(`[${status}] ${msg}`);
       console.error("Erro ao buscar histórico:", err);
     }
     setLoading(false);
@@ -390,6 +396,13 @@ export default function HistoricoDisciplinar() {
         {/* ── Lista de Registros ──────────────────────────────── */}
         {loading ? (
           <div className="disc-loading"><div className="disc-spinner" /></div>
+        ) : apiError ? (
+          <div className="disc-empty">
+            <div className="disc-empty-icon">⚠️</div>
+            <div className="disc-empty-title">Erro ao carregar registros</div>
+            <p style={{ fontSize: "0.78rem", color: "#f87171", marginTop: 8, wordBreak: "break-all" }}>{apiError}</p>
+            <button className="disc-btn-clear" style={{ marginTop: 12 }} onClick={fetchHistorico}>↻ Tentar novamente</button>
+          </div>
         ) : registros.length === 0 ? (
           <div className="disc-empty">
             <div className="disc-empty-icon">📭</div>

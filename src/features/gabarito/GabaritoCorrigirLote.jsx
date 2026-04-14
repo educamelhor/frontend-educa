@@ -2711,13 +2711,17 @@ export default function GabaritoCorrigirLote() {
                       e.currentTarget.style.borderColor = "transparent";
                     }}
                   >
-                    {/* Foto do professor (ou iniciais como fallback) */}
-                    {prof.foto ? (
-                      <div style={{
-                        width: 42, height: 42, borderRadius: "50%", flexShrink: 0,
-                        padding: 2,
-                        background: "linear-gradient(135deg, #06b6d4, #8b5cf6)",
-                      }}>
+                    {/* Foto do corretor (com iniciais como fallback se foto falhar) */}
+                    <div style={{
+                      width: 42, height: 42, borderRadius: "50%", flexShrink: 0,
+                      padding: prof.foto ? 2 : 0,
+                      background: prof.foto
+                        ? "linear-gradient(135deg, #06b6d4, #8b5cf6)"
+                        : "linear-gradient(135deg, rgba(6,182,212,0.15), rgba(139,92,246,0.15))",
+                      border: prof.foto ? "none" : "2px solid rgba(6,182,212,0.2)",
+                      position: "relative",
+                    }}>
+                      {prof.foto && (
                         <img
                           src={`${toPublicUrl(prof.foto)}?v=1`}
                           alt={prof.nome}
@@ -2728,22 +2732,24 @@ export default function GabaritoCorrigirLote() {
                           }}
                           onError={(e) => {
                             e.target.style.display = "none";
-                            e.target.nextSibling && (e.target.nextSibling.style.display = "flex");
+                            if (e.target.nextSibling) e.target.nextSibling.style.display = "flex";
                           }}
                         />
-                      </div>
-                    ) : (
+                      )}
+                      {/* Iniciais (fallback — visível quando não há foto ou quando foto falha) */}
                       <div style={{
-                        width: 42, height: 42, borderRadius: "50%", flexShrink: 0,
-                        background: "linear-gradient(135deg, rgba(6,182,212,0.15), rgba(139,92,246,0.15))",
-                        border: "2px solid rgba(6,182,212,0.2)",
-                        display: "flex", alignItems: "center", justifyContent: "center",
+                        width: "100%", height: "100%", borderRadius: "50%",
+                        display: prof.foto ? "none" : "flex",
+                        alignItems: "center", justifyContent: "center",
                         fontSize: "0.78rem", fontWeight: 800, color: "var(--gab-cyan-light, #22d3ee)",
                         fontFamily: "var(--gab-font-display)",
+                        position: prof.foto ? "absolute" : "static",
+                        top: 0, left: 0,
+                        background: prof.foto ? "linear-gradient(135deg, rgba(6,182,212,0.15), rgba(139,92,246,0.15))" : "transparent",
                       }}>
                         {prof.nome ? prof.nome.split(" ").map(n => n[0]).slice(0, 2).join("") : "?"}
                       </div>
-                    )}
+                    </div>
 
                     {/* Info */}
                     <div style={{ flex: 1, minWidth: 0 }}>

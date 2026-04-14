@@ -28,6 +28,14 @@ const TIPOS_JUSTIFICATIVA = [
 const FORM_VAZIO = { aluno_id: "", tipo: "", data_inicio: "", data_fim: "", observacao: "", dias: 1 };
 const ANO_LETIVO = String(new Date().getFullYear());
 
+// Formata 'YYYY-MM-DD' ou ISO para 'DD/MM/YYYY' sem passar pelo objeto Date (evita bug UTC-3)
+const fmtDataBR = (str) => {
+  if (!str) return '—';
+  const s = String(str).split('T')[0];
+  const [y, m, d] = s.split('-');
+  return d && m && y ? `${d}/${m}/${y}` : str;
+};
+
 // ─────────────────────────────────────────────
 // Componente principal
 // ─────────────────────────────────────────────
@@ -378,9 +386,9 @@ export default function Atestados() {
                         </span>
                       </td>
                       <td style={{ padding: "14px 16px", color: "#475569", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
-                        {j.data_inicio ? new Date(j.data_inicio).toLocaleDateString("pt-BR") : "—"}
+                        {fmtDataBR(j.data_inicio)}
                         {" → "}
-                        {j.data_fim ? new Date(j.data_fim).toLocaleDateString("pt-BR") : "—"}
+                        {fmtDataBR(j.data_fim)}
                       </td>
                       <td style={{ padding: "14px 16px", textAlign: "center" }}>
                         <span style={{ background: "#dbeafe", color: "#1d4ed8", padding: "3px 10px", borderRadius: 8, fontWeight: 700, fontSize: "0.82rem" }}>{j.dias || 1}</span>
@@ -390,7 +398,7 @@ export default function Atestados() {
                       </td>
                       <td style={{ padding: "14px 16px", color: "#64748b", fontSize: "0.82rem" }}>{j.registrado_por_nome || "—"}</td>
                       <td style={{ padding: "14px 16px", color: "#94a3b8", fontSize: "0.8rem", whiteSpace: "nowrap" }}>
-                        {j.criado_em ? new Date(j.criado_em).toLocaleDateString("pt-BR") : "—"}
+                        {fmtDataBR(j.criado_em)}
                       </td>
                       {canRegister && (
                         <td style={{ padding: "14px 16px", textAlign: "center" }}>
@@ -633,9 +641,9 @@ export default function Atestados() {
                 <p style={{ margin: 0, fontWeight: 700, color: "#991b1b", fontSize: "0.88rem" }}>{itemParaExcluir.aluno_nome}</p>
                 <p style={{ margin: "4px 0 0", fontSize: "0.82rem", color: "#6b7280" }}>
                   {getTypeInfo(itemParaExcluir.tipo)?.label || itemParaExcluir.tipo} &nbsp;·&nbsp;
-                  {itemParaExcluir.data_inicio ? new Date(itemParaExcluir.data_inicio).toLocaleDateString("pt-BR") : "—"}
+                  {fmtDataBR(itemParaExcluir.data_inicio)}
                   {" → "}
-                  {itemParaExcluir.data_fim ? new Date(itemParaExcluir.data_fim).toLocaleDateString("pt-BR") : "—"}
+                  {fmtDataBR(itemParaExcluir.data_fim)}
                   &nbsp;·&nbsp; {itemParaExcluir.dias || 1} dia(s)
                 </p>
               </div>

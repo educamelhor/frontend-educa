@@ -239,15 +239,9 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
             return;
         }
 
-        // REGISTRADA → avisa mas permita imprimir
-        if (statusUpper === "REGISTRADA") {
-            setOcorrenciaParaImprimir(oc);
-            setModalImprimirNaoFinalOpen(true);
-            return;
-        }
-
-        // FINALIZADA → fluxo normal
-        await executarImpressao(oc);
+        // REGISTRADA ou FINALIZADA → exibe modal informativo e o usuário decide
+        setOcorrenciaParaImprimir(oc);
+        setModalImprimirNaoFinalOpen(true);
     };
     // ==================================================================
 
@@ -889,7 +883,9 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
                                     </div>
                                     <div>
                                         <h2 className="text-lg font-bold text-white tracking-tight">
-                                            Registro não finalizado
+                                            {String(ocorrenciaParaImprimir.status || '').toUpperCase() === 'FINALIZADA'
+                                                ? 'Confirmar impressão'
+                                                : 'Registro não finalizado'}
                                         </h2>
                                         <p className="text-blue-300/70 text-xs mt-0.5">
                                             Status: <span className="font-semibold text-blue-200">{ocorrenciaParaImprimir.status}</span>
@@ -912,11 +908,22 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
                             <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200/60">
                                 <ExclamationTriangleIcon className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
                                 <div className="text-sm text-amber-800 leading-relaxed space-y-1">
-                                    <p className="font-semibold">Este registro ainda não possui status &ldquo;Finalizado&rdquo;.</p>
-                                    <p className="text-amber-700 text-xs">
-                                        O documento impresso refletirá o estado atual do registro, sem a assinatura de finalização.
-                                        Recomenda-se finalizar o registro antes de imprimir para garantir a integridade documental.
-                                    </p>
+                                    {String(ocorrenciaParaImprimir.status || '').toUpperCase() === 'FINALIZADA' ? (
+                                        <>
+                                            <p className="font-semibold">Deseja gerar a impressão deste registro?</p>
+                                            <p className="text-amber-700 text-xs">
+                                                O registro está <strong>Finalizado</strong>. O documento PDF será gerado com todos os dados e assinaturas registradas.
+                                            </p>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <p className="font-semibold">Este registro ainda não possui status &ldquo;Finalizado&rdquo;.</p>
+                                            <p className="text-amber-700 text-xs">
+                                                O documento impresso refletirá o estado atual do registro, sem a assinatura de finalização.
+                                                Recomenda-se finalizar o registro antes de imprimir para garantir a integridade documental.
+                                            </p>
+                                        </>
+                                    )}
                                 </div>
                             </div>
 
@@ -955,7 +962,9 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
                                 onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 4px 14px rgba(15,40,71,0.3)"; e.currentTarget.style.transform = "translateY(0)"; }}
                             >
                                 <PrinterIcon className="h-5 w-5" />
-                                Imprimir mesmo assim
+                                {String(ocorrenciaParaImprimir?.status || '').toUpperCase() === 'FINALIZADA'
+                                    ? 'Imprimir'
+                                    : 'Imprimir mesmo assim'}
                             </button>
                         </div>
                     </div>

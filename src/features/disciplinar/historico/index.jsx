@@ -3,7 +3,7 @@
 // Design premium inspirado pela Busca Ativa (green → dark disciplinary orange)
 // KPI Cards + Filtros + Lista paginada + Redirecionamento para Relatório
 // ============================================================================
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../../services/api";
 

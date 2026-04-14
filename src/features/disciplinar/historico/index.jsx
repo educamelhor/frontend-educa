@@ -4,7 +4,7 @@
 // KPI Cards + Filtros + Lista paginada + Redirecionamento para Relatório
 // ============================================================================
 import React, { useState, useEffect, useCallback } from "react";
-import ModalTACE from "../../alunos/ModalTACE";
+import FichaAluno from "../../alunos/FichaAluno";
 import api from "../../../services/api";
 
 // ── Helpers ─────────────────────────────────────────────────────────────
@@ -46,8 +46,8 @@ export default function HistoricoDisciplinar() {
   const [turnosLista, setTurnosLista] = useState([]);
   const [loading, setLoading] = useState(true);
   const [apiError, setApiError] = useState(null);
-  const [taceOpen, setTaceOpen] = useState(false);
-  const [taceAluno, setTaceAluno] = useState(null);
+  const [fichaOpen, setFichaOpen] = useState(false);
+  const [fichaCodigo, setFichaCodigo] = useState(null);
   // Filtros
   const [filtroStatus, setFiltroStatus] = useState("");
   const [filtroTurma, setFiltroTurma] = useState("");
@@ -117,17 +117,10 @@ export default function HistoricoDisciplinar() {
 
   const temFiltrosAtivos = filtroStatus || filtroTurma || filtroTurno || filtroAluno || filtroTipo || filtroResponsavel || filtroDataInicio || filtroDataFim;
 
-  // Abrir ModalTACE construindo aluno a partir dos dados do registro (sem fetch extra)
+  // Abrir FichaAluno com o codigo do aluno direto do registro
   const abrirRelatorio = (registro) => {
-    setTaceAluno({
-      id: registro.aluno_id,
-      codigo: registro.aluno_codigo,
-      estudante: registro.aluno_nome,
-      turma: registro.turma_nome,
-      turno: registro.turma_turno,
-      foto: null,
-    });
-    setTaceOpen(true);
+    setFichaCodigo(registro.aluno_codigo);
+    setFichaOpen(true);
   };
 
   // ── KPI Cards ─────────────────────────────────────────────────────────
@@ -519,13 +512,18 @@ export default function HistoricoDisciplinar() {
           </div>
         )}
       </div>
-        {/* ModalTACE - Relatorio Disciplinar */}
-        <ModalTACE
-          open={taceOpen}
-          onClose={() => { setTaceOpen(false); setTaceAluno(null); }}
-          aluno={taceAluno}
-          onSaved={() => fetchHistorico()}
-        />
+        {/* FichaAluno - Relatorio Disciplinar inline */}
+        {fichaOpen && fichaCodigo && (
+          <div style={{ position: "fixed", inset: 0, zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.5)" }}>
+            <div style={{ background: "#fff", borderRadius: 12, width: "90vw", maxWidth: 1000, maxHeight: "90vh", overflowY: "auto", position: "relative" }}>
+              <button
+                onClick={() => { setFichaOpen(false); setFichaCodigo(null); }}
+                style={{ position: "absolute", top: 10, right: 14, zIndex: 10, padding: "4px 14px", borderRadius: 6, background: "#e2e8f0", border: "none", cursor: "pointer", fontWeight: 700, fontSize: "1rem" }}
+              >?</button>
+              <FichaAluno codigo={fichaCodigo} />
+            </div>
+          </div>
+        )}
       </>
     );
 }

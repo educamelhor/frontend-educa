@@ -42,7 +42,8 @@ export default function HistoricoDisciplinar() {
   const [registros, setRegistros] = useState([]);
   const [kpis, setKpis] = useState({});
   const [paginacao, setPaginacao] = useState({ total: 0, page: 1, limit: 30, totalPages: 0 });
-  const [turmas, setTurmas] = useState([]);
+  const [turmasLista, setTurmasLista] = useState([]);
+  const [turnosLista, setTurnosLista] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Filtros
@@ -59,7 +60,15 @@ export default function HistoricoDisciplinar() {
 
   // ── Fetch Turmas ──────────────────────────────────────────────────────
   useEffect(() => {
-    api.get("/api/turmas").then((r) => setTurmas(r.data || [])).catch(() => {});
+    api.get("/api/turmas")
+      .then((r) => {
+        const data = r.data || [];
+        // Deduplica turnos para o select de turnos
+        const turnos = [...new Set(data.map((t) => t.turno).filter(Boolean))];
+        setTurmasLista(data);
+        setTurnosLista(turnos);
+      })
+      .catch(() => {});
   }, []);
 
   // ── Fetch Histórico ───────────────────────────────────────────────────
@@ -302,21 +311,27 @@ export default function HistoricoDisciplinar() {
                   </select>
                 </div>
                 <div className="disc-filter-group">
-                  <label>Turma</label>
-                  <select value={filtroTurma} onChange={(e) => setFiltroTurma(e.target.value)}>
-                    <option value="">Todas as turmas</option>
-                    {turmas.map((t) => (
-                      <option key={t.id} value={t.id}>{t.nome} ({t.turno})</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="disc-filter-group">
                   <label>Turno</label>
                   <select value={filtroTurno} onChange={(e) => setFiltroTurno(e.target.value)}>
                     <option value="">Todos os turnos</option>
-                    <option value="Matutino">Matutino</option>
-                    <option value="Vespertino">Vespertino</option>
-                    <option value="Integral">Integral</option>
+                    {turnosLista.length > 0
+                      ? turnosLista.map((t) => <option key={t} value={t}>{t}</option>)
+                      : ["Matutino", "Vespertino", "Integral", "Noturno"].map((t) => (
+                          <option key={t} value={t}>{t}</option>
+                        ))
+                    }
+                  </select>
+                </div>
+                <div className="disc-filter-group">
+                  <label>Turma</label>
+                  <select value={filtroTurma} onChange={(e) => setFiltroTurma(e.target.value)}>
+                    <option value="">Todas as turmas</option>
+                    {(filtroTurno
+                      ? turmasLista.filter((t) => t.turno === filtroTurno)
+                      : turmasLista
+                    ).map((t) => (
+                      <option key={t.id} value={t.id}>{t.turma || t.nome || `Turma ${t.id}`}</option>
+                    ))}
                   </select>
                 </div>
                 <div className="disc-filter-group">

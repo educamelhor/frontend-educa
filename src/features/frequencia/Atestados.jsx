@@ -373,8 +373,45 @@ export default function Atestados() {
         )}
       </div>
 
+
       {/* ═══ TABELA ═══ */}
       <div style={{ background: "#fff", borderRadius: 14, overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.06)", border: "1px solid #e5e7eb" }}>
+
+        {/* CSS responsivo embutido */}
+        <style>{`
+          .atst-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+          .atst-table th, .atst-table td { overflow: hidden; }
+          .atst-col-aluno     { width: 18%; }
+          .atst-col-turma     { width: 8%; }
+          .atst-col-tipo      { width: 16%; }
+          .atst-col-periodo   { width: 14%; }
+          .atst-col-dias      { width: 5%; }
+          .atst-col-obs       { width: 10%; }
+          .atst-col-reg       { width: 13%; }
+          .atst-col-data      { width: 9%; }
+          .atst-col-acoes     { width: 7%; }
+          .atst-tipo-label    { display: inline; }
+          .atst-acoes-label   { display: inline; }
+
+          @media (max-width: 900px) {
+            .atst-col-reg   { display: none; }
+            .atst-col-data  { display: none; }
+            .atst-col-aluno { width: 26%; }
+            .atst-col-tipo  { width: 20%; }
+            .atst-col-obs   { width: 14%; }
+            .atst-col-acoes { width: 9%; }
+          }
+          @media (max-width: 640px) {
+            .atst-col-obs   { display: none; }
+            .atst-col-dias  { display: none; }
+            .atst-tipo-label  { display: none; }
+            .atst-acoes-label { display: none; }
+            .atst-col-aluno { width: 38%; }
+            .atst-col-tipo  { width: 20%; }
+            .atst-col-acoes { width: 12%; }
+          }
+        `}</style>
+
         {loading ? (
           <div style={{ padding: 60, textAlign: "center", color: "#94a3b8" }}>
             <div style={{ fontSize: 32, marginBottom: 12 }}>⏳</div>Carregando...
@@ -389,15 +426,37 @@ export default function Atestados() {
           </div>
         ) : (
           <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <table className="atst-table">
+              <colgroup>
+                <col className="atst-col-aluno" />
+                <col className="atst-col-turma" />
+                <col className="atst-col-tipo" />
+                <col className="atst-col-periodo" />
+                <col className="atst-col-dias" />
+                <col className="atst-col-obs" />
+                <col className="atst-col-reg" />
+                <col className="atst-col-data" />
+                {canRegister && <col className="atst-col-acoes" />}
+              </colgroup>
               <thead>
                 <tr style={{ background: "#f8fafc", borderBottom: "2px solid #e2e8f0" }}>
-                  {["Aluno", "Turma", "Tipo", "Período", "Dias", "Observação", "Registrado por", "Data Registro", ...(canRegister ? ["Ações"] : [])].map(h => (
-                    <th key={h} style={{
-                      padding: "12px 16px", textAlign: h === "Ações" ? "center" : "left",
-                      fontSize: "0.75rem", fontWeight: 700, color: "#475569",
+                  {[
+                    { label: "Aluno",          cls: "atst-col-aluno"  },
+                    { label: "Turma",          cls: "atst-col-turma"  },
+                    { label: "Tipo",           cls: "atst-col-tipo"   },
+                    { label: "Período",        cls: "atst-col-periodo"},
+                    { label: "Dias",           cls: "atst-col-dias"   },
+                    { label: "Observação",     cls: "atst-col-obs"    },
+                    { label: "Registrado por", cls: "atst-col-reg"    },
+                    { label: "Data Reg.",      cls: "atst-col-data"   },
+                    ...(canRegister ? [{ label: "Ações", cls: "atst-col-acoes" }] : []),
+                  ].map(h => (
+                    <th key={h.label} className={h.cls} style={{
+                      padding: "10px 10px", textAlign: h.label === "Ações" || h.label === "Dias" ? "center" : "left",
+                      fontSize: "0.72rem", fontWeight: 700, color: "#475569",
                       textTransform: "uppercase", letterSpacing: "0.05em",
-                    }}>{h}</th>
+                      whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                    }}>{h.label}</th>
                   ))}
                 </tr>
               </thead>
@@ -408,66 +467,90 @@ export default function Atestados() {
                     <tr key={j.id || i} style={{ borderBottom: "1px solid #f1f5f9", transition: "background 0.15s" }}
                       onMouseEnter={e => e.currentTarget.style.background = "#f8fafc"}
                       onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
-                      <td style={{ padding: "14px 16px", fontWeight: 600, color: "#1e293b", fontSize: "0.88rem" }}>{j.aluno_nome || "—"}</td>
-                      <td style={{ padding: "14px 16px", color: "#64748b", fontSize: "0.85rem" }}>{j.turma_nome || "—"}</td>
-                      <td style={{ padding: "14px 16px" }}>
+
+                      {/* Aluno */}
+                      <td className="atst-col-aluno" style={{ padding: "12px 10px", fontWeight: 600, color: "#1e293b", fontSize: "0.82rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {j.aluno_nome || "—"}
+                      </td>
+
+                      {/* Turma */}
+                      <td className="atst-col-turma" style={{ padding: "12px 8px", color: "#64748b", fontSize: "0.8rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {j.turma_nome || "—"}
+                      </td>
+
+                      {/* Tipo — ícone sempre + label apenas no desktop */}
+                      <td className="atst-col-tipo" style={{ padding: "12px 8px" }}>
                         <span style={{
-                          display: "inline-flex", alignItems: "center", gap: 6,
+                          display: "inline-flex", alignItems: "center", gap: 5,
                           background: `${typeInfo?.cor || "#6b7280"}15`,
                           color: typeInfo?.cor || "#6b7280",
-                          padding: "4px 10px", borderRadius: 8, fontSize: "0.78rem", fontWeight: 700, whiteSpace: "nowrap",
+                          padding: "3px 8px", borderRadius: 7,
+                          fontSize: "0.74rem", fontWeight: 700,
+                          maxWidth: "100%", overflow: "hidden",
                         }}>
-                          <span>{typeInfo?.icon || "📋"}</span>
-                          {typeInfo?.label || j.tipo}
+                          <span style={{ flexShrink: 0 }}>{typeInfo?.icon || "📋"}</span>
+                          <span className="atst-tipo-label" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {typeInfo?.label || j.tipo}
+                          </span>
                         </span>
                       </td>
-                      <td style={{ padding: "14px 16px", color: "#475569", fontSize: "0.85rem", whiteSpace: "nowrap" }}>
-                        {fmtDataBR(j.data_inicio)}
-                        {" → "}
-                        {fmtDataBR(j.data_fim)}
+
+                      {/* Período */}
+                      <td className="atst-col-periodo" style={{ padding: "12px 8px", color: "#475569", fontSize: "0.8rem", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {fmtDataBR(j.data_inicio)} → {fmtDataBR(j.data_fim)}
                       </td>
-                      <td style={{ padding: "14px 16px", textAlign: "center" }}>
-                        <span style={{ background: "#dbeafe", color: "#1d4ed8", padding: "3px 10px", borderRadius: 8, fontWeight: 700, fontSize: "0.82rem" }}>{j.dias || 1}</span>
+
+                      {/* Dias */}
+                      <td className="atst-col-dias" style={{ padding: "12px 8px", textAlign: "center" }}>
+                        <span style={{ background: "#dbeafe", color: "#1d4ed8", padding: "2px 7px", borderRadius: 7, fontWeight: 700, fontSize: "0.78rem" }}>{j.dias || 1}</span>
                       </td>
-                      <td style={{ padding: "14px 16px", color: "#64748b", fontSize: "0.82rem", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+
+                      {/* Observação — truncada */}
+                      <td className="atst-col-obs" style={{ padding: "12px 8px", color: "#64748b", fontSize: "0.78rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {j.observacao || "—"}
                       </td>
-                      <td style={{ padding: "14px 16px", color: "#64748b", fontSize: "0.82rem" }}>{j.registrado_por_nome || "—"}</td>
-                      <td style={{ padding: "14px 16px", color: "#94a3b8", fontSize: "0.8rem", whiteSpace: "nowrap" }}>
+
+                      {/* Registrado por — oculto no mobile */}
+                      <td className="atst-col-reg" style={{ padding: "12px 8px", color: "#64748b", fontSize: "0.76rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {j.registrado_por_nome || "—"}
+                      </td>
+
+                      {/* Data */}
+                      <td className="atst-col-data" style={{ padding: "12px 8px", color: "#94a3b8", fontSize: "0.76rem", whiteSpace: "nowrap" }}>
                         {fmtDataBR(j.criado_em)}
                       </td>
+
+                      {/* Ações */}
                       {canRegister && (
-                        <td style={{ padding: "14px 16px", textAlign: "center" }}>
-                          <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
-                            {/* Botão Editar */}
+                        <td className="atst-col-acoes" style={{ padding: "12px 8px", textAlign: "center" }}>
+                          <div style={{ display: "flex", gap: 5, justifyContent: "center" }}>
                             <button
                               onClick={() => abrirModalEditar(j)}
                               title="Editar justificativa"
                               style={{
-                                padding: "6px 12px", borderRadius: 8, border: "1.5px solid #d1d5db",
-                                background: "#fff", color: "#374151", fontSize: "0.78rem",
-                                fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 5,
-                                transition: "all 0.15s",
+                                padding: "5px 8px", borderRadius: 7, border: "1.5px solid #d1d5db",
+                                background: "#fff", color: "#374151", fontSize: "0.75rem",
+                                fontWeight: 600, cursor: "pointer", display: "flex",
+                                alignItems: "center", gap: 3, transition: "all 0.15s",
                               }}
                               onMouseEnter={e => { e.currentTarget.style.background = "#eff6ff"; e.currentTarget.style.borderColor = "#2563eb"; e.currentTarget.style.color = "#2563eb"; }}
                               onMouseLeave={e => { e.currentTarget.style.background = "#fff"; e.currentTarget.style.borderColor = "#d1d5db"; e.currentTarget.style.color = "#374151"; }}>
-                              ✏️ Editar
+                              ✏️ <span className="atst-acoes-label">Editar</span>
                             </button>
-                            {/* Botão Excluir */}
                             <button
                               onClick={() => confirmarExclusao(j)}
                               disabled={excluindoId === j.id}
                               title="Excluir justificativa"
                               style={{
-                                padding: "6px 12px", borderRadius: 8, border: "1.5px solid #fecaca",
-                                background: "#fff", color: "#dc2626", fontSize: "0.78rem",
+                                padding: "5px 8px", borderRadius: 7, border: "1.5px solid #fecaca",
+                                background: "#fff", color: "#dc2626", fontSize: "0.75rem",
                                 fontWeight: 600, cursor: excluindoId === j.id ? "not-allowed" : "pointer",
-                                display: "flex", alignItems: "center", gap: 5, transition: "all 0.15s",
+                                display: "flex", alignItems: "center", gap: 3, transition: "all 0.15s",
                                 opacity: excluindoId === j.id ? 0.5 : 1,
                               }}
                               onMouseEnter={e => { if (excluindoId !== j.id) { e.currentTarget.style.background = "#fef2f2"; e.currentTarget.style.borderColor = "#dc2626"; } }}
                               onMouseLeave={e => { e.currentTarget.style.background = "#fff"; e.currentTarget.style.borderColor = "#fecaca"; }}>
-                              🗑️ Excluir
+                              🗑️ <span className="atst-acoes-label">Excluir</span>
                             </button>
                           </div>
                         </td>
@@ -480,6 +563,7 @@ export default function Atestados() {
           </div>
         )}
       </div>
+
 
       {/* ═══ MODAL — Registrar / Editar ═══ */}
       {showModal && (

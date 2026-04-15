@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import QuestaoDetalhes from './components/QuestaoDetalhes';
+import BulkImportModal from './BulkImportModal';
 
 /* ── Constantes ─────────────────────────────────────────── */
 const NIVEL_LABEL  = { facil: 'Fácil', medio: 'Médio', dificil: 'Difícil', enem: 'ENEM' };
@@ -149,6 +150,7 @@ export default function QuestoesBanco({ onEdit, refreshKey }) {
   const [filtStatus,  setFiltStatus]  = useState('');
   const [page,        setPage]        = useState(1);
   const [disciplinas, setDisciplinas] = useState([]);
+  const [showBulk,    setShowBulk]    = useState(false);
 
   const buscaTimer = useRef(null);
 
@@ -245,6 +247,14 @@ export default function QuestoesBanco({ onEdit, refreshKey }) {
 
   return (
     <div>
+      {/* Modal Importação em Massa */}
+      {showBulk && (
+        <BulkImportModal
+          onClose={() => setShowBulk(false)}
+          onImportado={() => { setShowBulk(false); carregar(1); carregarStats(); }}
+        />
+      )}
+
       {/* Modal de detalhes */}
       {detalhes && (
         <QuestaoDetalhes
@@ -347,6 +357,15 @@ export default function QuestoesBanco({ onEdit, refreshKey }) {
             ✕ Limpar
           </button>
         )}
+
+        {/* Botão Importação em Massa */}
+        <button
+          className="bq-btn bq-btn-primary"
+          onClick={() => setShowBulk(true)}
+          style={{ marginLeft: 'auto', padding: '8px 14px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}
+        >
+          📥 Importar em Massa
+        </button>
       </div>
 
       {/* Contagem de resultados */}

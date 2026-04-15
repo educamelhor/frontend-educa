@@ -109,7 +109,7 @@ function TemplateSelector({ value, onChange }) {
 /* ══════════════════════════════════════════════════════════════════════════════
    QUESTAO CARD — painel esquerdo (banco)
 ══════════════════════════════════════════════════════════════════════════════ */
-function BancoQuestaoCard({ questao, onAdd, jaAdicionada }) {
+function BancoQuestaoCard({ questao, onAdd, onDuplicate, jaAdicionada }) {
   const nivel = questao.nivel || 'medio';
   return (
     <div
@@ -157,21 +157,43 @@ function BancoQuestaoCard({ questao, onAdd, jaAdicionada }) {
         </p>
       </div>
 
-      {/* Botão adicionar */}
-      <button
-        onClick={() => !jaAdicionada && onAdd(questao)}
-        disabled={jaAdicionada}
-        title={jaAdicionada ? 'Já adicionada' : 'Adicionar à prova'}
-        style={{
-          flexShrink: 0, width: 28, height: 28, borderRadius: '50%',
-          background: jaAdicionada ? '#86efac' : '#0e7490',
-          border: 'none', cursor: jaAdicionada ? 'default' : 'pointer',
-          color: '#fff', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontFamily: 'inherit', transition: 'background 0.15s',
-        }}
-      >
-        {jaAdicionada ? '✓' : '+'}
-      </button>
+      {/* Ações */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
+        {/* Botão adicionar */}
+        <button
+          onClick={() => !jaAdicionada && onAdd(questao)}
+          disabled={jaAdicionada}
+          title={jaAdicionada ? 'Já adicionada' : 'Adicionar à prova'}
+          style={{
+            width: 28, height: 28, borderRadius: '50%',
+            background: jaAdicionada ? '#86efac' : '#0e7490',
+            border: 'none', cursor: jaAdicionada ? 'default' : 'pointer',
+            color: '#fff', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontFamily: 'inherit', transition: 'background 0.15s',
+          }}
+        >
+          {jaAdicionada ? '✓' : '+'}
+        </button>
+        {/* Botão duplicar */}
+        {onDuplicate && (
+          <button
+            onClick={() => onDuplicate(questao.id)}
+            title="Duplicar questão"
+            style={{
+              width: 28, height: 28, borderRadius: '50%',
+              background: '#f1f5f9', border: '1.5px solid #e2e8f0',
+              cursor: 'pointer', color: '#64748b',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontFamily: 'inherit', fontSize: '0.7rem', fontWeight: 800,
+              transition: 'background 0.15s',
+            }}
+            onMouseEnter={e => e.target.style.background = '#e2e8f0'}
+            onMouseLeave={e => e.target.style.background = '#f1f5f9'}
+          >
+            📄
+          </button>
+        )}
+      </div>
     </div>
   );
 }
@@ -408,6 +430,7 @@ export default function ProvaBuilder({ onProvasSalvas }) {
   const [activeTab,   setActiveTab]   = useState('questoes');
   const [dropOver,    setDropOver]    = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [metaQuestoes, setMetaQuestoes] = useState(10); // meta de questoes por prova
   const dragFromBancoRef = useRef(null);
   const dragIdxRef       = useRef(null);
 
@@ -453,6 +476,14 @@ export default function ProvaBuilder({ onProvasSalvas }) {
       ...questao,
     }]);
     toast('✅ Questão adicionada!', 'success');
+  };
+
+  // ── Duplicar questão do banco ─────────────────────────────────────────────
+  const duplicarQuestao = async (id) => {
+    try {
+      const r = await api(`/api/questoes/${id}/duplicar`, { method: 'POST' });
+      if (r) { toast('📄 Questão duplicada no banco!', 'success'); carregarBanco(bancoPage); }
+    } catch { toast('❌ Erro ao duplicar.', 'error'); }
   };
 
   // ── Remover questão ──────────────────────────────────────────────────────
@@ -589,7 +620,42 @@ export default function ProvaBuilder({ onProvasSalvas }) {
             {config.titulo || 'Sem título ainda...'}
           </div>
           <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>
-            {itens.length} questão(ões) · {totalPontos.toFixed(2)} pontos · {templateAtivo.icon} {templateAtivo.label}
+            {totalPontos.toFixed(2)} pts · {templateAtivo.icon} {templateAtivo.label}
+          </div>
+
+          {/* Indicador de progresso */}
+          <div style={{ marginTop: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+              <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.75)', fontWeight: 700 }}>
+                {itens.length} / <input
+                  type="number" min={1} max={100}
+                  value={metaQuestoes}
+                  onChange={e => setMetaQuestoes(Math.max(1, Number(e.target.value)))}
+                  onClick={e => e.stopPropagation()}
+                  style={{
+                    width: 34, padding: '1px 4px', borderRadius: 4,
+                    border: '1px solid rgba(255,255,255,0.3)',
+                    background: 'rgba(255,255,255,0.15)',
+                    color: '#fff', fontFamily: 'inherit',
+                    fontSize: '0.7rem', fontWeight: 700, textAlign: 'center',
+                  }}
+                  title="Meta de questões"
+                /> questões
+              </span>
+              <span style={{ fontSize: '0.65rem', fontWeight: 800, color: itens.length >= metaQuestoes ? '#4ade80' : 'rgba(255,255,255,0.45)' }}>
+                {itens.length >= metaQuestoes ? '\u2713 Meta!' : `faltam ${metaQuestoes - itens.length}`}
+              </span>
+            </div>
+            <div style={{ height: 4, borderRadius: 99, background: 'rgba(255,255,255,0.15)', width: 180, overflow: 'hidden' }}>
+              <div style={{
+                height: '100%', borderRadius: 99,
+                width: `${Math.min(100, (itens.length / metaQuestoes) * 100)}%`,
+                background: itens.length >= metaQuestoes
+                  ? 'linear-gradient(90deg,#4ade80,#22c55e)'
+                  : 'linear-gradient(90deg,#f59e0b,#fbbf24)',
+                transition: 'width 0.4s ease',
+              }} />
+            </div>
           </div>
         </div>
 
@@ -673,6 +739,7 @@ export default function ProvaBuilder({ onProvasSalvas }) {
                 <BancoQuestaoCard
                   key={q.id} questao={q}
                   onAdd={addQuestao}
+                  onDuplicate={duplicarQuestao}
                   jaAdicionada={adicionadosIds.has(q.id)}
                 />
               ))

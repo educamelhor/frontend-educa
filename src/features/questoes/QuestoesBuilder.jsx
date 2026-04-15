@@ -47,7 +47,6 @@ const INITIAL_STATE = {
   tipo: 'objetiva',
   nivel: 'medio',
   serie: '',
-  bimestre: '',
   enunciado: '',
   texto_apoio: '',
   fonte: '',
@@ -105,7 +104,6 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
         tipo:         editingQuestao.tipo || 'objetiva',
         nivel:        editingQuestao.nivel || 'medio',
         serie:        editingQuestao.serie || '',
-        bimestre:     editingQuestao.bimestre || '',
         enunciado:    editingQuestao.conteudo_bruto || '',
         texto_apoio:  editingQuestao.texto_apoio || '',
         fonte:        editingQuestao.fonte || '',
@@ -176,7 +174,6 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
       tipo:              form.tipo,
       nivel:             form.nivel,
       serie:             form.serie,
-      bimestre:          form.bimestre,
       disciplina:        form.disciplina,
       habilidade_bncc:   form.habilidade_bncc,
       texto_apoio:       form.texto_apoio,
@@ -267,7 +264,7 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
           open={openBlocks[1]}
           onToggle={() => toggle(1)}
         >
-          {/* Disciplina + Série + Bimestre */}
+          {/* Disciplina + Série — sem Bimestre (bimestre pertence à prova, não à questão) */}
           <div className="bq-field-row">
             <div className="bq-field">
               <label className="bq-label">Disciplina <span className="required">*</span></label>
@@ -281,13 +278,6 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
               <select className="bq-select" value={form.serie} onChange={e => set('serie', e.target.value)}>
                 <option value="">— Todas —</option>
                 {SERIES.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-            <div className="bq-field">
-              <label className="bq-label">Bimestre</label>
-              <select className="bq-select" value={form.bimestre} onChange={e => set('bimestre', e.target.value)}>
-                <option value="">— Todos —</option>
-                {[1,2,3,4].map(b => <option key={b} value={b}>{b}º Bimestre</option>)}
               </select>
             </div>
           </div>

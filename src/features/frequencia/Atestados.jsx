@@ -381,34 +381,32 @@ export default function Atestados() {
         <style>{`
           .atst-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
           .atst-table th, .atst-table td { overflow: hidden; }
-          .atst-col-aluno     { width: 18%; }
-          .atst-col-turma     { width: 8%; }
-          .atst-col-tipo      { width: 16%; }
-          .atst-col-periodo   { width: 14%; }
-          .atst-col-dias      { width: 5%; }
-          .atst-col-obs       { width: 10%; }
-          .atst-col-reg       { width: 13%; }
-          .atst-col-data      { width: 9%; }
-          .atst-col-acoes     { width: 7%; }
-          .atst-tipo-label    { display: inline; }
-          .atst-acoes-label   { display: inline; }
+          .atst-col-aluno   { width: 17%; }
+          .atst-col-turma   { width: 7%; }
+          .atst-col-tipo    { width: 17%; }
+          .atst-col-periodo { width: 15%; }
+          .atst-col-dias    { width: 5%; }
+          .atst-col-obs     { width: 8%; }
+          .atst-col-reg     { width: 13%; }
+          .atst-col-data    { width: 9%; }
+          .atst-col-acoes   { width: 9%; min-width: 76px; }
+          .atst-tipo-label  { display: inline; }
 
           @media (max-width: 900px) {
             .atst-col-reg   { display: none; }
             .atst-col-data  { display: none; }
             .atst-col-aluno { width: 26%; }
-            .atst-col-tipo  { width: 20%; }
-            .atst-col-obs   { width: 14%; }
-            .atst-col-acoes { width: 9%; }
+            .atst-col-tipo  { width: 21%; }
+            .atst-col-obs   { width: 12%; }
+            .atst-col-acoes { width: 10%; min-width: 76px; }
           }
           @media (max-width: 640px) {
             .atst-col-obs   { display: none; }
             .atst-col-dias  { display: none; }
-            .atst-tipo-label  { display: none; }
-            .atst-acoes-label { display: none; }
-            .atst-col-aluno { width: 38%; }
-            .atst-col-tipo  { width: 20%; }
-            .atst-col-acoes { width: 12%; }
+            .atst-tipo-label { display: none; }
+            .atst-col-aluno { width: 40%; }
+            .atst-col-tipo  { width: 18%; }
+            .atst-col-acoes { width: 14%; min-width: 72px; }
           }
         `}</style>
 
@@ -520,37 +518,41 @@ export default function Atestados() {
                         {fmtDataBR(j.criado_em)}
                       </td>
 
-                      {/* Ações */}
+                      {/* Ações — icon-only com tooltip */}
                       {canRegister && (
-                        <td className="atst-col-acoes" style={{ padding: "12px 8px", textAlign: "center" }}>
-                          <div style={{ display: "flex", gap: 5, justifyContent: "center" }}>
+                        <td className="atst-col-acoes" style={{ padding: "10px 8px", textAlign: "center" }}>
+                          <div style={{ display: "flex", gap: 4, justifyContent: "center" }}>
+                            {/* Editar */}
                             <button
                               onClick={() => abrirModalEditar(j)}
                               title="Editar justificativa"
                               style={{
-                                padding: "5px 8px", borderRadius: 7, border: "1.5px solid #d1d5db",
-                                background: "#fff", color: "#374151", fontSize: "0.75rem",
-                                fontWeight: 600, cursor: "pointer", display: "flex",
-                                alignItems: "center", gap: 3, transition: "all 0.15s",
+                                width: 30, height: 30, borderRadius: 7,
+                                border: "1.5px solid #d1d5db",
+                                background: "#fff", cursor: "pointer",
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                fontSize: "0.85rem", transition: "all 0.15s", flexShrink: 0,
                               }}
-                              onMouseEnter={e => { e.currentTarget.style.background = "#eff6ff"; e.currentTarget.style.borderColor = "#2563eb"; e.currentTarget.style.color = "#2563eb"; }}
-                              onMouseLeave={e => { e.currentTarget.style.background = "#fff"; e.currentTarget.style.borderColor = "#d1d5db"; e.currentTarget.style.color = "#374151"; }}>
-                              ✏️ <span className="atst-acoes-label">Editar</span>
+                              onMouseEnter={e => { e.currentTarget.style.background = "#eff6ff"; e.currentTarget.style.borderColor = "#2563eb"; }}
+                              onMouseLeave={e => { e.currentTarget.style.background = "#fff"; e.currentTarget.style.borderColor = "#d1d5db"; }}>
+                              ✏️
                             </button>
+                            {/* Excluir */}
                             <button
                               onClick={() => confirmarExclusao(j)}
                               disabled={excluindoId === j.id}
                               title="Excluir justificativa"
                               style={{
-                                padding: "5px 8px", borderRadius: 7, border: "1.5px solid #fecaca",
-                                background: "#fff", color: "#dc2626", fontSize: "0.75rem",
-                                fontWeight: 600, cursor: excluindoId === j.id ? "not-allowed" : "pointer",
-                                display: "flex", alignItems: "center", gap: 3, transition: "all 0.15s",
+                                width: 30, height: 30, borderRadius: 7,
+                                border: "1.5px solid #fecaca",
+                                background: "#fff", cursor: excluindoId === j.id ? "not-allowed" : "pointer",
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                fontSize: "0.85rem", transition: "all 0.15s", flexShrink: 0,
                                 opacity: excluindoId === j.id ? 0.5 : 1,
                               }}
                               onMouseEnter={e => { if (excluindoId !== j.id) { e.currentTarget.style.background = "#fef2f2"; e.currentTarget.style.borderColor = "#dc2626"; } }}
                               onMouseLeave={e => { e.currentTarget.style.background = "#fff"; e.currentTarget.style.borderColor = "#fecaca"; }}>
-                              🗑️ <span className="atst-acoes-label">Excluir</span>
+                              🗑️
                             </button>
                           </div>
                         </td>

@@ -43,6 +43,8 @@ export default function Atestados() {
   const escolaId = localStorage.getItem("escola_id");
   const perfil = String(localStorage.getItem("perfil") || "").toLowerCase();
   const canRegister = ["diretor", "vice_diretor", "coordenador", "secretaria"].includes(perfil);
+  const isProfessor = perfil === "professor";
+  const ANO_LETIVO = String(new Date().getFullYear());
 
   // ── Filtros ─────────────────────────────────
   const [turnos, setTurnos] = useState([]);
@@ -80,20 +82,34 @@ export default function Atestados() {
   // ── Turmas ──────────────────────────────────
   useEffect(() => {
     if (!escolaId) return;
-    api.get("/turmas")
-      .then(r => {
-        const all = (r.data || []).filter(t => String(t.ano) === ANO_LETIVO);
-        setTurmas(all);
-        setTurmasFiltradas(turno ? all.filter(t => (t.turno || "").toLowerCase() === turno.toLowerCase()) : all);
-      })
-      .catch(() => {});
-  }, [escolaId]);
+    if (isProfessor) {
+      // LGPD: professor vê apenas suas turmas do ano letivo atual
+      api.get(`/professores/me/turmas?ano=${ANO_LETIVO}`)
+        .then(r => {
+          const lista = r.data?.turmas || [];
+          setTurmas(lista);
+          setTurmasFiltradas(lista);
+        })
+        .catch(() => { setTurmas([]); setTurmasFiltradas([]); });
+    } else {
+      // Coordenação/direção: todas as turmas do ano letivo atual
+      api.get("/turmas")
+        .then(r => {
+          const all = (r.data || []).filter(t => String(t.ano) === ANO_LETIVO);
+          setTurmas(all);
+          setTurmasFiltradas(turno ? all.filter(t => (t.turno || "").toLowerCase() === turno.toLowerCase()) : all);
+        })
+        .catch(() => {});
+    }
+  }, [escolaId, isProfessor]);
 
   useEffect(() => {
+    // Para professor, o filtro de turno não se aplica (já filtrou pelas suas turmas)
+    if (isProfessor) return;
     setTurmasFiltradas(turno ? turmas.filter(t => (t.turno || "").toLowerCase() === turno.toLowerCase()) : turmas);
     setTurmaId("");
     setAlunos([]);
-  }, [turno, turmas]);
+  }, [turno, turmas, isProfessor]);
 
   // ── Alunos do modal ─────────────────────────
   useEffect(() => {
@@ -263,11 +279,31 @@ export default function Atestados() {
               Atestados e Justificativas
             </h1>
             <p style={{ margin: 0, opacity: 0.8, fontSize: "0.88rem", marginTop: 2 }}>
-              Registro e acompanhamento de justificativas de faltas dos estudantes
+              {isProfessor
+                ? `Consulta restrita às suas turmas · Ano letivo ${ANO_LETIVO}`
+                : "Registro e acompanhamento de justificativas de faltas dos estudantes"}
             </p>
           </div>
         </div>
       </div>
+
+      {/* Banner LGPD — só para professor */}
+      {isProfessor && (
+        <div style={{
+          background: "#eff6ff", border: "1.5px solid #bfdbfe", borderRadius: 12,
+          padding: "12px 18px", marginBottom: 20,
+          display: "flex", alignItems: "center", gap: 12,
+        }}>
+          <span style={{ fontSize: 20 }}>🔒</span>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: "0.82rem", color: "#1e40af" }}>Acesso LGPD restrito</div>
+            <div style={{ fontSize: "0.76rem", color: "#3b82f6", marginTop: 2 }}>
+              Você visualiza apenas os atestados dos alunos das suas turmas no ano letivo {ANO_LETIVO}.
+              Nenhum dado sensível (CID, imagem) é exibido.
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ═══ CARDS ═══ */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14, marginBottom: 24 }}>

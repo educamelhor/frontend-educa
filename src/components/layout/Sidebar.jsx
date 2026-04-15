@@ -431,6 +431,29 @@ export default function Sidebar({ isOpen, onClose }) {
             </>
             )}
 
+            {/* ─── FREQUÊNCIA (professor): sempre aberto, só Frequência + Atestados ─── */}
+            {isProfessor && (
+              <>
+                <div
+                  className="flex items-center w-full py-2 px-3 rounded mt-2"
+                  style={{ background: 'rgba(255,255,255,0.05)' }}
+                >
+                  <ClipboardDocumentListIcon className="h-5 w-5 mr-2" style={{ color: '#10b981' }} />
+                  <span className="flex-1 text-left font-semibold">Frequência</span>
+                </div>
+                <ul className="ml-4 mb-2">
+                  <li>
+                    <Link
+                      to="/frequencia/atestados"
+                      className={getSubmenuLinkClasses('/frequencia/atestados')}
+                    >
+                      <DocumentTextIcon className="h-5 w-5 mr-2" /> Atestados
+                    </Link>
+                  </li>
+                </ul>
+              </>
+            )}
+
             {/* LINK: Banco de Questões — acessível a todos (exceto militar/disciplinar) */}
             {!isDisciplinar && !isProfessor && (
             <Link

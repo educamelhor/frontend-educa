@@ -142,8 +142,9 @@ export default function GabaritoCorrigirProfessor() {
   const [ajusteSalvando, setAjusteSalvando] = useState(false);
   const [ajustesManuais, setAjustesManuais] = useState([]); // lista de ajustes do arquivo atual
 
-  // ─── Professor ID ───
+  // ─── Professor ID e usuario_id (para qualquer perfil pedagógico) ───
   const [professorIds, setProfessorIds] = useState([]);
+  const [currentUserId, setCurrentUserId] = useState(null); // fallback para não-professores
 
   // ─── Toast ───
   const [toast, setToast] = useState(null);
@@ -207,13 +208,16 @@ export default function GabaritoCorrigirProfessor() {
 
 
 
-  // ─── Resolver professor_ids via endpoint autenticado ───
+  // ─── Resolver professor_ids + usuario_id via endpoint autenticado ───
+  // professor_ids: IDs na tabela professores (para professores)
+  // usuario_id: ID na tabela usuarios (fallback para coord, supervisor, apoio, diretor, etc.)
   useEffect(() => {
     (async () => {
       try {
         const resp = await api.get("/api/professores/me/id");
-        if (resp.data?.ok && resp.data.professor_ids?.length > 0) {
-          setProfessorIds(resp.data.professor_ids);
+        if (resp.data?.ok) {
+          setProfessorIds(resp.data.professor_ids || []);
+          if (resp.data.usuario_id) setCurrentUserId(resp.data.usuario_id);
         }
       } catch (err) {
         console.error("Erro ao resolver professor_ids:", err);
@@ -264,10 +268,13 @@ export default function GabaritoCorrigirProfessor() {
       const resp = await api.get(`/api/gabarito-lotes?avaliacao_id=${av.id}`);
       const todosLotes = resp.data || [];
 
-      // Filtrar apenas lotes vinculados a este professor (pode ter múltiplos IDs)
-      const meusLotes = professorIds.length > 0
-        ? todosLotes.filter(l => professorIds.includes(l.professor_id))
-        : [];
+      // Filtrar apenas lotes vinculados a este usuário:
+      // - professor_id é int que pode ser um professors.id (para professores)
+      //   ou um usuarios.id (para coord, supervisor, apoio, diretor sem registro na tabela professores)
+      const meusLotes = todosLotes.filter(l =>
+        professorIds.includes(l.professor_id) ||
+        (currentUserId && l.professor_id === currentUserId)
+      );
       setLotes(meusLotes);
 
       // Se tem apenas 1 turma, já abrir direto

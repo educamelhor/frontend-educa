@@ -358,6 +358,21 @@ export default function Sidebar({ isOpen, onClose }) {
                   <DocumentTextIcon className="h-5 w-5 mr-2" /> Provas
                 </Link>
               </li>
+              <li>
+                <Link
+                  to="/questoes"
+                  className={getSubmenuLinkClasses('/questoes')}
+                >
+                  <BookOpenIcon className="h-5 w-5 mr-2" />
+                  <span className="flex-1 text-left">Banco de Questões</span>
+                  <span style={{
+                    fontSize: '0.52rem', fontWeight: 800,
+                    background: 'linear-gradient(135deg, #0e7490, #1d4ed8)',
+                    color: '#fff', padding: '2px 5px', borderRadius: '6px',
+                    letterSpacing: '0.4px',
+                  }}>NOVO</span>
+                </Link>
+              </li>
             </ul>
 
             </>
@@ -416,11 +431,25 @@ export default function Sidebar({ isOpen, onClose }) {
             </>
             )}
 
-            {/* LINK: Banco de Questões */}
-            {!isDisciplinar && !isProfessor && !isCoord && (
-            <Link to="/questoes" className={getMainLinkClasses('/questoes')}>
-              <BookOpenIcon className="h-5 w-5 mr-2" />
-              Banco de Questões
+            {/* LINK: Banco de Questões — acessível a todos (exceto militar/disciplinar) */}
+            {!isDisciplinar && !isProfessor && (
+            <Link
+              to="/questoes"
+              className={getMainLinkClasses('/questoes')}
+              style={{
+                background: isActive('/questoes')
+                  ? 'linear-gradient(90deg, rgba(14,116,144,0.2), transparent)'
+                  : undefined,
+              }}
+            >
+              <BookOpenIcon className="h-5 w-5 mr-2" style={{ color: isActive('/questoes') ? '#06b6d4' : undefined }} />
+              <span className="flex-1 text-left">Banco de Questões</span>
+              <span style={{
+                fontSize: '0.52rem', fontWeight: 800,
+                background: 'linear-gradient(135deg, #0e7490, #1d4ed8)',
+                color: '#fff', padding: '2px 5px', borderRadius: '6px',
+                letterSpacing: '0.4px',
+              }}>NOVO</span>
             </Link>
             )}
 

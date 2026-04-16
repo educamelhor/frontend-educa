@@ -156,6 +156,13 @@ function RequireDiretor({ children }) {
   return <Navigate to="/home" replace />;
 }
 
+// Banco de Questões — restrito a Direção + Coordenação (módulo em aprovação)
+function RequireBancoQuestoes({ children }) {
+  const p = String(localStorage.getItem('perfil') || '').toLowerCase().trim();
+  if (p === 'diretor' || p === 'vice_diretor' || p === 'coordenador') return children;
+  return <Navigate to="/home" replace />;
+}
+
 function RequireDiretorMilitar({ children }) {
   const p = String(localStorage.getItem('perfil') || '').toLowerCase().trim();
   if (p === 'diretor' || p === 'militar') return children;
@@ -246,7 +253,7 @@ export default function App() {
           <Route path="/alunos/:codigo/boletim-anual" element={<BoletimAnual />} />
           <Route path="/alunos/:codigo/ficha"         element={<FichaAluno />} />
           <Route path="/alunos/:codigo/foto-lote"     element={<FotoAluno />} />
-          <Route path="/questoes" element={<BancoQuestoes />} />
+          <Route path="/questoes" element={<RequireBancoQuestoes><BancoQuestoes /></RequireBancoQuestoes>} />
 
           {/* ── Secretaria ───────────────────────────────────────────────── */}
           <Route path="/secretaria/professores" element={<Professores />} />

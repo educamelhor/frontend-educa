@@ -967,6 +967,21 @@ export default function Sidebar({ isOpen, onClose }) {
                     <Cog6ToothIcon className="h-5 w-5 mr-2" /> Credenciais
                   </Link>
                 </li>
+                <li>
+                  <Link
+                    to="/agente-educa/planos"
+                    className={getSubmenuLinkClasses('/agente-educa/planos')}
+                  >
+                    <ClipboardDocumentListIcon className="h-5 w-5 mr-2" />
+                    Planos
+                    <span style={{
+                      marginLeft: 6, fontSize: '0.52rem', fontWeight: 800,
+                      background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
+                      color: '#fff', padding: '1px 5px', borderRadius: 6,
+                      letterSpacing: '0.4px',
+                    }}>ETAPA 1</span>
+                  </Link>
+                </li>
               </ul>
             )}
 

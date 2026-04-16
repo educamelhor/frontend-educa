@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+﻿import React, { useState, useEffect, useCallback } from "react";
 import api from "../../../services/api";
 import {
   CheckCircleIcon,
@@ -1245,8 +1245,8 @@ export default function Avaliacoes() {
                   fontSize: "0.78rem", color: "#6ee7b7", lineHeight: 1.6,
                 }}>
                   ✅ Todos os alunos possuem nota na Avaliação Bimestral.
-                  Após exportar, o diário ficará em <strong style={{color:"#a7f3d0"}}>modo somente leitura</strong>.
-                  Para reabrir, solicite à <strong style={{color:"#a7f3d0"}}>Secretaria</strong>.
+                  O diário <strong style={{color:"#a7f3d0"}}>permanece aberto</strong> após exportar — você pode atualizar notas e exportar novamente.
+                  Quando quiser fechar definitivamente, use o botão <strong style={{color:"#a7f3d0"}}>FECHAR DIÁRIO</strong>.
                 </div>
               )}
 

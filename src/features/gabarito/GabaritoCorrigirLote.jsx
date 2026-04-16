@@ -85,6 +85,7 @@ export default function GabaritoCorrigirLote() {
   const [importModalOpen, setImportModalOpen] = useState(false); // modal de confirmação
   const [importando, setImportando] = useState(false);
   const [importResultado, setImportResultado] = useState(null); // resultado após importação
+  const [reexportModalOpen, setReexportModalOpen] = useState(false); // modal de reexportação
 
   // ─── Governança (Avaliação Padrão Bimestral) ───
   const [avaliacaoConfig, setAvaliacaoConfig] = useState(null);
@@ -1274,22 +1275,44 @@ export default function GabaritoCorrigirLote() {
 
               {/* Botão de ação */}
               {importStatus.jaImportou ? (
-                <div style={{
-                  display: "flex", alignItems: "center", gap: 10, padding: "12px 16px",
-                  borderRadius: 10, background: "rgba(16,185,129,0.06)",
-                  border: "1px solid rgba(16,185,129,0.15)",
-                }}>
-                  <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="var(--gab-green-light, #10b981)" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <div>
-                    <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--gab-green-light, #10b981)" }}>
-                      Notas já foram importadas para o diário
-                    </div>
-                    <div style={{ fontSize: "0.72rem", color: "var(--gab-text-muted)", marginTop: 2 }}>
-                      As notas desta prova padronizada já foram transferidas para o diário dos professores.
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {/* Aviso: já importado */}
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 10, padding: "12px 16px",
+                    borderRadius: 10, background: "rgba(16,185,129,0.06)",
+                    border: "1px solid rgba(16,185,129,0.15)",
+                  }}>
+                    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="var(--gab-green-light, #10b981)" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div>
+                      <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--gab-green-light, #10b981)" }}>
+                        Notas já foram importadas para o diário
+                      </div>
+                      <div style={{ fontSize: "0.72rem", color: "var(--gab-text-muted)", marginTop: 2 }}>
+                        As notas desta prova padronizada já foram transferidas para o diário dos professores.
+                      </div>
                     </div>
                   </div>
+
+                  {/* Botão: Exportar Notas Novamente */}
+                  <button
+                    onClick={() => setReexportModalOpen(true)}
+                    disabled={importando}
+                    style={{
+                      width: "100%", padding: "11px 20px", fontSize: "0.82rem", fontWeight: 700,
+                      background: "linear-gradient(135deg, rgba(245,158,11,0.12), rgba(234,88,12,0.10))",
+                      border: "1px solid rgba(245,158,11,0.35)", borderRadius: 10, cursor: importando ? "not-allowed" : "pointer",
+                      color: "#f59e0b", transition: "all 0.2s",
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                      opacity: importando ? 0.6 : 1,
+                    }}
+                  >
+                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                    </svg>
+                    {importando ? "Exportando..." : "Exportar Notas Novamente"}
+                  </button>
                 </div>
               ) : !importStatus.todosFinalizados ? (
                 <div style={{
@@ -1326,6 +1349,91 @@ export default function GabaritoCorrigirLote() {
                   Importar Notas para o Diário
                 </button>
               )}
+            </div>
+          )}
+
+          {/* ─── Modal de Confirmação: Exportar Notas Novamente ─── */}
+          {reexportModalOpen && (
+            <div
+              style={{
+                position: "fixed", inset: 0, zIndex: 9998,
+                background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}
+              onClick={() => setReexportModalOpen(false)}
+            >
+              <div
+                onClick={e => e.stopPropagation()}
+                style={{
+                  background: "var(--gab-surface, #1a1f2e)", borderRadius: 20,
+                  border: "1px solid rgba(245,158,11,0.25)", padding: "32px",
+                  width: "100%", maxWidth: 460,
+                  boxShadow: "0 25px 80px rgba(0,0,0,0.5)",
+                }}
+              >
+                {/* Ícone */}
+                <div style={{ textAlign: "center", marginBottom: 20 }}>
+                  <div style={{
+                    width: 52, height: 52, borderRadius: "50%", margin: "0 auto 12px",
+                    background: "linear-gradient(135deg, #f59e0b, #ea580c)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: "1.4rem",
+                  }}>🔄</div>
+                  <div style={{ fontSize: "1.05rem", fontWeight: 800, color: "var(--gab-text-primary)" }}>
+                    Exportar Notas Novamente?
+                  </div>
+                  <div style={{ fontSize: "0.78rem", color: "var(--gab-text-muted)", marginTop: 8, lineHeight: 1.6 }}>
+                    As notas serão re-exportadas para o diário dos professores,
+                    <strong style={{ color: "#f59e0b" }}> substituindo</strong> os valores já lançados.
+                    <br />Use apenas se houve falha ou correção nos resultados.
+                  </div>
+                </div>
+
+                {/* Disciplinas afetadas */}
+                {importStatus?.disciplinas?.length > 0 && (
+                  <div style={{
+                    padding: "10px 14px", borderRadius: 10, marginBottom: 20,
+                    background: "rgba(245,158,11,0.05)", border: "1px solid rgba(245,158,11,0.15)",
+                    fontSize: "0.75rem", color: "var(--gab-text-muted)",
+                  }}>
+                    <span style={{ fontWeight: 600, color: "#f59e0b" }}>Disciplinas afetadas:</span>{" "}
+                    {importStatus.disciplinas.map(d => d.nome).join(", ")}
+                    {" "}({importStatus.bimestre})
+                  </div>
+                )}
+
+                {/* Botões */}
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button
+                    onClick={() => setReexportModalOpen(false)}
+                    style={{
+                      flex: 1, padding: "11px", borderRadius: 10, fontSize: "0.85rem", fontWeight: 600,
+                      background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)",
+                      color: "var(--gab-text-muted)", cursor: "pointer",
+                    }}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={async () => {
+                      setReexportModalOpen(false);
+                      await handleImportarNotas();
+                    }}
+                    disabled={importando}
+                    style={{
+                      flex: 2, padding: "11px", borderRadius: 10, fontSize: "0.85rem", fontWeight: 700,
+                      background: "linear-gradient(135deg, #f59e0b, #ea580c)",
+                      border: "none", color: "#fff", cursor: importando ? "not-allowed" : "pointer",
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                    }}
+                  >
+                    <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                    </svg>
+                    Sim, exportar novamente
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 

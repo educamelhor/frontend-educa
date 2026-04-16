@@ -63,6 +63,9 @@ export default function Avaliacoes() {
   // Exportação parcial: alunos sem nota na Avaliação Bimestral
   const [alunosSemNota, setAlunosSemNota] = useState([]);
   const [confirmarParcial, setConfirmarParcial] = useState(false); // segunda confirmação
+  // Fechar diário (decisão explícita do professor)
+  const [modalFechar, setModalFechar] = useState(false);
+  const [fechando, setFechando] = useState(false);
 
   // Governança: avaliação padrão bimestral (bloqueia edição manual)
   const [avaliacaoPadrao, setAvaliacaoPadrao] = useState(false);
@@ -364,7 +367,7 @@ export default function Avaliacoes() {
     setModalExportar(true);
   };
 
-  // Executa a exportação
+  // Executa a exportação (NÃO fecha o diário — professor decide quando fechar)
   const handleExportarBoletim = async () => {
     if (!plano?.id || !turmaSelecionada) return;
     // Se há alunos sem nota e ainda não confirmou, exige 2ª confirmação
@@ -380,22 +383,50 @@ export default function Avaliacoes() {
         notas,
         cores: coresCelulas,
       });
-      // Exportar
+      // Exportar — diário permanece aberto para possíveis atualizações
       const resp = await api.post(`/avaliacoes/${plano.id}/exportar-boletim`, {
         turma_id: turmaSelecionada,
       });
       if (resp.data?.ok) {
         setResultadoExportacao(resp.data);
-        setDiarioFechado(true);
+        // ✅ NÃO fecha o diário automaticamente
         setModalExportar(false);
         setConfirmarParcial(false);
-        showMsg("success", resp.data.message);
+        showMsg("success", `${resp.data.message} — O diário permanece aberto para atualizações.`);
       }
     } catch (err) {
       const msg = err.response?.data?.error || "Erro ao exportar notas.";
       showMsg("error", msg);
     }
     setExportando(false);
+  };
+
+  // Fecha o diário por decisão explícita do professor
+  const handleFecharDiario = async () => {
+    if (!plano?.id || !turmaSelecionada) return;
+    setFechando(true);
+    try {
+      // Salvar notas primeiro
+      await api.post(`/avaliacoes/${plano.id}/salvar-notas`, {
+        turma_id: turmaSelecionada,
+        notas,
+        cores: coresCelulas,
+      });
+      // Fechar diário (endpoint de fechamento definitivo)
+      const resp = await api.post(`/avaliacoes/${plano.id}/exportar-boletim`, {
+        turma_id: turmaSelecionada,
+        fechar_diario: true,
+      });
+      if (resp.data?.ok) {
+        setDiarioFechado(true);
+        setModalFechar(false);
+        showMsg("success", "Diário fechado com sucesso! Notas bloqueadas para edição.");
+      }
+    } catch (err) {
+      const msg = err.response?.data?.error || "Erro ao fechar o diário.";
+      showMsg("error", msg);
+    }
+    setFechando(false);
   };
 
   // Conta quantos alunos têm pelo menos 1 nota
@@ -706,6 +737,22 @@ export default function Avaliacoes() {
                    </div>
                 </div>
                 <div className="flex items-center gap-3">
+                    {/* BOTÃO FECHAR DIÁRIO */}
+                    {!carregandoDados && plano && !diarioFechado && (
+                        <button
+                          onClick={() => setModalFechar(true)}
+                          disabled={fechando}
+                          className="flex items-center gap-2 px-5 py-3 rounded-lg font-bold text-red-300 shadow-lg transition-all active:scale-95 border disabled:opacity-50"
+                          style={{
+                            background: "rgba(239,68,68,0.12)",
+                            border: "1px solid rgba(239,68,68,0.3)",
+                          }}
+                          title="Fechar o diário definitivamente (somente leitura)"
+                        >
+                            <LockClosedIcon className="w-5 h-5" />
+                            FECHAR DIÁRIO
+                        </button>
+                    )}
                     {/* BOTÃO SALVAR */}
                     {!carregandoDados && plano && !diarioFechado && (
                         <button
@@ -886,8 +933,140 @@ export default function Avaliacoes() {
         </section>
       )}
 
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* MODAL: FECHAR DIÁRIO                                           */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {modalFechar && plano && (
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center"
+          style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)" }}
+          onClick={() => !fechando && setModalFechar(false)}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            className="w-full mx-4 overflow-hidden"
+            style={{
+              maxWidth: 460, borderRadius: 24,
+              background: "linear-gradient(160deg, #1a1f35 0%, #12172a 100%)",
+              border: "1px solid rgba(239,68,68,0.2)",
+              boxShadow: "0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)",
+            }}
+          >
+            {/* Header */}
+            <div style={{
+              background: "linear-gradient(135deg, #991b1b, #7f1d1d)",
+              padding: "26px 32px 22px", textAlign: "center", position: "relative",
+            }}>
+              <div style={{
+                width: 56, height: 56, borderRadius: "50%", margin: "0 auto 14px",
+                background: "rgba(255,255,255,0.1)", backdropFilter: "blur(8px)",
+                border: "2px solid rgba(255,255,255,0.2)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: "1.5rem",
+              }}>🔒</div>
+              <div style={{ fontSize: "1.15rem", fontWeight: 900, color: "#fff" }}>
+                Fechar Diário?
+              </div>
+              <div style={{ fontSize: "0.78rem", color: "rgba(252,165,165,0.85)", marginTop: 6, fontWeight: 500 }}>
+                Esta ação coloca o diário em <strong style={{color:"#fca5a5"}}>somente leitura</strong>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: "22px 28px" }}>
+
+              {/* Resumo */}
+              <div style={{
+                display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 18,
+              }}>
+                {[
+                  { label: "Disciplina", value: disciplinaSelecionada },
+                  { label: "Turma",      value: turmaObj?.nome },
+                  { label: "Bimestre",   value: bimestreSelecionado },
+                  { label: "Com nota",   value: `${alunosComNota} / ${alunos.length} alunos` },
+                ].map(({ label, value }) => (
+                  <div key={label} style={{
+                    padding: "9px 13px", borderRadius: 10,
+                    background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)",
+                  }}>
+                    <div style={{ fontSize: "0.6rem", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 }}>{label}</div>
+                    <div style={{ fontSize: "0.85rem", fontWeight: 800, color: "#e2e8f0" }}>{value}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Aviso */}
+              <div style={{
+                padding: "12px 16px", borderRadius: 12, marginBottom: 18,
+                background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.25)",
+                fontSize: "0.78rem", color: "#fca5a5", lineHeight: 1.7,
+              }}>
+                <strong style={{color:"#f87171"}}>⚠️ Após fechar:</strong><br />
+                — O diário ficará em <strong>modo somente leitura</strong><br />
+                — Você <strong>não poderá mais editar</strong> as notas<br />
+                — Para reabrir, será necessário solicitar à <strong>Secretaria</strong>
+              </div>
+
+              {/* Alunos sem nota (aviso adicional) */}
+              {alunosComNota < alunos.length && (
+                <div style={{
+                  padding: "10px 14px", borderRadius: 10, marginBottom: 16,
+                  background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.2)",
+                  fontSize: "0.75rem", color: "#fcd34d",
+                }}>
+                  ⚠️ <strong>{alunos.length - alunosComNota} aluno(s)</strong> ainda sem nota — serão incluídos sem nota no boletim.
+                </div>
+              )}
+
+              {/* Botões */}
+              <div style={{ display: "flex", gap: 10 }}>
+                <button
+                  onClick={() => setModalFechar(false)}
+                  disabled={fechando}
+                  style={{
+                    flex: 1, padding: "12px", borderRadius: 12, fontWeight: 700, fontSize: "0.85rem",
+                    background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+                    color: "#94a3b8", cursor: fechando ? "not-allowed" : "pointer", opacity: fechando ? 0.5 : 1,
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleFecharDiario}
+                  disabled={fechando}
+                  style={{
+                    flex: 2, padding: "12px", borderRadius: 12, fontWeight: 800, fontSize: "0.88rem",
+                    background: "linear-gradient(135deg, #dc2626, #991b1b)",
+                    border: "none", color: "#fff",
+                    cursor: fechando ? "not-allowed" : "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                    boxShadow: "0 4px 20px rgba(220,38,38,0.3)",
+                    opacity: fechando ? 0.7 : 1,
+                    transition: "all 0.2s",
+                  }}
+                >
+                  {fechando ? (
+                    <>
+                      <div style={{
+                        width: 17, height: 17, borderRadius: "50%",
+                        border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff",
+                        animation: "spin 0.8s linear infinite",
+                      }} />
+                      Fechando...
+                    </>
+                  ) : (
+                    <>🔒 Sim, Fechar Diário</>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MODAL CONTEXTUAL DE CORES */}
       {contextMenu && !diarioFechado && (
+
         <>
           <div
             className="fixed inset-0 z-[100]"

@@ -98,13 +98,24 @@ export default function AgenteCredenciais() {
     stopPolling();
     setElapsedSec(0);
 
+    const pollingStartedAt = Date.now();
+    const MAX_POLL_MS = 120_000; // 2 minutos — timeout máximo
+
     // Contador visual de segundos
     elapsedRef.current = setInterval(() => setElapsedSec(s => s + 1), 1000);
 
     pollingRef.current = setInterval(async () => {
       try {
+        // Timeout: se exceder 2 min, para e pede para tentar novamente
+        if (Date.now() - pollingStartedAt > MAX_POLL_MS) {
+          stopPolling();
+          setStatusConexao('erro');
+          setFeedback({ type: 'error', msg: 'Tempo limite excedido. O teste demorou mais que o esperado. Tente novamente.' });
+          return;
+        }
+
         const resp = await api.get(`/api/agente/credenciais/${credId}/testar/status`);
-        const { status, ok, message } = resp.data;
+        const { status, ok, message, ultimo_teste_em } = resp.data;
 
         if (status === 'executando') return; // ainda rodando
 
@@ -119,12 +130,31 @@ export default function AgenteCredenciais() {
           setErroMsg(message || 'Não foi possível autenticar no portal EDUCADF.');
           setModalErroOpen(true);
           setFeedback(null);
+        } else if (status === 'sem_teste' && ultimo_teste_em) {
+          // O Map em memória pode ter sido limpo (deploy/restart), mas o banco
+          // registrou o ultimo_teste_em — se for recente (<2min), é sucesso.
+          const testDate = new Date(ultimo_teste_em);
+          const isRecent = (Date.now() - testDate.getTime()) < 120_000;
+          if (isRecent) {
+            setStatusConexao('conectado');
+            setUltimoTeste(ultimo_teste_em);
+            setFeedback({ type: 'success', msg: '✅ Conexão estabelecida! O Agente EDUCA está pronto para sincronizar.' });
+          } else {
+            setStatusConexao('desconectado');
+            setFeedback({ type: 'error', msg: 'Teste finalizado, mas o resultado não pôde ser confirmado. Tente novamente.' });
+          }
         } else {
-          // sem_teste ou sem_cache (não deveria ocorrer após disparar o teste)
           setStatusConexao('desconectado');
+          setFeedback({ type: 'error', msg: 'Não foi possível obter o resultado do teste. Tente novamente.' });
         }
       } catch (err) {
         console.warn('[AgenteCredenciais] Polling error:', err);
+        // Após 10 erros consecutivos de polling, desiste
+        if (Date.now() - pollingStartedAt > 30_000) {
+          stopPolling();
+          setStatusConexao('erro');
+          setFeedback({ type: 'error', msg: 'Erro ao consultar status do teste. Verifique sua conexão e tente novamente.' });
+        }
       }
     }, 3000); // consulta a cada 3s
   }, []);
@@ -146,6 +176,7 @@ export default function AgenteCredenciais() {
       if (status === 401) msg = 'Sessão expirada. Faça login novamente.';
       else if (status === 403) msg = 'Sem permissão para testar credenciais.';
       else if (status === 404) msg = 'Credencial não encontrada. Salve novamente e tente.';
+      else if (status === 422) msg = backendMsg || '⚠️ Credenciais desatualizadas. Por favor, insira sua senha e clique em "Salvar e Conectar" para atualizar.';
       else if (status === 400) msg = backendMsg || 'Parâmetros inválidos na requisição.';
       else if (status === 500) msg = backendMsg ? `Erro interno: ${backendMsg}` : 'Erro interno no servidor.';
       else if (backendMsg) msg = backendMsg;

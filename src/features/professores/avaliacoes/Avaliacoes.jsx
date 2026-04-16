@@ -60,6 +60,9 @@ export default function Avaliacoes() {
   const [modalExportar, setModalExportar] = useState(false);
   const [exportando, setExportando] = useState(false);
   const [resultadoExportacao, setResultadoExportacao] = useState(null);
+  // Exportação parcial: alunos sem nota na Avaliação Bimestral
+  const [alunosSemNota, setAlunosSemNota] = useState([]);
+  const [confirmarParcial, setConfirmarParcial] = useState(false); // segunda confirmação
 
   // Governança: avaliação padrão bimestral (bloqueia edição manual)
   const [avaliacaoPadrao, setAvaliacaoPadrao] = useState(false);
@@ -339,18 +342,45 @@ export default function Avaliacoes() {
   // ---------------------------
   // EXPORTAR NOTAS PARA BOLETIM
   // ---------------------------
+
+  // Identifica o índice do item "Avaliação Bimestral" (fixo_direcao) no plano
+  const idxBimestral = (() => {
+    if (!plano?.itens) return -1;
+    const arr = Array.isArray(plano.itens) ? plano.itens : JSON.parse(plano.itens || "[]");
+    return arr.findIndex(item => item.fixo_direcao);
+  })();
+
+  // Alunos sem nota na coluna Bimestral
+  const calcAlunosSemNotaBimestral = () => {
+    if (idxBimestral === -1) return []; // sem coluna bimestral, usa total
+    return alunos.filter(a => notas[getNotaKey(a.id, idxBimestral, 0)] === undefined);
+  };
+
+  // Abre o modal: calcula quem está sem nota
+  const abrirModalExportar = () => {
+    const semNota = calcAlunosSemNotaBimestral();
+    setAlunosSemNota(semNota);
+    setConfirmarParcial(false);
+    setModalExportar(true);
+  };
+
+  // Executa a exportação
   const handleExportarBoletim = async () => {
     if (!plano?.id || !turmaSelecionada) return;
+    // Se há alunos sem nota e ainda não confirmou, exige 2ª confirmação
+    if (alunosSemNota.length > 0 && !confirmarParcial) {
+      setConfirmarParcial(true);
+      return;
+    }
     setExportando(true);
     try {
-      // Primeiro salvar as notas atuais
+      // Salvar notas antes
       await api.post(`/avaliacoes/${plano.id}/salvar-notas`, {
         turma_id: turmaSelecionada,
         notas,
         cores: coresCelulas,
       });
-
-      // Depois exportar
+      // Exportar
       const resp = await api.post(`/avaliacoes/${plano.id}/exportar-boletim`, {
         turma_id: turmaSelecionada,
       });
@@ -358,6 +388,7 @@ export default function Avaliacoes() {
         setResultadoExportacao(resp.data);
         setDiarioFechado(true);
         setModalExportar(false);
+        setConfirmarParcial(false);
         showMsg("success", resp.data.message);
       }
     } catch (err) {
@@ -687,9 +718,9 @@ export default function Avaliacoes() {
                         </button>
                     )}
                     {/* BOTÃO EXPORTAR PARA BOLETIM */}
-                    {!carregandoDados && plano && !diarioFechado && alunosComNota > 0 && (
+                    {!carregandoDados && plano && !diarioFechado && (
                         <button
-                          onClick={() => setModalExportar(true)}
+                          onClick={abrirModalExportar}
                           className="flex items-center gap-2 px-5 py-3 rounded-lg bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-400 hover:to-indigo-500 font-bold text-white shadow-lg transition-all active:scale-95 border border-purple-400/30"
                         >
                             <ArrowDownTrayIcon className="w-5 h-5" />
@@ -898,101 +929,197 @@ export default function Avaliacoes() {
         </>
       )}
 
-      {/* ═══════════════════════════════════════════════════════ */}
-      {/* MODAL: CONFIRMAÇÃO EXPORTAR PARA BOLETIM               */}
-      {/* ═══════════════════════════════════════════════════════ */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* MODAL PREMIUM: EXPORTAR NOTAS PARA O BOLETIM                  */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
       {modalExportar && plano && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm"
-             onClick={() => !exportando && setModalExportar(false)}>
-          <div onClick={e => e.stopPropagation()}
-               className="bg-white rounded-2xl shadow-2xl border border-gray-100 w-full max-w-lg mx-4 overflow-hidden transform transition-all">
-            
-            {/* Header */}
-            <div className="bg-gradient-to-r from-purple-600 to-indigo-700 p-6 text-center">
-              <div className="w-16 h-16 rounded-full bg-white/10 backdrop-blur-sm border-2 border-white/20 mx-auto mb-3 flex items-center justify-center text-3xl">
-                📗
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center"
+          style={{ background: "rgba(0,0,0,0.72)", backdropFilter: "blur(8px)" }}
+          onClick={() => !exportando && (setModalExportar(false), setConfirmarParcial(false))}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            className="w-full mx-4 overflow-hidden"
+            style={{
+              maxWidth: 520, borderRadius: 24,
+              background: "linear-gradient(160deg, #1a1f35 0%, #12172a 100%)",
+              border: "1px solid rgba(139,92,246,0.25)",
+              boxShadow: "0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04)",
+            }}
+          >
+            {/* ── Header ── */}
+            <div style={{
+              background: "linear-gradient(135deg, #7c3aed, #4f46e5)",
+              padding: "28px 32px 24px", textAlign: "center", position: "relative",
+            }}>
+              {/* glow */}
+              <div style={{
+                position: "absolute", top: -40, left: "50%", transform: "translateX(-50%)",
+                width: 160, height: 160, borderRadius: "50%",
+                background: "radial-gradient(circle, rgba(139,92,246,0.4), transparent 70%)",
+                pointerEvents: "none",
+              }} />
+              <div style={{
+                width: 60, height: 60, borderRadius: "50%", margin: "0 auto 14px",
+                background: "rgba(255,255,255,0.12)", backdropFilter: "blur(8px)",
+                border: "2px solid rgba(255,255,255,0.25)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: "1.6rem",
+              }}>📤</div>
+              <div style={{ fontSize: "1.2rem", fontWeight: 900, color: "#fff", letterSpacing: "-0.3px" }}>
+                Exportar para o Boletim
               </div>
-              <h3 className="text-xl font-black text-white">
-                Exportar Notas para o Boletim
-              </h3>
-              <p className="text-purple-200 text-sm mt-1 font-medium">
-                Atenção: esta ação é irreversível pelo professor
-              </p>
+              <div style={{ fontSize: "0.78rem", color: "rgba(196,181,253,0.85)", marginTop: 6, fontWeight: 500 }}>
+                Apenas a <strong style={{color:"#c4b5fd"}}>Avaliação Bimestral</strong> será exportada nesta etapa
+              </div>
             </div>
 
-            {/* Body */}
-            <div className="p-6">
+            {/* ── Body ── */}
+            <div style={{ padding: "24px 28px" }}>
+
               {/* Resumo */}
-              <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 mb-4 space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Disciplina:</span>
-                  <span className="font-bold text-gray-800">{disciplinaSelecionada}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Turma:</span>
-                  <span className="font-bold text-gray-800">{turmaObj?.nome}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Bimestre:</span>
-                  <span className="font-bold text-gray-800">{bimestreSelecionado}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Alunos com notas:</span>
-                  <span className="font-bold text-indigo-600">{alunosComNota} de {alunos.length}</span>
-                </div>
-              </div>
-
-              {/* Warning */}
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
-                <div className="flex items-start gap-3">
-                  <ExclamationTriangleIcon className="w-6 h-6 text-amber-500 flex-shrink-0 mt-0.5" />
-                  <div className="text-sm text-amber-800">
-                    <p className="font-bold mb-1">⚠️ Ao confirmar:</p>
-                    <ul className="space-y-1 text-amber-700">
-                      <li>• O <strong>TOTAL</strong> de cada aluno será lançado no boletim</li>
-                      <li>• O diário ficará <strong>fechado e somente leitura</strong></li>
-                      <li>• Você <strong>não poderá mais editar</strong> as notas deste bimestre</li>
-                      <li>• Para reabrir, será necessário solicitar à <strong>Secretaria</strong></li>
-                    </ul>
+              <div style={{
+                display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20,
+              }}>
+                {[
+                  { label: "Disciplina", value: disciplinaSelecionada },
+                  { label: "Turma", value: turmaObj?.nome },
+                  { label: "Bimestre", value: bimestreSelecionado },
+                  { label: "Alunos", value: `${alunos.length - alunosSemNota.length} / ${alunos.length} com nota` },
+                ].map(({ label, value }) => (
+                  <div key={label} style={{
+                    padding: "10px 14px", borderRadius: 12,
+                    background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)",
+                  }}>
+                    <div style={{ fontSize: "0.62rem", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 3 }}>{label}</div>
+                    <div style={{ fontSize: "0.88rem", fontWeight: 800, color: "#e2e8f0" }}>{value}</div>
                   </div>
-                </div>
+                ))}
               </div>
 
-              {/* Alunos sem nota */}
-              {alunosComNota < alunos.length && (
-                <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4 text-sm text-red-700 flex items-center gap-2">
-                  <ExclamationCircleIcon className="w-5 h-5 flex-shrink-0" />
-                  <span>
-                    <strong>{alunos.length - alunosComNota} aluno(s)</strong> ainda não possuem nenhuma nota lançada.
-                    Esses alunos serão exportados com nota <strong>0.00</strong>.
-                  </span>
+              {/* Escopo — apenas Bimestral */}
+              <div style={{
+                padding: "12px 16px", borderRadius: 12, marginBottom: 16,
+                background: "rgba(139,92,246,0.07)", border: "1px solid rgba(139,92,246,0.2)",
+                fontSize: "0.78rem", color: "#c4b5fd", lineHeight: 1.6,
+              }}>
+                <span style={{ fontWeight: 700, color: "#a78bfa" }}>📋 Escopo desta exportação:</span><br />
+                Somente a coluna <strong style={{color:"#e2e8f0"}}>Avaliação Bimestral</strong> será lançada no
+                boletim do <strong style={{color:"#e2e8f0"}}>{bimestreSelecionado}</strong>.
+                As demais colunas (Caderno, Testes etc.) permanecem no diário do professor.
+              </div>
+
+              {/* ── ALERTA: alunos sem nota ── */}
+              {alunosSemNota.length > 0 && !confirmarParcial && (
+                <div style={{
+                  padding: "14px 16px", borderRadius: 12, marginBottom: 16,
+                  background: "rgba(245,158,11,0.07)", border: "1px solid rgba(245,158,11,0.3)",
+                }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                    <ExclamationTriangleIcon style={{ width: 20, height: 20, color: "#f59e0b", flexShrink: 0, marginTop: 2 }} />
+                    <div>
+                      <div style={{ fontSize: "0.82rem", fontWeight: 800, color: "#fbbf24", marginBottom: 6 }}>
+                        {alunosSemNota.length} aluno{alunosSemNota.length > 1 ? "s" : ""} sem nota na Avaliação Bimestral
+                      </div>
+                      <div style={{ maxHeight: 102, overflowY: "auto", marginBottom: 8 }}>
+                        {alunosSemNota.map(a => (
+                          <div key={a.id} style={{
+                            fontSize: "0.72rem", color: "#fcd34d", padding: "2px 0",
+                            borderBottom: "1px solid rgba(245,158,11,0.1)",
+                          }}>• {a.nome}</div>
+                        ))}
+                      </div>
+                      <div style={{ fontSize: "0.72rem", color: "#d97706", lineHeight: 1.5 }}>
+                        ⚠️ Esses alunos serão exportados com nota <strong>vazia (nula)</strong> no boletim.
+                        Pode ser previsto uma <strong>segunda chamada</strong> — você poderá exportar novamente
+                        as notas ausentes individualmente ou atualizar a turma completa enquanto o diário estiver aberto.
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 
-              {/* Botões */}
-              <div className="flex gap-3 mt-2">
+              {/* ── CONFIRMAÇÃO DE EXPORTAÇÃO PARCIAL ── */}
+              {alunosSemNota.length > 0 && confirmarParcial && (
+                <div style={{
+                  padding: "14px 16px", borderRadius: 12, marginBottom: 16,
+                  background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.3)",
+                }}>
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                    <ExclamationCircleIcon style={{ width: 20, height: 20, color: "#ef4444", flexShrink: 0, marginTop: 2 }} />
+                    <div style={{ fontSize: "0.8rem", color: "#fca5a5", lineHeight: 1.6 }}>
+                      <strong style={{color:"#f87171"}}>Confirme:</strong> Você está exportando com{" "}
+                      <strong style={{color:"#fca5a5"}}>{alunosSemNota.length} aluno{alunosSemNota.length > 1 ? "s" : ""} sem nota</strong>.
+                      O diário ficará <strong>fechado</strong> — notas ausentes poderão ser complementadas
+                      em uma segunda exportação posterior.
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Aviso de fechamento (sem ausências) ── */}
+              {alunosSemNota.length === 0 && (
+                <div style={{
+                  padding: "12px 16px", borderRadius: 12, marginBottom: 16,
+                  background: "rgba(16,185,129,0.06)", border: "1px solid rgba(16,185,129,0.2)",
+                  fontSize: "0.78rem", color: "#6ee7b7", lineHeight: 1.6,
+                }}>
+                  ✅ Todos os alunos possuem nota na Avaliação Bimestral.
+                  Após exportar, o diário ficará em <strong style={{color:"#a7f3d0"}}>modo somente leitura</strong>.
+                  Para reabrir, solicite à <strong style={{color:"#a7f3d0"}}>Secretaria</strong>.
+                </div>
+              )}
+
+              {/* ── Botões ── */}
+              <div style={{ display: "flex", gap: 10 }}>
                 <button
-                  onClick={() => setModalExportar(false)}
+                  onClick={() => { setModalExportar(false); setConfirmarParcial(false); }}
                   disabled={exportando}
-                  className="flex-1 py-3 rounded-xl font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 transition-all border border-gray-200 disabled:opacity-50"
+                  style={{
+                    flex: 1, padding: "12px", borderRadius: 12, fontWeight: 700, fontSize: "0.85rem",
+                    background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+                    color: "#94a3b8", cursor: exportando ? "not-allowed" : "pointer", opacity: exportando ? 0.5 : 1,
+                  }}
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={handleExportarBoletim}
                   disabled={exportando}
-                  className="flex-[2] py-3 rounded-xl font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 transition-all shadow-lg shadow-purple-500/25 flex items-center justify-center gap-2 disabled:opacity-50"
+                  style={{
+                    flex: 2, padding: "12px", borderRadius: 12, fontWeight: 800, fontSize: "0.88rem",
+                    background: confirmarParcial
+                      ? "linear-gradient(135deg, #f59e0b, #ea580c)"
+                      : "linear-gradient(135deg, #7c3aed, #4338ca)",
+                    border: "none", color: "#fff",
+                    cursor: exportando ? "not-allowed" : "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                    boxShadow: "0 4px 20px rgba(124,58,237,0.35)",
+                    opacity: exportando ? 0.7 : 1,
+                    transition: "all 0.2s",
+                  }}
                 >
                   {exportando ? (
                     <>
-                      <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                      <div style={{
+                        width: 18, height: 18, borderRadius: "50%",
+                        border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff",
+                        animation: "spin 0.8s linear infinite",
+                      }} />
                       Exportando...
                     </>
+                  ) : confirmarParcial ? (
+                    <>⚠️ Sim, exportar mesmo assim</>
+                  ) : alunosSemNota.length > 0 ? (
+                    <>📤 Continuar mesmo assim</>
                   ) : (
-                    <>📗 Confirmar Exportação</>
+                    <>📤 Confirmar Exportação</>
                   )}
                 </button>
               </div>
+
+              <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
             </div>
           </div>
         </div>

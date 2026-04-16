@@ -76,6 +76,20 @@ export default function Login() {
   // ✅ Reenviar código (cooldown)
   const [cooldown, setCooldown] = useState(0); // segundos restantes
 
+  // ✅ Dispositivo confiado
+  const [confirarDispositivo, setConfirarDispositivo] = useState(false);
+
+  // Helpers para device_token (localStorage)
+  const getDeviceToken = () => {
+    try { return localStorage.getItem("device_token") || ""; } catch { return ""; }
+  };
+  const saveDeviceToken = (token) => {
+    try { if (token) localStorage.setItem("device_token", token); } catch {}
+  };
+  const clearDeviceToken = () => {
+    try { localStorage.removeItem("device_token"); } catch {}
+  };
+
 
   const navigate = useNavigate();
 
@@ -421,7 +435,7 @@ export default function Login() {
     try {
       const payload = isCpf
         ? { cpf: valorLogin, senha }
-        : { emailOuCelular: valorLogin, senha };
+        : { emailOuCelular: valorLogin, senha, device_token: getDeviceToken() };
 
       const { data } = await api.post("/api/auth/login", payload);
 
@@ -446,6 +460,52 @@ export default function Login() {
           navigate("/home");
         }, 1200);
 
+        return;
+      }
+
+      // ✅ Dispositivo confiado: backend pulou OTP e retornou token direto
+      if (!isCpf && data?.dispositivo_confiado && data?.token) {
+        limparSessaoPlataforma();
+
+        // Multi-escola ainda precisa de seleção
+        if (data?.multi_escola) {
+          const lista = Array.isArray(data?.escolas) ? data.escolas : [];
+          setEscolasVinculadas(lista);
+          setUsuarioId(data.usuarioId || null);
+
+          const ultima = localStorage.getItem("last_escola_id");
+          const ctx = ultima ? lista.find((e) => String(e.id) === String(ultima)) : null;
+          setEscolaSelecionada(ctx ? String(ctx.id) : "");
+          setUsuarioCtxSelecionado(ctx ? String(ctx.usuario_ctx_id || "") : "");
+          setNomeUsuarioLogin(String(data?.nome || ""));
+          setTipoMensagem("info");
+          setMensagem("Selecione a escola para entrar no sistema.");
+          setEtapa("escola");
+          return;
+        }
+
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("userName", data.nome || "Usuário");
+        localStorage.setItem("escola_id", data.escola_id || 1);
+        localStorage.setItem("nome_escola", data.nome_escola || "Escola não definida");
+        localStorage.setItem("perfil", data.perfil || "aluno");
+        localStorage.setItem("scope", data.scope || "escola");
+        localStorage.setItem("perfis", JSON.stringify(Array.isArray(data?.perfis) ? data.perfis : []));
+        localStorage.setItem("permissoes", JSON.stringify(Array.isArray(data?.permissoes) ? data.permissoes : []));
+
+        await carregarDisciplinasProfessor(data.token);
+
+        const cpfLsD = data?.cpf || "";
+        const fotoLsD = data?.foto_url || "";
+        localStorage.setItem("cpf", String(cpfLsD || "").replace(/\D/g, ""));
+        localStorage.setItem("foto_url", String(fotoLsD || ""));
+        localStorage.setItem("last_escola_id", String(data.escola_id || ""));
+
+        setTipoMensagem("sucesso");
+        setMensagem("🔒 Login rápido! Dispositivo reconhecido.");
+        setSuccess(true);
+
+        setTimeout(() => { navigate("/home"); }, 1200);
         return;
       }
 
@@ -633,6 +693,7 @@ export default function Login() {
       const { data } = await api.post("/api/auth/confirmar", {
         usuarioId,
         codigo,
+        confiar_dispositivo: confirarDispositivo,
       });
 
       if (data?.multi_escola) {
@@ -672,6 +733,11 @@ export default function Login() {
 
       localStorage.setItem("cpf", String(cpfLs || "").replace(/\D/g, ""));
       localStorage.setItem("foto_url", String(fotoLs || ""));
+
+      // ✅ Salvar device_token se o backend gerou (usuário marcou "confiar neste dispositivo")
+      if (data?.device_token) saveDeviceToken(data.device_token);
+      // Limpar se o usuário não quis confiar
+      if (!confirarDispositivo) clearDeviceToken();
 
       setTipoMensagem("sucesso");
       setMensagem("Login realizado com sucesso!");
@@ -1136,6 +1202,32 @@ export default function Login() {
               }}
               className="px-4 py-2 rounded-lg border border-gray-300 text-center font-mono text-lg tracking-widest"
             />
+
+            {/* ✅ Opção: Confiar neste dispositivo */}
+            <label
+              htmlFor="confiar-dispositivo"
+              className={`flex items-start gap-3 rounded-xl border px-4 py-3 cursor-pointer transition-all select-none ${
+                confirarDispositivo
+                  ? "border-blue-400 bg-blue-50 shadow-sm"
+                  : "border-gray-200 bg-gray-50 hover:bg-white"
+              }`}
+            >
+              <input
+                id="confiar-dispositivo"
+                type="checkbox"
+                checked={confirarDispositivo}
+                onChange={(e) => setConfirarDispositivo(e.target.checked)}
+                className="mt-0.5 h-4 w-4 accent-blue-600 flex-shrink-0"
+              />
+              <div>
+                <div className={`text-sm font-semibold ${ confirarDispositivo ? "text-blue-800" : "text-gray-700" }`}>
+                  Não pedir código neste aparelho
+                </div>
+                <div className="text-xs text-gray-500 mt-0.5">
+                  Este dispositivo será lembrado por 90 dias. Use apenas em aparelhos de uso pessoal.
+                </div>
+              </div>
+            </label>
 
             <button
               className="bg-green-600 text-white py-2 rounded-lg disabled:cursor-not-allowed disabled:opacity-40"

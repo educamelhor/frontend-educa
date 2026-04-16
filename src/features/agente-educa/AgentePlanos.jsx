@@ -232,18 +232,47 @@ export default function AgentePlanos() {
   const [filtro, setFiltro]             = useState("todos"); // todos | prontos | exportados
   const [msgSistema, setMsgSistema]     = useState(null);
   const [modalConfirm, setModalConfirm] = useState(null); // plano selecionado p/ confirmar export
+  // Turmas e usuario do professor logado (para filtro pessoal)
+  const [turmasNomesProf, setTurmasNomesProf] = useState(null); // null = ainda carregando
+  const [usuarioIdProf, setUsuarioIdProf]     = useState(null);
 
-  // ── Carrega planos ─────────────────────────────────────
+  // ── Carrega planos filtrados pelas turmas do professor logado ──
   useEffect(() => {
-    const fetchPlanos = async () => {
+    const fetchDados = async () => {
       setCarregando(true);
       try {
         const ano = new Date().getFullYear();
+
+        // 1) Turmas do professor (via modulação + `professores.turma_id`)
+        //    Sem disciplina: retorna TODAS as turmas em que o prof tem vínculo
+        const [resTurmas, resId] = await Promise.all([
+          api.get("/professores/me/turmas", { params: { ano } }),
+          api.get("/professores/me/id"),
+        ]);
+
+        const nomesSet = new Set(
+          (resTurmas.data?.turmas || []).map(t => String(t.nome).trim().toUpperCase())
+        );
+        const uid = resId.data?.usuario_id ? Number(resId.data.usuario_id) : null;
+
+        setTurmasNomesProf(nomesSet);
+        setUsuarioIdProf(uid);
+
+        // 2) Todos os planos da escola (o backend já filtra por escola_id via token)
         const resp = await api.get("/avaliacoes", { params: { ano } });
         const lista = resp.data || [];
-        // Busca detalhes (itens) de cada plano
+
+        // 3) Filtra somente planos das turmas do professor OU criados por ele
+        const meus = lista.filter(p => {
+          const turmaNorm = String(p.turmas || "").trim().toUpperCase();
+          const eMinhaTurma  = nomesSet.has(turmaNorm);
+          const eMeuPlano    = uid && Number(p.usuario_id) === uid;
+          return eMinhaTurma || eMeuPlano;
+        });
+
+        // 4) Busca itens detalhados (em paralelo, com limite de concorrência)
         const comItens = await Promise.all(
-          lista.map(async p => {
+          meus.map(async p => {
             try {
               const det = await api.get(`/avaliacoes/${p.id}`);
               return det.data || p;
@@ -259,7 +288,7 @@ export default function AgentePlanos() {
         setCarregando(false);
       }
     };
-    fetchPlanos();
+    fetchDados();
   }, []);
 
   const showMsg = (type, text) => {

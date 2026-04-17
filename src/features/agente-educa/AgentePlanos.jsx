@@ -236,46 +236,62 @@ export default function AgentePlanos() {
   const [turmasNomesProf, setTurmasNomesProf] = useState(null);
 
   // ── Carrega planos filtrados por TURMA + DISCIPLINA do professor logado ──
-  // Padrão idêntico ao módulo Avaliacoes.jsx: intersecção turma ∩ disciplina.
-  // Não usamos usuario_id pois pode coincidir com planos de outros perfis.
+  // Padrão: busca por disciplina via backend (match exato no banco) + filtro de turma client-side.
+  // Evita inconsistência de grafia entre disciplinas.nome (modulação) e planos_avaliacao.disciplina.
   useEffect(() => {
     const fetchDados = async () => {
       setCarregando(true);
       try {
         const ano = new Date().getFullYear();
 
-        // 1) Busca em paralelo: turmas do ano letivo atual + disciplinas do professor
+        // 1) Busca em paralelo: turmas 2026 do professor + disciplinas 2026 do professor
         const [resTurmas, resDiscip] = await Promise.all([
           api.get("/professores/me/turmas",      { params: { ano } }),
-          api.get("/professores/me/disciplinas", { params: { ano } }), // ano garante só disciplinas do ano letivo atual
+          api.get("/professores/me/disciplinas", { params: { ano } }),
         ]);
 
-        // Sets normalizados para comparação case-insensitive
-        const turmasSet = new Set(
-          (resTurmas.data?.turmas || []).map(t => String(t.nome).trim().toUpperCase())
-        );
-        const disciplinasSet = new Set(
-          (resDiscip.data?.disciplinas || []).map(d => String(d.nome).trim().toUpperCase())
-        );
+        const turmasList     = resTurmas.data?.turmas     || [];
+        const disciplinasList = resDiscip.data?.disciplinas || [];
 
+        // Set de nomes de turma (normalizado) para filtro client-side
+        const turmasSet = new Set(
+          turmasList.map(t => String(t.nome).trim().toUpperCase())
+        );
         setTurmasNomesProf(turmasSet);
 
-        // 2) Todos os planos da escola do ano atual (backend filtra por escola_id + ano)
-        const resp = await api.get("/avaliacoes", { params: { ano } });
-        const lista = resp.data || [];
+        if (disciplinasList.length === 0 || turmasList.length === 0) {
+          setPlanos([]);
+          return;
+        }
 
-        // 3) Filtro duplo: turma DO professor AND disciplina DO professor
-        //    Garante que somente os planos pessoais apareçam,
-        //    mesmo que outra disciplina tenha turma com o mesmo nome.
-        const meus = lista.filter(p => {
-          const turmaNorm = String(p.turmas     || "").trim().toUpperCase();
-          const discNorm  = String(p.disciplina || "").trim().toUpperCase();
-          return turmasSet.has(turmaNorm) && disciplinasSet.has(discNorm);
+        // 2) Para cada disciplina do professor, busca planos do ano pelo backend
+        //    O backend faz o match exato na coluna planos_avaliacao.disciplina — sem risco de grafia
+        const respostasDiscip = await Promise.all(
+          disciplinasList.map(d =>
+            api.get("/avaliacoes", { params: { ano, disciplina: d.nome } })
+          )
+        );
+
+        // 3) Une todos os planos retornados (pode haver sobreposição se turma == plano)
+        const todos = respostasDiscip.flatMap(r => r.data || []);
+
+        // 4) Filtra somente os planos das turmas do professor (remove outras turmas da mesma disciplina)
+        const meus = todos.filter(p => {
+          const turmaNorm = String(p.turmas || "").trim().toUpperCase();
+          return turmasSet.has(turmaNorm);
         });
 
-        // 4) Busca itens detalhados em paralelo (para exibir colunas do plano)
+        // Remove duplicatas (mesmo plano vindo de múltiplas queries)
+        const vistos = new Set();
+        const meusSemDup = meus.filter(p => {
+          if (vistos.has(p.id)) return false;
+          vistos.add(p.id);
+          return true;
+        });
+
+        // 5) Busca itens detalhados em paralelo (para exibir colunas do plano)
         const comItens = await Promise.all(
-          meus.map(async p => {
+          meusSemDup.map(async p => {
             try {
               const det = await api.get(`/avaliacoes/${p.id}`);
               return det.data || p;

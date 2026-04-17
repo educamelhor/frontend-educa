@@ -236,62 +236,35 @@ export default function AgentePlanos() {
   const [turmasNomesProf, setTurmasNomesProf] = useState(null);
 
   // ── Carrega planos filtrados por TURMA + DISCIPLINA do professor logado ──
-  // Padrão: busca por disciplina via backend (match exato no banco) + filtro de turma client-side.
-  // Evita inconsistência de grafia entre disciplinas.nome (modulação) e planos_avaliacao.disciplina.
+  // Abordagem correta: filtra planos pelo usuario_id do professor logado.
+  // O usuario_id em planos_avaliacao identifica quem criou o plano — sem ambiguidade de grafia.
   useEffect(() => {
     const fetchDados = async () => {
       setCarregando(true);
       try {
         const ano = new Date().getFullYear();
 
-        // 1) Busca em paralelo: turmas 2026 do professor + disciplinas 2026 do professor
-        const [resTurmas, resDiscip] = await Promise.all([
-          api.get("/professores/me/turmas",      { params: { ano } }),
-          api.get("/professores/me/disciplinas", { params: { ano } }),
-        ]);
+        // 1) Resolve o usuario_id do professor logado (via token no backend)
+        const resId = await api.get("/professores/me/id");
+        const uid   = resId.data?.usuario_id ? Number(resId.data.usuario_id) : null;
 
-        const turmasList     = resTurmas.data?.turmas     || [];
-        const disciplinasList = resDiscip.data?.disciplinas || [];
-
-        // Set de nomes de turma (normalizado) para filtro client-side
-        const turmasSet = new Set(
-          turmasList.map(t => String(t.nome).trim().toUpperCase())
-        );
-        setTurmasNomesProf(turmasSet);
-
-        if (disciplinasList.length === 0 || turmasList.length === 0) {
+        if (!uid) {
+          showMsg("error", "Não foi possível identificar o usuário logado.");
           setPlanos([]);
           return;
         }
 
-        // 2) Para cada disciplina do professor, busca planos do ano pelo backend
-        //    O backend faz o match exato na coluna planos_avaliacao.disciplina — sem risco de grafia
-        const respostasDiscip = await Promise.all(
-          disciplinasList.map(d =>
-            api.get("/avaliacoes", { params: { ano, disciplina: d.nome } })
-          )
-        );
+        // 2) Busca TODOS os planos da escola no ano atual (uma única chamada)
+        const resp  = await api.get("/avaliacoes", { params: { ano } });
+        const lista = resp.data || [];
 
-        // 3) Une todos os planos retornados (pode haver sobreposição se turma == plano)
-        const todos = respostasDiscip.flatMap(r => r.data || []);
+        // 3) Filtro simples e confiável: planos criados por este usuário
+        //    usuario_id é o ID primário do criador — sem dependência de grafia de turma/disciplina
+        const meus = lista.filter(p => Number(p.usuario_id) === uid);
 
-        // 4) Filtra somente os planos das turmas do professor (remove outras turmas da mesma disciplina)
-        const meus = todos.filter(p => {
-          const turmaNorm = String(p.turmas || "").trim().toUpperCase();
-          return turmasSet.has(turmaNorm);
-        });
-
-        // Remove duplicatas (mesmo plano vindo de múltiplas queries)
-        const vistos = new Set();
-        const meusSemDup = meus.filter(p => {
-          if (vistos.has(p.id)) return false;
-          vistos.add(p.id);
-          return true;
-        });
-
-        // 5) Busca itens detalhados em paralelo (para exibir colunas do plano)
+        // 4) Busca itens detalhados em paralelo (para exibir colunas do plano)
         const comItens = await Promise.all(
-          meusSemDup.map(async p => {
+          meus.map(async p => {
             try {
               const det = await api.get(`/avaliacoes/${p.id}`);
               return det.data || p;

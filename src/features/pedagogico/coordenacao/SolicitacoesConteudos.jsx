@@ -13,6 +13,7 @@ import {
   ShieldCheckIcon,
   ExclamationTriangleIcon,
   InboxIcon,
+  LockOpenIcon,
 } from "@heroicons/react/24/outline";
 
 /**
@@ -385,12 +386,24 @@ export default function SolicitacoesConteudos() {
                         <td className="px-6 py-4 text-gray-600 text-sm">{sol.bimestre}</td>
                         <td className="px-6 py-4 text-center">
                           {sol.status === "LIBERACAO_SOLICITADA" ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 text-[11px] font-bold border border-amber-200">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75M3.75 21.75h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-                              </svg>
-                              Liberação
-                            </span>
+                            <div className="flex flex-col items-center gap-1">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 text-[11px] font-bold border border-amber-200">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75M3.75 21.75h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                                </svg>
+                                Liberação
+                              </span>
+                              {sol.motivo_devolucao && (
+                                <span
+                                  className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1 max-w-[180px] leading-tight text-left cursor-default"
+                                  title={sol.motivo_devolucao}
+                                >
+                                  💬 {sol.motivo_devolucao.length > 60
+                                    ? sol.motivo_devolucao.slice(0, 60) + "…"
+                                    : sol.motivo_devolucao}
+                                </span>
+                              )}
+                            </div>
                           ) : (
                             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-indigo-100 text-indigo-700 text-[11px] font-bold border border-indigo-200">
                               <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
@@ -413,19 +426,30 @@ export default function SolicitacoesConteudos() {
                             >
                               <EyeIcon className="w-4 h-4" />
                             </button>
-                            {/* Aprovar */}
+                            {/* Aprovar / Liberar */}
+                            {sol.status === "LIBERACAO_SOLICITADA" ? (
+                              <button
+                                onClick={() => setModalAcao({ id: sol.id, turma: sol.turmas, disciplina: sol.disciplina, acao: "APROVADO", isLiberacao: true })}
+                                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs font-bold transition"
+                                title="Liberar plano para edição"
+                              >
+                                <LockOpenIcon className="w-3.5 h-3.5" />
+                                Liberar
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => setModalAcao({ id: sol.id, turma: sol.turmas, disciplina: sol.disciplina, acao: "APROVADO", isLiberacao: false })}
+                                className="p-2 rounded-lg bg-green-100 hover:bg-green-200 text-green-700 transition"
+                                title="Aprovar plano"
+                              >
+                                <CheckCircleIcon className="w-4 h-4" />
+                              </button>
+                            )}
+                            {/* Devolver / Negar */}
                             <button
-                              onClick={() => setModalAcao({ id: sol.id, turma: sol.turmas, disciplina: sol.disciplina, acao: "APROVADO" })}
-                              className="p-2 rounded-lg bg-green-100 hover:bg-green-200 text-green-700 transition"
-                              title="Aprovar plano"
-                            >
-                              <CheckCircleIcon className="w-4 h-4" />
-                            </button>
-                            {/* Devolver */}
-                            <button
-                              onClick={() => setModalAcao({ id: sol.id, turma: sol.turmas, disciplina: sol.disciplina, acao: "DEVOLVIDO" })}
+                              onClick={() => setModalAcao({ id: sol.id, turma: sol.turmas, disciplina: sol.disciplina, acao: "DEVOLVIDO", isLiberacao: sol.status === "LIBERACAO_SOLICITADA" })}
                               className="p-2 rounded-lg bg-red-100 hover:bg-red-200 text-red-700 transition"
-                              title="Devolver para o professor"
+                              title={sol.status === "LIBERACAO_SOLICITADA" ? "Negar liberação" : "Devolver para o professor"}
                             >
                               <XCircleIcon className="w-4 h-4" />
                             </button>
@@ -547,11 +571,12 @@ export default function SolicitacoesConteudos() {
                       turma: modalDetalhe.plano.turmas,
                       disciplina: modalDetalhe.plano.disciplina,
                       acao: "DEVOLVIDO",
+                      isLiberacao: modalDetalhe.plano.status === "LIBERACAO_SOLICITADA",
                     });
                   }}
                   className="px-5 py-2.5 bg-red-100 hover:bg-red-200 text-red-700 font-bold rounded-xl transition"
                 >
-                  Devolver
+                  {modalDetalhe.plano.status === "LIBERACAO_SOLICITADA" ? "Negar Liberação" : "Devolver"}
                 </button>
                 <button
                   onClick={() => {
@@ -560,11 +585,16 @@ export default function SolicitacoesConteudos() {
                       turma: modalDetalhe.plano.turmas,
                       disciplina: modalDetalhe.plano.disciplina,
                       acao: "APROVADO",
+                      isLiberacao: modalDetalhe.plano.status === "LIBERACAO_SOLICITADA",
                     });
                   }}
-                  className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-500/25 transition active:scale-95"
+                  className={`px-5 py-2.5 font-bold rounded-xl shadow-lg transition active:scale-95 ${
+                    modalDetalhe.plano.status === "LIBERACAO_SOLICITADA"
+                      ? "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-amber-500/25"
+                      : "bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white shadow-emerald-500/25"
+                  }`}
                 >
-                  ✓ Aprovar Plano
+                  {modalDetalhe.plano.status === "LIBERACAO_SOLICITADA" ? "🔓 Liberar para Edição" : "✓ Aprovar Plano"}
                 </button>
               </div>
             </div>
@@ -585,19 +615,26 @@ export default function SolicitacoesConteudos() {
             {/* Header com gradiente */}
             <div className={`px-6 py-5 ${
               modalAcao.acao === "APROVADO"
-                ? "bg-gradient-to-r from-emerald-500 to-green-600"
+                ? modalAcao.isLiberacao
+                  ? "bg-gradient-to-r from-amber-500 to-orange-500"
+                  : "bg-gradient-to-r from-emerald-500 to-green-600"
                 : "bg-gradient-to-r from-red-500 to-orange-500"
             }`}>
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-white/20 rounded-xl">
-                  {modalAcao.acao === "APROVADO" 
-                    ? <ShieldCheckIcon className="w-7 h-7 text-white" />
+                  {modalAcao.acao === "APROVADO"
+                    ? modalAcao.isLiberacao
+                      ? <LockOpenIcon className="w-7 h-7 text-white" />
+                      : <ShieldCheckIcon className="w-7 h-7 text-white" />
                     : <ExclamationTriangleIcon className="w-7 h-7 text-white" />
                   }
                 </div>
                 <div>
                   <h4 className="text-lg font-black text-white">
-                    {modalAcao.acao === "APROVADO" ? "Aprovar Plano" : "Devolver Plano"}
+                    {modalAcao.acao === "APROVADO"
+                      ? modalAcao.isLiberacao ? "Liberar Plano para Edição" : "Aprovar Plano"
+                      : modalAcao.isLiberacao ? "Negar Solicitação de Liberação" : "Devolver Plano"
+                    }
                   </h4>
                   <p className="text-white/80 text-sm font-medium">Confirme a ação</p>
                 </div>
@@ -606,18 +643,32 @@ export default function SolicitacoesConteudos() {
 
             <div className="px-6 py-6">
               <div className={`border rounded-xl px-4 py-3 mb-4 ${
-                modalAcao.acao === "APROVADO" 
-                  ? "bg-emerald-50 border-emerald-200"
+                modalAcao.acao === "APROVADO"
+                  ? modalAcao.isLiberacao ? "bg-amber-50 border-amber-200" : "bg-emerald-50 border-emerald-200"
                   : "bg-red-50 border-red-200"
               }`}>
                 <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Plano</span>
                 <p className="font-bold text-gray-800">{modalAcao.turma} — {modalAcao.disciplina}</p>
               </div>
 
+              {/* Aviso contextual: comportamento diferente para Novo PAP vs Liberação */}
+              {modalAcao.isLiberacao && modalAcao.acao === "APROVADO" && (
+                <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-3">
+                  <ExclamationTriangleIcon className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-amber-800 text-sm font-semibold leading-snug">
+                    Atenção: este plano já está aprovado e pode ter notas lançadas. Ao liberar, o professor poderá editar as atividades. Itens com notas lançadas não poderão ser removidos pelo sistema.
+                  </p>
+                </div>
+              )}
+
               <p className="text-gray-600 text-sm leading-relaxed">
                 {modalAcao.acao === "APROVADO"
-                  ? "Ao aprovar, o professor poderá iniciar o lançamento de notas no Registro de Avaliações."
-                  : "Ao devolver, o plano retornará ao professor para que seja revisado e reenviado."
+                  ? modalAcao.isLiberacao
+                    ? "Ao liberar, o professor poderá editar o plano e deverá reenviar para aprovação ao concluir."
+                    : "Ao aprovar, o professor poderá iniciar o lançamento de notas no Registro de Avaliações."
+                  : modalAcao.isLiberacao
+                    ? "Ao negar, a solicitação de edição será recusada e o plano permanecerá protegido."
+                    : "Ao devolver, o plano retornará ao professor para que seja revisado e reenviado."
                 }
               </p>
 
@@ -652,13 +703,17 @@ export default function SolicitacoesConteudos() {
                 disabled={processandoAcao}
                 className={`px-5 py-2.5 font-bold rounded-xl shadow-lg transition active:scale-95 disabled:opacity-50 ${
                   modalAcao.acao === "APROVADO"
-                    ? "bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white shadow-emerald-500/25"
+                    ? modalAcao.isLiberacao
+                      ? "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-amber-500/25"
+                      : "bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white shadow-emerald-500/25"
                     : "bg-gradient-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600 text-white shadow-red-500/25"
                 }`}
               >
                 {processandoAcao
                   ? "Processando..."
-                  : modalAcao.acao === "APROVADO" ? "✓ Confirmar Aprovação" : "Confirmar Devolução"
+                  : modalAcao.acao === "APROVADO"
+                    ? modalAcao.isLiberacao ? "🔓 Confirmar Liberação" : "✓ Confirmar Aprovação"
+                    : modalAcao.isLiberacao ? "Confirmar Negação" : "Confirmar Devolução"
                 }
               </button>
             </div>

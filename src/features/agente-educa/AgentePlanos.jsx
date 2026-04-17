@@ -236,35 +236,21 @@ export default function AgentePlanos() {
   const [turmasNomesProf, setTurmasNomesProf] = useState(null);
 
   // ── Carrega planos filtrados por TURMA + DISCIPLINA do professor logado ──
-  // Abordagem correta: filtra planos pelo usuario_id do professor logado.
-  // O usuario_id em planos_avaliacao identifica quem criou o plano — sem ambiguidade de grafia.
+  // Endpoint dedicado /avaliacoes/me resolve via JOIN modulação no banco —
+  // sem dependência de usuario_id (criador) nem de comparação de strings.
   useEffect(() => {
     const fetchDados = async () => {
       setCarregando(true);
       try {
         const ano = new Date().getFullYear();
 
-        // 1) Resolve o usuario_id do professor logado (via token no backend)
-        const resId = await api.get("/professores/me/id");
-        const uid   = resId.data?.usuario_id ? Number(resId.data.usuario_id) : null;
+        // Uma única chamada — o backend resolve via CPF do token + modulação + turmas + disciplinas
+        const resp = await api.get("/avaliacoes/me", { params: { ano } });
+        const lista = resp.data?.planos || [];
 
-        if (!uid) {
-          showMsg("error", "Não foi possível identificar o usuário logado.");
-          setPlanos([]);
-          return;
-        }
-
-        // 2) Busca TODOS os planos da escola no ano atual (uma única chamada)
-        const resp  = await api.get("/avaliacoes", { params: { ano } });
-        const lista = resp.data || [];
-
-        // 3) Filtro simples e confiável: planos criados por este usuário
-        //    usuario_id é o ID primário do criador — sem dependência de grafia de turma/disciplina
-        const meus = lista.filter(p => Number(p.usuario_id) === uid);
-
-        // 4) Busca itens detalhados em paralelo (para exibir colunas do plano)
+        // Busca itens detalhados em paralelo (para exibir colunas do plano)
         const comItens = await Promise.all(
-          meus.map(async p => {
+          lista.map(async p => {
             try {
               const det = await api.get(`/avaliacoes/${p.id}`);
               return det.data || p;

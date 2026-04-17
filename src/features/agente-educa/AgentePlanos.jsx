@@ -232,6 +232,7 @@ export default function AgentePlanos() {
   const [filtro, setFiltro]             = useState("todos"); // todos | prontos | exportados
   const [msgSistema, setMsgSistema]     = useState(null);
   const [modalConfirm, setModalConfirm] = useState(null); // plano selecionado p/ confirmar export
+  const [modalSemCred, setModalSemCred] = useState(false); // modal de credenciais não configuradas
   // Turmas e disciplinas do professor logado (para filtro pessoal duplo)
   const [turmasNomesProf, setTurmasNomesProf] = useState(null);
 
@@ -315,8 +316,14 @@ export default function AgentePlanos() {
         showMsg("success", `✅ Estrutura da Avaliação Bimestral exportada para o EDUCADF — ${plano.disciplina} · ${plano.turmas}`);
       }
     } catch (err) {
-      const errMsg = err.response?.data?.error || "Erro ao exportar estrutura.";
-      showMsg("error", `❌ ${errMsg}`);
+      const codigo = err.response?.data?.codigo;
+      if (codigo === 'SEM_CREDENCIAIS' || codigo === 'CREDENCIAIS_CORROMPIDAS') {
+        // Modal premium de credenciais não configuradas
+        setModalSemCred(true);
+      } else {
+        const errMsg = err.response?.data?.error || "Erro ao exportar estrutura.";
+        showMsg("error", `❌ ${errMsg}`);
+      }
     } finally {
       setExportandoId(null);
     }
@@ -604,6 +611,91 @@ export default function AgentePlanos() {
                 >
                   <RocketLaunchIcon style={{ width: 16 }} />
                   Confirmar Exportação
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════ MODAL SEM CREDENCIAIS ═══════════════ */}
+      {modalSemCred && (
+        <div
+          style={{
+            position: "fixed", inset: 0, zIndex: 400,
+            background: "rgba(0,0,0,0.82)", backdropFilter: "blur(12px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            animation: "fadeIn 0.2s ease",
+          }}
+          onClick={() => setModalSemCred(false)}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: "100%", maxWidth: 440, margin: "0 16px",
+              borderRadius: 24, overflow: "hidden",
+              background: "linear-gradient(160deg, #1c1a10 0%, #12100a 100%)",
+              border: "1px solid rgba(245,158,11,0.3)",
+              boxShadow: "0 32px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(245,158,11,0.1)",
+            }}
+          >
+            {/* Header */}
+            <div style={{
+              background: "linear-gradient(135deg, #d97706, #b45309)",
+              padding: "26px 28px 20px", textAlign: "center",
+            }}>
+              <div style={{ fontSize: "2.4rem", marginBottom: 10, filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.4))" }}>🔐</div>
+              <div style={{ fontSize: "1.1rem", fontWeight: 900, color: "#fff", letterSpacing: "-0.3px" }}>
+                Credenciais EDUCADF não configuradas
+              </div>
+              <div style={{ fontSize: "0.78rem", color: "rgba(254,243,199,0.8)", marginTop: 6 }}>
+                O Agente precisa das suas credenciais para agir em seu nome
+              </div>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: "22px 24px" }}>
+              <div style={{
+                padding: "14px 16px", borderRadius: 14, marginBottom: 18,
+                background: "rgba(245,158,11,0.07)", border: "1px solid rgba(245,158,11,0.2)",
+                fontSize: "0.82rem", color: "#fde68a", lineHeight: 1.65,
+              }}>
+                <strong style={{ color: "#fbbf24" }}>O que precisa fazer:</strong><br />
+                Acesse <strong style={{ color: "#fff" }}>Agente EDUCA → Credenciais</strong>, informe
+                seu usuário e senha do portal <strong style={{ color: "#fff" }}>educadf.se.df.gov.br</strong>
+                e clique em "Salvar e Conectar". O Agente testará a conexão automaticamente.
+              </div>
+
+              <div style={{ display: "flex", gap: 10 }}>
+                <button
+                  onClick={() => setModalSemCred(false)}
+                  style={{
+                    flex: 1, padding: "11px", borderRadius: 12,
+                    background: "rgba(255,255,255,0.05)",
+                    border: "1px solid rgba(255,255,255,0.1)",
+                    color: "#94a3b8", fontWeight: 700, fontSize: "0.82rem", cursor: "pointer",
+                  }}
+                >
+                  Fechar
+                </button>
+                <button
+                  onClick={() => {
+                    setModalSemCred(false);
+                    // Navega para /agente-educa/credenciais dentro do SPA
+                    const base = window.location.pathname.replace(/\/agente-educa.*/, '');
+                    window.location.href = `${window.location.origin}${base}/agente-educa/credenciais`;
+                  }}
+                  style={{
+                    flex: 2, padding: "12px", borderRadius: 12,
+                    background: "linear-gradient(135deg, #d97706, #b45309)",
+                    border: "none", color: "#fff",
+                    fontWeight: 800, fontSize: "0.85rem", cursor: "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                    boxShadow: "0 4px 20px rgba(180,83,9,0.4)",
+                  }}
+                >
+                  <LockClosedIcon style={{ width: 16 }} />
+                  Configurar Credenciais
                 </button>
               </div>
             </div>

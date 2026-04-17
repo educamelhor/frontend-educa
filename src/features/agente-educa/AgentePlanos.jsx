@@ -247,7 +247,7 @@ export default function AgentePlanos() {
         // 1) Busca em paralelo: turmas do ano letivo atual + disciplinas do professor
         const [resTurmas, resDiscip] = await Promise.all([
           api.get("/professores/me/turmas",      { params: { ano } }),
-          api.get("/professores/me/disciplinas"),
+          api.get("/professores/me/disciplinas", { params: { ano } }), // ano garante só disciplinas do ano letivo atual
         ]);
 
         // Sets normalizados para comparação case-insensitive

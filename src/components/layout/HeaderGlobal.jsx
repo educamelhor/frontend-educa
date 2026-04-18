@@ -76,19 +76,17 @@ export default function HeaderGlobal({ onToggleSidebar, sidebarOpen }) {
       setFotoVersion(Date.now());
     };
 
-    const rehydrateFotoFromBackend = async () => {
+    const rehydrateFotoFromBackend = async (forceRefetch = false) => {
       try {
         const token = localStorage.getItem("token");
         const escolaId = localStorage.getItem("escola_id");
-        const savedPerfil = (localStorage.getItem("perfil") || "")
-          .toLowerCase()
-          .trim();
 
         // Reidrata foto de qualquer perfil logado
         if (!token || !escolaId) return;
 
         const savedFoto = localStorage.getItem("foto_url") || "";
-        if (savedFoto) return; // já tem foto em storage
+        // Só pula se já tem foto em cache E não foi forçado
+        if (savedFoto && !forceRefetch) return;
 
         const resp = await fetch(`${API_BASE}/usuarios/me/foto`, {
           method: "GET",
@@ -135,6 +133,40 @@ export default function HeaderGlobal({ onToggleSidebar, sidebarOpen }) {
     setFotoRetries(0);
     setFotoVersion(Date.now());
   }, [fotoUrl]);
+
+  // ✅ Recuperação: se a foto falhou (404 após redeploy ou URL inválida),
+  // limpa o cache e busca novamente do backend (pode estar no CDN/Spaces)
+  useEffect(() => {
+    if (!fotoErro) return;
+    // Limpa URL inválida do localStorage e tenta reobter do backend
+    localStorage.removeItem("foto_url");
+    // Usa timeout para não disparar imediatamente em loop
+    const t = setTimeout(() => {
+      const API_BASE_FALLBACK =
+        import.meta?.env?.VITE_API_BASE_URL ||
+        import.meta?.env?.VITE_API_URL ||
+        "https://educa-backend-docker-659zo.ondigitalocean.app/api";
+      const token = localStorage.getItem("token");
+      const escolaId = localStorage.getItem("escola_id");
+      if (!token || !escolaId) return;
+      fetch(`${API_BASE_FALLBACK}/usuarios/me/foto`, {
+        headers: { Authorization: `Bearer ${token}`, "x-escola-id": escolaId },
+      })
+        .then((r) => r.json())
+        .then((d) => {
+          const foto = d?.foto_url || "";
+          if (foto) {
+            localStorage.setItem("foto_url", foto);
+            setFotoUrl(foto);
+            setFotoErro(false);
+            setFotoRetries(0);
+            setFotoVersion(Date.now());
+          }
+        })
+        .catch(() => {});
+    }, 2000);
+    return () => clearTimeout(t);
+  }, [fotoErro]);
 
 
   /**
@@ -204,8 +236,6 @@ const UPLOADS_CDN = (() => {
     if (path.startsWith("http://") || path.startsWith("https://")) return path;
 
     // ✅ /uploads/...:
-    // - em localhost: servir do próprio backend (http://localhost:3000/uploads/...)
-    // - em produção: servir do CDN do Spaces
     if (path.startsWith("/uploads/")) {
       const isLocal =
         API_BASE.includes("localhost") ||
@@ -214,10 +244,10 @@ const UPLOADS_CDN = (() => {
       // em localhost, sirva do backend (sem /api no meio)
       if (isLocal) return `${API_BASE.replace(/\/api$/, "")}${path}`;
 
-      // 🔒 PRODUÇÃO:
-      // sempre servir uploads pelo BACKEND,
-      // pois o Space é privado e o CDN retorna AccessDenied
-      return `${API_BASE.replace(/\/api$/, "")}${path}`;
+      // 🔒 PRODUÇÃO: servir pelo CDN do Spaces (public-read)
+      // O backend DigitalOcean usa disco efêmero (redeploys apagam arquivos locais).
+      // Os uploads são feitos com ACL public-read no Spaces, então o CDN serve direto.
+      return `${UPLOADS_CDN}${path}`;
     }
 
     // demais rotas relativas continuam apontando para o backend

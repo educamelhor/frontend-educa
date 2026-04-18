@@ -239,7 +239,14 @@ export default function Planos() {
         setPapKeyAtiva(planoId);
         setPapStatus(data.status || "RASCUNHO");
         if (data.itens && data.itens.length > 0) {
-           setItens(data.itens);
+           // ✅ Normaliza datas de ISO datetime para YYYY-MM-DD (formato aceito por input[type=date])
+           const norm = (d) => d ? String(d).slice(0, 10) : '';
+           setItens(data.itens.map(it => ({
+             ...it,
+             data_inicio: norm(it.data_inicio),
+             data_final:  norm(it.data_final),
+             data:        norm(it.data),
+           })));
         } else {
            setItens([{ atividade: "Prova Bimestral", nota_total: 5, oportunidades: 1, nota_invertida: 0, fixo_direcao: true }]);
         }
@@ -262,10 +269,10 @@ export default function Planos() {
   const voltarTabelaMestra = () => {
     setModoEdicaoPlano(false);
     setMostrarTabela(false);
-    // força reload (sujo) mudando e voltando o state rápido, ou recarrega função
-    // Como a effect tem dependências, se apenas zerassemos e repusessemos, acionaria o update.
-    // Pra simplificar, vamos chamar apenas setDisciplinaSelecionada c/ a mesma coisa não trigga... então vamos só atualizar estado interno manual
-    setDisciplinaSelecionada(prev => prev); // (O React18 não aciona se for mesmo ref. Vamos criar trigger)
+    // ✅ Força o useEffect a recarregar a lista de planos (status atualizado)
+    const disc = disciplinaSelecionada;
+    setDisciplinaSelecionada(null);
+    setTimeout(() => setDisciplinaSelecionada(disc), 80);
   };
 
 
@@ -828,19 +835,9 @@ export default function Planos() {
                     };
                     const { data } = await api.post("/avaliacoes", payload);
                     if (data.success) {
-                      setPapKeyAtiva(data.plano_ids ? data.plano_ids[0] : "SALVO");
-                      showMsg("success", "Rascunho salvo com sucesso.");
-                      
-                      // Forçar atualização do dashboard visual
-                      setDisciplinaSelecionada(prev => prev);
-                      voltarTabelaMestra(); 
-                      
-                      setTimeout(() => {
-                         // recarrega os dados pra forçar effect
-                         setDisciplinaSelecionada(null);
-                         setTimeout(() => setDisciplinaSelecionada(disciplinaSelecionada), 50);
-                      }, 500);
-
+                      // ✅ Atualiza o ID do plano (caso fosse novo), mas FICA no editor
+                      if (data.plano_ids) setPapKeyAtiva(data.plano_ids[0]);
+                      showMsg("success", "✅ Rascunho salvo! Continue editando ou clique em VOLTAR PARA O PAINEL.");
                     }
                   } catch (err) {
                     console.error(err);

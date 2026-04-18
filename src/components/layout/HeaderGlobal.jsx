@@ -583,28 +583,34 @@ const UPLOADS_CDN = (() => {
         </button>
       </div>
 
-      {/* Modal de confirmação */}
+      {/* Modal de confirmação - Premium */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 animate-fadeIn">
-          <div className="bg-white rounded-xl shadow-xl p-6 w-80 transform scale-95 animate-scaleUp">
-            <h2 className="text-xl font-bold text-gray-800 mb-3 text-center">
-              Confirmar Logout
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm transition-opacity duration-300">
+          <div className="bg-white rounded-[24px] shadow-2xl p-8 w-[22rem] transform transition-all duration-300 scale-100 flex flex-col items-center animate-fadeInUp">
+            
+            <div className="h-16 w-16 bg-red-50 rounded-full flex items-center justify-center mb-5 shadow-inner">
+              <ArrowRightOnRectangleIcon className="h-8 w-8 text-red-500" />
+            </div>
+
+            <h2 className="text-2xl font-bold text-slate-800 mb-2 font-montserrat text-center">
+              Deseja Sair?
             </h2>
-            <p className="text-gray-600 text-center mb-5">
-              Tem certeza que deseja sair da sua conta?
+            <p className="text-sm text-slate-500 text-center mb-8 px-2 leading-relaxed">
+              Sua sessão atual será encerrada. Você precisará fazer login novamente para voltar ao painel.
             </p>
-            <div className="flex justify-around">
-              <button
-                onClick={() => setShowModal(false)}
-                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition"
-              >
-                Cancelar
-              </button>
+
+            <div className="flex flex-col gap-3 w-full">
               <button
                 onClick={handleLogoutConfirm}
-                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
+                className="w-full py-3 px-4 bg-red-500 hover:bg-red-600 active:bg-red-700 text-white font-bold rounded-xl transition-all shadow-lg shadow-red-500/30 flex items-center justify-center gap-2"
               >
-                Sair
+                Sair da Conta
+              </button>
+              <button
+                onClick={() => setShowModal(false)}
+                className="w-full py-3 px-4 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-700 font-bold rounded-xl transition-colors"
+              >
+                Cancelar
               </button>
             </div>
           </div>

@@ -41,6 +41,7 @@ export default function GabaritoGerar() {
   const [numQuestoes, setNumQuestoes] = useState("10");
   const [numAlternativas, setNumAlternativas] = useState("5");
   const [notaTotal, setNotaTotal] = useState("10");
+  const [dataAplicacao, setDataAplicacao] = useState("");
   const [modelo, setModelo] = useState("padrao");
   const [turnoSel, setTurnoSel] = useState("");
   const [turmasSel, setTurmasSel] = useState([]); // turma mode: múltiplas turmas
@@ -168,6 +169,7 @@ export default function GabaritoGerar() {
     setNumQuestoes("10");
     setNumAlternativas("5");
     setNotaTotal("10");
+    setDataAplicacao("");
     setModelo("padrao");
     setDiscConfig([]);
     setTurnoSel("");

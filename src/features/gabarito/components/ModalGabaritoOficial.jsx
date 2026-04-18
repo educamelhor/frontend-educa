@@ -102,7 +102,7 @@ export default function ModalGabaritoOficial({ open, onClose, onSave, avaliacaoI
     setSalvando(true);
     setErro("");
     try {
-      await api.put(`/gabarito-avaliacoes/${avalSelecionada.id}`, { gabarito_oficial: gabarito });
+      await api.put(`/gabarito-avaliacoes/${avalSelecionada.id}`, { gabarito_oficial: gabarito, status: "publicada" });
       onSave({
         id: avalSelecionada.id, titulo: avalSelecionada.titulo, tipo: avalSelecionada.tipo,
         bimestre: avalSelecionada.bimestre, numQuestoes: avalSelecionada.num_questoes,

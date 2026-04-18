@@ -419,6 +419,8 @@ export default function Planos() {
                     const isEnviado = status === "ENVIADO";
                     const isAprovado = status === "APROVADO";
                     const isDevolvido = status === "DEVOLVIDO";
+                    // ✅ Aprovado + professor já solicitou liberação para edição
+                    const isLiberacaoSolicitada = status === "LIBERACAO_SOLICITADA";
 
                     return (
                       <tr key={turma} className="hover:bg-gray-50 border-b">
@@ -440,6 +442,16 @@ export default function Planos() {
                           {isEnviado && <span className="text-green-600 bg-green-100 px-3 py-1 rounded-full text-xs font-bold">🟢 ENVIADO</span>}
                           {isAprovado && <span className="text-blue-600 bg-blue-100 px-3 py-1 rounded-full text-xs font-bold">🔵 APROVADO</span>}
                           {isDevolvido && <span className="text-amber-700 bg-amber-100 px-3 py-1 rounded-full text-xs font-bold">🟡 DEVOLVIDO</span>}
+                          {/* ✅ Status duplo: aprovado + edição solicitada */}
+                          {isLiberacaoSolicitada && (
+                            <div className="flex flex-col gap-1 items-start">
+                              <span className="text-blue-600 bg-blue-100 px-3 py-1 rounded-full text-xs font-bold">🔵 APROVADO</span>
+                              <span className="text-purple-700 bg-purple-100 px-2.5 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1">
+                                <span className="inline-block w-1.5 h-1.5 bg-purple-500 rounded-full animate-pulse"></span>
+                                ✏️ EDIÇÃO SOLICITADA
+                              </span>
+                            </div>
+                          )}
                         </td>
                         <td className="py-3 px-4 text-right">
                            {isPendente ? (
@@ -465,8 +477,16 @@ export default function Planos() {
                              </button>
                            ) : isAprovado ? (
                              <button
-                               onClick={() => setModalGovernanca({ tipo: "APROVADO", turma, planoId: id })}
+                               onClick={() => setModalGovernanca({ tipo: "APROVADO", turma, planoId: id, solicitacaoJaFeita: false })}
                                className="text-sm px-4 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold rounded shadow-sm border border-blue-200 transition"
+                             >
+                               Editar
+                             </button>
+                           ) : isLiberacaoSolicitada ? (
+                             // ✅ Já solicitou liberação — abre o mesmo modal mas com botão bloqueado
+                             <button
+                               onClick={() => setModalGovernanca({ tipo: "APROVADO", turma, planoId: id, solicitacaoJaFeita: true })}
+                               className="text-sm px-4 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 font-semibold rounded shadow-sm border border-purple-200 transition"
                              >
                                Editar
                              </button>
@@ -1212,16 +1232,23 @@ export default function Planos() {
               >
                 Fechar
               </button>
+              {/* ✅ Botão muda de verde para vermelho se já solicitou */}
               <button
-                disabled={solicitandoLiberacao}
+                disabled={solicitandoLiberacao || !!modalGovernanca?.solicitacaoJaFeita}
                 onClick={async () => {
-                  if (!modalGovernanca?.planoId) return;
+                  if (!modalGovernanca?.planoId || modalGovernanca?.solicitacaoJaFeita) return;
                   setSolicitandoLiberacao(true);
                   try {
                     const res = await api.post(`/avaliacoes/solicitar-liberacao/${modalGovernanca.planoId}`, {
                       motivo: "Professor solicitou liberação para atualização do plano."
                     });
                     if (res.data?.ok) {
+                      // ✅ Atualiza o estado local imediatamente (sem reload)
+                      setTurmasComPlanos(prev => prev.map(t =>
+                        t.turma === modalGovernanca.turma
+                          ? { ...t, status: "LIBERACAO_SOLICITADA" }
+                          : t
+                      ));
                       setModalGovernanca(null);
                       setSolicitacaoEnviada(true);
                     } else {
@@ -1234,11 +1261,20 @@ export default function Planos() {
                     setSolicitandoLiberacao(false);
                   }
                 }}
-                className={`px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-500/25 transition-all active:scale-95 flex items-center gap-2 ${
-                  solicitandoLiberacao ? "opacity-70 cursor-not-allowed" : ""
+                className={`px-5 py-2.5 font-bold rounded-xl shadow-lg transition-all active:scale-95 flex items-center gap-2 ${
+                  modalGovernanca?.solicitacaoJaFeita
+                    ? 'bg-red-500 text-white cursor-not-allowed opacity-80'
+                    : solicitandoLiberacao
+                      ? 'bg-emerald-500 text-white opacity-70 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-emerald-500/25'
                 }`}
               >
-                {solicitandoLiberacao ? (
+                {modalGovernanca?.solicitacaoJaFeita ? (
+                  <>
+                    <span>✗</span>
+                    SOLICITAÇÃO JÁ ENVIADA
+                  </>
+                ) : solicitandoLiberacao ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     Enviando...

@@ -126,7 +126,13 @@ export default function SolicitacoesConteudos() {
 
     setProcessandoAcao(true);
     try {
-      const payload = { status: modalAcao.acao };
+      // ✅ Se é uma liberação de edição: status correto é "LIBERADO" (não "APROVADO")
+      // Assim o professor vê um status distinto e pode editar o plano
+      const statusFinal = modalAcao.acao === "APROVADO" && modalAcao.isLiberacao
+        ? "LIBERADO"
+        : modalAcao.acao;
+
+      const payload = { status: statusFinal };
       if (modalAcao.acao === "DEVOLVIDO") {
         payload.motivo = motivoDevolucao.trim();
       }

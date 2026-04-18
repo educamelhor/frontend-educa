@@ -421,6 +421,8 @@ export default function Planos() {
                     const isDevolvido = status === "DEVOLVIDO";
                     // ✅ Aprovado + professor já solicitou liberação para edição
                     const isLiberacaoSolicitada = status === "LIBERACAO_SOLICITADA";
+                    // ✅ Direção aprovou a solicitação — professor pode editar
+                    const isLiberado = status === "LIBERADO";
 
                     return (
                       <tr key={turma} className="hover:bg-gray-50 border-b">
@@ -452,6 +454,16 @@ export default function Planos() {
                               </span>
                             </div>
                           )}
+                          {/* ✅ Direção liberou para edição */}
+                          {isLiberado && (
+                            <div className="flex flex-col gap-1 items-start">
+                              <span className="text-teal-700 bg-teal-100 px-3 py-1 rounded-full text-xs font-bold">🔓 LIBERADO
+                              </span>
+                              <span className="text-teal-600 text-[10px] font-semibold px-1">
+                                Edição liberada pela Direção
+                              </span>
+                            </div>
+                          )}
                         </td>
                         <td className="py-3 px-4 text-right">
                            {isPendente ? (
@@ -465,6 +477,14 @@ export default function Planos() {
                              <button
                                onClick={() => abrirPlano([turma], id)}
                                className="text-sm px-4 py-1.5 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded shadow transition"
+                             >
+                               Editar
+                             </button>
+                           ) : isLiberado ? (
+                             // ✅ Direção liberou: professor edita diretamente (como RASCUNHO)
+                             <button
+                               onClick={() => abrirPlano([turma], id)}
+                               className="text-sm px-4 py-1.5 bg-teal-600 hover:bg-teal-700 text-white font-semibold rounded shadow transition"
                              >
                                Editar
                              </button>

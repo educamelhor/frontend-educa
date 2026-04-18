@@ -219,15 +219,7 @@ const API_BASE = (() => {
 })();
 
 
-// CDN público do DigitalOcean Spaces (uploads)
-const UPLOADS_CDN = (() => {
-  const raw =
-    import.meta?.env?.VITE_UPLOADS_BASE_URL ||
-    "https://educa-melhor-uploads.nyc3.cdn.digitaloceanspaces.com";
 
-  // Normaliza para NÃO terminar com /uploads
-  return String(raw).trim().replace(/\/+$/, "").replace(/\/uploads$/, "");
-})();
 
   const toPublicUrl = (path) => {
     if (!path) return "";
@@ -237,17 +229,17 @@ const UPLOADS_CDN = (() => {
 
     // ✅ /uploads/...:
     if (path.startsWith("/uploads/")) {
-      const isLocal =
-        API_BASE.includes("localhost") ||
-        API_BASE.includes("127.0.0.1");
+      const rawCdn = import.meta?.env?.VITE_UPLOADS_BASE_URL;
+      
+      if (rawCdn) {
+        // Se houver CDN explícito no .env ativo, usa ele
+        const cdnUrl = String(rawCdn).trim().replace(/\/+$/, "").replace(/\/uploads$/, "");
+        return `${cdnUrl}${path}`;
+      }
 
-      // em localhost, sirva do backend (sem /api no meio)
-      if (isLocal) return `${API_BASE.replace(/\/api$/, "")}${path}`;
-
-      // 🔒 PRODUÇÃO: servir pelo CDN do Spaces (public-read)
-      // O backend DigitalOcean usa disco efêmero (redeploys apagam arquivos locais).
-      // Os uploads são feitos com ACL public-read no Spaces, então o CDN serve direto.
-      return `${UPLOADS_CDN}${path}`;
+      // 🔄 Fallback (PRODUÇÃO / DEV): Sem CDN explícito, serve as fotos diretamente do backend.
+      // O backend monta app.use("/uploads", express.static(...)).
+      return `${API_BASE.replace(/\/api$/, "")}${path}`;
     }
 
     // demais rotas relativas continuam apontando para o backend

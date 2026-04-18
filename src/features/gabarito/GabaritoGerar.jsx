@@ -47,6 +47,7 @@ export default function GabaritoGerar() {
   const [turmaSel, setTurmaSel] = useState(""); // aluno mode: single turma para buscar alunos
   const [modoGeracao, setModoGeracao] = useState("turma");
   const [alunoSel, setAlunoSel] = useState("");
+  const [dataAplicacao, setDataAplicacao] = useState(""); // ← DATA DA PROVA BIMESTRAL
 
   // ─── Disciplinas Mapeadas ───
   const [discConfig, setDiscConfig] = useState([]); // [{disciplina_id, nome, de, ate}]
@@ -175,6 +176,7 @@ export default function GabaritoGerar() {
     setTurmaSel("");
     setAlunoSel("");
     setModoGeracao("turma");
+    setDataAplicacao("");
   }
 
   // ─── Construir endpoint + body para geração de PDF ───
@@ -269,6 +271,7 @@ export default function GabaritoGerar() {
         disciplinas_config: discConfig.length > 0 ? discConfig : null,
         turmas_ids: turmaIds && turmaIds.length > 0 ? turmaIds : null,
         turno: turnoSel || null,
+        data_aplicacao: dataAplicacao || null, // ← propaga para itens fixo_direcao dos PAPs
       };
 
       const avalResp = await api.post("/gabarito-avaliacoes", avaliacaoPayload);
@@ -371,6 +374,29 @@ export default function GabaritoGerar() {
                     disabled={!!avaliacaoSalva}
                   />
                 </div>
+              </div>
+
+              {/* DATA DA PROVA BIMESTRAL */}
+              <div className="gab-form-group">
+                <label className="gab-label" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  📅 Data de Aplicação
+                  <span style={{ fontSize: '0.7rem', fontWeight: 400, color: 'var(--gab-text-muted)', marginLeft: 4 }}>
+                    (Prova Bimestral Padronizada)
+                  </span>
+                </label>
+                <input
+                  id="gabarito-data-aplicacao"
+                  className="gab-input"
+                  type="date"
+                  value={dataAplicacao}
+                  onChange={(e) => setDataAplicacao(e.target.value)}
+                  disabled={!!avaliacaoSalva}
+                />
+                {dataAplicacao && (
+                  <p style={{ fontSize: '0.72rem', color: 'var(--gab-cyan-light)', margin: '4px 0 0', display: 'flex', alignItems: 'center', gap: 4 }}>
+                    ℹ️ Esta data será propagada automaticamente para o PAP de todos os professores deste bimestre.
+                  </p>
+                )}
               </div>
 
               <div className="gab-grid-2">

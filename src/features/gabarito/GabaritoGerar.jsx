@@ -62,6 +62,10 @@ export default function GabaritoGerar() {
   const [gerando, setGerando] = useState(false);
   const [toast, setToast] = useState(null);
 
+  // ─── Avaliações Anteriores (Reimpressão) ───
+  const [avaliacoesAnteriores, setAvaliacoesAnteriores] = useState([]);
+  const [loadingAnteriores, setLoadingAnteriores] = useState(false);
+
   const showToast = useCallback((msg, type = "success") => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3500);
@@ -101,6 +105,36 @@ export default function GabaritoGerar() {
       setLoadingAlunos(false);
     })();
   }, [turmaSel]);
+
+  // ─── Fetch Avaliações Anteriores ───
+  useEffect(() => {
+    carregarAvaliacoes();
+  }, []);
+
+  async function carregarAvaliacoes() {
+    setLoadingAnteriores(true);
+    try {
+      const resp = await api.get("/gabarito-avaliacoes?limit=30");
+      setAvaliacoesAnteriores(resp.data || []);
+    } catch { }
+    setLoadingAnteriores(false);
+  }
+
+  // ─── Carregar Avaliação Existente (Reimpressão) ───
+  function carregarParaReimpressao(a) {
+    setTitulo(a.titulo || "");
+    setTipo(a.tipo || "");
+    setBimestre(a.bimestre || "");
+    setNumQuestoes(String(a.num_questoes || "10"));
+    setNumAlternativas(String(a.num_alternativas || "5"));
+    setNotaTotal(String(a.nota_total || "10"));
+    setModelo(a.modelo || "padrao");
+    setDiscConfig(a.disciplinas_config || []);
+    setDataAplicacao(""); // Limpa pois é opcional ou usado em provas padronizadas
+    setAvaliacaoSalva(a);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    showToast("Avaliação carregada! Defina o Destino e gere a impressão.");
+  }
 
   // ─── Disciplina: Adicionar ───
   function addDisciplina() {
@@ -286,6 +320,7 @@ export default function GabaritoGerar() {
       }
 
       showToast(`Avaliação salva com sucesso (ID: ${salva.id})! Gabaritos gerados.`);
+      carregarAvaliacoes(); // Atualiza a lista abaixo
     } catch (err) {
       const msg = err?.response?.data?.error || err.message || "Erro ao salvar/gerar.";
       showToast(msg, "error");
@@ -945,6 +980,66 @@ export default function GabaritoGerar() {
               </div>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* ═══ CARTÃO: Lista de Avaliações (Reimpressão) ═══ */}
+      <div className="gab-card" style={{ marginTop: 24 }}>
+        <div className="gab-card-header">
+          <div className="gab-card-icon blue">
+            <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m6.75 12l-3-3m0 0l-3 3m3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+            </svg>
+          </div>
+          <div className="gab-card-title">Avaliações Geradas Anteriores (Reimpressão)</div>
+        </div>
+
+        <div style={{ padding: 4 }}>
+          {loadingAnteriores ? (
+            <div style={{ textAlign: "center", padding: 20, color: "var(--gab-text-muted)" }}>
+              Carregando avaliações...
+            </div>
+          ) : avaliacoesAnteriores.length === 0 ? (
+            <div style={{ textAlign: "center", padding: 20, color: "var(--gab-text-muted)" }}>
+              Nenhuma avaliação gerada ainda.
+            </div>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", textAlign: "left", borderCollapse: "collapse", fontSize: "0.85rem" }}>
+                <thead>
+                  <tr style={{ background: "rgba(255,255,255,0.03)", color: "var(--gab-text-muted)" }}>
+                    <th style={{ padding: "12px 14px", borderBottom: "1px solid var(--gab-border)", fontWeight: 600 }}>ID</th>
+                    <th style={{ padding: "12px 14px", borderBottom: "1px solid var(--gab-border)", fontWeight: 600 }}>Data</th>
+                    <th style={{ padding: "12px 14px", borderBottom: "1px solid var(--gab-border)", fontWeight: 600 }}>Título</th>
+                    <th style={{ padding: "12px 14px", borderBottom: "1px solid var(--gab-border)", fontWeight: 600 }}>Tipo</th>
+                    <th style={{ padding: "12px 14px", borderBottom: "1px solid var(--gab-border)", fontWeight: 600 }}>Tamanho</th>
+                    <th style={{ padding: "12px 14px", borderBottom: "1px solid var(--gab-border)", fontWeight: 600 }}>Ação</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {avaliacoesAnteriores.map((a) => (
+                    <tr key={a.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.05)", transition: "background 0.2s" }} className="hover:bg-[rgba(255,255,255,0.02)]">
+                      <td style={{ padding: "12px 14px", color: "var(--gab-text-muted)" }}>#{a.id}</td>
+                      <td style={{ padding: "12px 14px" }}>{new Date(a.created_at).toLocaleDateString("pt-BR")}</td>
+                      <td style={{ padding: "12px 14px", fontWeight: 500, color: "var(--gab-cyan-light)" }}>{a.titulo}</td>
+                      <td style={{ padding: "12px 14px" }}>{TIPOS_AVALIACAO.find((t) => t.id === a.tipo)?.label || a.tipo}</td>
+                      <td style={{ padding: "12px 14px" }}>{a.num_questoes} Qts</td>
+                      <td style={{ padding: "12px 14px" }}>
+                        <button
+                          type="button"
+                          className="gab-btn gab-btn-ghost gab-btn-sm"
+                          onClick={() => carregarParaReimpressao(a)}
+                          style={{ fontSize: "0.75rem", padding: "6px 12px" }}
+                        >
+                          Carregar
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     </>

@@ -748,11 +748,11 @@ export default function Planos() {
                                 );
                               }
 
-                              // 2) Se o PAP ainda está em rascunho (não enviado)
-                              if (papStatus === "RASCUNHO") {
+                              // 2) Se o PAP ainda está em rascunho ou liberado (pode editar livremente)
+                              if (papStatus === "RASCUNHO" || papStatus === "LIBERADO") {
                                 return showMsg(
                                   "info",
-                                  "Plano ainda não foi enviado para a direção. Você pode continuar editando para finalizar."
+                                  "Plano em edição. Você pode continuar editando para finalizar."
                                 );
                               }
 
@@ -783,9 +783,9 @@ export default function Planos() {
                                 );
                               }
 
-                              // 2) Se o PAP ainda está em rascunho (pode editar livremente)
+                              // 2) Se o PAP está em rascunho ou liberado pela direção (pode editar)
 
-                              if (papStatus === "RASCUNHO") {
+                              if (papStatus === "RASCUNHO" || papStatus === "LIBERADO") {
                                 // ✅ modo edição
                                 setEditIndex(idx);
 

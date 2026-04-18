@@ -65,6 +65,7 @@ export default function GabaritoGerar() {
   // ─── Avaliações Anteriores (Reimpressão) ───
   const [avaliacoesAnteriores, setAvaliacoesAnteriores] = useState([]);
   const [loadingAnteriores, setLoadingAnteriores] = useState(false);
+  const [buscaReimpressao, setBuscaReimpressao] = useState("");
 
   const showToast = useCallback((msg, type = "success") => {
     setToast({ msg, type });
@@ -332,6 +333,12 @@ export default function GabaritoGerar() {
 
   // Disciplinas que já foram usadas
   const discUsadas = new Set(discConfig.map((d) => d.disciplina_id).filter(Boolean));
+
+  // Filtro de avaliações para reimpressão
+  const avaliacoesFiltradas = avaliacoesAnteriores.filter((a) =>
+    (a.titulo || "").toLowerCase().includes(buscaReimpressao.toLowerCase()) ||
+    String(a.id) === buscaReimpressao
+  );
 
   return (
     <>
@@ -985,13 +992,25 @@ export default function GabaritoGerar() {
 
       {/* ═══ CARTÃO: Lista de Avaliações (Reimpressão) ═══ */}
       <div className="gab-card" style={{ marginTop: 24 }}>
-        <div className="gab-card-header">
-          <div className="gab-card-icon blue">
-            <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m6.75 12l-3-3m0 0l-3 3m3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-            </svg>
+        <div className="gab-card-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div className="gab-card-icon blue">
+              <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m6.75 12l-3-3m0 0l-3 3m3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+              </svg>
+            </div>
+            <div className="gab-card-title">Avaliações Geradas Anteriores (Reimpressão)</div>
           </div>
-          <div className="gab-card-title">Avaliações Geradas Anteriores (Reimpressão)</div>
+          <div>
+            <input
+              type="text"
+              className="gab-input"
+              placeholder="Buscar por ID ou título..."
+              value={buscaReimpressao}
+              onChange={(e) => setBuscaReimpressao(e.target.value)}
+              style={{ width: "250px", fontSize: "0.85rem", padding: "8px 12px" }}
+            />
+          </div>
         </div>
 
         <div style={{ padding: 4 }}>
@@ -999,9 +1018,11 @@ export default function GabaritoGerar() {
             <div style={{ textAlign: "center", padding: 20, color: "var(--gab-text-muted)" }}>
               Carregando avaliações...
             </div>
-          ) : avaliacoesAnteriores.length === 0 ? (
+          ) : avaliacoesFiltradas.length === 0 ? (
             <div style={{ textAlign: "center", padding: 20, color: "var(--gab-text-muted)" }}>
-              Nenhuma avaliação gerada ainda.
+              {avaliacoesAnteriores.length === 0 
+                ? "Nenhuma avaliação gerada ainda."
+                : "Nenhuma avaliação encontrada na busca."}
             </div>
           ) : (
             <div style={{ overflowX: "auto" }}>
@@ -1017,7 +1038,7 @@ export default function GabaritoGerar() {
                   </tr>
                 </thead>
                 <tbody>
-                  {avaliacoesAnteriores.map((a) => (
+                  {avaliacoesFiltradas.map((a) => (
                     <tr key={a.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.05)", transition: "background 0.2s" }} className="hover:bg-[rgba(255,255,255,0.02)]">
                       <td style={{ padding: "12px 14px", color: "var(--gab-text-muted)" }}>#{a.id}</td>
                       <td style={{ padding: "12px 14px" }}>{new Date(a.created_at).toLocaleDateString("pt-BR")}</td>

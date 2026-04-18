@@ -7,6 +7,7 @@ import {
   IdentificationIcon,
   PencilSquareIcon,
   TrashIcon,
+  CalendarDaysIcon,
 } from "@heroicons/react/24/solid";
 
 import {
@@ -96,6 +97,10 @@ export default function Planos() {
   const [modalGovernanca, setModalGovernanca] = useState(null); // null | { tipo: "ENVIADO" | "APROVADO", turma: "...", planoId }
   const [solicitacaoEnviada, setSolicitacaoEnviada] = useState(false); // modal de confirmação após solicitar liberação
   const [solicitandoLiberacao, setSolicitandoLiberacao] = useState(false);
+
+  // ✅ Modal de data da Prova Bimestral (fixo_direcao)
+  const [modalDataFixo, setModalDataFixo] = useState(false);
+  const [dataFixoTemp, setDataFixoTemp] = useState("");
 
   // Campos do modal
   const [atividade, setAtividade] = useState("");
@@ -654,7 +659,31 @@ export default function Planos() {
                     </td>
                     <td className="border px-4 py-2">
                       {isFixo ? (
-                        <span className="text-gray-400">—</span>
+                        // ✅ Botão de data para Prova Bimestral padronizada
+                        <div className="flex items-center justify-center">
+                          <button
+                            type="button"
+                            title={item.data_inicio
+                              ? `Data da prova: ${new Date(item.data_inicio + 'T12:00:00').toLocaleDateString('pt-BR')} — clique para alterar`
+                              : 'Definir data da Prova Bimestral (obrigatório para enviar)'}
+                            onClick={() => {
+                              if (papStatus === 'APROVADO') return showMsg('info', 'PAP aprovado: data bloqueada para edição.');
+                              if (papStatus === 'ENVIADO') return showMsg('info', 'PAP enviado: aguardando apreciação da direção.');
+                              setDataFixoTemp(item.data_inicio || '');
+                              setModalDataFixo(true);
+                            }}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm ${
+                              item.data_inicio
+                                ? 'bg-green-100 text-green-700 hover:bg-green-200 border border-green-200'
+                                : 'bg-amber-100 text-amber-700 hover:bg-amber-200 border border-amber-300 animate-pulse'
+                            }`}
+                          >
+                            <CalendarDaysIcon className="h-4 w-4 flex-shrink-0" />
+                            {item.data_inicio
+                              ? new Date(item.data_inicio + 'T12:00:00').toLocaleDateString('pt-BR')
+                              : 'Definir data'}
+                          </button>
+                        </div>
                       ) : (
                         <div className="flex items-center justify-center gap-2">
                           {/* Ícone 1 (AZUL) — padrão discreto (igual Alunos) */}
@@ -850,6 +879,15 @@ export default function Planos() {
                     );
                   }
 
+                  // ✅ Data da Prova Bimestral é obrigatória ao enviar para direção
+                  const itemFixo = itens.find(i => i.fixo_direcao);
+                  if (itemFixo && !itemFixo.data_inicio) {
+                    return showMsg(
+                      "error",
+                      "⚠️ Informe a data da Prova Bimestral antes de enviar. Use o botão 📅 na coluna Ações."
+                    );
+                  }
+
                   try {
                     const nomeCodigo = "Plano-" + Math.floor(Math.random() * 10000);
                     const payload = {
@@ -912,6 +950,77 @@ export default function Planos() {
         </section>
       )}
 
+
+      {/* ═══════════════════════════════════════════════════════
+          Modal: Data da Prova Bimestral (fixo_direcao)
+      ════════════════════════════════════════════════════════ */}
+      {modalDataFixo && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setModalDataFixo(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-6 py-5 border-b flex items-center gap-3">
+              <div className="p-2 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl">
+                <CalendarDaysIcon className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h4 className="text-lg font-bold text-gray-800">Data da Prova Bimestral</h4>
+                <p className="text-xs text-gray-500 mt-0.5">Esta data é obrigatória para enviar o PAP à direção.</p>
+              </div>
+            </div>
+
+            <div className="px-6 py-5">
+              <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">
+                Data de Realização *
+              </label>
+              <input
+                type="date"
+                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-gray-800 font-semibold focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition"
+                value={dataFixoTemp}
+                onChange={(e) => setDataFixoTemp(e.target.value)}
+                autoFocus
+              />
+              {!dataFixoTemp && (
+                <p className="text-xs text-amber-600 mt-2 font-medium">
+                  ⚠️ Selecione a data antes de confirmar.
+                </p>
+              )}
+            </div>
+
+            <div className="px-6 pb-5 flex gap-3 justify-end">
+              <button
+                type="button"
+                onClick={() => setModalDataFixo(false)}
+                className="px-5 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-semibold hover:bg-gray-50 transition text-sm"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={!dataFixoTemp}
+                onClick={() => {
+                  if (!dataFixoTemp) return;
+                  // Atualiza o item fixo_direcao no array de itens
+                  setItens(prev => prev.map(it =>
+                    it.fixo_direcao
+                      ? { ...it, data_inicio: dataFixoTemp, data_final: dataFixoTemp }
+                      : it
+                  ));
+                  setModalDataFixo(false);
+                  showMsg('success', `Data da Prova Bimestral definida: ${new Date(dataFixoTemp + 'T12:00:00').toLocaleDateString('pt-BR')}`);
+                }}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold shadow hover:from-amber-400 hover:to-orange-400 transition text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                ✓ Confirmar Data
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal premium de confirmação de exclusão */}
       {confirmExcluirOpen && (

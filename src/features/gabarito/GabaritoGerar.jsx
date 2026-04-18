@@ -47,7 +47,6 @@ export default function GabaritoGerar() {
   const [turmaSel, setTurmaSel] = useState(""); // aluno mode: single turma para buscar alunos
   const [modoGeracao, setModoGeracao] = useState("turma");
   const [alunoSel, setAlunoSel] = useState("");
-  const [dataAplicacao, setDataAplicacao] = useState(""); // ← DATA DA PROVA BIMESTRAL
 
   // ─── Disciplinas Mapeadas ───
   const [discConfig, setDiscConfig] = useState([]); // [{disciplina_id, nome, de, ate}]
@@ -176,7 +175,6 @@ export default function GabaritoGerar() {
     setTurmaSel("");
     setAlunoSel("");
     setModoGeracao("turma");
-    setDataAplicacao("");
   }
 
   // ─── Construir endpoint + body para geração de PDF ───
@@ -271,7 +269,6 @@ export default function GabaritoGerar() {
         disciplinas_config: discConfig.length > 0 ? discConfig : null,
         turmas_ids: turmaIds && turmaIds.length > 0 ? turmaIds : null,
         turno: turnoSel || null,
-        data_aplicacao: dataAplicacao || null, // ← propaga para itens fixo_direcao dos PAPs
       };
 
       const avalResp = await api.post("/gabarito-avaliacoes", avaliacaoPayload);

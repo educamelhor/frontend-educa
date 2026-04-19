@@ -65,6 +65,7 @@ import LayoutGrade from "./features/secretaria/horarios/LayoutGrade.jsx";
 import ExecutarMock from "./features/secretaria/horarios/ExecutarMock.jsx";
 import AgenteCredenciais from "./features/agente-educa/Credenciais";
 import AgentePlanos from "./features/agente-educa/AgentePlanos";
+import AgenteNotas from "./features/agente-educa/AgenteNotas";
 
 // ✅ MÓDULO FREQUÊNCIA
 import Atestados from "./features/frequencia/Atestados.jsx";
@@ -313,6 +314,7 @@ export default function App() {
           {/* ── Agente EDUCA ─────────────────────────────────────────────── */}
           <Route path="/agente-educa/credenciais" element={<AgenteCredenciais />} />
           <Route path="/agente-educa/planos"      element={<AgentePlanos />} />
+          <Route path="/agente-educa/notas"       element={<AgenteNotas />} />
 
           {/* ── Direção ──────────────────────────────────────────────────── */}
           <Route path="/direcao/diretor" element={

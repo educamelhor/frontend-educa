@@ -982,6 +982,21 @@ export default function Sidebar({ isOpen, onClose }) {
                     }}>ETAPA 1</span>
                   </Link>
                 </li>
+                <li>
+                  <Link
+                    to="/agente-educa/notas"
+                    className={getSubmenuLinkClasses('/agente-educa/notas')}
+                  >
+                    <ChartBarIcon className="h-5 w-5 mr-2" />
+                    Notas
+                    <span style={{
+                      marginLeft: 6, fontSize: '0.52rem', fontWeight: 800,
+                      background: 'linear-gradient(135deg,#10b981,#0891b2)',
+                      color: '#fff', padding: '1px 5px', borderRadius: 6,
+                      letterSpacing: '0.4px',
+                    }}>ETAPA 2</span>
+                  </Link>
+                </li>
               </ul>
             )}
 

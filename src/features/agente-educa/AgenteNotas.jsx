@@ -113,6 +113,30 @@ function NotaCard({ plano, onExportar, exportandoId, onVerRelatorio }) {
                     ✓ Estrutura exportada
                   </span>
                 )}
+                {notasExportadas && (
+                  <button
+                    onClick={() => onVerRelatorio(plano)}
+                    title="Ver relatório da última exportação"
+                    style={{
+                      fontSize: "0.65rem", fontWeight: 700, padding: "3px 10px", borderRadius: 99,
+                      background: "rgba(99,102,241,0.12)", color: "#a5b4fc",
+                      border: "1px solid rgba(99,102,241,0.35)",
+                      cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4,
+                      transition: "background 0.15s, color 0.15s",
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = "rgba(99,102,241,0.25)";
+                      e.currentTarget.style.color = "#c7d2fe";
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = "rgba(99,102,241,0.12)";
+                      e.currentTarget.style.color = "#a5b4fc";
+                    }}
+                  >
+                    <ClipboardDocumentListIcon style={{ width: 11 }} />
+                    Relatório de Exportação
+                  </button>
+                )}
               </div>
 
               <div style={{ fontSize: "1.05rem", fontWeight: 800, color: "#e2e8f0", marginBottom: 4 }}>
@@ -127,43 +151,17 @@ function NotaCard({ plano, onExportar, exportandoId, onVerRelatorio }) {
             {/* Ações */}
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
               {notasExportadas ? (
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
-                  {/* Badge Notas Exportadas */}
-                  <div style={{
-                    display: "flex", alignItems: "center", gap: 6, padding: "8px 14px",
-                    borderRadius: 12, background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.25)",
-                  }}>
-                    <CheckCircleIcon style={{ width: 16, color: "#22c55e" }} />
-                    <div style={{ textAlign: "right" }}>
-                      <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "#22c55e" }}>Notas Exportadas</div>
-                      <div style={{ fontSize: "0.6rem", color: "#4ade80" }}>
-                        {new Date(plano.agente_notas_exportadas_em).toLocaleDateString("pt-BR")}
-                      </div>
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 6, padding: "8px 14px",
+                  borderRadius: 12, background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.25)",
+                }}>
+                  <CheckCircleIcon style={{ width: 16, color: "#22c55e" }} />
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "#22c55e" }}>Notas Exportadas</div>
+                    <div style={{ fontSize: "0.6rem", color: "#4ade80" }}>
+                      {new Date(plano.agente_notas_exportadas_em).toLocaleDateString("pt-BR")}
                     </div>
                   </div>
-                  {/* Botão Relatório de Exportação */}
-                  <button
-                    onClick={() => onVerRelatorio(plano)}
-                    style={{
-                      display: "flex", alignItems: "center", gap: 6,
-                      padding: "6px 13px", borderRadius: 10,
-                      background: "rgba(99,102,241,0.12)",
-                      border: "1px solid rgba(99,102,241,0.35)",
-                      color: "#a5b4fc", fontSize: "0.68rem", fontWeight: 700,
-                      cursor: "pointer", transition: "all 0.2s",
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.background = "rgba(99,102,241,0.22)";
-                      e.currentTarget.style.color = "#c7d2fe";
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.background = "rgba(99,102,241,0.12)";
-                      e.currentTarget.style.color = "#a5b4fc";
-                    }}
-                  >
-                    <ClipboardDocumentListIcon style={{ width: 13 }} />
-                    Relatório de Exportação
-                  </button>
                 </div>
               ) : !bimestral ? (
                 <div style={{

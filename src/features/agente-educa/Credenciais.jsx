@@ -134,7 +134,7 @@ export default function AgenteCredenciais() {
           // O Map em memória pode ter sido limpo (deploy/restart), mas o banco
           // registrou o ultimo_teste_em — se for recente (<2min), é sucesso.
           const testDate = new Date(ultimo_teste_em);
-          const isRecent = (Date.now() - testDate.getTime()) < 120_000;
+          const isRecent = (Date.now() - testDate.getTime()) < 300_000; // 5 min (EDUCADF pode demorar até 2-3 min)
           if (isRecent) {
             setStatusConexao('conectado');
             setUltimoTeste(ultimo_teste_em);
@@ -166,8 +166,15 @@ export default function AgenteCredenciais() {
     setFeedback({ type: 'info', msg: 'Agente iniciando sessão virtual no portal EDUCADF…' });
 
     try {
-      await api.post(`/api/agente/credenciais/${credId}/testar`);
-      startPolling(credId);
+      const resp = await api.post(`/api/agente/credenciais/${credId}/testar`);
+
+      // CORREÇÃO: backend pode ter gerado novo id (DELETE+INSERT ao salvar).
+      // Sincroniza com o realCredId devolvido para que o polling use o id correto.
+      const realId = resp.data?.credId || credId;
+      if (realId !== credId) {
+        setCredencialId(realId);
+      }
+      startPolling(realId);
     } catch (err) {
       setStatusConexao('erro');
       const status = err?.response?.status;

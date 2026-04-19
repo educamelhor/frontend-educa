@@ -230,9 +230,9 @@ export default function AgentePlanos() {
   const [carregando, setCarregando]     = useState(true);
   const [exportandoId, setExportandoId] = useState(null);
   const [filtro, setFiltro]             = useState("todos"); // todos | prontos | exportados
-  const [msgSistema, setMsgSistema]     = useState(null);
   const [modalConfirm, setModalConfirm] = useState(null); // plano selecionado p/ confirmar export
   const [modalSemCred, setModalSemCred] = useState(false); // modal de credenciais não configuradas
+  const [modalResultado, setModalResultado] = useState(null); // { tipo: 'sucesso'|'erro', titulo, texto }
   // Turmas e disciplinas do professor logado (para filtro pessoal duplo)
   const [turmasNomesProf, setTurmasNomesProf] = useState(null);
 
@@ -270,9 +270,8 @@ export default function AgentePlanos() {
     fetchDados();
   }, []);
 
-  const showMsg = (type, text) => {
-    setMsgSistema({ type, text });
-    setTimeout(() => setMsgSistema(null), 5000);
+  const abrirModalResultado = (tipo, titulo, texto) => {
+    setModalResultado({ tipo, titulo, texto });
   };
 
   // ── Filtros ────────────────────────────────────────────
@@ -302,27 +301,34 @@ export default function AgentePlanos() {
   // ── Exportar estrutura ─────────────────────────────────
   const handleExportarEstrutura = async (plano) => {
     setModalConfirm(null);
+    setModalResultado(null); // limpa resultado anterior
     setExportandoId(plano.id);
     try {
-      // Envia para o backend (endpoint a ser criado na Etapa 2)
       const resp = await api.post(`/agente-planos/${plano.id}/exportar-estrutura`);
       if (resp.data?.ok) {
-        // Atualiza localmente o plano como exportado
+        // Atualiza status localmente — imediato, sem F5
         setPlanos(prev => prev.map(p =>
           p.id === plano.id
             ? { ...p, agente_exportado_em: new Date().toISOString() }
             : p
         ));
-        showMsg("success", `✅ Estrutura da Avaliação Bimestral exportada para o EDUCADF — ${plano.disciplina} · ${plano.turmas}`);
+        abrirModalResultado(
+          'sucesso',
+          'Exportação concluída!',
+          `A coluna Avaliação Bimestral foi criada no EDUCADF com sucesso.\n\n📘 ${plano.disciplina} · ${plano.turmas} · ${plano.bimestre}`
+        );
+      } else {
+        // Backend retornou ok: false mas sem throw (ex: 502)
+        const errMsg = resp.data?.message || resp.data?.error || 'Exportação não concluída.';
+        abrirModalResultado('erro', 'Exportação não concluída', errMsg);
       }
     } catch (err) {
       const codigo = err.response?.data?.codigo;
       if (codigo === 'SEM_CREDENCIAIS' || codigo === 'CREDENCIAIS_CORROMPIDAS') {
-        // Modal premium de credenciais não configuradas
         setModalSemCred(true);
       } else {
-        const errMsg = err.response?.data?.error || "Erro ao exportar estrutura.";
-        showMsg("error", `❌ ${errMsg}`);
+        const errMsg = err.response?.data?.error || err.response?.data?.message || 'Erro ao exportar estrutura.';
+        abrirModalResultado('erro', 'Erro na exportação', errMsg);
       }
     } finally {
       setExportandoId(null);
@@ -458,18 +464,70 @@ export default function AgentePlanos() {
         ))}
       </div>
 
-      {/* ═════════════════════ MENSAGEM SISTEMA ══════════════════ */}
-      {msgSistema && (
-        <div style={{
-          margin: "16px 32px 0",
-          padding: "12px 18px", borderRadius: 14,
-          background: msgSistema.type === "success" ? "rgba(34,197,94,0.08)" : "rgba(239,68,68,0.08)",
-          border: `1px solid ${msgSistema.type === "success" ? "rgba(34,197,94,0.3)" : "rgba(239,68,68,0.3)"}`,
-          color: msgSistema.type === "success" ? "#4ade80" : "#f87171",
-          fontSize: "0.85rem", fontWeight: 600,
-          animation: "slideDown 0.3s ease",
-        }}>
-          {msgSistema.text}
+      {/* ═════════════════════ MODAL RESULTADO ══════════════════ */}
+      {modalResultado && (
+        <div
+          style={{
+            position: "fixed", inset: 0, zIndex: 500,
+            background: "rgba(0,0,0,0.82)", backdropFilter: "blur(12px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            animation: "fadeIn 0.2s ease",
+          }}
+          onClick={() => setModalResultado(null)}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: "100%", maxWidth: 420, margin: "0 16px",
+              borderRadius: 24, overflow: "hidden",
+              background: "linear-gradient(160deg, #1a1f35 0%, #12172a 100%)",
+              border: `1px solid ${modalResultado.tipo === 'sucesso' ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
+              boxShadow: "0 32px 80px rgba(0,0,0,0.7)",
+            }}
+          >
+            {/* Header colorido */}
+            <div style={{
+              background: modalResultado.tipo === 'sucesso'
+                ? "linear-gradient(135deg, #16a34a, #15803d)"
+                : "linear-gradient(135deg, #dc2626, #b91c1c)",
+              padding: "28px 28px 22px", textAlign: "center",
+            }}>
+              <div style={{ fontSize: "2.6rem", marginBottom: 10 }}>
+                {modalResultado.tipo === 'sucesso' ? '✅' : '❌'}
+              </div>
+              <div style={{ fontSize: "1.1rem", fontWeight: 900, color: "#fff", letterSpacing: "-0.3px" }}>
+                {modalResultado.titulo}
+              </div>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: "24px 28px" }}>
+              <div style={{
+                padding: "14px 16px", borderRadius: 14, marginBottom: 20,
+                background: modalResultado.tipo === 'sucesso' ? "rgba(34,197,94,0.07)" : "rgba(239,68,68,0.07)",
+                border: `1px solid ${modalResultado.tipo === 'sucesso' ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)'}`,
+                fontSize: "0.85rem",
+                color: modalResultado.tipo === 'sucesso' ? "#86efac" : "#fca5a5",
+                lineHeight: 1.65, whiteSpace: "pre-line",
+              }}>
+                {modalResultado.texto}
+              </div>
+              <button
+                onClick={() => setModalResultado(null)}
+                style={{
+                  width: "100%", padding: "12px", borderRadius: 12,
+                  background: modalResultado.tipo === 'sucesso'
+                    ? "linear-gradient(135deg, #16a34a, #15803d)"
+                    : "linear-gradient(135deg, #dc2626, #b91c1c)",
+                  border: "none", color: "#fff",
+                  fontWeight: 800, fontSize: "0.9rem", cursor: "pointer",
+                  boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
+                }}
+              >
+                {modalResultado.tipo === 'sucesso' ? 'Ótimo!' : 'Entendido'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

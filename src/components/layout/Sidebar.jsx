@@ -940,16 +940,6 @@ export default function Sidebar({ isOpen, onClose }) {
             >
               <BoltIcon className="h-5 w-5 mr-2" style={{ color: openGroup === 'agente-educa' ? '#eab308' : undefined }} />
               <span className="flex-1 text-left font-bold">Agente EDUCA</span>
-              <span style={{
-                fontSize: '0.55rem',
-                fontWeight: 800,
-                background: 'linear-gradient(135deg, #eab308, #f59e0b)',
-                color: '#fff',
-                padding: '2px 6px',
-                borderRadius: '8px',
-                letterSpacing: '0.5px',
-                marginRight: 4,
-              }}>PREMIUM</span>
               {openGroup === 'agente-educa' ? (
                 <ChevronDownIcon className="h-4 w-4" />
               ) : (
@@ -965,6 +955,12 @@ export default function Sidebar({ isOpen, onClose }) {
                     className={getSubmenuLinkClasses('/agente-educa/credenciais')}
                   >
                     <Cog6ToothIcon className="h-5 w-5 mr-2" /> Credenciais
+                    <span style={{
+                      marginLeft: 6, fontSize: '0.52rem', fontWeight: 800,
+                      background: 'linear-gradient(135deg,#475569,#64748b)',
+                      color: '#fff', padding: '1px 5px', borderRadius: 6,
+                      letterSpacing: '0.4px',
+                    }}>ETAPA 0</span>
                   </Link>
                 </li>
                 <li>

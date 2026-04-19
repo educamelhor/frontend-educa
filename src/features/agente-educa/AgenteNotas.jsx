@@ -41,8 +41,8 @@ const BIMESTRE_COLORS = {
   "4º Bimestre": "#f59e0b",
 };
 
-// ── Card individual de plano ──────────────────────────────
-function NotaCard({ plano, onExportar, exportandoId }) {
+// ── Card individual de plano ──────────────────────────
+function NotaCard({ plano, onExportar, exportandoId, onVerRelatorio }) {
   const [expanded, setExpanded] = useState(false);
 
   const statusInfo = STATUS_LABELS[plano.status] || STATUS_LABELS.RASCUNHO;
@@ -127,17 +127,43 @@ function NotaCard({ plano, onExportar, exportandoId }) {
             {/* Ações */}
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
               {notasExportadas ? (
-                <div style={{
-                  display: "flex", alignItems: "center", gap: 6, padding: "8px 14px",
-                  borderRadius: 12, background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.25)",
-                }}>
-                  <CheckCircleIcon style={{ width: 16, color: "#22c55e" }} />
-                  <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "#22c55e" }}>Notas Exportadas</div>
-                    <div style={{ fontSize: "0.6rem", color: "#4ade80" }}>
-                      {new Date(plano.agente_notas_exportadas_em).toLocaleDateString("pt-BR")}
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6 }}>
+                  {/* Badge Notas Exportadas */}
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 6, padding: "8px 14px",
+                    borderRadius: 12, background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.25)",
+                  }}>
+                    <CheckCircleIcon style={{ width: 16, color: "#22c55e" }} />
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "#22c55e" }}>Notas Exportadas</div>
+                      <div style={{ fontSize: "0.6rem", color: "#4ade80" }}>
+                        {new Date(plano.agente_notas_exportadas_em).toLocaleDateString("pt-BR")}
+                      </div>
                     </div>
                   </div>
+                  {/* Botão Relatório de Exportação */}
+                  <button
+                    onClick={() => onVerRelatorio(plano)}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 6,
+                      padding: "6px 13px", borderRadius: 10,
+                      background: "rgba(99,102,241,0.12)",
+                      border: "1px solid rgba(99,102,241,0.35)",
+                      color: "#a5b4fc", fontSize: "0.68rem", fontWeight: 700,
+                      cursor: "pointer", transition: "all 0.2s",
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = "rgba(99,102,241,0.22)";
+                      e.currentTarget.style.color = "#c7d2fe";
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = "rgba(99,102,241,0.12)";
+                      e.currentTarget.style.color = "#a5b4fc";
+                    }}
+                  >
+                    <ClipboardDocumentListIcon style={{ width: 13 }} />
+                    Relatório de Exportação
+                  </button>
                 </div>
               ) : !bimestral ? (
                 <div style={{
@@ -407,6 +433,33 @@ export default function AgenteNotas() {
     }
   };
 
+  // ── Ver relatório da última exportação ───────────────────────
+  const handleVerRelatorio = async (plano) => {
+    try {
+      const resp = await api.get(`/avaliacoes/${plano.id}`);
+      const d    = resp.data || {};
+      const r    = d.agente_notas_resultado || {};
+
+      setModalResultado({
+        tipo:  "sucesso",
+        titulo: "Relatório da Última Exportação",
+        plano,
+        totalPreenchidos:     r.totalPreenchidos     ?? null,
+        totalErros:           r.totalErros           ?? null,
+        alunosNaoEncontrados: r.alunosNaoEncontrados || [],
+        alunosDesabilitados:  r.alunosDesabilitados  || [],
+        exportadoEm:          d.agente_notas_exportadas_em,
+        isHistorico:          true,
+      });
+    } catch {
+      setModalResultado({
+        tipo:  "erro",
+        titulo: "Relatório indisponível",
+        texto:  "Não foi possível carregar o histórico. Tente novamente.",
+      });
+    }
+  };
+
   // ─────────────────────────────────────────────────────────
   // RENDER
   // ─────────────────────────────────────────────────────────
@@ -567,6 +620,7 @@ export default function AgenteNotas() {
               plano={plano}
               exportandoId={exportandoId}
               onExportar={(p) => setModalConfirm(p)}
+              onVerRelatorio={handleVerRelatorio}
             />
           ))
         )}
@@ -697,13 +751,15 @@ export default function AgenteNotas() {
           >
             {/* ─ Header ─ */}
             <div style={{
-              background: modalResultado.tipo === "sucesso"
-                ? "linear-gradient(135deg, #059669 0%, #0891b2 100%)"
-                : "linear-gradient(135deg, #dc2626, #b91c1c)",
+              background: modalResultado.isHistorico
+                ? "linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)"
+                : modalResultado.tipo === "sucesso"
+                  ? "linear-gradient(135deg, #059669 0%, #0891b2 100%)"
+                  : "linear-gradient(135deg, #dc2626, #b91c1c)",
               padding: "28px 28px 22px", textAlign: "center",
             }}>
               <div style={{ fontSize: "2.8rem", marginBottom: 10 }}>
-                {modalResultado.tipo === "sucesso" ? "✅" : "❌"}
+                {modalResultado.isHistorico ? "📋" : modalResultado.tipo === "sucesso" ? "✅" : "❌"}
               </div>
               <div style={{ fontSize: "1.15rem", fontWeight: 900, color: "#fff", letterSpacing: "-0.3px" }}>
                 {modalResultado.titulo}
@@ -711,6 +767,14 @@ export default function AgenteNotas() {
               {modalResultado.plano && (
                 <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.7)", marginTop: 6 }}>
                   {modalResultado.plano.disciplina} · {modalResultado.plano.turmas} · {modalResultado.plano.bimestre}
+                </div>
+              )}
+              {modalResultado.exportadoEm && (
+                <div style={{
+                  fontSize: "0.68rem", color: "rgba(255,255,255,0.55)", marginTop: 4,
+                  fontStyle: "italic",
+                }}>
+                  Exportado em {new Date(modalResultado.exportadoEm).toLocaleString("pt-BR")}
                 </div>
               )}
             </div>
@@ -881,16 +945,18 @@ export default function AgenteNotas() {
                 onClick={() => setModalResultado(null)}
                 style={{
                   width: "100%", padding: "13px", borderRadius: 13,
-                  background: modalResultado.tipo === "sucesso"
-                    ? "linear-gradient(135deg, #059669, #0891b2)"
-                    : "linear-gradient(135deg, #dc2626, #b91c1c)",
+                  background: modalResultado.isHistorico
+                    ? "linear-gradient(135deg, #4f46e5, #7c3aed)"
+                    : modalResultado.tipo === "sucesso"
+                      ? "linear-gradient(135deg, #059669, #0891b2)"
+                      : "linear-gradient(135deg, #dc2626, #b91c1c)",
                   border: "none", color: "#fff",
                   fontWeight: 800, fontSize: "0.92rem", cursor: "pointer",
                   boxShadow: "0 4px 20px rgba(0,0,0,0.35)",
                   letterSpacing: "0.2px",
                 }}
               >
-                {modalResultado.tipo === "sucesso" ? "Ótimo, fechar" : "Entendido"}
+                {modalResultado.isHistorico ? "Fechar relatório" : modalResultado.tipo === "sucesso" ? "Ótimo, fechar" : "Entendido"}
               </button>
             </div>
           </div>

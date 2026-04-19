@@ -959,7 +959,7 @@ export default function Sidebar({ isOpen, onClose }) {
                       marginLeft: 6, fontSize: '0.52rem', fontWeight: 800,
                       background: 'linear-gradient(135deg,#475569,#64748b)',
                       color: '#fff', padding: '1px 5px', borderRadius: 6,
-                      letterSpacing: '0.4px',
+                      letterSpacing: '0.4px', whiteSpace: 'nowrap',
                     }}>ETAPA 0</span>
                   </Link>
                 </li>

@@ -11,6 +11,8 @@ import {
   RocketLaunchIcon,
   SparklesIcon,
   ExclamationTriangleIcon,
+  UserGroupIcon,
+  InformationCircleIcon,
 } from "@heroicons/react/24/outline";
 
 /**
@@ -315,26 +317,35 @@ export default function AgenteNotas() {
     setModalResultado(null);
     setExportandoId(plano.id);
 
-    const marcarSucesso = (exportadoEm) => {
+    const abrirResultadoRico = (dados, exportadoEm) => {
+      // Atualiza o card na lista
       setPlanos(prev => prev.map(p =>
         p.id === plano.id
           ? { ...p, agente_notas_exportadas_em: exportadoEm || new Date().toISOString() }
           : p
       ));
-      abrirModalResultado(
-        "sucesso",
-        "Notas exportadas!",
-        `As notas da Avaliação Bimestral foram enviadas ao EDUCADF com sucesso.\n\n📘 ${plano.disciplina} · ${plano.turmas} · ${plano.bimestre}`
-      );
+      setModalResultado({
+        tipo: "sucesso",
+        titulo: "Exportação concluída!",
+        plano,
+        totalPreenchidos: dados.totalPreenchidos ?? 0,
+        totalErros:       dados.totalErros ?? 0,
+        alunosNaoEncontrados: dados.alunosNaoEncontrados || [],
+      });
     };
 
     try {
       const resp = await api.post(`/agente-planos/${plano.id}/exportar-notas`);
-      if (resp.data?.ok) {
-        marcarSucesso();
+      const d    = resp.data || {};
+
+      if (d.ok) {
+        abrirResultadoRico(d);
       } else {
-        const errMsg = resp.data?.message || resp.data?.error || "Exportação de notas não concluída.";
-        abrirModalResultado("erro", "Exportação não concluída", errMsg);
+        setModalResultado({
+          tipo: "erro",
+          titulo: "Exportação não concluída",
+          texto: d.message || d.error || "Exportação de notas não concluída.",
+        });
       }
       setExportandoId(null);
 
@@ -346,34 +357,36 @@ export default function AgenteNotas() {
         return;
       }
 
-      // Timeout — Playwright ainda rodando no servidor: polling 5 min
+      // Timeout — Playwright ainda rodando: polling 5 min
       if (!err.response) {
-        const MAX_TENTATIVAS = 15; // 15 × 20s = 5 min
+        const MAX_TENTATIVAS = 15;
         let encontrado = false;
         for (let i = 0; i < MAX_TENTATIVAS && !encontrado; i++) {
           await new Promise(r => setTimeout(r, 20000));
           try {
             const check = await api.get(`/avaliacoes/${plano.id}`);
-            const exportadoEm = check.data?.agente_notas_exportadas_em;
-            if (exportadoEm) {
-              marcarSucesso(exportadoEm);
+            if (check.data?.agente_notas_exportadas_em) {
+              abrirResultadoRico({ totalPreenchidos: "?", totalErros: 0, alunosNaoEncontrados: [] }, check.data.agente_notas_exportadas_em);
               encontrado = true;
             }
-          } catch { /* ignora erros de polling */ }
+          } catch { /* ignora */ }
         }
         if (!encontrado) {
-          abrirModalResultado(
-            "erro",
-            "Tempo esgotado",
-            "A exportação demorou mais que o esperado.\n\nAtualize a página para verificar se foi concluída no EDUCADF."
-          );
+          setModalResultado({
+            tipo: "erro",
+            titulo: "Tempo esgotado",
+            texto: "A exportação demorou mais que o esperado.\n\nAtualize a página para verificar se foi concluída no EDUCADF.",
+          });
         }
         setExportandoId(null);
         return;
       }
 
-      const errMsg = err.response?.data?.error || err.response?.data?.message || "Erro ao exportar notas.";
-      abrirModalResultado("erro", "Erro na exportação", errMsg);
+      setModalResultado({
+        tipo: "erro",
+        titulo: "Erro na exportação",
+        texto: err.response?.data?.error || err.response?.data?.message || "Erro ao exportar notas.",
+      });
       setExportandoId(null);
     }
   };
@@ -641,65 +654,186 @@ export default function AgenteNotas() {
         </div>
       )}
 
-      {/* ═══════════════ MODAL RESULTADO ════════════════════════════════ */}
+      {/* ═══════════════ MODAL RESULTADO (premium) ═══════════════════════ */}
       {modalResultado && (
         <div
           style={{
             position: "fixed", inset: 0, zIndex: 500,
-            background: "rgba(0,0,0,0.82)", backdropFilter: "blur(12px)",
+            background: "rgba(0,0,0,0.85)", backdropFilter: "blur(14px)",
             display: "flex", alignItems: "center", justifyContent: "center",
-            animation: "fadeIn 0.2s ease",
+            padding: "16px",
+            animation: "fadeIn 0.25s ease",
           }}
           onClick={() => setModalResultado(null)}
         >
           <div
             onClick={e => e.stopPropagation()}
             style={{
-              width: "100%", maxWidth: 420, margin: "0 16px",
+              width: "100%", maxWidth: modalResultado.tipo === "sucesso" ? 520 : 420,
               borderRadius: 24, overflow: "hidden",
               background: "linear-gradient(160deg, #1a1f35 0%, #12172a 100%)",
-              border: `1px solid ${modalResultado.tipo === "sucesso" ? "rgba(34,197,94,0.3)" : "rgba(239,68,68,0.3)"}`,
-              boxShadow: "0 32px 80px rgba(0,0,0,0.7)",
+              border: `1px solid ${
+                modalResultado.tipo === "sucesso" ? "rgba(16,185,129,0.3)" : "rgba(239,68,68,0.3)"
+              }`,
+              boxShadow: "0 40px 100px rgba(0,0,0,0.75)",
+              animation: "slideDown 0.3s ease",
             }}
           >
+            {/* ─ Header ─ */}
             <div style={{
               background: modalResultado.tipo === "sucesso"
-                ? "linear-gradient(135deg, #16a34a, #15803d)"
+                ? "linear-gradient(135deg, #059669 0%, #0891b2 100%)"
                 : "linear-gradient(135deg, #dc2626, #b91c1c)",
               padding: "28px 28px 22px", textAlign: "center",
             }}>
-              <div style={{ fontSize: "2.6rem", marginBottom: 10 }}>
+              <div style={{ fontSize: "2.8rem", marginBottom: 10 }}>
                 {modalResultado.tipo === "sucesso" ? "✅" : "❌"}
               </div>
-              <div style={{ fontSize: "1.1rem", fontWeight: 900, color: "#fff", letterSpacing: "-0.3px" }}>
+              <div style={{ fontSize: "1.15rem", fontWeight: 900, color: "#fff", letterSpacing: "-0.3px" }}>
                 {modalResultado.titulo}
               </div>
+              {modalResultado.plano && (
+                <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.7)", marginTop: 6 }}>
+                  {modalResultado.plano.disciplina} · {modalResultado.plano.turmas} · {modalResultado.plano.bimestre}
+                </div>
+              )}
             </div>
 
-            <div style={{ padding: "24px 28px" }}>
-              <div style={{
-                padding: "14px 16px", borderRadius: 14, marginBottom: 20,
-                background: modalResultado.tipo === "sucesso" ? "rgba(34,197,94,0.07)" : "rgba(239,68,68,0.07)",
-                border: `1px solid ${modalResultado.tipo === "sucesso" ? "rgba(34,197,94,0.2)" : "rgba(239,68,68,0.2)"}`,
-                fontSize: "0.85rem",
-                color: modalResultado.tipo === "sucesso" ? "#86efac" : "#fca5a5",
-                lineHeight: 1.65, whiteSpace: "pre-line",
-              }}>
-                {modalResultado.texto}
-              </div>
+            <div style={{ padding: "24px 26px" }}>
+
+              {/* ── Resultado de sucesso com métricas ── */}
+              {modalResultado.tipo === "sucesso" && (
+                <>
+                  {/* Métricas */}
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
+                    <div style={{
+                      padding: "14px", borderRadius: 14, textAlign: "center",
+                      background: "rgba(16,185,129,0.09)", border: "1px solid rgba(16,185,129,0.25)",
+                    }}>
+                      <div style={{ fontSize: "2rem", fontWeight: 900, color: "#34d399", lineHeight: 1 }}>
+                        {modalResultado.totalPreenchidos}
+                      </div>
+                      <div style={{ fontSize: "0.65rem", color: "#6ee7b7", fontWeight: 700, marginTop: 4, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                        Notas exportadas
+                      </div>
+                    </div>
+                    <div style={{
+                      padding: "14px", borderRadius: 14, textAlign: "center",
+                      background: modalResultado.totalErros > 0 ? "rgba(245,158,11,0.09)" : "rgba(255,255,255,0.03)",
+                      border: `1px solid ${modalResultado.totalErros > 0 ? "rgba(245,158,11,0.3)" : "rgba(255,255,255,0.07)"}`,
+                    }}>
+                      <div style={{ fontSize: "2rem", fontWeight: 900, color: modalResultado.totalErros > 0 ? "#fbbf24" : "#94a3b8", lineHeight: 1 }}>
+                        {modalResultado.totalErros}
+                      </div>
+                      <div style={{ fontSize: "0.65rem", color: modalResultado.totalErros > 0 ? "#fde68a" : "#475569", fontWeight: 700, marginTop: 4, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                        Não encontrados
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ── Alunos não encontrados (dessincronização) ── */}
+                  {modalResultado.alunosNaoEncontrados?.length > 0 && (
+                    <div style={{
+                      borderRadius: 14, overflow: "hidden",
+                      border: "1px solid rgba(245,158,11,0.3)",
+                      marginBottom: 16,
+                    }}>
+                      {/* Header do aviso */}
+                      <div style={{
+                        background: "linear-gradient(135deg, rgba(217,119,6,0.2), rgba(180,83,9,0.15))",
+                        padding: "12px 16px",
+                        display: "flex", alignItems: "center", gap: 10,
+                        borderBottom: "1px solid rgba(245,158,11,0.2)",
+                      }}>
+                        <ExclamationTriangleIcon style={{ width: 18, color: "#f59e0b", flexShrink: 0 }} />
+                        <div>
+                          <div style={{ fontSize: "0.78rem", fontWeight: 800, color: "#fbbf24" }}>
+                            Dessincronização detectada
+                          </div>
+                          <div style={{ fontSize: "0.66rem", color: "#fde68a", marginTop: 2 }}>
+                            {modalResultado.alunosNaoEncontrados.length} aluno(s) do EDUCA.MELHOR não encontrado(s) no EDUCADF
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Lista de alunos */}
+                      <div style={{
+                        background: "rgba(0,0,0,0.2)",
+                        padding: "10px 14px",
+                        maxHeight: 160, overflowY: "auto",
+                      }}>
+                        {modalResultado.alunosNaoEncontrados.map((a, i) => (
+                          <div key={i} style={{
+                            display: "flex", alignItems: "center", gap: 8,
+                            padding: "6px 0",
+                            borderBottom: i < modalResultado.alunosNaoEncontrados.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none",
+                          }}>
+                            <UserGroupIcon style={{ width: 14, color: "#f59e0b", flexShrink: 0 }} />
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#e2e8f0" }}>{a.nome}</div>
+                              {a.re && <div style={{ fontSize: "0.62rem", color: "#64748b" }}>RE: {a.re}</div>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Explicação */}
+                      <div style={{
+                        padding: "10px 14px",
+                        background: "rgba(245,158,11,0.04)",
+                        borderTop: "1px solid rgba(245,158,11,0.1)",
+                      }}>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <InformationCircleIcon style={{ width: 14, color: "#64748b", flexShrink: 0, marginTop: 1 }} />
+                          <div style={{ fontSize: "0.68rem", color: "#64748b", lineHeight: 1.6 }}>
+                            Esses alunos podem ter sido transferidos ou matriculados recentemente.
+                            O secretário precisa sincronizar o EDUCA.MELHOR com o EDUCADF para que as notas
+                            sejam exportadas nas próximas execuções.
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Mensagem de sucesso full */}
+                  {!modalResultado.alunosNaoEncontrados?.length && (
+                    <div style={{
+                      padding: "12px 16px", borderRadius: 12, marginBottom: 16,
+                      background: "rgba(16,185,129,0.07)", border: "1px solid rgba(16,185,129,0.2)",
+                      fontSize: "0.8rem", color: "#6ee7b7", lineHeight: 1.6,
+                    }}>
+                      ✅ Todas as notas foram exportadas com sucesso para o EDUCADF!
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* ── Resultado de erro ── */}
+              {modalResultado.tipo === "erro" && (
+                <div style={{
+                  padding: "14px 16px", borderRadius: 14, marginBottom: 16,
+                  background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.2)",
+                  fontSize: "0.85rem", color: "#fca5a5",
+                  lineHeight: 1.65, whiteSpace: "pre-line",
+                }}>
+                  {modalResultado.texto}
+                </div>
+              )}
+
               <button
                 onClick={() => setModalResultado(null)}
                 style={{
-                  width: "100%", padding: "12px", borderRadius: 12,
+                  width: "100%", padding: "13px", borderRadius: 13,
                   background: modalResultado.tipo === "sucesso"
-                    ? "linear-gradient(135deg, #16a34a, #15803d)"
+                    ? "linear-gradient(135deg, #059669, #0891b2)"
                     : "linear-gradient(135deg, #dc2626, #b91c1c)",
                   border: "none", color: "#fff",
-                  fontWeight: 800, fontSize: "0.9rem", cursor: "pointer",
-                  boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
+                  fontWeight: 800, fontSize: "0.92rem", cursor: "pointer",
+                  boxShadow: "0 4px 20px rgba(0,0,0,0.35)",
+                  letterSpacing: "0.2px",
                 }}
               >
-                {modalResultado.tipo === "sucesso" ? "Ótimo!" : "Entendido"}
+                {modalResultado.tipo === "sucesso" ? "Ótimo, fechar" : "Entendido"}
               </button>
             </div>
           </div>

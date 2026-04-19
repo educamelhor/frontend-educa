@@ -328,9 +328,10 @@ export default function AgenteNotas() {
         tipo: "sucesso",
         titulo: "Exportação concluída!",
         plano,
-        totalPreenchidos: dados.totalPreenchidos ?? 0,
-        totalErros:       dados.totalErros ?? 0,
+        totalPreenchidos:    dados.totalPreenchidos,
+        totalErros:          dados.totalErros,
         alunosNaoEncontrados: dados.alunosNaoEncontrados || [],
+        alunosDesabilitados:  dados.alunosDesabilitados  || [],
       });
     };
 
@@ -339,7 +340,12 @@ export default function AgenteNotas() {
       const d    = resp.data || {};
 
       if (d.ok) {
-        abrirResultadoRico(d);
+        abrirResultadoRico({
+          totalPreenchidos:     d.totalPreenchidos,
+          totalErros:           d.totalErros,
+          alunosNaoEncontrados: d.alunosNaoEncontrados || [],
+          alunosDesabilitados:  d.alunosDesabilitados  || [],
+        });
       } else {
         setModalResultado({
           tipo: "erro",
@@ -366,7 +372,17 @@ export default function AgenteNotas() {
           try {
             const check = await api.get(`/avaliacoes/${plano.id}`);
             if (check.data?.agente_notas_exportadas_em) {
-              abrirResultadoRico({ totalPreenchidos: "?", totalErros: 0, alunosNaoEncontrados: [] }, check.data.agente_notas_exportadas_em);
+              // Usa os stats reais do banco se disponíveis
+              const r = check.data?.agente_notas_resultado || {};
+              abrirResultadoRico(
+                {
+                  totalPreenchidos:     r.totalPreenchidos ?? null,
+                  totalErros:           r.totalErros       ?? null,
+                  alunosNaoEncontrados: r.alunosNaoEncontrados || [],
+                  alunosDesabilitados:  r.alunosDesabilitados  || [],
+                },
+                check.data.agente_notas_exportadas_em
+              );
               encontrado = true;
             }
           } catch { /* ignora */ }
@@ -711,7 +727,7 @@ export default function AgenteNotas() {
                       background: "rgba(16,185,129,0.09)", border: "1px solid rgba(16,185,129,0.25)",
                     }}>
                       <div style={{ fontSize: "2rem", fontWeight: 900, color: "#34d399", lineHeight: 1 }}>
-                        {modalResultado.totalPreenchidos}
+                        {modalResultado.totalPreenchidos ?? "–"}
                       </div>
                       <div style={{ fontSize: "0.65rem", color: "#6ee7b7", fontWeight: 700, marginTop: 4, textTransform: "uppercase", letterSpacing: "0.5px" }}>
                         Notas exportadas
@@ -719,13 +735,13 @@ export default function AgenteNotas() {
                     </div>
                     <div style={{
                       padding: "14px", borderRadius: 14, textAlign: "center",
-                      background: modalResultado.totalErros > 0 ? "rgba(245,158,11,0.09)" : "rgba(255,255,255,0.03)",
-                      border: `1px solid ${modalResultado.totalErros > 0 ? "rgba(245,158,11,0.3)" : "rgba(255,255,255,0.07)"}`,
+                      background: (modalResultado.totalErros ?? 0) > 0 ? "rgba(245,158,11,0.09)" : "rgba(255,255,255,0.03)",
+                      border: `1px solid ${(modalResultado.totalErros ?? 0) > 0 ? "rgba(245,158,11,0.3)" : "rgba(255,255,255,0.07)"}`,
                     }}>
-                      <div style={{ fontSize: "2rem", fontWeight: 900, color: modalResultado.totalErros > 0 ? "#fbbf24" : "#94a3b8", lineHeight: 1 }}>
-                        {modalResultado.totalErros}
+                      <div style={{ fontSize: "2rem", fontWeight: 900, color: (modalResultado.totalErros ?? 0) > 0 ? "#fbbf24" : "#94a3b8", lineHeight: 1 }}>
+                        {modalResultado.totalErros ?? "–"}
                       </div>
-                      <div style={{ fontSize: "0.65rem", color: modalResultado.totalErros > 0 ? "#fde68a" : "#475569", fontWeight: 700, marginTop: 4, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                      <div style={{ fontSize: "0.65rem", color: (modalResultado.totalErros ?? 0) > 0 ? "#fde68a" : "#475569", fontWeight: 700, marginTop: 4, textTransform: "uppercase", letterSpacing: "0.5px" }}>
                         Não encontrados
                       </div>
                     </div>
@@ -795,8 +811,49 @@ export default function AgenteNotas() {
                     </div>
                   )}
 
-                  {/* Mensagem de sucesso full */}
-                  {!modalResultado.alunosNaoEncontrados?.length && (
+                  {/* ── Alunos ausentes (campo desabilitado) ── */}
+                  {modalResultado.alunosDesabilitados?.length > 0 && (
+                    <div style={{
+                      borderRadius: 14, overflow: "hidden",
+                      border: "1px solid rgba(59,130,246,0.3)",
+                      marginBottom: 12,
+                    }}>
+                      <div style={{
+                        background: "linear-gradient(135deg, rgba(29,78,216,0.18), rgba(37,99,235,0.12))",
+                        padding: "11px 16px",
+                        display: "flex", alignItems: "center", gap: 10,
+                        borderBottom: "1px solid rgba(59,130,246,0.2)",
+                      }}>
+                        <InformationCircleIcon style={{ width: 17, color: "#60a5fa", flexShrink: 0 }} />
+                        <div>
+                          <div style={{ fontSize: "0.76rem", fontWeight: 800, color: "#93c5fd" }}>
+                            Ausentes no dia da avaliação
+                          </div>
+                          <div style={{ fontSize: "0.64rem", color: "#bfdbfe", marginTop: 1 }}>
+                            {modalResultado.alunosDesabilitados.length} aluno(s) sem presença registrada — campo bloqueado pelo EDUCADF
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ background: "rgba(0,0,0,0.15)", padding: "8px 14px" }}>
+                        {modalResultado.alunosDesabilitados.map((a, i) => (
+                          <div key={i} style={{
+                            display: "flex", alignItems: "center", gap: 8,
+                            padding: "5px 0",
+                            borderBottom: i < modalResultado.alunosDesabilitados.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none",
+                          }}>
+                            <span style={{ fontSize: "0.68rem" }}>🛋️</span>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontSize: "0.74rem", fontWeight: 700, color: "#cbd5e1" }}>{a.nome}</div>
+                              {a.re && <div style={{ fontSize: "0.6rem", color: "#475569" }}>RE: {a.re}</div>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Mensagem de sucesso full (sem nenhum problema) */}
+                  {!modalResultado.alunosNaoEncontrados?.length && !modalResultado.alunosDesabilitados?.length && (
                     <div style={{
                       padding: "12px 16px", borderRadius: 12, marginBottom: 16,
                       background: "rgba(16,185,129,0.07)", border: "1px solid rgba(16,185,129,0.2)",

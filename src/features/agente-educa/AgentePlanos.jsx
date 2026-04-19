@@ -301,66 +301,76 @@ export default function AgentePlanos() {
   // ── Exportar estrutura ─────────────────────────────────
   const handleExportarEstrutura = async (plano) => {
     setModalConfirm(null);
-    setModalResultado(null); // limpa resultado anterior
+    setModalResultado(null);
     setExportandoId(plano.id);
+
+    const marcarSucesso = (exportadoEm) => {
+      setPlanos(prev => prev.map(p =>
+        p.id === plano.id ? { ...p, agente_exportado_em: exportadoEm || new Date().toISOString() } : p
+      ));
+      abrirModalResultado(
+        'sucesso',
+        'Exportação concluída!',
+        `A coluna Avaliação Bimestral foi criada no EDUCADF com sucesso.\n\n📘 ${plano.disciplina} · ${plano.turmas} · ${plano.bimestre}`
+      );
+    };
+
     try {
       const resp = await api.post(`/agente-planos/${plano.id}/exportar-estrutura`);
       if (resp.data?.ok) {
-        // Atualiza status localmente — imediato, sem F5
-        setPlanos(prev => prev.map(p =>
-          p.id === plano.id
-            ? { ...p, agente_exportado_em: new Date().toISOString() }
-            : p
-        ));
-        abrirModalResultado(
-          'sucesso',
-          'Exportação concluída!',
-          `A coluna Avaliação Bimestral foi criada no EDUCADF com sucesso.\n\n📘 ${plano.disciplina} · ${plano.turmas} · ${plano.bimestre}`
-        );
+        marcarSucesso();
       } else {
-        // Backend retornou ok: false mas sem throw (ex: 502)
         const errMsg = resp.data?.message || resp.data?.error || 'Exportação não concluída.';
         abrirModalResultado('erro', 'Exportação não concluída', errMsg);
       }
+      setExportandoId(null);
+
     } catch (err) {
+      // ── Erro de credenciais: modal específico ──────────────────────────
       const codigo = err.response?.data?.codigo;
       if (codigo === 'SEM_CREDENCIAIS' || codigo === 'CREDENCIAIS_CORROMPIDAS') {
         setModalSemCred(true);
+        setExportandoId(null);
         return;
       }
 
-      // ── Verificação anti-falso-negativo ─────────────────────────────────
-      // O Playwright pode demorar 2-4 min. Se o proxy/browser cortar a
-      // conexão HTTP por timeout, o catch dispara — mas o Playwright
-      // continua rodando no servidor e pode ter concluído com sucesso.
-      // Consultamos o banco para confirmar o status real antes de exibir erro.
-      try {
-        const check = await api.get(`/avaliacoes/${plano.id}`);
-        const exportadoEm = check.data?.agente_exportado_em;
-        if (exportadoEm) {
-          // Exportação foi concluída no servidor mesmo com timeout do request
-          setPlanos(prev => prev.map(p =>
-            p.id === plano.id ? { ...p, agente_exportado_em: exportadoEm } : p
-          ));
-          abrirModalResultado(
-            'sucesso',
-            'Exportação concluída!',
-            `A coluna Avaliação Bimestral foi criada no EDUCADF com sucesso.\n\n📘 ${plano.disciplina} · ${plano.turmas} · ${plano.bimestre}`
-          );
-          return;
+      // ── Timeout de rede (!err.response): Playwright ainda rodando ──────
+      // O proxy (DigitalOcean/Vercel) corta conexões longas (>60s).
+      // O Playwright continua rodando no servidor por 2-4 min.
+      // Mantemos o spinner e fazemos polling a cada 20s por até 4 min.
+      if (!err.response) {
+        const MAX_TENTATIVAS = 15; // 15 × 20s = 5 minutos (margem para EDUCADF lento)
+        let encontrado = false;
+
+        for (let i = 0; i < MAX_TENTATIVAS && !encontrado; i++) {
+          await new Promise(r => setTimeout(r, 20000)); // aguarda 20s
+          try {
+            const check = await api.get(`/avaliacoes/${plano.id}`);
+            const exportadoEm = check.data?.agente_exportado_em;
+            if (exportadoEm) {
+              marcarSucesso(exportadoEm);
+              encontrado = true;
+            }
+          } catch { /* ignora erros de polling */ }
         }
-      } catch {
-        // Falha na verificação — ignora e exibe erro original abaixo
+
+        if (!encontrado) {
+          abrirModalResultado(
+            'erro',
+            'Tempo esgotado',
+            'A exportação demorou mais que o esperado.\n\nAtualize a página para verificar se foi concluída no EDUCADF.'
+          );
+        }
+        setExportandoId(null);
+        return;
       }
 
-      // Realmente falhou
+      // ── Erro real retornado pelo backend (com err.response) ────────────
       const errMsg = err.response?.data?.error || err.response?.data?.message || 'Erro ao exportar estrutura.';
       abrirModalResultado('erro', 'Erro na exportação', errMsg);
-    } finally {
       setExportandoId(null);
     }
   };
-
 
   // ─────────────────────────────────────────────────────────
   // RENDER

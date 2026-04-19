@@ -326,14 +326,41 @@ export default function AgentePlanos() {
       const codigo = err.response?.data?.codigo;
       if (codigo === 'SEM_CREDENCIAIS' || codigo === 'CREDENCIAIS_CORROMPIDAS') {
         setModalSemCred(true);
-      } else {
-        const errMsg = err.response?.data?.error || err.response?.data?.message || 'Erro ao exportar estrutura.';
-        abrirModalResultado('erro', 'Erro na exportação', errMsg);
+        return;
       }
+
+      // ── Verificação anti-falso-negativo ─────────────────────────────────
+      // O Playwright pode demorar 2-4 min. Se o proxy/browser cortar a
+      // conexão HTTP por timeout, o catch dispara — mas o Playwright
+      // continua rodando no servidor e pode ter concluído com sucesso.
+      // Consultamos o banco para confirmar o status real antes de exibir erro.
+      try {
+        const check = await api.get(`/avaliacoes/${plano.id}`);
+        const exportadoEm = check.data?.agente_exportado_em;
+        if (exportadoEm) {
+          // Exportação foi concluída no servidor mesmo com timeout do request
+          setPlanos(prev => prev.map(p =>
+            p.id === plano.id ? { ...p, agente_exportado_em: exportadoEm } : p
+          ));
+          abrirModalResultado(
+            'sucesso',
+            'Exportação concluída!',
+            `A coluna Avaliação Bimestral foi criada no EDUCADF com sucesso.\n\n📘 ${plano.disciplina} · ${plano.turmas} · ${plano.bimestre}`
+          );
+          return;
+        }
+      } catch {
+        // Falha na verificação — ignora e exibe erro original abaixo
+      }
+
+      // Realmente falhou
+      const errMsg = err.response?.data?.error || err.response?.data?.message || 'Erro ao exportar estrutura.';
+      abrirModalResultado('erro', 'Erro na exportação', errMsg);
     } finally {
       setExportandoId(null);
     }
   };
+
 
   // ─────────────────────────────────────────────────────────
   // RENDER

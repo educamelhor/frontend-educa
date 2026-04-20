@@ -32,9 +32,11 @@ export default function Planos() {
   // ---------------------------
   // Estados de seleção
   // ---------------------------
-  const [disciplinaSelecionada, setDisciplinaSelecionada] = useState(null);
-  const [bimestreSelecionado, setBimestreSelecionado] = useState(null);
+  const [turmaSelecionada, setTurmaSelecionada] = useState(null);      // ← ETAPA 1
+  const [bimestreSelecionado, setBimestreSelecionado] = useState(null); // ← ETAPA 2
+  const [disciplinaSelecionada, setDisciplinaSelecionada] = useState(null); // usado no editor de plano
   const [turmasSelecionadas, setTurmasSelecionadas] = useState([]);
+  const [etapaAtiva, setEtapaAtiva] = useState(1); // 1 | 2
   const [mostrarTabela, setMostrarTabela] = useState(false);
 
   // ---------------------------
@@ -120,22 +122,21 @@ export default function Planos() {
   const [turmas, setTurmas] = useState([]);
 
   useEffect(() => {
-    // Busca APENAS disciplinas atreladas ao professor logado na carga inicial
+    // Carga inicial: turmas + disciplinas do professor
     const fetchDadosIniciais = async () => {
       try {
-        const resDisc = await api.get("/professores/me/disciplinas");
+        const [resDisc, resTurmas] = await Promise.all([
+          api.get("/professores/me/disciplinas"),
+          api.get("/professores/me/turmas"),
+        ]);
 
         if (resDisc.data?.ok) {
-          // Extrai os nomes das disciplinas do array de objetos retornado
-          const nomesDisciplinas = resDisc.data.disciplinas.map(d => d.nome);
-          setDisciplinas(nomesDisciplinas);
-          
-          // Auto-select se houver apenas uma disciplina
-          if (nomesDisciplinas.length === 1) {
-             setDisciplinaSelecionada(nomesDisciplinas[0]);
-          }
+          const nomes = resDisc.data.disciplinas.map(d => d.nome);
+          setDisciplinas(nomes);
         }
-
+        if (resTurmas.data?.ok) {
+          setTurmas(resTurmas.data.turmas || []);
+        }
       } catch (err) {
         console.error("Erro ao carregar dados do professor", err);
       }
@@ -171,12 +172,13 @@ export default function Planos() {
   // Master Table Flow
   // ---------------------------
   const [loadingPlanos, setLoadingPlanos] = useState(false);
-  const [turmasComPlanos, setTurmasComPlanos] = useState([]); // [{ turma, id_plano, status, nota_total ...}]
-  
-  // Quando disciplina ou bimestre muda, busca do backend
+  // disciplinasComPlanos: [{ disciplina, id, status, motivo_devolucao }]
+  const [disciplinasComPlanos, setDisciplinasComPlanos] = useState([]);
+
+  // Quando turma ou bimestre muda, busca do backend (por cada disciplina)
   useEffect(() => {
-    if (!disciplinaSelecionada || !bimestreSelecionado) {
-      setTurmasComPlanos([]);
+    if (!turmaSelecionada || !bimestreSelecionado) {
+      setDisciplinasComPlanos([]);
       setMostrarTabela(false);
       return;
     }
@@ -185,44 +187,41 @@ export default function Planos() {
       setLoadingPlanos(true);
       try {
         const ano = new Date().getFullYear();
-        
-        // Em paralelo, buscamos os planos e também as turmas do professor filtradas pela disciplina atual!
-        const [resAvaliacoes, resTurmas] = await Promise.all([
-          api.get("/avaliacoes", {
-            params: { disciplina: disciplinaSelecionada, bimestre: bimestreSelecionado, ano }
-          }),
-          api.get("/professores/me/turmas", {
-            params: { disciplina: disciplinaSelecionada }
+        const turmaObj = turmas.find(t => String(t.id) === String(turmaSelecionada) || t.nome === turmaSelecionada);
+        const turmaNome = turmaObj?.nome || turmaSelecionada;
+
+        // Para cada disciplina do professor, busca o plano correspondente à turma+bimestre
+        const resultados = await Promise.all(
+          disciplinas.map(async (disc) => {
+            try {
+              const res = await api.get("/avaliacoes", {
+                params: { disciplina: disc, bimestre: bimestreSelecionado, ano }
+              });
+              const planos = res.data || [];
+              const planoNoBanco = planos.find(p => p.turmas === turmaNome);
+              return {
+                disciplina: disc,
+                id: planoNoBanco?.id || null,
+                status: planoNoBanco?.status || "PENDENTE",
+                motivo_devolucao: planoNoBanco?.motivo_devolucao || null,
+              };
+            } catch {
+              return { disciplina: disc, id: null, status: "PENDENTE", motivo_devolucao: null };
+            }
           })
-        ]);
+        );
 
-        const data = resAvaliacoes.data || [];
-        const turmasAtualizadas = (resTurmas.data?.turmas || []).map(t => t.nome);
-        setTurmas(turmasAtualizadas); // Armazena a lista pura para caso precise em outros cantos
-
-        // Monta nosso cruzamento Base (Todas as Turmas do Professor) x (Planos que vieram do banco)
-        const listaComStatus = turmasAtualizadas.map(t => {
-          const planoNoBanco = data.find(p => p.turmas === t);
-          return {
-            turma: t,
-            id: planoNoBanco ? planoNoBanco.id : null,
-            status: planoNoBanco ? planoNoBanco.status : "PENDENTE",
-            motivo_devolucao: planoNoBanco?.motivo_devolucao || null,
-          };
-        });
-
-        setTurmasComPlanos(listaComStatus);
-
+        setDisciplinasComPlanos(resultados);
       } catch (error) {
         console.error("Erro ao buscar planos:", error);
-        showMsg("error", "Erro ao carregar os dados das turmas.");
+        showMsg("error", "Erro ao carregar os dados dos planos.");
       } finally {
         setLoadingPlanos(false);
       }
     };
 
     buscarPlanos();
-  }, [disciplinaSelecionada, bimestreSelecionado]);
+  }, [turmaSelecionada, bimestreSelecionado, disciplinas, turmas]);
 
 
   // Controle do Modo "Plano Detalhado" (abrir visualização/edição)
@@ -276,259 +275,304 @@ export default function Planos() {
   };
 
 
-  const selecaoMinimaOk = !!disciplinaSelecionada && !!bimestreSelecionado;
+  const selecaoMinimaOk = !!turmaSelecionada && !!bimestreSelecionado;
   const bloqueadoPorTempo = !!bimestreSelecionado && bimestreEncerrado(bimestreSelecionado);
+  const turmaNomeSelecionada = turmas.find(t => String(t.id) === String(turmaSelecionada) || t.nome === turmaSelecionada)?.nome || turmaSelecionada || "";
 
   const [selecaoLote, setSelecaoLote] = useState([]);
   const toggleSelecaoLote = (t) => {
     setSelecaoLote(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
   };
 
+  // Helper para abrir plano de uma disciplina específica (novo fluxo turma-first)
+  const abrirPlanoDisc = (disc, planoId) => {
+    setDisciplinaSelecionada(disc);
+    abrirPlano([turmaNomeSelecionada], planoId);
+  };
+
   return (
     <div className="flex flex-col gap-6 w-full pb-20">
 
-      {/* =======================
-          Seletor Superior
-      ======================== */}
+      {/* ═══════════════════════════════════════════════════
+          HEADER PREMIUM — Sequenciador de Etapas
+      ═══════════════════════════════════════════════════ */}
       {!modoEdicaoPlano && (
-        <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 lg:p-8">
-          <div className="flex items-center gap-4 mb-8 border-b border-gray-50 pb-6">
-            <div className="p-3 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl shadow-md">
-              <IdentificationIcon className="w-7 h-7 text-white" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-black text-gray-800 tracking-tight">
-                Plano de Avaliação Pedagógica
-              </h2>
-              <p className="text-sm text-gray-500 font-medium mt-1">
-                Selecione os parâmetros para consultar ou gerar os planos avaliativos
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            {/* Disciplina - 5 colunas */}
-            <div className="lg:col-span-5 flex flex-col gap-3">
-              <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">
-                Disciplina
-              </label>
-              <div className="flex flex-wrap sm:flex-nowrap gap-2 bg-gray-100 p-1.5 rounded-xl border border-gray-100 shadow-inner h-full">
-                {disciplinas.map((d) => {
-                  const isSelected = disciplinaSelecionada === d;
-                  return (
-                    <button
-                      key={d}
-                      onClick={() => setDisciplinaSelecionada(d)}
-                      className={`flex-1 min-w-[100px] py-3 px-2 rounded-lg text-sm font-bold transition-all duration-300 ${
-                        isSelected 
-                          ? "bg-white text-blue-700 shadow-md transform scale-[1.02]"
-                          : "text-gray-500 hover:bg-gray-200/60 hover:text-gray-800"
-                      }`}
-                    >
-                      {d}
-                    </button>
-                  );
-                })}
+        <div
+          style={{
+            background: "linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #0f2a4a 100%)",
+            borderRadius: "1.25rem",
+            overflow: "hidden",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.28)",
+          }}
+        >
+          {/* Topo do banner */}
+          <div style={{ padding: "1.75rem 2rem 1.25rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+              <div style={{
+                background: "linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)",
+                borderRadius: "0.875rem",
+                padding: "0.75rem",
+                boxShadow: "0 4px 14px rgba(99,102,241,0.45)",
+                flexShrink: 0,
+              }}>
+                <IdentificationIcon style={{ width: 28, height: 28, color: "#fff" }} />
               </div>
-            </div>
-
-            {/* Bimestre - 7 colunas */}
-            <div className="lg:col-span-7 flex flex-col gap-3">
-              <label className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">
-                Bimestre
-              </label>
-              <div className="flex flex-wrap sm:flex-nowrap gap-2 bg-gray-100 p-1.5 rounded-xl border border-gray-100 shadow-inner h-full">
-                {bimestres.map((b) => {
-                  const isSelected = bimestreSelecionado === b;
-                  return (
-                    <button
-                      key={b}
-                      onClick={() => setBimestreSelecionado(b)}
-                      className={`flex-1 min-w-[100px] py-3 px-2 rounded-lg text-sm font-bold transition-all duration-300 ${
-                        isSelected 
-                          ? "bg-green-100 text-green-800 shadow-md transform scale-[1.02] border border-green-200"
-                          : "text-gray-500 hover:bg-gray-200/60 hover:text-gray-800"
-                      }`}
-                    >
-                      {b.replace(" Bimestre", " Bim")}
-                    </button>
-                  );
-                })}
+              <div>
+                <div style={{ display: "flex", alignItems: "baseline", gap: "0.75rem" }}>
+                  <h1 style={{ fontSize: "1.7rem", fontWeight: 900, color: "#fff", letterSpacing: "-0.02em", margin: 0 }}>PLANOS</h1>
+                  <span style={{ fontSize: "0.8rem", color: "#94a3b8", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" }}>PLANO DE AVALIAÇÃO PEDAGÓGICA</span>
+                </div>
+                {selecaoMinimaOk && (
+                  <div style={{ marginTop: "0.25rem", fontSize: "0.78rem", color: "#64748b", fontWeight: 500 }}>
+                    {turmaNomeSelecionada} · {bimestreSelecionado}
+                  </div>
+                )}
               </div>
             </div>
           </div>
-        </section>
+
+          {/* Separador */}
+          <div style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "0 2rem" }} />
+
+          {/* ─── Tabs de Etapas ─── */}
+          <div style={{ display: "flex", gap: 0 }}>
+            {[
+              { num: 1, label: "Selecionar Turma",    done: !!turmaSelecionada,    value: turmaNomeSelecionada },
+              { num: 2, label: "Selecionar Bimestre", done: !!bimestreSelecionado, value: bimestreSelecionado?.replace(" Bimestre", " Bim") },
+            ].map((et, idx) => {
+              const isActive = etapaAtiva === et.num;
+              const canClick = et.num === 1 || !!turmaSelecionada;
+              return (
+                <button
+                  key={et.num}
+                  onClick={() => canClick && setEtapaAtiva(et.num)}
+                  style={{
+                    flex: 1,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "0.75rem",
+                    padding: "1.1rem 1.75rem",
+                    background: "transparent",
+                    border: "none",
+                    borderBottom: isActive ? "3px solid #22d3ee" : "3px solid transparent",
+                    cursor: canClick ? "pointer" : "not-allowed",
+                    opacity: canClick ? 1 : 0.45,
+                    transition: "all 0.2s",
+                    borderRight: idx === 0 ? "1px solid rgba(255,255,255,0.06)" : "none",
+                    textAlign: "left",
+                  }}
+                >
+                  {/* Círculo / check */}
+                  <div style={{
+                    width: 32, height: 32, borderRadius: "50%",
+                    background: et.done ? "linear-gradient(135deg,#22d3ee,#0ea5e9)" : isActive ? "rgba(34,211,238,0.18)" : "rgba(255,255,255,0.07)",
+                    border: et.done ? "none" : isActive ? "2px solid #22d3ee" : "2px solid rgba(255,255,255,0.15)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    flexShrink: 0,
+                    boxShadow: et.done ? "0 2px 8px rgba(34,211,238,0.35)" : "none",
+                    transition: "all 0.25s",
+                  }}>
+                    {et.done ? (
+                      <svg width="16" height="16" fill="none" viewBox="0 0 24 24"><path stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
+                    ) : (
+                      <span style={{ color: isActive ? "#22d3ee" : "#64748b", fontWeight: 800, fontSize: "0.8rem" }}>{et.num}</span>
+                    )}
+                  </div>
+
+                  {/* Texto */}
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      <span style={{ fontSize: "0.72rem", fontWeight: 700, color: isActive ? "#22d3ee" : et.done ? "#38bdf8" : "#64748b", letterSpacing: "0.08em", textTransform: "uppercase" }}>ETAPA {et.num}</span>
+                      {et.done && <span style={{ fontSize: "0.62rem", background: "rgba(34,211,238,0.18)", color: "#22d3ee", padding: "1px 7px", borderRadius: 999, fontWeight: 700, letterSpacing: "0.05em" }}>✓ OK</span>}
+                    </div>
+                    <div style={{ fontSize: "0.88rem", fontWeight: 700, color: isActive ? "#f8fafc" : et.done ? "#cbd5e1" : "#64748b", marginTop: 1 }}>
+                      {et.done ? et.value : et.label}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* ─── Painel de seleção (a etapa ativa) ─── */}
+          <div style={{ padding: "1.5rem 2rem 1.75rem", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+            {/* ETAPA 1 — Turma */}
+            {etapaAtiva === 1 && (
+              <div>
+                <p style={{ fontSize: "0.78rem", color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "0.75rem" }}>Selecione a turma</p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+                  {turmas.length === 0 && <span style={{ color: "#64748b", fontSize: "0.875rem" }}>Carregando turmas...</span>}
+                  {turmas.map(t => {
+                    const nm = t.nome || t;
+                    const id = t.id || nm;
+                    const isSel = turmaSelecionada === id || turmaSelecionada === nm;
+                    return (
+                      <button key={id} onClick={() => { setTurmaSelecionada(id); setEtapaAtiva(2); }} style={{
+                        padding: "0.55rem 1.2rem",
+                        borderRadius: "0.6rem",
+                        fontWeight: 700,
+                        fontSize: "0.875rem",
+                        cursor: "pointer",
+                        transition: "all 0.2s",
+                        background: isSel ? "linear-gradient(135deg,#22d3ee,#0ea5e9)" : "rgba(255,255,255,0.07)",
+                        color: isSel ? "#0f172a" : "#cbd5e1",
+                        border: isSel ? "none" : "1px solid rgba(255,255,255,0.12)",
+                        boxShadow: isSel ? "0 4px 14px rgba(34,211,238,0.35)" : "none",
+                        transform: isSel ? "scale(1.04)" : "scale(1)",
+                      }}>{nm}</button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* ETAPA 2 — Bimestre */}
+            {etapaAtiva === 2 && (
+              <div>
+                <p style={{ fontSize: "0.78rem", color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "0.75rem" }}>Selecione o bimestre</p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+                  {bimestres.map(b => {
+                    const isSel = bimestreSelecionado === b;
+                    const enc = bimestreEncerrado(b);
+                    return (
+                      <button key={b} onClick={() => setBimestreSelecionado(b)} style={{
+                        padding: "0.55rem 1.4rem",
+                        borderRadius: "0.6rem",
+                        fontWeight: 700,
+                        fontSize: "0.875rem",
+                        cursor: "pointer",
+                        transition: "all 0.2s",
+                        background: isSel ? "linear-gradient(135deg,#4ade80,#22c55e)" : enc ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.07)",
+                        color: isSel ? "#0f172a" : enc ? "#475569" : "#cbd5e1",
+                        border: isSel ? "none" : "1px solid rgba(255,255,255,0.12)",
+                        boxShadow: isSel ? "0 4px 14px rgba(74,222,128,0.35)" : "none",
+                        transform: isSel ? "scale(1.04)" : "scale(1)",
+                        opacity: enc && !isSel ? 0.5 : 1,
+                      }}>{b.replace(" Bimestre", " Bim")}{enc ? " 🔒" : ""}</button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
-      {/* =======================
-          Tabela Mestra (Dashboard)
-      ======================== */}
+      {/* ═══════════════════════════════════════════════════
+          Tabela Mestra — Disciplinas para turma+bimestre
+      ═══════════════════════════════════════════════════ */}
       {!modoEdicaoPlano && selecaoMinimaOk && (
-        <section className="bg-white rounded-xl shadow-lg p-6 mb-10">
-          
-          <div className="flex items-center justify-between mb-6 border-b pb-4">
+        <section style={{
+          background: "#fff",
+          borderRadius: "1rem",
+          boxShadow: "0 4px 24px rgba(0,0,0,0.07)",
+          border: "1px solid #f1f5f9",
+          overflow: "hidden",
+          marginBottom: "2.5rem",
+        }}>
+          {/* Cabeçalho da seção */}
+          <div style={{
+            background: "linear-gradient(135deg,#1e293b,#0f172a)",
+            padding: "1.25rem 1.75rem",
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+          }}>
             <div>
-              <h2 className="text-2xl font-bold text-blue-900">Turmas - Status de Avaliação</h2>
-              <p className="text-gray-500">{disciplinaSelecionada} • {bimestreSelecionado}</p>
+              <h2 style={{ color: "#f8fafc", fontSize: "1.1rem", fontWeight: 800, margin: 0 }}>Planos por Disciplina</h2>
+              <p style={{ color: "#94a3b8", fontSize: "0.8rem", margin: "0.2rem 0 0" }}>
+                Turma <strong style={{ color: "#22d3ee" }}>{turmaNomeSelecionada}</strong> · {bimestreSelecionado}
+              </p>
             </div>
-
-            <div className="flex gap-4">
-               {selecaoLote.length > 0 && (
-                 <button
-                    onClick={() => abrirPlano(selecaoLote, null)}
-                    className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg shadow"
-                 >
-                   Criar Plano em Lote ({selecaoLote.length})
-                 </button>
-               )}
-            </div>
+            <button onClick={() => { setEtapaAtiva(1); setBimestreSelecionado(null); setTurmaSelecionada(null); setDisciplinasComPlanos([]); }}
+              style={{ background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)", color: "#94a3b8", borderRadius: "0.5rem", padding: "0.4rem 0.9rem", fontSize: "0.78rem", fontWeight: 700, cursor: "pointer" }}
+            >↺ Nova Seleção</button>
           </div>
 
           {loadingPlanos ? (
-            <p className="text-center text-gray-500 py-4">Carregando turmas...</p>
+            <div style={{ textAlign: "center", padding: "3rem", color: "#94a3b8" }}>
+              <div style={{ width: 36, height: 36, border: "3px solid #e2e8f0", borderTop: "3px solid #3b82f6", borderRadius: "50%", animation: "spin 0.8s linear infinite", margin: "0 auto 0.75rem" }} />
+              <p style={{ fontWeight: 600 }}>Carregando disciplinas...</p>
+            </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
-                  <tr className="bg-gray-100 text-left">
-                    <th className="py-3 px-4 border-b">
-                      <input 
-                        type="checkbox" 
-                        title="Selecionar todas sem plano"
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelecaoLote(turmasComPlanos.filter(t => t.status === "PENDENTE").map(t => t.turma));
-                          } else {
-                            setSelecaoLote([]);
-                          }
-                        }}
-                      />
-                    </th>
-                    <th className="py-3 px-4 border-b font-semibold text-gray-700">Turma</th>
-                    <th className="py-3 px-4 border-b font-semibold text-gray-700">Bimestre</th>
-                    <th className="py-3 px-4 border-b font-semibold text-gray-700">Disciplina</th>
-                    <th className="py-3 px-4 border-b font-semibold text-gray-700">Status do Plano</th>
-                    <th className="py-3 px-4 border-b font-semibold text-gray-700 text-right">Ações</th>
+                  <tr style={{ background: "#f8fafc" }}>
+                    <th style={{ padding: "0.85rem 1.5rem", textAlign: "left", fontSize: "0.72rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.07em", borderBottom: "1px solid #e2e8f0" }}>Disciplina</th>
+                    <th style={{ padding: "0.85rem 1.5rem", textAlign: "left", fontSize: "0.72rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.07em", borderBottom: "1px solid #e2e8f0" }}>Bimestre</th>
+                    <th style={{ padding: "0.85rem 1.5rem", textAlign: "left", fontSize: "0.72rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.07em", borderBottom: "1px solid #e2e8f0" }}>Status do Plano</th>
+                    <th style={{ padding: "0.85rem 1.5rem", textAlign: "right", fontSize: "0.72rem", fontWeight: 800, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.07em", borderBottom: "1px solid #e2e8f0" }}>Ação</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {turmasComPlanos.map(({ turma, id, status, motivo_devolucao }) => {
-                    
+                  {disciplinasComPlanos.map(({ disciplina, id, status, motivo_devolucao }) => {
                     const isPendente = status === "PENDENTE";
                     const isRascunho = status === "RASCUNHO";
                     const isEnviado = status === "ENVIADO";
                     const isAprovado = status === "APROVADO";
                     const isDevolvido = status === "DEVOLVIDO";
-                    // ✅ Aprovado + professor já solicitou liberação para edição
                     const isLiberacaoSolicitada = status === "LIBERACAO_SOLICITADA";
-                    // ✅ Direção aprovou a solicitação — professor pode editar
                     const isLiberado = status === "LIBERADO";
 
+                    const statusBadge = () => {
+                      if (isPendente) return { bg: "#fef2f2", color: "#dc2626", text: "🔴 PENDENTE" };
+                      if (isRascunho) return { bg: "#fff7ed", color: "#d97706", text: "🟠 RASCUNHO" };
+                      if (isEnviado)  return { bg: "#f0fdf4", color: "#16a34a", text: "🟢 ENVIADO" };
+                      if (isAprovado) return { bg: "#eff6ff", color: "#2563eb", text: "🔵 APROVADO" };
+                      if (isDevolvido) return { bg: "#fffbeb", color: "#b45309", text: "🟡 DEVOLVIDO" };
+                      if (isLiberacaoSolicitada) return { bg: "#f5f3ff", color: "#7c3aed", text: "✏️ EDIÇÃO SOLICITADA" };
+                      if (isLiberado) return { bg: "#f0fdfa", color: "#0d9488", text: "🔓 LIBERADO" };
+                      return { bg: "#f8fafc", color: "#64748b", text: status };
+                    };
+                    const badge = statusBadge();
+
                     return (
-                      <tr key={turma} className="hover:bg-gray-50 border-b">
-                        <td className="py-3 px-4">
-                           {isPendente && (
-                             <input 
-                                type="checkbox" 
-                                checked={selecaoLote.includes(turma)} 
-                                onChange={() => toggleSelecaoLote(turma)} 
-                             />
-                           )}
+                      <tr key={disciplina} style={{ borderBottom: "1px solid #f1f5f9", transition: "background 0.15s" }}
+                        onMouseEnter={e => e.currentTarget.style.background = "#f8fafc"}
+                        onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                      >
+                        <td style={{ padding: "1rem 1.5rem", fontWeight: 700, color: "#1e293b", fontSize: "0.9rem" }}>{disciplina}</td>
+                        <td style={{ padding: "1rem 1.5rem", color: "#64748b", fontSize: "0.875rem" }}>{bimestreSelecionado}</td>
+                        <td style={{ padding: "1rem 1.5rem" }}>
+                          <span style={{ background: badge.bg, color: badge.color, padding: "0.25rem 0.75rem", borderRadius: 999, fontSize: "0.72rem", fontWeight: 800 }}>{badge.text}</span>
                         </td>
-                        <td className="py-3 px-4 font-bold text-gray-800">{turma}</td>
-                        <td className="py-3 px-4 text-gray-600">{bimestreSelecionado}</td>
-                        <td className="py-3 px-4 text-gray-600">{disciplinaSelecionada}</td>
-                        <td className="py-3 px-4">
-                          {isPendente && <span className="text-red-600 bg-red-100 px-3 py-1 rounded-full text-xs font-bold">🔴 PENDENTE</span>}
-                          {isRascunho && <span className="text-orange-600 bg-orange-100 px-3 py-1 rounded-full text-xs font-bold">🟠 RASCUNHO</span>}
-                          {isEnviado && <span className="text-green-600 bg-green-100 px-3 py-1 rounded-full text-xs font-bold">🟢 ENVIADO</span>}
-                          {isAprovado && <span className="text-blue-600 bg-blue-100 px-3 py-1 rounded-full text-xs font-bold">🔵 APROVADO</span>}
-                          {isDevolvido && <span className="text-amber-700 bg-amber-100 px-3 py-1 rounded-full text-xs font-bold">🟡 DEVOLVIDO</span>}
-                          {/* ✅ Status duplo: aprovado + edição solicitada */}
+                        <td style={{ padding: "1rem 1.5rem", textAlign: "right" }}>
+                          {isPendente && (
+                            <button onClick={() => abrirPlanoDisc(disciplina, null)}
+                              style={{ background: "linear-gradient(135deg,#3b82f6,#6366f1)", color: "#fff", border: "none", borderRadius: "0.5rem", padding: "0.45rem 1.1rem", fontWeight: 700, fontSize: "0.8rem", cursor: "pointer" }}
+                            >Criar Plano</button>
+                          )}
+                          {(isRascunho || isLiberado) && (
+                            <button onClick={() => abrirPlanoDisc(disciplina, id)}
+                              style={{ background: isLiberado ? "linear-gradient(135deg,#0d9488,#0f766e)" : "linear-gradient(135deg,#f97316,#ea580c)", color: "#fff", border: "none", borderRadius: "0.5rem", padding: "0.45rem 1.1rem", fontWeight: 700, fontSize: "0.8rem", cursor: "pointer" }}
+                            >Editar</button>
+                          )}
+                          {isEnviado && (
+                            <button onClick={() => setModalGovernanca({ tipo: "ENVIADO", turma: turmaNomeSelecionada })}
+                              style={{ background: "#fef3c7", color: "#92400e", border: "1px solid #fde68a", borderRadius: "0.5rem", padding: "0.45rem 1.1rem", fontWeight: 700, fontSize: "0.8rem", cursor: "pointer" }}
+                            >Editar</button>
+                          )}
+                          {isAprovado && (
+                            <button onClick={() => setModalGovernanca({ tipo: "APROVADO", turma: turmaNomeSelecionada, planoId: id, solicitacaoJaFeita: false })}
+                              style={{ background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe", borderRadius: "0.5rem", padding: "0.45rem 1.1rem", fontWeight: 700, fontSize: "0.8rem", cursor: "pointer" }}
+                            >Editar</button>
+                          )}
                           {isLiberacaoSolicitada && (
-                            <div className="flex flex-col gap-1 items-start">
-                              <span className="text-blue-600 bg-blue-100 px-3 py-1 rounded-full text-xs font-bold">🔵 APROVADO</span>
-                              <span className="text-purple-700 bg-purple-100 px-2.5 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1">
-                                <span className="inline-block w-1.5 h-1.5 bg-purple-500 rounded-full animate-pulse"></span>
-                                ✏️ EDIÇÃO SOLICITADA
-                              </span>
-                            </div>
+                            <button onClick={() => setModalGovernanca({ tipo: "APROVADO", turma: turmaNomeSelecionada, planoId: id, solicitacaoJaFeita: true })}
+                              style={{ background: "#f5f3ff", color: "#6d28d9", border: "1px solid #ddd6fe", borderRadius: "0.5rem", padding: "0.45rem 1.1rem", fontWeight: 700, fontSize: "0.8rem", cursor: "pointer" }}
+                            >Editar</button>
                           )}
-                          {/* ✅ Direção liberou para edição */}
-                          {isLiberado && (
-                            <div className="flex flex-col gap-1 items-start">
-                              <span className="text-teal-700 bg-teal-100 px-3 py-1 rounded-full text-xs font-bold">🔓 LIBERADO
-                              </span>
-                              <span className="text-teal-600 text-[10px] font-semibold px-1">
-                                Edição liberada pela Direção
-                              </span>
-                            </div>
+                          {isDevolvido && (
+                            <button onClick={() => setModalGovernanca({ tipo: "DEVOLVIDO", turma: turmaNomeSelecionada, motivo: motivo_devolucao, planoId: id })}
+                              style={{ background: "#fffbeb", color: "#92400e", border: "1px solid #fde68a", borderRadius: "0.5rem", padding: "0.45rem 1.1rem", fontWeight: 700, fontSize: "0.8rem", cursor: "pointer" }}
+                            >Ver motivo</button>
                           )}
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                           {isPendente ? (
-                             <button
-                               onClick={() => abrirPlano([turma], null)}
-                               className="text-sm px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded shadow transition"
-                             >
-                               Criar Plano
-                             </button>
-                           ) : isRascunho ? (
-                             <button
-                               onClick={() => abrirPlano([turma], id)}
-                               className="text-sm px-4 py-1.5 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded shadow transition"
-                             >
-                               Editar
-                             </button>
-                           ) : isLiberado ? (
-                             // ✅ Direção liberou: professor edita diretamente (como RASCUNHO)
-                             <button
-                               onClick={() => abrirPlano([turma], id)}
-                               className="text-sm px-4 py-1.5 bg-teal-600 hover:bg-teal-700 text-white font-semibold rounded shadow transition"
-                             >
-                               Editar
-                             </button>
-                           ) : isEnviado ? (
-                             <button
-                               onClick={() => setModalGovernanca({ tipo: "ENVIADO", turma })}
-                               className="text-sm px-4 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-800 font-semibold rounded shadow-sm border border-amber-200 transition"
-                             >
-                               Editar
-                             </button>
-                           ) : isAprovado ? (
-                             <button
-                               onClick={() => setModalGovernanca({ tipo: "APROVADO", turma, planoId: id, solicitacaoJaFeita: false })}
-                               className="text-sm px-4 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold rounded shadow-sm border border-blue-200 transition"
-                             >
-                               Editar
-                             </button>
-                           ) : isLiberacaoSolicitada ? (
-                             // ✅ Já solicitou liberação — abre o mesmo modal mas com botão bloqueado
-                             <button
-                               onClick={() => setModalGovernanca({ tipo: "APROVADO", turma, planoId: id, solicitacaoJaFeita: true })}
-                               className="text-sm px-4 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 font-semibold rounded shadow-sm border border-purple-200 transition"
-                             >
-                               Editar
-                             </button>
-                           ) : isDevolvido ? (
-                             <button
-                               onClick={() => setModalGovernanca({ tipo: "DEVOLVIDO", turma, motivo: motivo_devolucao, planoId: id })}
-                               className="text-sm px-4 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-800 font-semibold rounded shadow-sm border border-amber-300 transition"
-                             >
-                               Ver motivo
-                             </button>
-                           ) : (
-                             <button
-                               onClick={() => abrirPlano([turma], id)}
-                               className="text-sm px-4 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded shadow transition"
-                             >
-                               Visualizar
-                             </button>
-                           )}
                         </td>
                       </tr>
                     );
                   })}
+                  {disciplinasComPlanos.length === 0 && (
+                    <tr><td colSpan={4} style={{ padding: "2.5rem", textAlign: "center", color: "#94a3b8", fontWeight: 600 }}>Nenhuma disciplina encontrada para esta turma.</td></tr>
+                  )}
                 </tbody>
               </table>
             </div>

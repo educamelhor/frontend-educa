@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import api from "../../../services/api";
 import {
   CheckCircleIcon,
@@ -542,108 +542,187 @@ export default function Avaliacoes() {
     );
   };
 
+  // ── Etapa ativa do sequenciador (1=Disciplina, 2=Bimestre, 3=Turma)
+  const [etapaAtiva, setEtapaAtiva] = useState(1);
+
   return (
     <div className="flex flex-col gap-6 w-full pb-20">
 
-      {/* ───────────────── HEADER SELECIONADORES ───────────────── */}
-      <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 lg:p-8">
-        <div className="flex items-center gap-4 mb-8 border-b border-gray-50 pb-6">
-          <div className="p-3 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl shadow-md">
-            <DocumentCheckIcon className="w-7 h-7 text-white" />
-          </div>
-          <div>
-            <h2 className="text-2xl font-black text-gray-800 tracking-tight">
-              Registro de Avaliações
-            </h2>
-            <p className="text-sm text-gray-500 font-medium mt-1">
-              Lance notas e acompanhe o rendimento baseando-se em seus Planos de Avaliação.
-            </p>
+      {/* ═══════════════════════════════════════════════════════
+          HEADER PREMIUM — Sequenciador de Etapas (3 etapas)
+      ═══════════════════════════════════════════════════════ */}
+      <div
+        style={{
+          background: "linear-gradient(135deg, #0f172a 0%, #1e293b 55%, #160f2e 100%)",
+          borderRadius: "1.25rem",
+          overflow: "hidden",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.28)",
+        }}
+      >
+        {/* Topo do banner */}
+        <div style={{ padding: "1.75rem 2rem 1.25rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+            <div style={{
+              background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+              borderRadius: "0.875rem",
+              padding: "0.75rem",
+              boxShadow: "0 4px 14px rgba(139,92,246,0.45)",
+              flexShrink: 0,
+            }}>
+              <DocumentCheckIcon style={{ width: 28, height: 28, color: "#fff" }} />
+            </div>
+            <div>
+              <div style={{ display: "flex", alignItems: "baseline", gap: "0.75rem" }}>
+                <h1 style={{ fontSize: "1.7rem", fontWeight: 900, color: "#fff", letterSpacing: "-0.02em", margin: 0 }}>AVALIAÇÕES</h1>
+                <span style={{ fontSize: "0.8rem", color: "#94a3b8", fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" }}>REGISTRO DE NOTAS</span>
+              </div>
+              {selecaoCompleta && (
+                <div style={{ marginTop: "0.25rem", fontSize: "0.78rem", color: "#64748b", fontWeight: 500 }}>
+                  {disciplinaSelecionada} · {bimestreSelecionado} · {turmaObj?.nome || ""}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Separador */}
+        <div style={{ height: 1, background: "rgba(255,255,255,0.07)", margin: "0 2rem" }} />
 
-          {/* DISCIPLINA */}
-          <div className="flex flex-col gap-2">
-            <label className="text-xs font-bold text-gray-400 uppercase tracking-widest pl-1">
-              Disciplina
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {disciplinas.length === 0 && <span className="text-sm text-gray-400">Nenhuma disciplina</span>}
-              {disciplinas.map((d) => (
-                <button
-                  key={d}
-                  onClick={() => setDisciplinaSelecionada(d)}
-                  className={`flex-1 min-w-[100px] py-2.5 px-3 rounded-lg text-sm font-bold transition-all shadow-sm ${
-                    disciplinaSelecionada === d
-                      ? "bg-indigo-50 text-indigo-700 border-2 border-indigo-200"
-                      : "bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100"
-                  }`}
-                >
-                  {d}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* BIMESTRE */}
-          <div className="flex flex-col gap-2">
-            <label className="text-xs font-bold text-gray-400 uppercase tracking-widest pl-1">
-              Bimestre
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {bimestres.map((b) => (
-                <button
-                  key={b}
-                  onClick={() => setBimestreSelecionado(b)}
-                  className={`flex-1 min-w-[80px] py-2.5 px-3 rounded-lg text-sm font-bold transition-all shadow-sm ${
-                    bimestreSelecionado === b
-                      ? "bg-green-50 text-green-700 border-2 border-green-200"
-                      : "bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100"
-                  }`}
-                >
-                  {b.replace(" Bimestre", " Bim")}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* TURMA */}
-          <div className="flex flex-col gap-2">
-            <label className="text-xs font-bold text-gray-400 uppercase tracking-widest pl-1">
-              Turma
-            </label>
-            {disciplinaSelecionada ? (
-                <div className="flex flex-wrap gap-2">
-                    {turmas.length === 0 ? (
-                        <span className="text-sm text-gray-500 py-2">Sem turmas</span>
-                    ) : (
-                        <div className="relative w-full">
-                            <select
-                                value={turmaSelecionada}
-                                onChange={(e) => setTurmaSelecionada(e.target.value)}
-                                className="w-full bg-gray-50 border border-gray-200 text-gray-700 font-bold py-3 px-4 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 transition-all appearance-none shadow-sm cursor-pointer"
-                            >
-                                <option value="" disabled>Selecionar Turma...</option>
-                                {turmas.map(t => (
-                                    <option key={t.id} value={t.id}>{t.nome}</option>
-                                ))}
-                            </select>
-                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-500">
-                                <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
-                            </div>
-                        </div>
-                    )}
+        {/* ─── Tabs de Etapas ─── */}
+        <div style={{ display: "flex", gap: 0 }}>
+          {[
+            { num: 1, label: "Selecionar Disciplina", done: !!disciplinaSelecionada, value: disciplinaSelecionada },
+            { num: 2, label: "Selecionar Bimestre",   done: !!bimestreSelecionado,  value: bimestreSelecionado?.replace(" Bimestre", " Bim") },
+            { num: 3, label: "Selecionar Turma",      done: !!turmaSelecionada,     value: turmaObj?.nome },
+          ].map((et, idx) => {
+            const isActive = etapaAtiva === et.num;
+            const canClick = et.num === 1 || (et.num === 2 && !!disciplinaSelecionada) || (et.num === 3 && !!disciplinaSelecionada && !!bimestreSelecionado);
+            return (
+              <button
+                key={et.num}
+                onClick={() => canClick && setEtapaAtiva(et.num)}
+                style={{
+                  flex: 1,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "0.65rem",
+                  padding: "1rem 1.4rem",
+                  background: "transparent",
+                  border: "none",
+                  borderBottom: isActive ? "3px solid #22d3ee" : "3px solid transparent",
+                  cursor: canClick ? "pointer" : "not-allowed",
+                  opacity: canClick ? 1 : 0.4,
+                  transition: "all 0.2s",
+                  borderRight: idx < 2 ? "1px solid rgba(255,255,255,0.06)" : "none",
+                  textAlign: "left",
+                }}
+              >
+                {/* Círculo / check */}
+                <div style={{
+                  width: 30, height: 30, borderRadius: "50%",
+                  background: et.done ? "linear-gradient(135deg,#22d3ee,#0ea5e9)" : isActive ? "rgba(34,211,238,0.18)" : "rgba(255,255,255,0.07)",
+                  border: et.done ? "none" : isActive ? "2px solid #22d3ee" : "2px solid rgba(255,255,255,0.15)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  flexShrink: 0,
+                  boxShadow: et.done ? "0 2px 8px rgba(34,211,238,0.35)" : "none",
+                  transition: "all 0.25s",
+                }}>
+                  {et.done ? (
+                    <svg width="15" height="15" fill="none" viewBox="0 0 24 24"><path stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
+                  ) : (
+                    <span style={{ color: isActive ? "#22d3ee" : "#64748b", fontWeight: 800, fontSize: "0.78rem" }}>{et.num}</span>
+                  )}
                 </div>
-            ) : (
-                <div className="w-full py-3 px-4 bg-gray-50 rounded-lg border border-dashed border-gray-300 text-center text-sm text-gray-400">
-                    Selecione a disciplina
-                </div>
-            )}
-          </div>
 
+                {/* Texto */}
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.45rem" }}>
+                    <span style={{ fontSize: "0.68rem", fontWeight: 700, color: isActive ? "#22d3ee" : et.done ? "#38bdf8" : "#64748b", letterSpacing: "0.08em", textTransform: "uppercase" }}>ETAPA {et.num}</span>
+                    {et.done && <span style={{ fontSize: "0.6rem", background: "rgba(34,211,238,0.18)", color: "#22d3ee", padding: "1px 6px", borderRadius: 999, fontWeight: 700 }}>✓</span>}
+                  </div>
+                  <div style={{ fontSize: "0.83rem", fontWeight: 700, color: isActive ? "#f8fafc" : et.done ? "#cbd5e1" : "#64748b", marginTop: 1 }}>
+                    {et.done ? et.value : et.label}
+                  </div>
+                </div>
+              </button>
+            );
+          })}
         </div>
-      </section>
+
+        {/* ─── Painel de seleção da etapa ativa ─── */}
+        <div style={{ padding: "1.4rem 2rem 1.7rem", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+          {/* ETAPA 1 — Disciplina */}
+          {etapaAtiva === 1 && (
+            <div>
+              <p style={{ fontSize: "0.75rem", color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "0.7rem" }}>Selecione a disciplina</p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+                {disciplinas.length === 0 && <span style={{ color: "#64748b", fontSize: "0.875rem" }}>Carregando...</span>}
+                {disciplinas.map(d => {
+                  const isSel = disciplinaSelecionada === d;
+                  return (
+                    <button key={d} onClick={() => { setDisciplinaSelecionada(d); setTurmaSelecionada(""); setEtapaAtiva(2); }} style={{
+                      padding: "0.55rem 1.3rem", borderRadius: "0.6rem", fontWeight: 700, fontSize: "0.875rem", cursor: "pointer", transition: "all 0.2s",
+                      background: isSel ? "linear-gradient(135deg,#6366f1,#8b5cf6)" : "rgba(255,255,255,0.07)",
+                      color: isSel ? "#fff" : "#cbd5e1",
+                      border: isSel ? "none" : "1px solid rgba(255,255,255,0.12)",
+                      boxShadow: isSel ? "0 4px 14px rgba(139,92,246,0.4)" : "none",
+                      transform: isSel ? "scale(1.04)" : "scale(1)",
+                    }}>{d}</button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ETAPA 2 — Bimestre */}
+          {etapaAtiva === 2 && (
+            <div>
+              <p style={{ fontSize: "0.75rem", color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "0.7rem" }}>Selecione o bimestre</p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+                {bimestres.map(b => {
+                  const isSel = bimestreSelecionado === b;
+                  return (
+                    <button key={b} onClick={() => { setBimestreSelecionado(b); setTurmaSelecionada(""); setEtapaAtiva(3); }} style={{
+                      padding: "0.55rem 1.4rem", borderRadius: "0.6rem", fontWeight: 700, fontSize: "0.875rem", cursor: "pointer", transition: "all 0.2s",
+                      background: isSel ? "linear-gradient(135deg,#4ade80,#22c55e)" : "rgba(255,255,255,0.07)",
+                      color: isSel ? "#0f172a" : "#cbd5e1",
+                      border: isSel ? "none" : "1px solid rgba(255,255,255,0.12)",
+                      boxShadow: isSel ? "0 4px 14px rgba(74,222,128,0.35)" : "none",
+                      transform: isSel ? "scale(1.04)" : "scale(1)",
+                    }}>{b.replace(" Bimestre", " Bim")}</button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* ETAPA 3 — Turma */}
+          {etapaAtiva === 3 && (
+            <div>
+              <p style={{ fontSize: "0.75rem", color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "0.7rem" }}>Selecione a turma</p>
+              {turmas.length === 0 ? (
+                <span style={{ color: "#64748b", fontSize: "0.875rem" }}>Sem turmas para esta disciplina</span>
+              ) : (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+                  {turmas.map(t => {
+                    const isSel = String(turmaSelecionada) === String(t.id);
+                    return (
+                      <button key={t.id} onClick={() => setTurmaSelecionada(t.id)} style={{
+                        padding: "0.55rem 1.3rem", borderRadius: "0.6rem", fontWeight: 700, fontSize: "0.875rem", cursor: "pointer", transition: "all 0.2s",
+                        background: isSel ? "linear-gradient(135deg,#22d3ee,#0ea5e9)" : "rgba(255,255,255,0.07)",
+                        color: isSel ? "#0f172a" : "#cbd5e1",
+                        border: isSel ? "none" : "1px solid rgba(255,255,255,0.12)",
+                        boxShadow: isSel ? "0 4px 14px rgba(34,211,238,0.35)" : "none",
+                        transform: isSel ? "scale(1.04)" : "scale(1)",
+                      }}>{t.nome}</button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* ───────────────── ALERTAS ───────────────── */}
       {mensagemSistema && (

@@ -463,8 +463,9 @@ export default function Login() {
         return;
       }
 
-      // ✅ Dispositivo confiado: backend pulou OTP e retornou token direto
-      if (!isCpf && data?.dispositivo_confiado && data?.token) {
+      // ✅ Dispositivo confiado: backend pulou OTP (pode ter token direto ou pedir escola)
+      // BUG FIX: não exigir data?.token aqui — multi-escola retorna sem token ainda
+      if (!isCpf && data?.dispositivo_confiado) {
         limparSessaoPlataforma();
 
         // Multi-escola ainda precisa de seleção
@@ -736,8 +737,10 @@ export default function Login() {
 
       // ✅ Salvar device_token se o backend gerou (usuário marcou "confiar neste dispositivo")
       if (data?.device_token) saveDeviceToken(data.device_token);
-      // Limpar se o usuário não quis confiar
-      if (!confirarDispositivo) clearDeviceToken();
+      // Só limpa o device_token se o usuário explicitamente desmarcou a opção
+      // NÃO limpar automaticamente apenas porque passou pelo OTP sem marcar
+      // (usuário pode já ter um token válido de sessão anterior)
+      if (!confirarDispositivo && !getDeviceToken()) clearDeviceToken();
 
       setTipoMensagem("sucesso");
       setMensagem("Login realizado com sucesso!");

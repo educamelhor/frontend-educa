@@ -43,7 +43,7 @@ function GabaritoImageZoom({ arquivoId, arquivoNome }) {
           }
           const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
           const page = await pdf.getPage(1);
-          const viewport = page.getViewport({ scale: 2.5 });
+          const viewport = page.getViewport({ scale: 1.5 });
           const canvas = document.createElement("canvas");
           canvas.width = viewport.width;
           canvas.height = viewport.height;
@@ -109,7 +109,7 @@ function GabaritoImageZoom({ arquivoId, arquivoNome }) {
               <button onClick={() => setModalAberto(false)} style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.15)", color: "#f87171", fontSize: "1.1rem", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s" }} onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(239,68,68,0.2)"; e.currentTarget.style.transform = "scale(1.1)"; }} onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(239,68,68,0.08)"; e.currentTarget.style.transform = "scale(1)"; }} title="Fechar (ESC)">✕</button>
             </div>
             <div style={{ overflow: "auto", maxHeight: "calc(90vh - 70px)", padding: 16, display: "flex", alignItems: "flex-start", justifyContent: "center" }}>
-              <img src={imgUrl} alt="Gabarito ampliado" style={{ maxWidth: "100%", borderRadius: 8, boxShadow: "0 4px 24px rgba(0,0,0,0.3)" }} draggable={false} />
+              <img src={imgUrl} alt="Gabarito ampliado" style={{ maxWidth: "95vw", maxHeight: "85vh", objectFit: "contain", borderRadius: 8, boxShadow: "0 4px 24px rgba(0,0,0,0.3)" }} draggable={false} />
             </div>
           </div>
         </div>

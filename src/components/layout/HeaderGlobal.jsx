@@ -13,15 +13,20 @@ import "@fontsource/montserrat/400.css";
 import "@fontsource/montserrat/700.css";
 
 export default function HeaderGlobal({ onToggleSidebar, sidebarOpen }) {
-  // Estados para dados dinâmicos do usuário
+  // ─── Dados do usuário ───
   const [nomeEscola, setNomeEscola] = useState("");
   const [userName, setUserName] = useState("");
   const [perfil, setPerfil] = useState("");
   const [cpf, setCpf] = useState("");
+
+  // ─── Foto: URL estável + flag de falha permanente ───
+  // imgFailed = true → mostra iniciais para sempre (sem re-fetch, sem loop)
   const [fotoUrl, setFotoUrl] = useState("");
-  const [fotoVersion, setFotoVersion] = useState(Date.now()); // cache-bust no <img>
-  const [fotoErro, setFotoErro] = useState(false); // quando true, usa fallback (iniciais)
-  const [fotoRetries, setFotoRetries] = useState(0); // evita loop infinito de retry
+  const [imgFailed, setImgFailed] = useState(false);
+  // Ref para controlar versão de cache-bust APENAS quando a URL muda intencionalmente
+  const fotoVersionRef = React.useRef(Date.now());
+  // Ref para garantir apenas UMA tentativa de busca à API por sessão
+  const fetchedFromApi = React.useRef(false);
 
   // ✅ Snapshot do modal (NÃO altera a bolinha até salvar)
   const [modalFotoUrl, setModalFotoUrl] = useState("");
@@ -42,131 +47,98 @@ export default function HeaderGlobal({ onToggleSidebar, sidebarOpen }) {
 
   // Editor (arrastar + zoom)
   const [cropScale, setCropScale] = useState(1);
-  const [cropOffset, setCropOffset] = useState({ x: 0, y: 0 }); // px
+  const [cropOffset, setCropOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const [cropStart, setCropStart] = useState({ x: 0, y: 0 });
 
-  // Tamanho do "viewport" do editor (círculo do preview) em px (h-32 w-32 => 128px)
   const PREVIEW_SIZE = 128;
-
-  // Dimensões naturais da imagem carregada (para clamp preciso)
   const [cropImgSize, setCropImgSize] = useState({ w: 0, h: 0 });
+
+  // ─── Inicialização: lê localStorage UMA VEZ e, se não tiver foto, busca uma vez na API ───
   useEffect(() => {
-    const hydrateFromStorage = () => {
-      const savedName = localStorage.getItem("userName") || "Usuário";
-      const savedPerfil = (localStorage.getItem("perfil") || "aluno")
-        .toLowerCase()
-        .trim();
-      const savedScope = (localStorage.getItem("scope") || "escola").toLowerCase().trim();
-      const savedNomeEscola =
-        savedScope === "plataforma"
-          ? "Plataforma (CEO)"
-          : localStorage.getItem("nome_escola") || "Escola não definida";
-      const savedCpf = localStorage.getItem("cpf") || "";
-      const savedFoto = localStorage.getItem("foto_url") || "";
+    const hydrate = () => {
+      const savedName    = localStorage.getItem("userName") || "Usuário";
+      const savedPerfil  = (localStorage.getItem("perfil") || "aluno").toLowerCase().trim();
+      const savedScope   = (localStorage.getItem("scope") || "escola").toLowerCase().trim();
+      const savedEscola  = savedScope === "plataforma"
+        ? "Plataforma (CEO)"
+        : localStorage.getItem("nome_escola") || "Escola não definida";
+      const savedCpf     = localStorage.getItem("cpf") || "";
+      const savedFoto    = localStorage.getItem("foto_url") || "";
 
       setUserName(savedName);
       setPerfil(savedPerfil);
-      setNomeEscola(savedNomeEscola);
+      setNomeEscola(savedEscola);
       setCpf(savedCpf);
 
-      setFotoUrl(savedFoto);
-      setFotoErro(false);
-      setFotoVersion(Date.now());
+      if (savedFoto) {
+        // Já tem foto no localStorage → usa diretamente, sem buscar à API
+        fotoVersionRef.current = Date.now();
+        setFotoUrl(savedFoto);
+        setImgFailed(false);
+      } else {
+        // Sem foto no cache → tenta buscar UMA VEZ na API
+        fetchFotoFromApi();
+      }
     };
 
-    const rehydrateFotoFromBackend = async (forceRefetch = false) => {
-      try {
-        const token = localStorage.getItem("token");
-        const escolaId = localStorage.getItem("escola_id");
+    const fetchFotoFromApi = async () => {
+      // Garante execução única por sessão
+      if (fetchedFromApi.current) return;
+      fetchedFromApi.current = true;
 
-        // Reidrata foto de qualquer perfil logado
+      try {
+        const token    = localStorage.getItem("token");
+        const escolaId = localStorage.getItem("escola_id");
         if (!token || !escolaId) return;
 
-        const savedFoto = localStorage.getItem("foto_url") || "";
-        // Só pula se já tem foto em cache E não foi forçado
-        if (savedFoto && !forceRefetch) return;
-
         const resp = await fetch(`${API_BASE}/usuarios/me/foto`, {
-          method: "GET",
           headers: {
             Authorization: `Bearer ${token}`,
             "x-escola-id": escolaId,
           },
         });
-
         const data = await resp.json().catch(() => ({}));
         if (!resp.ok) return;
 
         const foto = data?.foto_url || "";
         if (foto) {
           localStorage.setItem("foto_url", foto);
+          fotoVersionRef.current = Date.now();
           setFotoUrl(foto);
-          setFotoErro(false);
-          setFotoVersion(Date.now());
+          setImgFailed(false);
         }
       } catch {
-        // silencioso: não derruba header se a API estiver indisponível
+        // silencioso
       }
     };
 
-    hydrateFromStorage();
-    rehydrateFotoFromBackend();
+    hydrate();
 
-    const onStorage = () => {
-      hydrateFromStorage();
-      rehydrateFotoFromBackend();
+    // Ouve mudanças de localStorage de outras abas / após salvar nova foto
+    const onStorage = (e) => {
+      if (e.key === "foto_url" || e.key === null) {
+        const novaFoto = localStorage.getItem("foto_url") || "";
+        fotoVersionRef.current = Date.now();
+        setFotoUrl(novaFoto);
+        setImgFailed(false);
+        fetchedFromApi.current = false; // permite nova busca se a foto for removida
+      }
+      if (e.key === "userName" || e.key === null)
+        setUserName(localStorage.getItem("userName") || "Usuário");
+      if (e.key === "perfil" || e.key === null)
+        setPerfil((localStorage.getItem("perfil") || "aluno").toLowerCase().trim());
+      if (e.key === "nome_escola" || e.key === null) {
+        const scope = (localStorage.getItem("scope") || "escola").toLowerCase().trim();
+        setNomeEscola(scope === "plataforma" ? "Plataforma (CEO)" : localStorage.getItem("nome_escola") || "Escola não definida");
+      }
     };
 
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-
-
-  // Sempre que a foto mudar, tente renderizar novamente (evita ficar preso nas iniciais)
-  useEffect(() => {
-    if (!fotoUrl) return;
-    setFotoErro(false);
-    setFotoRetries(0);
-    setFotoVersion(Date.now());
-  }, [fotoUrl]);
-
-  // ✅ Recuperação: se a foto falhou (404 após redeploy ou URL inválida),
-  // limpa o cache e busca novamente do backend (pode estar no CDN/Spaces)
-  useEffect(() => {
-    if (!fotoErro) return;
-    // Limpa URL inválida do localStorage e tenta reobter do backend
-    localStorage.removeItem("foto_url");
-    // Usa timeout para não disparar imediatamente em loop
-    const t = setTimeout(() => {
-      const API_BASE_FALLBACK =
-        import.meta?.env?.VITE_API_BASE_URL ||
-        import.meta?.env?.VITE_API_URL ||
-        "https://educa-backend-docker-659zo.ondigitalocean.app/api";
-      const token = localStorage.getItem("token");
-      const escolaId = localStorage.getItem("escola_id");
-      if (!token || !escolaId) return;
-      fetch(`${API_BASE_FALLBACK}/usuarios/me/foto`, {
-        headers: { Authorization: `Bearer ${token}`, "x-escola-id": escolaId },
-      })
-        .then((r) => r.json())
-        .then((d) => {
-          const foto = d?.foto_url || "";
-          if (foto) {
-            localStorage.setItem("foto_url", foto);
-            setFotoUrl(foto);
-            setFotoErro(false);
-            setFotoRetries(0);
-            setFotoVersion(Date.now());
-          }
-        })
-        .catch(() => {});
-    }, 2000);
-    return () => clearTimeout(t);
-  }, [fotoErro]);
 
 
   /**
@@ -498,7 +470,7 @@ const API_BASE = (() => {
             // ✅ modal abre com a MESMA imagem efetiva da bolinha (mesma URL completa)
             // Evita alternância por reload em servidores/cache diferentes
             setModalFotoUrl(fotoUrl || "");
-            setModalFotoVersion(fotoVersion);
+            setModalFotoVersion(fotoVersionRef.current);
 
             // ✅ não mexe na bolinha ao abrir/fechar
             resetEditor();
@@ -508,26 +480,15 @@ const API_BASE = (() => {
           title="Editar foto do perfil"
         >
           <div className="h-full w-full rounded-full bg-white flex items-center justify-center overflow-hidden">
-            {fotoUrl && !fotoErro ? (
+            {fotoUrl && !imgFailed ? (
               <img
-                key={`${fotoUrl}-${fotoVersion}`}   // ✅ força React remontar e recarregar a imagem
-                src={`${toPublicUrl(fotoUrl)}?v=${fotoVersion}`}
+                key={fotoUrl}
+                src={`${toPublicUrl(fotoUrl)}?v=${fotoVersionRef.current}`}
                 alt="Foto do usuário"
                 className="h-full w-full object-cover"
-                onLoad={() => {
-                  setFotoErro(false);
-                  setFotoRetries(0);
-                }}
                 onError={() => {
-                  setFotoRetries((r) => {
-                    const next = r + 1;
-                    if (next <= 2) {
-                      setFotoVersion(Date.now());
-                      return next;
-                    }
-                    setFotoErro(true);
-                    return next;
-                  });
+                  // Falhou: mostra iniciais permanentemente — sem remount, sem loop
+                  setImgFailed(true);
                 }}
               />
             ) : (
@@ -854,13 +815,12 @@ const API_BASE = (() => {
                         setModalFotoVersion(Date.now());
 
                         // ✅ só aqui atualiza a bolinha (regra: somente ao salvar)
-                        setFotoErro(false);
-                        setFotoRetries(0);
-                        setFotoVersion(Date.now());
+                        fotoVersionRef.current = Date.now();
+                        setImgFailed(false);
 
-                        // limpa e repõe no próximo frame (evita ficar preso em cache/ETag/CDN)
-                        setFotoUrl("");
-                        requestAnimationFrame(() => setFotoUrl(fotoUrlReal));
+                        // Atualiza URL da foto com nova versão (força re-render sem loop)
+                        localStorage.setItem("foto_url", fotoUrlReal);
+                        setFotoUrl(fotoUrlReal);
 
                         // limpa estado do modal
                         setAvatarFile(null);

@@ -120,10 +120,12 @@ export default function Planos() {
   const [disciplinas, setDisciplinas] = useState([]);
   const bimestres = ["1º Bimestre", "2º Bimestre", "3º Bimestre", "4º Bimestre"];
   const [turmas, setTurmas] = useState([]);
+  const [loadingInicial, setLoadingInicial] = useState(true);
 
   useEffect(() => {
     // Carga inicial: turmas + disciplinas do professor
     const fetchDadosIniciais = async () => {
+      setLoadingInicial(true);
       try {
         const [resDisc, resTurmas] = await Promise.all([
           api.get("/professores/me/disciplinas"),
@@ -139,10 +141,13 @@ export default function Planos() {
         }
       } catch (err) {
         console.error("Erro ao carregar dados do professor", err);
+      } finally {
+        setLoadingInicial(false);
       }
     };
     fetchDadosIniciais();
   }, []);
+
 
   // ---------------------------
   // Regra temporal (MOCK)
@@ -401,7 +406,14 @@ export default function Planos() {
               <div>
                 <p style={{ fontSize: "0.78rem", color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "0.75rem" }}>Selecione a turma</p>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-                  {turmas.length === 0 && <span style={{ color: "#64748b", fontSize: "0.875rem" }}>Carregando turmas...</span>}
+                  {loadingInicial ? (
+                    <span style={{ color: "#64748b", fontSize: "0.875rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      <span style={{ display: "inline-block", width: 14, height: 14, border: "2px solid #334155", borderTop: "2px solid #22d3ee", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
+                      Carregando turmas...
+                    </span>
+                  ) : turmas.length === 0 ? (
+                    <span style={{ color: "#64748b", fontSize: "0.875rem" }}>Nenhuma turma encontrada para o ano letivo atual.</span>
+                  ) : null}
                   {turmas.map(t => {
                     const nm = t.nome || t;
                     const id = t.id || nm;
@@ -423,6 +435,7 @@ export default function Planos() {
                     );
                   })}
                 </div>
+
               </div>
             )}
 

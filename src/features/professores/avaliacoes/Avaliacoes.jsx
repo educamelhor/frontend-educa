@@ -78,8 +78,11 @@ export default function Avaliacoes() {
   // ---------------------------
   // Carga Inicial — Disciplinas do professor
   // ---------------------------
+  const [loadingInicial, setLoadingInicial] = useState(true);
+
   useEffect(() => {
     const fetchDadosIniciais = async () => {
+      setLoadingInicial(true);
       try {
         const resDisc = await api.get("/professores/me/disciplinas");
         if (resDisc.data?.ok) {
@@ -89,10 +92,13 @@ export default function Avaliacoes() {
         }
       } catch (err) {
         console.error("Erro ao carregar disciplinas", err);
+      } finally {
+        setLoadingInicial(false);
       }
     };
     fetchDadosIniciais();
   }, []);
+
 
   // ---------------------------
   // Busca turmas ao mudar disciplina
@@ -656,7 +662,15 @@ export default function Avaliacoes() {
             <div>
               <p style={{ fontSize: "0.75rem", color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "0.7rem" }}>Selecione a disciplina</p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-                {disciplinas.length === 0 && <span style={{ color: "#64748b", fontSize: "0.875rem" }}>Carregando...</span>}
+                {loadingInicial ? (
+                  <span style={{ color: "#64748b", fontSize: "0.875rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <span style={{ display: "inline-block", width: 14, height: 14, border: "2px solid #334155", borderTop: "2px solid #6366f1", borderRadius: "50%", animation: "spin 0.7s linear infinite" }} />
+                    Carregando disciplinas...
+                  </span>
+                ) : disciplinas.length === 0 ? (
+                  <span style={{ color: "#64748b", fontSize: "0.875rem" }}>Nenhuma disciplina encontrada para o ano letivo atual.</span>
+                ) : null}
+
                 {disciplinas.map(d => {
                   const isSel = disciplinaSelecionada === d;
                   return (

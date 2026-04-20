@@ -119,33 +119,42 @@ export default function AgenteCredenciais() {
 
         if (status === 'executando') return; // ainda rodando
 
-        stopPolling();
+        // ── CORREÇÃO: stopPolling() só em status DEFINITIVOS ──────────────────
+        // Status inconclusivos ('sem_teste' sem timestamp) NÃO param o polling.
+        // O teste pode estar rodando mas o Map foi limpo momentaneamente.
 
         if (status === 'sucesso' && ok) {
+          stopPolling();
           setStatusConexao('conectado');
           setUltimoTeste(new Date().toISOString());
           setFeedback({ type: 'success', msg: '✅ Conexão estabelecida! O Agente EDUCA está pronto para sincronizar.' });
+
         } else if (status === 'falha') {
+          stopPolling();
           setStatusConexao('erro');
           setErroMsg(message || 'Não foi possível autenticar no portal EDUCADF.');
           setModalErroOpen(true);
           setFeedback(null);
+
         } else if (status === 'sem_teste' && ultimo_teste_em) {
-          // O Map em memória pode ter sido limpo (deploy/restart), mas o banco
-          // registrou o ultimo_teste_em — se for recente (<2min), é sucesso.
+          // Map limpo (deploy/restart) mas banco tem registro recente → considera sucesso
           const testDate = new Date(ultimo_teste_em);
-          const isRecent = (Date.now() - testDate.getTime()) < 300_000; // 5 min (EDUCADF pode demorar até 2-3 min)
+          const isRecent = (Date.now() - testDate.getTime()) < 300_000; // 5 min
           if (isRecent) {
+            stopPolling();
             setStatusConexao('conectado');
             setUltimoTeste(ultimo_teste_em);
             setFeedback({ type: 'success', msg: '✅ Conexão estabelecida! O Agente EDUCA está pronto para sincronizar.' });
           } else {
+            stopPolling();
             setStatusConexao('desconectado');
             setFeedback({ type: 'error', msg: 'Teste finalizado, mas o resultado não pôde ser confirmado. Tente novamente.' });
           }
+
         } else {
-          setStatusConexao('desconectado');
-          setFeedback({ type: 'error', msg: 'Não foi possível obter o resultado do teste. Tente novamente.' });
+          // 'sem_teste' sem timestamp ou status desconhecido: teste pode estar em andamento.
+          // NÃO para — aguarda próximo ciclo (3s) até MAX_POLL_MS.
+          console.warn('[AgenteCredenciais] Status inconclusivo:', status, '— aguardando...');
         }
       } catch (err) {
         console.warn('[AgenteCredenciais] Polling error:', err);
@@ -170,11 +179,32 @@ export default function AgenteCredenciais() {
 
       // CORREÇÃO: backend pode ter gerado novo id (DELETE+INSERT ao salvar).
       // Sincroniza com o realCredId devolvido para que o polling use o id correto.
-      const realId = resp.data?.credId || credId;
-      if (realId !== credId) {
-        setCredencialId(realId);
+      const realId      = resp.data?.credId || credId;
+      const statusPost  = resp.data?.status;
+      const okPost      = resp.data?.ok;
+      const msgPost     = resp.data?.message;
+
+      if (realId !== credId) setCredencialId(realId);
+
+      // Se o backend j\u00e1 tem resultado definitivo em cache (< 90s), aplica diretamente.
+      // Elimina a janela de 2-3s onde o polling perde o resultado por click impar.
+      if (statusPost === 'sucesso' && okPost) {
+        setStatusConexao('conectado');
+        setUltimoTeste(new Date().toISOString());
+        setFeedback({ type: 'success', msg: '\u2705 Conex\u00e3o estabelecida! O Agente EDUCA est\u00e1 pronto para sincronizar.' });
+        return;
       }
+      if (statusPost === 'falha') {
+        setStatusConexao('erro');
+        setErroMsg(msgPost || 'N\u00e3o foi poss\u00edvel autenticar no portal EDUCADF.');
+        setModalErroOpen(true);
+        setFeedback(null);
+        return;
+      }
+
+      // Ainda em andamento: inicia polling
       startPolling(realId);
+
     } catch (err) {
       setStatusConexao('erro');
       const status = err?.response?.status;

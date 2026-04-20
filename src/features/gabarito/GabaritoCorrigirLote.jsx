@@ -57,6 +57,7 @@ export default function GabaritoCorrigirLote() {
   const [profModalLote, setProfModalLote] = useState(null); // lote para vincular professor
   const [profFiltro, setProfFiltro] = useState("");
   const [vinculandoProf, setVinculandoProf] = useState(false);
+  const [avisoNaoIdentificado, setAvisoNaoIdentificado] = useState(null); // { loteName, pendentes }
 
   // ─── Modal visualização de alunos (coordenador) ───
   const [modalAlunosLote, setModalAlunosLote] = useState(null); // lote aberto
@@ -128,19 +129,26 @@ export default function GabaritoCorrigirLote() {
     setVinculandoProf(false);
   }
 
-  // IDs de professores já vinculados aos lotes da avaliação atual
-  const professoresJaVinculados = lotes
-    .filter(l => l.professor_id && l.id !== profModalLote?.id)
-    .map(l => l.professor_id);
-
-  // Professores disponíveis para o modal (exclui já vinculados + filtro de busca)
+  // Professores disponíveis para o modal:
+  // - Um professor PODE ser vinculado a mais de uma turma da mesma avaliação
+  // - Apenas o lote atual é excluído para evitar re-seleção do mesmo professor no mesmo lote
+  // - Filtro de busca por nome
   const professoresDisponiveis = professores
-    .filter(p => !professoresJaVinculados.includes(p.id))
     .filter(p => !profFiltro || p.nome.toLowerCase().includes(profFiltro.toLowerCase()));
 
   // Abrir modal de professor
+  // ─ Verifica se todos os alunos foram identificados antes de permitir vincular ─
   function abrirModalProfessor(lote, e) {
     e.stopPropagation();
+    const total = lote.total_arquivos_real || lote.total_arquivos || 0;
+    const corrigidos = lote.total_corrigidos_real || lote.total_corrigidos || 0;
+    const identificados = lote.total_identificados || 0;
+    const erros = lote.total_erros || 0;
+    const pendentes = total - corrigidos - identificados - erros;
+    if (pendentes > 0) {
+      setAvisoNaoIdentificado({ loteName: lote.turma_nome, pendentes, total });
+      return;
+    }
     if (professores.length === 0) fetchProfessores();
     setProfFiltro("");
     setProfModalLote(lote);
@@ -2719,6 +2727,127 @@ export default function GabaritoCorrigirLote() {
         </div>
       )}
 
+      {/* ═══ Modal Premium — Aviso: Alunos Não Identificados ═══ */}
+      {avisoNaoIdentificado && (
+        <div
+          style={{
+            position: "fixed", inset: 0, zIndex: 10000,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            background: "rgba(0,0,0,0.75)", backdropFilter: "blur(10px)",
+            animation: "gab-fade-in 0.2s ease-out",
+          }}
+          onClick={() => setAvisoNaoIdentificado(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "linear-gradient(145deg, #1a1f2e 0%, #111827 100%)",
+              border: "1px solid rgba(245,158,11,0.25)",
+              borderRadius: 20, maxWidth: 440, width: "95%",
+              padding: 0, overflow: "hidden",
+              boxShadow: "0 24px 64px rgba(0,0,0,0.6), 0 0 40px rgba(245,158,11,0.08)",
+              animation: "gab-slide-up 0.35s ease-out",
+            }}
+          >
+            {/* Faixa de alerta no topo */}
+            <div style={{
+              height: 4,
+              background: "linear-gradient(90deg, #f59e0b, #ef4444, #f59e0b)",
+              backgroundSize: "200% 100%",
+              animation: "gabPulse 2s ease-in-out infinite",
+            }} />
+
+            {/* Corpo */}
+            <div style={{ padding: "28px 28px 24px" }}>
+              {/* Ícone + título */}
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 16, marginBottom: 20 }}>
+                <div style={{
+                  width: 52, height: 52, borderRadius: 14, flexShrink: 0,
+                  background: "rgba(245,158,11,0.12)",
+                  border: "1px solid rgba(245,158,11,0.3)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: "1.5rem",
+                }}>⚠️</div>
+                <div>
+                  <div style={{
+                    fontSize: "1rem", fontWeight: 800,
+                    color: "#fbbf24",
+                    letterSpacing: "0.2px", marginBottom: 4,
+                  }}>
+                    Alunos não identificados
+                  </div>
+                  <div style={{
+                    fontSize: "0.8rem", color: "var(--gab-text-muted)", lineHeight: 1.5,
+                  }}>
+                    Turma <strong style={{ color: "var(--gab-text-primary)" }}>{avisoNaoIdentificado.loteName}</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Contador de pendentes */}
+              <div style={{
+                display: "flex", alignItems: "center", gap: 14,
+                padding: "14px 16px", borderRadius: 12, marginBottom: 18,
+                background: "rgba(245,158,11,0.06)",
+                border: "1px solid rgba(245,158,11,0.18)",
+              }}>
+                <div style={{ textAlign: "center", minWidth: 56 }}>
+                  <div style={{
+                    fontSize: "1.8rem", fontWeight: 900, lineHeight: 1,
+                    color: "#f59e0b",
+                  }}>
+                    {avisoNaoIdentificado.pendentes}
+                  </div>
+                  <div style={{ fontSize: "0.6rem", color: "var(--gab-text-muted)", marginTop: 2, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+                    pendente{avisoNaoIdentificado.pendentes > 1 ? "s" : ""}
+                  </div>
+                </div>
+                <div style={{ width: 1, height: 36, background: "rgba(245,158,11,0.2)" }} />
+                <div style={{ fontSize: "0.8rem", color: "var(--gab-text-muted)", lineHeight: 1.55 }}>
+                  <strong style={{ color: "var(--gab-text-primary)" }}>
+                    {avisoNaoIdentificado.pendentes} de {avisoNaoIdentificado.total}
+                  </strong> gabaritos ainda não foram identificados.<br />
+                  Identifique todos os alunos antes de vincular o professor para correção.
+                </div>
+              </div>
+
+              {/* Instrução */}
+              <div style={{
+                display: "flex", alignItems: "flex-start", gap: 10,
+                padding: "12px 14px", borderRadius: 10, marginBottom: 22,
+                background: "rgba(6,182,212,0.04)",
+                border: "1px solid rgba(6,182,212,0.12)",
+                fontSize: "0.78rem", color: "var(--gab-text-muted)", lineHeight: 1.55,
+              }}>
+                <span style={{ fontSize: "1rem", flexShrink: 0 }}>💡</span>
+                <span>
+                  Clique no banner da turma para abrir o painel e identificar os alunos pendentes automaticamente ou de forma manual.
+                </span>
+              </div>
+
+              {/* Botão ENTENDI */}
+              <button
+                onClick={() => setAvisoNaoIdentificado(null)}
+                style={{
+                  width: "100%", padding: "13px",
+                  borderRadius: 12, border: "none",
+                  fontSize: "0.88rem", fontWeight: 800, letterSpacing: "0.4px",
+                  background: "linear-gradient(135deg, #f59e0b 0%, #ea580c 100%)",
+                  color: "#fff", cursor: "pointer",
+                  boxShadow: "0 4px 20px rgba(245,158,11,0.35)",
+                  transition: "all 0.2s",
+                  fontFamily: "var(--gab-font-display)",
+                }}
+                onMouseOver={(e) => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 6px 24px rgba(245,158,11,0.45)"; }}
+                onMouseOut={(e) => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 4px 20px rgba(245,158,11,0.35)"; }}
+              >
+                ENTENDI
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ═══ Modal Premium — Vincular Professor à Turma ═══ */}
       {profModalLote && (
         <div
@@ -2793,7 +2922,7 @@ export default function GabaritoCorrigirLote() {
                 </div>
               ) : professoresDisponiveis.length === 0 ? (
                 <div style={{ textAlign: "center", padding: 40, color: "var(--gab-text-muted)", fontSize: "0.85rem" }}>
-                  {profFiltro ? "Nenhum corretor encontrado." : "Todos os corretores já foram vinculados."}
+                  {profFiltro ? "Nenhum corretor encontrado com esse nome." : "Nenhum corretor disponível."}
                 </div>
               ) : (
                 professoresDisponiveis.map(prof => (
@@ -2867,7 +2996,7 @@ export default function GabaritoCorrigirLote() {
                       }}>
                         {prof.nome}
                       </div>
-                      <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: "0.72rem", color: "var(--gab-text-muted)", marginTop: 2 }}>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: "0.72rem", color: "var(--gab-text-muted)", marginTop: 2, flexWrap: "wrap" }}>
                         {prof.perfil && (
                           <span style={{
                             fontSize: "0.62rem", fontWeight: 700, textTransform: "uppercase",
@@ -2882,10 +3011,10 @@ export default function GabaritoCorrigirLote() {
                               "#06b6d4",
                           }}>
                             {prof.perfil === "vice_diretor" ? "Vice-Diretor" : prof.perfil}
+                            {prof.disciplina_nome ? ` · ${prof.disciplina_nome}` : ""}
                           </span>
                         )}
-                        {prof.disciplina_nome && <span>{prof.disciplina_nome}</span>}
-                        {prof.turno && <span>· {prof.turno}</span>}
+                        {prof.turno && <span style={{ color: "var(--gab-text-muted)" }}>· {prof.turno}</span>}
                       </div>
                     </div>
 

@@ -15,12 +15,18 @@
 import React, { useState, useEffect } from "react";
 import api from "../../services/api";
 
-// ─── Componente: Miniatura do gabarito + Modal premium ───
+// ─── Componente: Miniatura do gabarito + Modal premium com lupa ───
 // Suporta PDF (renderiza 1ª página via canvas) e imagens (JPG/PNG)
 function GabaritoImageZoom({ arquivoId, arquivoNome }) {
   const [imgUrl, setImgUrl] = useState(null);
   const [loading, setLoading] = useState(true);
   const [modalAberto, setModalAberto] = useState(false);
+
+  // ─── Lupa (magnifier) ───
+  const [lupa, setLupa] = useState(null); // { x, y } posição do cursor sobre a imagem
+  const imgRef = React.useRef(null);
+  const LUPA_SIZE = 160;   // diâmetro da lupa em px
+  const LUPA_ZOOM = 2.8;   // fator de ampliação
 
   useEffect(() => {
     if (!arquivoId) return;
@@ -66,6 +72,21 @@ function GabaritoImageZoom({ arquivoId, arquivoNome }) {
     return () => window.removeEventListener("keydown", h);
   }, [modalAberto]);
 
+  // ─── Handlers da lupa ───
+  function handleMouseMove(e) {
+    const img = imgRef.current;
+    if (!img) return;
+    const rect = img.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    // Só mostrar dentro da imagem
+    if (x < 0 || y < 0 || x > rect.width || y > rect.height) {
+      setLupa(null);
+      return;
+    }
+    setLupa({ x, y, imgW: rect.width, imgH: rect.height });
+  }
+
   if (loading) return (
     <div className="gab-card" style={{ padding: 20, textAlign: "center", animation: "gab-slide-up 0.35s ease-out" }}>
       <div className="gab-spinner" style={{ margin: "0 auto", width: 24, height: 24 }} />
@@ -74,16 +95,56 @@ function GabaritoImageZoom({ arquivoId, arquivoNome }) {
   );
   if (!imgUrl) return null;
 
+  // ─── Calcular posição do background da lupa ───
+  // Para simular zoom 2.8x: background-size = imgW*2.8 x imgH*2.8
+  // background-position = -(x*2.8 - LUPA_SIZE/2) e -(y*2.8 - LUPA_SIZE/2)
+  const lupa_bgX = lupa ? -(lupa.x * LUPA_ZOOM - LUPA_SIZE / 2) : 0;
+  const lupa_bgY = lupa ? -(lupa.y * LUPA_ZOOM - LUPA_SIZE / 2) : 0;
+  const lupa_bgW = lupa ? lupa.imgW * LUPA_ZOOM : 0;
+  const lupa_bgH = lupa ? lupa.imgH * LUPA_ZOOM : 0;
+
   return (
     <>
+      {/* Estilos da lupa */}
+      <style>{`
+        @keyframes lupa-aparecer { from { opacity:0; transform: scale(0.7); } to { opacity:1; transform: scale(1); } }
+        .gab-img-thumb { cursor: zoom-in !important; }
+        .gab-img-modal-wrapper { cursor: none !important; position: relative; }
+        .gab-lupa {
+          position: absolute;
+          pointer-events: none;
+          border-radius: 50%;
+          border: 2.5px solid rgba(6,182,212,0.9);
+          box-shadow:
+            0 0 0 1.5px rgba(0,0,0,0.5),
+            0 8px 32px rgba(0,0,0,0.5),
+            inset 0 0 12px rgba(6,182,212,0.12);
+          overflow: hidden;
+          z-index: 10;
+          animation: lupa-aparecer 0.15s ease-out;
+          width: ${LUPA_SIZE}px;
+          height: ${LUPA_SIZE}px;
+          transform: translate(-50%, -50%);
+        }
+        .gab-lupa::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          border-radius: 50%;
+          background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.08) 0%, transparent 60%);
+          pointer-events: none;
+        }
+      `}</style>
+
       <div className="gab-card" style={{ padding: 16, animation: "gab-slide-up 0.35s ease-out" }}>
         <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--gab-text-secondary)", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
           📄 Gabarito Digitalizado
           <span style={{ fontSize: "0.62rem", fontWeight: 500, color: "var(--gab-text-muted)" }}>— clique para ampliar</span>
         </div>
         <div
+          className="gab-img-thumb"
           onClick={() => setModalAberto(true)}
-          style={{ borderRadius: 10, overflow: "hidden", border: "1px solid rgba(255,255,255,0.06)", cursor: "pointer", maxHeight: 180, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.15)", transition: "all 0.25s", position: "relative" }}
+          style={{ borderRadius: 10, overflow: "hidden", border: "1px solid rgba(255,255,255,0.06)", maxHeight: 180, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.15)", transition: "all 0.25s", position: "relative" }}
           onMouseEnter={(e) => { e.currentTarget.style.borderColor = "rgba(6,182,212,0.4)"; e.currentTarget.style.boxShadow = "0 4px 20px rgba(6,182,212,0.1)"; }}
           onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)"; e.currentTarget.style.boxShadow = "none"; }}
         >
@@ -98,18 +159,50 @@ function GabaritoImageZoom({ arquivoId, arquivoNome }) {
         <div onClick={() => setModalAberto(false)} style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(12px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 30 }}>
           <style>{`@keyframes gab-modal-pop { from { opacity:0; transform:scale(0.85) translateY(20px); } to { opacity:1; transform:scale(1) translateY(0); } }`}</style>
           <div onClick={(e) => e.stopPropagation()} style={{ position: "relative", maxWidth: "90vw", maxHeight: "90vh", borderRadius: 16, overflow: "hidden", background: "linear-gradient(145deg, #1a1f35, #0f1321)", border: "1px solid rgba(6,182,212,0.15)", boxShadow: "0 32px 80px rgba(0,0,0,0.6), 0 0 60px rgba(6,182,212,0.08), inset 0 1px 0 rgba(255,255,255,0.04)", animation: "gab-modal-pop 0.35s cubic-bezier(0.34,1.56,0.64,1)", display: "flex", flexDirection: "column" }}>
+            {/* Header */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px", background: "linear-gradient(135deg, rgba(6,182,212,0.06), rgba(139,92,246,0.04))", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 <div style={{ width: 32, height: 32, borderRadius: 8, background: "linear-gradient(135deg, rgba(6,182,212,0.15), rgba(139,92,246,0.1))", border: "1px solid rgba(6,182,212,0.2)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.9rem" }}>📄</div>
                 <div>
                   <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "#e2e8f0" }}>{arquivoNome || "Gabarito Escaneado"}</div>
-                  <div style={{ fontSize: "0.62rem", color: "rgba(148,163,184,0.7)", marginTop: 1 }}>Visualização ampliada · ESC para fechar</div>
+                  <div style={{ fontSize: "0.62rem", color: "rgba(148,163,184,0.7)", marginTop: 1 }}>
+                    🔍 Passe o mouse para usar a lupa · ESC para fechar
+                  </div>
                 </div>
               </div>
               <button onClick={() => setModalAberto(false)} style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.15)", color: "#f87171", fontSize: "1.1rem", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s" }} onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(239,68,68,0.2)"; e.currentTarget.style.transform = "scale(1.1)"; }} onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(239,68,68,0.08)"; e.currentTarget.style.transform = "scale(1)"; }} title="Fechar (ESC)">✕</button>
             </div>
+
+            {/* Imagem com lupa */}
             <div style={{ overflow: "auto", maxHeight: "calc(90vh - 70px)", padding: 16, display: "flex", alignItems: "flex-start", justifyContent: "center" }}>
-              <img src={imgUrl} alt="Gabarito ampliado" style={{ maxWidth: "95vw", maxHeight: "85vh", objectFit: "contain", borderRadius: 8, boxShadow: "0 4px 24px rgba(0,0,0,0.3)" }} draggable={false} />
+              <div
+                className="gab-img-modal-wrapper"
+                onMouseMove={handleMouseMove}
+                onMouseLeave={() => setLupa(null)}
+                style={{ position: "relative", display: "inline-block" }}
+              >
+                <img
+                  ref={imgRef}
+                  src={imgUrl}
+                  alt="Gabarito ampliado"
+                  style={{ maxWidth: "95vw", maxHeight: "85vh", objectFit: "contain", borderRadius: 8, boxShadow: "0 4px 24px rgba(0,0,0,0.3)", display: "block" }}
+                  draggable={false}
+                />
+                {/* Círculo da lupa */}
+                {lupa && (
+                  <div
+                    className="gab-lupa"
+                    style={{
+                      left: lupa.x,
+                      top: lupa.y,
+                      backgroundImage: `url(${imgUrl})`,
+                      backgroundSize: `${lupa_bgW}px ${lupa_bgH}px`,
+                      backgroundPosition: `${lupa_bgX}px ${lupa_bgY}px`,
+                      backgroundRepeat: "no-repeat",
+                    }}
+                  />
+                )}
+              </div>
             </div>
           </div>
         </div>

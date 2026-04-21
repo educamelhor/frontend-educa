@@ -108,16 +108,18 @@ export default function TurmaForm({ open, onClose, onSubmit, turma }) {
 
     setSending(true);
 
-    const escolaIdLogin = localStorage.getItem('escola_id') || '';
+    // ✅ FIX MÉDIO 5: escola_id NÃO é mais enviado no payload — o backend usa exclusivamente req.user.escola_id (JWT).
+    // Manter escola_id no localStorage apenas para a verificação de duplicidade local (ListaTurmas.find).
+    const escolaIdLocal = localStorage.getItem('escola_id') || '';
 
     const dados = {
-      ...form,
-      escola_id: form.escola_id || escolaIdLogin || '',
       nome: form.nome.trim().toUpperCase(),
       etapa: form.etapa.trim().toUpperCase(),
-      ano: String(form.ano).trim(), // importante manter o ano no payload
+      ano: String(form.ano).trim(),
       turno: form.turno.trim().toUpperCase(),
-      serie: form.serie.trim().toUpperCase()
+      serie: form.serie.trim().toUpperCase(),
+      // escola_id incluso apenas para a verificação de duplicidade cliente-side antes do POST
+      _escola_id_local: escolaIdLocal,
     };
 
     // Mantém compatibilidade: onSubmit pode retornar boolean (atual) ou { ok, message } (melhoria)

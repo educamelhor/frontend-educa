@@ -121,11 +121,14 @@ async function handleSaveDisciplina(dados) {
     setEditingDisciplina(null);
   } catch (err) {
     console.error(err);
-    alert("Erro ao salvar disciplina.");
+    // ✅ FIX MÉDIO 7: exibe mensagem do backend (duplicata detectada no servidor)
+    const msgBackend = err?.response?.data?.message;
+    alert(msgBackend || "Erro ao salvar disciplina.");
   } finally {
     setLoading(false);
   }
 }
+
 
 
 
@@ -145,12 +148,15 @@ async function handleSaveDisciplina(dados) {
     setTimeout(() => setSuccessMessage(""), 3000);
   } catch (err) {
     console.error(err);
-    alert("Erro ao excluir disciplina.");
+    // ✅ FIX ALTO 3: exibe mensagem clara quando há FK constraint (vinculada a professores/planos)
+    const msgBackend = err?.response?.data?.message;
+    alert(msgBackend || "Erro ao excluir disciplina.");
   } finally {
     setLoading(false);
     setToDeleteDisciplina(null);
   }
 }
+
 
 
 

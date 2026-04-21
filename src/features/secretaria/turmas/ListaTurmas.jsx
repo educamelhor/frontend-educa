@@ -68,14 +68,12 @@ export default function ListaTurmas() {
       const novaTurma = normalizeLocal(dados.nome);
       const novoTurno = normalizeLocal(dados.turno);
       const novoAno = String(dados.ano);
-      const novaEscolaId = String(dados.escola_id);
 
-      // 🔎 Verifica duplicidade considerando escola + nome + turno + ano
+      // ✅ FIX MÉDIO 5: escola_id não vem mais no payload — a lista de turmas já é filtrada pelo backend
+      //  (turmas do usuário logado), então comparar apenas nome+turno+ano é suficiente.
       const duplicada = turmas.find((t) => {
         if (dados.id && t.id === dados.id) return false;
-
         return (
-          String(t.escola_id) === novaEscolaId &&
           normalizeLocal(t.turma) === novaTurma &&
           normalizeLocal(t.turno) === novoTurno &&
           String(t.ano) === novoAno
@@ -84,7 +82,7 @@ export default function ListaTurmas() {
 
       if (duplicada) {
         alert(
-          "⚠️ Já existe uma turma cadastrada com a mesma escola, nome, turno e ano."
+          "⚠️ Já existe uma turma cadastrada com este nome, turno e ano."
         );
         return false;
       }

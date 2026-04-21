@@ -278,9 +278,9 @@ export default function Modulacao() {
     // Se mesmo assim vierem turmas de vários turnos, filtra
     turmas = filtrarTurmasPorTurno(turmas, turno);
 
-    // ✅ Filtra pelo ano letivo atual (ignorando o filtro se não houver 'ano' na turma, por segurança)
-    const anoAtual = getAnoLetivoAtual();
-    turmas = turmas.filter((t) => !t.ano || Number(t.ano) === anoAtual);
+    // ✅ FIX MÉDIO 6: Turmas sem campo 'ano' eram pass-through (🚫 legado contaminava a visão atual).
+    // Agora exige 'ano' explícito e igual ao ano letivo corrente.
+    turmas = turmas.filter((t) => t.ano && Number(t.ano) === anoAtual);
 
     setTurmasTurno(turmas);
     if (turmas.length === 0) {

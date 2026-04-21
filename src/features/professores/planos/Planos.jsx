@@ -1321,11 +1321,12 @@ export default function Planos() {
                     });
                     if (res.data?.ok) {
                       // ✅ Atualiza o estado local imediatamente (sem reload)
-                      setTurmasComPlanos(prev => prev.map(t =>
-                        t.turma === modalGovernanca.turma
-                          ? { ...t, status: "LIBERACAO_SOLICITADA" }
-                          : t
+                      setDisciplinasComPlanos(prev => prev.map(d =>
+                        d.id === modalGovernanca.planoId
+                          ? { ...d, status: "LIBERACAO_SOLICITADA" }
+                          : d
                       ));
+
                       setModalGovernanca(null);
                       setSolicitacaoEnviada(true);
                     } else {
@@ -1503,11 +1504,13 @@ export default function Planos() {
                     await api.patch(`/avaliacoes/${modalGovernanca.planoId}/status`, { status: "RASCUNHO" });
                     setModalGovernanca(null);
                     // Recarregar dados da tabela
-                    setTurmasComPlanos(prev => prev.map(t =>
-                      t.turma === modalGovernanca.turma
-                        ? { ...t, status: "RASCUNHO", motivo_devolucao: null }
-                        : t
+                    // Atualiza estado local para refletir novo status 
+                    setDisciplinasComPlanos(prev => prev.map(d =>
+                      d.id === modalGovernanca.planoId
+                        ? { ...d, status: "RASCUNHO", motivo_devolucao: null }
+                        : d
                     ));
+
                     showMsg("success", "Plano reaberto para edição.");
                     // Abrir o editor
                     abrirPlano([modalGovernanca.turma], modalGovernanca.planoId);

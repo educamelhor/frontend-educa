@@ -101,6 +101,10 @@ export default function Planos() {
   const [solicitacaoEnviada, setSolicitacaoEnviada] = useState(false); // modal de confirmação após solicitar liberação
   const [solicitandoLiberacao, setSolicitandoLiberacao] = useState(false);
 
+  // ✅ Modal de confirmação de envio para direção
+  const [modalConfirmarEnvio, setModalConfirmarEnvio] = useState(false);
+  const [enviandoPAP, setEnviandoPAP] = useState(false);
+
   // ✅ Modal de data da Prova Bimestral (fixo_direcao)
   const [modalDataFixo, setModalDataFixo] = useState(false);
   const [dataFixoTemp, setDataFixoTemp] = useState("");
@@ -1120,54 +1124,19 @@ export default function Planos() {
 
               <button
                 type="button"
-                onClick={async () => {
+                onClick={() => {
                   if (!papKeyAtiva) return;
-
                   if (papStatus === "BLOQUEADO_TEMPO") return showMsg("info", "Bimestre encerrado: apenas consulta.");
                   if (papStatus === "APROVADO") return showMsg("info", "PAP aprovado: edição bloqueada.");
                   if (papStatus === "ENVIADO") return showMsg("info", "Este PAP já foi enviado para direção.");
-
                   if (!pontosOk) {
                     return showMsg(
                       "warn",
                       `Para enviar, o PAP deve fechar ${PONTOS_TOTAL_PAP} pontos. Atualmente: ${totalAtual}.`
                     );
                   }
-
-                  // ✅ Data da Prova Bimestral: não obrigatória para o professor
-                  // Será definida pela Direção / Coordenação em etapa posterior
-                  // data_inicio = NULL é aceito no BD (fallback no Agente ao exportar)
-
-                  try {
-                    const nomeCodigo = "Plano-" + Math.floor(Math.random() * 10000);
-                    const payload = {
-                      disciplina: disciplinaSelecionada,
-                      bimestre: bimestreSelecionado,
-                      turmas: turmasDoPlanoAberto,
-                      ano: new Date().getFullYear(),
-                      nome_codigo: nomeCodigo,
-                      status: "ENVIADO",
-                      itens
-                    };
-                    const { data } = await api.post("/avaliacoes", payload);
-                    if (data.success) {
-                      showMsg("success", "PAP enviado para direção com sucesso!");
-                      voltarTabelaMestra();
-                      // Forçar atualização do dashboard
-                      setTimeout(() => {
-                        setDisciplinaSelecionada(null);
-                        setTimeout(() => setDisciplinaSelecionada(disciplinaSelecionada), 50);
-                      }, 400);
-                    }
-                  } catch (err) {
-                    console.error(err);
-                    const errData = err?.response?.data;
-                    if (err?.response?.status === 409 && errData?.item_bloqueado) {
-                      showMsg("error", errData.error || `Não é possível remover "${errData.item_bloqueado}" — há notas lançadas nessa atividade.`);
-                    } else {
-                      showMsg("error", "Erro ao enviar PAP.");
-                    }
-                  }
+                  // ✅ Abre modal de confirmação premium
+                  setModalConfirmarEnvio(true);
                 }}
                 disabled={!papKeyAtiva || papStatus === "BLOQUEADO_TEMPO" || papStatus === "APROVADO" || papStatus === "ENVIADO"}
                 className={`px-6 py-3 rounded-xl font-bold shadow transition ${
@@ -1678,6 +1647,166 @@ export default function Planos() {
                 className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-bold rounded-xl shadow-lg shadow-amber-500/25 transition-all active:scale-95"
               >
                 Entendi, abrir para edição
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════
+          MODAL PREMIUM — CONFIRMAÇÃO DE ENVIO PARA DIREÇÃO
+          ═══════════════════════════════════════════════════════ */}
+      {modalConfirmarEnvio && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          onClick={() => { if (!enviandoPAP) setModalConfirmarEnvio(false); }}
+        >
+          <div
+            className="w-full max-w-lg rounded-2xl bg-white shadow-2xl overflow-hidden"
+            style={{ animation: "modalEntrada 0.22s cubic-bezier(0.34,1.56,0.64,1) both" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header gradiente verde premium */}
+            <div className="bg-gradient-to-r from-emerald-500 via-green-600 to-teal-600 px-6 py-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-sm shadow-lg">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                  </svg>
+                </div>
+                <div>
+                  <h4 className="text-xl font-black text-white tracking-tight">Confirmar Envio para Direção</h4>
+                  <p className="text-emerald-100 text-sm font-semibold mt-0.5">Plano de Avaliação Pedagógica</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Corpo */}
+            <div className="px-6 py-6">
+              {/* Info do plano */}
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 mb-5">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Disciplina</span>
+                </div>
+                <p className="text-emerald-900 font-bold text-base">{disciplinaSelecionada}</p>
+                <p className="text-emerald-600 text-xs font-medium mt-0.5">{bimestreSelecionado} • {new Date().getFullYear()}</p>
+              </div>
+
+              {/* Turmas afetadas */}
+              <div className="mb-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
+                  <span className="text-xs font-black text-gray-500 uppercase tracking-widest">
+                    {turmasDoPlanoAberto.length > 1 ? `${turmasDoPlanoAberto.length} Turmas — mesmo plano` : "Turma"}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {turmasDoPlanoAberto.map((turma, i) => (
+                    <span
+                      key={i}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-bold"
+                      style={{
+                        background: "linear-gradient(135deg, #d1fae5, #a7f3d0)",
+                        color: "#065f46",
+                        border: "1px solid #6ee7b7",
+                      }}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      {turma}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Aviso */}
+              <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-start gap-3">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                </svg>
+                <div>
+                  <p className="text-amber-800 text-sm font-bold">Após o envio, o plano ficará bloqueado para edição.</p>
+                  <p className="text-amber-700 text-xs mt-0.5">A Direção / Coordenação irá analisar e aprovar ou devolver com comentários.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 bg-gray-50 border-t flex items-center justify-end gap-3">
+              <button
+                type="button"
+                disabled={enviandoPAP}
+                onClick={() => setModalConfirmarEnvio(false)}
+                className="px-5 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-semibold hover:bg-gray-100 transition text-sm disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={enviandoPAP}
+                onClick={async () => {
+                  setEnviandoPAP(true);
+                  try {
+                    const nomeCodigo = "Plano-" + Math.floor(Math.random() * 10000);
+                    const payload = {
+                      disciplina: disciplinaSelecionada,
+                      bimestre: bimestreSelecionado,
+                      turmas: turmasDoPlanoAberto,
+                      ano: new Date().getFullYear(),
+                      nome_codigo: nomeCodigo,
+                      status: "ENVIADO",
+                      itens
+                    };
+                    const { data } = await api.post("/avaliacoes", payload);
+                    if (data.success) {
+                      // ✅ 1) Fecha modal
+                      setModalConfirmarEnvio(false);
+                      // ✅ 2) Atualiza status imediatamente na tabela mestra
+                      setDisciplinasComPlanos(prev => prev.map(d =>
+                        d.disciplina === disciplinaSelecionada
+                          ? { ...d, status: "ENVIADO", id: data.plano_ids?.[0] || d.id }
+                          : d
+                      ));
+                      // ✅ 3) Atualiza status local do editor
+                      setPapStatus("ENVIADO");
+                      showMsg("success", "✅ PAP enviado para a Direção com sucesso!");
+                      // ✅ 4) Volta à tabela mestra
+                      voltarTabelaMestra();
+                    }
+                  } catch (err) {
+                    console.error(err);
+                    const errData = err?.response?.data;
+                    if (err?.response?.status === 409 && errData?.item_bloqueado) {
+                      showMsg("error", errData.error || `Não é possível remover "${errData.item_bloqueado}" — há notas lançadas nessa atividade.`);
+                    } else {
+                      showMsg("error", "Erro ao enviar PAP para a direção.");
+                    }
+                  } finally {
+                    setEnviandoPAP(false);
+                  }
+                }}
+                className="px-6 py-2.5 rounded-xl font-bold text-white shadow-lg transition-all active:scale-95 flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                style={{
+                  background: enviandoPAP
+                    ? "#6b7280"
+                    : "linear-gradient(135deg, #10b981, #059669)",
+                  boxShadow: enviandoPAP ? "none" : "0 4px 14px rgba(16,185,129,0.4)",
+                }}
+              >
+                {enviandoPAP ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Enviando...
+                  </>
+                ) : (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                    </svg>
+                    Confirmar Envio
+                  </>
+                )}
               </button>
             </div>
           </div>

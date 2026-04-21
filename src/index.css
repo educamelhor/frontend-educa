@@ -75,6 +75,14 @@ input[type=number].no-spinner {
   100% { opacity: 1; transform: scale(1); }
 }
 
+/* ANIMAÇÃO PREMIUM DE ENTRADA DE MODAL (spring effect) */
+@keyframes modalEntrada {
+  0%   { opacity: 0; transform: scale(0.88) translateY(16px); }
+  60%  { opacity: 1; transform: scale(1.03) translateY(-3px); }
+  80%  { transform: scale(0.98) translateY(1px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+
 .animate-fadeIn {
   animation: fadeIn 0.4s ease-in-out forwards;
 }

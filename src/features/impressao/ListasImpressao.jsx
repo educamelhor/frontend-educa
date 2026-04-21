@@ -1,7 +1,7 @@
 // src/features/impressao/ListasImpressao.jsx
 // ============================================================================
-// MÃ³dulo LISTAS â€” GeraÃ§Ã£o de listas imprimÃ­veis para coordenaÃ§Ã£o/direÃ§Ã£o.
-// PDF gerado no servidor (PDFKit) â€” idÃªntico ao RelatÃ³rio Disciplinar.
+// Módulo LISTAS — Geração de listas imprimíveis para coordenação/direção.
+// PDF gerado no servidor (PDFKit) — idêntico ao Relatório Disciplinar.
 // ============================================================================
 
 import React, { useState, useEffect, useMemo } from "react";
@@ -17,10 +17,10 @@ import {
   ChartBarIcon,
 } from "@heroicons/react/24/outline";
 
-// â”€â”€â”€ Ano letivo atual â”€â”€â”€
+// ─── Ano letivo atual ───
 const ANO_LETIVO = String(new Date().getFullYear());
 
-// â”€â”€â”€ Normaliza texto para comparaÃ§Ã£o â”€â”€â”€
+// ─── Normaliza texto para comparação ───
 const norm = (s) =>
   String(s || "")
     .toLowerCase()
@@ -28,31 +28,28 @@ const norm = (s) =>
     .replace(/[\u0300-\u036f]/g, "")
     .trim();
 
-// â”€â”€â”€ Tipos de lista â”€â”€â”€
+// ─── Tipos de lista ───
 const TIPOS_LISTA = [
   {
     id: "chamada",
     nome: "Lista de Chamada",
-    desc: "FrequÃªncia diÃ¡ria com campos para marcar presenÃ§a/falta",
+    desc: "Frequência diária com campos para marcar presença/falta",
     icon: ClipboardDocumentListIcon,
     color: "from-blue-500 to-blue-700",
-    accentColor: "#3b82f6",
   },
   {
     id: "assinatura_prova",
-    nome: "Assinatura â€” Prova",
-    desc: "Folha de assinatura para dia de aplicaÃ§Ã£o de provas/avaliaÃ§Ãµes",
+    nome: "Assinatura — Prova",
+    desc: "Folha de assinatura para dia de aplicação de provas/avaliações",
     icon: DocumentTextIcon,
     color: "from-indigo-500 to-indigo-700",
-    accentColor: "#6366f1",
   },
   {
     id: "assinatura_geral",
-    nome: "Assinatura â€” Geral",
-    desc: "Folha de assinatura para reuniÃµes, eventos ou entregas de material",
+    nome: "Assinatura — Geral",
+    desc: "Folha de assinatura para reuniões, eventos ou entregas de material",
     icon: UserGroupIcon,
     color: "from-violet-500 to-violet-700",
-    accentColor: "#8b5cf6",
   },
   {
     id: "branco",
@@ -60,7 +57,6 @@ const TIPOS_LISTA = [
     desc: "Linhas vazias numeradas para preenchimento manual",
     icon: AcademicCapIcon,
     color: "from-gray-500 to-gray-700",
-    accentColor: "#6b7280",
   },
   {
     id: "notas",
@@ -68,13 +64,12 @@ const TIPOS_LISTA = [
     desc: "Notas corrigidas automaticamente pelos gabaritos digitalizados",
     icon: ChartBarIcon,
     color: "from-emerald-500 to-teal-700",
-    accentColor: "#10b981",
     badge: "NOVO",
   },
 ];
 
 export default function ListasImpressao() {
-  // â”€â”€â”€ Estado â”€â”€â”€
+  // ─── Estado ───
   const [turmas, setTurmas] = useState([]);
   const [loadingTurmas, setLoadingTurmas] = useState(false);
   const [gerando, setGerando] = useState(false);
@@ -91,7 +86,7 @@ export default function ListasImpressao() {
   );
   const [qtdLinhasBranco, setQtdLinhasBranco] = useState(30);
 
-  // â”€â”€â”€ Lista de Notas: avaliaÃ§Ã£o + turma â”€â”€â”€
+  // ─── Lista de Notas: avaliação + turma ───
   const [avaliacoesNotas, setAvaliacoesNotas] = useState([]);
   const [loadingAvaliacoesNotas, setLoadingAvaliacoesNotas] = useState(false);
   const [avaliacaoSelecionada, setAvaliacaoSelecionada] = useState(null);
@@ -102,7 +97,7 @@ export default function ListasImpressao() {
 
   const turnos = ["Matutino", "Vespertino", "Noturno"];
 
-  // â”€â”€â”€ Buscar turmas (filtradas pelo ano letivo atual) â”€â”€â”€
+  // ─── Buscar turmas (filtradas pelo ano letivo atual) ───
   useEffect(() => {
     (async () => {
       setLoadingTurmas(true);
@@ -123,7 +118,7 @@ export default function ListasImpressao() {
     })();
   }, []);
 
-  // â”€â”€â”€ Buscar avaliaÃ§Ãµes com notas (quando tipo = notas) â”€â”€â”€
+  // ─── Buscar avaliações com notas (quando tipo = notas) ───
   useEffect(() => {
     if (tipoLista?.id !== "notas") return;
     setLoadingAvaliacoesNotas(true);
@@ -133,7 +128,7 @@ export default function ListasImpressao() {
       .finally(() => setLoadingAvaliacoesNotas(false));
   }, [tipoLista]);
 
-  // â”€â”€â”€ Buscar turmas de uma avaliaÃ§Ã£o selecionada â”€â”€â”€
+  // ─── Buscar turmas de uma avaliação selecionada ───
   useEffect(() => {
     if (!avaliacaoSelecionada) return;
     setLoadingTurmasNotas(true);
@@ -143,7 +138,7 @@ export default function ListasImpressao() {
       .finally(() => setLoadingTurmasNotas(false));
   }, [avaliacaoSelecionada]);
 
-  // â”€â”€â”€ Turmas filtradas por turno â”€â”€â”€
+  // ─── Turmas filtradas por turno ───
   const turmasFiltradas = useMemo(
     () =>
       turmas
@@ -156,14 +151,12 @@ export default function ListasImpressao() {
     [turmas, turnoSelecionado]
   );
 
-  // â•â•â• GERAR PDF LISTA DE NOTAS â•â•â•
+  // ═══ GERAR PDF LISTA DE NOTAS ═══
   const handleGerarPDFNotas = async () => {
     if (!avaliacaoSelecionada || !turmaNota) return;
     setGerandoNotas(true);
     try {
-      const params = new URLSearchParams({
-        turma_nome: turmaNota.turma_nome,
-      });
+      const params = new URLSearchParams({ turma_nome: turmaNota.turma_nome });
       const turmaId = turmaNota.turma_id || "por-nome";
       const response = await api.get(
         `/api/listas-impressao/notas/${avaliacaoSelecionada.id}/${turmaId}?${params}`,
@@ -181,15 +174,12 @@ export default function ListasImpressao() {
     }
   };
 
-  // â•â•â• GERAR PDF (abre em nova aba via backend) â•â•â•
+  // ═══ GERAR PDF (turma individual) ═══
   const handleGerarPDF = async () => {
     if (!tipoLista || !turmaSelecionada) return;
     setGerando(true);
     try {
-      const params = new URLSearchParams({
-        tipo: tipoLista.id,
-        data: dataAplicacao,
-      });
+      const params = new URLSearchParams({ tipo: tipoLista.id, data: dataAplicacao });
       if (tituloPersonalizado.trim()) params.set("titulo", tituloPersonalizado.trim());
       if (tipoLista.id === "branco") params.set("linhas", String(qtdLinhasBranco));
 
@@ -203,21 +193,18 @@ export default function ListasImpressao() {
       setTimeout(() => URL.revokeObjectURL(url), 60000);
     } catch (err) {
       console.error("Erro ao gerar PDF:", err);
-      alert("Erro ao gerar o PDF. Verifique a conexÃ£o e tente novamente.");
+      alert("Erro ao gerar o PDF. Verifique a conexão e tente novamente.");
     } finally {
       setGerando(false);
     }
   };
 
-  // â•â•â• GERAR PDF POR TURNO (todas as turmas) â•â•â•
+  // ═══ GERAR PDF POR TURNO (todas as turmas) ═══
   const handleGerarPDFTurno = async () => {
     if (!tipoLista || !turnoSelecionado) return;
     setGerandoTurno(true);
     try {
-      const params = new URLSearchParams({
-        tipo: tipoLista.id,
-        data: dataAplicacao,
-      });
+      const params = new URLSearchParams({ tipo: tipoLista.id, data: dataAplicacao });
       if (tituloPersonalizado.trim()) params.set("titulo", tituloPersonalizado.trim());
       if (tipoLista.id === "branco") params.set("linhas", String(qtdLinhasBranco));
 
@@ -231,39 +218,29 @@ export default function ListasImpressao() {
       setTimeout(() => URL.revokeObjectURL(url), 60000);
     } catch (err) {
       console.error("Erro ao gerar PDF por turno:", err);
-      alert("Erro ao gerar o PDF por turno. Verifique a conexÃ£o e tente novamente.");
+      alert("Erro ao gerar o PDF por turno. Verifique a conexão e tente novamente.");
     } finally {
       setGerandoTurno(false);
     }
   };
 
-  // â”€â”€â”€ Stepper â”€â”€â”€
+  // ─── Stepper ───
   const isNotas = tipoLista?.id === "notas";
   const step = isNotas
     ? (!tipoLista ? 1 : !avaliacaoSelecionada ? 2 : !turmaNota ? 3 : 4)
     : (!tipoLista ? 1 : !turnoSelecionado ? 2 : !turmaSelecionada ? 3 : 4);
 
   const stepLabels = isNotas
-    ? [
-        { n: 1, label: "Tipo" },
-        { n: 2, label: "AvaliaÃ§Ã£o" },
-        { n: 3, label: "Turma" },
-        { n: 4, label: "Gerar PDF" },
-      ]
-    : [
-        { n: 1, label: "Tipo" },
-        { n: 2, label: "Turno" },
-        { n: 3, label: "Turma" },
-        { n: 4, label: "Gerar PDF" },
-      ];
+    ? [{ n: 1, label: "Tipo" }, { n: 2, label: "Avaliação" }, { n: 3, label: "Turma" }, { n: 4, label: "Gerar PDF" }]
+    : [{ n: 1, label: "Tipo" }, { n: 2, label: "Turno" }, { n: 3, label: "Turma" }, { n: 4, label: "Gerar PDF" }];
 
   const stepHint = isNotas
-    ? (step === 1 ? "Escolha o tipo de lista" : step === 2 ? "Selecione a avaliaÃ§Ã£o" : step === 3 ? "Selecione a turma" : "Pronto para gerar!")
+    ? (step === 1 ? "Escolha o tipo de lista" : step === 2 ? "Selecione a avaliação" : step === 3 ? "Selecione a turma" : "Pronto para gerar!")
     : (step === 1 ? "Escolha o tipo de lista" : step === 2 ? "Selecione o turno" : step === 3 ? "Selecione a turma" : "Pronto para gerar!");
 
   return (
     <div className="max-w-6xl mx-auto">
-      {/* â”€â”€â”€ HERO HEADER â”€â”€â”€ */}
+      {/* ─── HERO HEADER ─── */}
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 via-blue-700 to-blue-900 px-6 py-8 md:px-10 md:py-10 mb-8 shadow-xl">
         <div className="absolute inset-0 opacity-10"
           style={{
@@ -276,7 +253,7 @@ export default function ListasImpressao() {
           </div>
           <div>
             <h1 className="text-2xl md:text-4xl font-extrabold text-white tracking-tight" style={{ fontFamily: "'Montserrat', sans-serif" }}>
-              ðŸ“‹ Listas para ImpressÃ£o
+              {"\uD83D\uDCCB"} Listas para Impressão
             </h1>
             <p className="mt-1 text-blue-200 text-sm md:text-base">
               Selecione o tipo de lista, turno e turma para gerar o PDF.
@@ -306,7 +283,7 @@ export default function ListasImpressao() {
         </div>
       </div>
 
-      {/* â”€â”€â”€ STEP 1: Tipo de Lista â”€â”€â”€ */}
+      {/* ─── STEP 1: Tipo de Lista ─── */}
       <div className="mb-8">
         <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
           <span className="h-7 w-7 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center text-sm font-extrabold">1</span>
@@ -362,28 +339,28 @@ export default function ListasImpressao() {
         </div>
       </div>
 
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+      {/* ════════════════════════════════════════════════════════
           FLUXO ESPECIAL: LISTA DE NOTAS
-          â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+          ════════════════════════════════════════════════════════ */}
       {tipoLista?.id === "notas" && (
         <div className="animate-fadeIn">
-          {/* â”€â”€â”€ STEP 2: Selecionar AvaliaÃ§Ã£o â”€â”€â”€ */}
+          {/* ─── STEP 2: Selecionar Avaliação ─── */}
           <div className="mb-8">
             <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
               <span className="h-7 w-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center text-sm font-extrabold">2</span>
-              AvaliaÃ§Ã£o com Gabaritos Corrigidos
+              Avaliação com Gabaritos Corrigidos
             </h2>
 
             {loadingAvaliacoesNotas ? (
               <div className="flex items-center gap-3 p-4 text-gray-500">
                 <div className="h-5 w-5 animate-spin rounded-full border-2 border-gray-200 border-t-emerald-500" />
-                Carregando avaliaÃ§Ãµes...
+                Carregando avaliações...
               </div>
             ) : avaliacoesNotas.length === 0 ? (
               <div className="rounded-xl border-2 border-dashed border-amber-200 bg-amber-50 p-6 text-center">
                 <ChartBarIcon className="h-10 w-10 text-amber-300 mx-auto mb-2" />
-                <p className="text-amber-800 font-semibold text-sm">Nenhuma avaliaÃ§Ã£o com gabaritos corrigidos encontrada.</p>
-                <p className="text-amber-600 text-xs mt-1">Acesse <strong>ImpressÃ£o â†’ Gabaritos</strong> para corrigir gabaritos e gerar notas.</p>
+                <p className="text-amber-800 font-semibold text-sm">Nenhuma avaliação com gabaritos corrigidos encontrada.</p>
+                <p className="text-amber-600 text-xs mt-1">Acesse <strong>Impressão {"\u2192"} Gabaritos</strong> para corrigir gabaritos e gerar notas.</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -431,7 +408,7 @@ export default function ListasImpressao() {
             )}
           </div>
 
-          {/* â”€â”€â”€ STEP 3: Selecionar Turma (notas) â”€â”€â”€ */}
+          {/* ─── STEP 3: Selecionar Turma (notas) ─── */}
           {avaliacaoSelecionada && (
             <div className="mb-8 animate-fadeIn">
               <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
@@ -446,7 +423,7 @@ export default function ListasImpressao() {
                   Carregando turmas...
                 </div>
               ) : turmasNotasDisponiveis.length === 0 ? (
-                <p className="text-gray-500">Nenhuma turma com notas para esta avaliaÃ§Ã£o.</p>
+                <p className="text-gray-500">Nenhuma turma com notas para esta avaliação.</p>
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {turmasNotasDisponiveis.map((t) => {
@@ -473,7 +450,7 @@ export default function ListasImpressao() {
             </div>
           )}
 
-          {/* â”€â”€â”€ STEP 4: Gerar PDF Notas â”€â”€â”€ */}
+          {/* ─── STEP 4: Gerar PDF Notas ─── */}
           {avaliacaoSelecionada && turmaNota && (
             <div className="animate-fadeIn">
               <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 mb-6">
@@ -482,19 +459,18 @@ export default function ListasImpressao() {
                   Gerar Lista de Notas
                 </h3>
 
-                {/* Resumo */}
                 <div className="mb-5 p-3 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-lg border border-emerald-100">
                   <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-gray-600">
-                    <span><strong className="text-emerald-700">AvaliaÃ§Ã£o:</strong> {avaliacaoSelecionada.titulo}</span>
+                    <span><strong className="text-emerald-700">Avaliação:</strong> {avaliacaoSelecionada.titulo}</span>
                     <span><strong className="text-emerald-700">Turma:</strong> {turmaNota.turma_nome}</span>
                     {avaliacaoSelecionada.bimestre && (
                       <span><strong className="text-emerald-700">Bimestre:</strong> {avaliacaoSelecionada.bimestre}</span>
                     )}
                     <span><strong className="text-emerald-700">Alunos corrigidos:</strong> {turmaNota.total_alunos_corrigidos}</span>
-                    <span><strong className="text-emerald-700">Nota mÃ¡xima:</strong> {avaliacaoSelecionada.nota_total}</span>
+                    <span><strong className="text-emerald-700">Nota máxima:</strong> {avaliacaoSelecionada.nota_total}</span>
                   </div>
                   <p className="mt-2 text-xs text-gray-500">
-                    ðŸ“Š O PDF incluirÃ¡ cabeÃ§alho institucional premium, tabela com RE, nome do estudante, acertos, nota e situaÃ§Ã£o (aprovado/reprovado), alÃ©m de estatÃ­sticas da turma.
+                    {"\uD83D\uDCCA"} O PDF incluirá cabeçalho institucional premium, tabela com RE, nome do estudante, acertos, nota e situação (aprovado/reprovado), além de estatísticas da turma.
                   </p>
                 </div>
 
@@ -517,7 +493,7 @@ export default function ListasImpressao() {
                   ) : (
                     <>
                       <PrinterIcon className="h-5 w-5" />
-                      Gerar Lista de Notas â€” {turmaNota.turma_nome}
+                      Gerar Lista de Notas — {turmaNota.turma_nome}
                     </>
                   )}
                 </button>
@@ -527,12 +503,12 @@ export default function ListasImpressao() {
         </div>
       )}
 
-      {/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-          FLUXO PADRÃƒO (nÃ£o Ã© notas)
-          â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */}
+      {/* ════════════════════════════════════════════════════════
+          FLUXO PADRÃO (não é notas)
+          ════════════════════════════════════════════════════════ */}
       {tipoLista && tipoLista.id !== "notas" && (
         <>
-          {/* â”€â”€â”€ STEP 2: Turno â”€â”€â”€ */}
+          {/* ─── STEP 2: Turno ─── */}
           <div className="mb-8 animate-fadeIn">
             <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
               <span className="h-7 w-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center text-sm font-extrabold">2</span>
@@ -565,16 +541,16 @@ export default function ListasImpressao() {
                 </div>
                 <div className="flex-1">
                   <h3 className="text-sm font-bold text-indigo-900 flex items-center gap-2">
-                    ðŸ“‹ Gerar PDF do Turno Completo
+                    {"\uD83D\uDCCB"} Gerar PDF do Turno Completo
                     <span className="px-2 py-0.5 bg-indigo-600 text-white text-[10px] rounded-full font-bold uppercase tracking-wider">Novo</span>
                   </h3>
                   <p className="text-xs text-indigo-700/70 mt-1">
-                    Gera um Ãºnico PDF com <strong>todas as {turmasFiltradas.length} turmas</strong> do turno <strong>{turnoSelecionado}</strong>, cada uma em sua prÃ³pria pÃ¡gina.
+                    Gera um único PDF com <strong>todas as {turmasFiltradas.length} turmas</strong> do turno <strong>{turnoSelecionado}</strong>, cada uma em sua própria página.
                   </p>
 
                   <div className="flex flex-wrap items-end gap-3 mt-3">
                     <div className="flex-1 min-w-[180px]">
-                      <label className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">TÃ­tulo da lista</label>
+                      <label className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">Título da lista</label>
                       <input
                         type="text"
                         value={tituloPersonalizado}
@@ -616,7 +592,7 @@ export default function ListasImpressao() {
                       ) : (
                         <>
                           <DocumentDuplicateIcon className="h-5 w-5" />
-                          Gerar PDF â€” {turnoSelecionado}
+                          Gerar PDF — {turnoSelecionado}
                         </>
                       )}
                     </button>
@@ -626,7 +602,7 @@ export default function ListasImpressao() {
             </div>
           </div>
 
-          {/* â”€â”€â”€ STEP 3: Turma â”€â”€â”€ */}
+          {/* ─── STEP 3: Turma ─── */}
           {turnoSelecionado && (
             <div className="mb-8 animate-fadeIn">
               <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
@@ -661,7 +637,7 @@ export default function ListasImpressao() {
             </div>
           )}
 
-          {/* â”€â”€â”€ STEP 4: ConfiguraÃ§Ã£o + Gerar PDF â”€â”€â”€ */}
+          {/* ─── STEP 4: Configuração + Gerar PDF ─── */}
           {turmaSelecionada && tipoLista && (
             <div className="animate-fadeIn">
               <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 mb-6">
@@ -672,7 +648,7 @@ export default function ListasImpressao() {
 
                 <div className="flex flex-wrap items-end gap-4">
                   <div className="flex-1 min-w-[200px]">
-                    <label className="text-xs font-bold text-gray-600 uppercase tracking-wider">TÃ­tulo da lista</label>
+                    <label className="text-xs font-bold text-gray-600 uppercase tracking-wider">Título da lista</label>
                     <input
                       type="text"
                       value={tituloPersonalizado}
@@ -730,7 +706,7 @@ export default function ListasImpressao() {
                     <span><strong className="text-indigo-700">Data:</strong> {dataAplicacao.split("-").reverse().join("/")}</span>
                   </div>
                   <p className="mt-2 text-xs text-gray-500">
-                    ðŸ“„ O PDF serÃ¡ gerado com o cabeÃ§alho institucional completo (logos e informaÃ§Ãµes da escola) e aberto em uma nova aba para visualizaÃ§Ã£o e impressÃ£o.
+                    {"\uD83D\uDCC4"} O PDF será gerado com o cabeçalho institucional completo (logos e informações da escola) e aberto em uma nova aba para visualização e impressão.
                   </p>
                 </div>
               </div>

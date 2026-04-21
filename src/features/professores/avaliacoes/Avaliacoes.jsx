@@ -830,17 +830,18 @@ export default function Avaliacoes() {
                    </div>
                 </div>
                 <div className="flex items-center gap-3">
-                    {/* BOTÃO FECHAR DIÁRIO */}
+                    {/* BOTÃO FECHAR DIÁRIO — desabilitado provisoriamente */}
                     {!carregandoDados && plano && !diarioFechado && (
                         <button
-                          onClick={() => setModalFechar(true)}
-                          disabled={fechando}
-                          className="flex items-center gap-2 px-5 py-3 rounded-lg font-bold text-red-300 shadow-lg transition-all active:scale-95 border disabled:opacity-50"
+                          disabled
+                          className="flex items-center gap-2 px-5 py-3 rounded-lg font-bold text-red-300 border"
                           style={{
-                            background: "rgba(239,68,68,0.12)",
-                            border: "1px solid rgba(239,68,68,0.3)",
+                            background: "rgba(239,68,68,0.06)",
+                            border: "1px solid rgba(239,68,68,0.15)",
+                            opacity: 0.45,
+                            cursor: "not-allowed",
                           }}
-                          title="Fechar o diário definitivamente (somente leitura)"
+                          title="Funcionalidade temporariamente desabilitada"
                         >
                             <LockClosedIcon className="w-5 h-5" />
                             FECHAR DIÁRIO
@@ -857,11 +858,17 @@ export default function Avaliacoes() {
                             {salvando ? "SALVANDO..." : "SALVAR DIÁRIO"}
                         </button>
                     )}
-                    {/* BOTÃO EXPORTAR PARA BOLETIM */}
+                    {/* BOTÃO EXPORTAR BOLETIM — desabilitado provisoriamente */}
                     {!carregandoDados && plano && !diarioFechado && (
                         <button
-                          onClick={abrirModalExportar}
-                          className="flex items-center gap-2 px-5 py-3 rounded-lg bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-400 hover:to-indigo-500 font-bold text-white shadow-lg transition-all active:scale-95 border border-purple-400/30"
+                          disabled
+                          className="flex items-center gap-2 px-5 py-3 rounded-lg font-bold text-white border border-purple-400/15"
+                          style={{
+                            background: "linear-gradient(135deg, rgba(139,92,246,0.25), rgba(99,102,241,0.25))",
+                            opacity: 0.45,
+                            cursor: "not-allowed",
+                          }}
+                          title="Funcionalidade temporariamente desabilitada"
                         >
                             <ArrowDownTrayIcon className="w-5 h-5" />
                             EXPORTAR BOLETIM

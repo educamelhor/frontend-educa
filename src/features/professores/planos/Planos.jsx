@@ -928,30 +928,26 @@ export default function Planos() {
                     </td>
                     <td className="border px-4 py-2">
                       {isFixo ? (
-                        // ✅ Botão de data para Prova Bimestral padronizada
+                        // ✅ Data da Prova Bimestral: somente leitura para o professor
+                        // A data será definida pela Direção / Coordenação
                         <div className="flex items-center justify-center">
-                          <button
-                            type="button"
-                            title={item.data_inicio
-                              ? `Data da prova: ${new Date(item.data_inicio + 'T12:00:00').toLocaleDateString('pt-BR')} — clique para alterar`
-                              : 'Definir data da Prova Bimestral (obrigatório para enviar)'}
-                            onClick={() => {
-                              if (papStatus === 'APROVADO') return showMsg('info', 'PAP aprovado: data bloqueada para edição.');
-                              if (papStatus === 'ENVIADO') return showMsg('info', 'PAP enviado: aguardando apreciação da direção.');
-                              setDataFixoTemp(item.data_inicio || '');
-                              setModalDataFixo(true);
-                            }}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm ${
+                          <div
+                            title={
                               item.data_inicio
-                                ? 'bg-green-100 text-green-700 hover:bg-green-200 border border-green-200'
-                                : 'bg-amber-100 text-amber-700 hover:bg-amber-200 border border-amber-300 animate-pulse'
+                                ? `Data da prova: ${new Date(item.data_inicio + 'T12:00:00').toLocaleDateString('pt-BR')} — definida pela Direção`
+                                : 'Data a ser definida pela Direção / Coordenação'
+                            }
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold select-none cursor-not-allowed ${
+                              item.data_inicio
+                                ? 'bg-green-50 text-green-700 border border-green-200'
+                                : 'bg-slate-100 text-slate-400 border border-slate-200'
                             }`}
                           >
                             <CalendarDaysIcon className="h-4 w-4 flex-shrink-0" />
                             {item.data_inicio
                               ? new Date(item.data_inicio + 'T12:00:00').toLocaleDateString('pt-BR')
-                              : 'Definir data'}
-                          </button>
+                              : 'A definir 🔒'}
+                          </div>
                         </div>
                       ) : (
                         <div className="flex items-center justify-center gap-2">
@@ -1138,14 +1134,9 @@ export default function Planos() {
                     );
                   }
 
-                  // ✅ Data da Prova Bimestral é obrigatória ao enviar para direção
-                  const itemFixo = itens.find(i => i.fixo_direcao);
-                  if (itemFixo && !itemFixo.data_inicio) {
-                    return showMsg(
-                      "error",
-                      "⚠️ Informe a data da Prova Bimestral antes de enviar. Use o botão 📅 na coluna Ações."
-                    );
-                  }
+                  // ✅ Data da Prova Bimestral: não obrigatória para o professor
+                  // Será definida pela Direção / Coordenação em etapa posterior
+                  // data_inicio = NULL é aceito no BD (fallback no Agente ao exportar)
 
                   try {
                     const nomeCodigo = "Plano-" + Math.floor(Math.random() * 10000);

@@ -32,12 +32,13 @@ export default function Planos() {
   // ---------------------------
   // Estados de seleção
   // ---------------------------
-  const [turmaSelecionada, setTurmaSelecionada] = useState(null);      // ← ETAPA 1
+  const [turmaSelecionada, setTurmaSelecionada] = useState(null);      // ← ETAPA 1 (turma principal, compat)
   const [bimestreSelecionado, setBimestreSelecionado] = useState(null); // ← ETAPA 2
   const [disciplinaSelecionada, setDisciplinaSelecionada] = useState(null); // usado no editor de plano
-  const [turmasSelecionadas, setTurmasSelecionadas] = useState([]);
+  const [turmasSelecionadas, setTurmasSelecionadas] = useState([]);     // ← MULTI-SELEÇÃO (nova)
   const [etapaAtiva, setEtapaAtiva] = useState(1); // 1 | 2
   const [mostrarTabela, setMostrarTabela] = useState(false);
+  const [modoMultiTurma, setModoMultiTurma] = useState(false);          // ← toggle: plano para várias turmas
 
   // ---------------------------
   // Mensagens
@@ -289,10 +290,18 @@ export default function Planos() {
     setSelecaoLote(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
   };
 
-  // Helper para abrir plano de uma disciplina específica (novo fluxo turma-first)
+  // Helper para abrir plano de uma disciplina específica
+  // → passa TODAS as turmas selecionadas para o editor (suporta 1 ou N turmas)
   const abrirPlanoDisc = (disc, planoId) => {
     setDisciplinaSelecionada(disc);
-    abrirPlano([turmaNomeSelecionada], planoId);
+    // Se multi-turma ativo: usa o array completo; senão: somente a turma principal
+    const turmasParaAbrir = modoMultiTurma && turmasSelecionadas.length > 1
+      ? turmasSelecionadas.map(id => {
+          const obj = turmas.find(t => String(t.id) === String(id) || t.nome === id);
+          return obj?.nome || id;
+        })
+      : [turmaNomeSelecionada];
+    abrirPlano(turmasParaAbrir, planoId);
   };
 
   return (
@@ -342,7 +351,14 @@ export default function Planos() {
           {/* ─── Tabs de Etapas ─── */}
           <div style={{ display: "flex", gap: 0 }}>
             {[
-              { num: 1, label: "Selecionar Turma",    done: !!turmaSelecionada,    value: turmaNomeSelecionada },
+              {
+                num: 1,
+                label: "Selecionar Turma",
+                done: modoMultiTurma ? turmasSelecionadas.length > 0 : !!turmaSelecionada,
+                value: modoMultiTurma && turmasSelecionadas.length > 1
+                  ? `${turmasSelecionadas.length} turmas`
+                  : turmaNomeSelecionada,
+              },
               { num: 2, label: "Selecionar Bimestre", done: !!bimestreSelecionado, value: bimestreSelecionado?.replace(" Bimestre", " Bim") },
             ].map((et, idx) => {
               const isActive = etapaAtiva === et.num;
@@ -401,10 +417,54 @@ export default function Planos() {
 
           {/* ─── Painel de seleção (a etapa ativa) ─── */}
           <div style={{ padding: "1.5rem 2rem 1.75rem", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-            {/* ETAPA 1 — Turma */}
+            {/* ETAPA 1 — Seleção de turma(s) */}
             {etapaAtiva === 1 && (
               <div>
-                <p style={{ fontSize: "0.78rem", color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "0.75rem" }}>Selecione a turma</p>
+                {/* Cabeçalho da etapa com toggle multi-turma */}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.85rem", flexWrap: "wrap", gap: "0.5rem" }}>
+                  <p style={{ fontSize: "0.78rem", color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", margin: 0 }}>
+                    {modoMultiTurma ? "Selecione as turmas (mesmo plano para todas)" : "Selecione a turma"}
+                  </p>
+                  {/* Toggle modo multi-turma */}
+                  <button
+                    onClick={() => {
+                      setModoMultiTurma(v => !v);
+                      // Ao desativar, limpa multi-seleção e volta ao modo simples
+                      if (modoMultiTurma) {
+                        setTurmasSelecionadas([]);
+                        setTurmaSelecionada(null);
+                      }
+                    }}
+                    style={{
+                      display: "flex", alignItems: "center", gap: "0.45rem",
+                      padding: "0.35rem 0.85rem",
+                      borderRadius: "2rem",
+                      border: modoMultiTurma ? "none" : "1px solid rgba(255,255,255,0.18)",
+                      background: modoMultiTurma
+                        ? "linear-gradient(135deg,#818cf8,#6366f1)"
+                        : "rgba(255,255,255,0.06)",
+                      color: modoMultiTurma ? "#fff" : "#94a3b8",
+                      fontSize: "0.72rem", fontWeight: 700,
+                      cursor: "pointer",
+                      letterSpacing: "0.04em",
+                      boxShadow: modoMultiTurma ? "0 2px 12px rgba(99,102,241,0.45)" : "none",
+                      transition: "all 0.2s",
+                    }}
+                  >
+                    <span style={{
+                      width: 14, height: 14, borderRadius: "50%",
+                      border: "2px solid currentColor",
+                      display: "inline-flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      {modoMultiTurma && (
+                        <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#fff", display: "block" }} />
+                      )}
+                    </span>
+                    Mesmo plano para várias turmas
+                  </button>
+                </div>
+
+                {/* Lista de turmas */}
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
                   {loadingInicial ? (
                     <span style={{ color: "#64748b", fontSize: "0.875rem", display: "flex", alignItems: "center", gap: "0.5rem" }}>
@@ -414,28 +474,133 @@ export default function Planos() {
                   ) : turmas.length === 0 ? (
                     <span style={{ color: "#64748b", fontSize: "0.875rem" }}>Nenhuma turma encontrada para o ano letivo atual.</span>
                   ) : null}
+
                   {turmas.map(t => {
                     const nm = t.nome || t;
                     const id = t.id || nm;
-                    const isSel = turmaSelecionada === id || turmaSelecionada === nm;
+
+                    // Modo simples: seleção única, clique avança para etapa 2
+                    if (!modoMultiTurma) {
+                      const isSel = turmaSelecionada === id || turmaSelecionada === nm;
+                      return (
+                        <button key={id} onClick={() => { setTurmaSelecionada(id); setEtapaAtiva(2); }} style={{
+                          padding: "0.55rem 1.2rem",
+                          borderRadius: "0.6rem",
+                          fontWeight: 700,
+                          fontSize: "0.875rem",
+                          cursor: "pointer",
+                          transition: "all 0.2s",
+                          background: isSel ? "linear-gradient(135deg,#22d3ee,#0ea5e9)" : "rgba(255,255,255,0.07)",
+                          color: isSel ? "#0f172a" : "#cbd5e1",
+                          border: isSel ? "none" : "1px solid rgba(255,255,255,0.12)",
+                          boxShadow: isSel ? "0 4px 14px rgba(34,211,238,0.35)" : "none",
+                          transform: isSel ? "scale(1.04)" : "scale(1)",
+                        }}>{nm}</button>
+                      );
+                    }
+
+                    // Modo multi-turma: toggle por checkbox visual
+                    const isChecked = turmasSelecionadas.includes(id);
                     return (
-                      <button key={id} onClick={() => { setTurmaSelecionada(id); setEtapaAtiva(2); }} style={{
-                        padding: "0.55rem 1.2rem",
-                        borderRadius: "0.6rem",
-                        fontWeight: 700,
-                        fontSize: "0.875rem",
-                        cursor: "pointer",
-                        transition: "all 0.2s",
-                        background: isSel ? "linear-gradient(135deg,#22d3ee,#0ea5e9)" : "rgba(255,255,255,0.07)",
-                        color: isSel ? "#0f172a" : "#cbd5e1",
-                        border: isSel ? "none" : "1px solid rgba(255,255,255,0.12)",
-                        boxShadow: isSel ? "0 4px 14px rgba(34,211,238,0.35)" : "none",
-                        transform: isSel ? "scale(1.04)" : "scale(1)",
-                      }}>{nm}</button>
+                      <button
+                        key={id}
+                        onClick={() => {
+                          setTurmasSelecionadas(prev =>
+                            prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+                          );
+                        }}
+                        style={{
+                          display: "flex", alignItems: "center", gap: "0.45rem",
+                          padding: "0.5rem 1rem",
+                          borderRadius: "0.6rem",
+                          fontWeight: 700,
+                          fontSize: "0.875rem",
+                          cursor: "pointer",
+                          transition: "all 0.2s",
+                          background: isChecked ? "linear-gradient(135deg,#818cf8,#6366f1)" : "rgba(255,255,255,0.07)",
+                          color: isChecked ? "#fff" : "#cbd5e1",
+                          border: isChecked ? "none" : "1px solid rgba(255,255,255,0.12)",
+                          boxShadow: isChecked ? "0 4px 14px rgba(99,102,241,0.4)" : "none",
+                          transform: isChecked ? "scale(1.05)" : "scale(1)",
+                        }}
+                      >
+                        {/* Mini checkbox visual */}
+                        <span style={{
+                          width: 16, height: 16, borderRadius: 4, flexShrink: 0,
+                          border: isChecked ? "none" : "2px solid rgba(255,255,255,0.3)",
+                          background: isChecked ? "rgba(255,255,255,0.9)" : "transparent",
+                          display: "inline-flex", alignItems: "center", justifyContent: "center",
+                          transition: "all 0.15s",
+                        }}>
+                          {isChecked && (
+                            <svg width="10" height="10" fill="none" viewBox="0 0 24 24">
+                              <path stroke="#6366f1" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
+                            </svg>
+                          )}
+                        </span>
+                        {nm}
+                      </button>
                     );
                   })}
                 </div>
 
+                {/* Strip de confirmação — só aparece em modo multi com ao menos 1 turma selecionada */}
+                {modoMultiTurma && turmasSelecionadas.length > 0 && (
+                  <div style={{
+                    marginTop: "1.25rem",
+                    padding: "0.85rem 1.25rem",
+                    borderRadius: "0.875rem",
+                    background: "rgba(99,102,241,0.13)",
+                    border: "1px solid rgba(99,102,241,0.3)",
+                    display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.75rem",
+                  }}>
+                    {/* Chips das turmas selecionadas */}
+                    <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: "0.4rem" }}>
+                      <span style={{ fontSize: "0.75rem", color: "#a5b4fc", fontWeight: 700, marginRight: "0.25rem", letterSpacing: "0.05em" }}>
+                        📋 {turmasSelecionadas.length} turma{turmasSelecionadas.length > 1 ? "s" : ""} — mesmo plano:
+                      </span>
+                      {turmasSelecionadas.map(id => {
+                        const obj = turmas.find(t => String(t.id) === String(id) || t.nome === id);
+                        const nm = obj?.nome || id;
+                        return (
+                          <span key={id} style={{
+                            background: "rgba(99,102,241,0.3)", color: "#c7d2fe",
+                            fontSize: "0.72rem", fontWeight: 700,
+                            padding: "0.2rem 0.6rem", borderRadius: "2rem",
+                            display: "inline-flex", alignItems: "center", gap: "0.3rem",
+                          }}>
+                            {nm}
+                            <span
+                              onClick={() => setTurmasSelecionadas(prev => prev.filter(x => x !== id))}
+                              style={{ cursor: "pointer", opacity: 0.7, fontSize: "0.9rem", lineHeight: 1 }}
+                            >×</span>
+                          </span>
+                        );
+                      })}
+                    </div>
+                    {/* Botão confirmar → avança para ETAPA 2 */}
+                    <button
+                      onClick={() => {
+                        // Define turma principal como a primeira selecionada (para compat com o restante do fluxo)
+                        setTurmaSelecionada(turmasSelecionadas[0]);
+                        setEtapaAtiva(2);
+                      }}
+                      style={{
+                        padding: "0.55rem 1.3rem",
+                        borderRadius: "0.65rem",
+                        background: "linear-gradient(135deg,#818cf8,#6366f1)",
+                        color: "#fff", border: "none",
+                        fontWeight: 800, fontSize: "0.82rem",
+                        cursor: "pointer",
+                        boxShadow: "0 4px 14px rgba(99,102,241,0.5)",
+                        transition: "all 0.2s",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      Confirmar e Selecionar Bimestre →
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 

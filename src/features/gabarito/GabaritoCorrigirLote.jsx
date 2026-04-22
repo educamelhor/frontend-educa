@@ -97,14 +97,83 @@ export default function GabaritoCorrigirLote() {
   const [ajustesLoading, setAjustesLoading] = useState(false);
   const [decidindoAjusteId, setDecidindoAjusteId] = useState(null);
 
+  // ─── Cancelamento de Questão em Lote (coordenador/diretor) ───
+  const [cancelQuestaoModal, setCancelQuestaoModal] = useState(false);   // modal aberto?
+  const [cancelQuestaoNum, setCancelQuestaoNum] = useState("");           // número digitado
+  const [cancelQuestaoModo, setCancelQuestaoModo] = useState("bonificar"); // bonificar|desconsiderar
+  const [cancelQuestaoMotivo, setCancelQuestaoMotivo] = useState("");     // justificativa
+  const [cancelQuestaoSalvando, setCancelQuestaoSalvando] = useState(false);
+  const [questoesCanceladas, setQuestoesCanceladas] = useState([]);       // lista da avaliação ativa
+  const [loadingCanceladas, setLoadingCanceladas] = useState(false);
+
+
+
   // ─── Toast ───
   function showToast(msg, type = "success") {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 4000);
   }
 
+  // ─── Carregar questões canceladas da avaliação ativa ───
+  async function carregarQuestoesCanceladas(avaliacaoId) {
+    if (!avaliacaoId) { setQuestoesCanceladas([]); return; }
+    setLoadingCanceladas(true);
+    try {
+      const resp = await api.get(`/api/gabarito-avaliacoes/${avaliacaoId}/questoes-canceladas`);
+      setQuestoesCanceladas(resp.data?.questoes_canceladas || []);
+    } catch {
+      setQuestoesCanceladas([]);
+    }
+    setLoadingCanceladas(false);
+  }
+
+  // ─── Salvar cancelamento de questão (bonificar ou desconsiderar) ───
+  async function salvarCancelamentoQuestao() {
+    if (!avaliacaoAtiva) return;
+    const num = Number(cancelQuestaoNum);
+    if (!num || num < 1 || num > avaliacaoAtiva.num_questoes) {
+      showToast(`Informe um número de questão válido (1 a ${avaliacaoAtiva.num_questoes}).`, "error");
+      return;
+    }
+    setCancelQuestaoSalvando(true);
+    try {
+      const resp = await api.put(`/api/gabarito-avaliacoes/${avaliacaoAtiva.id}/cancelar-questao`, {
+        numero: num,
+        modo: cancelQuestaoModo,
+        motivo: cancelQuestaoMotivo.trim() || null,
+      });
+      setQuestoesCanceladas(resp.data.questoes_canceladas || []);
+      setCancelQuestaoModal(false);
+      setCancelQuestaoNum("");
+      setCancelQuestaoMotivo("");
+      setCancelQuestaoModo("bonificar");
+      const modoLabel = cancelQuestaoModo === "bonificar" ? "bonificada (todos ganham o ponto)" : "desconsiderada (N-1 questões)";
+      showToast(
+        `✅ Questão ${num} ${modoLabel}. ${resp.data.total_recalculados} aluno(s) recalculado(s).`,
+        "success"
+      );
+    } catch (err) {
+      showToast(err.response?.data?.error || "Erro ao cancelar questão.", "error");
+    }
+    setCancelQuestaoSalvando(false);
+  }
+
+  // ─── Reverter cancelamento de questão ───
+  async function reverterCancelamentoQuestao(numero) {
+    if (!avaliacaoAtiva) return;
+    if (!window.confirm(`Reverter o cancelamento da questão ${numero}?\n\nTodas as notas serão recalculadas sem este cancelamento.`)) return;
+    try {
+      const resp = await api.delete(`/api/gabarito-avaliacoes/${avaliacaoAtiva.id}/cancelar-questao/${numero}`);
+      setQuestoesCanceladas(resp.data.questoes_canceladas || []);
+      showToast(`↩ Cancelamento da questão ${numero} revertido. ${resp.data.total_recalculados} aluno(s) recalculado(s).`, "success");
+    } catch (err) {
+      showToast(err.response?.data?.error || "Erro ao reverter cancelamento.", "error");
+    }
+  }
+
   // ─── Buscar corretores disponíveis (professores + coord + direção + supervisor) ───
   async function fetchProfessores() {
+
     try {
       const resp = await api.get("/api/gabarito-lotes/corretores-disponiveis");
       const ativos = (resp.data || []).filter(p => p.status === "ativo");
@@ -194,6 +263,7 @@ export default function GabaritoCorrigirLote() {
     setAvaliacaoAtiva(av);
     setSubEtapa(SUB.UPLOAD);
     carregarLotes(av.id);
+    carregarQuestoesCanceladas(av.id); // carrega questões anuladas
   }
 
   // ─── Excluir avaliação ───
@@ -985,7 +1055,123 @@ export default function GabaritoCorrigirLote() {
             </div>
           </div>
 
+          {/* ─── Card: Questões Canceladas / Anuladas ─── */}
+          <div className="gab-card" style={{ borderColor: questoesCanceladas.length > 0 ? "rgba(245,158,11,0.3)" : undefined }}>
+            <div className="gab-card-header" style={{ marginBottom: 0 }}>
+              <div className="gab-card-icon" style={{ background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)" }}>
+                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#f59e0b" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                </svg>
+              </div>
+              <div className="gab-card-title">Questões Canceladas / Anuladas</div>
+              {questoesCanceladas.length > 0 && (
+                <span style={{
+                  marginLeft: "auto", padding: "2px 10px", borderRadius: 20,
+                  fontSize: "0.65rem", fontWeight: 800,
+                  background: "rgba(245,158,11,0.12)", color: "#f59e0b",
+                  border: "1px solid rgba(245,158,11,0.25)",
+                }}>
+                  {questoesCanceladas.length} anulada{questoesCanceladas.length > 1 ? "s" : ""}
+                </span>
+              )}
+              <button
+                onClick={() => { setCancelQuestaoModal(true); setCancelQuestaoNum(""); setCancelQuestaoMotivo(""); setCancelQuestaoModo("bonificar"); }}
+                style={{
+                  marginLeft: questoesCanceladas.length > 0 ? 8 : "auto",
+                  padding: "5px 14px", borderRadius: 8, fontSize: "0.72rem", fontWeight: 700,
+                  background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.2)",
+                  color: "#f59e0b", cursor: "pointer", transition: "all 0.2s",
+                }}
+                title="Cancelar / anular uma questão com efeito em lote"
+              >
+                ⚠ Cancelar Questão
+              </button>
+            </div>
+
+            {loadingCanceladas ? (
+              <div style={{ textAlign: "center", padding: "12px 0", color: "var(--gab-text-muted)", fontSize: "0.8rem" }}>
+                <div className="gab-spinner" style={{ margin: "0 auto 6px", width: 18, height: 18 }} />
+                Verificando...
+              </div>
+            ) : questoesCanceladas.length === 0 ? (
+              <div style={{ fontSize: "0.78rem", color: "var(--gab-text-muted)", padding: "10px 0 4px" }}>
+                Nenhuma questão cancelada nesta avaliação. Use o botão acima para anular uma questão com efeito imediato em todos os alunos.
+              </div>
+            ) : (
+              <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 6 }}>
+                {questoesCanceladas.map((qc) => (
+                  <div key={qc.numero} style={{
+                    display: "flex", alignItems: "center", gap: 12,
+                    padding: "10px 14px", borderRadius: 10,
+                    background: qc.modo === "bonificar" ? "rgba(16,185,129,0.05)" : "rgba(245,158,11,0.05)",
+                    border: `1px solid ${qc.modo === "bonificar" ? "rgba(16,185,129,0.15)" : "rgba(245,158,11,0.15)"}`,
+                  }}>
+                    {/* Número da questão */}
+                    <div style={{
+                      width: 36, height: 36, borderRadius: 8, flexShrink: 0,
+                      background: qc.modo === "bonificar" ? "rgba(16,185,129,0.1)" : "rgba(245,158,11,0.1)",
+                      border: `1px solid ${qc.modo === "bonificar" ? "rgba(16,185,129,0.25)" : "rgba(245,158,11,0.25)"}`,
+                      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                    }}>
+                      <span style={{ fontSize: "0.55rem", color: "var(--gab-text-muted)" }}>Q</span>
+                      <span style={{
+                        fontSize: "1rem", fontWeight: 800, lineHeight: 1,
+                        color: qc.modo === "bonificar" ? "var(--gab-green-light, #10b981)" : "#f59e0b",
+                      }}>{qc.numero}</span>
+                    </div>
+
+                    {/* Detalhes */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                        <span style={{
+                          padding: "2px 8px", borderRadius: 6, fontSize: "0.65rem", fontWeight: 800,
+                          background: qc.modo === "bonificar" ? "rgba(16,185,129,0.12)" : "rgba(245,158,11,0.12)",
+                          color: qc.modo === "bonificar" ? "var(--gab-green-light, #10b981)" : "#f59e0b",
+                          border: `1px solid ${qc.modo === "bonificar" ? "rgba(16,185,129,0.25)" : "rgba(245,158,11,0.25)"}`,
+                          textTransform: "uppercase",
+                        }}>
+                          {qc.modo === "bonificar" ? "✓ Bonificada" : "⊘ Desconsiderada"}
+                        </span>
+                        <span style={{ fontSize: "0.7rem", color: "var(--gab-text-muted)" }}>
+                          {qc.modo === "bonificar" ? "todos ganham o ponto" : "excluída do total de questões"}
+                        </span>
+                      </div>
+                      {qc.motivo && (
+                        <div style={{ fontSize: "0.72rem", color: "var(--gab-text-muted)", marginTop: 3, fontStyle: "italic" }}>
+                          "{qc.motivo}"
+                        </div>
+                      )}
+                      <div style={{ fontSize: "0.62rem", color: "rgba(148,163,184,0.5)", marginTop: 2 }}>
+                        {qc.cancelado_por_nome
+                          ? `por ${qc.cancelado_por_nome} · `
+                          : ""}
+                        {qc.cancelado_em
+                          ? new Date(qc.cancelado_em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })
+                          : ""}
+                      </div>
+                    </div>
+
+                    {/* Botão reverter */}
+                    <button
+                      onClick={() => reverterCancelamentoQuestao(qc.numero)}
+                      title="Reverter cancelamento desta questão"
+                      style={{
+                        padding: "4px 10px", borderRadius: 7, fontSize: "0.65rem", fontWeight: 700,
+                        background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.15)",
+                        color: "var(--gab-red-light, #f87171)", cursor: "pointer", flexShrink: 0,
+                        transition: "all 0.2s",
+                      }}
+                    >
+                      ↩ Reverter
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Zona de upload de pasta */}
+
           <div className="gab-card">
             <div className="gab-card-header">
               <div className="gab-card-icon cyan">
@@ -3136,6 +3322,182 @@ export default function GabaritoCorrigirLote() {
           </div>
         </div>
       )}
+
+      {/* ─── Modal: Cancelar / Anular Questão em Lote ─── */}
+      {cancelQuestaoModal && avaliacaoAtiva && (
+        <div
+          style={{
+            position: "fixed", inset: 0, zIndex: 9998,
+            background: "rgba(0,0,0,0.72)", backdropFilter: "blur(8px)",
+            display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+          }}
+          onClick={() => !cancelQuestaoSalvando && setCancelQuestaoModal(false)}
+        >
+          <style>{`@keyframes gab-modal-pop { from { opacity:0; transform:scale(0.88) translateY(16px); } to { opacity:1; transform:scale(1) translateY(0); } }`}</style>
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: "var(--gab-surface, #1a1f2e)", borderRadius: 20,
+              border: "1px solid rgba(245,158,11,0.25)", padding: "32px",
+              width: "100%", maxWidth: 500,
+              boxShadow: "0 25px 80px rgba(0,0,0,0.5), 0 0 60px rgba(245,158,11,0.05)",
+              animation: "gab-modal-pop 0.35s cubic-bezier(0.34,1.56,0.64,1)",
+            }}
+          >
+            {/* Header */}
+            <div style={{ textAlign: "center", marginBottom: 24 }}>
+              <div style={{
+                width: 60, height: 60, borderRadius: "50%", margin: "0 auto 12px",
+                background: "linear-gradient(135deg, rgba(245,158,11,0.15), rgba(245,158,11,0.25))",
+                border: "2px solid rgba(245,158,11,0.35)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: "1.6rem",
+              }}>⚠</div>
+              <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--gab-text-primary)" }}>
+                Cancelar / Anular Questão
+              </div>
+              <div style={{ fontSize: "0.78rem", color: "var(--gab-text-muted)", marginTop: 4 }}>
+                {avaliacaoAtiva.titulo}
+                &nbsp;·&nbsp;{avaliacaoAtiva.num_questoes} questões no total
+              </div>
+            </div>
+
+            {/* Número da questão */}
+            <div style={{ marginBottom: 18 }}>
+              <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 700, color: "var(--gab-text-muted)", marginBottom: 6, letterSpacing: "0.5px" }}>
+                NÚMERO DA QUESTÃO *
+              </label>
+              <input
+                type="number"
+                className="gab-input"
+                min={1}
+                max={avaliacaoAtiva.num_questoes}
+                value={cancelQuestaoNum}
+                onChange={e => setCancelQuestaoNum(e.target.value)}
+                placeholder={`1 a ${avaliacaoAtiva.num_questoes}`}
+                autoFocus
+                style={{ fontSize: "1.3rem", fontWeight: 800, textAlign: "center" }}
+              />
+            </div>
+
+            {/* Modo */}
+            <div style={{ marginBottom: 18 }}>
+              <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 700, color: "var(--gab-text-muted)", marginBottom: 8, letterSpacing: "0.5px" }}>
+                EFEITO DO CANCELAMENTO *
+              </label>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {[
+                  {
+                    id: "bonificar",
+                    label: "✓ Bonificar todos",
+                    desc: "Todos ganham o ponto desta questão, independente da resposta marcada.",
+                    cor: "#10b981",
+                    bgA: "rgba(16,185,129,",
+                  },
+                  {
+                    id: "desconsiderar",
+                    label: "⊘ Desconsiderar questão",
+                    desc: `Questão removida do total. Nota calculada sobre ${avaliacaoAtiva.num_questoes - 1} questões.`,
+                    cor: "#f59e0b",
+                    bgA: "rgba(245,158,11,",
+                  },
+                ].map(opt => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setCancelQuestaoModo(opt.id)}
+                    style={{
+                      display: "flex", alignItems: "flex-start", gap: 12,
+                      padding: "12px 16px", borderRadius: 12, textAlign: "left", cursor: "pointer",
+                      border: `1.5px solid ${cancelQuestaoModo === opt.id ? opt.cor : "rgba(255,255,255,0.07)"}`,
+                      background: cancelQuestaoModo === opt.id ? `${opt.bgA}0.07)` : "rgba(255,255,255,0.02)",
+                      transition: "all 0.2s", width: "100%", fontFamily: "var(--gab-font-body)",
+                    }}
+                  >
+                    <div style={{
+                      width: 18, height: 18, borderRadius: "50%", flexShrink: 0, marginTop: 2,
+                      border: `2px solid ${cancelQuestaoModo === opt.id ? opt.cor : "rgba(255,255,255,0.18)"}`,
+                      background: cancelQuestaoModo === opt.id ? opt.cor : "transparent",
+                      transition: "all 0.2s",
+                    }} />
+                    <div>
+                      <div style={{ fontSize: "0.85rem", fontWeight: 700, color: cancelQuestaoModo === opt.id ? opt.cor : "var(--gab-text-primary)" }}>
+                        {opt.label}
+                      </div>
+                      <div style={{ fontSize: "0.72rem", color: "var(--gab-text-muted)", marginTop: 2 }}>
+                        {opt.desc}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Motivo */}
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 700, color: "var(--gab-text-muted)", marginBottom: 6, letterSpacing: "0.5px" }}>
+                MOTIVO / JUSTIFICATIVA (opcional)
+              </label>
+              <textarea
+                className="gab-input"
+                value={cancelQuestaoMotivo}
+                onChange={e => setCancelQuestaoMotivo(e.target.value)}
+                placeholder="Ex: O gabarito oficial estava incorreto para esta questão..."
+                rows={2}
+                style={{ resize: "vertical", fontSize: "0.82rem" }}
+              />
+            </div>
+
+            {/* Aviso */}
+            <div style={{
+              padding: "10px 14px", borderRadius: 10, marginBottom: 22,
+              background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.15)",
+              fontSize: "0.72rem", color: "rgba(245,158,11,0.85)", lineHeight: 1.5,
+            }}>
+              <strong>⚡ Efeito imediato:</strong> ao confirmar, TODAS as notas desta avaliação serão recalculadas automaticamente para todos os alunos já corrigidos. Esta ação é reversível.
+            </div>
+
+            {/* Botões */}
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => setCancelQuestaoModal(false)}
+                disabled={cancelQuestaoSalvando}
+                style={{
+                  flex: 1, padding: "12px", borderRadius: 10, fontWeight: 700,
+                  background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
+                  color: "var(--gab-text-muted)", cursor: "pointer", fontSize: "0.85rem",
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={salvarCancelamentoQuestao}
+                disabled={cancelQuestaoSalvando || !cancelQuestaoNum}
+                style={{
+                  flex: 2, padding: "12px", borderRadius: 10, fontWeight: 700,
+                  background: cancelQuestaoSalvando || !cancelQuestaoNum
+                    ? "rgba(245,158,11,0.25)"
+                    : "linear-gradient(135deg, #f59e0b, #d97706)",
+                  border: "none",
+                  cursor: cancelQuestaoSalvando || !cancelQuestaoNum ? "not-allowed" : "pointer",
+                  color: "#fff", fontSize: "0.88rem",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                  transition: "all 0.2s",
+                }}
+              >
+                {cancelQuestaoSalvando ? (
+                  <><div className="gab-spinner" /> Recalculando...</>
+                ) : (
+                  <>⚠ Confirmar Cancelamento</>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

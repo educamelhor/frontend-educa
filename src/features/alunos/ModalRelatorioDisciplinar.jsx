@@ -3,7 +3,7 @@ import {
     XMarkIcon, PencilSquareIcon, TrashIcon, EyeIcon, ClipboardDocumentCheckIcon,
     PrinterIcon, DocumentTextIcon, ExclamationTriangleIcon, ExclamationCircleIcon,
     CheckCircleIcon, UserIcon, IdentificationIcon, ClipboardDocumentListIcon,
-    NoSymbolIcon, PhoneIcon, UserGroupIcon,
+    NoSymbolIcon, PhoneIcon, UserGroupIcon, DevicePhoneMobileIcon,
 } from "@heroicons/react/24/outline";
 import { AcademicCapIcon, ShieldExclamationIcon } from "@heroicons/react/24/solid";
 import api from "../../services/api";
@@ -452,7 +452,7 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
                                                             ? 'text-green-600 hover:text-green-800'
                                                             : 'text-orange-500 hover:text-orange-700'
                                                         }`}
-                                                        title={oc.status === 'CANCELADA' ? 'Registro cancelado — não pode ser finalizado' : oc.convocar_responsavel ? "Registrar Comparecimento" : "Finalizar Registro"}
+                                                        title={oc.status === 'CANCELADA' ? 'Registro cancelado — não pode ser finalizado' : 'Finalizar Registro'}
                                                     >
                                                         <ClipboardDocumentCheckIcon className="h-5 w-5" />
                                                     </button>
@@ -587,7 +587,7 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
                                 </div>
                             </button>
 
-                            {/* Card 3 — Responsável Não Compareceu */}
+                            {/* Card 3 — Responsável Convocado e Não Compareceu */}
                             <button
                                 type="button"
                                 onClick={() => setModoFinalizacao('nao_compareceu')}
@@ -603,8 +603,29 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
                                     <UserGroupIcon className="h-5 w-5" style={{ color: modoFinalizacao === 'nao_compareceu' ? "#fff" : "#9ca3af" }} />
                                 </div>
                                 <div>
-                                    <p style={{ fontWeight:600, fontSize:14, color: modoFinalizacao === 'nao_compareceu' ? "#b91c1c" : "#374151", margin:0 }}>Responsável não compareceu</p>
+                                    <p style={{ fontWeight:600, fontSize:14, color: modoFinalizacao === 'nao_compareceu' ? "#b91c1c" : "#374151", margin:0 }}>Responsável convocado e não compareceu</p>
                                     <p style={{ fontSize:11, color:"#6b7280", margin:"3px 0 0", lineHeight:1.4 }}>Encerra o registro sem comparecimento. Ficará registrado no histórico.</p>
+                                </div>
+                            </button>
+
+                            {/* Card 4 — Responsável Não Convocado (tomou conhecimento pelo app) */}
+                            <button
+                                type="button"
+                                onClick={() => setModoFinalizacao('nao_convocado')}
+                                className="w-full text-left"
+                                style={{
+                                    padding: "14px 16px", borderRadius: 14, cursor: "pointer",
+                                    border: modoFinalizacao === 'nao_convocado' ? "2px solid #7c3aed" : "1.5px solid #e5e7eb",
+                                    background: modoFinalizacao === 'nao_convocado' ? "linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%)" : "#fff",
+                                    transition: "all 0.2s", display: "flex", alignItems: "flex-start", gap: 12
+                                }}
+                            >
+                                <div style={{ padding:8, borderRadius:10, background: modoFinalizacao === 'nao_convocado' ? "#7c3aed" : "#f3f4f6", flexShrink:0, transition:"all 0.2s" }}>
+                                    <DevicePhoneMobileIcon className="h-5 w-5" style={{ color: modoFinalizacao === 'nao_convocado' ? "#fff" : "#9ca3af" }} />
+                                </div>
+                                <div>
+                                    <p style={{ fontWeight:600, fontSize:14, color: modoFinalizacao === 'nao_convocado' ? "#6d28d9" : "#374151", margin:0 }}>Finalizar, responsável não foi convocado</p>
+                                    <p style={{ fontSize:11, color:"#6b7280", margin:"3px 0 0", lineHeight:1.4 }}>Responsável tomou conhecimento do registro disciplinar através do aplicativo.</p>
                                 </div>
                             </button>
                         </div>

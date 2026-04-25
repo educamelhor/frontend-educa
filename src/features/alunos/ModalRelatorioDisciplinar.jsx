@@ -389,6 +389,25 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
                                             <td className="px-4 py-3 text-gray-600">
                                                 <div className="font-semibold text-gray-800">{oc.motivo}</div>
                                                 <div className="text-xs text-gray-500 mt-1 line-clamp-2" title={oc.descricao}>{oc.descricao}</div>
+                                                {/* Rastreabilidade — quem registrou e quem finalizou */}
+                                                <div className="flex flex-wrap gap-1 mt-1.5">
+                                                    {oc.nome_usuario_registro && (
+                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-indigo-700 bg-indigo-50 rounded-full border border-indigo-200" title="Usuário que registrou">
+                                                            <UserIcon className="h-3 w-3" />
+                                                            Registrado por: {oc.nome_usuario_registro}
+                                                        </span>
+                                                    )}
+                                                    {oc.nome_usuario_finalizacao && (oc.status === 'FINALIZADA' || oc.status === 'CANCELADA') && (
+                                                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full border ${
+                                                            oc.status === 'CANCELADA'
+                                                            ? 'text-red-700 bg-red-50 border-red-200'
+                                                            : 'text-green-700 bg-green-50 border-green-200'
+                                                        }`} title={oc.status === 'CANCELADA' ? 'Usuário que cancelou' : 'Usuário que finalizou'}>
+                                                            <IdentificationIcon className="h-3 w-3" />
+                                                            {oc.status === 'CANCELADA' ? 'Cancelado por:' : 'Finalizado por:'} {oc.nome_usuario_finalizacao}
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 {Boolean(oc.convocar_responsavel) && (
                                                     <div className="mt-2">
                                                         <span className="inline-block px-2 py-1 text-xs font-medium text-red-700 bg-red-100 rounded-full border border-red-200">

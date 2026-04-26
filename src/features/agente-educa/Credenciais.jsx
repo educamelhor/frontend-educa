@@ -58,6 +58,33 @@ export default function AgenteCredenciais() {
   const [modalErroOpen, setModalErroOpen] = useState(false);
   const [erroMsg, setErroMsg]             = useState('');
 
+  // ── Converte mensagem técnica → amigável ──────────────────────────────────
+  function friendlyError(raw) {
+    if (!raw) return 'Não foi possível autenticar no portal EDUCADF.';
+
+    const r = raw.toLowerCase();
+
+    // Mensagens conocidas do Playwright / agent
+    if (r.includes('timeout') || r.includes('waiting for') || r.includes('intercepts pointer'))
+      return 'O portal EDUCADF não respondeu a tempo. Verifique sua conexão e tente novamente.';
+    if (r.includes('invalid credentials') || r.includes('usuário ou senha') || r.includes('login inválido') || r.includes('senha incorreta'))
+      return 'Usuário ou senha incorretos. Verifique suas credenciais no portal EDUCADF.';
+    if (r.includes('profile') || r.includes('perfil'))
+      return 'Perfil não encontrado. Confirme se você é Professor, Secretário ou Gestor no EDUCADF.';
+    if (r.includes('screenshot') || r.includes('selector') || r.includes('locator') || r.includes('element') || r.includes('playwright') || r.includes('chromium') || r.includes('.js:') || r.includes('<a ') || r.includes('<h5'))
+      return 'Não foi possível autenticar no portal EDUCADF. Verifique seu perfil e suas credenciais e tente novamente.';
+    if (r.includes('network') || r.includes('net::') || r.includes('econnrefused'))
+      return 'Erro de conexão com o portal EDUCADF. Tente novamente em alguns instantes.';
+    if (r.includes('captcha'))
+      return 'O portal EDUCADF exibiu um captcha de segurança. Aguarde alguns minutos e tente novamente.';
+
+    // Se a mensagem é curta e legível, usa direta
+    if (raw.length <= 120 && !raw.includes('<') && !raw.includes('at ') && !raw.includes('/app/'))
+      return raw;
+
+    return 'Não foi possível autenticar no portal EDUCADF. Verifique suas credenciais e tente novamente.';
+  }
+
   const pollingRef = useRef(null);
   const elapsedRef = useRef(null);
 
@@ -65,6 +92,14 @@ export default function AgenteCredenciais() {
   const userName  = localStorage.getItem('userName') || localStorage.getItem('nome') || 'Usuário';
 
   useEffect(() => { injectAnims(); carregarCredencial(); return () => stopPolling(); }, []);
+
+  // Fechar modal com Escape
+  useEffect(() => {
+    if (!modalErroOpen) return;
+    const handler = (e) => { if (e.key === 'Escape') setModalErroOpen(false); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [modalErroOpen]);
 
   // ── Carrega credencial existente do backend ─────────────────────────────
   async function carregarCredencial() {
@@ -132,7 +167,7 @@ export default function AgenteCredenciais() {
         } else if (status === 'falha') {
           stopPolling();
           setStatusConexao('erro');
-          setErroMsg(message || 'Não foi possível autenticar no portal EDUCADF.');
+          setErroMsg(friendlyError(message));
           setModalErroOpen(true);
           setFeedback(null);
 
@@ -196,7 +231,7 @@ export default function AgenteCredenciais() {
       }
       if (statusPost === 'falha') {
         setStatusConexao('erro');
-        setErroMsg(msgPost || 'N\u00e3o foi poss\u00edvel autenticar no portal EDUCADF.');
+        setErroMsg(friendlyError(msgPost));
         setModalErroOpen(true);
         setFeedback(null);
         return;
@@ -514,6 +549,7 @@ export default function AgenteCredenciais() {
       <div
         className="fixed inset-0 z-[90] flex items-center justify-center p-4"
         style={{ background: 'rgba(15,23,42,0.75)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
+        onClick={(e) => { if (e.target === e.currentTarget) setModalErroOpen(false); }}
       >
         <style>{`
           @keyframes erroSlideIn { from { opacity:0; transform:scale(0.9) translateY(20px) } to { opacity:1; transform:scale(1) translateY(0) } }

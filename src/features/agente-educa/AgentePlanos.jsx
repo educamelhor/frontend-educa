@@ -233,6 +233,7 @@ export default function AgentePlanos() {
   const [modalConfirm, setModalConfirm] = useState(null); // plano selecionado p/ confirmar export
   const [modalSemCred, setModalSemCred] = useState(false); // modal de credenciais não configuradas
   const [modalResultado, setModalResultado] = useState(null); // { tipo: 'sucesso'|'erro', titulo, texto }
+  const [modalOcupado, setModalOcupado] = useState(null); // { turma, disciplina } do plano em execução
   // Turmas e disciplinas do professor logado (para filtro pessoal duplo)
   const [turmasNomesProf, setTurmasNomesProf] = useState(null);
 
@@ -300,6 +301,17 @@ export default function AgentePlanos() {
 
   // ── Exportar estrutura ─────────────────────────────────
   const handleExportarEstrutura = async (plano) => {
+    // ── Guarda de concorrência: bloqueia se o agente já está ocupado ──────
+    if (exportandoId !== null && exportandoId !== plano.id) {
+      const planoAtivo = planos.find(p => p.id === exportandoId);
+      setModalOcupado({
+        turma:      planoAtivo?.turmas      || '...',
+        disciplina: planoAtivo?.disciplina  || '...',
+        bimestre:   planoAtivo?.bimestre    || '...',
+      });
+      setModalConfirm(null);
+      return;
+    }
     setModalConfirm(null);
     setModalResultado(null);
     setExportandoId(plano.id);
@@ -500,6 +512,99 @@ export default function AgentePlanos() {
           </button>
         ))}
       </div>
+
+      {/* ═════════ MODAL AGENTE OCUPADO ══════════════════════════ */}
+      {modalOcupado && (
+        <div
+          style={{
+            position: "fixed", inset: 0, zIndex: 600,
+            background: "rgba(0,0,0,0.88)", backdropFilter: "blur(14px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            animation: "fadeIn 0.2s ease",
+          }}
+          onClick={() => setModalOcupado(null)}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: "100%", maxWidth: 440, margin: "0 16px",
+              borderRadius: 24, overflow: "hidden",
+              background: "linear-gradient(160deg, #1a1528 0%, #110f1e 100%)",
+              border: "1px solid rgba(168,85,247,0.35)",
+              boxShadow: "0 32px 80px rgba(0,0,0,0.7), 0 0 60px rgba(139,92,246,0.12)",
+            }}
+          >
+            {/* Header */}
+            <div style={{
+              background: "linear-gradient(135deg, #7c3aed, #6d28d9)",
+              padding: "28px 28px 22px", textAlign: "center",
+            }}>
+              <div style={{ fontSize: "2.8rem", marginBottom: 10 }}>🤖</div>
+              <div style={{ fontSize: "1.1rem", fontWeight: 900, color: "#fff", letterSpacing: "-0.3px" }}>
+                Agente trabalhando...
+              </div>
+              <div style={{ fontSize: "0.78rem", color: "rgba(221,214,254,0.8)", marginTop: 6 }}>
+                O Agente só pode executar uma tarefa por vez
+              </div>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: "24px 28px" }}>
+              {/* Card da tarefa em andamento */}
+              <div style={{
+                padding: "16px 18px", borderRadius: 16, marginBottom: 20,
+                background: "rgba(139,92,246,0.08)",
+                border: "1px solid rgba(139,92,246,0.25)",
+              }}>
+                <div style={{ fontSize: "0.65rem", fontWeight: 800, color: "#7c3aed", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 10 }}>
+                  ⚡ Exportação em andamento
+                </div>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  {[
+                    { label: "Turma",      value: modalOcupado.turma },
+                    { label: "Disciplina", value: modalOcupado.disciplina },
+                    { label: "Bimestre",   value: modalOcupado.bimestre },
+                  ].map(({ label, value }) => (
+                    <div key={label} style={{
+                      flex: "1 1 120px", padding: "8px 12px", borderRadius: 10,
+                      background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
+                    }}>
+                      <div style={{ fontSize: "0.58rem", color: "#64748b", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: 2 }}>{label}</div>
+                      <div style={{ fontSize: "0.82rem", fontWeight: 800, color: "#e2e8f0" }}>{value}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Mensagem */}
+              <div style={{
+                padding: "12px 16px", borderRadius: 12, marginBottom: 20,
+                background: "rgba(245,158,11,0.07)", border: "1px solid rgba(245,158,11,0.2)",
+                fontSize: "0.82rem", color: "#fde68a", lineHeight: 1.65,
+              }}>
+                ⚠️ O Agente está fazendo login e navegando no EDUCADF.
+                Iniciar outra exportação ao mesmo tempo pode causar
+                <strong style={{ color: "#fbbf24" }}> conflito de sessão</strong> e falha em ambas.
+                <br /><br />
+                <strong style={{ color: "#fbbf24" }}>Aguarde a conclusão</strong> e tente novamente.
+              </div>
+
+              <button
+                onClick={() => setModalOcupado(null)}
+                style={{
+                  width: "100%", padding: "13px", borderRadius: 12,
+                  background: "linear-gradient(135deg, #7c3aed, #6d28d9)",
+                  border: "none", color: "#fff",
+                  fontWeight: 800, fontSize: "0.9rem", cursor: "pointer",
+                  boxShadow: "0 4px 20px rgba(124,58,237,0.4)",
+                }}
+              >
+                Entendido — vou aguardar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ═════════════════════ MODAL RESULTADO ══════════════════ */}
       {modalResultado && (

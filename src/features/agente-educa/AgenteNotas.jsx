@@ -174,15 +174,7 @@ function NotaCard({ plano, onExportar, exportandoId, onVerRelatorio }) {
                   <LockClosedIcon style={{ width: 14 }} />
                   Sem col. Bimestral
                 </div>
-              ) : !estruturaExportada ? (
-                <div style={{
-                  padding: "8px 14px", borderRadius: 12, fontSize: "0.7rem",
-                  background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.2)",
-                  color: "#f59e0b", display: "flex", alignItems: "center", gap: 6,
-                }}>
-                  <ExclamationTriangleIcon style={{ width: 14 }} />
-                  Aguardando Etapa 1
-                </div>
+              // TODO:REVERTER — exibição "Aguardando Etapa 1" desativada temporariamente
               ) : !podeExportar ? (
                 <div style={{
                   padding: "8px 14px", borderRadius: 12, fontSize: "0.7rem",

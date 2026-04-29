@@ -54,7 +54,9 @@ function NotaCard({ plano, onExportar, exportandoId, onVerRelatorio }) {
   // Elegível para exportar notas: precisa ter estrutura exportada na Etapa 1
   const estruturaExportada = !!plano.agente_exportado_em;
   const notasExportadas    = !!plano.agente_notas_exportadas_em;
-  const podeExportar       = estruturaExportada && !notasExportadas &&
+  // TODO:REVERTER — Gate Etapa 1 desativado temporariamente (professores fazendo exportação manual)
+  // const podeExportar    = estruturaExportada && !notasExportadas &&
+  const podeExportar       = !notasExportadas &&
                              (plano.status === "APROVADO" || plano.status === "ENVIADO") &&
                              !!bimestral;
 

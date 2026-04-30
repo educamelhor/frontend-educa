@@ -54,9 +54,7 @@ function NotaCard({ plano, onExportar, exportandoId, onVerRelatorio }) {
   // Elegível para exportar notas: precisa ter estrutura exportada na Etapa 1
   const estruturaExportada = !!plano.agente_exportado_em;
   const notasExportadas    = !!plano.agente_notas_exportadas_em;
-  // TODO:REVERTER — Gate Etapa 1 desativado temporariamente (professores fazendo exportação manual)
-  // const podeExportar    = estruturaExportada && !notasExportadas &&
-  const podeExportar       = !notasExportadas &&
+  const podeExportar       = estruturaExportada && !notasExportadas &&
                              (plano.status === "APROVADO" || plano.status === "ENVIADO") &&
                              !!bimestral;
 
@@ -174,7 +172,15 @@ function NotaCard({ plano, onExportar, exportandoId, onVerRelatorio }) {
                   <LockClosedIcon style={{ width: 14 }} />
                   Sem col. Bimestral
                 </div>
-              // TODO:REVERTER — exibição "Aguardando Etapa 1" desativada temporariamente
+              ) : !estruturaExportada ? (
+                <div style={{
+                  padding: "8px 14px", borderRadius: 12, fontSize: "0.7rem",
+                  background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.2)",
+                  color: "#f59e0b", display: "flex", alignItems: "center", gap: 6,
+                }}>
+                  <ExclamationTriangleIcon style={{ width: 14 }} />
+                  Aguardando Etapa 1
+                </div>
               ) : !podeExportar ? (
                 <div style={{
                   padding: "8px 14px", borderRadius: 12, fontSize: "0.7rem",

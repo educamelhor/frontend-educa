@@ -296,7 +296,7 @@ function QuestaoCard({ questao, onEdit, onDuplicate, onGerenciar, onClick, isAut
 }
 
 /* ── Componente principal ─────────────────────────────────── */
-export default function QuestoesBanco({ onEdit, refreshKey }) {
+export default function QuestoesBanco({ onEdit, refreshKey, onRemovida }) {
   // Quem sou eu?
   const { professor_id: meuProfId, perfil: meuPerfil } = decodificarToken();
   const isGestor = ['diretor', 'coordenador', 'admin', 'militar'].includes(meuPerfil);
@@ -391,6 +391,7 @@ export default function QuestoesBanco({ onEdit, refreshKey }) {
       setQuestoes(p => p.filter(q => q.id !== id));
       carregarStats();
       setQuestaoParaExcluir(null);
+      onRemovida?.(); // notifica o pai (BancoQuestoes) para atualizar o header
     } catch (err) {
       const msg = err?.response?.data?.message || 'Não foi possível arquivar a questão.';
       alert(msg);
@@ -404,6 +405,7 @@ export default function QuestoesBanco({ onEdit, refreshKey }) {
       setQuestoes(p => p.filter(q => q.id !== id));
       carregarStats();
       setQuestaoParaExcluir(null);
+      onRemovida?.(); // notifica o pai (BancoQuestoes) para atualizar o header
     } catch (err) {
       const msg = err?.response?.data?.message || 'Não foi possível excluir a questão.';
       alert(msg);

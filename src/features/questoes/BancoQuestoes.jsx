@@ -58,9 +58,14 @@ export default function BancoQuestoes() {
   /* Quando salva uma questão: atualiza contadores e dashboard */
   const handleSaved = () => {
     setRefreshKey(k => k + 1);
-    setDashboardKey(k => k + 1); // força BancoDashboard a recarregar
-    // Não troca de aba — usuário já viu o modal de confirmação no Builder
+    setDashboardKey(k => k + 1);
     setEditingQuestao(null);
+  };
+
+  /* Quando arquiva ou exclui uma questão no banco: sincroniza header e dashboard */
+  const handleRemovida = () => {
+    setRefreshKey(k => k + 1);
+    setDashboardKey(k => k + 1);
   };
 
   /* Quando clica "Editar" num card */
@@ -208,7 +213,7 @@ export default function BancoQuestoes() {
                 Nova Questão
               </button>
             </div>
-            <QuestoesBanco onEdit={handleEdit} refreshKey={refreshKey} />
+            <QuestoesBanco onEdit={handleEdit} refreshKey={refreshKey} onRemovida={handleRemovida} />
           </>
         )}
 

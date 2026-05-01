@@ -2,6 +2,7 @@
 // 🧩 EDUCA.PROVA — Tab Manager (módulo raiz)
 
 import React, { useState, useEffect } from 'react';
+import api from '../../services/api';
 import './questoes.css';
 import BancoDashboard    from './BancoDashboard';
 import QuestoesBanco     from './QuestoesBanco';
@@ -37,6 +38,7 @@ export default function BancoQuestoes() {
   const [activeTab, setActiveTab]             = useState('dashboard');
   const [editingQuestao, setEditingQuestao]   = useState(null);
   const [refreshKey, setRefreshKey]           = useState(0);
+  const [dashboardKey, setDashboardKey]       = useState(0); // força refresh do dashboard
   const [provasRefreshKey, setProvasRefreshKey] = useState(0);
   const [totalQuestoes, setTotalQuestoes]     = useState(null);
   const [escola, setEscola]                   = useState({ nome: 'EDUCA.PROVA', sigla: 'EP' });
@@ -47,18 +49,17 @@ export default function BancoQuestoes() {
     if (stored) {
       try { setEscola(JSON.parse(stored)); } catch {}
     }
-    // Busca total de questões para o badge
-    const token = localStorage.getItem('token');
-    fetch('/api/questoes', { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.ok ? r.json() : [])
-      .then(data => setTotalQuestoes(Array.isArray(data) ? data.length : 0))
+    // Busca total de questões para o badge via api axios (não fetch relativo)
+    api.get('/api/questoes/stats')
+      .then(({ data }) => setTotalQuestoes(data?.totais?.total ?? data?.totais?.ativas ?? 0))
       .catch(() => setTotalQuestoes(0));
   }, [refreshKey]);
 
-  /* Quando salva uma questão: volta ao banco e refaz a listagem */
+  /* Quando salva uma questão: atualiza contadores e dashboard */
   const handleSaved = () => {
     setRefreshKey(k => k + 1);
-    setActiveTab('banco');
+    setDashboardKey(k => k + 1); // força BancoDashboard a recarregar
+    // Não troca de aba — usuário já viu o modal de confirmação no Builder
     setEditingQuestao(null);
   };
 
@@ -73,6 +74,9 @@ export default function BancoQuestoes() {
     setActiveTab('criar');
   };
 
+  // Rótulo da escola para nomenclatura
+  const escolaLabel = escola.apelido || escola.sigla || escola.nome || 'da Escola';
+
   const tabs = [
     {
       key: 'dashboard',
@@ -81,7 +85,7 @@ export default function BancoQuestoes() {
     },
     {
       key: 'banco',
-      label: 'Banco de Questões',
+      label: `Banco ${escolaLabel}`,   // "Banco CEF04-CCMDF"
       icon: <IconBanco />,
       count: totalQuestoes !== null ? totalQuestoes : null,
     },
@@ -109,7 +113,17 @@ export default function BancoQuestoes() {
         <div className="bq-header-top">
           <div className="bq-header-icon">🧩</div>
           <div className="bq-header-text">
-            <div className="bq-header-title">BANCO DE QUESTÕES</div>
+            <div className="bq-header-title">
+              BANCO DE QUESTÕES
+              <span style={{
+                fontSize: '0.65rem', fontWeight: 600,
+                background: 'rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.85)',
+                padding: '2px 8px', borderRadius: 99, marginLeft: 10,
+                letterSpacing: '0.04em', verticalAlign: 'middle',
+              }}>
+                🏫 {escolaLabel}
+              </span>
+            </div>
             <div className="bq-header-subtitle">
               EDUCA.PROVA — Construtor Inteligente de Provas
             </div>
@@ -171,6 +185,9 @@ export default function BancoQuestoes() {
         {/* Tab: Dashboard */}
         {activeTab === 'dashboard' && (
           <BancoDashboard
+            key={dashboardKey}      // força remontagem e re-fetch quando questão é salva
+            refreshKey={dashboardKey}
+            escolaLabel={escolaLabel}
             onCriarQuestao={goToCreate}
             onVerBanco={() => setActiveTab('banco')}
           />

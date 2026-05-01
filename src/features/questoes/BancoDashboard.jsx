@@ -2,13 +2,10 @@
 // 🏆 EDUCA.PROVA — Sprint 5: Dashboard de Estatísticas do Banco
 
 import React, { useState, useEffect, useCallback } from 'react';
+import apiService from '../../../services/api';
 
-const api = async (path) => {
-  const token = localStorage.getItem('token');
-  const r = await fetch(path, { headers: { Authorization: `Bearer ${token}` } });
-  if (!r.ok) throw new Error(`HTTP ${r.status}`);
-  return r.json();
-};
+// Helper que usa o axios service com URL correta (backend DO, não Vercel)
+const fetchApi = (path) => apiService.get(path).then(r => r.data);
 
 const NIVEL_COR  = { facil: '#059669', medio: '#d97706', dificil: '#dc2626', enem: '#7c3aed' };
 const NIVEL_LABEL= { facil: 'Fácil',   medio: 'Médio',   dificil: 'Difícil', enem: 'ENEM' };
@@ -55,20 +52,20 @@ function StatCard({ icon, value, label, color, sub }) {
 /* ════════════════════════════════════════════════════════════════════════════
    COMPONENTE PRINCIPAL
 ════════════════════════════════════════════════════════════════════════════ */
-export default function BancoDashboard({ onCriarQuestao, onVerBanco }) {
+export default function BancoDashboard({ onCriarQuestao, onVerBanco, escolaLabel, refreshKey }) {
   const [stats,   setStats]   = useState(null);
   const [loading, setLoading] = useState(true);
 
   const carregar = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await api('/api/questoes/stats');
+      const data = await fetchApi('/api/questoes/stats');
       setStats(data);
     } catch { setStats(null); }
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { carregar(); }, [carregar]);
+  useEffect(() => { carregar(); }, [carregar, refreshKey]);
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '60px 20px', justifyContent: 'center', color: '#94a3b8' }}>
@@ -101,9 +98,21 @@ export default function BancoDashboard({ onCriarQuestao, onVerBanco }) {
       }}>
         <div style={{ fontSize: '2.4rem' }}>📊</div>
         <div style={{ flex: 1 }}>
-          <div style={{ color: '#fff', fontWeight: 900, fontSize: '1.1rem' }}>Dashboard do Banco de Questões</div>
-          <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.8rem', marginTop: 2 }}>
-            Visão geral do acervo pedagógico da escola
+          <div style={{ color: '#fff', fontWeight: 900, fontSize: '1.1rem', lineHeight: 1.2 }}>
+            Dashboard do Banco
+            {escolaLabel && (
+              <span style={{
+                fontSize: '0.72rem', fontWeight: 700,
+                background: 'rgba(255,255,255,0.15)', color: '#e0f2fe',
+                padding: '2px 10px', borderRadius: 99, marginLeft: 10,
+                letterSpacing: '0.04em', verticalAlign: 'middle',
+              }}>
+                🏫 {escolaLabel}
+              </span>
+            )}
+          </div>
+          <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.8rem', marginTop: 4 }}>
+            Acervo pedagógico exclusivo da instituição · questões publicadas no 🌐 Banco Global EDUCA.MELHOR
           </div>
         </div>
         <button onClick={carregar} style={{

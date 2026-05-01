@@ -5,6 +5,7 @@ import React, { useState, useEffect } from 'react';
 import TagsInput from './components/TagsInput';
 import ImageUploader from './components/ImageUploader';
 import LatexPreview, { gerarLatex } from './components/LatexPreview';
+import ImagemParaQuestaoModal from './components/ImagemParaQuestaoModal';
 
 /* ── Constantes ─────────────────────────────────────────── */
 const LETRAS = ['A', 'B', 'C', 'D', 'E'];
@@ -84,6 +85,7 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
   const [openBlocks, setOpenBlocks] = useState({ 1: true, 2: true, 3: true, 4: false });
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState(null);  // { tipo: 'success'|'error', msg }
+  const [showImagemModal, setShowImagemModal] = useState(false);
 
   /* Popula formulário no modo edição */
   useEffect(() => {
@@ -128,6 +130,22 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
       ...p,
       alternativas: p.alternativas.map(a => a.id === id ? { ...a, [field]: val } : a),
     }));
+
+  // ── Preenche form com dados extraídos pelo Gemini ──────────────────────
+  const handleUsarExtracao = (dados) => {
+    setForm(prev => ({
+      ...prev,
+      enunciado:    dados.enunciado   || prev.enunciado,
+      fonte:        dados.fonte       || prev.fonte,
+      tipo:         dados.tipo        || prev.tipo,
+      alternativas: dados.alternativas && dados.alternativas.length >= 2
+        ? dados.alternativas
+        : prev.alternativas,
+    }));
+    // Garante que os blocos relevantes estejam abertos
+    setOpenBlocks({ 1: true, 2: true, 3: true, 4: false });
+    setFeedback({ tipo: 'success', msg: '✨ Questão importada! Revise e complete os campos.' });
+  };
 
   const marcarCorreta = (id) =>
     setForm(p => ({
@@ -252,6 +270,23 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
           {isEditing && (
             <button className="bq-btn bq-btn-ghost" onClick={onCancel} style={{ padding: '4px 10px', fontSize: '0.78rem' }}>
               ← Cancelar edição
+            </button>
+          )}
+          {/* Botão Gemini Vision */}
+          {!isEditing && (
+            <button
+              type="button"
+              onClick={() => setShowImagemModal(true)}
+              style={{
+                marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6,
+                background: 'linear-gradient(135deg, #0e7490, #0369a1)',
+                color: '#fff', border: 'none', borderRadius: 9,
+                padding: '7px 14px', fontSize: '0.8rem', fontWeight: 700,
+                cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
+                boxShadow: '0 2px 8px rgba(14,116,144,0.3)',
+              }}
+            >
+              📷 Importar da Imagem
             </button>
           )}
         </div>
@@ -575,6 +610,14 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
 
       {/* ── Coluna direita: preview ── */}
       <LatexPreview questao={form} />
+
+      {/* ── Modal Importar da Imagem ── */}
+      {showImagemModal && (
+        <ImagemParaQuestaoModal
+          onClose={() => setShowImagemModal(false)}
+          onUsar={handleUsarExtracao}
+        />
+      )}
     </div>
   );
 }

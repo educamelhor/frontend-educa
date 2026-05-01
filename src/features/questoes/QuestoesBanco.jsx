@@ -6,6 +6,88 @@ import apiService from '../../services/api';
 import QuestaoDetalhes from './components/QuestaoDetalhes';
 import BulkImportModal from './BulkImportModal';
 
+/* ── Decodifica JWT (sem biblioteca) para obter professor_id e perfil do usuário ── */
+function decodificarToken() {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) return {};
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return { professor_id: payload.professor_id || null, perfil: payload.perfil || '' };
+  } catch { return {}; }
+}
+
+/* ── Modal premium de confirmação de exclusão ─────────────────────────────── */
+function ExclusaoModal({ questao, onArquivar, onExcluir, onCancel }) {
+  if (!questao) return null;
+  const preview = (questao.conteudo_bruto || '(sem enunciado)').slice(0, 90);
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 9999,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'rgba(15,23,42,0.65)', backdropFilter: 'blur(6px)',
+    }}>
+      <div style={{
+        background: '#fff', borderRadius: 20, padding: '28px 28px 24px',
+        width: 420, maxWidth: '92vw', boxShadow: '0 24px 80px rgba(0,0,0,0.25)',
+        fontFamily: 'inherit',
+      }}>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
+          <div style={{
+            width: 46, height: 46, borderRadius: 12, flexShrink: 0,
+            background: 'linear-gradient(135deg, #fef3c7, #fee2e2)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '1.5rem',
+          }}>⚠️</div>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: '1rem', color: '#0f172a' }}>Gerenciar Questão</div>
+            <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: 2 }}>Escolha uma ação para esta questão</div>
+          </div>
+        </div>
+
+        {/* Preview da questão */}
+        <div style={{
+          background: '#f8fafc', borderRadius: 10, padding: '10px 14px',
+          fontSize: '0.8rem', color: '#334155', lineHeight: 1.5,
+          border: '1px solid #e2e8f0', marginBottom: 20,
+        }}>
+          {preview}{questao.conteudo_bruto?.length > 90 ? '...' : ''}
+        </div>
+
+        {/* Botões de ação */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <button onClick={onArquivar} style={{
+            padding: '11px 16px', borderRadius: 10, border: 'none', cursor: 'pointer',
+            background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+            color: '#fff', fontWeight: 700, fontSize: '0.875rem',
+            display: 'flex', alignItems: 'center', gap: 8,
+            fontFamily: 'inherit',
+          }}>
+            <span style={{ fontSize: '1.1rem' }}>📁</span>
+            Arquivar — ocultar do banco (recuperável)
+          </button>
+          <button onClick={onExcluir} style={{
+            padding: '11px 16px', borderRadius: 10, border: '1.5px solid #fecaca', cursor: 'pointer',
+            background: '#fff', color: '#dc2626', fontWeight: 700, fontSize: '0.875rem',
+            display: 'flex', alignItems: 'center', gap: 8,
+            fontFamily: 'inherit',
+          }}>
+            <span style={{ fontSize: '1.1rem' }}>🗑️</span>
+            Excluir Definitivamente — ação irreversível
+          </button>
+          <button onClick={onCancel} style={{
+            padding: '10px 16px', borderRadius: 10, border: '1.5px solid #e2e8f0', cursor: 'pointer',
+            background: '#f8fafc', color: '#64748b', fontWeight: 600, fontSize: '0.875rem',
+            fontFamily: 'inherit',
+          }}>
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Constantes ─────────────────────────────────────────── */
 const NIVEL_LABEL  = { facil: 'Fácil', medio: 'Médio', dificil: 'Difícil', enem: 'ENEM' };
 const TIPO_LABEL   = {
@@ -31,8 +113,7 @@ function parseTags(raw) {
 }
 
 /* ── Card de questão ─────────────────────────────────────── */
-function QuestaoCard({ questao, onEdit, onDuplicate, onDelete, onClick }) {
-  const [confirmDel, setConfirmDel] = useState(false);
+function QuestaoCard({ questao, onEdit, onDuplicate, onGerenciar, onClick, isAutor }) {
   const nivel = questao.nivel || 'medio';
   const tags = parseTags(questao.tags);
   let alts = [];
@@ -86,6 +167,11 @@ function QuestaoCard({ questao, onEdit, onDuplicate, onDelete, onClick }) {
               🤝 Compartilhada
             </span>
           )}
+          {isAutor && (
+            <span style={{ fontSize: '0.66rem', padding: '1px 7px', borderRadius: 99, background: '#f5f3ff', color: '#7c3aed', border: '1px solid #ddd6fe', fontWeight: 700 }}>
+              ✍️ Minha
+            </span>
+          )}
         </div>
       </div>
 
@@ -98,36 +184,31 @@ function QuestaoCard({ questao, onEdit, onDuplicate, onDelete, onClick }) {
           {tags.length === 0 && <span style={{ fontSize: '0.7rem', color: '#cbd5e1' }}>sem tags</span>}
         </div>
 
-        <div className="bq-card-actions">
-          {/* Editar */}
-          <button className="bq-icon-btn" onClick={() => onEdit(questao)} title="Editar">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
-          </button>
-
-          {/* Duplicar */}
-          <button className="bq-icon-btn" onClick={() => onDuplicate(questao)} title="Duplicar">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-            </svg>
-          </button>
-
-          {/* Excluir (arquivar) */}
-          {confirmDel ? (
-            <button className="bq-icon-btn danger" onClick={() => { onDelete(questao.id); setConfirmDel(false); }} title="Confirmar arquivar">
+        {/* Ações — só aparecem se o usuário é o autor */}
+        {isAutor && (
+          <div className="bq-card-actions">
+            {/* Editar */}
+            <button className="bq-icon-btn" onClick={() => onEdit(questao)} title="Editar">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
               </svg>
             </button>
-          ) : (
-            <button className="bq-icon-btn" onClick={() => setConfirmDel(true)} title="Arquivar questão">
+
+            {/* Duplicar */}
+            <button className="bq-icon-btn" onClick={() => onDuplicate(questao)} title="Duplicar">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+            </button>
+
+            {/* Gerenciar (arquivar / excluir) */}
+            <button className="bq-icon-btn danger" onClick={() => onGerenciar(questao)} title="Arquivar ou Excluir">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
               </svg>
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -135,11 +216,16 @@ function QuestaoCard({ questao, onEdit, onDuplicate, onDelete, onClick }) {
 
 /* ── Componente principal ─────────────────────────────────── */
 export default function QuestoesBanco({ onEdit, refreshKey }) {
+  // Quem sou eu?
+  const { professor_id: meuProfId, perfil: meuPerfil } = decodificarToken();
+  const isGestor = ['diretor', 'coordenador', 'admin', 'militar'].includes(meuPerfil);
+
   const [questoes,   setQuestoes]   = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [stats,      setStats]      = useState(null);
   const [pagination, setPagination] = useState({ total: 0, page: 1, pages: 1 });
   const [detalhes,   setDetalhes]   = useState(null);  // questão aberta no modal
+  const [questaoParaExcluir, setQuestaoParaExcluir] = useState(null); // controla modal
 
   // Filtros
   const [busca,       setBusca]       = useState('');
@@ -223,7 +309,24 @@ export default function QuestoesBanco({ onEdit, refreshKey }) {
       await apiService.delete(`/api/questoes/${id}`);
       setQuestoes(p => p.filter(q => q.id !== id));
       carregarStats();
-    } catch {}
+      setQuestaoParaExcluir(null);
+    } catch (err) {
+      const msg = err?.response?.data?.message || 'Não foi possível arquivar a questão.';
+      alert(msg);
+    }
+  };
+
+  /* Excluir definitivamente (hard delete) */
+  const excluirDefinitivo = async (id) => {
+    try {
+      await apiService.delete(`/api/questoes/${id}?hard=1`);
+      setQuestoes(p => p.filter(q => q.id !== id));
+      carregarStats();
+      setQuestaoParaExcluir(null);
+    } catch (err) {
+      const msg = err?.response?.data?.message || 'Não foi possível excluir a questão.';
+      alert(msg);
+    }
   };
 
   const limparFiltros = () => {
@@ -236,6 +339,14 @@ export default function QuestoesBanco({ onEdit, refreshKey }) {
 
   return (
     <div>
+      {/* Modal de Exclusão Premium */}
+      <ExclusaoModal
+        questao={questaoParaExcluir}
+        onArquivar={() => arquivar(questaoParaExcluir.id)}
+        onExcluir={() => excluirDefinitivo(questaoParaExcluir.id)}
+        onCancel={() => setQuestaoParaExcluir(null)}
+      />
+
       {/* Modal Importação em Massa */}
       {showBulk && (
         <BulkImportModal
@@ -409,8 +520,9 @@ export default function QuestoesBanco({ onEdit, refreshKey }) {
               questao={q}
               onEdit={onEdit}
               onDuplicate={duplicar}
-              onDelete={arquivar}
+              onGerenciar={(questao) => setQuestaoParaExcluir(questao)}
               onClick={(q) => setDetalhes(q)}
+              isAutor={isGestor || (meuProfId && Number(q.professor_id) === Number(meuProfId))}
             />
           ))}
         </div>

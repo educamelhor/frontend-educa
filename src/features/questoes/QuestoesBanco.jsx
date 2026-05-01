@@ -16,10 +16,91 @@ function decodificarToken() {
   } catch { return {}; }
 }
 
-/* ── Modal premium de confirmação de exclusão ─────────────────────────────── */
+/* ── Modal premium de confirmação de exclusão (2 etapas) ───────────────────── */
 function ExclusaoModal({ questao, onArquivar, onExcluir, onCancel }) {
+  const [passo, setPasso] = useState(null); // null | 'arquivar' | 'excluir'
   if (!questao) return null;
+
   const preview = (questao.conteudo_bruto || '(sem enunciado)').slice(0, 90);
+
+  /* ── Tela de confirmação ── */
+  if (passo) {
+    const isExcluir = passo === 'excluir';
+    return (
+      <div style={{
+        position: 'fixed', inset: 0, zIndex: 9999,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        background: 'rgba(15,23,42,0.72)', backdropFilter: 'blur(6px)',
+      }}>
+        <div style={{
+          background: '#fff', borderRadius: 20, padding: '28px 28px 24px',
+          width: 400, maxWidth: '92vw', boxShadow: '0 24px 80px rgba(0,0,0,0.28)',
+          fontFamily: 'inherit',
+        }}>
+          {/* Ícone */}
+          <div style={{ textAlign: 'center', marginBottom: 18 }}>
+            <div style={{
+              width: 60, height: 60, borderRadius: 16, margin: '0 auto 12px',
+              background: isExcluir
+                ? 'linear-gradient(135deg, #fee2e2, #fecaca)'
+                : 'linear-gradient(135deg, #fef3c7, #fde68a)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '2rem',
+            }}>
+              {isExcluir ? '🗑️' : '📁'}
+            </div>
+            <div style={{ fontWeight: 800, fontSize: '1.05rem', color: '#0f172a' }}>
+              {isExcluir ? 'Excluir Definitivamente?' : 'Arquivar Questão?'}
+            </div>
+            <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: 6, lineHeight: 1.5 }}>
+              {isExcluir
+                ? 'Esta ação é irreversível. A questão será removida permanentemente do banco e não poderá ser recuperada.'
+                : 'A questão será ocultada do banco, mas poderá ser recuperada futuramente pela administração.'}
+            </div>
+          </div>
+
+          {/* Preview */}
+          <div style={{
+            background: '#f8fafc', borderRadius: 10, padding: '9px 13px',
+            fontSize: '0.78rem', color: '#475569', lineHeight: 1.5,
+            border: `1px solid ${isExcluir ? '#fecaca' : '#fde68a'}`,
+            marginBottom: 20,
+          }}>
+            {preview}{questao.conteudo_bruto?.length > 90 ? '...' : ''}
+          </div>
+
+          {/* Botões */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <button
+              onClick={isExcluir ? onExcluir : onArquivar}
+              style={{
+                padding: '12px 16px', borderRadius: 10, border: 'none', cursor: 'pointer',
+                background: isExcluir
+                  ? 'linear-gradient(135deg, #dc2626, #b91c1c)'
+                  : 'linear-gradient(135deg, #f59e0b, #d97706)',
+                color: '#fff', fontWeight: 800, fontSize: '0.9rem',
+                fontFamily: 'inherit', letterSpacing: '0.01em',
+              }}
+            >
+              ✅ Entendi — {isExcluir ? 'Excluir Definitivamente' : 'Arquivar Questão'}
+            </button>
+            <button
+              onClick={() => setPasso(null)}
+              style={{
+                padding: '11px 16px', borderRadius: 10, border: '1.5px solid #e2e8f0',
+                cursor: 'pointer', background: '#f8fafc', color: '#64748b',
+                fontWeight: 600, fontSize: '0.875rem', fontFamily: 'inherit',
+              }}
+            >
+              ← Cancelar — voltar
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ── Tela principal (escolha de ação) ── */
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 9999,
@@ -56,7 +137,7 @@ function ExclusaoModal({ questao, onArquivar, onExcluir, onCancel }) {
 
         {/* Botões de ação */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <button onClick={onArquivar} style={{
+          <button onClick={() => setPasso('arquivar')} style={{
             padding: '11px 16px', borderRadius: 10, border: 'none', cursor: 'pointer',
             background: 'linear-gradient(135deg, #f59e0b, #d97706)',
             color: '#fff', fontWeight: 700, fontSize: '0.875rem',
@@ -66,7 +147,7 @@ function ExclusaoModal({ questao, onArquivar, onExcluir, onCancel }) {
             <span style={{ fontSize: '1.1rem' }}>📁</span>
             Arquivar — ocultar do banco (recuperável)
           </button>
-          <button onClick={onExcluir} style={{
+          <button onClick={() => setPasso('excluir')} style={{
             padding: '11px 16px', borderRadius: 10, border: '1.5px solid #fecaca', cursor: 'pointer',
             background: '#fff', color: '#dc2626', fontWeight: 700, fontSize: '0.875rem',
             display: 'flex', alignItems: 'center', gap: 8,

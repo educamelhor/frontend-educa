@@ -2,7 +2,7 @@
 // 🏆 EDUCA.PROVA — Sprint 5: Dashboard de Estatísticas do Banco
 
 import React, { useState, useEffect, useCallback } from 'react';
-import apiService from '../../../services/api';
+import apiService from '../../services/api';
 
 // Helper que usa o axios service com URL correta (backend DO, não Vercel)
 const fetchApi = (path) => apiService.get(path).then(r => r.data);

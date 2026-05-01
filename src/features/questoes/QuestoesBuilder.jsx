@@ -7,6 +7,7 @@ import TagsInput from './components/TagsInput';
 import ImageUploader from './components/ImageUploader';
 import LatexPreview, { gerarLatex } from './components/LatexPreview';
 import ImagemParaQuestaoModal from './components/ImagemParaQuestaoModal';
+import PublicarResultadoModal from './components/PublicarResultadoModal';
 
 /* ── Constantes ─────────────────────────────────────────── */
 const LETRAS = ['A', 'B', 'C', 'D', 'E'];
@@ -86,7 +87,7 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
   const [form, setForm] = useState(INITIAL_STATE);
   const [openBlocks, setOpenBlocks] = useState({ 1: true, 2: true, 3: true, 4: false });
   const [saving, setSaving] = useState(false);
-  const [feedback, setFeedback] = useState(null);  // { tipo: 'success'|'error', msg }
+  const [modalResultado, setModalResultado] = useState(null); // { tipo, titulo, mensagem, codigo, acoes }
   const [showImagemModal, setShowImagemModal] = useState(false);
 
   /* Popula formulário no modo edição */
@@ -152,9 +153,12 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
         ? dados.alternativas
         : prev.alternativas,
     }));
-    // Garante que os blocos relevantes estejam abertos
     setOpenBlocks({ 1: true, 2: true, 3: true, 4: false });
-    setFeedback({ tipo: 'success', msg: '✨ Questão importada! Revise e complete os campos.' });
+    setModalResultado({
+      tipo: 'success',
+      titulo: 'Imagem importada com sucesso!',
+      mensagem: '✨ O enunciado e as alternativas foram preenchidos automaticamente. Revise os dados antes de publicar.',
+    });
   };
 
   const marcarCorreta = (id) =>
@@ -221,21 +225,20 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
   /* Salvar (e opcionalmente publicar no banco global) */
   const handleSave = async (status = 'ativa') => {
     const erro = validar();
-    if (erro) { setFeedback({ tipo: 'error', msg: erro }); return; }
+    if (erro) {
+      setModalResultado({ tipo: 'error', titulo: 'Atenção', mensagem: erro });
+      return;
+    }
 
     setSaving(true);
-    setFeedback(null);
 
     try {
       let questaoId;
 
       if (editingQuestao) {
-        // Atualização
         await api.put(`/api/questoes/${editingQuestao.id}`, buildPayload(status));
         questaoId = editingQuestao.id;
-        setFeedback({ tipo: 'success', msg: 'Questão atualizada! ✅' });
       } else {
-        // Criação
         const { data } = await api.post('/api/questoes', buildPayload(status));
         questaoId = data.id;
       }
@@ -244,24 +247,39 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
       if (status === 'ativa' && questaoId) {
         try {
           const { data: pub } = await api.post(`/api/questoes/${questaoId}/publicar`);
-          setFeedback({
+          setModalResultado({
             tipo: 'success',
-            msg: `✅ Questão salva e publicada no Banco Global! Código: ${pub.codigo}`,
+            titulo: editingQuestao ? 'Questão Atualizada!' : 'Questão Publicada!',
+            mensagem: editingQuestao
+              ? 'As alterações foram salvas e o banco global foi atualizado.'
+              : 'Sua questão foi salva e publicada no Banco Global EDUCA.MELHOR. Agora qualquer escola pode utilizá-la.',
+            codigo: pub.codigo,
+            acoes: [
+              { label: 'Nova Questão', primary: true, onClick: () => { setModalResultado(null); setForm(INITIAL_STATE); } },
+              { label: 'Fechar', onClick: () => setModalResultado(null) },
+            ],
           });
         } catch (pubErr) {
-          // Falha na publicação não cancela o salvamento
-          const msg = pubErr.response?.data?.message || 'Questão salva, mas falha ao publicar no banco global.';
-          setFeedback({ tipo: 'success', msg: `✅ Questão salva. ⚠️ ${msg}` });
+          const msg = pubErr.response?.data?.message || 'Questão salva, mas não publicada no banco global.';
+          setModalResultado({
+            tipo: 'warning',
+            titulo: 'Questão Salva',
+            mensagem: `Questão salva com sucesso! Porém, não foi possível publicar no banco global: ${msg}`,
+          });
         }
       } else if (status === 'rascunho') {
-        setFeedback({ tipo: 'success', msg: '✅ Rascunho salvo. Não publicado no banco global.' });
+        setModalResultado({
+          tipo: 'success',
+          titulo: 'Rascunho Salvo!',
+          mensagem: 'Questão salva como rascunho. Ela não será publicada no banco global até você clicar em Publicar.',
+        });
       }
 
       if (!editingQuestao) setForm(INITIAL_STATE);
       onSaved?.();
     } catch (err) {
       const msg = err.response?.data?.message || err.message || 'Erro ao salvar questão.';
-      setFeedback({ tipo: 'error', msg });
+      setModalResultado({ tipo: 'error', titulo: 'Erro ao Salvar', mensagem: msg });
     } finally {
       setSaving(false);
     }
@@ -273,18 +291,6 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
     <div className="bq-builder">
       {/* ── Coluna esquerda: formulário ── */}
       <div className="bq-builder-form">
-
-        {/* Feedback */}
-        {feedback && (
-          <div className={`bq-toast bq-toast-${feedback.tipo}`}>
-            <span>{feedback.tipo === 'success' ? '✅' : '⚠️'}</span>
-            <span>{feedback.msg}</span>
-            <button
-              onClick={() => setFeedback(null)}
-              style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: 'inherit', fontWeight: 700 }}
-            >×</button>
-          </div>
-        )}
 
         {/* Título da ação */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
@@ -660,6 +666,18 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
         <ImagemParaQuestaoModal
           onClose={() => setShowImagemModal(false)}
           onUsar={handleUsarExtracao}
+        />
+      )}
+
+      {/* ── Modal de Resultado Premium ── */}
+      {modalResultado && (
+        <PublicarResultadoModal
+          tipo={modalResultado.tipo}
+          titulo={modalResultado.titulo}
+          mensagem={modalResultado.mensagem}
+          codigo={modalResultado.codigo}
+          acoes={modalResultado.acoes}
+          onClose={() => setModalResultado(null)}
         />
       )}
     </div>

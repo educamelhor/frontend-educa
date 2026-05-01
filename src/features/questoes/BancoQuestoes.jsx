@@ -74,8 +74,11 @@ export default function BancoQuestoes() {
     setActiveTab('criar');
   };
 
-  // Rótulo da escola para nomenclatura
-  const escolaLabel = escola.apelido || escola.sigla || escola.nome || 'da Escola';
+  // Rótulo da escola: prioriza apelido > nome cadastrado. Evita sigla 'EP' (placeholder do sistema).
+  const escolaLabel = localStorage.getItem('escola_apelido')
+    || escola.apelido
+    || escola.nome
+    || 'da Escola';
 
   const tabs = [
     {

@@ -2,6 +2,7 @@
 // Sprint 2 — Banco de Questões com paginação server-side, filtros completos e modal de detalhes
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import apiService from '../../services/api';
 import QuestaoDetalhes from './components/QuestaoDetalhes';
 import BulkImportModal from './BulkImportModal';
 
@@ -158,7 +159,6 @@ export default function QuestoesBanco({ onEdit, refreshKey }) {
   const carregar = useCallback(async (currentPage = 1) => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
       const params = new URLSearchParams({ page: currentPage, limit: LIMIT });
       if (busca)        params.set('busca', busca);
       if (filtDisc)     params.set('disciplina', filtDisc);
@@ -168,17 +168,12 @@ export default function QuestoesBanco({ onEdit, refreshKey }) {
       if (filtBimestre) params.set('bimestre', filtBimestre);
       if (filtStatus)   params.set('status', filtStatus);
 
-      const res = await fetch(`/api/questoes?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error();
-      const data = await res.json();
+      const { data } = await apiService.get(`/api/questoes?${params}`);
 
       // Suporte ao retorno antigo (array) e novo (objeto com pagination)
       if (Array.isArray(data)) {
         setQuestoes(data);
         setPagination({ total: data.length, page: 1, pages: 1 });
-        // Extrai disciplinas únicas
         const discs = [...new Set(data.map(q => q.disciplina).filter(Boolean))].sort();
         setDisciplinas(discs);
       } else {
@@ -197,9 +192,8 @@ export default function QuestoesBanco({ onEdit, refreshKey }) {
   /* Fetch stats */
   const carregarStats = useCallback(async () => {
     try {
-      const token = localStorage.getItem('token');
-      const res = await fetch('/api/questoes/stats', { headers: { Authorization: `Bearer ${token}` } });
-      if (res.ok) setStats(await res.json());
+      const { data } = await apiService.get('/api/questoes/stats');
+      setStats(data);
     } catch {}
   }, []);
 
@@ -216,25 +210,20 @@ export default function QuestoesBanco({ onEdit, refreshKey }) {
 
   /* Duplicar — usa endpoint Sprint 5 */
   const duplicar = async (questao) => {
-    const token = localStorage.getItem('token');
     try {
-      const r = await fetch(`/api/questoes/${questao.id}/duplicar`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (r.ok) { carregar(page); carregarStats(); }
+      await apiService.post(`/api/questoes/${questao.id}/duplicar`);
+      carregar(page);
+      carregarStats();
     } catch {}
   };
 
   /* Arquivar (soft delete) */
   const arquivar = async (id) => {
-    const token = localStorage.getItem('token');
-    await fetch(`/api/questoes/${id}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    setQuestoes(p => p.filter(q => q.id !== id));
-    carregarStats();
+    try {
+      await apiService.delete(`/api/questoes/${id}`);
+      setQuestoes(p => p.filter(q => q.id !== id));
+      carregarStats();
+    } catch {}
   };
 
   const limparFiltros = () => {

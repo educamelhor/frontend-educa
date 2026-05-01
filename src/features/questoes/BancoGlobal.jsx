@@ -14,6 +14,58 @@ function parseTags(raw) {
   try { const p = JSON.parse(raw); return Array.isArray(p) ? p : []; } catch { return String(raw).split(',').map(s => s.trim()).filter(Boolean); }
 }
 
+function decodificarToken() {
+  try {
+    const t = localStorage.getItem('token') || '';
+    const payload = t.split('.')[1];
+    if (!payload) return {};
+    return JSON.parse(atob(payload.replace(/-/g,'+').replace(/_/g,'/')));
+  } catch { return {}; }
+}
+
+/* ── Modal confirmação exclusão global ── */
+function ExcluirGlobalModal({ q, onConfirm, onCancel }) {
+  const [passo, setPasso] = useState(null);
+  if (!q) return null;
+  const preview = (q.conteudo_bruto || '').slice(0, 80);
+  const overlay = { position:'fixed',inset:0,zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(15,23,42,0.72)',backdropFilter:'blur(6px)' };
+  const box     = { background:'#fff',borderRadius:20,padding:'26px 26px 22px',width:420,maxWidth:'92vw',boxShadow:'0 24px 80px rgba(0,0,0,0.28)',fontFamily:'inherit' };
+
+  if (passo === 'confirmar') return (
+    <div style={overlay}><div style={box}>
+      <div style={{ textAlign:'center',marginBottom:16 }}>
+        <div style={{ width:56,height:56,borderRadius:14,margin:'0 auto 10px',background:'linear-gradient(135deg,#fee2e2,#fecaca)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'2rem' }}>🌐🗑️</div>
+        <div style={{ fontWeight:800,fontSize:'1rem',color:'#0f172a' }}>Remover do Banco Global?</div>
+        <div style={{ fontSize:'0.78rem',color:'#64748b',marginTop:6,lineHeight:1.5 }}>A questão será removida do banco global. Cópias nas escolas <strong>não</strong> serão afetadas.</div>
+      </div>
+      <div style={{ background:'#fef2f2',borderRadius:10,padding:'9px 13px',fontSize:'0.78rem',color:'#7f1d1d',border:'1px solid #fecaca',marginBottom:18 }}>{preview}{q.conteudo_bruto?.length>80?'...':''}</div>
+      <div style={{ display:'flex',flexDirection:'column',gap:8 }}>
+        <button onClick={onConfirm} style={{ padding:'12px',borderRadius:10,border:'none',cursor:'pointer',background:'linear-gradient(135deg,#dc2626,#b91c1c)',color:'#fff',fontWeight:800,fontSize:'0.9rem',fontFamily:'inherit' }}>✅ Entendi — Remover do Banco Global</button>
+        <button onClick={()=>setPasso(null)} style={{ padding:'11px',borderRadius:10,border:'1.5px solid #e2e8f0',cursor:'pointer',background:'#f8fafc',color:'#64748b',fontWeight:600,fontSize:'0.875rem',fontFamily:'inherit' }}>← Cancelar — voltar</button>
+      </div>
+    </div></div>
+  );
+
+  return (
+    <div style={overlay}><div style={box}>
+      <div style={{ display:'flex',alignItems:'center',gap:12,marginBottom:14 }}>
+        <div style={{ width:44,height:44,borderRadius:12,background:'linear-gradient(135deg,#ede9fe,#fee2e2)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'1.4rem',flexShrink:0 }}>⚠️</div>
+        <div>
+          <div style={{ fontWeight:800,fontSize:'0.95rem',color:'#0f172a' }}>Gerenciar Questão Global</div>
+          <div style={{ fontSize:'0.72rem',color:'#64748b',marginTop:2 }}>Esta ação afeta o Banco Global EDUCA.MELHOR</div>
+        </div>
+      </div>
+      <div style={{ background:'#f8fafc',borderRadius:10,padding:'9px 13px',fontSize:'0.78rem',color:'#475569',border:'1px solid #e0e7ff',marginBottom:18 }}>{preview}{q.conteudo_bruto?.length>80?'...':''}</div>
+      <div style={{ display:'flex',flexDirection:'column',gap:8 }}>
+        <button onClick={()=>setPasso('confirmar')} style={{ padding:'11px',borderRadius:10,border:'1.5px solid #fecaca',cursor:'pointer',background:'#fff',color:'#dc2626',fontWeight:700,fontSize:'0.875rem',display:'flex',alignItems:'center',gap:8,fontFamily:'inherit' }}>
+          <span>🌐🗑️</span> Remover do Banco Global — ação irreversível
+        </button>
+        <button onClick={onCancel} style={{ padding:'10px',borderRadius:10,border:'1.5px solid #e2e8f0',cursor:'pointer',background:'#f8fafc',color:'#64748b',fontWeight:600,fontSize:'0.875rem',fontFamily:'inherit' }}>Cancelar</button>
+      </div>
+    </div></div>
+  );
+}
+
 /* ── Toast interno ── */
 function Toast({ msg, tipo, onClose }) {
   useEffect(() => { const t = setTimeout(onClose, 3500); return () => clearTimeout(t); }, [onClose]);
@@ -84,7 +136,7 @@ function DetalhesModal({ q, onUsar, usando, onClose }) {
 }
 
 /* ── Card de questão global ── */
-function CardGlobal({ q, onVer, onUsar, usando }) {
+function CardGlobal({ q, onVer, onUsar, usando, isAutor, onExcluir }) {
   const tags = parseTags(q.tags);
   return (
     <div onClick={() => onVer(q)} style={{ background:'#fff',borderRadius:16,padding:'16px',cursor:'pointer',border:'1.5px solid #e0e7ff',boxShadow:'0 2px 8px rgba(79,70,229,0.06)',transition:'all .2s',position:'relative',overflow:'hidden' }}
@@ -92,8 +144,11 @@ function CardGlobal({ q, onVer, onUsar, usando }) {
       onMouseLeave={e=>{ e.currentTarget.style.borderColor='#e0e7ff'; e.currentTarget.style.boxShadow='0 2px 8px rgba(79,70,229,0.06)'; e.currentTarget.style.transform='none'; }}>
       {/* Faixa top */}
       <div style={{ position:'absolute',top:0,left:0,right:0,height:3,background:'linear-gradient(90deg,#4f46e5,#7c3aed)' }} />
-      {/* Código */}
-      <div style={{ fontSize:'0.65rem',fontWeight:800,color:'#818cf8',letterSpacing:'0.08em',marginBottom:6,marginTop:4 }}>{q.codigo}</div>
+      {/* Código + badge autoria */}
+      <div style={{ display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:6,marginTop:4 }}>
+        <div style={{ fontSize:'0.65rem',fontWeight:800,color:'#818cf8',letterSpacing:'0.08em' }}>{q.codigo}</div>
+        {isAutor && <span style={{ fontSize:'0.62rem',fontWeight:700,background:'#ede9fe',color:'#5b21b6',borderRadius:99,padding:'1px 7px' }}>✍️ Minha</span>}
+      </div>
       {/* Badges */}
       <div style={{ display:'flex',gap:5,flexWrap:'wrap',marginBottom:8 }}>
         {q.disciplina && <span style={{ fontSize:'0.68rem',fontWeight:700,background:'#ede9fe',color:'#5b21b6',borderRadius:99,padding:'1px 8px' }}>{q.disciplina}</span>}
@@ -103,14 +158,21 @@ function CardGlobal({ q, onVer, onUsar, usando }) {
       {/* Enunciado */}
       <p style={{ fontSize:'0.8rem',color:'#334155',lineHeight:1.55,margin:'0 0 10px',display:'-webkit-box',WebkitLineClamp:3,WebkitBoxOrient:'vertical',overflow:'hidden' }}>{q.conteudo_bruto||'(sem enunciado)'}</p>
       {/* Footer */}
-      <div style={{ display:'flex',justifyContent:'space-between',alignItems:'center' }}>
-        <div style={{ display:'flex',gap:5,flexWrap:'wrap' }}>
+      <div style={{ display:'flex',justifyContent:'space-between',alignItems:'center',gap:6 }}>
+        <div style={{ display:'flex',gap:5,flexWrap:'wrap',flex:1,minWidth:0 }}>
           {tags.slice(0,2).map(t=><span key={t} style={{ fontSize:'0.62rem',background:'#f8fafc',color:'#94a3b8',border:'1px solid #e2e8f0',borderRadius:99,padding:'1px 6px' }}>{t}</span>)}
           {q.uso_count > 0 && <span style={{ fontSize:'0.62rem',fontWeight:700,background:'#eff6ff',color:'#3b82f6',borderRadius:99,padding:'1px 7px',border:'1px solid #bfdbfe' }}>📊 {q.uso_count}×</span>}
         </div>
-        <button onClick={e=>{e.stopPropagation();onUsar(q);}} disabled={usando} style={{ fontSize:'0.7rem',fontWeight:700,background:usando?'#e2e8f0':'linear-gradient(135deg,#4f46e5,#7c3aed)',color:usando?'#94a3b8':'#fff',border:'none',borderRadius:8,padding:'5px 10px',cursor:usando?'not-allowed':'pointer',fontFamily:'inherit',whiteSpace:'nowrap' }}>
-          {usando ? '⏳' : '➕ Usar'}
-        </button>
+        <div style={{ display:'flex',gap:5,flexShrink:0 }}>
+          {isAutor && (
+            <button onClick={e=>{e.stopPropagation();onExcluir(q);}} title="Remover do Banco Global"
+              style={{ fontSize:'0.8rem',background:'#fff',color:'#dc2626',border:'1.5px solid #fecaca',borderRadius:8,padding:'4px 8px',cursor:'pointer',fontFamily:'inherit' }}>🗑️</button>
+          )}
+          <button onClick={e=>{e.stopPropagation();onUsar(q);}} disabled={usando}
+            style={{ fontSize:'0.7rem',fontWeight:700,background:usando?'#e2e8f0':'linear-gradient(135deg,#4f46e5,#7c3aed)',color:usando?'#94a3b8':'#fff',border:'none',borderRadius:8,padding:'5px 10px',cursor:usando?'not-allowed':'pointer',fontFamily:'inherit',whiteSpace:'nowrap' }}>
+            {usando ? '⏳' : '➕ Usar'}
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -118,14 +180,18 @@ function CardGlobal({ q, onVer, onUsar, usando }) {
 
 /* ── Componente principal ── */
 export default function BancoGlobal() {
-  const [questoes,   setQuestoes]   = useState([]);
-  const [stats,      setStats]      = useState(null);
-  const [loading,    setLoading]    = useState(true);
-  const [pagination, setPagination] = useState({ total:0, page:1, pages:1 });
-  const [detalhe,    setDetalhe]    = useState(null);
-  const [usando,     setUsando]     = useState(null); // id da questão sendo "usada"
-  const [toast,      setToast]      = useState(null); // { msg, tipo }
-  const [page,       setPage]       = useState(1);
+  const { professor_id: meuProfId, perfil: meuPerfil } = decodificarToken();
+  const isGestor = ['diretor','coordenador','admin','militar'].includes(meuPerfil);
+
+  const [questoes,          setQuestoes]          = useState([]);
+  const [stats,             setStats]             = useState(null);
+  const [loading,           setLoading]           = useState(true);
+  const [pagination,        setPagination]        = useState({ total:0, page:1, pages:1 });
+  const [detalhe,           setDetalhe]           = useState(null);
+  const [usando,            setUsando]            = useState(null);
+  const [toast,             setToast]             = useState(null);
+  const [page,              setPage]              = useState(1);
+  const [questaoParaExcluir,setQuestaoParaExcluir]= useState(null);
 
   // Filtros
   const [busca,    setBusca]    = useState('');
@@ -186,6 +252,21 @@ export default function BancoGlobal() {
     } finally { setUsando(null); }
   };
 
+  /* Excluir do banco global */
+  const excluirDoGlobal = async (q) => {
+    try {
+      await api.delete(`/api/questoes/global/${q.id}`);
+      setQuestoes(p => p.filter(x => x.id !== q.id));
+      setPagination(p => ({ ...p, total: Math.max(0, p.total - 1) }));
+      setQuestaoParaExcluir(null);
+      carregarStats();
+      setToast({ msg: `Questão ${q.codigo} removida do Banco Global.`, tipo: 'ok' });
+    } catch (err) {
+      setToast({ msg: err?.response?.data?.message || 'Erro ao remover questão.', tipo: 'erro' });
+      setQuestaoParaExcluir(null);
+    }
+  };
+
   /* Filtros ativos */
   const limpar = () => { setBusca(''); setFiltDisc(''); setFiltNivel(''); setFiltSerie(''); setOrdenar('mais_usadas'); setPage(1); };
   const temFiltro = busca || filtDisc || filtNivel || filtSerie;
@@ -206,6 +287,9 @@ export default function BancoGlobal() {
     <div style={{ fontFamily:'inherit', minHeight:500 }}>
       {/* Toast */}
       {toast && <Toast msg={toast.msg} tipo={toast.tipo} onClose={() => setToast(null)} />}
+
+      {/* Modal exclusão global */}
+      <ExcluirGlobalModal q={questaoParaExcluir} onConfirm={() => excluirDoGlobal(questaoParaExcluir)} onCancel={() => setQuestaoParaExcluir(null)} />
 
       {/* Modal detalhe */}
       <DetalhesModal q={detalhe} usando={usando===detalhe?.id} onUsar={() => usarQuestao(detalhe)} onClose={() => setDetalhe(null)} />
@@ -304,7 +388,14 @@ export default function BancoGlobal() {
       ) : (
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))', gap:16 }}>
           {questoes.map(q => (
-            <CardGlobal key={q.id} q={q} onVer={setDetalhe} onUsar={usarQuestao} usando={usando===q.id} />
+            <CardGlobal
+              key={q.id} q={q}
+              onVer={setDetalhe}
+              onUsar={usarQuestao}
+              usando={usando===q.id}
+              isAutor={isGestor || (meuProfId && Number(q.professor_id_origem) === Number(meuProfId))}
+              onExcluir={setQuestaoParaExcluir}
+            />
           ))}
         </div>
       )}

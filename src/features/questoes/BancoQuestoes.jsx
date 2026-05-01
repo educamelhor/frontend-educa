@@ -109,7 +109,6 @@ export default function BancoQuestoes() {
       key: 'global',
       label: 'Banco Global',
       icon: <IconGlobal />,
-      globalStyle: true, // flag visual
     },
     {
       key: 'criar',
@@ -187,12 +186,6 @@ export default function BancoQuestoes() {
                 if (tab.key !== 'criar') setEditingQuestao(null);
                 setActiveTab(tab.key);
               }}
-              style={tab.globalStyle ? {
-                background: activeTab === 'global' ? 'linear-gradient(135deg,#4f46e5,#7c3aed)' : 'rgba(79,70,229,0.08)',
-                color: activeTab === 'global' ? '#fff' : '#4f46e5',
-                border: '1.5px solid rgba(79,70,229,0.25)',
-                borderRadius: 10,
-              } : {}}
             >
               {tab.icon}
               {tab.label}
@@ -201,9 +194,6 @@ export default function BancoQuestoes() {
               )}
               {tab.badge && (
                 <span className="bq-tab-badge">{tab.badge}</span>
-              )}
-              {tab.globalStyle && (
-                <span style={{ fontSize:'0.6rem', fontWeight:800, background:'rgba(255,255,255,0.2)', borderRadius:99, padding:'1px 6px', marginLeft:2, color: activeTab==='global'?'#fff':'#4f46e5' }}>NOVO</span>
               )}
             </button>
           ))}

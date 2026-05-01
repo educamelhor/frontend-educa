@@ -3,6 +3,7 @@
 // Fluxo: upload → preview → extração → revisão → pré-preenchimento
 
 import React, { useState, useRef, useCallback } from 'react';
+import api from '../../../services/api';
 
 const CONFIANCA_COLOR = { alta: '#059669', media: '#d97706', baixa: '#dc2626' };
 const CONFIANCA_LABEL = { alta: '✅ Alta', media: '⚠️ Média', baixa: '❌ Baixa' };
@@ -51,25 +52,21 @@ export default function ImagemParaQuestaoModal({ onClose, onUsar }) {
     setErroMsg('');
 
     try {
-      const token = localStorage.getItem('token');
       const fd = new FormData();
       fd.append('imagem', arquivo);
 
-      const res = await fetch('/api/questoes/extrair-imagem', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: fd,
-      });
-      const data = await res.json();
+      // usa o api (axios) que já tem a URL do backend + token injetado
+      const { data } = await api.post('/api/questoes/extrair-imagem', fd);
 
-      if (!res.ok || !data.ok) {
+      if (!data.ok) {
         throw new Error(data.message || 'Falha ao processar a imagem.');
       }
 
       setResultado(data);
       setEtapa('revisao');
     } catch (err) {
-      setErroMsg(err.message || 'Erro inesperado.');
+      const msg = err.response?.data?.message || err.message || 'Erro inesperado.';
+      setErroMsg(msg);
       setEtapa('erro');
     }
   };

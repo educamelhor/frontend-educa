@@ -2,6 +2,7 @@
 // 🧩 Construtor de Questões — Puzzle Builder
 
 import React, { useState, useEffect } from 'react';
+import api from '../../services/api';
 import TagsInput from './components/TagsInput';
 import ImageUploader from './components/ImageUploader';
 import LatexPreview, { gerarLatex } from './components/LatexPreview';
@@ -56,6 +57,7 @@ const INITIAL_STATE = {
   habilidade_bncc: '',
   explicacao: '',
   tags: [],
+  temas: [],          // Temas/conteúdos para o banco global
   imagem: null,
   compartilhada: false,
 };
@@ -101,6 +103,13 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
         tagsArr = Array.isArray(raw) ? raw : (typeof raw === 'string' ? raw.split(',').map(t => t.trim()).filter(Boolean) : []);
       } catch {}
 
+      let temasArr = [];
+      try {
+        const rawT = editingQuestao.temas;
+        temasArr = Array.isArray(rawT) ? rawT
+          : (typeof rawT === 'string' ? JSON.parse(rawT) : []);
+      } catch {}
+
       setForm({
         disciplina:   editingQuestao.disciplina || '',
         tipo:         editingQuestao.tipo || 'objetiva',
@@ -114,6 +123,7 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
         habilidade_bncc: editingQuestao.habilidade_bncc || '',
         explicacao:   editingQuestao.explicacao || '',
         tags:         tagsArr,
+        temas:        temasArr,
         imagem:       editingQuestao.imagem_base64 || null,
         compartilhada: editingQuestao.compartilhada || false,
       });
@@ -200,6 +210,7 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
       correta:           correta?.letra || null,
       resposta_aberta:   form.resposta_aberta,
       tags:              form.tags.join(','),
+      temas:             form.temas.length > 0 ? JSON.stringify(form.temas) : null,
       imagem_base64:     form.imagem || null,
       explicacao:        form.explicacao,
       compartilhada:     form.compartilhada ? 1 : 0,
@@ -207,7 +218,7 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
     };
   };
 
-  /* Salvar */
+  /* Salvar (e opcionalmente publicar no banco global) */
   const handleSave = async (status = 'ativa') => {
     const erro = validar();
     if (erro) { setFeedback({ tipo: 'error', msg: erro }); return; }
@@ -216,28 +227,41 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
     setFeedback(null);
 
     try {
-      const token = localStorage.getItem('token');
-      const url = editingQuestao
-        ? `/api/questoes/${editingQuestao.id}`
-        : '/api/questoes';
-      const method = editingQuestao ? 'PUT' : 'POST';
+      let questaoId;
 
-      const res = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(buildPayload(status)),
-      });
+      if (editingQuestao) {
+        // Atualização
+        await api.put(`/api/questoes/${editingQuestao.id}`, buildPayload(status));
+        questaoId = editingQuestao.id;
+        setFeedback({ tipo: 'success', msg: 'Questão atualizada! ✅' });
+      } else {
+        // Criação
+        const { data } = await api.post('/api/questoes', buildPayload(status));
+        questaoId = data.id;
+      }
 
-      if (!res.ok) throw new Error('Falha ao salvar.');
+      // Se for PUBLICAR (não rascunho), envia ao Banco Global
+      if (status === 'ativa' && questaoId) {
+        try {
+          const { data: pub } = await api.post(`/api/questoes/${questaoId}/publicar`);
+          setFeedback({
+            tipo: 'success',
+            msg: `✅ Questão salva e publicada no Banco Global! Código: ${pub.codigo}`,
+          });
+        } catch (pubErr) {
+          // Falha na publicação não cancela o salvamento
+          const msg = pubErr.response?.data?.message || 'Questão salva, mas falha ao publicar no banco global.';
+          setFeedback({ tipo: 'success', msg: `✅ Questão salva. ⚠️ ${msg}` });
+        }
+      } else if (status === 'rascunho') {
+        setFeedback({ tipo: 'success', msg: '✅ Rascunho salvo. Não publicado no banco global.' });
+      }
 
-      setFeedback({ tipo: 'success', msg: editingQuestao ? 'Questão atualizada! ✅' : 'Questão salva com sucesso! ✅' });
       if (!editingQuestao) setForm(INITIAL_STATE);
       onSaved?.();
     } catch (err) {
-      setFeedback({ tipo: 'error', msg: err.message || 'Erro ao salvar questão.' });
+      const msg = err.response?.data?.message || err.message || 'Erro ao salvar questão.';
+      setFeedback({ tipo: 'error', msg });
     } finally {
       setSaving(false);
     }
@@ -522,6 +546,23 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
         >
           <div className="bq-field-row">
             <div className="bq-field" style={{ gridColumn: '1 / -1' }}>
+              <label className="bq-label">
+                Tema / Conteúdo
+                <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 400, marginLeft: 6 }}>
+                  (obrigatório para publicar no banco global)
+                </span>
+              </label>
+              <TagsInput
+                tags={form.temas}
+                onChange={(val) => set('temas', val)}
+                placeholder="Ex: Fotossíntese, Biologia Celular... (Enter para adicionar)"
+              />
+              <p className="bq-helper">Adicione os temas/conteúdos que essa questão aborda. Use Enter para confirmar cada tema.</p>
+            </div>
+          </div>
+
+          <div className="bq-field-row">
+            <div className="bq-field" style={{ gridColumn: '1 / -1' }}>
               <label className="bq-label">Tags</label>
               <TagsInput tags={form.tags} onChange={(val) => set('tags', val)} />
             </div>
@@ -597,13 +638,14 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
             className="bq-btn bq-btn-primary"
             onClick={() => handleSave('ativa')}
             disabled={saving}
+            title={isEditing ? 'Salvar alterações' : 'Salva a questão e publica no Banco Global EDUCA.MELHOR'}
           >
             {saving ? <span className="bq-spinner" /> : (
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
               </svg>
             )}
-            {isEditing ? 'Salvar Alterações' : 'Publicar Questão'}
+            {isEditing ? 'Salvar Alterações' : '🌐 Publicar no Banco Global'}
           </button>
         </div>
       </div>

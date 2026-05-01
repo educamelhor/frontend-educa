@@ -283,12 +283,17 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
         acoes: [
           {
             label: '➕ Nova Questão', primary: true,
-            onClick: () => { setModalResultado(null); setForm(INITIAL_STATE); setSavedDraftId(null); },
+            onClick: () => {
+              setModalResultado(null);
+              setForm(INITIAL_STATE);
+              setSavedDraftId(null);
+              onSaved?.(); // Chama aqui: após o usuário confirmar, não antes do modal aparecer
+            },
           },
           { label: 'Fechar', onClick: () => setModalResultado(null) },
         ],
       });
-      onSaved?.(); // Atualiza contagem no banco da escola
+      // ⚠️ NÃO chamar onSaved() aqui — desmontaria o componente antes do modal renderizar
     } catch (err) {
       const msg = err.response?.data?.message || err.message || 'Erro ao publicar.';
       setModalResultado({ tipo: 'error', titulo: 'Erro ao Publicar', mensagem: msg });

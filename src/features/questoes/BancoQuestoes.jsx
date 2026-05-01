@@ -6,12 +6,19 @@ import api from '../../services/api';
 import './questoes.css';
 import BancoDashboard    from './BancoDashboard';
 import QuestoesBanco     from './QuestoesBanco';
+import BancoGlobal       from './BancoGlobal';
 import QuestoesBuilder   from './QuestoesBuilder';
 import ProvaBuilder      from './ProvaBuilder';
 import ProvasHistorico   from './ProvasHistorico';
 
 
 /* ── Ícones SVG inline ───────────────────────────────────── */
+const IconGlobal = () => (
+  <svg className="bq-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/>
+  </svg>
+);
 const IconBanco = () => (
   <svg className="bq-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
@@ -94,9 +101,15 @@ export default function BancoQuestoes() {
     },
     {
       key: 'banco',
-      label: `Banco ${escolaLabel}`,   // "Banco CEF04-CCMDF"
+      label: `Banco ${escolaLabel}`,
       icon: <IconBanco />,
       count: totalQuestoes !== null ? totalQuestoes : null,
+    },
+    {
+      key: 'global',
+      label: 'Banco Global',
+      icon: <IconGlobal />,
+      globalStyle: true, // flag visual
     },
     {
       key: 'criar',
@@ -174,6 +187,12 @@ export default function BancoQuestoes() {
                 if (tab.key !== 'criar') setEditingQuestao(null);
                 setActiveTab(tab.key);
               }}
+              style={tab.globalStyle ? {
+                background: activeTab === 'global' ? 'linear-gradient(135deg,#4f46e5,#7c3aed)' : 'rgba(79,70,229,0.08)',
+                color: activeTab === 'global' ? '#fff' : '#4f46e5',
+                border: '1.5px solid rgba(79,70,229,0.25)',
+                borderRadius: 10,
+              } : {}}
             >
               {tab.icon}
               {tab.label}
@@ -182,6 +201,9 @@ export default function BancoQuestoes() {
               )}
               {tab.badge && (
                 <span className="bq-tab-badge">{tab.badge}</span>
+              )}
+              {tab.globalStyle && (
+                <span style={{ fontSize:'0.6rem', fontWeight:800, background:'rgba(255,255,255,0.2)', borderRadius:99, padding:'1px 6px', marginLeft:2, color: activeTab==='global'?'#fff':'#4f46e5' }}>NOVO</span>
               )}
             </button>
           ))}
@@ -202,7 +224,7 @@ export default function BancoQuestoes() {
           />
         )}
 
-        {/* Tab: Banco */}
+        {/* Tab: Banco da Escola */}
         {activeTab === 'banco' && (
           <>
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 20 }}>
@@ -215,6 +237,11 @@ export default function BancoQuestoes() {
             </div>
             <QuestoesBanco onEdit={handleEdit} refreshKey={refreshKey} onRemovida={handleRemovida} />
           </>
+        )}
+
+        {/* Tab: Banco Global EDUCA.MELHOR */}
+        {activeTab === 'global' && (
+          <BancoGlobal />
         )}
 
         {/* Tab: Criar / Editar */}

@@ -319,11 +319,11 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
         <Block
           num="①"
           title="Classificação"
-          subtitle="Disciplina, tipo, nível e série"
+          subtitle="Disciplina, tema, tipo, nível e série"
           open={openBlocks[1]}
           onToggle={() => toggle(1)}
         >
-          {/* Disciplina + Série — sem Bimestre (bimestre pertence à prova, não à questão) */}
+          {/* Disciplina + Série */}
           <div className="bq-field-row">
             <div className="bq-field">
               <label className="bq-label">Disciplina <span className="required">*</span></label>
@@ -339,6 +339,24 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
                 {SERIES.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
             </div>
+          </div>
+
+          {/* Tema / Conteúdo — obrigatório para publicar no banco global */}
+          <div className="bq-field" style={{ marginBottom: 12 }}>
+            <label className="bq-label">
+              Tema / Conteúdo
+              <span style={{
+                fontSize: '0.7rem', color: '#0369a1', fontWeight: 600,
+                marginLeft: 8, background: '#e0f2fe', padding: '1px 7px',
+                borderRadius: 99, letterSpacing: '0.01em',
+              }}>obrigatório para o banco global</span>
+            </label>
+            <TagsInput
+              tags={form.temas}
+              onChange={(val) => set('temas', val)}
+              placeholder="Ex: Fotossíntese, Célula... pressione Enter para adicionar"
+            />
+            <p className="bq-helper">Adicione os temas/conteúdos desta questão. Pressione Enter para confirmar cada tema.</p>
           </div>
 
           {/* Tipo */}
@@ -544,22 +562,6 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
           open={openBlocks[4]}
           onToggle={() => toggle(4)}
         >
-          <div className="bq-field-row">
-            <div className="bq-field" style={{ gridColumn: '1 / -1' }}>
-              <label className="bq-label">
-                Tema / Conteúdo
-                <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 400, marginLeft: 6 }}>
-                  (obrigatório para publicar no banco global)
-                </span>
-              </label>
-              <TagsInput
-                tags={form.temas}
-                onChange={(val) => set('temas', val)}
-                placeholder="Ex: Fotossíntese, Biologia Celular... (Enter para adicionar)"
-              />
-              <p className="bq-helper">Adicione os temas/conteúdos que essa questão aborda. Use Enter para confirmar cada tema.</p>
-            </div>
-          </div>
 
           <div className="bq-field-row">
             <div className="bq-field" style={{ gridColumn: '1 / -1' }}>

@@ -74,10 +74,11 @@ export default function BancoQuestoes() {
     setActiveTab('criar');
   };
 
-  // Rótulo da escola: prioriza apelido > nome cadastrado. Evita sigla 'EP' (placeholder do sistema).
-  const escolaLabel = localStorage.getItem('escola_apelido')
+  // Rótulo da escola: mesma fonte que o HeaderGlobal usa ("nome_escola")
+  const escolaLabel = localStorage.getItem('nome_escola')
+    || localStorage.getItem('escola_apelido')
     || escola.apelido
-    || escola.nome
+    || (escola.nome !== 'EDUCA.PROVA' ? escola.nome : null)
     || 'da Escola';
 
   const tabs = [

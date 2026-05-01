@@ -87,8 +87,10 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
   const [form, setForm] = useState(INITIAL_STATE);
   const [openBlocks, setOpenBlocks] = useState({ 1: true, 2: true, 3: true, 4: false });
   const [saving, setSaving] = useState(false);
-  const [modalResultado, setModalResultado] = useState(null); // { tipo, titulo, mensagem, codigo, acoes }
+  const [modalResultado, setModalResultado] = useState(null);
   const [showImagemModal, setShowImagemModal] = useState(false);
+  // Rastreia ID de rascunho salvo mas ainda não publicado no banco global
+  const [savedDraftId, setSavedDraftId] = useState(null);
 
   /* Popula formulário no modo edição */
   useEffect(() => {
@@ -133,6 +135,17 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
       setForm(INITIAL_STATE);
     }
   }, [editingQuestao]);
+
+  // Guarda de navegação: avisa ao fechar o browser com rascunho pendente
+  useEffect(() => {
+    if (!savedDraftId) return;
+    const handler = (e) => {
+      e.preventDefault();
+      e.returnValue = 'Você tem uma questão salva como rascunho que ainda não foi publicada.';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [savedDraftId]);
 
   const toggle = (n) => setOpenBlocks(p => ({ ...p, [n]: !p[n] }));
   const set    = (field, val) => setForm(p => ({ ...p, [field]: val }));
@@ -222,68 +235,106 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
     };
   };
 
-  /* Salvar (e opcionalmente publicar no banco global) */
-  const handleSave = async (status = 'ativa') => {
-    const erro = validar();
-    if (erro) {
-      setModalResultado({ tipo: 'error', titulo: 'Atenção', mensagem: erro });
-      return;
+  /* Limpar tela com confirmação se há rascunho pendente */
+  const handleLimpar = () => {
+    if (savedDraftId) {
+      setModalResultado({
+        tipo: 'warning',
+        titulo: 'Rascunho não publicado',
+        mensagem: 'Você tem uma questão salva como rascunho que ainda não foi publicada no Banco Global. Deseja publicar antes de limpar?',
+        acoes: [
+          { label: '🌐 Publicar Agora', primary: true, onClick: () => { setModalResultado(null); handlePublicar(); } },
+          { label: 'Descartar Rascunho', onClick: () => { setModalResultado(null); setSavedDraftId(null); setForm(INITIAL_STATE); } },
+          { label: 'Cancelar', onClick: () => setModalResultado(null) },
+        ],
+      });
+    } else {
+      setForm(INITIAL_STATE);
+      setSavedDraftId(null);
     }
+  };
 
+  /* Publicar no banco global (rascunho existente ou novo) */
+  const handlePublicar = async () => {
+    const erro = validar();
+    if (erro) { setModalResultado({ tipo: 'error', titulo: 'Atenção', mensagem: erro }); return; }
     setSaving(true);
-
     try {
       let questaoId;
-
-      if (editingQuestao) {
-        await api.put(`/api/questoes/${editingQuestao.id}`, buildPayload(status));
-        questaoId = editingQuestao.id;
+      // Se já existe um rascunho salvo, atualiza-o; senao cria novo
+      const draftId = savedDraftId || (editingQuestao?.id);
+      if (draftId) {
+        await api.put(`/api/questoes/${draftId}`, buildPayload('ativa'));
+        questaoId = draftId;
       } else {
-        const { data } = await api.post('/api/questoes', buildPayload(status));
+        const { data } = await api.post('/api/questoes', buildPayload('ativa'));
         questaoId = data.id;
       }
-
-      // Se for PUBLICAR (não rascunho), envia ao Banco Global
-      if (status === 'ativa' && questaoId) {
-        try {
-          const { data: pub } = await api.post(`/api/questoes/${questaoId}/publicar`);
-          setModalResultado({
-            tipo: 'success',
-            titulo: editingQuestao ? 'Questão Atualizada!' : 'Questão Publicada!',
-            mensagem: editingQuestao
-              ? 'As alterações foram salvas e o banco global foi atualizado.'
-              : 'Sua questão foi salva e publicada no Banco Global EDUCA.MELHOR. Agora qualquer escola pode utilizá-la.',
-            codigo: pub.codigo,
-            acoes: [
-              { label: 'Nova Questão', primary: true, onClick: () => { setModalResultado(null); setForm(INITIAL_STATE); } },
-              { label: 'Fechar', onClick: () => setModalResultado(null) },
-            ],
-          });
-        } catch (pubErr) {
-          const msg = pubErr.response?.data?.message || 'Questão salva, mas não publicada no banco global.';
-          setModalResultado({
-            tipo: 'warning',
-            titulo: 'Questão Salva',
-            mensagem: `Questão salva com sucesso! Porém, não foi possível publicar no banco global: ${msg}`,
-          });
-        }
-      } else if (status === 'rascunho') {
-        setModalResultado({
-          tipo: 'success',
-          titulo: 'Rascunho Salvo!',
-          mensagem: 'Questão salva como rascunho. Ela não será publicada no banco global até você clicar em Publicar.',
-        });
-      }
-
-      if (!editingQuestao) setForm(INITIAL_STATE);
-      onSaved?.();
+      // Publica no banco global
+      const { data: pub } = await api.post(`/api/questoes/${questaoId}/publicar`);
+      setSavedDraftId(null);
+      setModalResultado({
+        tipo: 'success',
+        titulo: editingQuestao ? 'Questão Atualizada!' : 'Questão Publicada!',
+        mensagem: editingQuestao
+          ? 'As alterações foram salvas e o banco global foi sincronizado.'
+          : 'Sua questão foi publicada no Banco Global EDUCA.MELHOR. Qualquer escola pode utilizá-la agora!',
+        codigo: pub.codigo,
+        acoes: [
+          {
+            label: '➕ Nova Questão', primary: true,
+            onClick: () => { setModalResultado(null); setForm(INITIAL_STATE); setSavedDraftId(null); },
+          },
+          { label: 'Fechar', onClick: () => setModalResultado(null) },
+        ],
+      });
+      onSaved?.(); // Atualiza contagem no banco da escola
     } catch (err) {
-      const msg = err.response?.data?.message || err.message || 'Erro ao salvar questão.';
+      const msg = err.response?.data?.message || err.message || 'Erro ao publicar.';
+      setModalResultado({ tipo: 'error', titulo: 'Erro ao Publicar', mensagem: msg });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /* Salvar como Rascunho — mantém formulário preenchido */
+  const handleSaveRascunho = async () => {
+    if (!form.enunciado.trim()) {
+      setModalResultado({ tipo: 'error', titulo: 'Atenção', mensagem: 'Preencha ao menos o enunciado antes de salvar.' });
+      return;
+    }
+    setSaving(true);
+    try {
+      let questaoId;
+      const draftId = savedDraftId || (editingQuestao?.id);
+      if (draftId) {
+        await api.put(`/api/questoes/${draftId}`, buildPayload('rascunho'));
+        questaoId = draftId;
+      } else {
+        const { data } = await api.post('/api/questoes', buildPayload('rascunho'));
+        questaoId = data.id;
+        setSavedDraftId(questaoId); // marca como rascunho pendente
+      }
+      setModalResultado({
+        tipo: 'success',
+        titulo: 'Rascunho Salvo!',
+        mensagem: 'Questão salva como rascunho. Continue editando e publique no banco global quando estiver pronta.',
+        acoes: [
+          { label: '🌐 Publicar Agora', primary: true, onClick: () => { setModalResultado(null); handlePublicar(); } },
+          { label: 'Continuar Editando', onClick: () => setModalResultado(null) },
+        ],
+      });
+      // Não reseta form, não chama onSaved
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message || 'Erro ao salvar rascunho.';
       setModalResultado({ tipo: 'error', titulo: 'Erro ao Salvar', mensagem: msg });
     } finally {
       setSaving(false);
     }
   };
+
+  // Compat: mantém handleSave para uso legado interno
+  const handleSave = (status) => status === 'rascunho' ? handleSaveRascunho() : handlePublicar();
 
   const isEditing = !!editingQuestao;
 
@@ -292,6 +343,33 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
       {/* ── Coluna esquerda: formulário ── */}
       <div className="bq-builder-form">
 
+        {/* Banner de rascunho pendente */}
+        {savedDraftId && !isEditing && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10,
+            background: 'linear-gradient(90deg, #78350f, #92400e)',
+            color: '#fff', borderRadius: 10, padding: '10px 14px',
+            marginBottom: 12, fontSize: '0.85rem', fontWeight: 600,
+            boxShadow: '0 2px 8px rgba(120,53,15,0.35)',
+          }}>
+            <span style={{ fontSize: '1.1rem' }}>⚠️</span>
+            <span style={{ flex: 1 }}>
+              Rascunho salvo (ID #{savedDraftId}) — questão ainda não publicada no Banco Global.
+            </span>
+            <button
+              onClick={() => handlePublicar()}
+              disabled={saving}
+              style={{
+                background: '#f59e0b', color: '#1c1917', border: 'none',
+                borderRadius: 8, padding: '5px 14px', fontWeight: 700,
+                fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'inherit',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {saving ? 'Publicando...' : '🌐 Publicar Agora'}
+            </button>
+          </div>
+        )}
         {/* Título da ação */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
           <h2 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
@@ -619,7 +697,7 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
           <button
             type="button"
             className="bq-btn bq-btn-outline"
-            onClick={() => { setForm(INITIAL_STATE); setFeedback(null); onCancel?.(); }}
+            onClick={handleLimpar}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />

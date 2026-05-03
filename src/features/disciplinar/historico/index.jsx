@@ -131,132 +131,184 @@ export default function HistoricoDisciplinar() {
 
   // ── KPI Cards ─────────────────────────────────────────────────────────
   const kpiCards = [
-    { label: "Total Registros", value: kpis.total || 0, color: "#6366f1", bg: "rgba(99,102,241,0.12)", icon: "📊" },
-    { label: "Registradas", value: kpis.registradas || 0, color: "#f59e0b", bg: "rgba(245,158,11,0.12)", icon: "📝" },
-    { label: "Finalizadas", value: kpis.finalizadas || 0, color: "#10b981", bg: "rgba(16,185,129,0.12)", icon: "✅" },
-    { label: "Aguardando Responsável", value: kpis.aguardando_responsavel || 0, color: "#ef4444", bg: "rgba(239,68,68,0.12)", icon: "⏳" },
+    { label: "Total Registros",       value: kpis.total || 0,                    gradient: "linear-gradient(135deg,#6366f1,#818cf8)", icon: "📊", shadow: "rgba(99,102,241,0.30)" },
+    { label: "Registradas",            value: kpis.registradas || 0,              gradient: "linear-gradient(135deg,#f59e0b,#fbbf24)", icon: "📝", shadow: "rgba(245,158,11,0.30)" },
+    { label: "Finalizadas",            value: kpis.finalizadas || 0,              gradient: "linear-gradient(135deg,#10b981,#34d399)", icon: "✅", shadow: "rgba(16,185,129,0.30)" },
+    { label: "Aguardando Responsável", value: kpis.aguardando_responsavel || 0,   gradient: "linear-gradient(135deg,#ef4444,#f87171)", icon: "⏳", shadow: "rgba(239,68,68,0.30)" },
   ];
 
   return (
     <>
       <style>{`
-        .disc-hist { font-family: 'Inter', 'Segoe UI', sans-serif; color: #e2e8f0; min-height: 100vh; padding: 24px; background: transparent; }
-        .disc-hist-header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+        /* ── Base ─────────────────────────────────────────────────────── */
+        .disc-hist {
+          font-family: 'Inter', 'Segoe UI', sans-serif;
+          min-height: 100vh; padding: 24px; background: transparent;
+        }
+
+        /* ── Header ───────────────────────────────────────────────────── */
+        .disc-hist-header {
+          display: flex; align-items: center; gap: 16px; margin-bottom: 28px; flex-wrap: wrap;
+          background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+          border-radius: 18px; padding: 22px 28px;
+          box-shadow: 0 4px 24px rgba(30,41,59,0.18);
+        }
         .disc-hist-header-icon {
-          width: 52px; height: 52px; border-radius: 14px; display: flex; align-items: center; justify-content: center;
-          background: linear-gradient(135deg, #f59e0b, #ea580c); font-size: 1.5rem; flex-shrink: 0;
-          box-shadow: 0 4px 20px rgba(245,158,11,0.25);
+          width: 56px; height: 56px; border-radius: 16px;
+          display: flex; align-items: center; justify-content: center;
+          background: linear-gradient(135deg, #f59e0b, #ea580c);
+          font-size: 1.6rem; flex-shrink: 0;
+          box-shadow: 0 6px 20px rgba(245,158,11,0.40);
         }
-        .disc-hist-header h2 { font-size: 1.5rem; font-weight: 800; color: #f1f5f9; margin: 0; letter-spacing: -0.5px; }
-        .disc-hist-header p { font-size: 0.82rem; color: #94a3b8; margin: 2px 0 0; }
+        .disc-hist-header h2 {
+          font-size: 1.5rem; font-weight: 800; color: #f8fafc;
+          margin: 0; letter-spacing: -0.5px;
+        }
+        .disc-hist-header p { font-size: 0.83rem; color: #94a3b8; margin: 3px 0 0; }
 
-        .disc-kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 24px; }
+        /* ── KPI Cards ─────────────────────────────────────────────────── */
+        .disc-kpi-grid {
+          display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+          gap: 16px; margin-bottom: 28px;
+        }
         .disc-kpi-card {
-          background: rgba(15,23,42,0.6); border: 1px solid rgba(255,255,255,0.06);
-          border-radius: 14px; padding: 16px 18px; display: flex; align-items: center; gap: 14px;
-          transition: transform 0.2s, box-shadow 0.2s; cursor: pointer; backdrop-filter: blur(12px);
+          border-radius: 16px; padding: 20px 22px;
+          display: flex; align-items: center; gap: 16px;
+          transition: transform 0.25s, box-shadow 0.25s; cursor: pointer;
+          position: relative; overflow: hidden; color: #fff;
         }
-        .disc-kpi-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
-        .disc-kpi-card.active { border-color: var(--kpi-color); box-shadow: 0 0 16px rgba(var(--kpi-r), var(--kpi-g), var(--kpi-b), 0.25); }
-        .disc-kpi-icon { width: 38px; height: 38px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex-shrink: 0; }
-        .disc-kpi-value { font-size: 1.6rem; font-weight: 800; line-height: 1; }
-        .disc-kpi-label { font-size: 0.72rem; color: #94a3b8; margin-top: 2px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.3px; }
+        .disc-kpi-card::after {
+          content: ''; position: absolute; right: -18px; top: -18px;
+          width: 80px; height: 80px; border-radius: 50%;
+          background: rgba(255,255,255,0.10);
+        }
+        .disc-kpi-card:hover { transform: translateY(-3px); }
+        .disc-kpi-card.active { outline: 3px solid rgba(255,255,255,0.5); }
+        .disc-kpi-icon {
+          width: 44px; height: 44px; border-radius: 12px;
+          display: flex; align-items: center; justify-content: center;
+          font-size: 1.4rem; flex-shrink: 0;
+          background: rgba(255,255,255,0.18);
+        }
+        .disc-kpi-value { font-size: 1.9rem; font-weight: 900; line-height: 1; color: #fff; }
+        .disc-kpi-label {
+          font-size: 0.70rem; color: rgba(255,255,255,0.85); margin-top: 3px;
+          font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px;
+        }
 
+        /* ── Filter Bar ────────────────────────────────────────────────── */
         .disc-filter-bar {
-          background: rgba(15,23,42,0.5); border: 1px solid rgba(255,255,255,0.06);
-          border-radius: 14px; padding: 16px 20px; margin-bottom: 20px; backdrop-filter: blur(12px);
+          background: #fff; border: 1.5px solid #e2e8f0;
+          border-radius: 16px; padding: 18px 22px; margin-bottom: 22px;
+          box-shadow: 0 2px 12px rgba(0,0,0,0.05);
         }
         .disc-filter-toggle { display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
-        .disc-filter-toggle h3 { font-size: 0.88rem; font-weight: 700; color: #e2e8f0; margin: 0; display: flex; align-items: center; gap: 8px; }
+        .disc-filter-toggle h3 {
+          font-size: 0.90rem; font-weight: 700; color: #1e293b;
+          margin: 0; display: flex; align-items: center; gap: 8px;
+        }
         .disc-filter-grid {
           display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px;
-          margin-top: 16px; animation: fadeIn 0.3s ease;
+          margin-top: 18px; animation: fadeIn 0.3s ease;
         }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
-        .disc-filter-group label { font-size: 0.7rem; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 4px; display: block; }
-        .disc-filter-group select, .disc-filter-group input {
-          width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);
-          background: rgba(15,23,42,0.8); color: #e2e8f0; font-size: 0.82rem; outline: none;
-          transition: border-color 0.2s;
+        .disc-filter-group label {
+          font-size: 0.70rem; font-weight: 700; color: #64748b;
+          text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; display: block;
         }
-        .disc-filter-group select:focus, .disc-filter-group input:focus { border-color: #f59e0b; }
+        .disc-filter-group select, .disc-filter-group input {
+          width: 100%; padding: 9px 12px; border-radius: 9px;
+          border: 1.5px solid #e2e8f0; background: #f8fafc;
+          color: #1e293b; font-size: 0.83rem; outline: none; transition: border-color 0.2s;
+        }
+        .disc-filter-group select:focus, .disc-filter-group input:focus { border-color: #f59e0b; background: #fff; }
         .disc-filter-actions { display: flex; gap: 10px; margin-top: 14px; align-items: center; }
         .disc-btn-clear {
-          padding: 7px 16px; border-radius: 8px; border: 1px solid rgba(239,68,68,0.3);
-          background: rgba(239,68,68,0.1); color: #f87171; font-size: 0.78rem; font-weight: 600; cursor: pointer;
-          transition: all 0.2s;
+          padding: 7px 18px; border-radius: 9px;
+          border: 1.5px solid #fca5a5; background: #fff1f1; color: #dc2626;
+          font-size: 0.78rem; font-weight: 700; cursor: pointer; transition: all 0.2s;
         }
-        .disc-btn-clear:hover { background: rgba(239,68,68,0.2); }
+        .disc-btn-clear:hover { background: #fee2e2; }
         .disc-active-count {
-          font-size: 0.72rem; padding: 3px 10px; border-radius: 20px;
-          background: rgba(245,158,11,0.15); color: #f59e0b; font-weight: 700;
+          font-size: 0.72rem; padding: 3px 11px; border-radius: 20px;
+          background: #fef3c7; color: #d97706; font-weight: 700; border: 1px solid #fde68a;
         }
 
-        .disc-list { display: flex; flex-direction: column; gap: 10px; }
+        /* ── Student Cards ─────────────────────────────────────────────── */
+        .disc-list { display: flex; flex-direction: column; gap: 12px; }
         .disc-card {
-          background: rgba(15,23,42,0.5); border: 1px solid rgba(255,255,255,0.06);
-          border-radius: 14px; padding: 16px 20px; display: flex; gap: 16px; align-items: flex-start;
-          transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s; cursor: pointer;
-          backdrop-filter: blur(12px); position: relative; overflow: hidden;
+          background: #fff; border: 1.5px solid #e2e8f0;
+          border-radius: 16px; padding: 18px 22px;
+          display: flex; gap: 16px; align-items: flex-start;
+          transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+          cursor: pointer; position: relative; overflow: hidden;
+          box-shadow: 0 1px 6px rgba(0,0,0,0.04);
         }
-        .disc-card::before {
-          content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
-          border-radius: 14px 0 0 14px;
+        .disc-card:hover {
+          border-color: #f59e0b; transform: translateY(-2px);
+          box-shadow: 0 8px 28px rgba(245,158,11,0.14);
         }
-        .disc-card:hover { border-color: rgba(245,158,11,0.3); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,0,0,0.2); }
         .disc-card-avatar {
-          width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
-          font-size: 0.78rem; font-weight: 800; flex-shrink: 0; color: #fff;
+          width: 46px; height: 46px; border-radius: 13px;
+          display: flex; align-items: center; justify-content: center;
+          font-size: 0.80rem; font-weight: 800; flex-shrink: 0; color: #fff;
+          letter-spacing: 0.5px;
         }
         .disc-card-body { flex: 1; min-width: 0; }
-        .disc-card-name { font-size: 0.92rem; font-weight: 700; color: #f1f5f9; margin-bottom: 2px; }
-        .disc-card-turma { font-size: 0.72rem; color: #94a3b8; }
-        .disc-card-desc { font-size: 0.78rem; color: #cbd5e1; margin-top: 6px; line-height: 1.4; }
-        .disc-card-meta { display: flex; gap: 10px; margin-top: 8px; flex-wrap: wrap; align-items: center; }
+        .disc-card-name { font-size: 0.94rem; font-weight: 800; color: #0f172a; margin-bottom: 2px; }
+        .disc-card-turma { font-size: 0.73rem; color: #64748b; font-weight: 500; }
+        .disc-card-desc { font-size: 0.80rem; color: #334155; margin-top: 7px; line-height: 1.5; }
+        .disc-card-meta { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; align-items: center; }
         .disc-tag {
-          font-size: 0.65rem; font-weight: 700; text-transform: uppercase; padding: 2px 8px;
-          border-radius: 6px; letter-spacing: 0.3px; white-space: nowrap;
+          font-size: 0.66rem; font-weight: 700; text-transform: uppercase;
+          padding: 3px 9px; border-radius: 7px; letter-spacing: 0.3px; white-space: nowrap;
         }
-        .disc-card-date { font-size: 0.72rem; color: #64748b; }
-        .disc-card-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
-        .disc-card-pts {
-          font-size: 1rem; font-weight: 800; display: flex; align-items: center; gap: 4px;
+        .disc-card-date {
+          font-size: 0.73rem; color: #64748b; font-weight: 600;
+          display: inline-flex; align-items: center; gap: 4px;
         }
+        .disc-card-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex-shrink: 0; }
+        .disc-card-pts { font-size: 1.05rem; font-weight: 900; display: flex; align-items: center; gap: 4px; }
         .disc-card-action {
-          font-size: 0.68rem; padding: 4px 12px; border-radius: 6px; border: 1px solid rgba(245,158,11,0.3);
-          background: rgba(245,158,11,0.1); color: #f59e0b; font-weight: 600; cursor: pointer;
-          transition: all 0.2s; white-space: nowrap;
+          font-size: 0.70rem; padding: 5px 14px; border-radius: 8px;
+          border: 1.5px solid #f59e0b; background: #fffbeb;
+          color: #b45309; font-weight: 700; cursor: pointer; transition: all 0.2s; white-space: nowrap;
         }
-        .disc-card-action:hover { background: rgba(245,158,11,0.25); }
+        .disc-card-action:hover { background: #fef3c7; border-color: #d97706; }
 
+        /* ── Pagination ────────────────────────────────────────────────── */
         .disc-pagination {
-          display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 20px; padding: 16px 0;
+          display: flex; justify-content: center; align-items: center;
+          gap: 8px; margin-top: 24px; padding: 16px 0;
         }
         .disc-page-btn {
-          padding: 6px 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);
-          background: rgba(15,23,42,0.6); color: #e2e8f0; font-size: 0.78rem; font-weight: 600;
+          padding: 7px 18px; border-radius: 9px;
+          border: 1.5px solid #e2e8f0; background: #fff;
+          color: #334155; font-size: 0.80rem; font-weight: 700;
           cursor: pointer; transition: all 0.2s;
         }
-        .disc-page-btn:hover { border-color: #f59e0b; color: #f59e0b; }
-        .disc-page-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-        .disc-page-info { font-size: 0.78rem; color: #94a3b8; }
+        .disc-page-btn:hover { border-color: #f59e0b; color: #b45309; background: #fffbeb; }
+        .disc-page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+        .disc-page-info { font-size: 0.80rem; color: #64748b; font-weight: 600; }
 
-        .disc-empty {
-          text-align: center; padding: 60px 20px; color: #64748b;
-        }
+        /* ── Empty / Loading ───────────────────────────────────────────── */
+        .disc-empty { text-align: center; padding: 60px 20px; }
         .disc-empty-icon { font-size: 3rem; margin-bottom: 12px; opacity: 0.5; }
-        .disc-empty-title { font-size: 1.1rem; font-weight: 700; color: #94a3b8; margin-bottom: 4px; }
-
+        .disc-empty-title { font-size: 1.1rem; font-weight: 700; color: #475569; margin-bottom: 4px; }
         .disc-loading { display: flex; justify-content: center; padding: 60px; }
         .disc-spinner {
-          width: 36px; height: 36px; border: 3px solid rgba(245,158,11,0.2);
+          width: 38px; height: 38px; border: 3px solid #fed7aa;
           border-top-color: #f59e0b; border-radius: 50%; animation: spin 0.8s linear infinite;
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        .disc-resp-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 0.65rem; padding: 2px 8px; border-radius: 6px; font-weight: 700; }
-        .disc-resp-aguardando { background: rgba(239,68,68,0.12); color: #f87171; }
-        .disc-resp-compareceu { background: rgba(16,185,129,0.12); color: #34d399; }
+        /* ── Badges ────────────────────────────────────────────────────── */
+        .disc-resp-badge {
+          display: inline-flex; align-items: center; gap: 4px;
+          font-size: 0.66rem; padding: 3px 9px; border-radius: 7px; font-weight: 700;
+        }
+        .disc-resp-aguardando { background: #fff1f1; color: #dc2626; border: 1px solid #fca5a5; }
+        .disc-resp-compareceu { background: #f0fdf4; color: #16a34a; border: 1px solid #86efac; }
       `}</style>
 
       <div className="disc-hist">
@@ -280,7 +332,7 @@ export default function HistoricoDisciplinar() {
               <div
                 key={i}
                 className={`disc-kpi-card${isActive ? " active" : ""}`}
-                style={{ "--kpi-color": k.color }}
+                style={{ background: k.gradient, boxShadow: `0 6px 24px ${k.shadow}` }}
                 onClick={() => {
                   if (i === 1) setFiltroStatus(filtroStatus === "REGISTRADA" ? "" : "REGISTRADA");
                   else if (i === 2) setFiltroStatus(filtroStatus === "FINALIZADA" ? "" : "FINALIZADA");
@@ -288,9 +340,9 @@ export default function HistoricoDisciplinar() {
                   else { limparFiltros(); }
                 }}
               >
-                <div className="disc-kpi-icon" style={{ background: k.bg }}>{k.icon}</div>
+                <div className="disc-kpi-icon">{k.icon}</div>
                 <div>
-                  <div className="disc-kpi-value" style={{ color: k.color }}>{k.value}</div>
+                  <div className="disc-kpi-value">{k.value}</div>
                   <div className="disc-kpi-label">{k.label}</div>
                 </div>
               </div>

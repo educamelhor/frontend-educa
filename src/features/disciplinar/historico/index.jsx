@@ -10,6 +10,12 @@ import api from "../../../services/api";
 // ── Helpers ─────────────────────────────────────────────────────────────
 const fmtDate = (d) => {
   if (!d) return "—";
+  // Datas puras (YYYY-MM-DD) são tratadas como UTC pelo construtor Date,
+  // causando offset de -3h e exibindo o dia anterior no fuso BR. Parse manual evita isso.
+  if (typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
+    const [y, m, day] = d.split("-");
+    return `${day}/${m}/${y}`;
+  }
   const dt = new Date(d);
   if (isNaN(dt)) return String(d);
   return dt.toLocaleDateString("pt-BR");

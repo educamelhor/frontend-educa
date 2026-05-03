@@ -10,11 +10,11 @@ import api from "../../../services/api";
 // ── Helpers ─────────────────────────────────────────────────────────────
 const fmtDate = (d) => {
   if (!d) return "—";
-  // Datas puras (YYYY-MM-DD) são tratadas como UTC pelo construtor Date,
-  // causando offset de -3h e exibindo o dia anterior no fuso BR. Parse manual evita isso.
-  if (typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
-    const [y, m, day] = d.split("-");
-    return `${day}/${m}/${y}`;
+  // Extrai YYYY-MM-DD diretamente da string (funciona para "2026-05-03" e "2026-05-03T00:00:00.000Z").
+  // Evita o bug clássico UTC-3: new Date("2026-05-03") → UTC midnight → 02/05 no fuso BR.
+  if (typeof d === "string") {
+    const m = d.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return `${m[3]}/${m[2]}/${m[1]}`;
   }
   const dt = new Date(d);
   if (isNaN(dt)) return String(d);

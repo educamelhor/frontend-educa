@@ -38,6 +38,8 @@ import ConteudosProfessor from "./features/professores/conteudos/Conteudos";
 import ProvasProfessor from "./features/professores/provas/Provas";
 import SolicitacoesConteudos from "./features/pedagogico/coordenacao/SolicitacoesConteudos.jsx";
 import LandingPage from "./features/landing/LandingPage";
+import PrivacidadePage from "./pages/PrivacidadePage";
+import ExcluirContaPage from "./pages/ExcluirContaPage";
 import Ferramentas from "./features/ferramentas";
 
 // ✅ Direção (Diretor) — Devices EDUCA-CAPTURE
@@ -210,6 +212,8 @@ export default function App() {
         <Route path="/ativar-diretor" element={<AtivarDiretor />} />
         <Route path="/login-professor" element={<LoginProfessor />} />
         <Route path="/cadastro" element={<CadastroUsuario />} />
+        <Route path="/privacidade" element={<PrivacidadePage />} />
+        <Route path="/excluir-conta" element={<ExcluirContaPage />} />
         <Route path="/print/boletins" element={<PrintBoletinsTurma />} />
 
         {/* Rotas protegidas da PLATAFORMA */}

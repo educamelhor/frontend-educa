@@ -1,18 +1,26 @@
 // src/features/secretaria/cargas-horarias/index.jsx
 // ============================================================================
 // Cargas Horárias — Fluxo completo:
+// - Seletor de Ano Letivo no topo + filtro por Turno.
 // - Clicar em turma → checa se há disciplinas salvas via /api/cargas-horarias?turma_id=
 //   - Se houver, renderiza tabela abaixo.
 //   - Se não houver, abre o ModalDefinirCargas.
-// - Botão "Alterar / Definir" abre modal com editor por turma (ListaCargasHorarias no modo turma)
-// - Ao fechar/salvar, recarrega as cargas e exibe a tabela.
+// - Botão "Alterar / Definir" abre modal com editor por turma.
 // ============================================================================
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import api from "../../../services/api";
 import Modal from "../../../components/ui/Modal";
 import ModalDefinirCargas from "./ModalDefinirCargas";
-import ListaCargasHorarias from "./ListaCargasHorarias"; // editor por turma (com lixeira) :contentReference[oaicite:1]{index=1}
+import ListaCargasHorarias from "./ListaCargasHorarias";
+import ModalCargasLote from "./ModalCargasLote";
+
+// Retorna o ano letivo vigente (janeiro pertence ao ano anterior)
+function getAnoLetivoAtual() {
+  const hoje = new Date();
+  const ano = hoje.getFullYear();
+  return hoje.getMonth() === 0 ? ano - 1 : ano;
+}
 
 // Util para comparar textos independentemente de acentos/maiúsculas
 function normalizaTexto(str) {
@@ -28,6 +36,7 @@ export default function CargasHorariasPage() {
   // ─────────────────────────────────────────────────────────────
   // Estados principais
   // ─────────────────────────────────────────────────────────────
+  const [anoLetivo, setAnoLetivo] = useState(getAnoLetivoAtual());
   const [turnoSelecionado, setTurnoSelecionado] = useState(null);
   const [turmas, setTurmas] = useState([]);
   const [loadingTurmas, setLoadingTurmas] = useState(false);
@@ -38,14 +47,25 @@ export default function CargasHorariasPage() {
   const [openModalDefinir, setOpenModalDefinir] = useState(false);
   // Modal: editar/alterar cargas existentes (lista com lixo)
   const [openModalEditar, setOpenModalEditar] = useState(false);
+  // Modal: cadastrar em lote
+  const [openModalLote, setOpenModalLote] = useState(false);
 
   // Cargas existentes da turma selecionada
   const [loadingCargas, setLoadingCargas] = useState(false);
   const [erroCargas, setErroCargas] = useState("");
-  const [cargasTurma, setCargasTurma] = useState([]); // [{disciplina_id, disciplina_nome, carga, ...}]
+  const [cargasTurma, setCargasTurma] = useState([]);
   const [totalCarga, setTotalCarga] = useState(0);
 
   const turnos = ["Matutino", "Vespertino", "Noturno"];
+
+  // Anos letivos disponíveis extraídos das turmas carregadas
+  const anosDisponiveis = useMemo(() => {
+    const set = new Set();
+    turmas.forEach((t) => { if (t.ano) set.add(Number(t.ano)); });
+    // Garante que o ano atual sempre apareça
+    set.add(getAnoLetivoAtual());
+    return Array.from(set).sort((a, b) => b - a); // decrescente
+  }, [turmas]);
 
   // ─────────────────────────────────────────────────────────────
   // Carregar turmas da escola
@@ -72,7 +92,10 @@ export default function CargasHorariasPage() {
   // Filtra turmas pelo turno selecionado
   // ─────────────────────────────────────────────────────────────
   const turmasFiltradas = turmas.filter(
-    (t) => turnoSelecionado && normalizaTexto(t.turno) === normalizaTexto(turnoSelecionado)
+    (t) =>
+      turnoSelecionado &&
+      normalizaTexto(t.turno) === normalizaTexto(turnoSelecionado) &&
+      Number(t.ano) === anoLetivo
   );
 
   // ─────────────────────────────────────────────────────────────
@@ -80,6 +103,15 @@ export default function CargasHorariasPage() {
   // ─────────────────────────────────────────────────────────────
   const handleClickTurno = (turno) => {
     setTurnoSelecionado(turno);
+    setTurmaSelecionada(null);
+    setCargasTurma([]);
+    setTotalCarga(0);
+    setErroCargas("");
+  };
+
+  const handleChangeAno = (novoAno) => {
+    setAnoLetivo(Number(novoAno));
+    // Limpa seleções dependentes do ano
     setTurmaSelecionada(null);
     setCargasTurma([]);
     setTotalCarga(0);
@@ -160,11 +192,33 @@ export default function CargasHorariasPage() {
     <div className="p-6">
       {/* Título */}
       <h1
-        className="text-5xl font-bold text-center text-blue-900 mb-8"
+        className="text-5xl font-bold text-center text-blue-900 mb-6"
         style={{ fontFamily: "'Montserrat', sans-serif" }}
       >
         Cargas Horárias
       </h1>
+
+      {/* Seletor de Ano Letivo */}
+      <div className="flex justify-center items-center gap-3 mb-6">
+        <span className="text-sm font-semibold text-blue-700 uppercase tracking-wide">
+          Ano Letivo
+        </span>
+        <div className="flex gap-2">
+          {anosDisponiveis.map((ano) => (
+            <button
+              key={ano}
+              onClick={() => handleChangeAno(ano)}
+              className={`px-5 py-2 rounded-full text-sm font-bold shadow transition hover:scale-105 ${
+                anoLetivo === ano
+                  ? "bg-blue-700 text-white shadow-blue-200"
+                  : "bg-white text-blue-700 border border-blue-300 hover:bg-blue-50"
+              }`}
+            >
+              {ano}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Botões de Turnos */}
       <div className="flex justify-center gap-4 mb-10">
@@ -185,7 +239,19 @@ export default function CargasHorariasPage() {
 
       {/* Cards de Turmas por Turno */}
       {turnoSelecionado && (
-        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2 mb-8">
+        <>
+          {/* Botão Cadastrar em Lote */}
+          <div className="flex justify-end mb-3">
+            <button
+              onClick={() => setOpenModalLote(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold rounded-lg shadow transition hover:scale-105"
+              title="Definir o mesmo conjunto de disciplinas para múltiplas turmas de uma só vez"
+            >
+              <span>📋</span> Cadastrar em Lote
+            </button>
+          </div>
+
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2 mb-8">
           {loadingTurmas ? (
             <p className="col-span-full text-center text-gray-500">
               Turmas sendo carregadas...
@@ -208,10 +274,11 @@ export default function CargasHorariasPage() {
             ))
           ) : (
             <p className="col-span-full text-center text-gray-500">
-              Nenhuma turma encontrada para {turnoSelecionado}.
+              Nenhuma turma encontrada para {turnoSelecionado} em {anoLetivo}.
             </p>
           )}
         </div>
+        </>
       )}
 
       {/* Bloco com TABELA (quando já há disciplinas salvas) */}
@@ -289,9 +356,25 @@ export default function CargasHorariasPage() {
             <ListaCargasHorarias
               turma={turmaSelecionada}
               turno={turnoSelecionado}
-              onSaved={handleModalEditarClose} // ao salvar, fecha e recarrega
+              onSaved={handleModalEditarClose}
             />
           </div>
+        )}
+      </Modal>
+
+      {/* Modal: Cadastrar em Lote */}
+      <Modal open={openModalLote} onClose={() => setOpenModalLote(false)}>
+        {openModalLote && turnoSelecionado && (
+          <ModalCargasLote
+            turno={turnoSelecionado}
+            turmas={turmasFiltradas}
+            onClose={() => setOpenModalLote(false)}
+            onSaved={() => {
+              // Limpa seleção da turma atual para forçar recarga ao clicar
+              setTurmaSelecionada(null);
+              setCargasTurma([]);
+            }}
+          />
         )}
       </Modal>
     </div>

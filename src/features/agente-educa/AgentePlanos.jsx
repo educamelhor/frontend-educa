@@ -234,6 +234,7 @@ export default function AgentePlanos() {
   const [modalSemCred, setModalSemCred] = useState(false); // modal de credenciais não configuradas
   const [modalResultado, setModalResultado] = useState(null); // { tipo: 'sucesso'|'erro', titulo, texto }
   const [modalOcupado, setModalOcupado] = useState(null); // { turma, disciplina } do plano em execução
+  const [modalJaExiste, setModalJaExiste] = useState(null); // { turma, disciplina, bimestre, nome } quando JA_EXISTE
   // Turmas e disciplinas do professor logado (para filtro pessoal duplo)
   const [turmasNomesProf, setTurmasNomesProf] = useState(null);
 
@@ -339,9 +340,23 @@ export default function AgentePlanos() {
 
     } catch (err) {
       // ── Erro de credenciais: modal específico ──────────────────────────
-      const codigo = err.response?.data?.codigo;
+      const codigo = err.response?.data?.codigo || err.response?.data?.errorCode;
       if (codigo === 'SEM_CREDENCIAIS' || codigo === 'CREDENCIAIS_CORROMPIDAS') {
         setModalSemCred(true);
+        setExportandoId(null);
+        return;
+      }
+
+      // ── JA_EXISTE: modal informativo (não é erro, é aviso) ─────────────
+      if (codigo === 'JA_EXISTE' || err.response?.status === 409) {
+        const itens = Array.isArray(plano.itens) ? plano.itens : JSON.parse(plano.itens || '[]');
+        const bimestral = itens.find(i => i.fixo_direcao);
+        setModalJaExiste({
+          turma:      plano.turmas,
+          disciplina: plano.disciplina,
+          bimestre:   plano.bimestre,
+          nome:       bimestral?.atividade || 'Prova Bimestral',
+        });
         setExportandoId(null);
         return;
       }
@@ -600,6 +615,99 @@ export default function AgentePlanos() {
                 }}
               >
                 Entendido — vou aguardar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═════════════════════ MODAL JÁ EXISTE ═══════════════════════ */}
+      {modalJaExiste && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 550,
+            background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(14px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            animation: 'fadeIn 0.2s ease',
+          }}
+          onClick={() => setModalJaExiste(null)}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: '100%', maxWidth: 460, margin: '0 16px',
+              borderRadius: 24, overflow: 'hidden',
+              background: 'linear-gradient(160deg, #0f1c35 0%, #0a1220 100%)',
+              border: '1px solid rgba(59,130,246,0.4)',
+              boxShadow: '0 32px 80px rgba(0,0,0,0.7), 0 0 60px rgba(59,130,246,0.1)',
+            }}
+          >
+            {/* Header */}
+            <div style={{
+              background: 'linear-gradient(135deg, #1d4ed8, #1e40af)',
+              padding: '28px 28px 22px', textAlign: 'center',
+            }}>
+              <div style={{ fontSize: '2.8rem', marginBottom: 10 }}>ℹ️</div>
+              <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#fff', letterSpacing: '-0.3px' }}>
+                Procedimento já cadastrado
+              </div>
+              <div style={{ fontSize: '0.78rem', color: 'rgba(191,219,254,0.85)', marginTop: 6 }}>
+                Nenhuma duplicata foi criada no EDUCADF
+              </div>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: '24px 28px' }}>
+              {/* Detalhe do procedimento */}
+              <div style={{
+                padding: '16px 18px', borderRadius: 16, marginBottom: 20,
+                background: 'rgba(59,130,246,0.08)',
+                border: '1px solid rgba(59,130,246,0.25)',
+              }}>
+                <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#3b82f6', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 10 }}>
+                  📋 Procedimento identificado no EDUCADF
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  {[
+                    { label: 'Procedimento', value: modalJaExiste.nome },
+                    { label: 'Turma',        value: modalJaExiste.turma },
+                    { label: 'Disciplina',   value: modalJaExiste.disciplina },
+                    { label: 'Bimestre',     value: modalJaExiste.bimestre },
+                  ].map(({ label, value }) => (
+                    <div key={label} style={{
+                      padding: '8px 12px', borderRadius: 10,
+                      background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)',
+                    }}>
+                      <div style={{ fontSize: '0.58rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 2 }}>{label}</div>
+                      <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#e2e8f0' }}>{value}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Explicação */}
+              <div style={{
+                padding: '12px 16px', borderRadius: 12, marginBottom: 20,
+                background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.18)',
+                fontSize: '0.82rem', color: '#93c5fd', lineHeight: 1.65,
+              }}>
+                O Agente verificou a aba <strong style={{ color: '#bfdbfe' }}>Registro de Procedimentos Avaliativos</strong> no
+                EDUCADF e encontrou uma coluna com o mesmo nome.<br /><br />
+                Se precisar <strong style={{ color: '#bfdbfe' }}>reexportar</strong>, remova manualmente a coluna no EDUCADF
+                e tente novamente.
+              </div>
+
+              <button
+                onClick={() => setModalJaExiste(null)}
+                style={{
+                  width: '100%', padding: '13px', borderRadius: 12,
+                  background: 'linear-gradient(135deg, #1d4ed8, #1e40af)',
+                  border: 'none', color: '#fff',
+                  fontWeight: 800, fontSize: '0.9rem', cursor: 'pointer',
+                  boxShadow: '0 4px 20px rgba(29,78,216,0.4)',
+                }}
+              >
+                Entendido
               </button>
             </div>
           </div>

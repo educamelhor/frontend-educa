@@ -35,6 +35,9 @@ function getAnoLetivoAtual() {
   return ano;
 }
 
+// Ano letivo vigente — usado para filtrar turmas na grade de modulação
+const anoAtual = getAnoLetivoAtual();
+
 // Normaliza turmas preservando possível campo de turno/periodo (para filtragem)
 function normalizeTurmas(raw) {
   const arr = Array.isArray(raw) ? raw : Array.isArray(raw?.turmas) ? raw.turmas : [];

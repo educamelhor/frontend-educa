@@ -251,7 +251,7 @@ export default function CargasHorariasPage() {
             </button>
           </div>
 
-          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2 mb-8">
+          <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 xl:grid-cols-12 gap-2 mb-8">
           {loadingTurmas ? (
             <p className="col-span-full text-center text-gray-500">
               Turmas sendo carregadas...
@@ -263,10 +263,9 @@ export default function CargasHorariasPage() {
               <div
                 key={turma.id}
                 onClick={() => handleClickTurma(turma)}
-                className={`bg-gradient-to-b from-blue-200 to-blue-50 rounded-md px-9 py-2 shadow-md cursor-pointer hover:shadow-xl transition-transform hover:scale-105 text-center font-bold text-blue-900 text-base ${
+                className={`bg-gradient-to-b from-blue-200 to-blue-50 rounded-md px-3 py-2 shadow-md cursor-pointer hover:shadow-xl transition-transform hover:scale-105 text-center font-bold text-blue-900 text-sm whitespace-nowrap ${
                   turmaSelecionada?.id === turma.id ? "ring-2 ring-green-600" : ""
                 }`}
-                style={{ minWidth: "80px", maxWidth: "100px", margin: "0 auto" }}
                 title={`Turma ${turma.turma}`}
               >
                 {turma.turma}
@@ -278,6 +277,7 @@ export default function CargasHorariasPage() {
             </p>
           )}
         </div>
+
         </>
       )}
 

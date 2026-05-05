@@ -7,10 +7,14 @@
 // - Acertos por disciplina (se multidisciplinar)
 // ============================================================================
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import api from "../../services/api";
 
 export default function GabaritoResultados() {
+  // ─── Perfil ───
+  const perfil = String(localStorage.getItem("perfil") || "").toLowerCase().trim();
+  const isGestao = !["professor"].includes(perfil); // coord/diretor/vice/supervisor
+
   // ─── Dados ───
   const [avaliacoes, setAvaliacoes] = useState([]);
   const [resultados, setResultados] = useState([]);
@@ -18,6 +22,22 @@ export default function GabaritoResultados() {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [avaliacaoSelecionada, setAvaliacaoSelecionada] = useState(null);
   const [busca, setBusca] = useState("");
+
+  // ─── Busca na tabela de alunos (gestão) ───
+  const [buscaAluno, setBuscaAluno] = useState("");
+
+  // ─── Modal: Editar nota manual ───
+  const [editModal, setEditModal] = useState(null); // resultado
+  const [editNota, setEditNota] = useState("");
+  const [editJustificativa, setEditJustificativa] = useState("");
+  const [editSalvando, setEditSalvando] = useState(false);
+  const [editErro, setEditErro] = useState("");
+
+  // ─── Modal: Imagem do gabarito ───
+  const [gabModal, setGabModal] = useState(null); // { nome_aluno, arquivo_id, arquivo_nome }
+  const [gabImgUrl, setGabImgUrl] = useState(null);
+  const [gabLoading, setGabLoading] = useState(false);
+  const [gabErro, setGabErro] = useState("");
 
   // ─── Carregar resumo das avaliações ───
   useEffect(() => {
@@ -113,6 +133,68 @@ export default function GabaritoResultados() {
     a.bimestre?.toLowerCase().includes(busca.toLowerCase()) ||
     a.tipo?.toLowerCase().includes(busca.toLowerCase())
   );
+
+  // ─── Filtrar alunos na tabela (RE / nome / turma) ───
+  const resultadosFiltrados = useMemo(() => {
+    if (!buscaAluno.trim()) return resultados;
+    const q = buscaAluno.toLowerCase();
+    return resultados.filter(r =>
+      r.codigo_aluno?.toLowerCase().includes(q) ||
+      r.nome_aluno?.toLowerCase().includes(q) ||
+      r.turma_nome?.toLowerCase().includes(q)
+    );
+  }, [resultados, buscaAluno]);
+
+  // ─── Abrir modal de edição de nota ───
+  function abrirEditModal(r) {
+    setEditModal(r);
+    setEditNota(String(Number(r.nota || 0).toFixed(1)));
+    setEditJustificativa("");
+    setEditErro("");
+  }
+
+  // ─── Salvar nota manual ───
+  async function salvarNotaManual() {
+    if (!editModal) return;
+    const v = parseFloat(editNota);
+    if (isNaN(v) || v < 0) { setEditErro("Nota inválida."); return; }
+    setEditSalvando(true); setEditErro("");
+    try {
+      const resp = await api.patch(`/api/gabaritos/respostas/${editModal.id}/nota`, {
+        nota: v, justificativa: editJustificativa || null,
+      });
+      if (resp.data.ok) {
+        setResultados(prev => prev.map(r =>
+          r.id === editModal.id ? { ...r, nota: resp.data.nota, acertos: resp.data.acertos, nota_manual: 1 } : r
+        ));
+        setEditModal(null);
+      }
+    } catch (err) {
+      setEditErro(err.response?.data?.error || "Erro ao salvar nota.");
+    }
+    setEditSalvando(false);
+  }
+
+  // ─── Abrir modal de gabarito (imagem) ───
+  async function abrirGabModal(r) {
+    setGabModal({ nome_aluno: r.nome_aluno || r.codigo_aluno });
+    setGabImgUrl(null); setGabErro(""); setGabLoading(true);
+    try {
+      const meta = await api.get(`/api/gabaritos/respostas/${r.id}/arquivo-gabarito`);
+      const { arquivo_id, arquivo_nome } = meta.data;
+      setGabModal({ nome_aluno: r.nome_aluno || r.codigo_aluno, arquivo_id, arquivo_nome });
+      const imgResp = await api.get(`/api/gabarito-lotes/arquivos/${arquivo_id}/imagem`, { responseType: "blob" });
+      setGabImgUrl(URL.createObjectURL(imgResp.data));
+    } catch (err) {
+      setGabErro(err.response?.data?.error || "Gabarito não encontrado para este aluno.");
+    }
+    setGabLoading(false);
+  }
+
+  function fecharGabModal() {
+    if (gabImgUrl) URL.revokeObjectURL(gabImgUrl);
+    setGabModal(null); setGabImgUrl(null); setGabErro("");
+  }
 
   // ─── Cor dinâmica ───
   function getColor(pct) {
@@ -418,11 +500,33 @@ export default function GabaritoResultados() {
 
               {/* ─── Tabela de Resultados por Aluno ─── */}
               <div className="gab-card" style={{ padding: 0 }}>
-                <div style={{ padding: "18px 24px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ padding: "18px 24px 12px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
                   <div className="gab-card-title">Resultados por Aluno</div>
-                  <span style={{ fontSize: "0.75rem", color: "var(--gab-text-muted)" }}>
-                    {resultados.length} resultado{resultados.length !== 1 ? "s" : ""}
-                  </span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, flex: 1, justifyContent: "flex-end", flexWrap: "wrap" }}>
+                    {/* Barra de busca — apenas gestão */}
+                    {isGestao && (
+                      <div style={{ position: "relative", minWidth: 260 }}>
+                        <svg style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "var(--gab-text-muted)", pointerEvents: "none" }} width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                        </svg>
+                        <input
+                          type="text"
+                          placeholder="Buscar por RE, nome ou turma..."
+                          value={buscaAluno}
+                          onChange={e => setBuscaAluno(e.target.value)}
+                          style={{
+                            paddingLeft: 32, paddingRight: 12, paddingTop: 7, paddingBottom: 7,
+                            borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)",
+                            background: "rgba(255,255,255,0.04)", color: "var(--gab-text-primary)",
+                            fontSize: "0.8rem", outline: "none", width: "100%",
+                          }}
+                        />
+                      </div>
+                    )}
+                    <span style={{ fontSize: "0.75rem", color: "var(--gab-text-muted)", whiteSpace: "nowrap" }}>
+                      {resultadosFiltrados.length}/{resultados.length} resultado{resultados.length !== 1 ? "s" : ""}
+                    </span>
+                  </div>
                 </div>
                 <div className="gab-table-wrap" style={{ border: "none", borderRadius: 0 }}>
                   <table className="gab-table">
@@ -435,41 +539,71 @@ export default function GabaritoResultados() {
                         <th>Acertos</th>
                         <th>Nota</th>
                         <th>Status</th>
+                        {isGestao && <th style={{ textAlign: "center", width: 90 }}>Ações</th>}
                       </tr>
                     </thead>
                     <tbody>
-                      {resultados.map((r, idx) => {
+                      {resultadosFiltrados.map((r, idx) => {
                         const pctAcerto = Number(r.total_questoes) > 0 ? (Number(r.acertos) / Number(r.total_questoes)) * 100 : 0;
                         return (
                           <tr key={r.id || idx}>
-                            <td style={{ textAlign: "center", color: "var(--gab-text-muted)", fontSize: "0.75rem" }}>
-                              {idx + 1}
-                            </td>
-                            <td style={{ textAlign: "left", fontFamily: "var(--gab-font-display)", fontSize: "0.8rem" }}>
-                              {r.codigo_aluno}
-                            </td>
+                            <td style={{ textAlign: "center", color: "var(--gab-text-muted)", fontSize: "0.75rem" }}>{idx + 1}</td>
+                            <td style={{ textAlign: "left", fontFamily: "var(--gab-font-display)", fontSize: "0.8rem" }}>{r.codigo_aluno}</td>
                             <td style={{ textAlign: "left", fontWeight: 600 }}>
                               {r.nome_aluno || "—"}
+                              {r.nota_manual ? <span style={{ marginLeft: 5, fontSize: "0.6rem", padding: "1px 5px", borderRadius: 4, background: "rgba(139,92,246,0.15)", color: "#a78bfa", border: "1px solid rgba(139,92,246,0.2)", fontWeight: 700 }}>MANUAL</span> : null}
                             </td>
                             <td>{r.turma_nome || "—"}</td>
-                            <td>
-                              <span className="gab-font-mono">{r.acertos}/{r.total_questoes}</span>
-                            </td>
+                            <td><span className="gab-font-mono">{r.acertos}/{r.total_questoes}</span></td>
                             <td>
                               <span className={`gab-nota-badge ${getColorClass(pctAcerto)}`} style={{ padding: "4px 10px", fontSize: "0.85rem" }}>
                                 {Number(r.nota || 0).toFixed(1)}
                               </span>
                             </td>
                             <td>
-                              {pctAcerto >= 60 ? (
-                                <span className="gab-text-green" style={{ fontWeight: 600, fontSize: "0.8rem" }}>✓ Aprovado</span>
-                              ) : (
-                                <span className="gab-text-red" style={{ fontWeight: 600, fontSize: "0.8rem" }}>Recuperação</span>
-                              )}
+                              {pctAcerto >= 60
+                                ? <span className="gab-text-green" style={{ fontWeight: 600, fontSize: "0.8rem" }}>✓ Aprovado</span>
+                                : <span className="gab-text-red" style={{ fontWeight: 600, fontSize: "0.8rem" }}>Recuperação</span>
+                              }
                             </td>
+                            {isGestao && (
+                              <td style={{ textAlign: "center" }}>
+                                <div style={{ display: "flex", gap: 6, justifyContent: "center" }}>
+                                  {/* Editar nota */}
+                                  <button
+                                    title="Editar nota"
+                                    onClick={() => abrirEditModal(r)}
+                                    style={{ width: 30, height: 30, borderRadius: 7, border: "none", cursor: "pointer", background: "rgba(139,92,246,0.12)", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.18s" }}
+                                    onMouseEnter={e => e.currentTarget.style.background = "rgba(139,92,246,0.28)"}
+                                    onMouseLeave={e => e.currentTarget.style.background = "rgba(139,92,246,0.12)"}
+                                  >
+                                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#a78bfa" strokeWidth={2}>
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                                    </svg>
+                                  </button>
+                                  {/* Ver gabarito */}
+                                  <button
+                                    title="Ver gabarito escaneado"
+                                    onClick={() => abrirGabModal(r)}
+                                    style={{ width: 30, height: 30, borderRadius: 7, border: "none", cursor: "pointer", background: "rgba(6,182,212,0.1)", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.18s" }}
+                                    onMouseEnter={e => e.currentTarget.style.background = "rgba(6,182,212,0.25)"}
+                                    onMouseLeave={e => e.currentTarget.style.background = "rgba(6,182,212,0.1)"}
+                                  >
+                                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#06b6d4" strokeWidth={2}>
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                                    </svg>
+                                  </button>
+                                </div>
+                              </td>
+                            )}
                           </tr>
                         );
                       })}
+                      {resultadosFiltrados.length === 0 && buscaAluno && (
+                        <tr><td colSpan={isGestao ? 8 : 7} style={{ textAlign: "center", padding: "24px", color: "var(--gab-text-muted)", fontSize: "0.85rem" }}>
+                          Nenhum aluno encontrado para "{buscaAluno}"
+                        </td></tr>
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -477,6 +611,97 @@ export default function GabaritoResultados() {
             </>
           )}
         </>
+      )}
+
+      {/* ═══════════════════════════════════════════════════ */}
+      {/* MODAL: EDITAR NOTA MANUAL                         */}
+      {/* ═══════════════════════════════════════════════════ */}
+      {editModal && (
+        <div onClick={() => setEditModal(null)} style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(10px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 440, borderRadius: 18, background: "linear-gradient(145deg,#1a1f35,#0f1321)", border: "1px solid rgba(139,92,246,0.25)", boxShadow: "0 32px 80px rgba(0,0,0,0.6), 0 0 60px rgba(139,92,246,0.08)", overflow: "hidden" }}>
+            {/* Header */}
+            <div style={{ padding: "18px 22px", background: "linear-gradient(135deg,rgba(139,92,246,0.08),rgba(6,182,212,0.04))", borderBottom: "1px solid rgba(255,255,255,0.04)", display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: "linear-gradient(135deg,rgba(139,92,246,0.2),rgba(139,92,246,0.08))", border: "1px solid rgba(139,92,246,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1rem" }}>✏️</div>
+              <div>
+                <div style={{ fontSize: "0.9rem", fontWeight: 700, color: "#e2e8f0" }}>Editar Nota Manualmente</div>
+                <div style={{ fontSize: "0.7rem", color: "rgba(148,163,184,0.7)", marginTop: 1 }}>{editModal.nome_aluno || editModal.codigo_aluno}</div>
+              </div>
+              <button onClick={() => setEditModal(null)} style={{ marginLeft: "auto", width: 32, height: 32, borderRadius: 8, border: "1px solid rgba(239,68,68,0.2)", background: "rgba(239,68,68,0.08)", color: "#f87171", fontSize: "1rem", cursor: "pointer" }}>✕</button>
+            </div>
+            {/* Body */}
+            <div style={{ padding: "20px 22px", display: "flex", flexDirection: "column", gap: 14 }}>
+              <div>
+                <div style={{ fontSize: "0.75rem", color: "rgba(148,163,184,0.8)", marginBottom: 6, fontWeight: 600 }}>NOTA ATUAL → NOVA NOTA (0 – {avaliacaoSelecionada?.nota_total || 10})</div>
+                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  <span style={{ fontSize: "1.1rem", fontWeight: 800, color: "rgba(148,163,184,0.5)", textDecoration: "line-through" }}>{Number(editModal.nota || 0).toFixed(1)}</span>
+                  <span style={{ color: "rgba(139,92,246,0.6)", fontSize: "1.2rem" }}>→</span>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max={avaliacaoSelecionada?.nota_total || 10}
+                    value={editNota}
+                    onChange={e => setEditNota(e.target.value)}
+                    autoFocus
+                    style={{ flex: 1, padding: "10px 14px", borderRadius: 10, border: "1px solid rgba(139,92,246,0.3)", background: "rgba(139,92,246,0.06)", color: "#e2e8f0", fontSize: "1.1rem", fontWeight: 700, outline: "none" }}
+                  />
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: "0.75rem", color: "rgba(148,163,184,0.8)", marginBottom: 6, fontWeight: 600 }}>JUSTIFICATIVA (opcional)</div>
+                <textarea
+                  rows={3}
+                  placeholder="Ex: Correção manual após revisão do gabarito físico..."
+                  value={editJustificativa}
+                  onChange={e => setEditJustificativa(e.target.value)}
+                  style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)", color: "#e2e8f0", fontSize: "0.82rem", resize: "vertical", outline: "none", boxSizing: "border-box" }}
+                />
+              </div>
+              {editErro && <div style={{ padding: "8px 12px", borderRadius: 8, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", color: "#f87171", fontSize: "0.8rem" }}>{editErro}</div>}
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+                <button onClick={() => setEditModal(null)} style={{ padding: "9px 18px", borderRadius: 9, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.04)", color: "rgba(148,163,184,0.8)", cursor: "pointer", fontSize: "0.82rem" }}>Cancelar</button>
+                <button onClick={salvarNotaManual} disabled={editSalvando} style={{ padding: "9px 22px", borderRadius: 9, border: "none", background: editSalvando ? "rgba(139,92,246,0.3)" : "linear-gradient(135deg,#8b5cf6,#7c3aed)", color: "#fff", fontWeight: 700, cursor: editSalvando ? "not-allowed" : "pointer", fontSize: "0.85rem" }}>
+                  {editSalvando ? "Salvando..." : "✓ Salvar Nota"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════ */}
+      {/* MODAL: GABARITO ESCANEADO                         */}
+      {/* ═══════════════════════════════════════════════════ */}
+      {gabModal && (
+        <div onClick={fecharGabModal} style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(12px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 680, maxHeight: "90vh", borderRadius: 18, background: "linear-gradient(145deg,#1a1f35,#0f1321)", border: "1px solid rgba(6,182,212,0.2)", boxShadow: "0 32px 80px rgba(0,0,0,0.6)", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+            <div style={{ padding: "16px 20px", background: "linear-gradient(135deg,rgba(6,182,212,0.06),rgba(139,92,246,0.04))", borderBottom: "1px solid rgba(255,255,255,0.04)", display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 34, height: 34, borderRadius: 9, background: "rgba(6,182,212,0.12)", border: "1px solid rgba(6,182,212,0.25)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.95rem" }}>📄</div>
+              <div>
+                <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "#e2e8f0" }}>Gabarito Escaneado</div>
+                <div style={{ fontSize: "0.68rem", color: "rgba(148,163,184,0.7)", marginTop: 1 }}>{gabModal.nome_aluno}</div>
+              </div>
+              <button onClick={fecharGabModal} style={{ marginLeft: "auto", width: 34, height: 34, borderRadius: 9, border: "1px solid rgba(239,68,68,0.2)", background: "rgba(239,68,68,0.08)", color: "#f87171", fontSize: "1rem", cursor: "pointer" }}>✕</button>
+            </div>
+            <div style={{ flex: 1, overflowY: "auto", padding: 16, display: "flex", alignItems: "flex-start", justifyContent: "center" }}>
+              {gabLoading && (
+                <div style={{ textAlign: "center", padding: 48 }}>
+                  <div className="gab-spinner gab-spinner-lg" style={{ margin: "0 auto 12px" }} />
+                  <div style={{ color: "var(--gab-text-muted)", fontSize: "0.85rem" }}>Carregando gabarito...</div>
+                </div>
+              )}
+              {gabErro && !gabLoading && (
+                <div style={{ textAlign: "center", padding: 40, color: "#f87171", fontSize: "0.85rem" }}>
+                  <div style={{ fontSize: "2rem", marginBottom: 10 }}>📭</div>
+                  {gabErro}
+                </div>
+              )}
+              {gabImgUrl && !gabLoading && (
+                <img src={gabImgUrl} alt="Gabarito escaneado" style={{ maxWidth: "100%", borderRadius: 10, boxShadow: "0 4px 24px rgba(0,0,0,0.4)" }} draggable={false} />
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

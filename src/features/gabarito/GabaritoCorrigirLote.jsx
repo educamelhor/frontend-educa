@@ -206,9 +206,15 @@ export default function GabaritoCorrigirLote() {
     .filter(p => !profFiltro || p.nome.toLowerCase().includes(profFiltro.toLowerCase()));
 
   // Abrir modal de professor
+  // ─ Bloqueado após importação das notas ─
   // ─ Verifica se todos os alunos foram identificados antes de permitir vincular ─
   function abrirModalProfessor(lote, e) {
     e.stopPropagation();
+    // Bloquear se a avaliação já teve notas importadas
+    if (avaliacaoAtiva?.status === "notas_importadas") {
+      showToast("🔒 Não é possível vincular correto após a importação das notas.", "error");
+      return;
+    }
     const total = lote.total_arquivos_real || lote.total_arquivos || 0;
     const corrigidos = lote.total_corrigidos_real || lote.total_corrigidos || 0;
     const identificados = lote.total_identificados || 0;
@@ -1247,24 +1253,40 @@ export default function GabaritoCorrigirLote() {
                           📁 {lote.turma_nome}
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          {/* Botão vincular professor — BEM VISÍVEL */}
-                          <button
-                            onClick={(e) => abrirModalProfessor(lote, e)}
-                            title={lote.professor_id ? `Prof: ${lote.professor_nome}` : "Vincular professor"}
-                            style={{
-                              width: 32, height: 32, borderRadius: 8, border: "none",
-                              cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                              fontSize: "0.9rem", transition: "all 0.2s",
-                              background: lote.professor_id
-                                ? "linear-gradient(135deg, #10b981, #059669)"
-                                : "linear-gradient(135deg, #ef4444, #dc2626)",
-                              boxShadow: lote.professor_id
-                                ? "0 2px 10px rgba(16,185,129,0.4)"
-                                : "0 2px 10px rgba(239,68,68,0.4)",
-                            }}
-                          >
-                            👨‍🏫
-                          </button>
+                          {/* Botão vincular professor — bloqueado após importação */}
+                          {avaliacaoAtiva?.status === "notas_importadas" ? (
+                            <div
+                              title="Vinculação bloqueada — notas já importadas"
+                              style={{
+                                width: 32, height: 32, borderRadius: 8,
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                fontSize: "0.9rem",
+                                background: "rgba(255,255,255,0.05)",
+                                border: "1px solid rgba(255,255,255,0.08)",
+                                opacity: 0.4, cursor: "not-allowed",
+                              }}
+                            >
+                              🔒
+                            </div>
+                          ) : (
+                            <button
+                              onClick={(e) => abrirModalProfessor(lote, e)}
+                              title={lote.professor_id ? `Prof: ${lote.professor_nome}` : "Vincular professor"}
+                              style={{
+                                width: 32, height: 32, borderRadius: 8, border: "none",
+                                cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                                fontSize: "0.9rem", transition: "all 0.2s",
+                                background: lote.professor_id
+                                  ? "linear-gradient(135deg, #10b981, #059669)"
+                                  : "linear-gradient(135deg, #ef4444, #dc2626)",
+                                boxShadow: lote.professor_id
+                                  ? "0 2px 10px rgba(16,185,129,0.4)"
+                                  : "0 2px 10px rgba(239,68,68,0.4)",
+                              }}
+                            >
+                              👨‍🏫
+                            </button>
+                          )}
                           <span style={{
                             padding: "2px 8px", borderRadius: 10, fontSize: "0.65rem", fontWeight: 700,
                             background: isFinalizado ? "rgba(16,185,129,0.1)" : "rgba(245,158,11,0.1)",

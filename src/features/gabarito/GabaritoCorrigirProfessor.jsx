@@ -318,13 +318,26 @@ export default function GabaritoCorrigirProfessor() {
     })();
   }, []);
 
-  // ─── Carregar avaliações publicadas ───
+  // ─── Carregar avaliações (publicadas + notas_importadas) ───
+  // Avaliações com notas_importadas são exibidas com banner de bloqueio
   useEffect(() => {
     (async () => {
       setLoadingAv(true);
       try {
-        const resp = await api.get("/api/gabarito-avaliacoes?status=publicada");
-        setAvaliacoes(resp.data || []);
+        const [respPubl, respImport] = await Promise.all([
+          api.get("/api/gabarito-avaliacoes?status=publicada"),
+          api.get("/api/gabarito-avaliacoes?status=notas_importadas"),
+        ]);
+        const todas = [
+          ...(respPubl.data || []),
+          ...(respImport.data || []),
+        ];
+        // Ordena: publicadas primeiro, depois importadas
+        todas.sort((a, b) => {
+          if (a.status === b.status) return new Date(b.created_at) - new Date(a.created_at);
+          return a.status === "publicada" ? -1 : 1;
+        });
+        setAvaliacoes(todas);
       } catch (err) {
         console.error("Erro ao carregar avaliações:", err);
       }
@@ -577,22 +590,29 @@ export default function GabaritoCorrigirProfessor() {
             avaliacoes.map(av => {
               const isOpen = avaliacaoAberta === av.id;
               const temGabarito = av.gabarito_oficial && av.gabarito_oficial.length > 0;
+              const notasImportadas = av.status === "notas_importadas";
 
               return (
                 <div key={av.id} style={{ display: "flex", flexDirection: "column", gap: 0 }}>
                   {/* ─── Card da Avaliação ─── */}
                   <div
-                    onClick={() => toggleAvaliacao(av)}
+                    onClick={() => !notasImportadas && toggleAvaliacao(av)}
                     style={{
                       padding: "18px 22px",
                       borderRadius: isOpen ? "14px 14px 0 0" : 14,
-                      cursor: "pointer",
+                      cursor: notasImportadas ? "default" : "pointer",
                       transition: "all 0.25s",
-                      background: isOpen
-                        ? "linear-gradient(135deg, rgba(6,182,212,0.08), rgba(139,92,246,0.05))"
-                        : "var(--gab-surface, #1a1f2e)",
-                      border: `1px solid ${isOpen ? "rgba(6,182,212,0.3)" : "rgba(255,255,255,0.06)"}`,
+                      background: notasImportadas
+                        ? "rgba(15,23,42,0.6)"
+                        : isOpen
+                          ? "linear-gradient(135deg, rgba(6,182,212,0.08), rgba(139,92,246,0.05))"
+                          : "var(--gab-surface, #1a1f2e)",
+                      border: `1px solid ${
+                        notasImportadas ? "rgba(59,130,246,0.2)"
+                        : isOpen ? "rgba(6,182,212,0.3)" : "rgba(255,255,255,0.06)"
+                      }`,
                       borderBottom: isOpen ? "none" : undefined,
+                      opacity: notasImportadas ? 0.85 : 1,
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 6 }}>
@@ -606,29 +626,65 @@ export default function GabaritoCorrigirProfessor() {
                         </div>
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: 12 }}>
-                        <div style={{
-                          padding: "3px 10px", borderRadius: 8, fontSize: "0.65rem", fontWeight: 700, whiteSpace: "nowrap",
-                          background: temGabarito ? "rgba(16,185,129,0.1)" : "rgba(245,158,11,0.1)",
-                          color: temGabarito ? "var(--gab-green-light, #10b981)" : "var(--gab-amber-light, #f59e0b)",
-                          border: `1px solid ${temGabarito ? "rgba(16,185,129,0.2)" : "rgba(245,158,11,0.2)"}`,
-                        }}>
-                          {temGabarito ? "✓ OFICIAL" : "✗ SEM GABARITO"}
-                        </div>
-                        <svg
-                          width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
-                          style={{
-                            color: isOpen ? "var(--gab-cyan-light)" : "var(--gab-text-muted)",
-                            transition: "transform 0.3s",
-                            transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
-                          }}
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-                        </svg>
+                        {/* Badge de status */}
+                        {notasImportadas ? (
+                          <div style={{
+                            padding: "3px 10px", borderRadius: 8, fontSize: "0.65rem", fontWeight: 700, whiteSpace: "nowrap",
+                            background: "rgba(59,130,246,0.12)",
+                            color: "#60a5fa",
+                            border: "1px solid rgba(59,130,246,0.3)",
+                            display: "flex", alignItems: "center", gap: 4,
+                          }}>
+                            🔒 NOTAS IMPORTADAS
+                          </div>
+                        ) : (
+                          <div style={{
+                            padding: "3px 10px", borderRadius: 8, fontSize: "0.65rem", fontWeight: 700, whiteSpace: "nowrap",
+                            background: temGabarito ? "rgba(16,185,129,0.1)" : "rgba(245,158,11,0.1)",
+                            color: temGabarito ? "var(--gab-green-light, #10b981)" : "var(--gab-amber-light, #f59e0b)",
+                            border: `1px solid ${temGabarito ? "rgba(16,185,129,0.2)" : "rgba(245,158,11,0.2)"}`,
+                          }}>
+                            {temGabarito ? "✓ OFICIAL" : "✗ SEM GABARITO"}
+                          </div>
+                        )}
+                        {!notasImportadas && (
+                          <svg
+                            width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
+                            style={{
+                              color: isOpen ? "var(--gab-cyan-light)" : "var(--gab-text-muted)",
+                              transition: "transform 0.3s",
+                              transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+                            }}
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                          </svg>
+                        )}
                       </div>
                     </div>
 
+                    {/* ─── Banner: Notas já importadas ─── */}
+                    {notasImportadas && (
+                      <div style={{
+                        marginTop: 10, padding: "10px 14px", borderRadius: 10,
+                        background: "rgba(30,58,138,0.25)",
+                        border: "1px solid rgba(59,130,246,0.3)",
+                        display: "flex", alignItems: "flex-start", gap: 10,
+                      }}>
+                        <span style={{ fontSize: "1.1rem", flexShrink: 0 }}>🔒</span>
+                        <div>
+                          <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "#93c5fd", marginBottom: 2 }}>
+                            Correção encerrada — notas já importadas para o diário
+                          </div>
+                          <div style={{ fontSize: "0.7rem", color: "rgba(147,197,253,0.7)", lineHeight: 1.5 }}>
+                            As notas desta avaliação foram enviadas ao diário dos professores pela coordenação.
+                            Caso precise corrigir algo, entre em contato com o coordenador para reverter a importação.
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Disciplinas tags */}
-                    {av.disciplinas_config && av.disciplinas_config.length > 0 && (
+                    {!notasImportadas && av.disciplinas_config && av.disciplinas_config.length > 0 && (
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
                         {av.disciplinas_config.map((dc, i) => (
                           <span key={i} style={{

@@ -538,8 +538,8 @@ export default function Sidebar({ isOpen, onClose }) {
                 {/* Corrigir — todos com canGabarito */}
                 <li>
                   <Link
-                    to="/gabarito"
-                    className={getSubmenuLinkClasses('/gabarito', true)}
+                    to="/gabarito/corrigir"
+                    className={getSubmenuLinkClasses('/gabarito/corrigir', true)}
                   >
                     <CheckCircleIcon className="h-5 w-5 mr-2" /> Corrigir
                   </Link>

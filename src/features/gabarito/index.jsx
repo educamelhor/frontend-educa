@@ -60,6 +60,7 @@ function getTabFromPath(pathname) {
   if (pathname.includes("/corrigir-lote")) return "corrigir-lote";
   if (pathname.includes("/resultados")) return "resultados";
   if (pathname.includes("/corrigir")) return "corrigir";
+  if (pathname === "/gabarito") return "corrigir"; // fallback para rota raiz
   return null;
 }
 
@@ -92,7 +93,7 @@ export default function GabaritoModule() {
 
   const handleTabChange = (tabId) => {
     setActiveTab(tabId);
-    if (tabId === "corrigir") navigate("/gabarito");
+    if (tabId === "corrigir") navigate("/gabarito/corrigir");
     else navigate(`/gabarito/${tabId}`);
   };
 

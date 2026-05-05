@@ -40,6 +40,7 @@ import SolicitacoesConteudos from "./features/pedagogico/coordenacao/Solicitacoe
 import LandingPage from "./features/landing/LandingPage";
 import PrivacidadePage from "./pages/PrivacidadePage";
 import ExcluirContaPage from "./pages/ExcluirContaPage";
+import CapturePrivacidadePage from "./pages/CapturePrivacidadePage";
 import Ferramentas from "./features/ferramentas";
 
 // ✅ Direção (Diretor) — Devices EDUCA-CAPTURE
@@ -214,6 +215,9 @@ export default function App() {
         <Route path="/cadastro" element={<CadastroUsuario />} />
         <Route path="/privacidade" element={<PrivacidadePage />} />
         <Route path="/excluir-conta" element={<ExcluirContaPage />} />
+        {/* EDUCA-CAPTURE — páginas públicas (App Store Connect: support/privacy URLs) */}
+        <Route path="/capture/privacidade" element={<CapturePrivacidadePage />} />
+        <Route path="/capture/suporte" element={<CapturePrivacidadePage />} />
         <Route path="/print/boletins" element={<PrintBoletinsTurma />} />
 
         {/* Rotas protegidas da PLATAFORMA */}

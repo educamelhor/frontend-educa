@@ -267,7 +267,7 @@ export default function ExcluirContaPage() {
                 <span style={styles.bullet}>•</span>
                 <span>Preferências e configurações salvas</span>
               </div>
-              <div style={styles.infoTitle} style={{ ...styles.infoTitle, marginTop: "12px" }}>
+              <div style={{ ...styles.infoTitle, marginTop: "12px" }}>
                 ⚠️ O que poderá ser mantido:
               </div>
               <div style={styles.infoItem}>

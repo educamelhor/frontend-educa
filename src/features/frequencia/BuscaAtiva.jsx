@@ -44,7 +44,7 @@ const fmtDataBR = (str) => {
 export default function BuscaAtiva() {
   const escolaId = localStorage.getItem("escola_id");
   const perfil = String(localStorage.getItem("perfil") || "").toLowerCase();
-  const canRegister = ["diretor", "vice_diretor", "coordenador", "secretaria"].includes(perfil);
+  const canRegister = ["diretor", "vice_diretor", "coordenador", "secretaria", "supervisor"].includes(perfil);
 
   const [registros, setRegistros] = useState([]);
   const [turnos, setTurnos] = useState([]);
@@ -62,6 +62,15 @@ export default function BuscaAtiva() {
   const [excluindoId, setExcluindoId] = useState(null);
   const [confirmandoExclusao, setConfirmandoExclusao] = useState(false);
   const [itemParaExcluir, setItemParaExcluir] = useState(null);
+
+  // ── Edição ──────────────────────────────────────
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editItem, setEditItem] = useState(null);
+  const [salvandoEdit, setSalvandoEdit] = useState(false);
+  const [erroEditModal, setErroEditModal] = useState("");
+  const [editForm, setEditForm] = useState({
+    data_contato: "", meio_contato: "", resultado: "", observacao: "",
+  });
 
   // ── Modal state (independente dos filtros da página) ──
   const [modalTurmaId, setModalTurmaId] = useState("");
@@ -165,6 +174,37 @@ export default function BuscaAtiva() {
       alert("Erro ao excluir: " + (err.response?.data?.error || err.message));
     } finally {
       setExcluindoId(null);
+    }
+  };
+
+  // ── Edição ──────────────────────────────────────────────
+  const abrirEdicao = (registro) => {
+    setEditItem(registro);
+    setEditForm({
+      data_contato: String(registro.data_contato || "").split("T")[0],
+      meio_contato: registro.meio_contato || "",
+      resultado: registro.resultado || "",
+      observacao: registro.observacao || "",
+    });
+    setErroEditModal("");
+    setShowEditModal(true);
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    if (!editForm.meio_contato || !editForm.resultado) return;
+    setSalvandoEdit(true);
+    setErroEditModal("");
+    try {
+      await api.put(`/frequencia/busca-ativa/${editItem.id}`, editForm);
+      setShowEditModal(false);
+      setEditItem(null);
+      carregarRegistros();
+    } catch (err) {
+      const msg = err.response?.data?.message || err.response?.data?.error || err.message;
+      setErroEditModal("\u274c Erro ao editar: " + msg);
+    } finally {
+      setSalvandoEdit(false);
     }
   };
 
@@ -331,20 +371,36 @@ export default function BuscaAtiva() {
                           borderRadius: 6, fontSize: "0.72rem", fontWeight: 700,
                         }}>{r.turma_nome || ""}</span>
                       </div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <span style={{ fontSize: "0.78rem", color: "#94a3b8" }}>
                           {fmtDataBR(r.data_contato)}
                         </span>
                         {canRegister && (
-                          <button
-                            onClick={() => confirmarExclusao(r)}
-                            disabled={excluindoId === r.id}
-                            title="Excluir registro"
-                            style={{
-                              padding: "4px 10px", borderRadius: 8, border: "1.5px solid #fecaca",
-                              background: "#fff", color: "#dc2626", fontSize: "0.75rem",
-                              fontWeight: 600, cursor: excluindoId === r.id ? "not-allowed" : "pointer",
-                              opacity: excluindoId === r.id ? 0.5 : 1,
+                          <>
+                            <button
+                              onClick={() => abrirEdicao(r)}
+                              title="Editar registro"
+                              style={{
+                                padding: "4px 10px", borderRadius: 8, border: "1.5px solid #c7d2fe",
+                                background: "#fff", color: "#4f46e5", fontSize: "0.75rem",
+                                fontWeight: 600, cursor: "pointer",
+                                display: "flex", alignItems: "center", gap: 4,
+                                transition: "all 0.15s",
+                              }}
+                              onMouseEnter={e => { e.currentTarget.style.background = "#eef2ff"; e.currentTarget.style.borderColor = "#4f46e5"; }}
+                              onMouseLeave={e => { e.currentTarget.style.background = "#fff"; e.currentTarget.style.borderColor = "#c7d2fe"; }}
+                            >
+                              ✏️ Editar
+                            </button>
+                            <button
+                              onClick={() => confirmarExclusao(r)}
+                              disabled={excluindoId === r.id}
+                              title="Excluir registro"
+                              style={{
+                                padding: "4px 10px", borderRadius: 8, border: "1.5px solid #fecaca",
+                                background: "#fff", color: "#dc2626", fontSize: "0.75rem",
+                                fontWeight: 600, cursor: excluindoId === r.id ? "not-allowed" : "pointer",
+                                opacity: excluindoId === r.id ? 0.5 : 1,
                               display: "flex", alignItems: "center", gap: 4,
                               transition: "all 0.15s",
                             }}
@@ -352,7 +408,8 @@ export default function BuscaAtiva() {
                             onMouseLeave={e => { e.currentTarget.style.background = "#fff"; e.currentTarget.style.borderColor = "#fecaca"; }}
                           >
                             🗑️ Excluir
-                          </button>
+                            </button>
+                          </>
                         )}
                       </div>
                     </div>
@@ -378,8 +435,15 @@ export default function BuscaAtiva() {
                         {r.observacao}
                       </p>
                     )}
-                    <div style={{ marginTop: 8, fontSize: "0.72rem", color: "#94a3b8" }}>
-                      Registrado por: {r.registrado_por_nome || "—"}
+                    <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 3 }}>
+                      <span style={{ fontSize: "0.72rem", color: "#94a3b8" }}>
+                        📝 Registrado por: {r.registrado_por_nome || "—"}
+                      </span>
+                      {r.editado_por_nome && (
+                        <span style={{ fontSize: "0.72rem", color: "#6366f1", fontWeight: 600 }}>
+                          ✏️ Editado por: {r.editado_por_nome} · {fmtDataBR(r.editado_em)}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -582,6 +646,119 @@ export default function BuscaAtiva() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ MODAL — Editar Contato ═══ */}
+      {showEditModal && editItem && (
+        <div style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)",
+          backdropFilter: "blur(4px)", display: "flex", alignItems: "center",
+          justifyContent: "center", zIndex: 9999, padding: 20,
+          animation: "fadeIn 0.2s ease",
+        }}>
+          <div style={{
+            background: "#fff", borderRadius: 20, width: "100%", maxWidth: 520,
+            maxHeight: "90vh", overflow: "auto",
+            boxShadow: "0 25px 50px rgba(0,0,0,0.15)",
+            animation: "slideUp 0.3s ease",
+          }}>
+            {/* Header */}
+            <div style={{
+              background: "linear-gradient(135deg, #4f46e5, #7c3aed)",
+              padding: "24px 28px", borderRadius: "20px 20px 0 0",
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                <div style={{
+                  width: 44, height: 44, borderRadius: 12,
+                  background: "rgba(255,255,255,0.15)", display: "flex",
+                  alignItems: "center", justifyContent: "center", fontSize: 22,
+                }}>✏️</div>
+                <div>
+                  <h2 style={{ color: "#fff", fontWeight: 800, fontSize: "1.1rem", margin: 0 }}>Editar Contato</h2>
+                  <p style={{ color: "rgba(255,255,255,0.7)", fontSize: "0.78rem", margin: 0, marginTop: 2 }}>
+                    {editItem.aluno_nome} · {editItem.turma_nome}
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => setShowEditModal(false)} style={{
+                background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 10,
+                width: 36, height: 36, cursor: "pointer", color: "#fff", fontSize: 18,
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>✕</button>
+            </div>
+
+            <form onSubmit={handleEditSubmit} style={{ padding: "28px" }}>
+              {erroEditModal && (
+                <div style={{
+                  padding: "12px 16px", borderRadius: 10, marginBottom: 20,
+                  background: "#fef2f2", border: "1.5px solid #fecaca",
+                  color: "#991b1b", fontSize: "0.85rem", fontWeight: 600,
+                }}>{erroEditModal}</div>
+              )}
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
+                <div>
+                  <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "#374151", marginBottom: 6, display: "block" }}>Data do Contato *</label>
+                  <input type="date" value={editForm.data_contato}
+                    onChange={e => setEditForm(f => ({ ...f, data_contato: e.target.value }))} required
+                    style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1.5px solid #d1d5db", background: "#f9fafb", fontSize: "0.88rem", fontWeight: 600, boxSizing: "border-box" }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "#374151", marginBottom: 6, display: "block" }}>Meio de Contato *</label>
+                  <select value={editForm.meio_contato}
+                    onChange={e => setEditForm(f => ({ ...f, meio_contato: e.target.value }))} required
+                    style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1.5px solid #d1d5db", background: "#f9fafb", fontSize: "0.88rem", fontWeight: 600 }}>
+                    <option value="">Selecione...</option>
+                    {MEIOS_CONTATO.map(m => <option key={m.value} value={m.value}>{m.icon} {m.label}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "#374151", marginBottom: 8, display: "block" }}>Resultado *</label>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {RESULTADOS_CONTATO.map(res => (
+                    <button key={res.value} type="button" onClick={() => setEditForm(f => ({ ...f, resultado: res.value }))} style={{
+                      display: "flex", alignItems: "center", gap: 10,
+                      padding: "10px 14px", borderRadius: 10,
+                      border: editForm.resultado === res.value ? `2px solid ${res.cor}` : "1.5px solid #e5e7eb",
+                      background: editForm.resultado === res.value ? `${res.cor}10` : "#fff",
+                      cursor: "pointer", textAlign: "left", transition: "all 0.15s",
+                    }}>
+                      <div style={{ width: 12, height: 12, borderRadius: "50%", background: editForm.resultado === res.value ? res.cor : "#d1d5db", transition: "background 0.15s" }} />
+                      <span style={{ fontSize: "0.85rem", fontWeight: 600, color: editForm.resultado === res.value ? res.cor : "#374151" }}>{res.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div style={{ marginBottom: 24 }}>
+                <label style={{ fontSize: "0.78rem", fontWeight: 700, color: "#374151", marginBottom: 6, display: "block" }}>Observação</label>
+                <textarea value={editForm.observacao}
+                  onChange={e => setEditForm(f => ({ ...f, observacao: e.target.value }))}
+                  placeholder="Detalhes da conversa, compromissos firmados..."
+                  rows={3}
+                  style={{ width: "100%", padding: "10px 14px", borderRadius: 10, border: "1.5px solid #d1d5db", background: "#f9fafb", fontSize: "0.88rem", resize: "vertical", fontFamily: "inherit", boxSizing: "border-box" }} />
+              </div>
+
+              <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
+                <button type="button" onClick={() => setShowEditModal(false)} style={{
+                  padding: "10px 24px", borderRadius: 10, border: "1.5px solid #d1d5db",
+                  background: "#fff", fontWeight: 600, fontSize: "0.88rem", cursor: "pointer", color: "#6b7280",
+                }}>Cancelar</button>
+                <button type="submit" disabled={salvandoEdit} style={{
+                  padding: "10px 28px", borderRadius: 10, border: "none",
+                  background: salvandoEdit ? "#9ca3af" : "linear-gradient(135deg, #4f46e5, #7c3aed)",
+                  color: "#fff", fontWeight: 700, fontSize: "0.88rem",
+                  cursor: salvandoEdit ? "not-allowed" : "pointer",
+                  boxShadow: salvandoEdit ? "none" : "0 2px 8px rgba(79,70,229,0.3)",
+                  display: "flex", alignItems: "center", gap: 8,
+                }}>{salvandoEdit ? "⏳ Salvando..." : "✅ Salvar Alterações"}</button>
+              </div>
+            </form>
           </div>
         </div>
       )}

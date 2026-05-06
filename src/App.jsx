@@ -59,6 +59,7 @@ import PlataformaSuporte from "./features/plataforma/PlataformaSuporte.jsx";
 import PlataformaGovernanca from "./features/plataforma/PlataformaGovernanca.jsx";
 import BoletimTurmas from "./features/impressao/BoletimTurmas";
 import ListasImpressao from "./features/impressao/ListasImpressao";
+import DocumentosImpressao from "./features/impressao/DocumentosImpressao";
 import PrintBoletinsTurma from "./features/impressao/PrintBoletinsTurma";
 import LoginProfessor from "./features/login/LoginProfessor";
 import CadastroUsuario from "./features/login/CadastroUsuario.jsx";
@@ -308,9 +309,10 @@ export default function App() {
           <Route path="/frequencia/conselho-tutelar" element={<ConselhoTutelar />} />
 
           {/* ── Impressão ────────────────────────────────────────────────── */}
-          <Route path="/impressao/gabaritos" element={<GerarGabaritos />} />
-          <Route path="/impressao/boletins"  element={<BoletimTurmas />} />
-          <Route path="/impressao/listas"    element={<ListasImpressao />} />
+          <Route path="/impressao/gabaritos"   element={<GerarGabaritos />} />
+          <Route path="/impressao/boletins"    element={<BoletimTurmas />} />
+          <Route path="/impressao/listas"      element={<ListasImpressao />} />
+          <Route path="/impressao/documentos"  element={<DocumentosImpressao />} />
 
           {/* ── Horários ─────────────────────────────────────────────────── */}
           <Route path="/secretaria/horarios/layout" element={<LayoutGrade />} />

@@ -1386,6 +1386,21 @@ export default function Sidebar({ isOpen, onClose }) {
                     <ClipboardDocumentListIcon className="h-5 w-5 mr-2" /> Listas
                   </Link>
                 </li>
+                <li>
+                  <Link
+                    to="/impressao/documentos"
+                    className={getSubmenuLinkClasses('/impressao/documentos')}
+                  >
+                    <DocumentTextIcon className="h-5 w-5 mr-2" />
+                    <span className="flex-1">Documentos</span>
+                    <span style={{
+                      fontSize: '0.5rem', fontWeight: 800,
+                      background: 'linear-gradient(135deg, #1e3a5f, #1565a0)',
+                      color: '#fff', padding: '1px 5px', borderRadius: '6px',
+                      letterSpacing: '0.5px',
+                    }}>NOVO</span>
+                  </Link>
+                </li>
               </ul>
             )}
           </>

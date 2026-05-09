@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import api from "../../services/api";
 import {
   BoltIcon,
@@ -254,6 +254,7 @@ export default function AgentePlanos() {
   const [carregando, setCarregando]     = useState(true);
   const [exportandoId, setExportandoId] = useState(null);
   const [filtro, setFiltro]             = useState("todos");
+  const [filtroBimestre, setFiltroBimestre] = useState("todos"); // "todos" | "1" | "2" | "3" | "4"
   const [modalConfirm, setModalConfirm] = useState(null);
   const [modalSemCred, setModalSemCred] = useState(false);
   const [modalResultado, setModalResultado] = useState(null);
@@ -307,23 +308,35 @@ export default function AgentePlanos() {
     return itens.some(i => i.fixo_direcao);
   });
 
+  // Filtro por bimestre
+  const planosPorBimestre = filtroBimestre === "todos"
+    ? planosComBimestral
+    : planosComBimestral.filter(p => String(p.bimestre || "").replace(/\D/g, "") === filtroBimestre);
+
   const planosFiltrados = (() => {
     switch (filtro) {
       case "prontos":
-        return planosComBimestral.filter(p =>
+        return planosPorBimestre.filter(p =>
           (p.status === "APROVADO" || p.status === "ENVIADO") && !p.agente_exportado_em
         );
       case "exportados":
-        return planosComBimestral.filter(p => !!p.agente_exportado_em);
+        return planosPorBimestre.filter(p => !!p.agente_exportado_em);
       default:
-        return planosComBimestral;
+        return planosPorBimestre;
     }
   })();
 
-  const totalProntos    = planosComBimestral.filter(p =>
+  const totalProntos    = planosPorBimestre.filter(p =>
     (p.status === "APROVADO" || p.status === "ENVIADO") && !p.agente_exportado_em
   ).length;
-  const totalExportados = planosComBimestral.filter(p => !!p.agente_exportado_em).length;
+  const totalExportados = planosPorBimestre.filter(p => !!p.agente_exportado_em).length;
+
+  // Contagem por bimestre (para badge nos mini-cards)
+  const contagemPorBim = planosComBimestral.reduce((acc, p) => {
+    const n = String(p.bimestre || "").replace(/\D/g, "");
+    if (n) acc[n] = (acc[n] || 0) + 1;
+    return acc;
+  }, {});
 
   // ── Polling helper (202 async pattern) ────────────────────────────────────
   // Mapeia mensagens técnicas em textos legíveis pelo professor
@@ -533,7 +546,7 @@ export default function AgentePlanos() {
             <h1 style={{ fontSize: "1.9rem", fontWeight: 900, color: "#f1f5f9", letterSpacing: "-0.5px", margin: 0 }}>
               Planos — Exportar para EDUCADF
             </h1>
-            <p style={{ color: "#64748b", fontSize: "0.9rem", marginTop: 8, maxWidth: 560, lineHeight: 1.6 }}>
+            <p style={{ color: "#64748b", fontSize: "0.9rem", marginTop: 8, maxWidth: 560, lineHeight: 1.6}>
               O Agente migra a coluna <strong style={{ color: "#a78bfa" }}>Avaliação Bimestral</strong> dos seus
               Planos de Avaliação Pedagógico (PAP) para o portal EDUCADF.
               Apenas a <strong style={{ color: "#e2e8f0" }}>estrutura</strong> é exportada nesta etapa — as notas serão em etapa posterior.
@@ -579,28 +592,78 @@ export default function AgentePlanos() {
       </div>
 
       {/* ═════════════════════ FILTROS ═════════════════════════ */}
-      <div style={{ margin: "20px 32px 0", display: "flex", gap: 8 }}>
-        {[
-          { key: "todos",      label: `Todos (${planosComBimestral.length})` },
-          { key: "prontos",    label: `Prontos (${totalProntos})` },
-          { key: "exportados", label: `Exportados (${totalExportados})` },
-        ].map(f => (
-          <button
-            key={f.key}
-            onClick={() => setFiltro(f.key)}
-            style={{
-              padding: "8px 16px", borderRadius: 10, fontWeight: 700, fontSize: "0.78rem",
-              cursor: "pointer", border: "none", transition: "all 0.2s",
-              background: filtro === f.key
-                ? "linear-gradient(135deg, #6366f1, #8b5cf6)"
-                : "rgba(255,255,255,0.04)",
-              color: filtro === f.key ? "#fff" : "#64748b",
-              boxShadow: filtro === f.key ? "0 4px 14px rgba(99,102,241,0.3)" : "none",
-            }}
-          >
-            {f.label}
-          </button>
-        ))}
+      <div style={{ margin: "20px 32px 0", display: "flex", flexWrap: "wrap", gap: 16, alignItems: "center" }}>
+
+        {/* Filtros de status */}
+        <div style={{ display: "flex", gap: 8 }}>
+          {[
+            { key: "todos",      label: `Todos (${planosPorBimestre.length})` },
+            { key: "prontos",    label: `Prontos (${totalProntos})` },
+            { key: "exportados", label: `Exportados (${totalExportados})` },
+          ].map(f => (
+            <button
+              key={f.key}
+              onClick={() => setFiltro(f.key)}
+              style={{
+                padding: "8px 16px", borderRadius: 10, fontWeight: 700, fontSize: "0.78rem",
+                cursor: "pointer", border: "none", transition: "all 0.2s",
+                background: filtro === f.key
+                  ? "linear-gradient(135deg, #6366f1, #8b5cf6)"
+                  : "rgba(255,255,255,0.04)",
+                color: filtro === f.key ? "#fff" : "#64748b",
+                boxShadow: filtro === f.key ? "0 4px 14px rgba(99,102,241,0.3)" : "none",
+              }}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Divisor vertical */}
+        <div style={{ width: 1, height: 28, background: "rgba(255,255,255,0.08)", flexShrink: 0 }} />
+
+        {/* Filtros de bimestre — 4 mini-cards */}
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+          <span style={{ fontSize: "0.65rem", color: "#334155", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginRight: 2 }}>Bimestre:</span>
+          {[
+            { key: "todos", label: "Todos",  color: "#6366f1", total: planosComBimestral.length },
+            { key: "1",     label: "1° Bim", color: "#6366f1", total: contagemPorBim["1"] || 0 },
+            { key: "2",     label: "2° Bim", color: "#8b5cf6", total: contagemPorBim["2"] || 0 },
+            { key: "3",     label: "3° Bim", color: "#ec4899", total: contagemPorBim["3"] || 0 },
+            { key: "4",     label: "4° Bim", color: "#f59e0b", total: contagemPorBim["4"] || 0 },
+          ].map(b => {
+            const ativo = filtroBimestre === b.key;
+            return (
+              <button
+                key={b.key}
+                onClick={() => setFiltroBimestre(b.key)}
+                title={b.key === "todos" ? "Todos os bimestres" : `Filtrar ${b.label}`}
+                style={{
+                  display: "flex", alignItems: "center", gap: 5,
+                  padding: "6px 11px", borderRadius: 8, fontWeight: 700, fontSize: "0.72rem",
+                  cursor: "pointer",
+                  border: `1px solid ${ativo ? b.color : "rgba(255,255,255,0.08)"}`,
+                  background: ativo ? `${b.color}22` : "rgba(255,255,255,0.03)",
+                  color: ativo ? b.color : "#475569",
+                  transition: "all 0.18s",
+                  boxShadow: ativo ? `0 2px 10px ${b.color}33` : "none",
+                }}
+              >
+                <span style={{
+                  display: "inline-block", width: 6, height: 6, borderRadius: "50%",
+                  background: ativo ? b.color : "#334155", flexShrink: 0,
+                }} />
+                {b.label}
+                <span style={{
+                  fontSize: "0.65rem", fontWeight: 800,
+                  color: ativo ? b.color : "#334155",
+                  background: ativo ? `${b.color}18` : "rgba(255,255,255,0.05)",
+                  borderRadius: 5, padding: "1px 5px", marginLeft: 2,
+                }}>{b.total}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* ═════════ MODAL AGENTE OCUPADO ══════════════════════════ */}

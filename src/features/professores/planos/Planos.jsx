@@ -818,6 +818,119 @@ export default function Planos() {
             )}
           </div>
 
+          {/* ── Card de contexto: aparece sempre que o editor estiver aberto (turma única ou lote) ── */}
+          {turmasDoPlanoAberto.length >= 1 && (() => {
+            const isLote = turmasDoPlanoAberto.length > 1;
+            const corBg        = isLote ? "linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(139,92,246,0.06) 100%)"
+                                        : "linear-gradient(135deg, rgba(14,165,233,0.07) 0%, rgba(56,189,248,0.05) 100%)";
+            const corBorder    = isLote ? "1px solid rgba(99,102,241,0.28)" : "1px solid rgba(14,165,233,0.25)";
+            const corIconeBg   = isLote ? "linear-gradient(135deg, #818cf8, #6366f1)" : "linear-gradient(135deg, #38bdf8, #0ea5e9)";
+            const corIconeSomb = isLote ? "0 2px 8px rgba(99,102,241,0.35)" : "0 2px 8px rgba(14,165,233,0.28)";
+            const corLabel     = isLote ? "#818cf8" : "#0ea5e9";
+            const corChipBg    = isLote ? "rgba(99,102,241,0.18)" : "rgba(14,165,233,0.13)";
+            const corChipBord  = isLote ? "1px solid rgba(99,102,241,0.35)" : "1px solid rgba(14,165,233,0.28)";
+            const corChipTxt   = isLote ? "#a5b4fc" : "#38bdf8";
+            const corSvg       = isLote ? "#a5b4fc" : "#38bdf8";
+
+            return (
+              <div
+                style={{
+                  marginBottom: "1rem",
+                  borderRadius: "0.875rem",
+                  background: corBg,
+                  border: corBorder,
+                  padding: "0.75rem 1.1rem",
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: "0.75rem",
+                  boxShadow: isLote ? "0 2px 12px rgba(99,102,241,0.09)" : "0 2px 8px rgba(14,165,233,0.07)",
+                }}
+              >
+                {/* Ícone */}
+                <div
+                  style={{
+                    flexShrink: 0,
+                    width: 34,
+                    height: 34,
+                    borderRadius: "0.55rem",
+                    background: corIconeBg,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    boxShadow: corIconeSomb,
+                    fontSize: "0.95rem",
+                  }}
+                >
+                  {isLote ? "📋" : "📄"}
+                </div>
+
+                {/* Conteúdo */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  {/* Título dinâmico */}
+                  <div
+                    style={{
+                      fontSize: "0.68rem",
+                      fontWeight: 800,
+                      color: corLabel,
+                      letterSpacing: "0.07em",
+                      textTransform: "uppercase",
+                      marginBottom: "0.4rem",
+                    }}
+                  >
+                    {isLote
+                      ? `Plano em lote — ${turmasDoPlanoAberto.length} turmas receberão este plano`
+                      : "Plano individual — turma de destino"}
+                  </div>
+
+                  {/* Chips de turmas */}
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.35rem" }}>
+                    {turmasDoPlanoAberto.map((turma) => (
+                      <span
+                        key={turma}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "0.3rem",
+                          padding: "0.2rem 0.65rem",
+                          borderRadius: "2rem",
+                          background: corChipBg,
+                          border: corChipBord,
+                          color: corChipTxt,
+                          fontSize: "0.75rem",
+                          fontWeight: 700,
+                          letterSpacing: "0.02em",
+                        }}
+                      >
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+                          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke={corSvg} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          <circle cx="9" cy="7" r="4" stroke={corSvg} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M23 21v-2a4 4 0 0 0-3-3.87" stroke={corSvg} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          <path d="M16 3.13a4 4 0 0 1 0 7.75" stroke={corSvg} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                        {turma}
+                      </span>
+                    ))}
+                  </div>
+
+                  {/* Rodapé contextual */}
+                  <div
+                    style={{
+                      marginTop: "0.45rem",
+                      fontSize: "0.7rem",
+                      color: "#64748b",
+                      fontWeight: 500,
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {isLote
+                      ? "Ao salvar, o mesmo plano de avaliação será aplicado a todas as turmas listadas acima."
+                      : "Este plano será salvo exclusivamente para esta turma."}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-2xl font-semibold text-blue-800">
               Atividades Avaliativas

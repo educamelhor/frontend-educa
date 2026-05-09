@@ -675,7 +675,6 @@ export default function AgentePlanos() {
           })}
         </div>
       </div>
-      </div>
 
       {/* ═════════ MODAL AGENTE OCUPADO ══════════════════════════ */}
       {modalOcupado && (

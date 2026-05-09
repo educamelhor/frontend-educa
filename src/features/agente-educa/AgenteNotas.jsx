@@ -714,7 +714,6 @@ export default function AgenteNotas() {
           })}
         </div>
       </div>
-      </div>
 
       {/* ═══════════════════════════ LISTA ═══════════════════════════════ */}
       <div style={{ padding: "20px 32px 40px" }}>

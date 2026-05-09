@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import api from "../../services/api";
 import {
   BoltIcon,
@@ -231,12 +231,12 @@ function PlanCard({ plano, onExportar, onReexportar, exportandoId }) {
                     }}
                   >
                     <div style={{ fontSize: "0.72rem", fontWeight: 700, color: item.fixo_direcao ? "#c4b5fd" : "#94a3b8" }}>
-                      {item.fixo_direcao && <SparklesIcon style={{ width: 12, display: "inline", marginRight: 4 }} />}
+                      {!!item.fixo_direcao && <SparklesIcon style={{ width: 12, display: "inline", marginRight: 4 }} />}
                       {item.atividade}
                     </div>
                     <div style={{ fontSize: "0.6rem", color: "#475569", marginTop: 2 }}>
                       {item.nota_total} pts
-                      {item.fixo_direcao && <span style={{ color: "#a78bfa", marginLeft: 6 }}>← será exportado</span>}
+                      {!!item.fixo_direcao && <span style={{ color: "#a78bfa", marginLeft: 6 }}>← será exportado</span>}
                     </div>
                   </div>
                 ))}

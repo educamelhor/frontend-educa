@@ -2,24 +2,28 @@
 // Modal — Importar Questão via Imagem + Gemini Vision
 // Fluxo: upload → preview → extração → revisão → pré-preenchimento
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import api from '../../../services/api';
 
 const CONFIANCA_COLOR = { alta: '#059669', media: '#d97706', baixa: '#dc2626' };
 const CONFIANCA_LABEL = { alta: '✅ Alta', media: '⚠️ Média', baixa: '❌ Baixa' };
 
 export default function ImagemParaQuestaoModal({ onClose, onUsar }) {
-  const [etapa, setEtapa]         = useState('upload');   // upload | extraindo | revisao | erro
-  const [arquivo, setArquivo]     = useState(null);
-  const [preview, setPreview]     = useState(null);
-  const [resultado, setResultado] = useState(null);
-  const [erroMsg, setErroMsg]     = useState('');
-  const [isDrag, setIsDrag]       = useState(false);
+  const [etapa, setEtapa]           = useState('upload'); // upload | extraindo | revisao | erro
+  const [arquivo, setArquivo]       = useState(null);
+  const [preview, setPreview]       = useState(null);
+  const [resultado, setResultado]   = useState(null);
+  const [erroMsg, setErroMsg]       = useState('');
+  const [isDrag, setIsDrag]         = useState(false);
+  const [pasteFlash, setPasteFlash] = useState(false); // feedback ao colar print
   const inputRef = useRef();
 
   // ── Selecionar arquivo ─────────────────────────────────────────────────────
   const selecionarArquivo = useCallback((file) => {
-    if (!file || !/^image\/(jpeg|png|webp|gif)$/i.test(file.type)) {
+    if (!file) return;
+    // Clipboard paste pode vir sem nome; valida pelo tipo MIME
+    const tipo = file.type || 'image/png';
+    if (!/^image\/(jpeg|png|webp|gif|bmp|tiff|avif)$/i.test(tipo)) {
       setErroMsg('Formato inválido. Use JPG, PNG ou WEBP.');
       return;
     }
@@ -45,6 +49,34 @@ export default function ImagemParaQuestaoModal({ onClose, onUsar }) {
     selecionarArquivo(e.dataTransfer.files?.[0]);
   };
 
+  // ── Ctrl+V — captura print da área de transferência ───────────────────────
+  useEffect(() => {
+    const handlePaste = (e) => {
+      // Só processa na etapa de upload (ou erro para nova tentativa)
+      if (etapa !== 'upload' && etapa !== 'erro') return;
+
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (const item of items) {
+        if (item.kind === 'file' && item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          if (file) {
+            selecionarArquivo(file);
+            // Flash de feedback visual — borda verde + toast
+            setPasteFlash(true);
+            setTimeout(() => setPasteFlash(false), 1800);
+            e.preventDefault();
+            break;
+          }
+        }
+      }
+    };
+
+    window.addEventListener('paste', handlePaste);
+    return () => window.removeEventListener('paste', handlePaste);
+  }, [etapa, selecionarArquivo]);
+
   // ── Chamar Gemini ──────────────────────────────────────────────────────────
   const extrair = async () => {
     if (!arquivo) return;
@@ -55,7 +87,6 @@ export default function ImagemParaQuestaoModal({ onClose, onUsar }) {
       const fd = new FormData();
       fd.append('imagem', arquivo);
 
-      // usa o api (axios) que já tem a URL do backend + token injetado
       const { data } = await api.post('/api/questoes/extrair-imagem', fd);
 
       if (!data.ok) {
@@ -75,7 +106,6 @@ export default function ImagemParaQuestaoModal({ onClose, onUsar }) {
   const usar = () => {
     if (!resultado) return;
 
-    // Monta no formato exato que o QuestoesBuilder.INITIAL_STATE espera
     const alternativas = (resultado.alternativas || []).map((a, i) => ({
       id:      Date.now() + i,
       letra:   a.letra,
@@ -86,10 +116,10 @@ export default function ImagemParaQuestaoModal({ onClose, onUsar }) {
     }));
 
     onUsar({
-      enunciado:   resultado.enunciado || '',
-      fonte:       resultado.fonte     || '',
+      enunciado:    resultado.enunciado || '',
+      fonte:        resultado.fonte     || '',
       alternativas: alternativas.length >= 2 ? alternativas : undefined,
-      tipo:        'objetiva',
+      tipo:         'objetiva',
     });
     onClose();
   };
@@ -113,10 +143,10 @@ export default function ImagemParaQuestaoModal({ onClose, onUsar }) {
           <div style={{ flex: 1 }}>
             <div style={styles.headerTitle}>Importar Questão por Imagem</div>
             <div style={styles.headerSub}>
-              {etapa === 'upload'   && 'Envie uma foto ou print da questão'}
-              {etapa === 'extraindo'&& 'Gemini Vision analisando...'}
-              {etapa === 'revisao'  && 'Revise antes de usar'}
-              {etapa === 'erro'     && 'Ocorreu um erro'}
+              {etapa === 'upload'    && 'Arraste, selecione ou cole um print (Ctrl+V)'}
+              {etapa === 'extraindo' && 'Gemini Vision analisando...'}
+              {etapa === 'revisao'   && 'Revise antes de usar'}
+              {etapa === 'erro'      && 'Ocorreu um erro'}
             </div>
           </div>
           <button style={styles.btnClose} onClick={onClose}>✕</button>
@@ -128,12 +158,20 @@ export default function ImagemParaQuestaoModal({ onClose, onUsar }) {
           {/* ── ETAPA: UPLOAD ── */}
           {(etapa === 'upload' || etapa === 'erro') && (
             <>
+              {/* Toast de feedback do Ctrl+V */}
+              {pasteFlash && (
+                <div style={styles.pasteToast}>
+                  📋 Print colado com sucesso!
+                </div>
+              )}
+
               {/* Drag & drop */}
               <div
                 style={{
                   ...styles.dropZone,
-                  ...(isDrag ? styles.dropZoneActive : {}),
-                  ...(preview ? styles.dropZoneWithPreview : {}),
+                  ...(isDrag      ? styles.dropZoneActive      : {}),
+                  ...(preview     ? styles.dropZoneWithPreview : {}),
+                  ...(pasteFlash  ? styles.dropZoneFlash       : {}),
                 }}
                 onClick={() => inputRef.current.click()}
                 onDragOver={(e) => { e.preventDefault(); setIsDrag(true); }}
@@ -154,17 +192,30 @@ export default function ImagemParaQuestaoModal({ onClose, onUsar }) {
                   <div style={{ textAlign: 'center' }}>
                     <div style={{ fontSize: '2.5rem', marginBottom: 8 }}>🖼️</div>
                     <div style={styles.dropText}>
-                      Arraste a imagem aqui ou <span style={styles.dropLink}>clique para selecionar</span>
+                      Arraste aqui ou <span style={styles.dropLink}>clique para selecionar</span>
                     </div>
                     <div style={styles.dropSub}>JPG, PNG ou WEBP · Máx. 10 MB</div>
+
+                    {/* Hint do Ctrl+V */}
+                    <div style={styles.pasteHint}>
+                      <span style={styles.kbdKey}>Ctrl</span>
+                      <span style={styles.kbdPlus}>+</span>
+                      <span style={styles.kbdKey}>V</span>
+                      <span style={styles.pasteHintText}>para colar um print da área de transferência</span>
+                    </div>
                   </div>
                 )}
               </div>
 
               {preview && (
-                <button style={styles.btnTrocar} onClick={() => inputRef.current.click()}>
-                  🔄 Trocar imagem
-                </button>
+                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+                  <button style={styles.btnTrocar} onClick={() => inputRef.current.click()}>
+                    🔄 Trocar imagem
+                  </button>
+                  <button style={styles.btnTrocar} onClick={resetar}>
+                    🗑️ Remover
+                  </button>
+                </div>
               )}
 
               {erroMsg && (
@@ -202,7 +253,6 @@ export default function ImagemParaQuestaoModal({ onClose, onUsar }) {
           {/* ── ETAPA: REVISÃO ── */}
           {etapa === 'revisao' && resultado && (
             <>
-              {/* Lado a lado: imagem + resultado */}
               <div style={styles.revisaoGrid}>
                 {/* Imagem original */}
                 <div style={styles.revisaoImagem}>
@@ -226,7 +276,6 @@ export default function ImagemParaQuestaoModal({ onClose, onUsar }) {
                     )}
                   </div>
 
-                  {/* Fonte */}
                   {resultado.fonte && (
                     <div style={styles.campoBlock}>
                       <div style={styles.campoLabel}>Fonte</div>
@@ -234,13 +283,11 @@ export default function ImagemParaQuestaoModal({ onClose, onUsar }) {
                     </div>
                   )}
 
-                  {/* Enunciado */}
                   <div style={styles.campoBlock}>
                     <div style={styles.campoLabel}>Enunciado</div>
                     <div style={{ ...styles.campoValor, fontWeight: 500 }}>{resultado.enunciado}</div>
                   </div>
 
-                  {/* Alternativas */}
                   {resultado.alternativas?.length > 0 && (
                     <div style={styles.campoBlock}>
                       <div style={styles.campoLabel}>
@@ -312,7 +359,7 @@ const styles = {
     background: 'linear-gradient(135deg, #0e7490, #0369a1)',
     flexShrink: 0,
   },
-  headerIcon: { fontSize: '1.5rem', background: 'rgba(255,255,255,0.2)', borderRadius: 10, padding: '6px 10px' },
+  headerIcon:  { fontSize: '1.5rem', background: 'rgba(255,255,255,0.2)', borderRadius: 10, padding: '6px 10px' },
   headerTitle: { color: '#fff', fontWeight: 800, fontSize: '1rem' },
   headerSub:   { color: 'rgba(255,255,255,0.8)', fontSize: '0.78rem', marginTop: 2 },
   btnClose: {
@@ -320,29 +367,55 @@ const styles = {
     color: '#fff', cursor: 'pointer', fontSize: '0.9rem',
     width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
-  body: { padding: 20, overflowY: 'auto', flex: 1 },
+  body: { padding: 20, overflowY: 'auto', flex: 1, position: 'relative' },
 
-  // Upload
+  // ── Toast Ctrl+V
+  pasteToast: {
+    position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)',
+    background: '#059669', color: '#fff', borderRadius: 10,
+    padding: '8px 18px', fontSize: '0.85rem', fontWeight: 700,
+    boxShadow: '0 4px 16px rgba(5,150,105,0.4)',
+    zIndex: 10, whiteSpace: 'nowrap',
+  },
+
+  // ── Upload / dropzone
   dropZone: {
     border: '2px dashed #cbd5e1', borderRadius: 14, padding: 32,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     cursor: 'pointer', background: '#f8fafc', transition: 'all 0.2s',
     minHeight: 180,
   },
-  dropZoneActive: { borderColor: '#0e7490', background: '#f0fdff' },
+  dropZoneActive:      { borderColor: '#0e7490', background: '#f0fdff' },
   dropZoneWithPreview: { padding: 8, border: '2px solid #0e7490', background: '#f0fdff' },
+  dropZoneFlash:       { borderColor: '#059669', background: '#f0fdf4', boxShadow: '0 0 0 3px rgba(5,150,105,0.2)' },
   dropText: { fontSize: '0.92rem', color: '#475569', marginBottom: 4 },
   dropLink: { color: '#0e7490', fontWeight: 700, textDecoration: 'underline' },
-  dropSub:  { fontSize: '0.75rem', color: '#94a3b8' },
+  dropSub:  { fontSize: '0.75rem', color: '#94a3b8', marginBottom: 12 },
   previewImg: { width: '100%', maxHeight: 300, objectFit: 'contain', borderRadius: 8 },
+
+  // ── Hint Ctrl+V
+  pasteHint: {
+    display: 'inline-flex', alignItems: 'center', gap: 5,
+    marginTop: 4, background: '#f1f5f9', borderRadius: 8,
+    padding: '5px 12px', fontSize: '0.75rem',
+  },
+  kbdKey: {
+    background: '#fff', border: '1.5px solid #cbd5e1', borderRadius: 5,
+    padding: '1px 7px', fontWeight: 700, fontSize: '0.73rem',
+    color: '#334155', fontFamily: 'monospace',
+    boxShadow: '0 2px 0 #cbd5e1',
+  },
+  kbdPlus:       { color: '#94a3b8', fontWeight: 600 },
+  pasteHintText: { color: '#64748b', marginLeft: 2 },
+
   btnTrocar: {
-    marginTop: 8, background: 'none', border: '1px solid #cbd5e1',
+    background: 'none', border: '1px solid #cbd5e1',
     borderRadius: 8, padding: '4px 12px', fontSize: '0.78rem',
     color: '#64748b', cursor: 'pointer',
   },
 
-  // Loading
-  loadingWrap: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 0', gap: 12 },
+  // ── Loading
+  loadingWrap:  { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 0', gap: 12 },
   spinner: {
     width: 44, height: 44, border: '4px solid #e2e8f0',
     borderTop: '4px solid #0e7490', borderRadius: '50%',
@@ -351,11 +424,11 @@ const styles = {
   loadingTitle: { fontSize: '1.05rem', fontWeight: 700, color: '#0f172a' },
   loadingSub:   { fontSize: '0.82rem', color: '#64748b', textAlign: 'center', lineHeight: 1.5 },
 
-  // Revisão
-  revisaoGrid: { display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 16, marginBottom: 16 },
+  // ── Revisão
+  revisaoGrid:   { display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: 16, marginBottom: 16 },
   revisaoImagem: { display: 'flex', flexDirection: 'column', gap: 6 },
-  revisaoImg: { width: '100%', borderRadius: 10, border: '1.5px solid #e2e8f0', objectFit: 'contain', maxHeight: 380 },
-  revisaoDados: { display: 'flex', flexDirection: 'column', gap: 10, overflowY: 'auto', maxHeight: 420, paddingRight: 4 },
+  revisaoImg:    { width: '100%', borderRadius: 10, border: '1.5px solid #e2e8f0', objectFit: 'contain', maxHeight: 380 },
+  revisaoDados:  { display: 'flex', flexDirection: 'column', gap: 10, overflowY: 'auto', maxHeight: 420, paddingRight: 4 },
   revisaoLabel: {
     fontSize: '0.7rem', fontWeight: 700, color: '#64748b',
     textTransform: 'uppercase', letterSpacing: '0.05em',
@@ -371,7 +444,7 @@ const styles = {
     textTransform: 'uppercase', letterSpacing: '0.04em',
     marginBottom: 5, display: 'flex', alignItems: 'center', gap: 8,
   },
-  campoValor: { fontSize: '0.88rem', color: '#0f172a', lineHeight: 1.5 },
+  campoValor:    { fontSize: '0.88rem', color: '#0f172a', lineHeight: 1.5 },
   gabaritoBadge: {
     fontSize: '0.68rem', background: '#f0fdf4', color: '#059669',
     border: '1px solid #86efac', borderRadius: 99, padding: '1px 8px', fontWeight: 700,
@@ -389,11 +462,11 @@ const styles = {
     justifyContent: 'center', fontWeight: 800, fontSize: '0.75rem',
   },
 
-  // Alertas
-  alertErro:   { marginTop: 10, padding: '10px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, fontSize: '0.82rem', color: '#b91c1c' },
-  alertAviso:  { marginTop: 4, padding: '10px 14px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, fontSize: '0.82rem', color: '#92400e' },
+  // ── Alertas
+  alertErro:  { marginTop: 10, padding: '10px 14px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, fontSize: '0.82rem', color: '#b91c1c' },
+  alertAviso: { marginTop: 4,  padding: '10px 14px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, fontSize: '0.82rem', color: '#92400e' },
 
-  // Footer
+  // ── Footer
   footer: { display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16, paddingTop: 14, borderTop: '1px solid #f1f5f9' },
   btnPrimario: {
     background: '#0e7490', color: '#fff', border: 'none', borderRadius: 10,

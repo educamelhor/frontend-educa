@@ -8,6 +8,7 @@ import ImageUploader from './components/ImageUploader';
 import LatexPreview, { gerarLatex } from './components/LatexPreview';
 import ImagemParaQuestaoModal from './components/ImagemParaQuestaoModal';
 import PublicarResultadoModal from './components/PublicarResultadoModal';
+import ComentarioCorretaModal from './components/ComentarioCorretaModal';
 
 /* ── Constantes ─────────────────────────────────────────── */
 const LETRAS = ['A', 'B', 'C', 'D', 'E'];
@@ -89,6 +90,9 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
   const [saving, setSaving] = useState(false);
   const [modalResultado, setModalResultado] = useState(null);
   const [showImagemModal, setShowImagemModal] = useState(false);
+  // Modal de justificativa da alternativa correta
+  const [showComentarioModal, setShowComentarioModal]   = useState(false);
+  const [altCorretaInfoModal, setAltCorretaInfoModal]   = useState(null); // { id, letra, texto }
   // Rastreia ID de rascunho salvo mas ainda não publicado no banco global
   const [savedDraftId, setSavedDraftId] = useState(null);
 
@@ -174,11 +178,19 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
     });
   };
 
-  const marcarCorreta = (id) =>
+  const marcarCorreta = (id) => {
+    // 1. Marca a alternativa como correta no form
     setForm(p => ({
       ...p,
       alternativas: p.alternativas.map(a => ({ ...a, correta: a.id === id })),
     }));
+    // 2. Abre modal premium pedindo justificativa
+    const alt = form.alternativas.find(a => a.id === id);
+    if (alt) {
+      setAltCorretaInfoModal({ id, letra: alt.letra, texto: alt.texto });
+      setShowComentarioModal(true);
+    }
+  };
 
   const addAlt = () => {
     if (form.alternativas.length >= 7) return;
@@ -749,6 +761,26 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
         <ImagemParaQuestaoModal
           onClose={() => setShowImagemModal(false)}
           onUsar={handleUsarExtracao}
+        />
+      )}
+
+      {/* ── Modal Comentário da Alternativa Correta ── */}
+      {showComentarioModal && altCorretaInfoModal && (
+        <ComentarioCorretaModal
+          letraCorreta={altCorretaInfoModal.letra}
+          textoCorreta={altCorretaInfoModal.texto}
+          comentarioAtual={form.explicacao}
+          onSalvar={(texto) => {
+            set('explicacao', texto);
+            setShowComentarioModal(false);
+            setAltCorretaInfoModal(null);
+            // Abre o bloco 4 para o usuário ver o campo preenchido
+            if (texto) setOpenBlocks(p => ({ ...p, 4: true }));
+          }}
+          onPular={() => {
+            setShowComentarioModal(false);
+            setAltCorretaInfoModal(null);
+          }}
         />
       )}
 

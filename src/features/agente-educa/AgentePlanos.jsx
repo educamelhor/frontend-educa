@@ -42,7 +42,7 @@ const BIMESTRE_COLORS = {
   "4º Bimestre": "#f59e0b",
 };
 
-function PlanCard({ plano, onExportar, exportandoId }) {
+function PlanCard({ plano, onExportar, onReexportar, exportandoId }) {
   const [expanded, setExpanded] = useState(false);
   const statusInfo  = STATUS_LABELS[plano.status] || STATUS_LABELS.RASCUNHO;
   const bimColor    = BIMESTRE_COLORS[plano.bimestre] || "#6366f1";
@@ -50,8 +50,11 @@ function PlanCard({ plano, onExportar, exportandoId }) {
   const bimestral   = itens.find(i => i.fixo_direcao);
   const exportando  = exportandoId === plano.id;
 
+  // Lock de concorrência: se agente_executando_desde < 15min → em execução
+  const emExecucao  = !!plano.agente_executando_desde &&
+    (Date.now() - new Date(plano.agente_executando_desde).getTime() < 15 * 60 * 1000);
   const jaExportado  = plano.agente_exportado_em;
-  const podeExportar = !jaExportado && (plano.status === "APROVADO" || plano.status === "ENVIADO");
+  const podeExportar = !jaExportado && !emExecucao && (plano.status === "APROVADO" || plano.status === "ENVIADO");
 
   return (
     <div
@@ -112,19 +115,51 @@ function PlanCard({ plano, onExportar, exportandoId }) {
 
             {/* Ações */}
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
-              {jaExportado ? (
+              {emExecucao || exportando ? (
                 <div style={{
-                  display: "flex", alignItems: "center", gap: 6, padding: "8px 14px",
-                  borderRadius: 12, background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.25)",
+                  display: "flex", alignItems: "center", gap: 8, padding: "10px 18px",
+                  borderRadius: 14, background: "rgba(99,102,241,0.15)",
+                  border: "1px solid rgba(99,102,241,0.35)",
                 }}>
-                  <CheckCircleIcon style={{ width: 16, color: "#22c55e" }} />
+                  <ArrowPathIcon style={{ width: 15, color: "#818cf8", animation: "spin 0.8s linear infinite" }} />
                   <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "#22c55e" }}>Exportado</div>
-                    <div style={{ fontSize: "0.6rem", color: "#4ade80" }}>
-                      {new Date(jaExportado).toLocaleDateString("pt-BR")}
-                    </div>
+                    <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "#818cf8" }}>Em execução...</div>
+                    <div style={{ fontSize: "0.6rem", color: "#6366f1" }}>Agente trabalhando no EDUCADF</div>
                   </div>
                 </div>
+              ) : jaExportado ? (
+                <>
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 6, padding: "8px 14px",
+                    borderRadius: 12, background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.25)",
+                  }}>
+                    <CheckCircleIcon style={{ width: 16, color: "#22c55e" }} />
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "#22c55e" }}>Estrutura Exportada</div>
+                      <div style={{ fontSize: "0.6rem", color: "#4ade80" }}>
+                        {new Date(jaExportado).toLocaleDateString("pt-BR")}
+                      </div>
+                    </div>
+                  </div>
+                  {(plano.status === "APROVADO" || plano.status === "ENVIADO") && (
+                    <button
+                      onClick={() => onReexportar(plano)}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 6,
+                        padding: "7px 14px", borderRadius: 10, fontWeight: 700,
+                        fontSize: "0.72rem", cursor: "pointer",
+                        background: "rgba(99,102,241,0.15)",
+                        border: "1px solid rgba(99,102,241,0.4)", color: "#a5b4fc",
+                        transition: "all 0.15s",
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.background = "rgba(99,102,241,0.28)"; e.currentTarget.style.color = "#c7d2fe"; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = "rgba(99,102,241,0.15)"; e.currentTarget.style.color = "#a5b4fc"; }}
+                    >
+                      <ArrowPathIcon style={{ width: 13 }} />
+                      Reexportar Estrutura
+                    </button>
+                  )}
+                </>
               ) : !bimestral ? (
                 <div style={{
                   padding: "8px 14px", borderRadius: 12, fontSize: "0.7rem",
@@ -146,29 +181,18 @@ function PlanCard({ plano, onExportar, exportandoId }) {
               ) : (
                 <button
                   onClick={() => onExportar(plano)}
-                  disabled={exportando}
                   style={{
                     display: "flex", alignItems: "center", gap: 8,
                     padding: "10px 18px", borderRadius: 14, fontWeight: 800,
-                    fontSize: "0.8rem", cursor: exportando ? "not-allowed" : "pointer",
-                    background: exportando ? "rgba(99,102,241,0.3)" : "linear-gradient(135deg, #6366f1, #8b5cf6)",
+                    fontSize: "0.8rem", cursor: "pointer",
+                    background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
                     border: "none", color: "#fff",
                     boxShadow: "0 4px 16px rgba(99,102,241,0.35)",
-                    opacity: exportando ? 0.7 : 1,
                     transition: "all 0.2s",
                   }}
                 >
-                  {exportando ? (
-                    <>
-                      <ArrowPathIcon style={{ width: 15, animation: "spin 0.8s linear infinite" }} />
-                      Exportando...
-                    </>
-                  ) : (
-                    <>
-                      <RocketLaunchIcon style={{ width: 15 }} />
-                      Exportar Estrutura
-                    </>
-                  )}
+                  <RocketLaunchIcon style={{ width: 15 }} />
+                  Exportar Estrutura
                 </button>
               )}
 
@@ -229,12 +253,13 @@ export default function AgentePlanos() {
   const [planos, setPlanos]             = useState([]);
   const [carregando, setCarregando]     = useState(true);
   const [exportandoId, setExportandoId] = useState(null);
-  const [filtro, setFiltro]             = useState("todos"); // todos | prontos | exportados
-  const [modalConfirm, setModalConfirm] = useState(null); // plano selecionado p/ confirmar export
-  const [modalSemCred, setModalSemCred] = useState(false); // modal de credenciais não configuradas
-  const [modalResultado, setModalResultado] = useState(null); // { tipo: 'sucesso'|'erro', titulo, texto }
-  const [modalOcupado, setModalOcupado] = useState(null); // { turma, disciplina } do plano em execução
-  const [modalJaExiste, setModalJaExiste] = useState(null); // { turma, disciplina, bimestre, nome } quando JA_EXISTE
+  const [filtro, setFiltro]             = useState("todos");
+  const [modalConfirm, setModalConfirm] = useState(null);
+  const [modalSemCred, setModalSemCred] = useState(false);
+  const [modalResultado, setModalResultado] = useState(null);
+  const [modalOcupado, setModalOcupado] = useState(null);
+  const [modalJaExiste, setModalJaExiste] = useState(null);
+  const [modalReexportar, setModalReexportar] = useState(null); // confirmar reexportação
   // Turmas e disciplinas do professor logado (para filtro pessoal duplo)
   const [turmasNomesProf, setTurmasNomesProf] = useState(null);
 
@@ -300,108 +325,158 @@ export default function AgentePlanos() {
   ).length;
   const totalExportados = planosComBimestral.filter(p => !!p.agente_exportado_em).length;
 
-  // ── Exportar estrutura ─────────────────────────────────
+  // ── Polling helper (202 async pattern) ────────────────────────────────────
+  // Mapeia mensagens técnicas em textos legíveis pelo professor
+  const traduzirErroAgente = (msg) => {
+    if (!msg) return 'O agente encontrou um erro no EDUCADF. Tente novamente.';
+    const m = msg.toLowerCase();
+    // Portal fora do ar ou com erro interno — verificado PRIMEIRO (prioridade máxima)
+    if (m.includes('portal_indisponivel') || m.includes('problemas técnicos') ||
+        m.includes('erro interno') || m.includes('serviço indisponível') ||
+        m.includes('servidor indisponível') || m.includes('bad gateway') ||
+        m.includes('gateway timeout') || m.includes('sistema indisponível'))
+      return '⚠️ O EDUCADF está apresentando instabilidade técnica. Aguarde alguns minutos e tente novamente. Se o problema persistir, verifique se o portal EDUCADF está acessível pelo navegador.';
+    // Dropdown vazio — sintoma de portal sem dados carregados
+    if (m.includes('dropdown vazio') || m.includes('no items found') || m.includes('turmas disponíveis'))
+      return '⚠️ O EDUCADF não retornou as turmas disponíveis — provavelmente por instabilidade do portal. Aguarde um minuto e tente novamente.';
+    // Mismatch de bimestre — deve vir ANTES do check genérico de "turma"
+    if (m.includes('bimestre_indisponivel') || m.includes('não possui eventos do') || m.includes('exibe apenas')) {
+      // Extrai o bimestre alvo e os disponíveis da mensagem para feedback preciso
+      const bimAlvo  = msg.match(/eventos do (\dº Bimestre)/i)?.[1] || 'bimestre solicitado';
+      const bimDisp  = msg.match(/exibe apenas:\s*([^.]+)/i)?.[1]?.trim() || '';
+      return `⚠️ O calendário EDUCADF não tem eventos do ${bimAlvo} para esta turma.` +
+             (bimDisp ? ` Os eventos disponíveis são do: ${bimDisp}.` : '') +
+             ' Verifique se o bimestre do plano está correto ou atualize o plano para o período letivo atual no EDUCADF.';
+    }
+    if (m.includes('swal') || m.includes('intercepts pointer') || m.includes('overlay'))
+      return 'O portal EDUCADF exibiu uma janela de alerta que bloqueou a operação. Tente novamente — o agente agora fecha esse alerta automaticamente.';
+    if (m.includes('login') || m.includes('senha') || m.includes('credencial'))
+      return 'Falha no login do EDUCADF. Verifique suas credenciais em Agente EDUCA > Configurações.';
+    if (m.includes('turma') || m.includes('calendário') || m.includes('calendario'))
+      return `Turma não encontrada no EDUCADF: "${msg.match(/"([^"]+)"/)?.[1] || 'ver detalhes'}". Verifique se a turma está cadastrada no EDUCADF para este bimestre.`;
+    if (m.includes('filtrar') || m.includes('filtro'))
+      return 'Falha ao aplicar filtros no EDUCADF. O portal pode estar lento — tente novamente em alguns minutos.';
+    if (m.includes('aba') || m.includes('procedimento'))
+      return 'Não foi possível abrir a aba de Procedimentos Avaliativos no EDUCADF. O portal pode estar em manutenção.';
+    if (m.includes('timeout') || m.includes('time out'))
+      return 'O EDUCADF demorou demais para responder. Tente novamente — o portal pode estar sobrecarregado.';
+    return msg.length > 200 ? msg.substring(0, 200) + '...' : msg;
+  };
+
+  const pollarEstrutura = async (plano, startTime) => {
+    const MAX = 25; // 25 × 30s = 12.5 min
+    const itens = Array.isArray(plano.itens) ? plano.itens : JSON.parse(plano.itens || '[]');
+    const bimestral = itens.find(i => i.fixo_direcao);
+
+    for (let i = 0; i < MAX; i++) {
+      await new Promise(r => setTimeout(r, 30000));
+      try {
+        const check = await api.get(`/avaliacoes/${plano.id}`);
+        const d = check.data || {};
+        if (d.agente_exportado_em && new Date(d.agente_exportado_em) >= new Date(startTime - 5000)) {
+          setPlanos(prev => prev.map(p =>
+            p.id === plano.id
+              ? { ...p, agente_exportado_em: d.agente_exportado_em, agente_executando_desde: null, agente_exportado_resultado: d.agente_exportado_resultado }
+              : p
+          ));
+          if (d.agente_exportado_resultado === 'JA_EXISTIA') {
+            setModalJaExiste({
+              turma: plano.turmas, disciplina: plano.disciplina,
+              bimestre: plano.bimestre, nome: bimestral?.atividade || 'Prova Bimestral',
+            });
+          } else {
+            abrirModalResultado('sucesso', 'Exportação concluída!',
+              `Estrutura criada no EDUCADF com sucesso.\n\n📘 ${plano.disciplina} · ${plano.turmas} · ${plano.bimestre}`);
+          }
+          setExportandoId(null);
+          return;
+        }
+        // Lock limpo sem sucesso = falhou
+        if (!d.agente_executando_desde && i >= 1) {
+          const erroMsg = traduzirErroAgente(d.agente_ultimo_erro);
+          abrirModalResultado('erro', 'Exportação falhou', erroMsg);
+          setPlanos(prev => prev.map(p => p.id === plano.id ? { ...p, agente_executando_desde: null } : p));
+          setExportandoId(null);
+          return;
+        }
+      } catch { /* ignora erros de polling */ }
+    }
+    abrirModalResultado('erro', 'Tempo esgotado',
+      'A exportação demorou mais que o esperado.\nAtualize a página para verificar se foi concluída no EDUCADF.');
+    setExportandoId(null);
+  };
+
+  // ── Exportar / Reexportar estrutura ───────────────────────────────────────
   const handleExportarEstrutura = async (plano) => {
-    // ── Guarda de concorrência: bloqueia se o agente já está ocupado ──────
     if (exportandoId !== null && exportandoId !== plano.id) {
       const planoAtivo = planos.find(p => p.id === exportandoId);
-      setModalOcupado({
-        turma:      planoAtivo?.turmas      || '...',
-        disciplina: planoAtivo?.disciplina  || '...',
-        bimestre:   planoAtivo?.bimestre    || '...',
-      });
-      setModalConfirm(null);
+      setModalOcupado({ turma: planoAtivo?.turmas || '...', disciplina: planoAtivo?.disciplina || '...', bimestre: planoAtivo?.bimestre || '...' });
       return;
     }
     setModalConfirm(null);
+    setModalReexportar(null);
     setModalResultado(null);
     setExportandoId(plano.id);
+    // Marca lock otimisticamente na UI
+    setPlanos(prev => prev.map(p => p.id === plano.id ? { ...p, agente_executando_desde: new Date().toISOString() } : p));
 
-    const marcarSucesso = (exportadoEm) => {
-      setPlanos(prev => prev.map(p =>
-        p.id === plano.id ? { ...p, agente_exportado_em: exportadoEm || new Date().toISOString() } : p
-      ));
-      abrirModalResultado(
-        'sucesso',
-        'Exportação concluída!',
-        `A coluna Avaliação Bimestral foi criada no EDUCADF com sucesso.\n\n📘 ${plano.disciplina} · ${plano.turmas} · ${plano.bimestre}`
-      );
-    };
-
+    const startTime = Date.now();
     try {
       const resp = await api.post(`/agente-planos/${plano.id}/exportar-estrutura`);
-      if (resp.data?.ok) {
-        marcarSucesso();
-      } else {
-        const errMsg = resp.data?.message || resp.data?.error || 'Exportação não concluída.';
-        abrirModalResultado('erro', 'Exportação não concluída', errMsg);
+      if (resp.status === 202 || resp.data?.status === 'running') {
+        // Backend 202: Playwright rodando em background → polling
+        await pollarEstrutura(plano, startTime);
+        return;
       }
+      // Resposta síncrona (improvável com o novo backend, mas seguro)
+      if (resp.data?.ok) {
+        setPlanos(prev => prev.map(p => p.id === plano.id ? { ...p, agente_exportado_em: new Date().toISOString(), agente_executando_desde: null } : p));
+        abrirModalResultado('sucesso', 'Exportação concluída!', `Estrutura criada no EDUCADF.\n\n📘 ${plano.disciplina} · ${plano.turmas} · ${plano.bimestre}`);
+      } else {
+        abrirModalResultado('erro', 'Exportação não concluída', resp.data?.message || resp.data?.error || 'Erro desconhecido.');
+      }
+      setPlanos(prev => prev.map(p => p.id === plano.id ? { ...p, agente_executando_desde: null } : p));
       setExportandoId(null);
 
     } catch (err) {
-      // ── Erro de credenciais: modal específico ──────────────────────────
       const codigo = err.response?.data?.codigo || err.response?.data?.errorCode;
       if (codigo === 'SEM_CREDENCIAIS' || codigo === 'CREDENCIAIS_CORROMPIDAS') {
         setModalSemCred(true);
-        setExportandoId(null);
-        return;
-      }
-
-      // ── JA_EXISTE: modal informativo (não é erro, é aviso) ─────────────
-      if (codigo === 'JA_EXISTE' || err.response?.status === 409) {
+      } else if (codigo === 'EM_EXECUCAO') {
+        abrirModalResultado('erro', 'Já em execução', 'Este plano já está sendo exportado. Aguarde a conclusão.');
+      } else if (codigo === 'JA_EXISTE' || err.response?.status === 409) {
         const itens = Array.isArray(plano.itens) ? plano.itens : JSON.parse(plano.itens || '[]');
         const bimestral = itens.find(i => i.fixo_direcao);
-        setModalJaExiste({
-          turma:      plano.turmas,
-          disciplina: plano.disciplina,
-          bimestre:   plano.bimestre,
-          nome:       bimestral?.atividade || 'Prova Bimestral',
-        });
-        setExportandoId(null);
+        setModalJaExiste({ turma: plano.turmas, disciplina: plano.disciplina, bimestre: plano.bimestre, nome: bimestral?.atividade || 'Prova Bimestral' });
+      } else if (!err.response) {
+        // Conexão caiu mas Playwright segue — polling
+        await pollarEstrutura(plano, startTime);
         return;
+      } else {
+        abrirModalResultado('erro', 'Erro na exportação', err.response?.data?.error || err.response?.data?.message || 'Erro ao exportar estrutura.');
       }
-
-      // ── Timeout de rede (!err.response): Playwright ainda rodando ──────
-      // O proxy (DigitalOcean/Vercel) corta conexões longas (>60s).
-      // O Playwright continua rodando no servidor por 2-4 min.
-      // Mantemos o spinner e fazemos polling a cada 20s por até 4 min.
-      if (!err.response) {
-        const MAX_TENTATIVAS = 15; // 15 × 20s = 5 minutos (margem para EDUCADF lento)
-        let encontrado = false;
-
-        for (let i = 0; i < MAX_TENTATIVAS && !encontrado; i++) {
-          await new Promise(r => setTimeout(r, 20000)); // aguarda 20s
-          try {
-            const check = await api.get(`/avaliacoes/${plano.id}`);
-            const exportadoEm = check.data?.agente_exportado_em;
-            if (exportadoEm) {
-              marcarSucesso(exportadoEm);
-              encontrado = true;
-            }
-          } catch { /* ignora erros de polling */ }
-        }
-
-        if (!encontrado) {
-          abrirModalResultado(
-            'erro',
-            'Tempo esgotado',
-            'A exportação demorou mais que o esperado.\n\nAtualize a página para verificar se foi concluída no EDUCADF.'
-          );
-        }
-        setExportandoId(null);
-        return;
-      }
-
-      // ── Erro real retornado pelo backend (com err.response) ────────────
-      const errMsg = err.response?.data?.error || err.response?.data?.message || 'Erro ao exportar estrutura.';
-      abrirModalResultado('erro', 'Erro na exportação', errMsg);
+      setPlanos(prev => prev.map(p => p.id === plano.id ? { ...p, agente_executando_desde: null } : p));
       setExportandoId(null);
     }
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Reexportar estrutura (com modal de confirmação)
+  // ─────────────────────────────────────────────────────────────────────────
+  const handleReexportarEstrutura = (plano) => {
+    const itens = Array.isArray(plano.itens) ? plano.itens : JSON.parse(plano.itens || '[]');
+    const bimestral = itens.find(i => i.fixo_direcao);
+    setModalReexportar({
+      plano,
+      atividade: bimestral?.atividade || 'Prova Bimestral',
+      onConfirmar: () => handleExportarEstrutura(plano),
+    });
   };
 
   // ─────────────────────────────────────────────────────────
   // RENDER
   // ─────────────────────────────────────────────────────────
+
   return (
     <div
       style={{ minHeight: "100vh", fontFamily: "'Inter', 'Segoe UI', sans-serif" }}
@@ -817,6 +892,7 @@ export default function AgentePlanos() {
               plano={plano}
               exportandoId={exportandoId}
               onExportar={(p) => setModalConfirm(p)}
+              onReexportar={handleReexportarEstrutura}
             />
           ))
         )}
@@ -926,7 +1002,53 @@ export default function AgentePlanos() {
         </div>
       )}
 
+      {/* ═══════════════ MODAL REEXPORTAR ESTRUTURA ═══════════ */}
+      {modalReexportar && (
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 350, background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(14px)', display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'fadeIn 0.2s ease' }}
+          onClick={() => setModalReexportar(null)}
+        >
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 460, margin: '0 16px', borderRadius: 24, overflow: 'hidden', background: 'linear-gradient(160deg, #1a1528 0%, #120f1e 100%)', border: '1px solid rgba(245,158,11,0.35)', boxShadow: '0 32px 80px rgba(0,0,0,0.7)' }}>
+            <div style={{ background: 'linear-gradient(135deg, #d97706, #b45309)', padding: '28px 28px 22px', textAlign: 'center' }}>
+              <div style={{ fontSize: '2.8rem', marginBottom: 10 }}>⚠️</div>
+              <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#fff' }}>Reexportar Estrutura?</div>
+              <div style={{ fontSize: '0.78rem', color: 'rgba(253,230,138,0.85)', marginTop: 6 }}>A coluna já foi exportada anteriormente</div>
+            </div>
+            <div style={{ padding: '24px 28px' }}>
+              <div style={{ padding: '16px 18px', borderRadius: 16, marginBottom: 18, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)' }}>
+                <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#d97706', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 10 }}>📋 Plano selecionado</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  {[
+                    { label: 'Disciplina',   value: modalReexportar.plano.disciplina },
+                    { label: 'Turma',        value: modalReexportar.plano.turmas },
+                    { label: 'Bimestre',     value: modalReexportar.plano.bimestre },
+                    { label: 'Procedimento', value: modalReexportar.atividade },
+                  ].map(({ label, value }) => (
+                    <div key={label} style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                      <div style={{ fontSize: '0.58rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 2 }}>{label}</div>
+                      <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#e2e8f0' }}>{value}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div style={{ padding: '12px 16px', borderRadius: 12, marginBottom: 20, background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.2)', fontSize: '0.82rem', color: '#fde68a', lineHeight: 1.65 }}>
+                O Agente tentará criar o procedimento no EDUCADF.<br />
+                Se ele já existir, você será informado e <strong style={{ color: '#fbbf24' }}>nenhuma duplicata</strong> será criada.
+              </div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button onClick={() => setModalReexportar(null)} style={{ flex: 1, padding: '12px', borderRadius: 12, fontWeight: 700, fontSize: '0.85rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8', cursor: 'pointer' }}>Cancelar</button>
+                <button onClick={() => { modalReexportar.onConfirmar(); setModalReexportar(null); }} style={{ flex: 2, padding: '12px', borderRadius: 12, fontWeight: 800, fontSize: '0.88rem', background: 'linear-gradient(135deg, #d97706, #b45309)', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 20px rgba(217,119,6,0.35)' }}>
+                  <ArrowPathIcon style={{ width: 16 }} />
+                  Confirmar Reexportação
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ═══════════════ MODAL SEM CREDENCIAIS ═══════════════ */}
+
       {modalSemCred && (
         <div
           style={{

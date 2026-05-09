@@ -42,7 +42,7 @@ const BIMESTRE_COLORS = {
 };
 
 // ── Card individual de plano ──────────────────────────
-function NotaCard({ plano, onExportar, exportandoId, onVerRelatorio }) {
+function NotaCard({ plano, onExportar, onReexportar, exportandoId, onVerRelatorio }) {
   const [expanded, setExpanded] = useState(false);
 
   const statusInfo = STATUS_LABELS[plano.status] || STATUS_LABELS.RASCUNHO;
@@ -51,10 +51,11 @@ function NotaCard({ plano, onExportar, exportandoId, onVerRelatorio }) {
   const bimestral  = itens.find(i => i.fixo_direcao);
   const exportando = exportandoId === plano.id;
 
-  // Elegível para exportar notas: precisa ter estrutura exportada na Etapa 1
+  const emExecucao         = !!plano.agente_executando_desde &&
+    (Date.now() - new Date(plano.agente_executando_desde).getTime() < 15 * 60 * 1000);
   const estruturaExportada = !!plano.agente_exportado_em;
   const notasExportadas    = !!plano.agente_notas_exportadas_em;
-  const podeExportar       = estruturaExportada && !notasExportadas &&
+  const podeExportar       = estruturaExportada && !notasExportadas && !emExecucao &&
                              (plano.status === "APROVADO" || plano.status === "ENVIADO") &&
                              !!bimestral;
 
@@ -150,72 +151,81 @@ function NotaCard({ plano, onExportar, exportandoId, onVerRelatorio }) {
 
             {/* Ações */}
             <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
-              {notasExportadas ? (
+              {emExecucao || exportando ? (
                 <div style={{
-                  display: "flex", alignItems: "center", gap: 6, padding: "8px 14px",
-                  borderRadius: 12, background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.25)",
+                  display: "flex", alignItems: "center", gap: 8, padding: "10px 18px",
+                  borderRadius: 14, background: "rgba(16,185,129,0.12)",
+                  border: "1px solid rgba(16,185,129,0.35)",
                 }}>
-                  <CheckCircleIcon style={{ width: 16, color: "#22c55e" }} />
+                  <ArrowPathIcon style={{ width: 15, color: "#34d399", animation: "spin 0.8s linear infinite" }} />
                   <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "#22c55e" }}>Notas Exportadas</div>
-                    <div style={{ fontSize: "0.6rem", color: "#4ade80" }}>
-                      {new Date(plano.agente_notas_exportadas_em).toLocaleDateString("pt-BR")}
-                    </div>
+                    <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "#34d399" }}>Em execução...</div>
+                    <div style={{ fontSize: "0.6rem", color: "#10b981" }}>Lançando notas no EDUCADF</div>
                   </div>
                 </div>
+              ) : notasExportadas ? (
+                <>
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 6, padding: "8px 14px",
+                    borderRadius: 12, background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.25)",
+                  }}>
+                    <CheckCircleIcon style={{ width: 16, color: "#22c55e" }} />
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "#22c55e" }}>Notas Exportadas</div>
+                      <div style={{ fontSize: "0.6rem", color: "#4ade80" }}>
+                        {new Date(plano.agente_notas_exportadas_em).toLocaleDateString("pt-BR")}
+                      </div>
+                    </div>
+                  </div>
+                  {estruturaExportada && (plano.status === "APROVADO" || plano.status === "ENVIADO") && (
+                    <button
+                      onClick={() => onReexportar(plano)}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 6,
+                        padding: "5px 12px", borderRadius: 10, fontWeight: 700,
+                        fontSize: "0.7rem", cursor: "pointer",
+                        background: "rgba(255,255,255,0.04)",
+                        border: "1px solid rgba(255,255,255,0.12)", color: "#94a3b8",
+                        transition: "all 0.15s",
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.background = "rgba(16,185,129,0.1)"; e.currentTarget.style.color = "#6ee7b7"; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.color = "#94a3b8"; }}
+                    >
+                      <ArrowPathIcon style={{ width: 12 }} />
+                      Reexportar Notas
+                    </button>
+                  )}
+                </>
               ) : !bimestral ? (
-                <div style={{
-                  padding: "8px 14px", borderRadius: 12, fontSize: "0.7rem",
-                  background: "rgba(148,163,184,0.06)", border: "1px solid rgba(148,163,184,0.15)",
-                  color: "#64748b", display: "flex", alignItems: "center", gap: 6,
-                }}>
+                <div style={{ padding: "8px 14px", borderRadius: 12, fontSize: "0.7rem", background: "rgba(148,163,184,0.06)", border: "1px solid rgba(148,163,184,0.15)", color: "#64748b", display: "flex", alignItems: "center", gap: 6 }}>
                   <LockClosedIcon style={{ width: 14 }} />
                   Sem col. Bimestral
                 </div>
               ) : !estruturaExportada ? (
-                <div style={{
-                  padding: "8px 14px", borderRadius: 12, fontSize: "0.7rem",
-                  background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.2)",
-                  color: "#f59e0b", display: "flex", alignItems: "center", gap: 6,
-                }}>
+                <div style={{ padding: "8px 14px", borderRadius: 12, fontSize: "0.7rem", background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.2)", color: "#f59e0b", display: "flex", alignItems: "center", gap: 6 }}>
                   <ExclamationTriangleIcon style={{ width: 14 }} />
                   Aguardando Etapa 1
                 </div>
               ) : !podeExportar ? (
-                <div style={{
-                  padding: "8px 14px", borderRadius: 12, fontSize: "0.7rem",
-                  background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.2)",
-                  color: "#f59e0b", display: "flex", alignItems: "center", gap: 6,
-                }}>
+                <div style={{ padding: "8px 14px", borderRadius: 12, fontSize: "0.7rem", background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.2)", color: "#f59e0b", display: "flex", alignItems: "center", gap: 6 }}>
                   <ExclamationTriangleIcon style={{ width: 14 }} />
                   Plano {plano.status}
                 </div>
               ) : (
                 <button
                   onClick={() => onExportar(plano)}
-                  disabled={exportando}
                   style={{
                     display: "flex", alignItems: "center", gap: 8,
                     padding: "10px 18px", borderRadius: 14, fontWeight: 800,
-                    fontSize: "0.8rem", cursor: exportando ? "not-allowed" : "pointer",
-                    background: exportando ? "rgba(16,185,129,0.3)" : "linear-gradient(135deg, #10b981, #0891b2)",
+                    fontSize: "0.8rem", cursor: "pointer",
+                    background: "linear-gradient(135deg, #10b981, #0891b2)",
                     border: "none", color: "#fff",
                     boxShadow: "0 4px 16px rgba(16,185,129,0.35)",
-                    opacity: exportando ? 0.7 : 1,
                     transition: "all 0.2s",
                   }}
                 >
-                  {exportando ? (
-                    <>
-                      <ArrowPathIcon style={{ width: 15, animation: "spin 0.8s linear infinite" }} />
-                      Exportando notas...
-                    </>
-                  ) : (
-                    <>
-                      <RocketLaunchIcon style={{ width: 15 }} />
-                      Exportar Notas
-                    </>
-                  )}
+                  <RocketLaunchIcon style={{ width: 15 }} />
+                  Exportar Notas
                 </button>
               )}
 
@@ -275,10 +285,11 @@ export default function AgenteNotas() {
   const [planos, setPlanos]               = useState([]);
   const [carregando, setCarregando]       = useState(true);
   const [exportandoId, setExportandoId]   = useState(null);
-  const [filtro, setFiltro]               = useState("todos"); // todos | prontos | exportados
+  const [filtro, setFiltro]               = useState("todos");
   const [modalConfirm, setModalConfirm]   = useState(null);
   const [modalSemCred, setModalSemCred]   = useState(false);
   const [modalResultado, setModalResultado] = useState(null);
+  const [modalReexportarNotas, setModalReexportarNotas] = useState(null);
 
   // ── Carrega planos ──────────────────────────────────────
   useEffect(() => {
@@ -335,101 +346,149 @@ export default function AgenteNotas() {
     }
   })();
 
-  // ── Exportar notas ──────────────────────────────────────
+  // ── Polling helper notas (202 async pattern) ─────────────────────────────
+  const traduzirErroAgente = (msg) => {
+    if (!msg) return 'O agente encontrou um erro no EDUCADF. Tente novamente.';
+    const m = msg.toLowerCase();
+    // Portal fora do ar — verificado PRIMEIRO
+    if (m.includes('portal_indisponivel') || m.includes('problemas técnicos') ||
+        m.includes('erro interno') || m.includes('serviço indisponível') ||
+        m.includes('bad gateway') || m.includes('gateway timeout') || m.includes('sistema indisponível'))
+      return '⚠️ O EDUCADF está apresentando instabilidade técnica. Aguarde alguns minutos e tente novamente.';
+    if (m.includes('dropdown vazio') || m.includes('no items found') || m.includes('turmas disponíveis'))
+      return '⚠️ O EDUCADF não retornou as turmas disponíveis — instabilidade do portal. Aguarde um minuto e tente novamente.';
+    if (m.includes('swal') || m.includes('intercepts pointer') || m.includes('overlay'))
+      return 'O portal EDUCADF exibiu uma janela de alerta que bloqueou a operação. Tente novamente — o agente agora fecha esse alerta automaticamente.';
+    if (m.includes('login') || m.includes('senha') || m.includes('credencial'))
+      return 'Falha no login do EDUCADF. Verifique suas credenciais em Agente EDUCA > Configurações.';
+    // Mismatch de bimestre — deve vir ANTES do check genérico de "turma"
+    if (m.includes('bimestre_indisponivel') || m.includes('não possui eventos do') || m.includes('exibe apenas')) {
+      const bimAlvo = msg.match(/eventos do (\dº Bimestre)/i)?.[1] || 'bimestre solicitado';
+      const bimDisp = msg.match(/exibe apenas:\s*([^.]+)/i)?.[1]?.trim() || '';
+      return `⚠️ O calendário EDUCADF não tem eventos do ${bimAlvo} para esta turma.` +
+             (bimDisp ? ` Os eventos disponíveis são do: ${bimDisp}.` : '') +
+             ' Verifique se o bimestre do plano está correto ou atualize o plano para o período letivo atual no EDUCADF.';
+    }
+    if (m.includes('turma') || m.includes('calendário') || m.includes('calendario'))
+      return 'Turma não encontrada no EDUCADF. Verifique se a turma está cadastrada para este bimestre.';
+
+    if (m.includes('nota') || m.includes('aluno') || m.includes('coluna'))
+      return 'Erro ao preencher notas no EDUCADF. Verifique se a estrutura (Etapa 1) foi exportada corretamente.';
+    if (m.includes('timeout') || m.includes('time out'))
+      return 'O EDUCADF demorou demais para responder. Tente novamente — o portal pode estar sobrecarregado.';
+    return msg.length > 200 ? msg.substring(0, 200) + '...' : msg;
+  };
+
+  const pollarNotas = async (plano, startTime) => {
+    const MAX = 25; // 25 × 30s = 12.5 min
+    for (let i = 0; i < MAX; i++) {
+      await new Promise(r => setTimeout(r, 30000));
+      try {
+        const check = await api.get(`/avaliacoes/${plano.id}`);
+        const d = check.data || {};
+        if (d.agente_notas_exportadas_em && new Date(d.agente_notas_exportadas_em) >= new Date(startTime - 5000)) {
+          setPlanos(prev => prev.map(p => p.id === plano.id
+            ? { ...p, agente_notas_exportadas_em: d.agente_notas_exportadas_em, agente_executando_desde: null }
+            : p
+          ));
+          const r = (() => { try { return JSON.parse(d.agente_notas_resultado_json || '{}'); } catch { return {}; } })();
+          setModalResultado({
+            tipo: 'sucesso', titulo: 'Notas exportadas!', plano,
+            totalPreenchidos: r.totalPreenchidos ?? null,
+            totalErros: r.totalErros ?? null,
+            alunosNaoEncontrados: r.alunosNaoEncontrados || [],
+            alunosDesabilitados: r.alunosDesabilitados || [],
+          });
+          setExportandoId(null);
+          return;
+        }
+        if (!d.agente_executando_desde && i >= 1) {
+          const erroMsg = traduzirErroAgente(d.agente_ultimo_erro);
+          setModalResultado({ tipo: 'erro', titulo: 'Exportação falhou', texto: erroMsg });
+          setPlanos(prev => prev.map(p => p.id === plano.id ? { ...p, agente_executando_desde: null } : p));
+          setExportandoId(null);
+          return;
+        }
+      } catch { /* ignora */ }
+    }
+    setModalResultado({ tipo: 'erro', titulo: 'Tempo esgotado', texto: 'A exportação demorou mais que o esperado.\nAtualize a página para verificar.' });
+    setExportandoId(null);
+  };
+
+  // ── Exportar notas ──────────────────────────────────────────────────────────
   const handleExportarNotas = async (plano) => {
     setModalConfirm(null);
     setModalResultado(null);
     setExportandoId(plano.id);
+    // Lock otimista na UI
+    setPlanos(prev => prev.map(p => p.id === plano.id ? { ...p, agente_executando_desde: new Date().toISOString() } : p));
 
-    const abrirResultadoRico = (dados, exportadoEm) => {
-      // Atualiza o card na lista
-      setPlanos(prev => prev.map(p =>
-        p.id === plano.id
-          ? { ...p, agente_notas_exportadas_em: exportadoEm || new Date().toISOString() }
-          : p
-      ));
-      setModalResultado({
-        tipo: "sucesso",
-        titulo: "Exportação concluída!",
-        plano,
-        totalPreenchidos:    dados.totalPreenchidos,
-        totalErros:          dados.totalErros,
-        alunosNaoEncontrados: dados.alunosNaoEncontrados || [],
-        alunosDesabilitados:  dados.alunosDesabilitados  || [],
-      });
-    };
-
+    const startTime = Date.now();
     try {
       const resp = await api.post(`/agente-planos/${plano.id}/exportar-notas`);
       const d    = resp.data || {};
 
-      if (d.ok) {
-        abrirResultadoRico({
-          totalPreenchidos:     d.totalPreenchidos,
-          totalErros:           d.totalErros,
-          alunosNaoEncontrados: d.alunosNaoEncontrados || [],
-          alunosDesabilitados:  d.alunosDesabilitados  || [],
-        });
-      } else {
-        setModalResultado({
-          tipo: "erro",
-          titulo: "Exportação não concluída",
-          texto: d.message || d.error || "Exportação de notas não concluída.",
-        });
+      // ── 202 / running: Playwright rodando em background → polling obrigatório
+      // NUNCA mostrar sucesso com base só na resposta inicial — sempre esperar o banco confirmar
+      if (resp.status === 202 || d.status === 'running' || resp.status === 200) {
+        // Se o backend retornou 200 com ok:true mas status:running, é o 202 chegando como 200 via proxy
+        if (d.status === 'running' || resp.status === 202) {
+          await pollarNotas(plano, startTime);
+          return;
+        }
+        // 200 síncrono real (não deve ocorrer com backend v2, mas tratado por segurança)
+        if (d.ok && !d.status) {
+          setPlanos(prev => prev.map(p => p.id === plano.id
+            ? { ...p, agente_notas_exportadas_em: new Date().toISOString(), agente_executando_desde: null }
+            : p
+          ));
+          setModalResultado({
+            tipo: 'sucesso', titulo: 'Exportação concluída!', plano,
+            totalPreenchidos: d.totalPreenchidos, totalErros: d.totalErros,
+            alunosNaoEncontrados: d.alunosNaoEncontrados || [], alunosDesabilitados: d.alunosDesabilitados || [],
+          });
+          setPlanos(prev => prev.map(p => p.id === plano.id ? { ...p, agente_executando_desde: null } : p));
+          setExportandoId(null);
+          return;
+        }
+        // Qualquer outro 200 → polling (segurança)
+        await pollarNotas(plano, startTime);
+        return;
       }
+      setModalResultado({ tipo: 'erro', titulo: 'Exportação não concluída', texto: d.message || d.error || 'Resposta inesperada do servidor.' });
+      setPlanos(prev => prev.map(p => p.id === plano.id ? { ...p, agente_executando_desde: null } : p));
       setExportandoId(null);
 
     } catch (err) {
       const codigo = err.response?.data?.codigo;
-      if (codigo === "SEM_CREDENCIAIS" || codigo === "CREDENCIAIS_CORROMPIDAS") {
+      if (codigo === 'SEM_CREDENCIAIS' || codigo === 'CREDENCIAIS_CORROMPIDAS') {
         setModalSemCred(true);
-        setExportandoId(null);
+      } else if (codigo === 'EM_EXECUCAO') {
+        setModalResultado({ tipo: 'erro', titulo: 'Já em execução', texto: 'As notas já estão sendo exportadas. Aguarde.' });
+      } else if (!err.response) {
+        // Conexão caiu mas Playwright segue — polling
+        await pollarNotas(plano, startTime);
         return;
+      } else {
+        setModalResultado({ tipo: 'erro', titulo: 'Erro na exportação', texto: err.response?.data?.error || err.response?.data?.message || 'Erro ao exportar notas.' });
       }
-
-      // Timeout — Playwright ainda rodando: polling 5 min
-      if (!err.response) {
-        const MAX_TENTATIVAS = 15;
-        let encontrado = false;
-        for (let i = 0; i < MAX_TENTATIVAS && !encontrado; i++) {
-          await new Promise(r => setTimeout(r, 20000));
-          try {
-            const check = await api.get(`/avaliacoes/${plano.id}`);
-            if (check.data?.agente_notas_exportadas_em) {
-              // Usa os stats reais do banco se disponíveis
-              const r = check.data?.agente_notas_resultado || {};
-              abrirResultadoRico(
-                {
-                  totalPreenchidos:     r.totalPreenchidos ?? null,
-                  totalErros:           r.totalErros       ?? null,
-                  alunosNaoEncontrados: r.alunosNaoEncontrados || [],
-                  alunosDesabilitados:  r.alunosDesabilitados  || [],
-                },
-                check.data.agente_notas_exportadas_em
-              );
-              encontrado = true;
-            }
-          } catch { /* ignora */ }
-        }
-        if (!encontrado) {
-          setModalResultado({
-            tipo: "erro",
-            titulo: "Tempo esgotado",
-            texto: "A exportação demorou mais que o esperado.\n\nAtualize a página para verificar se foi concluída no EDUCADF.",
-          });
-        }
-        setExportandoId(null);
-        return;
-      }
-
-      setModalResultado({
-        tipo: "erro",
-        titulo: "Erro na exportação",
-        texto: err.response?.data?.error || err.response?.data?.message || "Erro ao exportar notas.",
-      });
+      setPlanos(prev => prev.map(p => p.id === plano.id ? { ...p, agente_executando_desde: null } : p));
       setExportandoId(null);
     }
   };
+
+  // ── Reexportar notas (com modal de confirmação) ─────────────────────────────
+  const handleReexportarNotas = (plano) => {
+    const itens = Array.isArray(plano.itens) ? plano.itens : JSON.parse(plano.itens || '[]');
+    const bimestral = itens.find(i => i.fixo_direcao);
+    setModalReexportarNotas({
+      plano,
+      atividade: bimestral?.atividade || 'Prova Bimestral',
+      onConfirmar: () => handleExportarNotas(plano),
+    });
+  };
+
+
 
   // ── Ver relatório da última exportação ───────────────────────
   const handleVerRelatorio = async (plano) => {
@@ -618,6 +677,7 @@ export default function AgenteNotas() {
               plano={plano}
               exportandoId={exportandoId}
               onExportar={(p) => setModalConfirm(p)}
+              onReexportar={handleReexportarNotas}
               onVerRelatorio={handleVerRelatorio}
             />
           ))
@@ -961,7 +1021,50 @@ export default function AgenteNotas() {
         </div>
       )}
 
+      {/* ═══════════════ MODAL REEXPORTAR NOTAS ══════════════ */}
+      {modalReexportarNotas && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 350, background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(14px)', display: 'flex', alignItems: 'center', justifyContent: 'center', animation: 'fadeIn 0.2s ease' }} onClick={() => setModalReexportarNotas(null)}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 460, margin: '0 16px', borderRadius: 24, overflow: 'hidden', background: 'linear-gradient(160deg, #0d1f14 0%, #091510 100%)', border: '1px solid rgba(16,185,129,0.35)', boxShadow: '0 32px 80px rgba(0,0,0,0.7)' }}>
+            <div style={{ background: 'linear-gradient(135deg, #059669, #047857)', padding: '28px 28px 22px', textAlign: 'center' }}>
+              <div style={{ fontSize: '2.8rem', marginBottom: 10 }}>🔄</div>
+              <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#fff' }}>Reexportar Notas?</div>
+              <div style={{ fontSize: '0.78rem', color: 'rgba(167,243,208,0.85)', marginTop: 6 }}>As notas já foram exportadas anteriormente</div>
+            </div>
+            <div style={{ padding: '24px 28px' }}>
+              <div style={{ padding: '16px 18px', borderRadius: 16, marginBottom: 18, background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)' }}>
+                <div style={{ fontSize: '0.65rem', fontWeight: 800, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 10 }}>📋 Plano selecionado</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  {[
+                    { label: 'Disciplina',   value: modalReexportarNotas.plano.disciplina },
+                    { label: 'Turma',        value: modalReexportarNotas.plano.turmas },
+                    { label: 'Bimestre',     value: modalReexportarNotas.plano.bimestre },
+                    { label: 'Procedimento', value: modalReexportarNotas.atividade },
+                  ].map(({ label, value }) => (
+                    <div key={label} style={{ padding: '8px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                      <div style={{ fontSize: '0.58rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 2 }}>{label}</div>
+                      <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#e2e8f0' }}>{value}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div style={{ padding: '12px 16px', borderRadius: 12, marginBottom: 20, background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.2)', fontSize: '0.82rem', color: '#6ee7b7', lineHeight: 1.65 }}>
+                O Agente irá <strong style={{ color: '#a7f3d0' }}>sobrescrever</strong> as notas já lançadas no EDUCADF.<br />
+                Certifique-se de que as notas no sistema estão corretas antes de continuar.
+              </div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button onClick={() => setModalReexportarNotas(null)} style={{ flex: 1, padding: '12px', borderRadius: 12, fontWeight: 700, fontSize: '0.85rem', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8', cursor: 'pointer' }}>Cancelar</button>
+                <button onClick={() => { modalReexportarNotas.onConfirmar(); setModalReexportarNotas(null); }} style={{ flex: 2, padding: '12px', borderRadius: 12, fontWeight: 800, fontSize: '0.88rem', background: 'linear-gradient(135deg, #059669, #047857)', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, boxShadow: '0 4px 20px rgba(5,150,105,0.35)' }}>
+                  <ArrowPathIcon style={{ width: 16 }} />
+                  Confirmar Reexportação
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ═══════════════ MODAL SEM CREDENCIAIS ══════════════════════════ */}
+
       {modalSemCred && (
         <div
           style={{

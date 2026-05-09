@@ -1,19 +1,45 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../../services/api';
-import { PencilIcon, TrashIcon, PlusIcon } from '@heroicons/react/24/solid';
-import Modal from '../../../components/ui/Modal';
+import { TrashIcon, PlusIcon } from '@heroicons/react/24/solid';
 import DisciplinaForm from './DisciplinaForm';
 import { PencilSquareIcon } from "@heroicons/react/24/solid";
 
+// ── Cores dos badges de etapa ────────────────────────────────────────────────
+const ETAPA_STYLE = {
+  INFANTIL:    { background: '#e0f2fe', color: '#0369a1', border: '1px solid #7dd3fc' },
+  FUNDAMENTAL: { background: '#dcfce7', color: '#15803d', border: '1px solid #86efac' },
+  'MÉDIO':     { background: '#fef3c7', color: '#92400e', border: '1px solid #fcd34d' },
+  GERAL:       { background: '#f3f4f6', color: '#6b7280', border: '1px solid #d1d5db' },
+};
+
+function EtapaBadge({ etapa }) {
+  const st = ETAPA_STYLE[etapa?.toUpperCase()] || ETAPA_STYLE.GERAL;
+  const label = etapa
+    ? etapa.charAt(0).toUpperCase() + etapa.slice(1).toLowerCase()
+    : 'Geral';
+  return (
+    <span style={{
+      ...st,
+      display: 'inline-block',
+      padding: '2px 10px',
+      borderRadius: 20,
+      fontSize: 12,
+      fontWeight: 600,
+    }}>
+      {label}
+    </span>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────
 export default function ListaDisciplinas() {
-  const [disciplinas, setDisciplinas] = useState([]);
-  const [loading, setLoading]         = useState(true);
-  const [search, setSearch]           = useState('');
-  const [isFormOpen, setFormOpen]     = useState(false);
+  const [disciplinas, setDisciplinas]   = useState([]);
+  const [loading, setLoading]           = useState(true);
+  const [search, setSearch]             = useState('');
+  const [isFormOpen, setFormOpen]       = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [toDeleteDisciplina, setToDeleteDisciplina] = useState(null);
-  const [editingDisciplina, setEditingDisciplina] = useState(null);
+  const [editingDisciplina, setEditingDisciplina]   = useState(null);
 
 // ─────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -33,11 +59,11 @@ export default function ListaDisciplinas() {
   const term = normalize(search);
 
 // ─────────────────────────────────────────────────────────────
-  
+
 async function handleSaveDisciplina(dados) {
   setLoading(true);
   try {
-    const normalize = (str = "") =>
+    const normalizeStr = (str = "") =>
       str
         .normalize("NFD")
         .replace(/\p{Diacritic}/gu, "")
@@ -45,7 +71,8 @@ async function handleSaveDisciplina(dados) {
         .replace(/[\s_\-]/g, "");
 
     const nomeOriginal = dados.nome ?? dados.disciplina ?? "";
-    const nomeNovo = normalize(nomeOriginal);
+    const nomeNovo = normalizeStr(nomeOriginal);
+    const etapaNova = (dados.etapa ?? "GERAL").toUpperCase();
 
     function levenshtein(a, b) {
       const m = a.length, n = b.length;
@@ -68,12 +95,17 @@ async function handleSaveDisciplina(dados) {
       // ⚠️ IGNORA a própria disciplina ao editar
       if (dados.id && d.id === dados.id) continue;
 
-      const nomeExistente = normalize(d.nome ?? d.disciplina ?? "");
+      const nomeExistente = normalizeStr(d.nome ?? d.disciplina ?? "");
+      const etapaExistente = (d.etapa ?? "GERAL").toUpperCase();
 
-      // 1. Nome exatamente igual → bloqueia
+      // ✅ Verificações de similaridade SÓ aplicam quando a etapa for igual
+      if (etapaNova !== etapaExistente) continue;
+
+      // 1. Nome exatamente igual na mesma etapa → bloqueia
       if (nomeNovo === nomeExistente) {
-        alert(`⚠️ Já existe uma disciplina com esse nome ("${d.nome || d.disciplina}").\nPara corrigir, você deve excluir a duplicada antes de editar.`);
-        return;
+        alert(`⚠️ Já existe a disciplina "${d.nome || d.disciplina}" nesta etapa.\nPara corrigir, você deve excluir a duplicada antes de editar.`);
+        setLoading(false);
+        return false;
       }
 
       // 2. Sequência numérica (ex: artes → artes-2)
@@ -86,23 +118,28 @@ async function handleSaveDisciplina(dados) {
         const numeroExistente = nomeExistente.match(/\d+$/)?.[0];
 
         if (numeroNovo && numeroNovo === numeroExistente) {
-          alert(`⚠️ Já existe uma disciplina semelhante com o número ${numeroNovo}. Altere o número para evitar duplicidade.`);
-          return;
+          alert(`⚠️ Já existe uma disciplina semelhante com o número ${numeroNovo} nesta etapa.`);
+          setLoading(false);
+          return false;
         }
 
         const confirmar = confirm(
-          `⚠️ Já existe a disciplina "${d.nome || d.disciplina}".\nDeseja realmente criar "${nomeOriginal}" como uma variação numerada?`
+          `⚠️ Já existe a disciplina "${d.nome || d.disciplina}" nesta etapa.\nDeseja realmente criar "${nomeOriginal}" como uma variação numerada?`
         );
-        if (!confirmar) return;
+        if (!confirmar) {
+          setLoading(false);
+          return false;
+        }
 
-        continue; // pula o restante das verificações (incluindo Levenshtein)
+        continue;
       }
 
-      // 3. Erros de digitação leves
+      // 3. Erros de digitação leves (Levenshtein ≤ 2) na mesma etapa
       const distancia = levenshtein(nomeNovo, nomeExistente);
       if (distancia > 0 && distancia <= 2) {
-        alert(`⚠️ Nome muito semelhante ao já existente: "${d.nome || d.disciplina}".\nCorrija o nome antes de salvar.`);
-        return;
+        alert(`⚠️ Nome muito semelhante ao já existente: "${d.nome || d.disciplina}" (mesma etapa).\nCorrija o nome antes de salvar.`);
+        setLoading(false);
+        return false;
       }
     }
 
@@ -119,20 +156,17 @@ async function handleSaveDisciplina(dados) {
     setTimeout(() => setSuccessMessage(""), 3000);
     setFormOpen(false);
     setEditingDisciplina(null);
+    return true;
   } catch (err) {
     console.error(err);
-    // ✅ FIX MÉDIO 7: exibe mensagem do backend (duplicata detectada no servidor)
+    // Exibe mensagem do backend (duplicata detectada no servidor)
     const msgBackend = err?.response?.data?.message;
     alert(msgBackend || "Erro ao salvar disciplina.");
+    return false;
   } finally {
     setLoading(false);
   }
 }
-
-
-
-
-
 
 
 
@@ -148,7 +182,6 @@ async function handleSaveDisciplina(dados) {
     setTimeout(() => setSuccessMessage(""), 3000);
   } catch (err) {
     console.error(err);
-    // ✅ FIX ALTO 3: exibe mensagem clara quando há FK constraint (vinculada a professores/planos)
     const msgBackend = err?.response?.data?.message;
     alert(msgBackend || "Erro ao excluir disciplina.");
   } finally {
@@ -156,8 +189,6 @@ async function handleSaveDisciplina(dados) {
     setToDeleteDisciplina(null);
   }
 }
-
-
 
 
 // ─────────────────────────────────────────────────────────────
@@ -199,14 +230,13 @@ async function handleSaveDisciplina(dados) {
 
 
 
-
-
           {/* Tabela */}
           <div className="overflow-x-auto">
             <table className="w-full border-collapse mt-4">
               <thead className="bg-blue-100">
                 <tr>
                   <th className="p-2 border text-center font-medium text-blue-900">Disciplina</th>
+                  <th className="p-2 border text-center font-medium text-blue-900">Etapa</th>
                   <th className="p-2 border text-center font-medium text-blue-900">Carga</th>
                   <th className="p-2 border text-center font-medium text-blue-900">Ações</th>
                 </tr>
@@ -217,13 +247,11 @@ async function handleSaveDisciplina(dados) {
                   .map(d => (
                     <tr key={d.id} className="hover:bg-blue-50">
                       <td className="p-2 border text-center uppercase">{d.disciplina}</td>
+                      <td className="p-2 border text-center">
+                        <EtapaBadge etapa={d.etapa} />
+                      </td>
                       <td className="p-2 border text-center">{d.carga}</td>
                       <td className="p-2 border text-center space-x-2">
-
-
-
-
-
                         <button
                           onClick={() => {
                             setEditingDisciplina(d);
@@ -235,11 +263,6 @@ async function handleSaveDisciplina(dados) {
                           <PencilSquareIcon className="w-5 h-5" />
                         </button>
 
-
-
-
-
-
                         <button
                           onClick={() => setToDeleteDisciplina(d)}
                           className="text-red-600 hover:text-red-800"
@@ -247,13 +270,6 @@ async function handleSaveDisciplina(dados) {
                         >
                           <TrashIcon className="w-5 h-5" />
                         </button>
-
-
-
-
-
-
-
                       </td>
                     </tr>
                   ))}
@@ -263,11 +279,8 @@ async function handleSaveDisciplina(dados) {
         </>
       )}
 
-      {/* Modal de cadastro */}
-      <Modal open={isFormOpen} onClose={() => {
-        setFormOpen(false);
-        setEditingDisciplina(null);
-      }}>
+      {/* Modal de cadastro — DisciplinaForm gerencia seu próprio overlay premium */}
+      {isFormOpen && (
         <DisciplinaForm
           open={isFormOpen}
           onClose={() => {
@@ -277,39 +290,47 @@ async function handleSaveDisciplina(dados) {
           onSubmit={handleSaveDisciplina}
           disciplina={editingDisciplina}
         />
-      </Modal>
+      )}
 
 
-     
-
-      <Modal open={!!toDeleteDisciplina} onClose={() => setToDeleteDisciplina(null)}>
-  <div className="p-6 space-y-4">
-    <h3 className="text-lg font-semibold">Confirmação</h3>
-    <p>
-      Tem certeza que deseja excluir a disciplina{" "}
-      <strong>{toDeleteDisciplina?.disciplina}</strong>?
-    </p>
-    <div className="flex justify-end space-x-2">
-      <button
-        onClick={() => setToDeleteDisciplina(null)}
-        className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
-      >
-        Não
-      </button>
-      <button
-        onClick={handleDeleteDisciplinaConfirmed}
-        className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-      >
-        Sim
-      </button>
-    </div>
-  </div>
-</Modal>
-
-
-
-
-
+      {/* Modal de exclusão */}
+      {!!toDeleteDisciplina && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4">
+            <div
+              className="fixed inset-0 bg-black opacity-30"
+              onClick={() => setToDeleteDisciplina(null)}
+            />
+            <div className="relative bg-white rounded-lg shadow-lg p-6 max-w-md w-full z-50">
+              <div className="p-2 space-y-4">
+                <h3 className="text-lg font-semibold">Confirmação</h3>
+                <p>
+                  Tem certeza que deseja excluir a disciplina{" "}
+                  <strong>{toDeleteDisciplina?.disciplina}</strong>
+                  {toDeleteDisciplina?.etapa && toDeleteDisciplina.etapa !== 'GERAL' && (
+                    <> (<EtapaBadge etapa={toDeleteDisciplina.etapa} />)</>
+                  )}
+                  ?
+                </p>
+                <div className="flex justify-end space-x-2">
+                  <button
+                    onClick={() => setToDeleteDisciplina(null)}
+                    className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+                  >
+                    Não
+                  </button>
+                  <button
+                    onClick={handleDeleteDisciplinaConfirmed}
+                    className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                  >
+                    Sim, excluir
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

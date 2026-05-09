@@ -631,78 +631,89 @@ export default function AgenteNotas() {
       </div>
 
       {/* ═══════════════════════════ FILTROS ═══════════════════════════ */}
-      <div style={{ margin: "20px 32px 0", display: "flex", flexWrap: "wrap", gap: 16, alignItems: "center" }}>
+      <div style={{ margin: "20px 32px 0", display: "flex", flexDirection: "column", gap: 10 }}>
 
-        {/* Filtros de status */}
-        <div style={{ display: "flex", gap: 8 }}>
+        {/* Linha 1: Status */}
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           {[
-            { key: "todos",      label: `Todos (${planosPorBimestre.length})` },
-            { key: "prontos",    label: `Prontos (${planosProntos.length})` },
-            { key: "exportados", label: `Exportados (${planosExportados.length})` },
+            { key: "todos",      label: "Todos",      count: planosPorBimestre.length },
+            { key: "prontos",    label: "Prontos",    count: planosProntos.length },
+            { key: "exportados", label: "Exportados", count: planosExportados.length },
           ].map(f => (
             <button
               key={f.key}
               onClick={() => setFiltro(f.key)}
               style={{
+                display: "flex", alignItems: "center", gap: 7,
                 padding: "8px 16px", borderRadius: 10, fontWeight: 700, fontSize: "0.78rem",
-                cursor: "pointer", border: "none", transition: "all 0.2s",
+                cursor: "pointer", transition: "all 0.2s",
+                border: filtro === f.key ? "1.5px solid #10b981" : "1.5px solid rgba(255,255,255,0.12)",
                 background: filtro === f.key
                   ? "linear-gradient(135deg, #10b981, #0891b2)"
-                  : "rgba(255,255,255,0.04)",
-                color: filtro === f.key ? "#fff" : "#64748b",
+                  : "rgba(255,255,255,0.06)",
+                color: filtro === f.key ? "#fff" : "#94a3b8",
                 boxShadow: filtro === f.key ? "0 4px 14px rgba(16,185,129,0.3)" : "none",
               }}
             >
               {f.label}
+              <span style={{
+                background: filtro === f.key ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.08)",
+                color: filtro === f.key ? "#fff" : "#64748b",
+                borderRadius: 6, padding: "1px 7px", fontSize: "0.72rem", fontWeight: 800,
+              }}>{f.count}</span>
             </button>
           ))}
         </div>
 
-        {/* Divisor vertical */}
-        <div style={{ width: 1, height: 28, background: "rgba(255,255,255,0.08)", flexShrink: 0 }} />
-
-        {/* Filtros de bimestre — 4 mini-cards */}
+        {/* Linha 2: Bimestre */}
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
-          <span style={{ fontSize: "0.65rem", color: "#334155", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginRight: 2 }}>Bimestre:</span>
+          <span style={{
+            fontSize: "0.65rem", color: "#475569", fontWeight: 700,
+            textTransform: "uppercase", letterSpacing: "0.08em", marginRight: 4,
+          }}>Bimestre:</span>
           {[
-            { key: "todos", label: "Todos",  color: "#10b981", total: planosComBimestral.length },
-            { key: "1",     label: "1° Bim", color: "#6366f1", total: contagemPorBim["1"] || 0 },
-            { key: "2",     label: "2° Bim", color: "#8b5cf6", total: contagemPorBim["2"] || 0 },
-            { key: "3",     label: "3° Bim", color: "#ec4899", total: contagemPorBim["3"] || 0 },
-            { key: "4",     label: "4° Bim", color: "#f59e0b", total: contagemPorBim["4"] || 0 },
+            { key: "todos", label: "Todos os Bimestres", short: "Todos", color: "#10b981", total: planosComBimestral.length },
+            { key: "1",     label: "1° Bimestre",         short: "1° Bim", color: "#6366f1", total: contagemPorBim["1"] || 0 },
+            { key: "2",     label: "2° Bimestre",         short: "2° Bim", color: "#8b5cf6", total: contagemPorBim["2"] || 0 },
+            { key: "3",     label: "3° Bimestre",         short: "3° Bim", color: "#ec4899", total: contagemPorBim["3"] || 0 },
+            { key: "4",     label: "4° Bimestre",         short: "4° Bim", color: "#f59e0b", total: contagemPorBim["4"] || 0 },
           ].map(b => {
             const ativo = filtroBimestre === b.key;
             return (
               <button
                 key={b.key}
                 onClick={() => setFiltroBimestre(b.key)}
-                title={b.key === "todos" ? "Todos os bimestres" : `Filtrar ${b.label}`}
+                title={b.label}
                 style={{
-                  display: "flex", alignItems: "center", gap: 5,
-                  padding: "6px 11px", borderRadius: 8, fontWeight: 700, fontSize: "0.72rem",
-                  cursor: "pointer",
-                  border: `1px solid ${ativo ? b.color : "rgba(255,255,255,0.08)"}`,
-                  background: ativo ? `${b.color}22` : "rgba(255,255,255,0.03)",
-                  color: ativo ? b.color : "#475569",
-                  transition: "all 0.18s",
-                  boxShadow: ativo ? `0 2px 10px ${b.color}33` : "none",
+                  display: "flex", alignItems: "center", gap: 6,
+                  padding: "7px 13px", borderRadius: 9, fontWeight: 700, fontSize: "0.74rem",
+                  cursor: "pointer", transition: "all 0.18s",
+                  border: `1.5px solid ${ativo ? b.color : "rgba(255,255,255,0.15)"}`,
+                  background: ativo
+                    ? `linear-gradient(135deg, ${b.color}33, ${b.color}1a)`
+                    : "rgba(255,255,255,0.05)",
+                  color: ativo ? b.color : "#94a3b8",
+                  boxShadow: ativo ? `0 3px 12px ${b.color}40` : "none",
                 }}
               >
                 <span style={{
-                  display: "inline-block", width: 6, height: 6, borderRadius: "50%",
-                  background: ativo ? b.color : "#334155", flexShrink: 0,
+                  width: 7, height: 7, borderRadius: "50%", flexShrink: 0,
+                  background: ativo ? b.color : "rgba(255,255,255,0.25)",
+                  boxShadow: ativo ? `0 0 6px ${b.color}` : "none",
+                  transition: "all 0.18s",
                 }} />
-                {b.label}
+                {b.short}
                 <span style={{
-                  fontSize: "0.65rem", fontWeight: 800,
-                  color: ativo ? b.color : "#334155",
-                  background: ativo ? `${b.color}18` : "rgba(255,255,255,0.05)",
-                  borderRadius: 5, padding: "1px 5px", marginLeft: 2,
+                  background: ativo ? `${b.color}30` : "rgba(255,255,255,0.1)",
+                  color: ativo ? b.color : "#64748b",
+                  borderRadius: 5, padding: "1px 6px", fontSize: "0.68rem", fontWeight: 800,
+                  minWidth: 18, textAlign: "center",
                 }}>{b.total}</span>
               </button>
             );
           })}
         </div>
+      </div>
       </div>
 
       {/* ═══════════════════════════ LISTA ═══════════════════════════════ */}

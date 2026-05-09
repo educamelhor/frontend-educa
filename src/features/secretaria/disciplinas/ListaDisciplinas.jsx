@@ -12,21 +12,32 @@ const ETAPA_STYLE = {
   GERAL:       { background: '#f3f4f6', color: '#6b7280', border: '1px solid #d1d5db' },
 };
 
+// ── Cores dos badges de turno ─────────────────────────────────────────────────
+const TURNO_STYLE = {
+  INTEGRAL:   { background: '#fffbeb', color: '#b45309', border: '1px solid #fcd34d' },
+  MATUTINO:   { background: '#ecfdf5', color: '#047857', border: '1px solid #6ee7b7' },
+  VESPERTINO: { background: '#eff6ff', color: '#1d4ed8', border: '1px solid #93c5fd' },
+  NOTURNO:    { background: '#1e1b4b', color: '#c7d2fe', border: '1px solid #4338ca' },
+};
+
 function EtapaBadge({ etapa }) {
   const st = ETAPA_STYLE[etapa?.toUpperCase()] || ETAPA_STYLE.GERAL;
   const label = etapa
     ? etapa.charAt(0).toUpperCase() + etapa.slice(1).toLowerCase()
     : 'Geral';
   return (
-    <span style={{
-      ...st,
-      display: 'inline-block',
-      padding: '2px 10px',
-      borderRadius: 20,
-      fontSize: 12,
-      fontWeight: 600,
-    }}>
+    <span style={{ ...st, display:'inline-block', padding:'2px 10px', borderRadius:20, fontSize:12, fontWeight:600 }}>
       {label}
+    </span>
+  );
+}
+
+function TurnoBadge({ turno }) {
+  const TURNO_LABELS = { INTEGRAL:'Integral', MATUTINO:'Matutino', VESPERTINO:'Vespertino', NOTURNO:'Noturno' };
+  const st = TURNO_STYLE[turno?.toUpperCase()] || TURNO_STYLE.INTEGRAL;
+  return (
+    <span style={{ ...st, display:'inline-block', padding:'2px 10px', borderRadius:20, fontSize:12, fontWeight:600 }}>
+      {TURNO_LABELS[turno?.toUpperCase()] || turno || 'Integral'}
     </span>
   );
 }
@@ -73,6 +84,7 @@ async function handleSaveDisciplina(dados) {
     const nomeOriginal = dados.nome ?? dados.disciplina ?? "";
     const nomeNovo = normalizeStr(nomeOriginal);
     const etapaNova = (dados.etapa ?? "GERAL").toUpperCase();
+    const turnoNovo = (dados.turno ?? "INTEGRAL").toUpperCase();
 
     function levenshtein(a, b) {
       const m = a.length, n = b.length;
@@ -98,12 +110,14 @@ async function handleSaveDisciplina(dados) {
       const nomeExistente = normalizeStr(d.nome ?? d.disciplina ?? "");
       const etapaExistente = (d.etapa ?? "GERAL").toUpperCase();
 
-      // ✅ Verificações de similaridade SÓ aplicam quando a etapa for igual
+      // ✅ Verificações de similaridade SÓ aplicam quando etapa E turno forem iguais
       if (etapaNova !== etapaExistente) continue;
+      const turnoExistente = (d.turno ?? "INTEGRAL").toUpperCase();
+      if (turnoNovo !== turnoExistente) continue;
 
       // 1. Nome exatamente igual na mesma etapa → bloqueia
       if (nomeNovo === nomeExistente) {
-        alert(`⚠️ Já existe a disciplina "${d.nome || d.disciplina}" nesta etapa.\nPara corrigir, você deve excluir a duplicada antes de editar.`);
+        alert(`⚠️ Já existe a disciplina "${d.nome || d.disciplina}" nesta etapa e turno.\nExclua a duplicada antes de editar.`);
         setLoading(false);
         return false;
       }
@@ -124,7 +138,7 @@ async function handleSaveDisciplina(dados) {
         }
 
         const confirmar = confirm(
-          `⚠️ Já existe a disciplina "${d.nome || d.disciplina}" nesta etapa.\nDeseja realmente criar "${nomeOriginal}" como uma variação numerada?`
+          `⚠️ Já existe a disciplina "${d.nome || d.disciplina}" nesta etapa/turno.\nDeseja criar "${nomeOriginal}" como uma variação numerada?`
         );
         if (!confirmar) {
           setLoading(false);
@@ -134,10 +148,10 @@ async function handleSaveDisciplina(dados) {
         continue;
       }
 
-      // 3. Erros de digitação leves (Levenshtein ≤ 2) na mesma etapa
+      // 3. Erros de digitação leves (Levenshtein ≤ 2) na mesma etapa/turno
       const distancia = levenshtein(nomeNovo, nomeExistente);
       if (distancia > 0 && distancia <= 2) {
-        alert(`⚠️ Nome muito semelhante ao já existente: "${d.nome || d.disciplina}" (mesma etapa).\nCorrija o nome antes de salvar.`);
+        alert(`⚠️ Nome muito semelhante ao já existente: "${d.nome || d.disciplina}" (mesma etapa/turno).\nCorrija o nome antes de salvar.`);
         setLoading(false);
         return false;
       }
@@ -237,6 +251,7 @@ async function handleSaveDisciplina(dados) {
                 <tr>
                   <th className="p-2 border text-center font-medium text-blue-900">Disciplina</th>
                   <th className="p-2 border text-center font-medium text-blue-900">Etapa</th>
+                  <th className="p-2 border text-center font-medium text-blue-900">Turno</th>
                   <th className="p-2 border text-center font-medium text-blue-900">Carga</th>
                   <th className="p-2 border text-center font-medium text-blue-900">Ações</th>
                 </tr>
@@ -249,6 +264,9 @@ async function handleSaveDisciplina(dados) {
                       <td className="p-2 border text-center uppercase">{d.disciplina}</td>
                       <td className="p-2 border text-center">
                         <EtapaBadge etapa={d.etapa} />
+                      </td>
+                      <td className="p-2 border text-center">
+                        <TurnoBadge turno={d.turno} />
                       </td>
                       <td className="p-2 border text-center">{d.carga}</td>
                       <td className="p-2 border text-center space-x-2">
@@ -307,8 +325,8 @@ async function handleSaveDisciplina(dados) {
                 <p>
                   Tem certeza que deseja excluir a disciplina{" "}
                   <strong>{toDeleteDisciplina?.disciplina}</strong>
-                  {toDeleteDisciplina?.etapa && toDeleteDisciplina.etapa !== 'GERAL' && (
-                    <> (<EtapaBadge etapa={toDeleteDisciplina.etapa} />)</>
+                  {(toDeleteDisciplina?.etapa || toDeleteDisciplina?.turno) && (
+                    <> (<EtapaBadge etapa={toDeleteDisciplina.etapa} /> <TurnoBadge turno={toDeleteDisciplina.turno} />)</>
                   )}
                   ?
                 </p>

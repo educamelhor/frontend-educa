@@ -73,9 +73,42 @@ export default function Avaliacoes() {
   // Modal: plano ainda não aprovado (status ENVIADO) — bloqueia lançamento
   const [modalPlanoPendente, setModalPlanoPendente] = useState(false);
 
+  // Modal: editar data de um item de avaliação no cabeçalho do diário
+  const [modalDataItem, setModalDataItem] = useState(null); // null | { itemId, itemIdx, atividade, dataAtual }
+  const [salvandoData, setSalvandoData] = useState(false);
+  const [dataEditTemp, setDataEditTemp] = useState("");
+
   const showMsg = (type, text) => {
     setMensagemSistema({ type, text });
     setTimeout(() => setMensagemSistema(null), 4500);
+  };
+
+  // Salva data_inicio de um item via PATCH
+  const salvarDataItem = async () => {
+    if (!modalDataItem || !plano?.id) return;
+    setSalvandoData(true);
+    try {
+      const resp = await api.patch(`/avaliacoes/${plano.id}/item/${modalDataItem.itemId}/data`, {
+        data_inicio: dataEditTemp,
+      });
+      if (resp.data?.ok) {
+        // Atualiza o plano local sem recarregar
+        setPlano(prev => {
+          const itens = Array.isArray(prev.itens) ? prev.itens : JSON.parse(prev.itens || "[]");
+          const novosItens = itens.map((it, idx) =>
+            idx === modalDataItem.itemIdx ? { ...it, data_inicio: dataEditTemp } : it
+          );
+          return { ...prev, itens: novosItens };
+        });
+        showMsg("success", `Data de "${modalDataItem.atividade}" atualizada.`);
+        setModalDataItem(null);
+      } else {
+        showMsg("error", resp.data?.error || "Erro ao salvar data.");
+      }
+    } catch (err) {
+      showMsg("error", err.response?.data?.error || "Erro ao salvar data.");
+    }
+    setSalvandoData(false);
   };
 
   // ---------------------------
@@ -1041,15 +1074,7 @@ export default function Avaliacoes() {
                                     <th rowSpan={2} className="px-6 py-4 font-bold border-b border-r border-slate-200 w-10 text-center">Nº</th>
                                     <th rowSpan={2} className="px-6 py-4 font-bold border-b border-r border-slate-200 bg-slate-100 sticky left-0 z-30 min-w-[250px] shadow-sm">Estudante</th>
 
-                                    {/* CABEÇALHO 1 - Títulos das Atividades */}
-                                    {(Array.isArray(plano.itens) ? plano.itens : JSON.parse(plano.itens || "[]")).map((item, idx) => (
-                                       <th key={idx} colSpan={Number(item.oportunidades) || 1} className="px-4 py-2 text-center text-[11px] font-black uppercase tracking-wider text-indigo-800 border-b border-r border-indigo-100 bg-indigo-50/50">
-                                           {item.atividade}
-                                           <div className="text-[10px] text-indigo-500 font-semibold lowercase mt-0.5">
-                                               (Max: {item.nota_total} pts)
-                                           </div>
-                                       </th>
-                                    ))}
+                                     {/* CABEÇALHO 1 - Títulos das Atividades */}                                      {(Array.isArray(plano.itens) ? plano.itens : JSON.parse(plano.itens || "[]")).map((item, idx) => {                                        const dataExibir = item.data_inicio ? String(item.data_inicio).slice(0, 10) : null;                                        const dataFormatada = dataExibir                                          ? new Date(dataExibir + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })                                          : null;                                        const podeEditar = !item.fixo_direcao && !diarioFechado;                                        return (                                          <th key={idx} colSpan={Number(item.oportunidades) || 1} className="px-4 py-2 text-center text-[11px] font-black uppercase tracking-wider text-indigo-800 border-b border-r border-indigo-100 bg-indigo-50/50">                                            {item.atividade}                                            <div className="text-[10px] text-indigo-500 font-semibold lowercase mt-0.5">                                              (Max: {item.nota_total} pts)                                            </div>                                            {item.fixo_direcao ? (                                              <div title="Data gerenciada pela Direção" style={{ marginTop: 3, fontSize: "0.62rem", color: "#92400e", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", gap: 2 }}>                                                {"\uD83D\uDD12"} {dataFormatada || "a definir"}                                              </div>                                            ) : (                                              <button                                                onClick={() => { if (!podeEditar) return; setDataEditTemp(dataExibir || ""); setModalDataItem({ itemId: item.id, itemIdx: idx, atividade: item.atividade, dataAtual: dataExibir }); }}                                                title={podeEditar ? "Clique para definir a data" : "Diário fechado"}                                                style={{ marginTop: 3, display: "flex", alignItems: "center", justifyContent: "center", gap: 3, fontSize: "0.62rem", fontWeight: 700, color: dataFormatada ? "#1d4ed8" : "#94a3b8", background: dataFormatada ? "rgba(59,130,246,0.1)" : "rgba(148,163,184,0.1)", border: "1px dashed " + (dataFormatada ? "rgba(59,130,246,0.4)" : "rgba(148,163,184,0.4)"), borderRadius: "0.3rem", padding: "1px 5px", cursor: podeEditar ? "pointer" : "default", width: "100%", transition: "all 0.15s" }}                                              >                                                {"\uD83D\uDCC5"} {dataFormatada || "+ data"}                                              </button>                                            )}                                          </th>                                        );                                      })}
 
                                     <th rowSpan={2} className="px-6 py-4 font-black uppercase tracking-widest text-center border-b border-slate-200 text-slate-800 bg-slate-200 min-w-[120px]">TOTAL</th>
                                 </tr>
@@ -1601,6 +1626,60 @@ export default function Avaliacoes() {
               >
                 Fechar
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════ MODAL — EDITAR DATA DE AVALIAÇÃO ═══════════════ */}
+      {modalDataItem && (
+        <div
+          style={{ position: "fixed", inset: 0, zIndex: 700, background: "rgba(2,6,23,0.75)", backdropFilter: "blur(12px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "1rem" }}
+          onClick={() => setModalDataItem(null)}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ width: "100%", maxWidth: 400, borderRadius: "1.25rem", background: "linear-gradient(160deg, #1e293b 0%, #0f172a 100%)", border: "1px solid rgba(59,130,246,0.3)", boxShadow: "0 24px 64px rgba(0,0,0,0.6)", overflow: "hidden" }}
+          >
+            {/* Header */}
+            <div style={{ background: "linear-gradient(135deg, #1d4ed8, #3b82f6)", padding: "1.25rem 1.5rem", display: "flex", alignItems: "center", gap: "0.75rem" }}>
+              <div style={{ width: 36, height: 36, borderRadius: "0.6rem", background: "rgba(255,255,255,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.1rem" }}>📅</div>
+              <div>
+                <div style={{ fontSize: "0.65rem", color: "rgba(191,219,254,0.8)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em" }}>Data da avaliação</div>
+                <div style={{ fontSize: "0.95rem", fontWeight: 800, color: "#fff" }}>{modalDataItem.atividade}</div>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: "1.5rem" }}>
+              <label style={{ fontSize: "0.72rem", fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: "0.5rem" }}>
+                Data de realização
+              </label>
+              <input
+                type="date"
+                value={dataEditTemp}
+                onChange={e => setDataEditTemp(e.target.value)}
+                style={{ width: "100%", padding: "0.7rem 1rem", borderRadius: "0.6rem", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.15)", color: "#e2e8f0", fontSize: "1rem", fontWeight: 600, outline: "none", boxSizing: "border-box" }}
+              />
+              <p style={{ marginTop: "0.6rem", fontSize: "0.7rem", color: "#475569", lineHeight: 1.5 }}>
+                Esta data será exibida no cabeçalho da coluna como referência para os alunos e para o registro do diário.
+              </p>
+
+              <div style={{ display: "flex", gap: "0.75rem", marginTop: "1.25rem" }}>
+                <button
+                  onClick={() => setModalDataItem(null)}
+                  style={{ flex: 1, padding: "0.7rem", borderRadius: "0.6rem", background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "#94a3b8", fontWeight: 700, fontSize: "0.85rem", cursor: "pointer" }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={salvarDataItem}
+                  disabled={salvandoData || !dataEditTemp}
+                  style={{ flex: 2, padding: "0.7rem", borderRadius: "0.6rem", background: "linear-gradient(135deg, #1d4ed8, #3b82f6)", border: "none", color: "#fff", fontWeight: 800, fontSize: "0.85rem", cursor: salvandoData || !dataEditTemp ? "not-allowed" : "pointer", opacity: salvandoData || !dataEditTemp ? 0.55 : 1, transition: "all 0.2s", boxShadow: "0 4px 14px rgba(59,130,246,0.35)" }}
+                >
+                  {salvandoData ? "Salvando..." : "Salvar Data"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

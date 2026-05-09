@@ -358,7 +358,6 @@ export default function AgenteNotas() {
     if (n) acc[n] = (acc[n] || 0) + 1;
     return acc;
   }, {});
-  })();
 
   // ── Polling helper notas (202 async pattern) ─────────────────────────────
   const traduzirErroAgente = (msg) => {

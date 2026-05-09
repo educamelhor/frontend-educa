@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import api from "../../services/api";
 import {
   BoltIcon,
@@ -546,7 +546,7 @@ export default function AgentePlanos() {
             <h1 style={{ fontSize: "1.9rem", fontWeight: 900, color: "#f1f5f9", letterSpacing: "-0.5px", margin: 0 }}>
               Planos — Exportar para EDUCADF
             </h1>
-            <p style={{ color: "#64748b", fontSize: "0.9rem", marginTop: 8, maxWidth: 560, lineHeight: 1.6}>
+            <p style={{ color: "#64748b", fontSize: "0.9rem", marginTop: 8, maxWidth: 560, lineHeight: 1.6 }}>
               O Agente migra a coluna <strong style={{ color: "#a78bfa" }}>Avaliação Bimestral</strong> dos seus
               Planos de Avaliação Pedagógico (PAP) para o portal EDUCADF.
               Apenas a <strong style={{ color: "#e2e8f0" }}>estrutura</strong> é exportada nesta etapa — as notas serão em etapa posterior.

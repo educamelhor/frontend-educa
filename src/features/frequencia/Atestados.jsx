@@ -42,7 +42,7 @@ const fmtDataBR = (str) => {
 export default function Atestados() {
   const escolaId = localStorage.getItem("escola_id");
   const perfil = String(localStorage.getItem("perfil") || "").toLowerCase();
-  const canRegister = ["diretor", "vice_diretor", "coordenador", "secretaria"].includes(perfil);
+  const canRegister = ["diretor", "vice_diretor", "supervisor", "coordenador", "secretario", "orientador", "pedagogo"].includes(perfil);
   const isProfessor = perfil === "professor";
   const ANO_LETIVO = String(new Date().getFullYear());
 

@@ -9,11 +9,11 @@ const ETAPAS = [
 ];
 
 const TURNOS = [
+  { value: 'DIURNO',     label: 'Diurno' },
   { value: 'INTEGRAL',   label: 'Integral (Mat. + Vesp.)' },
   { value: 'MATUTINO',   label: 'Matutino' },
   { value: 'VESPERTINO', label: 'Vespertino' },
   { value: 'NOTURNO',    label: 'Noturno' },
-  { value: 'INTEGRAL',   label: 'Integral' },
 ];
 
 // ─── Paletas de cores ────────────────────────────────────────────────────────
@@ -25,6 +25,7 @@ const ETAPA_COLORS = {
 };
 
 const TURNO_COLORS = {
+  DIURNO:     { bg: '#f0f9ff', color: '#0369a1', border: '#7dd3fc' },
   INTEGRAL:   { bg: '#fffbeb', color: '#b45309', border: '#fcd34d' },
   MATUTINO:   { bg: '#ecfdf5', color: '#047857', border: '#6ee7b7' },
   VESPERTINO: { bg: '#eff6ff', color: '#1d4ed8', border: '#93c5fd' },

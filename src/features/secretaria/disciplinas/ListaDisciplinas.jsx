@@ -14,6 +14,7 @@ const ETAPA_STYLE = {
 
 // ── Cores dos badges de turno ─────────────────────────────────────────────────
 const TURNO_STYLE = {
+  DIURNO:     { background: '#f0f9ff', color: '#0369a1', border: '1px solid #7dd3fc' },
   INTEGRAL:   { background: '#fffbeb', color: '#b45309', border: '1px solid #fcd34d' },
   MATUTINO:   { background: '#ecfdf5', color: '#047857', border: '1px solid #6ee7b7' },
   VESPERTINO: { background: '#eff6ff', color: '#1d4ed8', border: '1px solid #93c5fd' },
@@ -33,7 +34,7 @@ function EtapaBadge({ etapa }) {
 }
 
 function TurnoBadge({ turno }) {
-  const TURNO_LABELS = { INTEGRAL:'Integral', MATUTINO:'Matutino', VESPERTINO:'Vespertino', NOTURNO:'Noturno' };
+  const TURNO_LABELS = { DIURNO:'Diurno', INTEGRAL:'Integral', MATUTINO:'Matutino', VESPERTINO:'Vespertino', NOTURNO:'Noturno' };
   const st = TURNO_STYLE[turno?.toUpperCase()] || TURNO_STYLE.INTEGRAL;
   return (
     <span style={{ ...st, display:'inline-block', padding:'2px 10px', borderRadius:20, fontSize:12, fontWeight:600 }}>

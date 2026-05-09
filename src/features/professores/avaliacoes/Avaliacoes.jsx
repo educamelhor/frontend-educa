@@ -70,6 +70,9 @@ export default function Avaliacoes() {
   // Governança: avaliação padrão bimestral (bloqueia edição manual)
   const [avaliacaoPadrao, setAvaliacaoPadrao] = useState(false);
 
+  // Modal: plano ainda não aprovado (status ENVIADO) — bloqueia lançamento
+  const [modalPlanoPendente, setModalPlanoPendente] = useState(false);
+
   const showMsg = (type, text) => {
     setMensagemSistema({ type, text });
     setTimeout(() => setMensagemSistema(null), 4500);
@@ -176,8 +179,17 @@ export default function Avaliacoes() {
 
         setPlanoStatus(planoEncontrado.status);
 
-        // Apenas planos com status ENVIADO ou APROVADO permitem lançamento
-        if (planoEncontrado.status !== "APROVADO" && planoEncontrado.status !== "ENVIADO") {
+        // Status ENVIADO: exibe modal de bloqueio — aguarda aprovação da direção
+        if (planoEncontrado.status === "ENVIADO") {
+          setPlano(null);
+          setAlunos([]);
+          setCarregandoDados(false);
+          setModalPlanoPendente(true);
+          return;
+        }
+
+        // Demais status não permitidos (RASCUNHO, PENDENTE, etc.)
+        if (planoEncontrado.status !== "APROVADO") {
           setPlano(null);
           setAlunos([]);
           setCarregandoDados(false);
@@ -796,6 +808,142 @@ export default function Avaliacoes() {
 
       {/* ───────────────── MENSAGEM DE PLANO NÃO DISPONÍVEL ───────────────── */}
       {renderMensagemPlanoNaoDisponivel()}
+
+      {/* ═══════════════ MODAL PREMIUM — PAP AGUARDANDO APROVAÇÃO ═══════════════ */}
+      {modalPlanoPendente && (
+        <div
+          style={{
+            position: "fixed", inset: 0, zIndex: 600,
+            background: "rgba(2,6,23,0.82)",
+            backdropFilter: "blur(14px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: "1rem",
+            animation: "fadeInModal 0.25s ease",
+          }}
+          onClick={() => setModalPlanoPendente(false)}
+        >
+          <style>{`
+            @keyframes fadeInModal { from { opacity:0; transform:scale(0.96); } to { opacity:1; transform:scale(1); } }
+            @keyframes floatIcon { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+          `}</style>
+
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: "100%", maxWidth: 480,
+              borderRadius: "1.5rem",
+              overflow: "hidden",
+              background: "linear-gradient(160deg, #1a1f3a 0%, #0f1629 100%)",
+              border: "1px solid rgba(245,158,11,0.3)",
+              boxShadow: "0 32px 80px rgba(0,0,0,0.7), 0 0 60px rgba(245,158,11,0.08)",
+            }}
+          >
+            {/* ── Faixa superior âmbar ── */}
+            <div style={{
+              background: "linear-gradient(135deg, #b45309 0%, #d97706 60%, #f59e0b 100%)",
+              padding: "2rem 2rem 1.5rem",
+              textAlign: "center",
+              position: "relative",
+              overflow: "hidden",
+            }}>
+              {/* círculos decorativos */}
+              <div style={{ position:"absolute", top:-40, right:-40, width:140, height:140, borderRadius:"50%", background:"rgba(255,255,255,0.06)", pointerEvents:"none" }} />
+              <div style={{ position:"absolute", bottom:-30, left:-30, width:100, height:100, borderRadius:"50%", background:"rgba(255,255,255,0.04)", pointerEvents:"none" }} />
+
+              <div style={{
+                width: 64, height: 64, borderRadius: "1rem",
+                background: "rgba(255,255,255,0.15)",
+                border: "2px solid rgba(255,255,255,0.25)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: "2rem", margin: "0 auto 1rem",
+                animation: "floatIcon 3s ease-in-out infinite",
+              }}>⏳</div>
+
+              <h2 style={{ fontSize: "1.2rem", fontWeight: 900, color: "#fff", letterSpacing: "-0.02em", margin: 0 }}>
+                Aguardando Aprovação
+              </h2>
+              <p style={{ fontSize: "0.8rem", color: "rgba(254,243,199,0.85)", marginTop: "0.4rem", fontWeight: 500 }}>
+                O lançamento de notas ainda não está liberado
+              </p>
+            </div>
+
+            {/* ── Corpo ── */}
+            <div style={{ padding: "1.75rem 2rem" }}>
+
+              {/* Card de contexto */}
+              <div style={{
+                padding: "1rem 1.25rem",
+                borderRadius: "0.875rem",
+                background: "rgba(245,158,11,0.07)",
+                border: "1px solid rgba(245,158,11,0.22)",
+                marginBottom: "1.25rem",
+              }}>
+                <div style={{ fontSize: "0.65rem", fontWeight: 800, color: "#f59e0b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.6rem" }}>
+                  📋 Plano de avaliação
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.6rem" }}>
+                  {[
+                    { label: "Disciplina", value: disciplinaSelecionada },
+                    { label: "Turma",      value: turmaObj?.nome || "" },
+                    { label: "Bimestre",   value: bimestreSelecionado },
+                    { label: "Status",     value: "⏳ ENVIADO" },
+                  ].map(({ label, value }) => (
+                    <div key={label} style={{
+                      padding: "0.55rem 0.75rem", borderRadius: "0.6rem",
+                      background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)",
+                    }}>
+                      <div style={{ fontSize: "0.58rem", color: "#64748b", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>{label}</div>
+                      <div style={{ fontSize: "0.82rem", fontWeight: 800, color: "#e2e8f0" }}>{value}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Explicação */}
+              <div style={{
+                padding: "0.9rem 1.1rem",
+                borderRadius: "0.875rem",
+                background: "rgba(255,255,255,0.03)",
+                border: "1px solid rgba(255,255,255,0.07)",
+                marginBottom: "1.5rem",
+                fontSize: "0.82rem",
+                color: "#94a3b8",
+                lineHeight: 1.65,
+              }}>
+                O Plano de Avaliação foi <strong style={{ color: "#fbbf24" }}>enviado para a Direção/Coordenação</strong> e está
+                aguardando aprovação.<br /><br />
+                O lançamento de notas só será liberado após a <strong style={{ color: "#e2e8f0" }}>aprovação do plano</strong>.
+                Você receberá acesso automaticamente quando a direção aprovar.
+                <br /><br />
+                <span style={{ fontSize: "0.75rem", color: "#475569" }}>
+                  💡 A coluna <strong style={{ color: "#fbbf24" }}>Prova Bimestral</strong> permanece bloqueada para edição manual
+                  independentemente do status — ela é preenchida automaticamente pelo módulo Gabarito.
+                </span>
+              </div>
+
+              {/* Botão fechar */}
+              <button
+                onClick={() => setModalPlanoPendente(false)}
+                style={{
+                  width: "100%", padding: "0.85rem",
+                  borderRadius: "0.875rem",
+                  background: "linear-gradient(135deg, #b45309, #d97706)",
+                  border: "none", color: "#fff",
+                  fontWeight: 800, fontSize: "0.9rem",
+                  cursor: "pointer",
+                  boxShadow: "0 4px 20px rgba(180,83,9,0.4)",
+                  transition: "all 0.2s",
+                  letterSpacing: "0.02em",
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = "linear-gradient(135deg, #92400e, #b45309)"}
+                onMouseLeave={e => e.currentTarget.style.background = "linear-gradient(135deg, #b45309, #d97706)"}
+              >
+                Entendido — Aguardar Aprovação
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ───────────────── GRID DE AVALIAÇÃO ───────────────── */}
       {selecaoCompleta && plano && (

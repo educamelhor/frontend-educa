@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+﻿import React, { useState, useEffect, useCallback } from "react";
 import api from "../../../services/api";
 import {
   CheckCircleIcon,
@@ -308,23 +308,47 @@ export default function Avaliacoes() {
   const handleNotaChange = (alunoId, itemIdx, opIdx, maxVal, val) => {
     if (diarioFechado) return; // readonly
     if (isItemBloqueado(itemIdx)) return; // apenas coluna padronizada bloqueada
-    let cleanVal = val.replace(",", ".");
-    if (cleanVal === "") {
+
+    // Permite digitação livre: aceita vírgula como separador e entrada parcial (ex: ",4" ou "1.")
+    // Guardamos o texto bruto temporariamente no estado de notas como string
+    // A normalização final ocorre no onBlur
+    const rawAllowComma = val.replace(",", ".");
+
+    if (rawAllowComma === "" || rawAllowComma === ".") {
       setNotas(prev => { const n = { ...prev }; delete n[getNotaKey(alunoId, itemIdx, opIdx)]; return n; });
       return;
     }
-    let numVal = parseFloat(cleanVal);
-    if (isNaN(numVal)) return;
 
-    if (numVal > maxVal) numVal = maxVal;
-    if (numVal < 0) numVal = 0;
-
+    // Durante a digitação, aceita strings como "1." ou ".4" sem forçar parse
     setNotas(prev => ({
       ...prev,
-      [getNotaKey(alunoId, itemIdx, opIdx)]: numVal
+      [getNotaKey(alunoId, itemIdx, opIdx)]: rawAllowComma
     }));
 
     setCoresCelulas(prev => { const c = { ...prev }; delete c[getNotaKey(alunoId, itemIdx, opIdx)]; return c; });
+  };
+
+  // Normaliza a nota ao sair do campo (Tab / click fora)
+  // Exemplos: "1" → 1.0 | ",4" → 0.4 | "1." → 1.0 | "" → remove
+  const handleNotaBlur = (alunoId, itemIdx, opIdx, maxVal) => {
+    if (diarioFechado) return;
+    if (isItemBloqueado(itemIdx)) return;
+    const key = getNotaKey(alunoId, itemIdx, opIdx);
+    const raw = notas[key];
+    if (raw === undefined || raw === "") return;
+
+    let numVal = parseFloat(String(raw));
+    if (isNaN(numVal)) {
+      // valor inválido → remove
+      setNotas(prev => { const n = { ...prev }; delete n[key]; return n; });
+      return;
+    }
+    if (numVal > maxVal) numVal = maxVal;
+    if (numVal < 0) numVal = 0;
+
+    // Arredonda para 1 casa decimal e armazena como número
+    const normalizado = Math.round(numVal * 10) / 10;
+    setNotas(prev => ({ ...prev, [key]: normalizado }));
   };
 
   const handleContextMenu = (e, alunoId, itemIdx, opIdx, maxVal) => {
@@ -363,10 +387,11 @@ export default function Avaliacoes() {
       const freq = Number(item.oportunidades) || 1;
       for (let opIdx = 0; opIdx < freq; opIdx++) {
         const val = notas[getNotaKey(alunoId, itemIdx, opIdx)];
-        if (val !== undefined && !isNaN(val)) total += val;
+        if (val !== undefined && !isNaN(Number(val))) total += Number(val);
       }
     });
-    return total.toFixed(2);
+    // Sempre exibe com 1 casa decimal (ex: 3.0, 4.5, 10.0)
+    return parseFloat(total.toFixed(1));
   };
 
   // ---------------------------
@@ -1113,9 +1138,17 @@ export default function Avaliacoes() {
                                             {/* CÉLULAS DE INPUT */}
                                             {columns.map((col, i) => {
                                                 const val = notas[getNotaKey(aluno.id, col.itemIdx, col.opIdx)];
-                                                const displayVal = val !== undefined ? val : "";
                                                 const cor = coresCelulas[getNotaKey(aluno.id, col.itemIdx, col.opIdx)];
                                                 const cellBloqueada = diarioFechado || isItemBloqueado(col.itemIdx);
+
+                                                // Durante a edição mostramos o valor bruto (string) para não interferir na digitação.
+                                                // Em células bloqueadas (readonly) e após o blur, mostramos sempre com 1 casa decimal.
+                                                const numVal = val !== undefined ? Number(val) : NaN;
+                                                const displayVal = val === undefined
+                                                  ? ""
+                                                  : cellBloqueada
+                                                    ? (!isNaN(numVal) ? numVal.toFixed(1) : val)
+                                                    : val; // valor bruto durante digitação
 
                                                 const bgClass =
                                                    cor === "red" ? "bg-red-200 text-red-900" :
@@ -1130,12 +1163,14 @@ export default function Avaliacoes() {
                                                    className={`px-1 py-1 border-r border-slate-100 text-center relative group/cell transition-colors duration-300 ${cor === "red" ? "bg-red-100" : cor === "yellow" ? "bg-yellow-100" : cor === "green" ? "bg-green-100" : ""} ${cellBloqueada ? "bg-amber-50/40" : ""}`}
                                                 >
                                                     <input
-                                                       type="number"
+                                                       type="text"
+                                                       inputMode="decimal"
                                                        min="0"
                                                        max={col.maxVal}
                                                        step="0.1"
                                                        value={displayVal}
                                                        onChange={(e) => handleNotaChange(aluno.id, col.itemIdx, col.opIdx, col.maxVal, e.target.value)}
+                                                       onBlur={() => handleNotaBlur(aluno.id, col.itemIdx, col.opIdx, col.maxVal)}
                                                        readOnly={cellBloqueada}
                                                        tabIndex={cellBloqueada ? -1 : 0}
                                                        className={`w-full text-center py-2.5 font-bold border border-transparent rounded-lg outline-none transition-all placeholder:text-slate-300 ${bgClass} ${
@@ -1166,7 +1201,7 @@ export default function Avaliacoes() {
                                                         Number(total) >= 6 ? 'text-green-600' :
                                                         Number(total) >= 4 ? 'text-orange-500' : 'text-red-600'
                                                     }`}>
-                                                        {total}
+                                                         {String(Number(total).toFixed(1)).replace(".", ",")}
                                                     </span>
                                                     <div className="w-16 h-1 bg-slate-200 rounded-full mt-1 overflow-hidden">
                                                         <div

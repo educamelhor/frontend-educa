@@ -51,6 +51,8 @@ export default function Avaliacoes() {
   const [contextMenu, setContextMenu] = useState(null);
   const [salvando, setSalvando] = useState(false);
   const [mensagemSistema, setMensagemSistema] = useState(null);
+  // Rastreia qual célula está sendo editada para exibir valor bruto durante digitação
+  const [focusedKey, setFocusedKey] = useState(null);
 
   // ---------------------------
   // Estados de Fechamento / Exportação
@@ -328,12 +330,13 @@ export default function Avaliacoes() {
     setCoresCelulas(prev => { const c = { ...prev }; delete c[getNotaKey(alunoId, itemIdx, opIdx)]; return c; });
   };
 
-  // Normaliza a nota ao sair do campo (Tab / click fora)
-  // Exemplos: "1" → 1.0 | ",4" → 0.4 | "1." → 1.0 | "" → remove
+  // Normaliza a nota ao sair do campo (Tab / click fora) — padrão EDUCADF: 2 casas decimais
+  // Exemplos: "1" → 1.00 | ",4" → 0.40 | "1." → 1.00 | "" → remove
   const handleNotaBlur = (alunoId, itemIdx, opIdx, maxVal) => {
     if (diarioFechado) return;
     if (isItemBloqueado(itemIdx)) return;
     const key = getNotaKey(alunoId, itemIdx, opIdx);
+    setFocusedKey(null); // sai do modo de edição → exibe formatado
     const raw = notas[key];
     if (raw === undefined || raw === "") return;
 
@@ -346,8 +349,8 @@ export default function Avaliacoes() {
     if (numVal > maxVal) numVal = maxVal;
     if (numVal < 0) numVal = 0;
 
-    // Arredonda para 1 casa decimal e armazena como número
-    const normalizado = Math.round(numVal * 10) / 10;
+    // Arredonda para 2 casas decimais e armazena como número (padrão EDUCADF)
+    const normalizado = Math.round(numVal * 100) / 100;
     setNotas(prev => ({ ...prev, [key]: normalizado }));
   };
 
@@ -390,8 +393,8 @@ export default function Avaliacoes() {
         if (val !== undefined && !isNaN(Number(val))) total += Number(val);
       }
     });
-    // Sempre exibe com 1 casa decimal (ex: 3.0, 4.5, 10.0)
-    return parseFloat(total.toFixed(1));
+    // Padrão EDUCADF: 2 casas decimais (ex: 3.00, 4.50, 10.00)
+    return parseFloat(total.toFixed(2));
   };
 
   // ---------------------------
@@ -1136,19 +1139,28 @@ export default function Avaliacoes() {
                                             </td>
 
                                             {/* CÉLULAS DE INPUT */}
-                                            {columns.map((col, i) => {
-                                                const val = notas[getNotaKey(aluno.id, col.itemIdx, col.opIdx)];
-                                                const cor = coresCelulas[getNotaKey(aluno.id, col.itemIdx, col.opIdx)];
+                                             {columns.map((col, i) => {
+                                                const key = getNotaKey(aluno.id, col.itemIdx, col.opIdx);
+                                                const val = notas[key];
+                                                const cor = coresCelulas[key];
                                                 const cellBloqueada = diarioFechado || isItemBloqueado(col.itemIdx);
+                                                const isFocused = focusedKey === key;
 
-                                                // Durante a edição mostramos o valor bruto (string) para não interferir na digitação.
-                                                // Em células bloqueadas (readonly) e após o blur, mostramos sempre com 1 casa decimal.
-                                                const numVal = val !== undefined ? Number(val) : NaN;
-                                                const displayVal = val === undefined
-                                                  ? ""
-                                                  : cellBloqueada
-                                                    ? (!isNaN(numVal) ? numVal.toFixed(1) : val)
-                                                    : val; // valor bruto durante digitação
+                                                // Lógica de exibição:
+                                                // • Campo focado (digitando): mostra o valor bruto com vírgula (não interfere na digitação)
+                                                // • Campo em repouso OU bloqueado: formata com vírgula e 2 casas decimais (padrão EDUCADF)
+                                                // Isso garante que valores carregados do banco também apareçam formatados
+                                                let displayVal = "";
+                                                if (val !== undefined) {
+                                                  if (isFocused) {
+                                                    // Durante digitação: mostra o texto bruto (. → ,)
+                                                    displayVal = String(val).replace(".", ",");
+                                                  } else {
+                                                    // Em repouso: formata com 2 casas decimais e vírgula (padrão EDUCADF)
+                                                    const numV = Number(val);
+                                                    displayVal = isNaN(numV) ? "" : numV.toFixed(2).replace(".", ",");
+                                                  }
+                                                }
 
                                                 const bgClass =
                                                    cor === "red" ? "bg-red-200 text-red-900" :
@@ -1165,43 +1177,41 @@ export default function Avaliacoes() {
                                                     <input
                                                        type="text"
                                                        inputMode="decimal"
-                                                       min="0"
-                                                       max={col.maxVal}
-                                                       step="0.1"
                                                        value={displayVal}
                                                        onChange={(e) => handleNotaChange(aluno.id, col.itemIdx, col.opIdx, col.maxVal, e.target.value)}
+                                                       onFocus={() => setFocusedKey(key)}
                                                        onBlur={() => handleNotaBlur(aluno.id, col.itemIdx, col.opIdx, col.maxVal)}
                                                        readOnly={cellBloqueada}
                                                        tabIndex={cellBloqueada ? -1 : 0}
                                                        className={`w-full text-center py-2.5 font-bold border border-transparent rounded-lg outline-none transition-all placeholder:text-slate-300 ${bgClass} ${
                                                          cellBloqueada
-                                                           ? 'cursor-not-allowed bg-slate-50' 
+                                                           ? 'cursor-not-allowed bg-slate-50'
                                                            : 'hover:border-slate-300 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200'
                                                        }`}
                                                        placeholder="-"
                                                     />
                                                     {/* Tooltip de suporte no hover */}
                                                     {!cellBloqueada && (
-                                                      <div className="absolute opacity-0 group-hover/cell:opacity-100 -top-8 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg pointer-events-none transition-opacity whitespace-nowrap z-50">
-                                                          Max: {col.maxVal}
-                                                      </div>
-                                                    )}
-                                                    {cellBloqueada && !diarioFechado && (
-                                                      <div className="absolute opacity-0 group-hover/cell:opacity-100 -top-8 left-1/2 transform -translate-x-1/2 bg-amber-700 text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg pointer-events-none transition-opacity whitespace-nowrap z-50">
-                                                          🔒 Preenchido via Gabarito
-                                                      </div>
-                                                    )}
-                                                </td>
-                                            )})}
+                                                       <div className="absolute opacity-0 group-hover/cell:opacity-100 -top-8 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg pointer-events-none transition-opacity whitespace-nowrap z-50">
+                                                           Max: {col.maxVal}
+                                                       </div>
+                                                     )}
+                                                     {cellBloqueada && !diarioFechado && (
+                                                       <div className="absolute opacity-0 group-hover/cell:opacity-100 -top-8 left-1/2 transform -translate-x-1/2 bg-amber-700 text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg pointer-events-none transition-opacity whitespace-nowrap z-50">
+                                                           🔒 Preenchido via Gabarito
+                                                       </div>
+                                                     )}
+                                                 </td>
+                                             )})}
 
-                                            {/* CÉLULA TOTAL (Readonly) */}
+                                             {/* CÉLULA TOTAL (Readonly) */}
                                             <td className="px-6 py-3 text-center border-l-2 border-slate-200 bg-slate-50/50">
                                                 <div className="flex flex-col items-center">
                                                     <span className={`text-lg font-black ${
                                                         Number(total) >= 6 ? 'text-green-600' :
                                                         Number(total) >= 4 ? 'text-orange-500' : 'text-red-600'
                                                     }`}>
-                                                         {String(Number(total).toFixed(1)).replace(".", ",")}
+                                                         {String(Number(total).toFixed(2)).replace(".", ",")}
                                                     </span>
                                                     <div className="w-16 h-1 bg-slate-200 rounded-full mt-1 overflow-hidden">
                                                         <div

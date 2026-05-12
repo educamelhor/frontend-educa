@@ -90,7 +90,38 @@ export default function ListaDisciplinas() {
   const normalize = (str = '') =>
     str.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 
-  const term = normalize(search);
+  const term = normalize(search).trim();
+
+  // Aliases: permite digitar abreviações ou variações comuns
+  const ETAPA_ALIASES = {
+    'infantil': 'infantil',
+    'fund': 'fundamental', 'fundamental': 'fundamental',
+    'medio': 'medio', 'médio': 'medio', 'ensino medio': 'medio',
+    'geral': 'geral',
+  };
+  const TURNO_ALIASES = {
+    'diurno': 'diurno',
+    'integral': 'integral', 'int': 'integral',
+    'mat': 'matutino', 'matutino': 'matutino', 'manha': 'matutino', 'manhã': 'matutino',
+    'vesp': 'vespertino', 'vespertino': 'vespertino', 'tarde': 'vespertino',
+    'not': 'noturno', 'noturno': 'noturno', 'noite': 'noturno',
+  };
+
+  const matchesDisciplina = (d) => {
+    if (!term) return true;
+    const nome   = normalize(d.disciplina ?? d.nome ?? '');
+    const etapa  = normalize(d.etapa ?? '');
+    const turno  = normalize(d.turno ?? '');
+    // Verifica nome direto
+    if (nome.includes(term)) return true;
+    // Verifica etapa (valor bruto + aliases)
+    if (etapa.includes(term)) return true;
+    if (ETAPA_ALIASES[term] && etapa.includes(ETAPA_ALIASES[term])) return true;
+    // Verifica turno (valor bruto + aliases)
+    if (turno.includes(term)) return true;
+    if (TURNO_ALIASES[term] && turno.includes(TURNO_ALIASES[term])) return true;
+    return false;
+  };
 
 // ─────────────────────────────────────────────────────────────
 
@@ -259,7 +290,7 @@ export default function ListaDisciplinas() {
 
             <input
               type="text"
-              placeholder="🔍 Filtrar por Disciplina"
+              placeholder="🔍 Disciplina, Etapa ou Turno..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               className="border rounded p-2 w-80 placeholder-gray-500"
@@ -291,7 +322,7 @@ export default function ListaDisciplinas() {
               </thead>
               <tbody>
                 {disciplinas
-                  .filter(d => normalize(d.disciplina).includes(term))
+                  .filter(matchesDisciplina)
                   .map(d => (
                     <tr key={d.id} className="hover:bg-blue-50">
                       <td className="p-2 border text-center uppercase">{d.disciplina}</td>

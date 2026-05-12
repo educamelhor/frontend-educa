@@ -170,7 +170,7 @@ export default function ListaDisciplinas() {
       console.error(err);
       setSimilarModal({
         tipo: 'exato', dadosPendentes: null, nomeExistente: '', sugestao: null,
-        mensagem: err?.response?.data?.message || 'Erro ao salvar disciplina.',
+        mensagem: err?.response?.data?.message || err?.response?.data?.error || 'Erro ao salvar disciplina.',
       });
       return false;
     } finally {
@@ -187,7 +187,11 @@ export default function ListaDisciplinas() {
       await _executarSave(pendente);
     } catch (err) {
       console.error(err);
-      alert(err?.response?.data?.message || 'Erro ao salvar disciplina.');
+      const msg = err?.response?.data?.message || err?.response?.data?.error || 'Erro ao salvar disciplina.';
+      setSimilarModal({
+        tipo: 'exato', dadosPendentes: null, nomeExistente: '', sugestao: null,
+        mensagem: msg,
+      });
     } finally {
       setLoading(false);
     }

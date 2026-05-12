@@ -193,27 +193,9 @@ export default function ListaDisciplinas() {
     }
   };
 
-
-    // ── Passou em todas as verificações → salva ─────────────────────────────
-    await _executarSave(dados, { setDisciplinas, setSuccessMessage, setFormOpen, setEditingDisciplina, setLoading });
-    return true;
-  } catch (err) {
-    console.error(err);
-    const msgBackend = err?.response?.data?.message;
-    setSimilarModal({
-      tipo: 'exato',
-      dadosPendentes: null,
-      nomeExistente: '',
-      sugestao: null,
-      mensagem: msgBackend || 'Erro ao salvar disciplina.',
-    });
-    return false;
-  } finally {
-    setLoading(false);
-  }
-
 // ─────────────────────────────────────────────────────────────
   async function handleDeleteDisciplinaConfirmed() {
+
 
   if (!toDeleteDisciplina) return;
   setLoading(true);

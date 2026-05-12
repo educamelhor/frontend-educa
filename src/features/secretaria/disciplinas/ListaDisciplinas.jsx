@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../../services/api';
 import { TrashIcon, PlusIcon } from '@heroicons/react/24/solid';
 import DisciplinaForm from './DisciplinaForm';
-import { PencilSquareIcon } from "@heroicons/react/24/solid";
+import { PencilSquareIcon, ExclamationTriangleIcon } from "@heroicons/react/24/solid";
 
 // ── Cores dos badges de etapa ────────────────────────────────────────────────
 const ETAPA_STYLE = {
@@ -53,6 +53,10 @@ export default function ListaDisciplinas() {
   const [toDeleteDisciplina, setToDeleteDisciplina] = useState(null);
   const [editingDisciplina, setEditingDisciplina]   = useState(null);
 
+  // ── Modal de confirmação de similaridade ──────────────────────────────────
+  const [similarModal, setSimilarModal] = useState(null);
+  // similarModal = { dadosPendentes, nomeExistente, mensagem } | null
+
 // ─────────────────────────────────────────────────────────────
   useEffect(() => {
     async function load() {
@@ -72,121 +76,145 @@ export default function ListaDisciplinas() {
 
 // ─────────────────────────────────────────────────────────────
 
-async function handleSaveDisciplina(dados) {
-  setLoading(true);
-  try {
-    const normalizeStr = (str = "") =>
-      str
-        .normalize("NFD")
-        .replace(/\p{Diacritic}/gu, "")
-        .toLowerCase()
-        .replace(/[\s_\-]/g, "");
-
-    const nomeOriginal = dados.nome ?? dados.disciplina ?? "";
-    const nomeNovo = normalizeStr(nomeOriginal);
-    const etapaNova = (dados.etapa ?? "GERAL").toUpperCase();
-    const turnoNovo = (dados.turno ?? "INTEGRAL").toUpperCase();
-
-    function levenshtein(a, b) {
-      const m = a.length, n = b.length;
-      const dp = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
-      for (let i = 0; i <= m; i++) dp[i][0] = i;
-      for (let j = 0; j <= n; j++) dp[0][j] = j;
-      for (let i = 1; i <= m; i++) {
-        for (let j = 1; j <= n; j++) {
-          if (a[i - 1] === b[j - 1]) {
-            dp[i][j] = dp[i - 1][j - 1];
-          } else {
-            dp[i][j] = 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
-          }
-        }
-      }
-      return dp[m][n];
-    }
-
-    for (const d of disciplinas) {
-      // ⚠️ IGNORA a própria disciplina ao editar
-      if (dados.id && d.id === dados.id) continue;
-
-      const nomeExistente = normalizeStr(d.nome ?? d.disciplina ?? "");
-      const etapaExistente = (d.etapa ?? "GERAL").toUpperCase();
-
-      // ✅ Verificações de similaridade SÓ aplicam quando etapa E turno forem iguais
-      if (etapaNova !== etapaExistente) continue;
-      const turnoExistente = (d.turno ?? "INTEGRAL").toUpperCase();
-      if (turnoNovo !== turnoExistente) continue;
-
-      // 1. Nome exatamente igual na mesma etapa → bloqueia
-      if (nomeNovo === nomeExistente) {
-        alert(`⚠️ Já existe a disciplina "${d.nome || d.disciplina}" nesta etapa e turno.\nExclua a duplicada antes de editar.`);
-        setLoading(false);
-        return false;
-      }
-
-      // 2. Sequência numérica (ex: artes → artes-2)
-      const baseNovo = nomeNovo.replace(/\d+$/, "");
-      const baseExistente = nomeExistente.replace(/\d+$/, "");
-      const regexNumeroFinal = /\d+$/;
-
-      if (baseNovo === baseExistente && regexNumeroFinal.test(nomeNovo)) {
-        const numeroNovo = nomeNovo.match(/\d+$/)?.[0];
-        const numeroExistente = nomeExistente.match(/\d+$/)?.[0];
-
-        if (numeroNovo && numeroNovo === numeroExistente) {
-          alert(`⚠️ Já existe uma disciplina semelhante com o número ${numeroNovo} nesta etapa.`);
-          setLoading(false);
-          return false;
-        }
-
-        const confirmar = confirm(
-          `⚠️ Já existe a disciplina "${d.nome || d.disciplina}" nesta etapa/turno.\nDeseja criar "${nomeOriginal}" como uma variação numerada?`
-        );
-        if (!confirmar) {
-          setLoading(false);
-          return false;
-        }
-
-        continue;
-      }
-
-      // 3. Erros de digitação leves (Levenshtein ≤ 2) na mesma etapa/turno
-      const distancia = levenshtein(nomeNovo, nomeExistente);
-      if (distancia > 0 && distancia <= 2) {
-        alert(`⚠️ Nome muito semelhante ao já existente: "${d.nome || d.disciplina}" (mesma etapa/turno).\nCorrija o nome antes de salvar.`);
-        setLoading(false);
-        return false;
-      }
-    }
-
-    // Se passou em todas as verificações:
+  // ── Executa o save real no backend ───────────────────────────────────────
+  const _executarSave = async (dados) => {
     if (dados.id) {
       await api.put(`/api/disciplinas/${dados.id}`, dados);
     } else {
-      await api.post("/api/disciplinas", dados);
+      await api.post('/api/disciplinas', dados);
     }
-
-    const { data } = await api.get("/api/disciplinas");
+    const { data } = await api.get('/api/disciplinas');
     setDisciplinas(data);
-    setSuccessMessage("✅ Disciplina salva com sucesso!");
-    setTimeout(() => setSuccessMessage(""), 3000);
+    setSuccessMessage('✅ Disciplina salva com sucesso!');
+    setTimeout(() => setSuccessMessage(''), 3000);
     setFormOpen(false);
     setEditingDisciplina(null);
+  };
+
+  // ── Verifica similaridade e salva (ou abre modal de confirmação) ──────────
+  const handleSaveDisciplina = async (dados) => {
+    setLoading(true);
+    try {
+      const nomeOriginal = dados.nome ?? dados.disciplina ?? '';
+      const nomeNovo     = normalizeStr(nomeOriginal);
+      const etapaNova    = (dados.etapa  ?? 'GERAL').toUpperCase();
+      const turnoNovo    = (dados.turno  ?? 'INTEGRAL').toUpperCase();
+
+      for (const d of disciplinas) {
+        if (dados.id && d.id === dados.id) continue;
+
+        const nomeExistente  = normalizeStr(d.nome ?? d.disciplina ?? '');
+        const etapaExistente = (d.etapa  ?? 'GERAL').toUpperCase();
+        const turnoExistente = (d.turno  ?? 'INTEGRAL').toUpperCase();
+
+        if (etapaNova !== etapaExistente || turnoNovo !== turnoExistente) continue;
+
+        // Regra 1: nome EXATAMENTE igual → bloqueia + sugere numeração
+        if (nomeNovo === nomeExistente) {
+          const base   = nomeOriginal.trim().replace(/\d+$/, '');
+          const usados = disciplinas
+            .filter(x => normalizeStr(x.nome ?? x.disciplina ?? '').replace(/\d+$/, '') === normalizeStr(base)
+              && (x.etapa  ?? 'GERAL').toUpperCase()     === etapaNova
+              && (x.turno  ?? 'INTEGRAL').toUpperCase()  === turnoNovo)
+            .map(x => parseInt((x.nome ?? x.disciplina ?? '').match(/\d+$/)?.[0] ?? '0', 10))
+            .filter(n => n > 0);
+          const proximo = usados.length ? Math.max(...usados) + 1 : 1;
+          setSimilarModal({
+            tipo: 'exato',
+            dadosPendentes: null,
+            nomeExistente: d.nome || d.disciplina,
+            sugestao: `${base.trim()}${proximo}`,
+            mensagem: `Já existe "${d.nome || d.disciplina}" nesta etapa e turno.`,
+          });
+          setLoading(false);
+          return false;
+        }
+
+        // Regra 2: mesma base + mesmo número (ex: PCA1 == PCA1) → bloqueia
+        const baseNovo      = nomeNovo.replace(/\d+$/, '');
+        const baseExistente = nomeExistente.replace(/\d+$/, '');
+        if (baseNovo === baseExistente) {
+          const numNovo  = nomeNovo.match(/\d+$/)?.[0];
+          const numExist = nomeExistente.match(/\d+$/)?.[0];
+          if (numNovo && numNovo === numExist) {
+            setSimilarModal({
+              tipo: 'exato',
+              dadosPendentes: null,
+              nomeExistente: d.nome || d.disciplina,
+              sugestao: null,
+              mensagem: `Já existe "${d.nome || d.disciplina}" com o mesmo número nesta etapa e turno.`,
+            });
+            setLoading(false);
+            return false;
+          }
+        }
+
+        // Regra 3: nome similar (Levenshtein ≤ 2) → abre modal de confirmação
+        const dist = levenshtein(nomeNovo, nomeExistente);
+        if (dist > 0 && dist <= 2) {
+          setSimilarModal({
+            tipo: 'similar',
+            dadosPendentes: dados,
+            nomeExistente: d.nome || d.disciplina,
+            sugestao: null,
+            mensagem: `O nome "${nomeOriginal.trim()}" é muito parecido com "${d.nome || d.disciplina}" (mesma etapa/turno).`,
+          });
+          setLoading(false);
+          return false;
+        }
+      }
+
+      await _executarSave(dados);
+      return true;
+    } catch (err) {
+      console.error(err);
+      setSimilarModal({
+        tipo: 'exato', dadosPendentes: null, nomeExistente: '', sugestao: null,
+        mensagem: err?.response?.data?.message || 'Erro ao salvar disciplina.',
+      });
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleConfirmarSimilar = async () => {
+    if (!similarModal?.dadosPendentes) { setSimilarModal(null); return; }
+    setLoading(true);
+    const pendente = similarModal.dadosPendentes;
+    setSimilarModal(null);
+    try {
+      await _executarSave(pendente);
+    } catch (err) {
+      console.error(err);
+      alert(err?.response?.data?.message || 'Erro ao salvar disciplina.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
+    // ── Passou em todas as verificações → salva ─────────────────────────────
+    await _executarSave(dados, { setDisciplinas, setSuccessMessage, setFormOpen, setEditingDisciplina, setLoading });
     return true;
   } catch (err) {
     console.error(err);
-    // Exibe mensagem do backend (duplicata detectada no servidor)
     const msgBackend = err?.response?.data?.message;
-    alert(msgBackend || "Erro ao salvar disciplina.");
+    setSimilarModal({
+      tipo: 'exato',
+      dadosPendentes: null,
+      nomeExistente: '',
+      sugestao: null,
+      mensagem: msgBackend || 'Erro ao salvar disciplina.',
+    });
     return false;
   } finally {
     setLoading(false);
   }
-}
-
-
 
 // ─────────────────────────────────────────────────────────────
   async function handleDeleteDisciplinaConfirmed() {
+
   if (!toDeleteDisciplina) return;
   setLoading(true);
   try {
@@ -346,6 +374,108 @@ async function handleSaveDisciplina(dados) {
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── Modal de similaridade ────────────────────────────────────────────── */}
+      {!!similarModal && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 60,
+          background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+        }}>
+          <div style={{
+            background: '#fff', borderRadius: 16, maxWidth: 440, width: '100%',
+            boxShadow: '0 24px 60px rgba(0,0,0,0.22)',
+            overflow: 'hidden',
+          }}>
+            {/* Cabeçalho */}
+            <div style={{
+              background: similarModal.tipo === 'exato'
+                ? 'linear-gradient(135deg,#dc2626,#f87171)'
+                : 'linear-gradient(135deg,#d97706,#fbbf24)',
+              padding: '18px 22px',
+              display: 'flex', alignItems: 'center', gap: 12,
+            }}>
+              <div style={{
+                width: 38, height: 38, borderRadius: '50%',
+                background: 'rgba(255,255,255,0.2)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <ExclamationTriangleIcon style={{ width: 20, height: 20, color: '#fff' }} />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, color: '#fff', fontSize: 16, fontWeight: 700 }}>
+                  {similarModal.tipo === 'exato' ? 'Disciplina já cadastrada' : 'Nome semelhante detectado'}
+                </h3>
+                <p style={{ margin: 0, color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 }}>
+                  {similarModal.tipo === 'exato' ? 'Conflito de nome' : 'Confirme se são disciplinas distintas'}
+                </p>
+              </div>
+            </div>
+
+            {/* Corpo */}
+            <div style={{ padding: '20px 24px' }}>
+              <p style={{ margin: '0 0 12px', fontSize: 14, color: '#374151', lineHeight: 1.6 }}>
+                {similarModal.mensagem}
+              </p>
+
+              {similarModal.sugestao && (
+                <div style={{
+                  background: '#f0fdf4', border: '1px solid #86efac',
+                  borderRadius: 8, padding: '10px 14px', marginBottom: 12,
+                }}>
+                  <p style={{ margin: 0, fontSize: 13, color: '#15803d' }}>
+                    💡 Sugestão: use <strong>"{similarModal.sugestao}"</strong> para diferenciá-la
+                  </p>
+                </div>
+              )}
+
+              {similarModal.tipo === 'similar' && (
+                <div style={{
+                  background: '#fffbeb', border: '1px solid #fcd34d',
+                  borderRadius: 8, padding: '10px 14px',
+                }}>
+                  <p style={{ margin: 0, fontSize: 13, color: '#92400e' }}>
+                    ⚠️ Se <strong>PCA</strong> e <strong>"{similarModal.nomeExistente}"</strong> são disciplinas diferentes
+                    (ex: siglas distintas), clique em <em>"São distintas, criar mesmo assim"</em>.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Rodapé */}
+            <div style={{
+              padding: '12px 24px 20px',
+              display: 'flex', justifyContent: 'flex-end', gap: 10,
+              borderTop: '1px solid #f0f0f0',
+              flexWrap: 'wrap',
+            }}>
+              <button
+                onClick={() => setSimilarModal(null)}
+                style={{
+                  padding: '9px 20px', border: '1.5px solid #d1d5db',
+                  borderRadius: 10, background: '#fff', color: '#374151',
+                  fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                }}
+              >
+                {similarModal.tipo === 'exato' ? 'Entendido' : 'Cancelar'}
+              </button>
+
+              {similarModal.tipo === 'similar' && similarModal.dadosPendentes && (
+                <button
+                  onClick={handleConfirmarSimilar}
+                  style={{
+                    padding: '9px 20px', border: 'none', borderRadius: 10,
+                    background: 'linear-gradient(135deg,#d97706,#f59e0b)',
+                    color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer',
+                    boxShadow: '0 4px 12px rgba(217,119,6,0.35)',
+                  }}
+                >
+                  São distintas, criar mesmo assim
+                </button>
+              )}
             </div>
           </div>
         </div>

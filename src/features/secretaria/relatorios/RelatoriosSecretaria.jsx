@@ -127,8 +127,25 @@ export default function RelatoriosSecretaria() {
     }
   }
 
-  function handleImprimir() {
-    window.print();
+  const [gerandoPdf, setGerandoPdf] = useState(false);
+
+  async function handleImprimir() {
+    const abasComPdf = ["matriculas", "idades"];
+    if (!abasComPdf.includes(abaAtiva)) { window.print(); return; }
+    setGerandoPdf(true);
+    try {
+      const params = new URLSearchParams({ ano_letivo: anoLetivo, turno });
+      if (abaAtiva === "idades" && serie !== "todas") params.set("serie", serie);
+      const endpoint = abaAtiva === "matriculas" ? "sintetico-matriculas" : "idades";
+      const r = await api.get(`/api/secretaria/relatorios/pdf/${endpoint}?${params}`, { responseType: "blob" });
+      const url = URL.createObjectURL(new Blob([r.data], { type: "application/pdf" }));
+      window.open(url, "_blank");
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (e) {
+      alert("Erro ao gerar PDF. Verifique a conexão.");
+    } finally {
+      setGerandoPdf(false);
+    }
   }
 
   return (
@@ -222,9 +239,14 @@ export default function RelatoriosSecretaria() {
           </button>
           <button
             onClick={handleImprimir}
-            style={{ background: "#f1f5f9", color: "#475569", border: "1.5px solid #e2e8f0", borderRadius: 8, padding: "8px 18px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}
+            disabled={gerandoPdf}
+            style={{ background: gerandoPdf ? "#94a3b8" : "#f1f5f9", color: "#475569", border: "1.5px solid #e2e8f0", borderRadius: 8, padding: "8px 18px", fontWeight: 700, fontSize: 13, cursor: gerandoPdf ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 6, opacity: gerandoPdf ? 0.7 : 1 }}
           >
-            🖨️ Imprimir
+            {gerandoPdf ? (
+              <><span style={{ display: "inline-block", width: 14, height: 14, border: "2px solid #94a3b8", borderTopColor: "#475569", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />Gerando PDF...</>
+            ) : (
+              <>🖨️ Imprimir PDF</>
+            )}
           </button>
         </div>
       </div>

@@ -95,6 +95,9 @@ import EmbeddingsGerar from "./features/monitoramento/EmbeddingsGerar.jsx";
 // ⭐️ NOVO IMPORT: Boletim → Secretaria (Edição)
 import BoletimEdicao from "./features/secretaria/boletim/BoletimEdicao.jsx";
 
+// ✅ NOVO IMPORT: Relatórios da Secretaria
+import RelatoriosSecretaria from "./features/secretaria/relatorios/RelatoriosSecretaria.jsx";
+
 // Layout protegido para rotas autenticadas
 function ProtectedLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -270,6 +273,7 @@ export default function App() {
           <Route path="/secretaria/professores" element={<Professores />} />
           <Route path="/secretaria/professores/:id/ficha" element={<FichaProfessor />} />
           <Route path="/secretaria/boletim"    element={<BoletimEdicao />} />
+          <Route path="/secretaria/relatorios" element={<RelatoriosSecretaria />} />
           <Route path="/secretaria/*"          element={<Secretaria />} />
           <Route path="/secretaria/modulacao"  element={<Modulacao />} />
           <Route path="/secretaria/horarios"   element={<HorariosPage />} />

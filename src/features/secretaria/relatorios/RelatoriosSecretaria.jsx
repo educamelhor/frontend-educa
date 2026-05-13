@@ -130,13 +130,17 @@ export default function RelatoriosSecretaria() {
   const [gerandoPdf, setGerandoPdf] = useState(false);
 
   async function handleImprimir() {
-    const abasComPdf = ["matriculas", "idades"];
-    if (!abasComPdf.includes(abaAtiva)) { window.print(); return; }
     setGerandoPdf(true);
     try {
       const params = new URLSearchParams({ ano_letivo: anoLetivo, turno });
       if (abaAtiva === "idades" && serie !== "todas") params.set("serie", serie);
-      const endpoint = abaAtiva === "matriculas" ? "sintetico-matriculas" : "idades";
+      const endpointMap = {
+        matriculas: "sintetico-matriculas",
+        idades: "idades",
+        turmas: "turmas",
+        genero: "genero",
+      };
+      const endpoint = endpointMap[abaAtiva] || "sintetico-matriculas";
       const r = await api.get(`/api/secretaria/relatorios/pdf/${endpoint}?${params}`, { responseType: "blob" });
       const url = URL.createObjectURL(new Blob([r.data], { type: "application/pdf" }));
       window.open(url, "_blank");

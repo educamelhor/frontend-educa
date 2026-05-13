@@ -247,6 +247,14 @@ export default function RelatoriosSecretaria() {
         {/* ABA: MATRÍCULAS */}
         {!loading && abaAtiva === "matriculas" && dadosMatriculas && (
           <div>
+            {dadosMatriculas.total_geral === 0 ? (
+              <div style={{ textAlign: 'center', padding: '60px 0', color: '#94a3b8' }}>
+                <div style={{ fontSize: 48, marginBottom: 12 }}>📭</div>
+                <div style={{ fontWeight: 700, fontSize: 16, color: '#64748b' }}>Nenhuma matrícula encontrada</div>
+                <div style={{ fontSize: 13, marginTop: 6 }}>Não há alunos matriculados com os filtros selecionados.</div>
+              </div>
+            ) : (
+              <>
             <div style={{ display: "flex", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
               <MetricCard label="Total de Alunos" value={dadosMatriculas.total_geral} color="#6366f1" sub={`Ano letivo ${dadosMatriculas.ano_letivo}`} />
               {dadosMatriculas.por_serie.map(s => (
@@ -264,7 +272,7 @@ export default function RelatoriosSecretaria() {
             {/* Detalhado por turno */}
             {dadosMatriculas.detalhado?.length > 0 && (
               <div style={{ background: "#fff", borderRadius: 16, padding: "24px 28px", boxShadow: "0 2px 16px rgba(0,0,0,0.06)" }}>
-                <h2 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 800, color: "#1e293b" }}>Detalhamento por Turno</h2>
+                <h2 style={{ margin: "0 0 16px", fontSize: 16, fontWeight: 800, color: "#1e293b" }}>Detalhamento por Série e Turno</h2>
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead>
                     <tr style={{ background: "#f8fafc" }}>
@@ -287,12 +295,22 @@ export default function RelatoriosSecretaria() {
                 </table>
               </div>
             )}
+              </>
+            )}
           </div>
         )}
 
         {/* ABA: IDADES */}
         {!loading && abaAtiva === "idades" && dadosIdades && (
           <div>
+            {dadosIdades.total === 0 && dadosIdades.sem_data_nascimento === 0 ? (
+              <div style={{ textAlign: 'center', padding: '60px 0' }}>
+                <div style={{ fontSize: 48, marginBottom: 12 }}>📭</div>
+                <div style={{ fontWeight: 700, fontSize: 16, color: '#64748b' }}>Nenhum aluno encontrado</div>
+                <div style={{ fontSize: 13, color: '#94a3b8', marginTop: 6 }}>Não há alunos com os filtros selecionados. Tente outro turno ou série.</div>
+              </div>
+            ) : (
+              <>
             <div style={{ display: "flex", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
               <MetricCard label="Total com DOB" value={dadosIdades.total} color="#0ea5e9" sub="Com data de nascimento" />
               <MetricCard label="Sem Data Nasc." value={dadosIdades.sem_data_nascimento} color="#f59e0b" sub="Dado ausente" />
@@ -332,7 +350,7 @@ export default function RelatoriosSecretaria() {
                           </td>
                           <td style={{ padding: "8px 12px", fontSize: 12, color: "#64748b" }}>{a.turma}</td>
                           <td style={{ padding: "8px 12px", fontSize: 12, color: "#64748b" }}>{a.turno}</td>
-                          <td style={{ padding: "8px 12px", fontSize: 12, color: "#64748b" }}>{a.data_nascimento ? new Date(a.data_nascimento + "T12:00:00").toLocaleDateString("pt-BR") : "—"}</td>
+                          <td style={{ padding: "8px 12px", fontSize: 12, color: "#64748b" }}>{a.data_nascimento ? new Date(a.data_nascimento.includes('T') ? a.data_nascimento : a.data_nascimento + 'T12:00:00').toLocaleDateString('pt-BR') : '—'}</td>
                           <td style={{ padding: "8px 12px", fontSize: 14, fontWeight: 800, color: "#6366f1" }}>{a.idade} anos</td>
                         </tr>
                       ))}
@@ -341,12 +359,21 @@ export default function RelatoriosSecretaria() {
                 </div>
               </div>
             )}
+              </>
+            )}
           </div>
         )}
 
         {/* ABA: TURMAS */}
         {!loading && abaAtiva === "turmas" && dadosTurmas && (
           <div>
+            {dadosTurmas.total_geral === 0 ? (
+              <div style={{ textAlign: 'center', padding: '60px 0' }}>
+                <div style={{ fontSize: 48, marginBottom: 12 }}>📭</div>
+                <div style={{ fontWeight: 700, fontSize: 16, color: '#64748b' }}>Nenhuma turma encontrada</div>
+                <div style={{ fontSize: 13, color: '#94a3b8', marginTop: 6 }}>Não há turmas com alunos matriculados para os filtros selecionados.</div>
+              </div>
+            ) : (<>
             <div style={{ display: "flex", gap: 16, marginBottom: 24, flexWrap: "wrap" }}>
               <MetricCard label="Total de Alunos" value={dadosTurmas.total_geral} color="#10b981" sub={`Ano letivo ${dadosTurmas.ano_letivo}`} />
               <MetricCard label="Total de Turmas" value={dadosTurmas.turmas?.length || 0} color="#0ea5e9" />
@@ -386,6 +413,7 @@ export default function RelatoriosSecretaria() {
                 </tbody>
               </table>
             </div>
+            </>)}
           </div>
         )}
 

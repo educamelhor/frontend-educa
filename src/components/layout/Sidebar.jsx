@@ -74,7 +74,7 @@ export default function Sidebar({ isOpen, onClose }) {
   const isProfessor = perfil === 'professor';
 
   // Começando pelos 3 módulos solicitados
-  const canConteudos = isScopeEscola && !isDisciplinar && !isProfessor && hasPerm('conteudos.visualizar');
+  const canConteudos = isScopeEscola && !isDisciplinar && !isProfessor && hasPerm('conteudos:ver');
   const canAvaliacoes = isScopeEscola && !isDisciplinar && !isProfessor && hasPerm('avaliacoes.visualizar');
   const canMonitoramento = isScopeEscola && !isDisciplinar && !isProfessor && hasPerm('monitoramento.visualizar');
 
@@ -1220,8 +1220,8 @@ export default function Sidebar({ isOpen, onClose }) {
                 {canConteudos && (
                   <li>
                     <Link
-                      to="/pedagogico/conteudos"
-                      className={getSubmenuLinkClasses('/pedagogico/conteudos')}
+                      to="/pedagogico/conteudos-programaticos"
+                      className={getSubmenuLinkClasses('/pedagogico/conteudos-programaticos')}
                     >
                       <BookOpenIcon className="h-5 w-5 mr-2" /> Conteúdos
                     </Link>

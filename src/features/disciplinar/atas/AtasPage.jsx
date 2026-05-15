@@ -1,4 +1,4 @@
-﻿import React,{useState,useEffect,useCallback}from'react';
+import React,{useState,useEffect,useCallback}from'react';
 import api from'../../../services/api';
 import{DocumentTextIcon,PlusIcon,PrinterIcon,CheckCircleIcon,PencilSquareIcon,UserIcon,ClockIcon,EyeIcon,XMarkIcon,ArrowPathIcon,TrashIcon,ExclamationTriangleIcon}from'@heroicons/react/24/outline';
 const fmtD=iso=>iso?new Date(iso).toLocaleString('pt-BR'):'—';
@@ -71,7 +71,7 @@ return(
 {loading?<tr><td colSpan={4} style={{padding:40,textAlign:'center',color:'#94a3b8'}}>Carregando...</td></tr>
 :filtered.length===0?<tr><td colSpan={4} style={{padding:40,textAlign:'center',color:'#94a3b8'}}><ExclamationTriangleIcon style={{width:32,height:32,margin:'0 auto 8px',display:'block',opacity:0.4}}/>{busca?'Nenhuma ata encontrada.':'Nenhuma ata cadastrada.'}</td></tr>
 :filtered.map(a=><tr key={a.id} style={{borderBottom:'1px solid #f1f5f9'}}>
-<td style={{padding:16}}><div style={{fontWeight:600,color:'#0f172a',fontSize:14}}>{a.titulo}</div><div style={{fontSize:11,color:'#94a3b8',marginTop:3}}>ID #{a.id}{a.turma_nome&&` • ${a.turma_nome}`}{a.turno&&` • ${a.turno}`}</div></td>
+<td style={{padding:16}}><div style={{fontWeight:600,color:'#0f172a',fontSize:14}}>{a.titulo}</div>{a.aluno_nome&&<div style={{fontSize:12,color:'#1e3a8a',fontWeight:600,marginTop:2}}>👤 {a.aluno_nome}</div>}<div style={{fontSize:11,color:'#94a3b8',marginTop:2}}>ID #{a.id}{a.turma_nome&&` • ${a.turma_nome}`}{a.turno&&` • ${a.turno}`}</div></td>
 <td style={{padding:16}}><Tag s={a.status}/></td>
 <td style={{padding:16}}><div style={{display:'flex',alignItems:'center',gap:6,fontSize:13,color:'#475569'}}><UserIcon style={{width:14,height:14}}/>{a.editado_por||a.criado_por||'—'}</div><div style={{display:'flex',alignItems:'center',gap:6,fontSize:11,color:'#94a3b8',marginTop:4}}><ClockIcon style={{width:13,height:13}}/>{fmtD(a.editado_em||a.criado_em)}</div></td>
 <td style={{padding:16,textAlign:'center'}}><div style={{display:'inline-flex',gap:6}}>

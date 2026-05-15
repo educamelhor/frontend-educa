@@ -30,7 +30,17 @@ useEffect(()=>{fetchAtas();},[fetchAtas]);
 useEffect(()=>{if(!ctxOpen)return;api.get('/api/turmas',{params:{escola_id:localStorage.getItem('escola_id')||1}}).then(r=>setTurmas((r.data||[]).filter(t=>String(t.ano)===ANO))).catch(()=>setTurmas([]));},[ctxOpen]);
 useEffect(()=>{if(!turmaId){setAlunos([]);return;}api.get('/api/alunos',{params:{turma_id:turmaId,limit:200}}).then(r=>{const d=r.data;setAlunos(Array.isArray(d)?d:d?.alunos||[]);}).catch(()=>setAlunos([]));},[turmaId]);
 const turmasFilt=turmas.filter(t=>!turno||t.turno?.toLowerCase()===turno.toLowerCase()).sort((a,b)=>(a.turma||'').localeCompare(b.turma||'','pt-BR'));
-const filtered=atas.filter(a=>a.titulo.toLowerCase().includes(busca.toLowerCase()));
+const filtered=atas.filter(a=>{
+const q=busca.toLowerCase();
+if(!q)return true;
+return(
+(a.titulo||'').toLowerCase().includes(q)||
+(a.aluno_nome||'').toLowerCase().includes(q)||
+(a.status||'').toLowerCase().includes(q)||
+(a.criado_por||'').toLowerCase().includes(q)||
+(a.editado_por||'').toLowerCase().includes(q)
+);
+});
 const openNew=()=>{setCtxOpen(true);setTurno('');setTurmaId('');setTurmaNome('');setAlunoId('');};
 const confirmCtx=()=>{if(!turno||!turmaId){er('Turno e turma são obrigatórios.');return;}setCtxOpen(false);setForm({titulo:'',conteudo:'',turno,turma_id:turmaId,turma_nome:turmaNome,aluno_id:alunoId||null});setViewing(false);};
 const openEdit=a=>{if(a.status==='Finalizado')return;setForm({...a});setViewing(false);};
@@ -130,6 +140,14 @@ return(
 {form.status==='Finalizado'&&<div style={{gridColumn:'1/-1',color:'#16a34a',borderTop:'1px solid #e2e8f0',paddingTop:8}}><b>✅ Finalizado por:</b> {form.finalizado_por||'—'} — {fmtD(form.finalizado_em)}</div>}
 </div>
 {(form.turma_nome||form.turno)&&<p style={{margin:'8px 0 0',color:'#1e3a8a',fontSize:12}}>📌 Contexto: <b>{form.turma_nome}</b>{form.turno&&` • ${form.turno}`}</p>}
+</div>}
+{viewing&&form.aluno_nome&&<div style={{background:'linear-gradient(135deg,#eff6ff,#dbeafe)',padding:16,borderRadius:12,marginBottom:20,border:'1.5px solid #93c5fd'}}>
+<p style={{fontWeight:800,color:'#1e3a8a',margin:'0 0 8px',fontSize:13}}>👤 Identificação do Estudante</p>
+<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,fontSize:13,color:'#1e40af'}}>
+<div><b>Nome:</b> {form.aluno_nome}</div>
+{form.turma_nome&&<div><b>Turma:</b> {form.turma_nome}</div>}
+{form.turno&&<div><b>Turno:</b> {form.turno}</div>}
+</div>
 </div>}
 <div style={{marginBottom:16}}>
 <label style={{display:'block',fontSize:12,fontWeight:700,color:'#374151',marginBottom:6,textTransform:'uppercase'}}>Título *</label>

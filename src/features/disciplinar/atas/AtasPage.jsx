@@ -197,21 +197,21 @@ export default function AtasPage() {
               <div>${ata.criadoPor || 'Relator'}</div>
               <div style="font-size:12px;color:#555;">(Criação)</div>
             </div>
-            ${ata.finalizadoPor ? \`
+            ${ata.finalizadoPor ? `
             <div class="signature-box">
               <div class="signature-line"></div>
-              <div>\${ata.finalizadoPor}</div>
+              <div>${ata.finalizadoPor}</div>
               <div style="font-size:12px;color:#555;">(Homologação)</div>
             </div>
-            \` : ''}
+            ` : ''}
           </div>
 
           <div class="meta">
             <b>Rastreabilidade Documental:</b><br/>
             Documento ID: #${ata.id}<br/>
             Criado por: ${ata.criadoPor} em ${formatDate(ata.criadoEm)}<br/>
-            ${ata.editadoPor ? \`Última edição por: \${ata.editadoPor} em \${formatDate(ata.editadoEm)}<br/>\` : ''}
-            ${ata.finalizadoPor ? \`Finalizado por: \${ata.finalizadoPor} em \${formatDate(ata.finalizadoEm)}<br/>\` : 'Status: RASCUNHO'}
+            ${ata.editadoPor ? `Última edição por: ${ata.editadoPor} em ${formatDate(ata.editadoEm)}<br/>` : ''}
+            ${ata.finalizadoPor ? `Finalizado por: ${ata.finalizadoPor} em ${formatDate(ata.finalizadoEm)}<br/>` : 'Status: RASCUNHO'}
           </div>
           
           <script>
@@ -301,7 +301,7 @@ export default function AtasPage() {
                         padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700,
                         background: ata.status === 'Finalizado' ? '#dcfce7' : '#fef9c3',
                         color: ata.status === 'Finalizado' ? '#16a34a' : '#ca8a04',
-                        border: \`1px solid \${ata.status === 'Finalizado' ? '#bbf7d0' : '#fef08a'}\`
+                        border: `1px solid ${ata.status === 'Finalizado' ? '#bbf7d0' : '#fef08a'}`
                       }}>
                         {ata.status}
                       </span>

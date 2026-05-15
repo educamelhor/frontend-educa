@@ -13,6 +13,7 @@ import RegimentosDisciplinar from "./features/disciplinar/regimentos";
 import ManualDisciplinar from "./features/disciplinar/manual";
 import SuporteSAC from "./features/disciplinar/suporte";
 import HistoricoDisciplinar from "./features/disciplinar/historico";
+import AtasDisciplinar from "./features/disciplinar/atas/AtasPage.jsx";
 import Boletim from "./features/boletim/Boletim";
 import BoletimAnual from "./features/boletim/BoletimAnual";
 import FichaAluno from "./features/alunos/FichaAluno";
@@ -42,6 +43,7 @@ import LandingPage from "./features/landing/LandingPage";
 import PrivacidadePage from "./pages/PrivacidadePage";
 import ExcluirContaPage from "./pages/ExcluirContaPage";
 import CapturePrivacidadePage from "./pages/CapturePrivacidadePage";
+import SuportePage from "./pages/SuportePage";
 import Ferramentas from "./features/ferramentas";
 
 // ✅ Direção (Diretor) — Devices EDUCA-CAPTURE
@@ -220,6 +222,8 @@ export default function App() {
         <Route path="/cadastro" element={<CadastroUsuario />} />
         <Route path="/privacidade" element={<PrivacidadePage />} />
         <Route path="/excluir-conta" element={<ExcluirContaPage />} />
+        {/* EDUCA Mobile — página pública de suporte (App Store: Guideline 1.5.0) */}
+        <Route path="/suporte" element={<SuportePage />} />
         {/* EDUCA-CAPTURE — páginas públicas (App Store Connect: support/privacy URLs) */}
         <Route path="/capture/privacidade" element={<CapturePrivacidadePage />} />
         <Route path="/capture/suporte" element={<CapturePrivacidadePage />} />
@@ -252,6 +256,7 @@ export default function App() {
             <RequireDiretorMilitar><GestaoEquipe /></RequireDiretorMilitar>
           } />
           <Route path="/disciplinar/historico"  element={<HistoricoDisciplinar />} />
+          <Route path="/disciplinar/atas"       element={<AtasDisciplinar />} />
           <Route path="/disciplinar/metadados"  element={<MetadadosDisciplinar />} />
           <Route path="/disciplinar/regimentos" element={<RegimentosDisciplinar />} />
           <Route path="/disciplinar/manual"     element={<ManualDisciplinar />} />

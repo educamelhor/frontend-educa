@@ -120,8 +120,32 @@ export default function LandingPage() {
 
           </div>
           {/* Footer */}
-          <footer className="text-center text-blue-200 pb-6 opacity-70">
-            © {new Date().getFullYear()} Educa.Melhor • Versão 1.0 • contato@educamelhor.com.br
+          <footer className="text-center pb-6">
+            <p className="text-blue-200 opacity-70 text-sm mb-2">
+              © {new Date().getFullYear()} Educa.Melhor • Versão 1.0 • contato@educamelhor.com.br
+            </p>
+            <div className="flex items-center justify-center gap-4">
+              <a
+                href="/suporte"
+                className="text-blue-300 hover:text-white text-xs font-semibold underline underline-offset-2 transition-colors duration-200"
+              >
+                Suporte
+              </a>
+              <span className="text-blue-500 text-xs">•</span>
+              <a
+                href="/privacidade"
+                className="text-blue-300 hover:text-white text-xs font-semibold underline underline-offset-2 transition-colors duration-200"
+              >
+                Política de Privacidade
+              </a>
+              <span className="text-blue-500 text-xs">•</span>
+              <a
+                href="/excluir-conta"
+                className="text-blue-300 hover:text-white text-xs font-semibold underline underline-offset-2 transition-colors duration-200"
+              >
+                Excluir Conta
+              </a>
+            </div>
           </footer>
         </div>
       )}

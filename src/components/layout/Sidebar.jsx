@@ -783,6 +783,21 @@ export default function Sidebar({ isOpen, onClose }) {
                 </li>
                 <li>
                   <Link
+                    to="/disciplinar/atas"
+                    className={getSubmenuLinkClasses('/disciplinar/atas')}
+                    style={{
+                      background: isActive('/disciplinar/atas')
+                        ? 'linear-gradient(90deg, rgba(30,58,138,0.15), transparent)'
+                        : undefined,
+                    }}
+                  >
+                    <DocumentTextIcon className="h-5 w-5 mr-2" style={{ color: isActive('/disciplinar/atas') ? '#1e3a8a' : undefined }} />
+                    <span className="flex-1">Atas</span>
+                    <span style={{ fontSize:'0.5rem', fontWeight:800, background:'linear-gradient(135deg,#1e3a8a,#3b82f6)', color:'#fff', padding:'1px 5px', borderRadius:'6px', letterSpacing:'0.5px' }}>PREMIUM</span>
+                  </Link>
+                </li>
+                <li>
+                  <Link
                     to="/disciplinar/metadados"
                     className={getSubmenuLinkClasses('/disciplinar/metadados')}
                   >
@@ -876,6 +891,21 @@ export default function Sidebar({ isOpen, onClose }) {
                     <ClockIcon className="h-5 w-5 mr-2" style={{ color: isActive('/disciplinar/historico') ? '#f59e0b' : undefined }} />
                     <span className="flex-1">Histórico</span>
                     <span style={{ fontSize:'0.5rem', fontWeight:800, background:'linear-gradient(135deg,#f59e0b,#ea580c)', color:'#fff', padding:'1px 5px', borderRadius:'6px', letterSpacing:'0.5px' }}>NOVO</span>
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/disciplinar/atas"
+                    className={getSubmenuLinkClasses('/disciplinar/atas')}
+                    style={{
+                      background: isActive('/disciplinar/atas')
+                        ? 'linear-gradient(90deg, rgba(30,58,138,0.15), transparent)'
+                        : undefined,
+                    }}
+                  >
+                    <DocumentTextIcon className="h-5 w-5 mr-2" style={{ color: isActive('/disciplinar/atas') ? '#1e3a8a' : undefined }} />
+                    <span className="flex-1">Atas</span>
+                    <span style={{ fontSize:'0.5rem', fontWeight:800, background:'linear-gradient(135deg,#1e3a8a,#3b82f6)', color:'#fff', padding:'1px 5px', borderRadius:'6px', letterSpacing:'0.5px' }}>PREMIUM</span>
                   </Link>
                 </li>
                 <li>

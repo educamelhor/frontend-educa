@@ -158,11 +158,11 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
 
     // Calcula a pontuação: pontos do BD já possuem sinal correto
     // (negativo para medidas disciplinares, positivo para elogios)
-    // Apenas ocorrências com status FINALIZADA afetam a pontuação
+    // REGISTRADA + FINALIZADA afetam a pontuação; CANCELADA é ignorada
     const pontuacaoCalculada = React.useMemo(() => {
         let pontuacao = PONTUACAO_INICIAL;
         for (const oc of ocorrencias) {
-            if (oc.status !== 'FINALIZADA' && oc.status !== 'Finalizado') continue;
+            if (oc.status === 'CANCELADA') continue;
             const pts = Number(oc.pontos) || 0;
             pontuacao += pts;
         }

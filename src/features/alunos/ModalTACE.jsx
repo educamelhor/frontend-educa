@@ -57,7 +57,7 @@ export default function ModalTACE({ open, onClose, aluno, onSaved }) {
           let pts = PONTUACAO_INICIAL;
           const ocorrencias = Array.isArray(ocRes.data) ? ocRes.data : [];
           for (const oc of ocorrencias) {
-            if (oc.status !== "FINALIZADA" && oc.status !== "Finalizado") continue;
+            if (oc.status === 'CANCELADA') continue; // cancelada reverte, não conta
             pts += Number(oc.pontos) || 0;
           }
           setPontuacao(Math.max(0, Math.min(10, parseFloat(pts.toFixed(2)))));

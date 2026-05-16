@@ -23,13 +23,15 @@ function anoLetivoPadrao() {
     return mes <= 1 ? hoje.getFullYear() - 1 : hoje.getFullYear();
 }
 
-// Calcula pontuação disciplinar a partir das ocorrências finalizadas
+// Calcula pontuação disciplinar:
+// REGISTRADA + FINALIZADA contam normalmente
+// CANCELADA é ignorada (já não conta positivo nem negativo)
 function calcularPontuacao(ocorrencias) {
     const PONTUACAO_INICIAL = 8.0;
     let pts = PONTUACAO_INICIAL;
     const lista = Array.isArray(ocorrencias) ? ocorrencias : [];
     for (const oc of lista) {
-        if (oc.status !== "FINALIZADA" && oc.status !== "Finalizado") continue;
+        if (oc.status === "CANCELADA") continue; // cancelada não conta
         pts += Number(oc.pontos) || 0;
     }
     return Math.max(0, Math.min(10, parseFloat(pts.toFixed(2))));

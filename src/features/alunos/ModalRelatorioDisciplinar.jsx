@@ -18,6 +18,7 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
     const [editMode, setEditMode] = useState(false);
     const [ocorrencias, setOcorrencias] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [bonusMerito, setBonusMerito] = useState({ bonusTotal: 0, totalBonusDias: 0 });
 
     // Estados do comparecimento
     const [modalComparecimentoOpen, setModalComparecimentoOpen] = useState(false);
@@ -59,8 +60,12 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
     const fetchOcorrencias = async () => {
         setLoading(true);
         try {
-            const res = await api.get(`/api/alunos/${aluno.id}/ocorrencias`);
-            setOcorrencias(res.data);
+            const [ocRes, meritoRes] = await Promise.all([
+                api.get(`/api/alunos/${aluno.id}/ocorrencias`),
+                api.get(`/api/relatorio-disciplinar/merito/${aluno.id}`).catch(() => ({ data: { bonusTotal: 0, totalBonusDias: 0 } }))
+            ]);
+            setOcorrencias(ocRes.data);
+            setBonusMerito(meritoRes.data || { bonusTotal: 0, totalBonusDias: 0 });
         } catch (err) {
             console.error("Erro ao carregar ocorrências", err);
         } finally {
@@ -166,9 +171,11 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
             const pts = Number(oc.pontos) || 0;
             pontuacao += pts;
         }
+        // Adiciona bônus de mérito
+        pontuacao += Number(bonusMerito.bonusTotal) || 0;
         // Limitar entre 0 e 10
         return Math.max(0, Math.min(10, parseFloat(pontuacao.toFixed(2))));
-    }, [ocorrencias]);
+    }, [ocorrencias, bonusMerito]);
 
     // Classifica o comportamento conforme Art. 45
     const getComportamento = (nota) => {
@@ -374,14 +381,37 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
                                             Carregando histórico...
                                         </td>
                                     </tr>
-                                ) : ocorrencias.length === 0 ? (
+                                ) : ocorrencias.length === 0 && bonusMerito.bonusTotal === 0 ? (
                                     <tr>
                                         <td colSpan="6" className="px-4 py-8 text-center text-gray-500 italic">
                                             Nenhum registro disciplinar encontrado para este estudante.
                                         </td>
                                     </tr>
                                 ) : (
-                                    ocorrencias.map((oc) => (
+                                    <>
+                                    {/* Linha de Mérito — sempre no topo se houver bônus */}
+                                    {bonusMerito.bonusTotal > 0 && (
+                                        <tr className="bg-emerald-50/60 border-l-4 border-emerald-400">
+                                            <td className="px-4 py-3 font-medium text-emerald-700">★ Mérito</td>
+                                            <td className="px-4 py-3 text-emerald-700 font-semibold">Mérito</td>
+                                            <td className="px-4 py-3 text-gray-500 text-sm">—</td>
+                                            <td className="px-4 py-3">
+                                                <div className="font-semibold text-emerald-700">
+                                                    Pontuação positiva por mérito de ausência de reincidência de registro.
+                                                </div>
+                                                <div className="text-xs text-emerald-600 mt-1">
+                                                    🏅 {bonusMerito.totalBonusDias} dias sem registro negativo além do período de carência (60 dias)
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <span className="px-2 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200">FINALIZADA</span>
+                                            </td>
+                                            <td className="px-4 py-3 text-center">
+                                                <span className="text-emerald-700 font-bold text-sm">+{Number(bonusMerito.bonusTotal).toFixed(2).replace('.', ',')}</span>
+                                            </td>
+                                        </tr>
+                                    )}
+                                    {ocorrencias.map((oc) => (
                                         <tr key={oc.id} className="hover:bg-gray-50 transition">
                                             <td className="px-4 py-3 font-medium text-gray-800">{oc.registro || oc.id}</td>
                                             <td className="px-4 py-3 text-gray-600 capitalize">{oc.tipo || '-'}</td>
@@ -479,7 +509,8 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
                                                 </div>
                                             </td>
                                         </tr>
-                                    ))
+                                    ))}
+                                    </>
                                 )}
                             </tbody>
                         </table>

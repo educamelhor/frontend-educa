@@ -429,7 +429,9 @@ export default function NovoConteudo() {
             <div style={{ display: "flex", gap: 12, flexWrap: "wrap", borderTop: `1px solid ${C.bdr}`, paddingTop: 20 }}>
               <Btn variant="outline" onClick={() => setStep(2)}>← Voltar</Btn>
               <Btn variant="outline" onClick={() => setPreview(true)}>👁 Visualizar</Btn>
-              <Btn variant="success" onClick={publicar} disabled={saving} style={{ marginLeft: "auto" }}>
+              <Btn variant="success" onClick={publicar}
+                disabled={saving || !topicos.some(t => t.topico.trim())}
+                style={{ marginLeft: "auto" }}>
                 {saving ? "Publicando…" : "✓ Publicar"}
               </Btn>
             </div>

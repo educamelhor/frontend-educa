@@ -9,12 +9,27 @@ const C = {
   txt: "#1e293b", sub: "#64748b", bdr: "#e2e8f0",
 };
 
-const SERIES = [
-  { label: "6º Ano", anoId: 6, serieLabel: "6º ANO" },
-  { label: "7º Ano", anoId: 7, serieLabel: "7º ANO" },
-  { label: "8º Ano", anoId: 8, serieLabel: "8º ANO" },
-  { label: "9º Ano", anoId: 9, serieLabel: "9º ANO" },
-];
+const SERIES_POR_ETAPA = {
+  FUNDAMENTAL:    [1,2,3,4,5,6,7,8,9].map(n => ({ label: `${n}º Ano`, anoId: n, serieLabel: `${n}º ANO` })),
+  FUNDAMENTAL_I:  [1,2,3,4,5].map(n => ({ label: `${n}º Ano`, anoId: n, serieLabel: `${n}º ANO` })),
+  FUNDAMENTAL_II: [6,7,8,9].map(n => ({ label: `${n}º Ano`, anoId: n, serieLabel: `${n}º ANO` })),
+  MEDIO:          [1,2,3].map(n => ({ label: `${n}ª Série`, anoId: 9+n, serieLabel: `${n}ª SÉRIE` })),
+};
+const ETAPA_LABELS = {
+  FUNDAMENTAL:    "Ensino Fundamental (Anos Iniciais e Finais)",
+  FUNDAMENTAL_I:  "Ens. Fundamental — Anos Iniciais (1º ao 5º)",
+  FUNDAMENTAL_II: "Ens. Fundamental — Anos Finais (6º ao 9º)",
+  MEDIO:          "Ensino Médio",
+};
+function etapaLabel(e) {
+  const k = (e || "").toUpperCase().replace(/[ÁÉÍÓÚ]/g, c => ({Á:"A",É:"E",Í:"I",Ó:"O",Ú:"U"}[c] || c)).replace(/\s+/g, "_");
+  return ETAPA_LABELS[k] || e;
+}
+function seriesPorEtapa(e) {
+  if (!e) return [];
+  const k = (e || "").toUpperCase().replace(/[ÁÉÍÓÚ]/g, c => ({Á:"A",É:"E",Í:"I",Ó:"O",Ú:"U"}[c] || c)).replace(/\s+/g, "_");
+  return SERIES_POR_ETAPA[k] || SERIES_POR_ETAPA.FUNDAMENTAL;
+}
 
 function Btn({ onClick, disabled, children, variant = "primary", style = {} }) {
   const v = variant === "success" ? { bg: C.grn, color: "#fff" }
@@ -81,8 +96,11 @@ export default function NovoConteudo() {
   const [bnccSub, setBnccSub] = useState(0); // 0=unidade, 1=objeto
 
   // BÁSICO
+  const [etapas, setEtapas] = useState([]);
+  const [etapa, setEtapa] = useState("");
   const [disciplinas, setDisciplinas] = useState([]);
   const [discId, setDiscId] = useState("");
+  const [discNome, setDiscNome] = useState(""); // nome real p/ BNCC matching
   const [serieObj, setSerieObj] = useState(null); // {label, anoId, serieLabel}
   const [bimestre, setBimestre] = useState("");
 
@@ -106,17 +124,24 @@ export default function NovoConteudo() {
   const scroll = () => setTimeout(() => btmRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
 
   useEffect(() => {
-    api.get("/api/conteudos/admin/bncc/disciplinas")
-      .then(r => { if (r.data?.ok) setDisciplinas(r.data.disciplinas || []); })
+    api.get("/api/conteudos/admin/bncc/etapas-e-disciplinas")
+      .then(r => {
+        if (r.data?.ok) {
+          setEtapas(r.data.etapas || []);
+          setDisciplinas(r.data.disciplinas || []);
+          // Se só há uma etapa, pré-seleciona
+          if ((r.data.etapas || []).length === 1) setEtapa(r.data.etapas[0]);
+        }
+      })
       .catch(() => {});
   }, []);
 
   async function avancarBasico() {
-    if (!discId || !serieObj || !bimestre) return;
+    if (!discId || !discNome || !serieObj || !bimestre) return;
     setLoadingBncc(true);
     try {
       const r = await api.get("/api/conteudos/admin/bncc/unidades", {
-        params: { disciplina_id: discId, ano_id: serieObj.anoId }
+        params: { disciplina_nome: discNome, ano_id: serieObj.anoId }
       });
       setUnidades(r.data?.unidades || []);
     } catch { setUnidades([]); }
@@ -142,7 +167,7 @@ export default function NovoConteudo() {
     if (!unidadeSel && unidades.length > 0) return;
     setLoadingSeedf(true);
     try {
-      const params = { disciplina_id: discId, serie: serieObj.serieLabel };
+      const params = { disciplina_nome: discNome, serie: serieObj.serieLabel };
       if (unidadeSel) params.unidade_tematica_id = unidadeSel.id;
       const r = await api.get("/api/conteudos/admin/seedf/conteudos", { params });
       setSeedfList(r.data?.conteudos || []);
@@ -221,41 +246,67 @@ export default function NovoConteudo() {
 
         {/* ── ETAPA 1: BÁSICO ── */}
         <Card num={1} title="Básico" active={step === 0} done={step > 0}
-          summary={discSel ? `${discSel.nome} · ${serieObj?.label} · ${bimestre}º Bimestre` : ""}>
+          summary={discNome ? `${discNome} · ${serieObj?.label} · ${bimestre}º Bimestre` : ""}>
+
+          {/* Linha 1: Etapa + Disciplina */}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginBottom: 16 }}>
-
-            <div style={{ flex: 1, minWidth: 180 }}>
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <label style={{ fontSize: 12, fontWeight: 700, color: C.sub, textTransform: "uppercase" }}>Etapa</label>
+              <select value={etapa} onChange={e => { setEtapa(e.target.value); setDiscId(""); setDiscNome(""); setSerieObj(null); }}
+                style={{ display: "block", width: "100%", marginTop: 6, padding: "10px 12px",
+                  border: `1.5px solid ${C.bdr}`, borderRadius: 10, fontSize: 14, background: C.card }}>
+                <option value="">Selecione…</option>
+                {etapas.map(et => <option key={et} value={et}>{etapaLabel(et)}</option>)}
+              </select>
+            </div>
+            <div style={{ flex: 1, minWidth: 200 }}>
               <label style={{ fontSize: 12, fontWeight: 700, color: C.sub, textTransform: "uppercase" }}>Disciplina</label>
-              <select value={discId} onChange={e => setDiscId(e.target.value)}
+              <select value={discId}
+                onChange={ev => {
+                  const d = disciplinas.find(x => String(x.id) === ev.target.value);
+                  setDiscId(ev.target.value);
+                  setDiscNome(d?.nome || "");
+                }}
+                disabled={!etapa}
                 style={{ display: "block", width: "100%", marginTop: 6, padding: "10px 12px",
-                  border: `1.5px solid ${C.bdr}`, borderRadius: 10, fontSize: 14, background: C.card }}>
+                  border: `1.5px solid ${C.bdr}`, borderRadius: 10, fontSize: 14,
+                  background: C.card, opacity: !etapa ? .5 : 1 }}>
                 <option value="">Selecione…</option>
-                {disciplinas.map(d => <option key={d.id} value={d.id}>{d.nome}</option>)}
+                {disciplinas.filter(d => d.etapa === etapa).map(d => (
+                  <option key={d.id} value={d.id}>
+                    {d.nome}{!d.tem_bncc ? " (sem BNCC)" : ""}
+                  </option>
+                ))}
               </select>
             </div>
+          </div>
 
+          {/* Linha 2: Série + Bimestre */}
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginBottom: 24 }}>
             <div style={{ flex: 1, minWidth: 180 }}>
-              <label style={{ fontSize: 12, fontWeight: 700, color: C.sub, textTransform: "uppercase" }}>Série</label>
-              <select value={serieObj?.label || ""} onChange={e => setSerieObj(SERIES.find(s => s.label === e.target.value) || null)}
+              <label style={{ fontSize: 12, fontWeight: 700, color: C.sub, textTransform: "uppercase" }}>Série / Ano</label>
+              <select value={serieObj?.label || ""}
+                onChange={e => setSerieObj(seriesPorEtapa(etapa).find(s => s.label === e.target.value) || null)}
+                disabled={!etapa}
                 style={{ display: "block", width: "100%", marginTop: 6, padding: "10px 12px",
-                  border: `1.5px solid ${C.bdr}`, borderRadius: 10, fontSize: 14, background: C.card }}>
+                  border: `1.5px solid ${C.bdr}`, borderRadius: 10, fontSize: 14,
+                  background: C.card, opacity: !etapa ? .5 : 1 }}>
                 <option value="">Selecione…</option>
-                {SERIES.map(s => <option key={s.label}>{s.label}</option>)}
+                {seriesPorEtapa(etapa).map(s => <option key={s.label}>{s.label}</option>)}
               </select>
             </div>
-
             <div style={{ flex: 1, minWidth: 180 }}>
               <label style={{ fontSize: 12, fontWeight: 700, color: C.sub, textTransform: "uppercase" }}>Bimestre</label>
               <select value={bimestre} onChange={e => setBimestre(e.target.value)}
                 style={{ display: "block", width: "100%", marginTop: 6, padding: "10px 12px",
                   border: `1.5px solid ${C.bdr}`, borderRadius: 10, fontSize: 14, background: C.card }}>
                 <option value="">Selecione…</option>
-                {["1", "2", "3", "4"].map(b => <option key={b} value={b}>{b}º Bimestre</option>)}
+                {["1","2","3","4"].map(b => <option key={b} value={b}>{b}º Bimestre</option>)}
               </select>
             </div>
           </div>
 
-          <Btn onClick={avancarBasico} disabled={!discId || !serieObj || !bimestre || loadingBncc}>
+          <Btn onClick={avancarBasico} disabled={!discId || !discNome || !serieObj || !bimestre || loadingBncc}>
             {loadingBncc ? "Carregando…" : "Avançar →"}
           </Btn>
         </Card>
@@ -385,7 +436,7 @@ export default function NovoConteudo() {
                 CONTEÚDO PROGRAMÁTICO
               </div>
               <h2 style={{ color: "#fff", fontSize: 22, fontWeight: 800, margin: "8px 0 4px" }}>
-                {discSel?.nome}
+                {discNome}
               </h2>
               <p style={{ color: "#a5b4fc", fontSize: 14, margin: 0 }}>
                 {serieObj?.label} · {bimestre}º Bimestre · {new Date().getFullYear()}

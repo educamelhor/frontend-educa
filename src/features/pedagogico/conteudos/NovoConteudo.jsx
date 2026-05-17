@@ -124,14 +124,21 @@ export default function NovoConteudo() {
   const scroll = () => setTimeout(() => btmRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
 
   useEffect(() => {
-    api.get("/api/conteudos/admin/bncc/etapas-e-disciplinas")
+    // Usa /api/disciplinas — endpoint já funcional da Secretaria
+    // Retorna: [{id, disciplina, etapa, turno, carga, escola_id}]
+    api.get("/api/disciplinas")
       .then(r => {
-        if (r.data?.ok) {
-          setEtapas(r.data.etapas || []);
-          setDisciplinas(r.data.disciplinas || []);
-          // Se só há uma etapa, pré-seleciona
-          if ((r.data.etapas || []).length === 1) setEtapa(r.data.etapas[0]);
-        }
+        const lista = Array.isArray(r.data) ? r.data : [];
+        const discs = lista.map(d => ({
+          id: d.id,
+          nome: d.disciplina || d.nome || "",
+          etapa: (d.etapa || "").toUpperCase(),
+          tem_bncc: true, // assume true; BNCC step vai confirmar ao carregar
+        }));
+        const ets = [...new Set(discs.map(d => d.etapa))].filter(Boolean).sort();
+        setDisciplinas(discs);
+        setEtapas(ets);
+        if (ets.length === 1) setEtapa(ets[0]);
       })
       .catch(() => {});
   }, []);

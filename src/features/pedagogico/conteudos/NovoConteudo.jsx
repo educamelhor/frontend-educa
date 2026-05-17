@@ -16,9 +16,9 @@ const SERIES_POR_ETAPA = {
   MEDIO:          [1,2,3].map(n => ({ label: `${n}ª Série`, anoId: 9+n, serieLabel: `${n}ª SÉRIE` })),
 };
 const ETAPA_LABELS = {
-  FUNDAMENTAL:    "Ensino Fundamental (Anos Iniciais e Finais)",
-  FUNDAMENTAL_I:  "Ens. Fundamental — Anos Iniciais (1º ao 5º)",
-  FUNDAMENTAL_II: "Ens. Fundamental — Anos Finais (6º ao 9º)",
+  FUNDAMENTAL:    "Ensino Fundamental",
+  FUNDAMENTAL_I:  "Ens. Fundamental — Anos Iniciais",
+  FUNDAMENTAL_II: "Ens. Fundamental — Anos Finais",
   MEDIO:          "Ensino Médio",
 };
 function etapaLabel(e) {

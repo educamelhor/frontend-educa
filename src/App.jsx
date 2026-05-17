@@ -34,6 +34,7 @@ import GerarGabaritos from "./features/impressao/GerarGabaritos";
 import ConselhoClasse from "./features/pedagogico/conselho/ConselhoClasse";
 import ConteudosAdmin from "./features/pedagogico/conteudos/ConteudosAdmin.jsx";
 import ConteudosProgramaticos from "./features/pedagogico/conteudos/ConteudosProgramaticos.jsx";
+import NovoConteudo from "./features/pedagogico/conteudos/NovoConteudo.jsx";
 import Planos from "./features/professores/planos/Planos";
 import Avaliacoes from "./features/professores/avaliacoes/Avaliacoes";
 import ConteudosProfessor from "./features/professores/conteudos/Conteudos";
@@ -307,6 +308,7 @@ export default function App() {
           <Route path="/pedagogico/conteudos-programaticos" element={
             <RequirePerm perm="conteudos:ver"><ConteudosProgramaticos /></RequirePerm>
           } />
+          <Route path="/pedagogico/conteudos-programaticos/novo" element={<NovoConteudo />} />
           <Route path="/pedagogico/coordenacao/solicitacoes" element={<SolicitacoesConteudos />} />
 
           {/* ── Professores ──────────────────────────────────────────────── */}

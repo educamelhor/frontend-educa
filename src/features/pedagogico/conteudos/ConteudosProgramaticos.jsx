@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import "./ConteudosProgramaticos.css";
 import api from "../../../services/api";
 
@@ -87,6 +88,7 @@ export default function ConteudosProgramaticos() {
   const [modo, setModo]             = useState("coordenacao_decide");
   const [modoLoading, setModoLoading] = useState(true);
 
+  const navigate = useNavigate();
   const escolaId = localStorage.getItem("escola_id");
   const perfil   = String(localStorage.getItem("perfil") || "").toLowerCase().trim();
   const isGestao = PERFIS_GESTAO.has(perfil);
@@ -143,7 +145,7 @@ export default function ConteudosProgramaticos() {
             <IcoStats /> {viewMode === "cards" ? "Visualização em tabela" : "Visualização em cards"}
           </button>
           {podeCriar && (
-            <button className="cp-btn-primary" onClick={() => setModalOpen(true)} disabled={modoLoading}>
+            <button className="cp-btn-primary" onClick={() => navigate("/pedagogico/conteudos-programaticos/novo")} disabled={modoLoading}>
               <IcoPlus /> Novo Conteúdo
             </button>
           )}

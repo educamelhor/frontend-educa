@@ -337,17 +337,24 @@ export default function NovoConteudo() {
             {bnccSub >= 1 && unidadeSel && (
               <div style={{ marginTop: 20, paddingTop: 16, borderTop: `1px dashed ${C.bdr}` }}>
                 <p style={{ fontSize: 13, color: C.sub, marginBottom: 10 }}>
-                  <strong>B)</strong> Selecione o <strong>Objeto de Conhecimento</strong> {loadingBncc ? "(carregando…)" : "(opcional):"}
+                  <strong>B)</strong> Selecione o <strong>Objeto de Conhecimento</strong>
+                  {loadingBncc ? " (carregando…)" : " (obrigatório):"}
                 </p>
                 <Lista items={objetos} selId={objetoSel?.id}
-                  onSel={o => setObjetoSel(prev => prev?.id === o.id ? null : o)}
+                  onSel={o => setObjetoSel(o)}
                   emptyMsg="Nenhum objeto de conhecimento encontrado para esta unidade." />
               </div>
             )}
 
             <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
               <Btn variant="outline" onClick={() => { setStep(0); setBnccSub(0); }}>← Voltar</Btn>
-              <Btn onClick={avancarBncc} disabled={(unidades.length > 0 && !unidadeSel) || loadingSeedf}>
+              <Btn
+                onClick={avancarBncc}
+                disabled={
+                  (unidades.length > 0 && !unidadeSel) ||
+                  (objetos.length > 0 && !objetoSel) ||
+                  loadingSeedf
+                }>
                 {loadingSeedf ? "Carregando…" : unidades.length === 0 ? "Pular →" : "Avançar →"}
               </Btn>
             </div>

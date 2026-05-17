@@ -5,7 +5,17 @@
 // ============================================================================
 import React, { useState, useEffect, useCallback } from "react";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:3000";
+// URL de produção — mesma lógica do src/services/api.js
+function getApiRoot() {
+  const envUrl =
+    import.meta.env.VITE_API_BASE_URL ||
+    import.meta.env.VITE_API_URL;
+  if (envUrl) return String(envUrl).replace(/\/api$/, "").replace(/\/$/, "");
+  const host = typeof window !== "undefined" ? window.location.hostname : "";
+  if (host === "localhost" || host === "127.0.0.1") return "http://localhost:3000";
+  return "https://educa-backend-docker-659zo.ondigitalocean.app";
+}
+const API = getApiRoot();
 
 // ── Mapa de ícones SVG por categoria (inline para zero deps) ──
 const CATEGORY_META = {

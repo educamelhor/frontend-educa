@@ -337,8 +337,7 @@ export default function NovoConteudo() {
             {bnccSub >= 1 && unidadeSel && (
               <div style={{ marginTop: 20, paddingTop: 16, borderTop: `1px dashed ${C.bdr}` }}>
                 <p style={{ fontSize: 13, color: C.sub, marginBottom: 10 }}>
-                  <strong>B)</strong> Selecione o <strong>Objeto de Conhecimento</strong>
-                  {loadingBncc ? " (carregando…)" : " (obrigatório):"}
+                  <strong>B)</strong> Selecione o <strong>Objeto de Conhecimento</strong>:
                 </p>
                 <Lista items={objetos} selId={objetoSel?.id}
                   onSel={o => setObjetoSel(o)}
@@ -366,14 +365,18 @@ export default function NovoConteudo() {
           <Card num={3} title="SEE-DF — Currículo em Movimento" active={step === 2} done={step > 2}
             summary={seedfSel?.texto}>
             <p style={{ fontSize: 13, color: C.sub, marginBottom: 14 }}>
-              Selecione o conteúdo do Currículo em Movimento da Secretaria de Educação do DF <em>(opcional)</em>:
+              Selecione o conteúdo do Currículo em Movimento da Secretaria de Educação do DF:
             </p>
             <Lista items={seedfList} selId={seedfSel?.id}
               onSel={c => setSeedfSel(prev => prev?.id === c.id ? null : c)}
-              emptyMsg="Nenhum conteúdo SEE-DF encontrado para essa combinação. Você pode avançar sem selecionar." />
+              emptyMsg="Nenhum conteúdo SEE-DF encontrado para essa combinação." />
             <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
               <Btn variant="outline" onClick={() => setStep(1)}>← Voltar</Btn>
-              <Btn onClick={() => { setStep(3); scroll(); }}>Avançar →</Btn>
+              <Btn
+                onClick={() => { setStep(3); scroll(); }}
+                disabled={seedfList.length > 0 && !seedfSel}>
+                Avançar →
+              </Btn>
             </div>
           </Card>
         )}

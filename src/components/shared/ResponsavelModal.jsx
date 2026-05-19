@@ -788,7 +788,7 @@ export default function ResponsavelModal({
               >
                 <Dialog.Panel className="w-full max-w-sm transform overflow-hidden rounded-2xl bg-white shadow-2xl transition-all border border-gray-100">
                   {/* Header vermelho premium */}
-                  <div className="bg-gradient-to-r from-red-600 via-red-500 to-rose-500 px-6 pt-6 pb-8 text-center relative">
+                  <div className="bg-gradient-to-r from-red-600 via-red-500 to-rose-500 px-6 pt-6 pb-5 text-center">
                     <div className="mx-auto w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center ring-2 ring-white/30 mb-3">
                       <LinkSlashIcon className="w-7 h-7 text-white" />
                     </div>
@@ -799,9 +799,9 @@ export default function ResponsavelModal({
                   </div>
 
                   {/* Body */}
-                  <div className="px-6 pb-6">
-                    {/* Card com o nome do aluno — sobrepõe o header */}
-                    <div className="-mt-5 mb-5 bg-white rounded-xl border border-red-100 shadow-lg shadow-red-500/10 px-4 py-3.5 flex items-center gap-3">
+                  <div className="px-6 pt-4 pb-6">
+                    {/* Card com o nome do aluno */}
+                    <div className="mb-5 bg-red-50 rounded-xl border border-red-100 px-4 py-3.5 flex items-center gap-3">
                       <div className="w-9 h-9 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
                         <span className="text-red-600 font-bold text-sm">
                           {(confirmDesvincular?.aluno_nome || "?")[0].toUpperCase()}

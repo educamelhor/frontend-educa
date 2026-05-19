@@ -1,35 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState } from "react";
 import "./ConteudosProgramaticos.css";
-import api from "../../../services/api";
-
-// ── Perfis de gestão que sempre podem criar conteúdo ──────────────
-const PERFIS_GESTAO = new Set([
-  "diretor", "vice_diretor", "coordenador", "supervisor",
-  "pedagogo", "secretario", "orientador",
-]);
-
-// ── Textos informativos por modo ──────────────────────────────────
-const MODO_INFO = {
-  coordenacao_decide: {
-    label: "Direção decide o conteúdo programático",
-    desc:  "Apenas Direção e Coordenação podem criar e editar. Professores têm acesso somente leitura.",
-    color: "#6366f1",
-    bg:    "#eef2ff",
-  },
-  professor_aprovacao: {
-    label: "Professor cria — Coordenação aprova",
-    desc:  "Professor elabora e envia para aprovação da Coordenação/Direção antes de publicar.",
-    color: "#0ea5e9",
-    bg:    "#f0f9ff",
-  },
-  professor_autonomo: {
-    label: "Professor tem autonomia total",
-    desc:  "Professor cria e publica diretamente, sem necessidade de aprovação.",
-    color: "#10b981",
-    bg:    "#f0fdf4",
-  },
-};
 
 // ── Dados mock ─────────────────────────────────────────────────────────────
 const SERIES = ["6º Ano", "7º Ano", "8º Ano", "9º Ano"];
@@ -80,41 +50,11 @@ export default function ConteudosProgramaticos() {
   const [discFiltro, setDiscFiltro]           = useState("Todas");
   const [bimestreFiltro, setBimestreFiltro]   = useState("Todos");
   const [statusFiltro, setStatusFiltro]       = useState("Todos");
-  const [viewMode, setViewMode]               = useState("cards");
+  const [viewMode, setViewMode]               = useState("cards"); // "cards" | "table"
   const [modalOpen, setModalOpen]             = useState(false);
   const [detalheItem, setDetalheItem]         = useState(null);
 
-  // ── Governança de conteúdos ──────────────────────────────────────
-  const [modo, setModo]             = useState("coordenacao_decide");
-  const [modoLoading, setModoLoading] = useState(true);
-
-  const navigate = useNavigate();
-  const escolaId = localStorage.getItem("escola_id");
-  const perfil   = String(localStorage.getItem("perfil") || "").toLowerCase().trim();
-  const isGestao = PERFIS_GESTAO.has(perfil);
-
-  useEffect(() => {
-    if (!escolaId) return;
-    api.get(`/api/governanca/conteudo-modo?escola_id=${escolaId}`)
-      .then(r => { if (r.data?.ok) setModo(r.data.modo); })
-      .catch(() => {}) // fallback: mantém "coordenacao_decide"
-      .finally(() => setModoLoading(false));
-  }, [escolaId]);
-
-  // ── Regras de acesso derivadas do modo + perfil ──────────────────
-  // Modo A: só gestão cria
-  // Modo B: todos criam, mas professor envia para aprovação
-  // Modo C: todos criam e publicam diretamente
-  const podeCriar =
-    isGestao ||
-    modo === "professor_aprovacao" ||
-    modo === "professor_autonomo";
-
-  const btnSalvarLabel = !isGestao && modo === "professor_aprovacao"
-    ? "Salvar e Enviar para Aprovação"
-    : "Salvar e Publicar";
-
-
+  // Filtros aplicados
   const filtered = MOCK_CONTEUDOS.filter(c =>
     (serieFiltro    === "Todas" || c.serie       === serieFiltro) &&
     (discFiltro     === "Todas" || c.disciplina  === discFiltro) &&
@@ -144,30 +84,11 @@ export default function ConteudosProgramaticos() {
           <button className="cp-btn-outline" onClick={() => setViewMode(v => v === "cards" ? "table" : "cards")}>
             <IcoStats /> {viewMode === "cards" ? "Visualização em tabela" : "Visualização em cards"}
           </button>
-          {podeCriar && (
-            <button className="cp-btn-primary" onClick={() => navigate("/pedagogico/conteudos-programaticos/novo")} disabled={modoLoading}>
-              <IcoPlus /> Novo Conteúdo
-            </button>
-          )}
+          <button className="cp-btn-primary" onClick={() => setModalOpen(true)}>
+            <IcoPlus /> Novo Conteúdo
+          </button>
         </div>
       </div>
-
-      {/* ── Banner governança ── */}
-      {!modoLoading && MODO_INFO[modo] && (
-        <div style={{
-          display: "flex", alignItems: "flex-start", gap: 10,
-          background: MODO_INFO[modo].bg,
-          border: `1px solid ${MODO_INFO[modo].color}33`,
-          borderLeft: `4px solid ${MODO_INFO[modo].color}`,
-          borderRadius: 10, padding: "10px 16px", marginBottom: 16,
-          fontSize: 13,
-        }}>
-          <span style={{ color: MODO_INFO[modo].color, fontWeight: 700, whiteSpace: "nowrap" }}>
-            📋 {MODO_INFO[modo].label}
-          </span>
-          <span style={{ color: "#475569" }}>— {MODO_INFO[modo].desc}</span>
-        </div>
-      )}
 
       {/* ── KPI Cards ── */}
       <div className="cp-kpi-row">
@@ -394,7 +315,7 @@ export default function ConteudosProgramaticos() {
             <div className="cp-modal-footer">
               <button className="cp-btn-outline" onClick={() => setModalOpen(false)}>Cancelar</button>
               <button className="cp-btn-primary" onClick={() => setModalOpen(false)}>Salvar como Rascunho</button>
-              <button className="cp-btn-success" onClick={() => setModalOpen(false)}>{btnSalvarLabel}</button>
+              <button className="cp-btn-success" onClick={() => setModalOpen(false)}>Salvar e Enviar</button>
             </div>
           </div>
         </div>

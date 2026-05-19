@@ -20,6 +20,7 @@ import {
   UserIcon,
   AcademicCapIcon,
   ExclamationTriangleIcon,
+  LinkSlashIcon,
 } from "@heroicons/react/24/outline";
 import api from "../../services/api";
 
@@ -116,6 +117,9 @@ export default function ResponsavelModal({
 
   // ── Confirm vinculo state ──
   const [confirmVinculo, setConfirmVinculo] = useState(null);
+
+  // ── Confirm desvínculo state ──
+  const [confirmDesvincular, setConfirmDesvincular] = useState(null); // { vinculo_id, aluno_nome }
 
   // ── Fetch data when opening ──
   useEffect(() => {
@@ -237,6 +241,23 @@ export default function ResponsavelModal({
       onClose?.();
     } catch (err) {
       alert(err?.response?.data?.error || "Erro ao salvar.");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  // ── Desvincular aluno específico ──
+  async function handleDesvincular() {
+    if (!confirmDesvincular) return;
+    setSalvando(true);
+    try {
+      await api.delete(`/api/responsaveis/vinculo/${confirmDesvincular.vinculo_id}`);
+      setConfirmDesvincular(null);
+      // Recarrega os dados atualizados do responsável
+      const { data: resp } = await api.get(`/api/responsaveis/${responsavelId}/detalhe`);
+      setData(resp);
+    } catch (err) {
+      alert(err?.response?.data?.error || "Erro ao desvincular aluno.");
     } finally {
       setSalvando(false);
     }
@@ -461,11 +482,19 @@ export default function ResponsavelModal({
               {data.alunos_detalhes.map((al) => (
                 <span
                   key={al.vinculo_id}
-                  className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-800 text-xs font-semibold px-3 py-1.5 rounded-full border border-blue-100"
+                  className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-800 text-xs font-semibold px-3 py-1.5 rounded-full border border-blue-100 group"
                 >
-                  <AcademicCapIcon className="w-3.5 h-3.5" />
+                  <AcademicCapIcon className="w-3.5 h-3.5 flex-shrink-0" />
                   {al.aluno_nome}
                   <span className="text-blue-400 font-normal">RE: {al.aluno_codigo}</span>
+                  <button
+                    type="button"
+                    title="Desvincular estudante"
+                    onClick={() => setConfirmDesvincular({ vinculo_id: al.vinculo_id, aluno_nome: al.aluno_nome })}
+                    className="ml-0.5 w-4 h-4 rounded-full bg-red-100 hover:bg-red-500 flex items-center justify-center text-red-400 hover:text-white transition-all duration-150 flex-shrink-0"
+                  >
+                    <XMarkIcon className="w-2.5 h-2.5" />
+                  </button>
                 </span>
               ))}
             </div>
@@ -734,6 +763,84 @@ export default function ResponsavelModal({
                       {salvando && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
                       Sim, Vincular
                     </button>
+                  </div>
+                </Dialog.Panel>
+              </Transition.Child>
+            </div>
+          </div>
+        </Dialog>
+      </Transition>
+
+      {/* ── Modal Premium de Confirmação de Desvínculo ── */}
+      <Transition appear show={!!confirmDesvincular} as={Fragment}>
+        <Dialog as="div" className="relative z-[60]" onClose={() => setConfirmDesvincular(null)}>
+          <Transition.Child as={Fragment}
+            enter="ease-out duration-300" enterFrom="opacity-0" enterTo="opacity-100"
+            leave="ease-in duration-200" leaveFrom="opacity-100" leaveTo="opacity-0"
+          >
+            <div className="fixed inset-0 bg-gray-900/60 backdrop-blur-sm" />
+          </Transition.Child>
+          <div className="fixed inset-0 overflow-y-auto">
+            <div className="flex min-h-full items-center justify-center p-4">
+              <Transition.Child as={Fragment}
+                enter="ease-out duration-300" enterFrom="opacity-0 scale-95" enterTo="opacity-100 scale-100"
+                leave="ease-in duration-200" leaveFrom="opacity-100 scale-100" leaveTo="opacity-0 scale-95"
+              >
+                <Dialog.Panel className="w-full max-w-sm transform overflow-hidden rounded-2xl bg-white shadow-2xl transition-all border border-gray-100">
+                  {/* Header vermelho premium */}
+                  <div className="bg-gradient-to-r from-red-600 via-red-500 to-rose-500 px-6 pt-6 pb-8 text-center relative">
+                    <div className="mx-auto w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center ring-2 ring-white/30 mb-3">
+                      <LinkSlashIcon className="w-7 h-7 text-white" />
+                    </div>
+                    <Dialog.Title as="h3" className="text-lg font-bold text-white leading-tight">
+                      Desvincular Estudante
+                    </Dialog.Title>
+                    <p className="text-red-100 text-sm mt-1">Esta ação removerá o acesso deste responsável</p>
+                  </div>
+
+                  {/* Body */}
+                  <div className="px-6 pb-6">
+                    {/* Card com o nome do aluno — sobrepõe o header */}
+                    <div className="-mt-5 mb-5 bg-white rounded-xl border border-red-100 shadow-lg shadow-red-500/10 px-4 py-3.5 flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
+                        <span className="text-red-600 font-bold text-sm">
+                          {(confirmDesvincular?.aluno_nome || "?")[0].toUpperCase()}
+                        </span>
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Estudante</p>
+                        <p className="text-sm font-bold text-gray-800">{confirmDesvincular?.aluno_nome}</p>
+                      </div>
+                    </div>
+
+                    <p className="text-sm text-gray-600 mb-1.5">
+                      Ao confirmar, este responsável <strong>perderá o acesso</strong> aos dados e comunicações relacionados a este estudante.
+                    </p>
+                    <p className="text-xs text-gray-400 mb-6">
+                      ⚠️ Use em casos como divórcio ou mudança de guarda. O estudante permanece cadastrado normalmente.
+                    </p>
+
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDesvincular(null)}
+                        className="flex-1 px-4 py-2.5 text-sm font-semibold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDesvincular}
+                        disabled={salvando}
+                        className="flex-1 px-4 py-2.5 text-sm font-semibold text-white bg-red-500 hover:bg-red-600 rounded-xl shadow-sm shadow-red-500/30 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
+                      >
+                        {salvando
+                          ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          : <LinkSlashIcon className="w-4 h-4" />
+                        }
+                        Sim, Desvincular
+                      </button>
+                    </div>
                   </div>
                 </Dialog.Panel>
               </Transition.Child>

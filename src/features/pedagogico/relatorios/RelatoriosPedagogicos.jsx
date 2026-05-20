@@ -157,6 +157,16 @@ export default function RelatoriosPedagogicos() {
 
   const ano = anoLetivoAtual();
 
+  // Extrai resumo dos bimestres para os mini-KPIs do card
+  const kpiBimSummary = kpi ? [
+    { label: "1º Bim",   value: (kpi.bimestres?.["1º Bimestre"]?.aprovado || 0), color: STATUS_COLOR.aprovado },
+    { label: "2º Bim",   value: (kpi.bimestres?.["2º Bimestre"]?.aprovado || 0), color: STATUS_COLOR.aprovado },
+    { label: "Enviados",  value: Object.values(kpi.bimestres || {}).reduce((a, b) => a + (b.enviado || 0), 0),  color: STATUS_COLOR.enviado },
+    { label: "Pendentes", value: kpi.total_professores - Math.max(
+        ...[1,2,3,4].map(b => kpi.bimestres?.[`${b}º Bimestre`]?.professores_com_plano || 0)
+      ), color: STATUS_COLOR.nao_iniciado },
+  ] : null;
+
   return (
     <div style={{ minHeight: "100vh", fontFamily: "Montserrat, 'Inter', sans-serif" }}>
       {/* ── Header premium ─────────────────────────────────────────────── */}
@@ -196,36 +206,17 @@ export default function RelatoriosPedagogicos() {
             borderTop: "1px solid rgba(255,255,255,0.1)", flexWrap: "wrap",
           }}>
             {[
-              { label: "Em regência", value: kpi.total, color: "#c7d2fe" },
-              { label: "Não iniciado", value: kpi.nao_iniciado, color: STATUS_COLOR.nao_iniciado },
-              { label: "Rascunho", value: kpi.rascunho, color: STATUS_COLOR.rascunho },
-              { label: "Enviado", value: kpi.enviado, color: STATUS_COLOR.enviado },
-              { label: "Aprovado", value: kpi.aprovado, color: STATUS_COLOR.aprovado },
-              { label: "Revisão", value: kpi.revisao, color: STATUS_COLOR.revisao },
+              { label: "Em Regência", value: kpi.total_professores,                                                  color: "#c7d2fe" },
+              { label: "1º Bim Aprov.", value: kpi.bimestres?.["1º Bimestre"]?.aprovado || 0,                       color: "#10b981" },
+              { label: "2º Bim Aprov.", value: kpi.bimestres?.["2º Bimestre"]?.aprovado || 0,                       color: "#10b981" },
+              { label: "Enviados",      value: Object.values(kpi.bimestres || {}).reduce((a,b) => a + (b.enviado||0), 0), color: "#3b82f6" },
+              { label: "Devolvidos",    value: Object.values(kpi.bimestres || {}).reduce((a,b) => a + (b.devolvido||0),0), color: "#ef4444" },
             ].map((k) => (
               <div key={k.label} style={{ textAlign: "center", minWidth: 64 }}>
                 <div style={{ color: k.color, fontSize: "1.8rem", fontWeight: 800, lineHeight: 1 }}>{k.value}</div>
                 <div style={{ color: "rgba(255,255,255,0.45)", fontSize: "0.68rem", marginTop: 4 }}>{k.label}</div>
               </div>
             ))}
-
-            {/* Barra de progresso de aprovação */}
-            {kpi.total > 0 && (
-              <div style={{ flex: 1, minWidth: 200, display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                <div style={{ color: "rgba(255,255,255,0.5)", fontSize: "0.7rem", marginBottom: 6 }}>
-                  Aprovados — {Math.round((kpi.aprovado / kpi.total) * 100)}%
-                </div>
-                <div style={{ height: 8, background: "rgba(255,255,255,0.1)", borderRadius: 999 }}>
-                  <div style={{
-                    height: "100%",
-                    width: `${Math.round((kpi.aprovado / kpi.total) * 100)}%`,
-                    background: "linear-gradient(90deg, #10b981, #0891b2)",
-                    borderRadius: 999,
-                    transition: "width 0.8s ease",
-                  }} />
-                </div>
-              </div>
-            )}
           </div>
         )}
       </div>
@@ -243,12 +234,7 @@ export default function RelatoriosPedagogicos() {
           route="/pedagogico/relatorios/plano-avaliacao"
           available={true}
           badge="DISPONÍVEL"
-          kpi={kpi ? [
-            { label: "Professores", value: kpi.total,        color: "#c7d2fe" },
-            { label: "Enviados",    value: kpi.enviado,      color: STATUS_COLOR.enviado },
-            { label: "Aprovados",   value: kpi.aprovado,     color: STATUS_COLOR.aprovado },
-            { label: "Pendentes",   value: kpi.nao_iniciado, color: STATUS_COLOR.nao_iniciado },
-          ] : null}
+          kpi={kpiBimSummary}
         />
 
         <ReportCard

@@ -51,11 +51,17 @@ export default function ConfigCargaSegmento() {
     try {
       const escola_id = localStorage.getItem("escola_id") || 1;
       const resDiscs = await api.get("/api/disciplinas", { params: { escola_id } });
-      const discs = Array.isArray(resDiscs.data)
+      const raw = Array.isArray(resDiscs.data)
         ? resDiscs.data
         : Array.isArray(resDiscs.data?.disciplinas)
         ? resDiscs.data.disciplinas
         : [];
+      // Normaliza: backend retorna o campo como "disciplina" (alias no SELECT),
+      // mas nosso componente usa "nome". Idêntico ao que faz ListaCargasHorarias.jsx.
+      const discs = raw.map((d) => ({
+        ...d,
+        nome: d.nome ?? d.disciplina ?? d.titulo ?? `Disciplina ${d.id}`,
+      }));
       setDisciplinas(discs.sort((a, b) => (a.nome ?? "").localeCompare(b.nome ?? "", "pt-BR")));
     } catch (e) {
       console.warn("[ConfigCargaSegmento] Disciplinas não carregadas:", e?.response?.status, e?.message);

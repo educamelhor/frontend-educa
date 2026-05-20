@@ -37,17 +37,28 @@ export default function ConfigCargaSegmento() {
     setLoading(true);
     setErro("");
     try {
-      const [resConfigs, resDiscs] = await Promise.all([
-        api.get("/api/cargas-horarias/config-segmento"),
-        api.get("/api/disciplinas"),
-      ]);
+      // Chamadas independentes para isolar falhas
+      const resConfigs = await api.get("/api/cargas-horarias/config-segmento");
       setConfigs(resConfigs.data?.itens ?? []);
-      const discs = Array.isArray(resDiscs.data) ? resDiscs.data : [];
-      setDisciplinas(discs.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR")));
     } catch (e) {
-      setErro("Não foi possível carregar as configurações.");
+      console.error("[ConfigCargaSegmento] Erro ao carregar configs:", e);
+      setErro(`Não foi possível carregar as configurações. (${e?.response?.status ?? "sem resposta"})`);
     } finally {
       setLoading(false);
+    }
+
+    // Disciplinas — carregadas separadamente para não bloquear o painel
+    try {
+      const resDiscs = await api.get("/api/disciplinas");
+      const discs = Array.isArray(resDiscs.data)
+        ? resDiscs.data
+        : Array.isArray(resDiscs.data?.disciplinas)
+        ? resDiscs.data.disciplinas
+        : [];
+      setDisciplinas(discs.sort((a, b) => (a.nome ?? "").localeCompare(b.nome ?? "", "pt-BR")));
+    } catch (e) {
+      console.warn("[ConfigCargaSegmento] Disciplinas não carregadas:", e?.response?.status, e?.message);
+      // Não exibe erro crítico — o usuário ainda pode ver as configs existentes
     }
   }
 

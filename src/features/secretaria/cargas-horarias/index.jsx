@@ -295,7 +295,7 @@ export default function CargasHorariasPage() {
                     {cargasTurma.map((item, idx) => (
                       <tr key={item.disciplina_id ?? `${item.disciplina_nome}-${idx}`} className="hover:bg-blue-50">
                         <td className="p-2 border text-center">{idx + 1}</td>
-                        <td className="p-2 border text-center">{item.disciplina_nome}</td>
+                        <td className="p-2 border text-center uppercase">{item.disciplina_nome}</td>
                         <td className="p-2 border text-center">{item.carga}</td>
                       </tr>
                     ))}

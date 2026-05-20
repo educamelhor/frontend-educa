@@ -101,6 +101,10 @@ import BoletimEdicao from "./features/secretaria/boletim/BoletimEdicao.jsx";
 // ✅ NOVO IMPORT: Relatórios da Secretaria
 import RelatoriosSecretaria from "./features/secretaria/relatorios/RelatoriosSecretaria.jsx";
 
+// ✅ NOVO IMPORT: Relatórios Pedagógicos
+import RelatoriosPedagogicos from "./features/pedagogico/relatorios/RelatoriosPedagogicos.jsx";
+import PlanoAvaliacaoPage from "./features/pedagogico/relatorios/PlanoAvaliacaoPage.jsx";
+
 // Layout protegido para rotas autenticadas
 function ProtectedLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -308,6 +312,10 @@ export default function App() {
             <RequirePerm perm="conteudos:ver"><ConteudosProgramaticos /></RequirePerm>
           } />
           <Route path="/pedagogico/coordenacao/solicitacoes" element={<SolicitacoesConteudos />} />
+
+          {/* ✅ Relatórios Pedagógicos */}
+          <Route path="/pedagogico/relatorios" element={<RelatoriosPedagogicos />} />
+          <Route path="/pedagogico/relatorios/plano-avaliacao" element={<PlanoAvaliacaoPage />} />
 
           {/* ── Professores ──────────────────────────────────────────────── */}
           <Route path="/professores/planos"     element={<Planos />} />

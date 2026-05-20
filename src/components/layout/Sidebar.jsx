@@ -1310,6 +1310,31 @@ export default function Sidebar({ isOpen, onClose }) {
 
                 {/* Gabarito migrado para menu unificado (/gabarito) */}
 
+                {/* Relatórios Pedagógicos */}
+                <li>
+                  <Link
+                    to="/pedagogico/relatorios"
+                    className={getSubmenuLinkClasses('/pedagogico/relatorios')}
+                    style={{
+                      background: isActive('/pedagogico/relatorios')
+                        ? 'linear-gradient(90deg, rgba(99,102,241,0.15), transparent)'
+                        : undefined,
+                    }}
+                  >
+                    <ChartBarIcon className="h-5 w-5 mr-2" style={{ color: isActive('/pedagogico/relatorios') ? '#818cf8' : undefined }} />
+                    <span className="flex-1">Relatórios</span>
+                    <span style={{
+                      fontSize: '0.5rem',
+                      fontWeight: 800,
+                      background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                      color: '#fff',
+                      padding: '1px 5px',
+                      borderRadius: '6px',
+                      letterSpacing: '0.5px',
+                    }}>NOVO</span>
+                  </Link>
+                </li>
+
                 <li>
                   <Link
                     to="/pedagogico/graficos"

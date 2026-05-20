@@ -5,7 +5,7 @@
 // Permite que a coordenação/direção altere o status
 // ============================================================================
 
-import { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../../services/api";
 

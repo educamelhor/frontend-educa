@@ -4,9 +4,9 @@
 // Cards por tema de relatório — o primeiro é Plano de Avaliação Pedagógica
 // ============================================================================
 
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../../services/api";
-import { useEffect, useState } from "react";
 
 // ─── Status colors helpers ───────────────────────────────────────────────────
 const STATUS_COLOR = {

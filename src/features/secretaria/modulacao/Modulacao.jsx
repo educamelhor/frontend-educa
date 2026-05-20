@@ -166,6 +166,9 @@ export default function Modulacao() {
   // Tabelas auxiliares
   const [cargaPorDisciplina, setCargaPorDisciplina] = useState({}); // {disciplinaId: cargaSemanal}
   const [aulasTotaisPorProfessor, setAulasTotaisPorProfessor] = useState({}); // {profId: totalSemanal}
+  // MODULAÇÃO INTELIGENTE: carga real por turma × disciplina
+  // { turma_id: { disciplina_id: N_aulas } } — preenchido pelo endpoint /api/modulacao/carga-turma
+  const [cargaPorTurmaDisc, setCargaPorTurmaDisc] = useState({}); // {turmaId: {discId: N}}
 
   // ESTADOS (adicione junto aos outros useState de UI/relatórios)
   const [removerOpen, setRemoverOpen] = useState(false);
@@ -314,6 +317,24 @@ export default function Modulacao() {
         await carregarTurmasDoTurno(turnoSelecionado);
         // carrega/atualiza o map de total de aulas por professor para este turno
         const mapAulasTotais = await carregarAulasTotaisDoTurno(turnoSelecionado);
+
+        // MODULAÇÃO INTELIGENTE: carrega carga real por turma × disciplina
+        try {
+          const { data: cargaTurmaData } = await api.get("/api/modulacao/carga-turma", {
+            params: { turno: turnoSelecionado },
+          });
+          // Normaliza chaves para Number (o backend retorna string em JSON)
+          const normalizado = {};
+          for (const [turmaId, discs] of Object.entries(cargaTurmaData || {})) {
+            normalizado[Number(turmaId)] = {};
+            for (const [discId, carga] of Object.entries(discs)) {
+              normalizado[Number(turmaId)][Number(discId)] = Number(carga);
+            }
+          }
+          setCargaPorTurmaDisc(normalizado);
+        } catch {
+          setCargaPorTurmaDisc({});
+        }
 
         // busca as alocações do turno
         const { data } = await api.get("/api/modulacao", { params: { turno: turnoSelecionado } });
@@ -559,17 +580,23 @@ export default function Modulacao() {
     const map = {};
     for (const prof of professoresTabela) {
       const total = Number(aulasTotaisPorProfessor[prof.id] ?? prof.aulas ?? 0) || 0;
-      const cargaDisc = Number(cargaPorDisciplina[prof.disciplina_id]) || 1;
-      const usadas = alocacoes.filter((a) => a.profId === prof.id).length * cargaDisc;
+      // MODULAÇÃO INTELIGENTE: soma a carga real de cada turma alocada ao professor
+      const usadas = alocacoes
+        .filter((a) => a.profId === prof.id)
+        .reduce((soma, a) => {
+          const cargaEspecifica = cargaPorTurmaDisc[a.turmaId]?.[prof.disciplina_id];
+          const carga = cargaEspecifica ?? Number(cargaPorDisciplina[prof.disciplina_id]) ?? 1;
+          return soma + (carga || 1);
+        }, 0);
       map[prof.id] = {
         total,
         usadas,
         restante: total - usadas,
-        carga: cargaDisc,
+        carga: Number(cargaPorDisciplina[prof.disciplina_id]) || 1, // fallback global
       };
     }
     return map;
-  }, [professoresTabela, alocacoes, aulasTotaisPorProfessor, cargaPorDisciplina]);
+  }, [professoresTabela, alocacoes, aulasTotaisPorProfessor, cargaPorDisciplina, cargaPorTurmaDisc]);
 
 
 
@@ -1755,69 +1782,57 @@ export default function Modulacao() {
                         </span>
                       </td>
 
-                      {/* Turmas */}
-                      {turmasTurno.map((turma) => (
-                        <td key={turma.id} className="py-2 px-4 border">
-                          <div className="flex justify-center">
-                            <input
-                              type="checkbox"
-                              checked={alocacoes.some(
-                                (a) => a.profId === prof.id && a.turmaId === turma.id
-                              )}
-                              onChange={(e) => {
-                                const total = Number(prof.aulas) || 0;
+                      {/* Turmas — checkboxes com lógica inteligente de carga */}
+                      {turmasTurno.map((turma) => {
+                        const isChecked = alocacoes.some(
+                          (a) => a.profId === prof.id && a.turmaId === turma.id
+                        );
+                        // Carga real desta disciplina nesta turma (com fallback)
+                        const cargaTurma =
+                          cargaPorTurmaDisc[turma.id]?.[prof.disciplina_id] ??
+                          Number(cargaPorDisciplina[prof.disciplina_id]) ??
+                          1;
+                        const restanteAtual = r.restante;
+                        // Bloqueia somente se não está marcado e não há saldo suficiente
+                        const semSaldo = !isChecked && restanteAtual < cargaTurma;
+                        const tooltipBloqueio = semSaldo
+                          ? restanteAtual <= 0
+                            ? `${prof.nome} está 100% modulado (0 aulas restantes)`
+                            : `Insuficiente: esta turma consome ${cargaTurma} aula(s), mas restam apenas ${restanteAtual}`
+                          : `Total: ${r.total} • Usadas: ${r.usadas} • Restante: ${restanteAtual} • Esta turma: ${cargaTurma} aula(s)`;
 
-                                // carga da disciplina (aulas por turma)
-                                const cargaDisc =
-                                  Number(
-                                    resumoAulas[prof.id]?.carga ??
-                                      cargaPorDisciplina[prof.disciplina_id]
-                                  ) || 1;
-
-                                // aulas já usadas
-                                const usadasAtual =
-                                  alocacoes.filter((a) => a.profId === prof.id).length *
-                                  cargaDisc;
-
-                                // saldo antes do clique
-                                const restanteAtual = total - usadasAtual;
-
-                                if (e.target.checked) {
-                                  // Tentar adicionar
-                                  if (restanteAtual <= 0) {
-                                    alert(
-                                      `Saldo de aulas zerado para ${prof.nome} (${prof.disciplina_nome}).`
+                        return (
+                          <td key={turma.id} className="py-2 px-4 border">
+                            <div className="flex justify-center">
+                              <input
+                                type="checkbox"
+                                title={tooltipBloqueio}
+                                checked={isChecked}
+                                disabled={semSaldo}
+                                style={semSaldo ? { cursor: "not-allowed", opacity: 0.35 } : {}}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    // verifica saldo (dupla cheque, pois disabled já bloqueia)
+                                    if (restanteAtual < cargaTurma) {
+                                      return;
+                                    }
+                                    setAlocacoes((prev) => [
+                                      ...prev,
+                                      { profId: prof.id, turmaId: turma.id },
+                                    ]);
+                                  } else {
+                                    setAlocacoes((prev) =>
+                                      prev.filter(
+                                        (a) => !(a.profId === prof.id && a.turmaId === turma.id)
+                                      )
                                     );
-                                    e.preventDefault?.();
-                                    e.target.checked = false;
-                                    return;
                                   }
-                                  if (restanteAtual - cargaDisc < 0) {
-                                    alert(
-                                      `Carga de aulas insuficiente para ${prof.nome} (${prof.disciplina_nome}). Saldo: ${restanteAtual}`
-                                    );
-                                    e.preventDefault?.();
-                                    e.target.checked = false;
-                                    return;
-                                  }
-                                  // Ok para adicionar
-                                  setAlocacoes((prev) => [
-                                    ...prev,
-                                    { profId: prof.id, turmaId: turma.id },
-                                  ]);
-                                } else {
-                                  // Remover (sempre permitido)
-                                  setAlocacoes((prev) =>
-                                    prev.filter(
-                                      (a) => !(a.profId === prof.id && a.turmaId === turma.id)
-                                    )
-                                  );
-                                }
-                              }}
-                            />
-                          </div>
-                        </td>
-                      ))}
+                                }}
+                              />
+                            </div>
+                          </td>
+                        );
+                      })}
 
                       {/* Ações (largura fixa e sem quebra) */}
                       <td className="py-2 px-4 border text-center w-[140px] whitespace-nowrap">

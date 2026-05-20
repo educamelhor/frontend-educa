@@ -49,7 +49,8 @@ export default function ConfigCargaSegmento() {
 
     // Disciplinas — carregadas separadamente para não bloquear o painel
     try {
-      const resDiscs = await api.get("/api/disciplinas");
+      const escola_id = localStorage.getItem("escola_id") || 1;
+      const resDiscs = await api.get("/api/disciplinas", { params: { escola_id } });
       const discs = Array.isArray(resDiscs.data)
         ? resDiscs.data
         : Array.isArray(resDiscs.data?.disciplinas)

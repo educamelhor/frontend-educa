@@ -14,6 +14,7 @@ import ManualDisciplinar from "./features/disciplinar/manual";
 import SuporteSAC from "./features/disciplinar/suporte";
 import HistoricoDisciplinar from "./features/disciplinar/historico";
 import AtasDisciplinar from "./features/disciplinar/atas/AtasPage.jsx";
+import LiberacaoDisciplinar from "./features/disciplinar/liberacao/LiberacaoPage.jsx";
 import Boletim from "./features/boletim/Boletim";
 import BoletimAnual from "./features/boletim/BoletimAnual";
 import FichaAluno from "./features/alunos/FichaAluno";
@@ -45,6 +46,14 @@ import ExcluirContaPage from "./pages/ExcluirContaPage";
 import CapturePrivacidadePage from "./pages/CapturePrivacidadePage";
 import SuportePage from "./pages/SuportePage";
 import Ferramentas from "./features/ferramentas";
+
+// ✅ MÓDULO BIBLIOTECA
+import BibliotecaAcervo from "./features/biblioteca/acervo/AcervoPage";
+import BibliotecaEmprestimos from "./features/biblioteca/emprestimos/EmprestimosPage";
+import BibliotecaAlunos from "./features/biblioteca/alunos/AlunosLeitorPage";
+import LeitorDestaque from "./features/biblioteca/leitor-destaque/LeitorDestaquePage";
+import BibliotecaConcurso from "./features/biblioteca/concurso/ConcursoPage";
+import BibliotecaMetadados from "./features/biblioteca/metadados/MetadadosPage";
 
 // ✅ Direção (Diretor) — Devices EDUCA-CAPTURE
 import DiretorPedagogico from "./features/direcao/diretor/DiretorPedagogico.jsx";
@@ -261,6 +270,7 @@ export default function App() {
           } />
           <Route path="/disciplinar/historico"  element={<HistoricoDisciplinar />} />
           <Route path="/disciplinar/atas"       element={<AtasDisciplinar />} />
+          <Route path="/disciplinar/liberacao"  element={<LiberacaoDisciplinar />} />
           <Route path="/disciplinar/metadados"  element={<MetadadosDisciplinar />} />
           <Route path="/disciplinar/regimentos" element={<RegimentosDisciplinar />} />
           <Route path="/disciplinar/manual"     element={<ManualDisciplinar />} />
@@ -339,8 +349,16 @@ export default function App() {
           <Route path="/secretaria/horarios/layout" element={<LayoutGrade />} />
           <Route path="/secretaria/horarios/mock"   element={<ExecutarMock />} />
 
-          {/* ── Ferramentas ──────────────────────────────────────────────── */}
+          {/* ── Ferramentas ─────────────────────────────────────────────── */}
           <Route path="/ferramentas" element={<Ferramentas />} />
+
+          {/* ── Biblioteca ──────────────────────────────────────────── */}
+          <Route path="/biblioteca/acervo"          element={<BibliotecaAcervo />} />
+          <Route path="/biblioteca/emprestimos"     element={<BibliotecaEmprestimos />} />
+          <Route path="/biblioteca/alunos"          element={<BibliotecaAlunos />} />
+          <Route path="/biblioteca/leitor-destaque" element={<LeitorDestaque />} />
+          <Route path="/biblioteca/concurso"        element={<BibliotecaConcurso />} />
+          <Route path="/biblioteca/metadados"       element={<BibliotecaMetadados />} />
 
           {/* ── Agente EDUCA ─────────────────────────────────────────────── */}
           <Route path="/agente-educa/credenciais" element={<AgenteCredenciais />} />

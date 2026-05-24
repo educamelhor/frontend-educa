@@ -153,6 +153,7 @@ export default function Sidebar({ isOpen, onClose }) {
     else if (p.startsWith('/plataforma')) setOpenGroup('plataforma');
     else if (p.startsWith('/gabarito')) setOpenGroup('gabarito');
     else if (p.startsWith('/agente-educa')) setOpenGroup('agente-educa');
+    else if (p.startsWith('/biblioteca')) setOpenGroup('biblioteca');
     else setOpenGroup(null);
   }, [location.pathname]);
 
@@ -471,6 +472,133 @@ export default function Sidebar({ isOpen, onClose }) {
               Ferramentas
             </Link>
             )}
+
+            {/* ────────────────────────────────
+                GRUPO: BIBLIOTECA
+                Acesso: direção, coordenação, supervisão, sala recurso
+                Restrito: professor, militar/disciplinar, coordenador de turma
+            ──────────────────────────────── */}
+            {isScopeEscola && !isDisciplinar && !isProfessor && !isCoord && (
+            <>
+            <button
+              className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-2 transition"
+              onClick={() => setOpenGroup(openGroup === 'biblioteca' ? null : 'biblioteca')}
+              type="button"
+              style={{
+                background: openGroup === 'biblioteca'
+                  ? 'linear-gradient(90deg, rgba(16,185,129,0.18), transparent)'
+                  : undefined,
+              }}
+            >
+              <BookOpenIcon className="h-5 w-5 mr-2" style={{ color: openGroup === 'biblioteca' ? '#34d399' : undefined }} />
+              <span className="flex-1 text-left" style={{ fontWeight: 700 }}>Biblioteca</span>
+              <span style={{
+                fontSize: '0.55rem',
+                fontWeight: 800,
+                background: 'linear-gradient(135deg, #10b981, #059669)',
+                color: '#fff',
+                padding: '2px 6px',
+                borderRadius: '8px',
+                letterSpacing: '0.5px',
+                marginRight: 4,
+              }}>NOVO</span>
+              {openGroup === 'biblioteca' ? (
+                <ChevronDownIcon className="h-4 w-4" />
+              ) : (
+                <ChevronRightIcon className="h-4 w-4" />
+              )}
+            </button>
+
+            {openGroup === 'biblioteca' && (
+              <ul className="ml-4 mb-2">
+                <li>
+                  <Link
+                    to="/biblioteca/acervo"
+                    className={getSubmenuLinkClasses('/biblioteca/acervo')}
+                    style={{
+                      background: isActive('/biblioteca/acervo')
+                        ? 'linear-gradient(90deg, rgba(16,185,129,0.18), transparent)'
+                        : undefined,
+                    }}
+                  >
+                    <BookOpenIcon className="h-5 w-5 mr-2" style={{ color: isActive('/biblioteca/acervo') ? '#34d399' : undefined }} />
+                    <span className="flex-1">Acervo</span>
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/biblioteca/emprestimos"
+                    className={getSubmenuLinkClasses('/biblioteca/emprestimos')}
+                    style={{
+                      background: isActive('/biblioteca/emprestimos')
+                        ? 'linear-gradient(90deg, rgba(59,130,246,0.15), transparent)'
+                        : undefined,
+                    }}
+                  >
+                    <ClipboardDocumentListIcon className="h-5 w-5 mr-2" style={{ color: isActive('/biblioteca/emprestimos') ? '#60a5fa' : undefined }} />
+                    <span className="flex-1">Empréstimos</span>
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/biblioteca/alunos"
+                    className={getSubmenuLinkClasses('/biblioteca/alunos')}
+                    style={{
+                      background: isActive('/biblioteca/alunos')
+                        ? 'linear-gradient(90deg, rgba(139,92,246,0.15), transparent)'
+                        : undefined,
+                    }}
+                  >
+                    <UsersIcon className="h-5 w-5 mr-2" style={{ color: isActive('/biblioteca/alunos') ? '#a78bfa' : undefined }} />
+                    <span className="flex-1">Alunos Leitores</span>
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/biblioteca/leitor-destaque"
+                    className={getSubmenuLinkClasses('/biblioteca/leitor-destaque')}
+                    style={{
+                      background: isActive('/biblioteca/leitor-destaque')
+                        ? 'linear-gradient(90deg, rgba(245,158,11,0.15), transparent)'
+                        : undefined,
+                    }}
+                  >
+                    <span className="mr-2 text-base" style={{ lineHeight: 1 }}>⭐</span>
+                    <span className="flex-1" style={{ color: isActive('/biblioteca/leitor-destaque') ? '#fbbf24' : undefined }}>Leitor Destaque</span>
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/biblioteca/concurso"
+                    className={getSubmenuLinkClasses('/biblioteca/concurso')}
+                    style={{
+                      background: isActive('/biblioteca/concurso')
+                        ? 'linear-gradient(90deg, rgba(20,184,166,0.15), transparent)'
+                        : undefined,
+                    }}
+                  >
+                    <ChartBarIcon className="h-5 w-5 mr-2" style={{ color: isActive('/biblioteca/concurso') ? '#2dd4bf' : undefined }} />
+                    <span className="flex-1">Ranking & Concurso</span>
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/biblioteca/metadados"
+                    className={getSubmenuLinkClasses('/biblioteca/metadados')}
+                    style={{
+                      background: isActive('/biblioteca/metadados')
+                        ? 'linear-gradient(90deg, rgba(100,116,139,0.15), transparent)'
+                        : undefined,
+                    }}
+                  >
+                    <TableCellsIcon className="h-5 w-5 mr-2" style={{ color: isActive('/biblioteca/metadados') ? '#94a3b8' : undefined }} />
+                    <span className="flex-1">Painel / Metadados</span>
+                  </Link>
+                </li>
+              </ul>
+            )}
+            </>
+            )}
           </>
         )}
 
@@ -763,7 +891,6 @@ export default function Sidebar({ isOpen, onClose }) {
                   >
                     <BoltIcon className="h-5 w-5 mr-2" style={{ color: isActive('/disciplinar/fo-coletivo') ? '#f87171' : undefined }} />
                     <span className="flex-1">F.O. Coletivo</span>
-                    <span style={{ fontSize:'0.5rem', fontWeight:800, background:'linear-gradient(135deg,#ef4444,#dc2626)', color:'#fff', padding:'1px 5px', borderRadius:'6px', letterSpacing:'0.5px' }}>NOVO</span>
                   </Link>
                 </li>
                 <li>
@@ -778,7 +905,6 @@ export default function Sidebar({ isOpen, onClose }) {
                   >
                     <ClockIcon className="h-5 w-5 mr-2" style={{ color: isActive('/disciplinar/historico') ? '#f59e0b' : undefined }} />
                     <span className="flex-1">Histórico</span>
-                    <span style={{ fontSize:'0.5rem', fontWeight:800, background:'linear-gradient(135deg,#f59e0b,#ea580c)', color:'#fff', padding:'1px 5px', borderRadius:'6px', letterSpacing:'0.5px' }}>NOVO</span>
                   </Link>
                 </li>
                 <li>
@@ -793,7 +919,20 @@ export default function Sidebar({ isOpen, onClose }) {
                   >
                     <DocumentTextIcon className="h-5 w-5 mr-2" style={{ color: isActive('/disciplinar/atas') ? '#1e3a8a' : undefined }} />
                     <span className="flex-1">Atas</span>
-                    <span style={{ fontSize:'0.5rem', fontWeight:800, background:'linear-gradient(135deg,#1e3a8a,#3b82f6)', color:'#fff', padding:'1px 5px', borderRadius:'6px', letterSpacing:'0.5px' }}>PREMIUM</span>
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/disciplinar/liberacao"
+                    className={getSubmenuLinkClasses('/disciplinar/liberacao')}
+                    style={{
+                      background: isActive('/disciplinar/liberacao')
+                        ? 'linear-gradient(90deg, rgba(5,150,105,0.15), transparent)'
+                        : undefined,
+                    }}
+                  >
+                    <CheckCircleIcon className="h-5 w-5 mr-2" style={{ color: isActive('/disciplinar/liberacao') ? '#059669' : undefined }} />
+                    <span className="flex-1">Liberação</span>
                   </Link>
                 </li>
                 <li>
@@ -875,7 +1014,6 @@ export default function Sidebar({ isOpen, onClose }) {
                   >
                     <BoltIcon className="h-5 w-5 mr-2" style={{ color: isActive('/disciplinar/fo-coletivo') ? '#f87171' : undefined }} />
                     <span className="flex-1">F.O. Coletivo</span>
-                    <span style={{ fontSize:'0.5rem', fontWeight:800, background:'linear-gradient(135deg,#ef4444,#dc2626)', color:'#fff', padding:'1px 5px', borderRadius:'6px', letterSpacing:'0.5px' }}>NOVO</span>
                   </Link>
                 </li>
                 <li>
@@ -890,7 +1028,6 @@ export default function Sidebar({ isOpen, onClose }) {
                   >
                     <ClockIcon className="h-5 w-5 mr-2" style={{ color: isActive('/disciplinar/historico') ? '#f59e0b' : undefined }} />
                     <span className="flex-1">Histórico</span>
-                    <span style={{ fontSize:'0.5rem', fontWeight:800, background:'linear-gradient(135deg,#f59e0b,#ea580c)', color:'#fff', padding:'1px 5px', borderRadius:'6px', letterSpacing:'0.5px' }}>NOVO</span>
                   </Link>
                 </li>
                 <li>
@@ -905,7 +1042,20 @@ export default function Sidebar({ isOpen, onClose }) {
                   >
                     <DocumentTextIcon className="h-5 w-5 mr-2" style={{ color: isActive('/disciplinar/atas') ? '#1e3a8a' : undefined }} />
                     <span className="flex-1">Atas</span>
-                    <span style={{ fontSize:'0.5rem', fontWeight:800, background:'linear-gradient(135deg,#1e3a8a,#3b82f6)', color:'#fff', padding:'1px 5px', borderRadius:'6px', letterSpacing:'0.5px' }}>PREMIUM</span>
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/disciplinar/liberacao"
+                    className={getSubmenuLinkClasses('/disciplinar/liberacao')}
+                    style={{
+                      background: isActive('/disciplinar/liberacao')
+                        ? 'linear-gradient(90deg, rgba(5,150,105,0.15), transparent)'
+                        : undefined,
+                    }}
+                  >
+                    <CheckCircleIcon className="h-5 w-5 mr-2" style={{ color: isActive('/disciplinar/liberacao') ? '#059669' : undefined }} />
+                    <span className="flex-1">Liberação</span>
                   </Link>
                 </li>
                 <li>

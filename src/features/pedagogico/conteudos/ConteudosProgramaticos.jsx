@@ -1,4 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import api from "../../../services/api";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import "./ConteudosProgramaticos.css";
 
 // ── Dados mock ─────────────────────────────────────────────────────────────
@@ -6,8 +9,15 @@ const SERIES = ["6º Ano", "7º Ano", "8º Ano", "9º Ano"];
 
 const DISCIPLINAS = [
   "Língua Portuguesa", "Matemática", "Ciências", "História",
-  "Geografia", "Inglês", "Arte", "Educação Física", "Ensino Religioso",
+  "Geografia", "Inglês", "Arte", "Educação Física", "Geometria",
 ];
+
+// Mapeamento: nome da disciplina → disciplina_id real da tabela `disciplinas`
+const DISC_ID_MAP = {
+  "Língua Portuguesa": 48, "Matemática": 21, "Ciências": 25,
+  "História": 24, "Geografia": 23, "Inglês": 30,
+  "Arte": 26, "Educação Física": 27, "Geometria": 29,
+};
 
 const BIMESTRES = ["1º Bimestre", "2º Bimestre", "3º Bimestre", "4º Bimestre"];
 
@@ -42,7 +52,8 @@ const IcoEye   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor
 const IcoCheck = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="cp-icon"><polyline points="20 6 9 17 4 12"/></svg>;
 const IcoBook  = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="cp-icon"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>;
 const IcoFilter = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="cp-icon"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>;
-const IcoStats = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="cp-icon"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>;
+const IcoStats  = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="cp-icon"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>;
+const IcoPDF    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="cp-icon"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/><polyline points="9 9 10 9"/></svg>;
 
 // ── Componente principal ───────────────────────────────────────────────────
 export default function ConteudosProgramaticos() {
@@ -53,6 +64,578 @@ export default function ConteudosProgramaticos() {
   const [viewMode, setViewMode]               = useState("cards"); // "cards" | "table"
   const [modalOpen, setModalOpen]             = useState(false);
   const [detalheItem, setDetalheItem]         = useState(null);
+
+  // Estado do modal PDF
+  const [pdfModalOpen, setPdfModalOpen]   = useState(false);
+  const [pdfDisc, setPdfDisc]             = useState("");
+  const [pdfBimestre, setPdfBimestre]     = useState("");
+  const [pdfLoading, setPdfLoading]       = useState(false);
+  const [pdfErr, setPdfErr]               = useState("");
+  const [pdfTipo, setPdfTipo]             = useState("interno"); // "interno" | "alunos"
+
+  // Abre / fecha modal PDF
+  const openPdfModal = () => {
+    setPdfDisc(""); setPdfBimestre(""); setPdfErr(""); setPdfTipo("interno"); setPdfModalOpen(true);
+  };
+
+  // ── Helper: faz o cabeçalho premium (compartilhado) ────────────────────────
+  const buildPdfHeader = (doc, W, H, hoje, escolaNome, titulo, badges, corFundo) => {
+    const [cr,cg,cb]   = corFundo || [99,102,241];
+    const [cr2,cg2,cb2] = [Math.max(cr-20,0), Math.max(cg-32,0), Math.max(cb-12,0)];
+    doc.setFillColor(cr,cg,cb); doc.rect(0, 0, W, 42, "F");
+    doc.setFillColor(cr2,cg2,cb2); doc.rect(0, 34, W, 8, "F");
+    doc.setFillColor(251,191,36); doc.rect(0, 42, W, 1.5, "F");
+    doc.setTextColor(255,255,255);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(15);
+    doc.text(escolaNome, 14, 13);
+    doc.setFontSize(9); doc.setFont("helvetica", "normal");
+    doc.setTextColor(199,210,254);
+    doc.text("Centro de Ensino Fundamental 04 — CCMDF — SEEDF", 14, 19);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.setTextColor(255,255,255);
+    doc.text(titulo, 14, 29);
+    let bx = 14;
+    badges.forEach(b => {
+      doc.setFillColor(cr2,cg2,cb2);
+      const tw = doc.getTextWidth(b.val) + 14;
+      doc.roundedRect(bx, 35, tw, 6, 1, 1, "F");
+      doc.setFont("helvetica", "bold"); doc.setFontSize(7);
+      doc.setTextColor(199,210,254); doc.text(b.label + ":  ", bx + 2, 38.8);
+      doc.setTextColor(255,255,255); doc.text(b.val, bx + 2 + doc.getTextWidth(b.label + ":  "), 38.8);
+      bx += tw + 4;
+    });
+    doc.setFont("helvetica", "normal"); doc.setFontSize(7); doc.setTextColor(199,210,254);
+    doc.text(`Emitido em: ${hoje}`, W - 14, 13, { align: "right" });
+  };
+
+  // ── Helper: rodapé de página ───────────────────────────────────────────────────
+  const drawFooter = (doc, W, H, escolaNome, bimNum) => {
+    const pn = doc.internal.getCurrentPageInfo().pageNumber;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(7); doc.setTextColor(148,163,184);
+    doc.text(`${escolaNome} — ${bimNum}º Bimestre / 2026`, 14, H - 8);
+    doc.text(`Pág. ${pn}`, W - 14, H - 8, { align: "right" });
+    doc.setDrawColor(226,232,240); doc.line(14, H - 11, W - 14, H - 11);
+  };
+
+  // ── Helper: parseia objetivo_texto em tópicos + subitens ───────────────────────
+  const parseObjetivo = (texto) => {
+    if (!texto) return [];
+    const topicos = [];
+    let atual = null;
+    for (const linha of texto.split("\n")) {
+      const tMatch = linha.match(/^\s*(\d+)[\.\)\s]+(.+)/);
+      const sMatch = linha.match(/^\s*[\u2022\-\*\.\s]{1,4}\s+(.+)/) ||
+                     linha.match(/^\s{3,}(.+)/) ;
+      if (tMatch) {
+        atual = { num: tMatch[1], texto: tMatch[2].trim(), subitens: [] };
+        topicos.push(atual);
+      } else if (sMatch && atual) {
+        const sub = (sMatch[1] || "").trim();
+        if (sub) atual.subitens.push(sub);
+      } else {
+        const raw = linha.replace(/^[\u2022\-\*]\s*/, "").trim();
+        if (raw && !atual) {
+          atual = { num: topicos.length + 1, texto: raw, subitens: [] };
+          topicos.push(atual);
+        } else if (raw && atual && raw !== atual.texto) {
+          atual.subitens.push(raw);
+        }
+      }
+    }
+    return topicos;
+  };
+
+  // ── PDF INTERNO (4 colunas, com UT e conteúdo SEEDF) ──────────────────────────
+  const gerarPdfInterno = (doc, W, H, hoje, data, bimNum) => {
+    buildPdfHeader(doc, W, H, hoje, data.escola_nome, "CONTEÚDO PROGRAMÁTICO",
+      [{ label:"DISCIPLINA", val: data.disciplina_nome },
+       { label:"BIMESTRE",   val: `${bimNum}º Bimestre` },
+       { label:"ANO LETIVO", val: "2026" }], [99,102,241]);
+
+    const SERIES_ORDER = ["6º ANO","7º ANO","8º ANO","9º ANO"];
+    const BG_SERIE = { "6º ANO":[99,102,241],"7º ANO":[14,165,233],"8º ANO":[16,185,129],"9º ANO":[245,158,11] };
+    const bySerie = {};
+    for (const item of data.itens) {
+      const s = item.serie || "Sem série";
+      if (!bySerie[s]) bySerie[s] = [];
+      bySerie[s].push(item);
+    }
+    let curY = 50;
+    const PAGE_BOTTOM = H - 18;
+    for (const serie of [...SERIES_ORDER, ...Object.keys(bySerie).filter(s => !SERIES_ORDER.includes(s))]) {
+      const itens = bySerie[serie]; if (!itens) continue;
+      if (curY > PAGE_BOTTOM - 20) { doc.addPage(); curY = 15; }
+      const [r,g,b] = BG_SERIE[serie] || [99,102,241];
+      doc.setFillColor(r,g,b); doc.roundedRect(14, curY, W-28, 8, 1.5,1.5,"F");
+      doc.setFont("helvetica","bold"); doc.setFontSize(9); doc.setTextColor(255,255,255);
+      doc.text(serie, 19, curY+5.4); curY += 11;
+      const rows = itens.map((item,idx) => [
+        String(idx+1), item.unidade_tematica||"—", item.conteudo_seedf||"—", item.objetivo_texto||"—"
+      ]);
+      autoTable(doc, {
+        startY: curY,
+        head: [["#","Unidade Temática - BNCC","Conteúdo - Currículo em Movimento","Objetivo de Aprendizagem"]],
+        body: rows,
+        styles: { fontSize:7.5, cellPadding:{top:2.5,bottom:2.5,left:3,right:3}, valign:"top", overflow:"linebreak" },
+        headStyles: { fillColor:[r,g,b], textColor:[255,255,255], fontStyle:"bold", fontSize:7.5 },
+        alternateRowStyles: { fillColor:[248,250,252] },
+        columnStyles: { 0:{cellWidth:8,halign:"center",fontStyle:"bold"}, 1:{cellWidth:38}, 2:{cellWidth:58}, 3:{cellWidth:"auto"} },
+        margin: { left:14, right:14 }, tableLineColor:[226,232,240], tableLineWidth:0.1,
+        didDrawPage: () => drawFooter(doc, W, H, data.escola_nome, bimNum),
+      });
+      curY = doc.lastAutoTable.finalY + 8;
+    }
+  };
+
+  // ── PDF ALUNOS (só objetivos únicos, formato lista) ────────────────────────────
+  const gerarPdfAlunos = (doc, W, H, hoje, data, bimNum) => {
+    buildPdfHeader(doc, W, H, hoje, data.escola_nome, "OBJETIVOS DE APRENDIZAGEM",
+      [{ label:"DISCIPLINA", val: data.disciplina_nome },
+       { label:"BIMESTRE",   val: `${bimNum}º Bimestre` },
+       { label:"ANO LETIVO", val: "2026" }], [16,185,129]); // emerald
+
+    const SERIES_ORDER = ["6º ANO","7º ANO","8º ANO","9º ANO"];
+    const BG_SERIE = { "6º ANO":[99,102,241],"7º ANO":[14,165,233],"8º ANO":[16,185,129],"9º ANO":[245,158,11] };
+    const bySerie = {};
+    for (const item of data.itens) {
+      const s = item.serie || "Sem série";
+      if (!bySerie[s]) bySerie[s] = [];
+      bySerie[s].push(item);
+    }
+
+    let curY = 50;
+    const PAGE_BOTTOM = H - 20;
+    const MX = 14; // margem X
+    const CW = W - 28; // largura útil
+
+    for (const serie of [...SERIES_ORDER, ...Object.keys(bySerie).filter(s => !SERIES_ORDER.includes(s))]) {
+      const itens = bySerie[serie]; if (!itens) continue;
+      const [r,g,b] = BG_SERIE[serie] || [99,102,241];
+
+      // Deduplica os objetivos desta série
+      const vistos = new Set();
+      const unicos = [];
+      for (const item of itens) {
+        const txt = (item.objetivo_texto || "").trim();
+        if (txt && !vistos.has(txt)) { vistos.add(txt); unicos.push(txt); }
+      }
+      if (!unicos.length) continue;
+
+      // ── Cabeçalho da série ──
+      if (curY > PAGE_BOTTOM - 20) { doc.addPage(); curY = 15; }
+      doc.setFillColor(r,g,b);
+      doc.roundedRect(MX, curY, CW, 9, 1.5,1.5,"F");
+      doc.setFont("helvetica","bold"); doc.setFontSize(10); doc.setTextColor(255,255,255);
+      doc.text(serie, MX+5, curY+6.2);
+      // contador de objetivos
+      const cntTxt = `${unicos.length} objetivo${unicos.length>1?"s":""}`;
+      doc.setFontSize(7.5); doc.setFont("helvetica","normal");
+      doc.text(cntTxt, W - MX - 2, curY+6.2, { align:"right" });
+      curY += 13;
+
+      // ── Lista de objetivos (card-style) ──
+      let numGlobal = 1;
+      for (const objTxt of unicos) {
+        const topicos = parseObjetivo(objTxt);
+
+        // Calcula altura total necessária para este bloco
+        let blockH = 4; // padding top
+        for (const top of topicos) {
+          const linhasTop = doc.splitTextToSize(top.texto, CW - 20);
+          blockH += linhasTop.length * 4.5 + 1.5;
+          for (const sub of top.subitens) {
+            const linhasSub = doc.splitTextToSize(`\u2022 ${sub}`, CW - 32);
+            blockH += linhasSub.length * 4 + 1.5;
+          }
+        }
+        if (!topicos.length) {
+          const linhas = doc.splitTextToSize(objTxt, CW - 20);
+          blockH += linhas.length * 4.5;
+        }
+        blockH += 4; // padding bottom
+
+        // Nova página se não cabe
+        if (curY + blockH > PAGE_BOTTOM) { doc.addPage(); curY = 15; drawFooter(doc, W, H, data.escola_nome, bimNum); }
+
+        // Fundo do card de objetivo
+        doc.setFillColor(248,250,252);
+        doc.roundedRect(MX, curY, CW, blockH, 2, 2, "F");
+        // Borda esquerda colorida
+        doc.setFillColor(r,g,b);
+        doc.roundedRect(MX, curY, 3, blockH, 1, 1, "F");
+
+        // Número do objetivo (badge)
+        doc.setFillColor(r,g,b);
+        doc.circle(MX + 10, curY + 7, 3.5, "F");
+        doc.setFont("helvetica","bold"); doc.setFontSize(7); doc.setTextColor(255,255,255);
+        doc.text(String(numGlobal++), MX + 10, curY + 8.4, { align:"center" });
+
+        let ty = curY + 4;
+        if (topicos.length > 0) {
+          for (let ti = 0; ti < topicos.length; ti++) {
+            const top = topicos[ti];
+            // Tópico — sem prefixo numérico (a bolinha já numera)
+            const linhasTop = doc.splitTextToSize(top.texto, CW - 22);
+            doc.setFont("helvetica", "bold");
+            doc.setFontSize(8.5); doc.setTextColor(30,41,59);
+            doc.text(linhasTop, MX + 17, ty + 4.5);
+            ty += linhasTop.length * 4.5 + 2;
+            // Subitens — recuados com bullet
+            for (const sub of top.subitens) {
+              const linhasSub = doc.splitTextToSize(`\u2022 ${sub}`, CW - 36);
+              doc.setFont("helvetica","normal"); doc.setFontSize(7.8);
+              doc.setTextColor(71,85,105);
+              doc.text(linhasSub, MX + 24, ty + 3.5);
+              ty += linhasSub.length * 4.2 + 1.5;
+            }
+          }
+        } else {
+          // Texto plano (sem estrutura numerada)
+          const linhas = doc.splitTextToSize(objTxt, CW - 22);
+          doc.setFont("helvetica","bold"); doc.setFontSize(8.5); doc.setTextColor(30,41,59);
+          doc.text(linhas, MX + 17, curY + 8.5);
+        }
+
+        curY += blockH + 3;
+      }
+
+      curY += 4; // espaço entre séries
+      drawFooter(doc, W, H, data.escola_nome, bimNum);
+    }
+  };
+
+  // ── Orquestra: chama o gerador correto conforme o tipo ──────────────────
+  const gerarPDF = async () => {
+    if (!pdfDisc || !pdfBimestre) return;
+    const discId = DISC_ID_MAP[pdfDisc];
+    const bimNum = parseInt(pdfBimestre);
+    if (!discId) { setPdfErr("Disciplina não mapeada."); return; }
+
+    setPdfLoading(true); setPdfErr("");
+    try {
+      const { data } = await api.get("/conteudos/admin/relatorio/pdf-data", {
+        params: { disciplina_id: discId, bimestre: bimNum, ano_letivo: 2026 },
+      });
+      if (!data?.ok || !data.itens?.length) {
+        setPdfErr("Nenhum dado encontrado para essa seleção.");
+        setPdfLoading(false);
+        return;
+      }
+      const doc  = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const W    = doc.internal.pageSize.getWidth();
+      const H    = doc.internal.pageSize.getHeight();
+      const hoje = new Date().toLocaleDateString("pt-BR", { day:"2-digit", month:"long", year:"numeric" });
+
+      if (pdfTipo === "interno") {
+        gerarPdfInterno(doc, W, H, hoje, data, bimNum);
+      } else {
+        gerarPdfAlunos(doc, W, H, hoje, data, bimNum);
+      }
+
+      // Abre no navegador (botão de impressão nativo)
+      const blob    = doc.output("blob");
+      const blobUrl = URL.createObjectURL(blob);
+      window.open(blobUrl, "_blank");
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+      setPdfModalOpen(false);
+    } catch (e) {
+      setPdfErr(e?.response?.data?.message || "Erro ao gerar PDF. Tente novamente.");
+    } finally {
+      setPdfLoading(false);
+    }
+  };
+
+  // ── Estado do modal (novo conteúdo) ──────────────────────────────────────
+  const BIMESTRES_OPTS = ["1º Bimestre", "2º Bimestre", "3º Bimestre", "4º Bimestre"];
+  const [mSerie, setMSerie]           = useState("");
+  const [mDisciplina, setMDisciplina] = useState("");
+  const [mBimestre, setMBimestre]     = useState(BIMESTRES_OPTS[0]);
+  const [mAno, setMAno]               = useState("2026");
+  const [mUnidadeId, setMUnidadeId]   = useState("");
+
+  // Unidades Temáticas carregadas da API
+  const [unidades, setUnidades]         = useState([]);
+  const [loadingUTs, setLoadingUTs]     = useState(false);
+  const [erroUTs, setErroUTs]           = useState(null);
+
+  // Conteúdos SEEDF carregados da API
+  const [mConteudoId, setMConteudoId]   = useState("");
+  const [conteudos, setConteudos]       = useState([]);
+  const [loadingCTs, setLoadingCTs]     = useState(false);
+  const [erroCTs, setErroCTs]           = useState(null);
+
+  // ── Objetivos de Aprendizagem (tópicos + subitens) ──────────────────────
+  const escolaApelido = localStorage.getItem("escola_apelido")
+                     || localStorage.getItem("nome_escola")
+                     || "Escola";
+  const [objetivos, setObjetivos]           = useState([]); // [{ id, texto, subitens: [{id,texto}] }]
+  const [objSubVisible, setObjSubVisible]   = useState(false);
+  const [novoTopico, setNovoTopico]         = useState("");
+  const [novosSubitens, setNovosSubitens]   = useState([""]);
+  const [topicoError, setTopicoError]       = useState(false);
+
+  // ── Registro existente (carregar para edição) ────────────────────────────
+  const [existingId, setExistingId]         = useState(null);   // id do registro no BD
+  const [existingLoading, setExistingLoading] = useState(false); // checando...
+
+  // Converte texto estruturado "1. Tópico\n   • Subitem" de volta para array [{id,texto,subitens}]
+  const parseTextoToObjetivos = (texto) => {
+    if (!texto) return [];
+    const result = [];
+    let atual = null;
+    for (const linha of texto.split("\n")) {
+      const tMatch = linha.match(/^\s*(\d+)\.\s+(.+)/);
+      const sMatch = linha.match(/^\s*•\s+(.+)/);
+      if (tMatch) {
+        atual = { id: `obj-${Date.now()}-${result.length}`, texto: tMatch[2].trim(), subitens: [] };
+        result.push(atual);
+      } else if (sMatch && atual) {
+        atual.subitens.push({ id: `si-${Date.now()}-${atual.subitens.length}`, texto: sMatch[1].trim() });
+      } else {
+        const raw = linha.replace(/^[•\-\*]\s*/, "").trim();
+        if (raw) {
+          // Linha sem número (dados importados) → trata como tópico
+          atual = { id: `obj-${Date.now()}-${result.length}`, texto: raw, subitens: [] };
+          result.push(atual);
+        }
+      }
+    }
+    return result;
+  };
+
+  // ── Estado do save ────────────────────────────────────────────────
+  const [savingConteudo, setSavingConteudo] = useState(false);
+  const [saveMsg, setSaveMsg]               = useState("");
+
+  const addSubitemInput    = () => setNovosSubitens(p => [...p, ""]);
+  const editSubitem        = (i, v) => setNovosSubitens(p => p.map((s, idx) => idx === i ? v : s));
+  const removeSubitemInput = (i)    => setNovosSubitens(p => p.filter((_, idx) => idx !== i));
+
+  // ── Edição inline de tópico existente ──────────────────────────────────────
+  const [editandoObjId, setEditandoObjId]       = useState(null);  // id do obj em edição
+  const [editTexto, setEditTexto]               = useState("");
+  const [editSubitens, setEditSubitens]         = useState([""]);
+
+  const startEditTopico = (obj) => {
+    setEditandoObjId(obj.id);
+    setEditTexto(obj.texto);
+    // Monta array de strings dos subitems (adiciona 1 campo vazio ao final para novo)
+    setEditSubitens(obj.subitens.length > 0
+      ? [...obj.subitens.map(s => s.texto), ""]
+      : [""]);
+    setObjSubVisible(false); // fecha o form de NOVO tópico enquanto edita
+  };
+
+  const cancelEditTopico = () => {
+    setEditandoObjId(null);
+    setEditTexto("");
+    setEditSubitens([""]);
+  };
+
+  const saveEditTopico = (id) => {
+    const texto = editTexto.trim();
+    if (!texto) return; // não salva vazio
+    const subitens = editSubitens
+      .map(s => s.trim()).filter(Boolean)
+      .map((s, i) => ({ id: `si-${Date.now()}-${i}`, texto: s }));
+    setObjetivos(p => p.map(o =>
+      o.id === id ? { ...o, texto, subitens } : o
+    ));
+    cancelEditTopico();
+  };
+
+  const addEditSubitem    = () => setEditSubitens(p => [...p, ""]);
+  const changeEditSubitem = (i, v) => setEditSubitens(p => p.map((s, idx) => idx === i ? v : s));
+  const removeEditSubitem = (i) => setEditSubitens(p => p.filter((_, idx) => idx !== i));
+
+  // Confirma o tópico com subitens e reseta o editor
+  const addTopico = () => {
+    const texto = novoTopico.trim();
+    if (!texto) {
+      setTopicoError(true);          // destaca o campo em vermelho
+      setTimeout(() => setTopicoError(false), 1500); // remove após 1.5s
+      return;
+    }
+    setTopicoError(false);
+    const subitens = novosSubitens
+      .map(s => s.trim()).filter(Boolean)
+      .map((s, i) => ({ id: `si-${Date.now()}-${i}`, texto: s }));
+    setObjetivos(p => [...p, { id: `obj-${Date.now()}`, texto, subitens }]);
+    setNovoTopico("");
+    setNovosSubitens([""]);
+    setObjSubVisible(false);
+  };
+
+  const removeTopico  = (id)       => setObjetivos(p => p.filter(o => o.id !== id));
+  const removeSubitem = (oId, sId) => setObjetivos(p =>
+    p.map(o => o.id === oId ? { ...o, subitens: o.subitens.filter(s => s.id !== sId) } : o)
+  );
+
+  // Salva o conteúdo programatico na API
+  const salvarConteudo = async (statusEnvio) => {
+    // Validações mínimas
+    if (!mSerie || !mDisciplina || !mBimestre || !mAno || !mUnidadeId || !mConteudoId) {
+      setSaveMsg("Preencha todos os campos: Série, Disciplina, Bimestre, Ano, Unidade Temática e Conteúdo SEEDF.");
+      return;
+    }
+    if (objetivos.length === 0) {
+      setSaveMsg("Adicione ao menos um Objetivo de Aprendizagem antes de salvar.");
+      return;
+    }
+
+    const disciplinaId = DISC_ID_MAP[mDisciplina];
+    if (!disciplinaId) { setSaveMsg("Disciplina não reconhecida."); return; }
+
+    // Formata os objetivos como texto estruturado
+    const textoObj = objetivos.map((obj, i) => {
+      let t = `${i + 1}. ${obj.texto}`;
+      if (obj.subitens.length > 0)
+        t += "\n" + obj.subitens.map(s => `   • ${s.texto}`).join("\n");
+      return t;
+    }).join("\n\n");
+
+    const bimestreNum = parseInt(mBimestre); // "1º Bimestre" → 1
+
+    try {
+      setSavingConteudo(true);
+      setSaveMsg("");
+      const { data } = await api.post("/conteudos/admin/planejamento", {
+        disciplina_id:            disciplinaId,
+        serie:                    mSerie.toUpperCase(),
+        bimestre:                 bimestreNum,
+        ano_letivo:               Number(mAno),
+        bncc_unidade_tematica_id: Number(mUnidadeId),
+        seedf_conteudo_id:        Number(mConteudoId),
+        texto:                    textoObj,
+      });
+      if (data?.ok) {
+        setSaveMsg(statusEnvio === "enviar" ? "✅ Conteúdo enviado com sucesso!" : "✅ Salvo como rascunho!");
+        setTimeout(() => { setModalOpen(false); setSaveMsg(""); }, 1200);
+      } else {
+        setSaveMsg(data?.message || "Erro ao salvar.");
+      }
+    } catch (e) {
+      setSaveMsg(e?.response?.data?.message || "Erro de conexão. Tente novamente.");
+    } finally {
+      setSavingConteudo(false);
+    }
+  };
+
+  // Mapa: nome da série → ano_id (número do ano escolar)
+  const serieToAnoId = { "6º Ano": 6, "7º Ano": 7, "8º Ano": 8, "9º Ano": 9 };
+
+  // 1º Efeito: carrega UTs quando série + disciplina são selecionadas
+  useEffect(() => {
+    setMUnidadeId("");
+    setUnidades([]);
+    setErroUTs(null);
+    // Também reseta conteúdos
+    setMConteudoId("");
+    setConteudos([]);
+    setErroCTs(null);
+
+    const ano_id = serieToAnoId[mSerie];
+    if (!ano_id || !mDisciplina) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoadingUTs(true);
+        const { data } = await api.get("/conteudos/admin/bncc/unidades", {
+          params: { disciplina_nome: mDisciplina, ano_id },
+        });
+        if (cancelled) return;
+        setUnidades(Array.isArray(data?.unidades) ? data.unidades : []);
+        setErroUTs(null);
+      } catch (e) {
+        if (!cancelled) { setUnidades([]); setErroUTs("Não foi possível carregar as Unidades Temáticas."); }
+      } finally {
+        if (!cancelled) setLoadingUTs(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [mSerie, mDisciplina]);
+
+  // 2º Efeito: carrega Conteúdos SEEDF quando UT é selecionada
+  useEffect(() => {
+    setMConteudoId("");
+    setConteudos([]);
+    setErroCTs(null);
+
+    if (!mUnidadeId || !mDisciplina || !mSerie) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoadingCTs(true);
+        const { data } = await api.get("/conteudos/admin/seedf/conteudos", {
+          params: {
+            disciplina_nome: mDisciplina,
+            serie: mSerie.toUpperCase(),   // ex: '6º ANO'
+            unidade_tematica_id: mUnidadeId,
+          },
+        });
+        if (cancelled) return;
+        setConteudos(Array.isArray(data?.conteudos) ? data.conteudos : []);
+        setErroCTs(null);
+      } catch (e) {
+        if (!cancelled) { setConteudos([]); setErroCTs("Não foi possível carregar os Conteúdos SEEDF."); }
+      } finally {
+        if (!cancelled) setLoadingCTs(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [mUnidadeId]);
+
+  // 3º Efeito: verifica/carrega registro existente quando Conteúdo SEEDF é selecionado
+  useEffect(() => {
+    setExistingId(null);
+    // Limpa objetivos ao trocar conteúdo (serão recarregados se existir)
+    setObjetivos([]);
+    setObjSubVisible(false);
+    setNovoTopico(""); setNovosSubitens([""]);
+
+    const discId = DISC_ID_MAP[mDisciplina];
+    if (!mConteudoId || !mSerie || !mDisciplina || !mBimestre || !discId) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        setExistingLoading(true);
+        const { data } = await api.get("/conteudos/admin/planejamento/check", {
+          params: {
+            disciplina_id:            discId,
+            serie:                    mSerie.toUpperCase(),
+            bimestre:                 parseInt(mBimestre),
+            ano_letivo:               Number(mAno),
+            seedf_conteudo_id:        Number(mConteudoId),
+          },
+        });
+        if (cancelled) return;
+        if (data?.found && data.registro) {
+          setExistingId(data.registro.id);
+          const parsed = parseTextoToObjetivos(data.registro.texto || "");
+          setObjetivos(parsed);
+        }
+      } catch (e) {
+        // Falha silenciosa — não bloqueia o usuário
+        console.warn("[check existente] erro:", e?.message);
+      } finally {
+        if (!cancelled) setExistingLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [mConteudoId]);
+
+  // Reseta estado completo do modal ao abrir
+  const openModal = () => {
+    setMSerie(""); setMDisciplina(""); setMBimestre(BIMESTRES_OPTS[0]);
+    setMAno("2026"); setMUnidadeId(""); setUnidades([]); setErroUTs(null);
+    setMConteudoId(""); setConteudos([]); setErroCTs(null);
+    setObjetivos([]); setObjSubVisible(false); setNovoTopico(""); setNovosSubitens([""]);
+    setTopicoError(false); setSaveMsg("");
+    setExistingId(null); setExistingLoading(false);
+    setModalOpen(true);
+  };
 
   // Filtros aplicados
   const filtered = MOCK_CONTEUDOS.filter(c =>
@@ -81,10 +664,13 @@ export default function ConteudosProgramaticos() {
           </div>
         </div>
         <div className="cp-header-actions">
+          <button className="cp-btn-pdf" onClick={openPdfModal} id="btn-gera-pdf">
+            <IcoPDF /> Gera PDF
+          </button>
           <button className="cp-btn-outline" onClick={() => setViewMode(v => v === "cards" ? "table" : "cards")}>
             <IcoStats /> {viewMode === "cards" ? "Visualização em tabela" : "Visualização em cards"}
           </button>
-          <button className="cp-btn-primary" onClick={() => setModalOpen(true)}>
+          <button className="cp-btn-primary" onClick={openModal}>
             <IcoPlus /> Novo Conteúdo
           </button>
         </div>
@@ -215,7 +801,7 @@ export default function ConteudosProgramaticos() {
                 <th>Série</th>
                 <th>Disciplina</th>
                 <th>Bimestre</th>
-                <th>Unidade Temática</th>
+                <th>Unidade Temática - BNCC</th>
                 <th>Conteúdo</th>
                 <th>Itens</th>
                 <th>Status</th>
@@ -274,13 +860,23 @@ export default function ConteudosProgramaticos() {
               <div className="cp-form-row">
                 <div className="cp-form-group">
                   <label>Série</label>
-                  <select className="cp-select cp-select-full">
+                  <select
+                    className="cp-select cp-select-full"
+                    value={mSerie}
+                    onChange={e => setMSerie(e.target.value)}
+                  >
+                    <option value="">Selecione a série...</option>
                     {SERIES.map(s => <option key={s}>{s}</option>)}
                   </select>
                 </div>
                 <div className="cp-form-group">
                   <label>Disciplina</label>
-                  <select className="cp-select cp-select-full">
+                  <select
+                    className="cp-select cp-select-full"
+                    value={mDisciplina}
+                    onChange={e => setMDisciplina(e.target.value)}
+                  >
+                    <option value="">Selecione a disciplina...</option>
                     {DISCIPLINAS.map(d => <option key={d}>{d}</option>)}
                   </select>
                 </div>
@@ -288,34 +884,354 @@ export default function ConteudosProgramaticos() {
               <div className="cp-form-row">
                 <div className="cp-form-group">
                   <label>Bimestre</label>
-                  <select className="cp-select cp-select-full">
-                    {BIMESTRES.map(b => <option key={b}>{b}</option>)}
+                  <select
+                    className="cp-select cp-select-full"
+                    value={mBimestre}
+                    onChange={e => setMBimestre(e.target.value)}
+                  >
+                    {BIMESTRES_OPTS.map(b => <option key={b}>{b}</option>)}
                   </select>
                 </div>
                 <div className="cp-form-group">
                   <label>Ano Letivo</label>
-                  <select className="cp-select cp-select-full">
+                  <select
+                    className="cp-select cp-select-full"
+                    value={mAno}
+                    onChange={e => setMAno(e.target.value)}
+                  >
                     <option>2026</option><option>2025</option>
                   </select>
                 </div>
               </div>
+
+              {/* Unidade Temática - BNCC: carrega automaticamente com Série + Disciplina */}
               <div className="cp-form-group cp-form-full">
-                <label>Unidade Temática</label>
-                <input type="text" className="cp-input" placeholder="Ex: Números Naturais" />
+                <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  Unidade Temática - BNCC
+                  {loadingUTs && (
+                    <span style={{ fontSize: "0.75rem", color: "#6366f1", fontWeight: 600 }}>
+                      ⏳ Carregando...
+                    </span>
+                  )}
+                </label>
+
+                {!mSerie || !mDisciplina ? (
+                  <div className="cp-ut-hint">
+                    Selecione a <strong>Série</strong> e a <strong>Disciplina</strong> para carregar as Unidades Temáticas da BNCC.
+                  </div>
+                ) : erroUTs ? (
+                  <div className="cp-ut-erro">{erroUTs}</div>
+                ) : loadingUTs ? (
+                  <select className="cp-select cp-select-full" disabled>
+                    <option>Carregando Unidades Temáticas BNCC...</option>
+                  </select>
+                ) : unidades.length === 0 ? (
+                  <div className="cp-ut-hint cp-ut-vazio">
+                    Nenhuma Unidade Temática encontrada para <strong>{mDisciplina}</strong> — {mSerie}.
+                  </div>
+                ) : (
+                  <select
+                    className="cp-select cp-select-full"
+                    value={mUnidadeId}
+                    onChange={e => setMUnidadeId(e.target.value)}
+                  >
+                    <option value="">Selecione uma Unidade Temática BNCC...</option>
+                    {unidades.map(u => (
+                      <option key={u.id} value={u.id}>{u.texto}</option>
+                    ))}
+                  </select>
+                )}
               </div>
+
+              {/* Conteúdo - Currículo em Movimento - SEEDF: carrega ao selecionar UT */}
               <div className="cp-form-group cp-form-full">
-                <label>Conteúdo</label>
-                <textarea className="cp-textarea" rows={3} placeholder="Descreva os conteúdos a serem trabalhados..." />
+                <label style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  Conteúdo - Currículo em Movimento - SEEDF
+                  {loadingCTs && (
+                    <span style={{ fontSize: "0.75rem", color: "#10b981", fontWeight: 600 }}>
+                      ⏳ Carregando...
+                    </span>
+                  )}
+                </label>
+
+                {!mUnidadeId ? (
+                  <div className="cp-ut-hint">
+                    Selecione a <strong>Unidade Temática - BNCC</strong> para carregar os Conteúdos do Currículo em Movimento - SEEDF.
+                  </div>
+                ) : erroCTs ? (
+                  <div className="cp-ut-erro">{erroCTs}</div>
+                ) : loadingCTs ? (
+                  <select className="cp-select cp-select-full" disabled>
+                    <option>Carregando conteúdos SEEDF...</option>
+                  </select>
+                ) : conteudos.length === 0 ? (
+                  <div className="cp-ut-hint cp-ut-vazio">
+                    Nenhum conteúdo SEEDF encontrado para esta Unidade Temática.
+                    <br />
+                    <span style={{ fontSize: "0.78rem", opacity: 0.8 }}>Isso pode ocorrer para tópicos não catalogados no Currículo em Movimento.</span>
+                  </div>
+                ) : (
+                  <select
+                    className="cp-select cp-select-full"
+                    value={mConteudoId}
+                    onChange={e => setMConteudoId(e.target.value)}
+                    style={{ height: "auto" }}
+                  >
+                    <option value="">Selecione um conteúdo do Currículo em Movimento...</option>
+                    {conteudos.map(c => (
+                      <option key={c.id} value={c.id} title={c.texto}>
+                        {c.texto.length > 100 ? c.texto.substring(0, 100) + "…" : c.texto}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
+              {/* ── OBJETIVO DE APRENDIZAGEM ─ input sempre visível, subitens ao focar ── */}
               <div className="cp-form-group cp-form-full">
-                <label>Objetivo de Aprendizagem</label>
-                <textarea className="cp-textarea" rows={2} placeholder="O que o aluno deverá ser capaz de fazer ao final..." />
+                <label>
+                  Objetivo de Aprendizagem
+                  <span style={{ color: "#6366f1", fontWeight: 700 }}>{" "}- {escolaApelido}</span>
+                </label>
+
+                {/* Banner: verificando BD */}
+                {existingLoading && (
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 8,
+                    background: "#f0f9ff", border: "1px solid #bae6fd",
+                    borderRadius: 8, padding: "8px 12px", marginBottom: 10,
+                    fontSize: "0.8rem", color: "#0369a1",
+                  }}>
+                    <span className="cp-spin">⏳</span>
+                    Verificando se já existe objetivo cadastrado para esta seleção...
+                  </div>
+                )}
+
+                {/* Banner: registro existente carregado */}
+                {!existingLoading && existingId && (
+                  <div style={{
+                    display: "flex", alignItems: "flex-start", gap: 10,
+                    background: "#fffbeb", border: "1px solid #fcd34d",
+                    borderRadius: 8, padding: "10px 14px", marginBottom: 10,
+                  }}>
+                    <span style={{ fontSize: "1.1rem" }}>✏️</span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 700, color: "#92400e", fontSize: "0.82rem" }}>
+                        Editando registro existente
+                      </div>
+                      <div style={{ color: "#b45309", fontSize: "0.75rem", marginTop: 2 }}>
+                        Os objetivos abaixo foram carregados do banco de dados. Edite à vontade — ao salvar, o registro será atualizado.
+                        Para adicionar um novo objetivo independente, clique em <strong>+ Adicionar tópico</strong>.
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      title="Descartar carregamento e começar do zero"
+                      onClick={() => { setObjetivos([]); setExistingId(null); }}
+                      style={{
+                        background: "none", border: "1px solid #fbbf24", borderRadius: 6,
+                        cursor: "pointer", color: "#92400e", fontSize: "0.72rem",
+                        padding: "3px 8px", whiteSpace: "nowrap",
+                      }}
+                    >
+                      Limpar
+                    </button>
+                  </div>
+                )}
+
+                {/* Banner: sem registro (novo cadastro) */}
+                {!existingLoading && !existingId && mConteudoId && (
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 8,
+                    background: "#f0fdf4", border: "1px solid #86efac",
+                    borderRadius: 8, padding: "8px 12px", marginBottom: 10,
+                    fontSize: "0.78rem", color: "#166534",
+                  }}>
+                    <span>🆕</span>
+                    Nenhum objetivo cadastrado para esta combinação. Adicione abaixo.
+                  </div>
+                )}
+
+                {/* Tópicos já confirmados */}
+                {objetivos.length > 0 && (
+                  <div className="cp-obj-lista">
+                    {objetivos.map((obj, oi) => (
+                      <div key={obj.id} className="cp-obj-card">
+
+                        {/* Linha do tópico */}
+                        <div className="cp-obj-card-top">
+                          <div className="cp-obj-num">{oi + 1}</div>
+                          <div className="cp-obj-texto">{obj.texto}</div>
+                          {/* Botão editar */}
+                          <button
+                            type="button"
+                            className="cp-obj-edit"
+                            title="Editar tópico e subitens"
+                            onClick={() => editandoObjId === obj.id
+                              ? cancelEditTopico()
+                              : startEditTopico(obj)}
+                          >
+                            {editandoObjId === obj.id ? "✕" : "✏️"}
+                          </button>
+                          <button type="button" className="cp-obj-del"
+                            onClick={() => removeTopico(obj.id)} title="Remover tópico">🗑</button>
+                        </div>
+
+                        {/* Subitens existentes (quando NÃO está editando) */}
+                        {editandoObjId !== obj.id && obj.subitens.length > 0 && (
+                          <ul className="cp-obj-subitens">
+                            {obj.subitens.map(s => (
+                              <li key={s.id}>
+                                <span className="cp-obj-bullet">◦</span>
+                                <span className="cp-obj-sub-txt">{s.texto}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+
+                        {/* ── FORMULÁRIO DE EDIÇÃO INLINE ── */}
+                        {editandoObjId === obj.id && (
+                          <div className="cp-obj-editor" style={{ marginTop: 8, background: "#f8fafc", borderRadius: 8, padding: "10px 12px", border: "1px solid #e2e8f0" }}>
+
+                            {/* Campo do tópico */}
+                            <div style={{ marginBottom: 8 }}>
+                              <label style={{ fontSize: "0.75rem", fontWeight: 600, color: "#475569", display: "block", marginBottom: 4 }}>
+                                Tópico principal
+                              </label>
+                              <input
+                                type="text"
+                                className="cp-input"
+                                style={{ width: "100%", boxSizing: "border-box" }}
+                                value={editTexto}
+                                autoFocus
+                                onChange={e => setEditTexto(e.target.value)}
+                                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveEditTopico(obj.id); } }}
+                              />
+                            </div>
+
+                            {/* Subitens em edição */}
+                            <div className="cp-obj-editor-label" style={{ marginBottom: 6 }}>
+                              ◦ Subitens <span style={{ fontWeight: 400, fontSize: "0.72rem" }}>(opcional)</span>
+                            </div>
+                            {editSubitens.map((sub, i) => (
+                              <div key={i} className="cp-obj-sub-row">
+                                <input
+                                  type="text"
+                                  className="cp-input"
+                                  placeholder={`Subitem ${i + 1}...`}
+                                  value={sub}
+                                  onChange={e => changeEditSubitem(i, e.target.value)}
+                                  onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addEditSubitem(); } }}
+                                />
+                                {editSubitens.length > 1 && (
+                                  <button type="button" className="cp-obj-del cp-obj-del-sm"
+                                    onClick={() => removeEditSubitem(i)}>✕</button>
+                                )}
+                              </div>
+                            ))}
+                            <button type="button" className="cp-obj-add-sub" onClick={addEditSubitem}>
+                              + subitem
+                            </button>
+
+                            {/* Ações */}
+                            <div className="cp-obj-editor-actions" style={{ marginTop: 10 }}>
+                              <button type="button" className="cp-btn-outline"
+                                style={{ padding: "5px 12px", fontSize: "0.78rem" }}
+                                onClick={cancelEditTopico}>
+                                Cancelar
+                              </button>
+                              <button type="button" className="cp-btn-primary"
+                                style={{ padding: "5px 16px", fontSize: "0.78rem" }}
+                                onClick={() => saveEditTopico(obj.id)}>
+                                ✓ Confirmar
+                              </button>
+                            </div>
+
+                          </div>
+                        )}
+
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+
+                {/* Input do tópico — SEMPRE visível, sem seta de dropdown */}
+                <input
+                  type="text"
+                  className={`cp-input${topicoError ? " cp-input-error" : ""}`}
+                  style={{ width: "100%", boxSizing: "border-box" }}
+                  placeholder={objetivos.length === 0
+                    ? "O que o aluno deverá ser capaz de fazer ao final..."
+                    : "Adicionar outro tópico..."}
+                  value={novoTopico}
+                  onChange={e => { setNovoTopico(e.target.value); setTopicoError(false); if (e.target.value) setObjSubVisible(true); }}
+                  onFocus={() => setObjSubVisible(true)}
+                  onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); addTopico(); } }}
+                />
+
+                {/* Subitens — aparecem ao focar/digitar */}
+                {objSubVisible && (
+                  <div className="cp-obj-editor">
+                    <div className="cp-obj-editor-label">
+                      ◦ Subitens <span style={{ fontWeight: 400, fontSize: "0.72rem" }}>(opcional)</span>
+                    </div>
+                    {novosSubitens.map((sub, i) => (
+                      <div key={i} className="cp-obj-sub-row">
+                        <input
+                          type="text"
+                          className="cp-input"
+                          placeholder={`Subitem ${i + 1}...`}
+                          value={sub}
+                          onChange={e => editSubitem(i, e.target.value)}
+                          onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addSubitemInput(); } }}
+                        />
+                        {novosSubitens.length > 1 && (
+                          <button type="button" className="cp-obj-del cp-obj-del-sm"
+                            onClick={() => removeSubitemInput(i)}>✕</button>
+                        )}
+                      </div>
+                    ))}
+                    <button type="button" className="cp-obj-add-sub" onClick={addSubitemInput}>
+                      + subitem
+                    </button>
+                    <div className="cp-obj-editor-actions">
+                      <button type="button" className="cp-btn-outline"
+                        style={{ padding: "6px 14px", fontSize: "0.82rem" }}
+                        onClick={() => { setObjSubVisible(false); setNovoTopico(""); setNovosSubitens([""]); setTopicoError(false); }}>
+                        Cancelar
+                      </button>
+                      {/* botão sempre habilitado — valida internamente e destaca campo */}
+                      <button type="button" className="cp-btn-primary"
+                        style={{ padding: "6px 16px", fontSize: "0.82rem" }}
+                        onClick={addTopico}>
+                        ✓ Confirmar tópico
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
+
             </div>
             <div className="cp-modal-footer">
-              <button className="cp-btn-outline" onClick={() => setModalOpen(false)}>Cancelar</button>
-              <button className="cp-btn-primary" onClick={() => setModalOpen(false)}>Salvar como Rascunho</button>
-              <button className="cp-btn-success" onClick={() => setModalOpen(false)}>Salvar e Enviar</button>
+              {saveMsg && (
+                <span style={{
+                  fontSize: "0.82rem", fontWeight: 600, flex: 1,
+                  color: saveMsg.startsWith("✅") ? "#10b981" : "#ef4444"
+                }}>{saveMsg}</span>
+              )}
+              <button className="cp-btn-outline"
+                onClick={() => setModalOpen(false)}
+                disabled={savingConteudo}>Cancelar</button>
+              <button className="cp-btn-primary"
+                onClick={() => salvarConteudo("rascunho")}
+                disabled={savingConteudo}>
+                {savingConteudo ? "⏳ Salvando..." : "Salvar como Rascunho"}
+              </button>
+              <button className="cp-btn-success"
+                onClick={() => salvarConteudo("enviar")}
+                disabled={savingConteudo}>
+                {savingConteudo ? "⏳ Enviando..." : "Salvar e Enviar"}
+              </button>
             </div>
           </div>
         </div>
@@ -336,15 +1252,15 @@ export default function ConteudosProgramaticos() {
             </div>
             <div className="cp-modal-body">
               <div className="cp-detalhe-grid">
-                <div className="cp-detalhe-field"><span>Unidade Temática</span><strong>{detalheItem.unidade}</strong></div>
+                <div className="cp-detalhe-field"><span>Unidade Temática - BNCC</span><strong>{detalheItem.unidade}</strong></div>
                 <div className="cp-detalhe-field"><span>Status</span>
                   <span className="cp-status-badge" style={{ background: STATUS_COLORS[detalheItem.status].bg, color: STATUS_COLORS[detalheItem.status].text }}>
                     <span className="cp-status-dot" style={{ background: STATUS_COLORS[detalheItem.status].dot }} />
                     {STATUS_COLORS[detalheItem.status].label}
                   </span>
                 </div>
-                <div className="cp-detalhe-field cp-detalhe-full"><span>Conteúdo</span><p>{detalheItem.conteudo}</p></div>
-                <div className="cp-detalhe-field cp-detalhe-full"><span>Objetivo de Aprendizagem</span><p>{detalheItem.objetivo}</p></div>
+                <div className="cp-detalhe-field cp-detalhe-full"><span>Conteúdo - Currículo em Movimento - SEEDF</span><p>{detalheItem.conteudo}</p></div>
+                <div className="cp-detalhe-field cp-detalhe-full"><span>Objetivo de Aprendizagem - {localStorage.getItem("escola_apelido") || "Escola"}</span><p>{detalheItem.objetivo}</p></div>
                 <div className="cp-detalhe-field"><span>Total de Itens</span><strong>{detalheItem.itens} itens cadastrados</strong></div>
               </div>
               {detalheItem.status === "ENVIADO" && (
@@ -364,6 +1280,187 @@ export default function ConteudosProgramaticos() {
           </div>
         </div>
       )}
+
+      {/* ── Modal Gera PDF ── */}
+      {pdfModalOpen && (
+        <div className="cp-modal-overlay" onClick={() => setPdfModalOpen(false)}>
+          <div className="cp-modal" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
+
+            {/* Header */}
+            <div className="cp-modal-header" style={{ background: "linear-gradient(135deg,#6366f1,#4f46e5)", borderRadius: "16px 16px 0 0", padding: "20px 24px" }}>
+              <span className="cp-modal-icon" style={{ background: "#ffffff22", color: "#fff" }}>
+                <IcoPDF />
+              </span>
+              <div>
+                <h2 style={{ color: "#fff", margin: 0, fontSize: "1.1rem" }}>Gerar PDF</h2>
+                <p style={{ color: "#c7d2fe", fontSize: "0.8rem", margin: "2px 0 0" }}>
+                  Relatório de Conteúdo Programático — CEF04-CCMDF
+                </p>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="cp-modal-body">
+
+              {/* Preview do cabeçalho do PDF */}
+              <div style={{
+                background: "linear-gradient(135deg,#6366f1,#4f46e5)",
+                borderRadius: 10, padding: "14px 18px", marginBottom: 20,
+                display: "flex", alignItems: "center", gap: 12,
+              }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ color: "#fff", fontWeight: 700, fontSize: "0.92rem" }}>CEF04-CCMDF</div>
+                  <div style={{ color: "#c7d2fe", fontSize: "0.72rem" }}>Conteúdo Programático — Ano Letivo 2026</div>
+                  <div style={{ marginTop: 6, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                    {pdfDisc && (
+                      <span style={{ background: "#4f46e5", color: "#e0e7ff", fontSize: "0.7rem", borderRadius: 6, padding: "2px 8px", fontWeight: 600 }}>
+                        {pdfDisc}
+                      </span>
+                    )}
+                    {pdfBimestre && (
+                      <span style={{ background: "#4f46e5", color: "#e0e7ff", fontSize: "0.7rem", borderRadius: 6, padding: "2px 8px", fontWeight: 600 }}>
+                        {parseInt(pdfBimestre)}º Bimestre
+                      </span>
+                    )}
+                    {!pdfDisc && !pdfBimestre && (
+                      <span style={{ color: "#a5b4fc", fontSize: "0.7rem" }}>Selecione os filtros abaixo ↓</span>
+                    )}
+                  </div>
+                </div>
+                <div style={{ color: "#c7d2fe", opacity: 0.6, fontSize: "2.5rem" }}>📄</div>
+              </div>
+
+              {/* ── Seletor de Tipo de PDF ── */}
+              <div style={{ marginBottom: 18 }}>
+                <label style={{ display:"block", fontWeight:600, color:"#374151", fontSize:"0.85rem", marginBottom:8 }}>
+                  Tipo de Relatório <span style={{ color:"#ef4444" }}>*</span>
+                </label>
+                <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10 }}>
+
+                  {/* Interno */}
+                  <button
+                    type="button"
+                    id="pdf-tipo-interno"
+                    onClick={() => setPdfTipo("interno")}
+                    style={{
+                      border: pdfTipo === "interno" ? "2px solid #6366f1" : "2px solid #e2e8f0",
+                      borderRadius: 10, padding: "12px 10px", cursor:"pointer", textAlign:"left",
+                      background: pdfTipo === "interno" ? "#eef2ff" : "#f8fafc",
+                      transition: "all .18s",
+                    }}
+                  >
+                    <div style={{ fontSize:"1.2rem", marginBottom:4 }}>🏫</div>
+                    <div style={{ fontWeight:700, fontSize:"0.82rem", color: pdfTipo==="interno"?"#4338ca":"#374151" }}>
+                      Pedagógico (Interno)
+                    </div>
+                    <div style={{ fontSize:"0.7rem", color:"#64748b", marginTop:3 }}>
+                      Tabela completa: UT-BNCC, Conteúdo SEEDF e Objetivos
+                    </div>
+                  </button>
+
+                  {/* Alunos */}
+                  <button
+                    type="button"
+                    id="pdf-tipo-alunos"
+                    onClick={() => setPdfTipo("alunos")}
+                    style={{
+                      border: pdfTipo === "alunos" ? "2px solid #10b981" : "2px solid #e2e8f0",
+                      borderRadius: 10, padding: "12px 10px", cursor:"pointer", textAlign:"left",
+                      background: pdfTipo === "alunos" ? "#f0fdf4" : "#f8fafc",
+                      transition: "all .18s",
+                    }}
+                  >
+                    <div style={{ fontSize:"1.2rem", marginBottom:4 }}>👨‍👩‍👧 </div>
+                    <div style={{ fontWeight:700, fontSize:"0.82rem", color: pdfTipo==="alunos"?"#059669":"#374151" }}>
+                      Alunos / Responsáveis
+                    </div>
+                    <div style={{ fontSize:"0.7rem", color:"#64748b", marginTop:3 }}>
+                      Apenas Objetivos únicos, sem repetição (EDUCA MOBILE)
+                    </div>
+                  </button>
+
+                </div>
+              </div>
+
+              {/* Seletores */}
+              <div className="cp-form-grid">
+
+                <div className="cp-form-group cp-form-full">
+                  <label>Disciplina <span style={{ color:"#ef4444" }}>*</span></label>
+                  <select
+                    id="pdf-disc-select"
+                    className="cp-select cp-select-full"
+                    value={pdfDisc}
+                    onChange={e => { setPdfDisc(e.target.value); setPdfErr(""); }}
+                  >
+                    <option value="">Selecione a disciplina...</option>
+                    {DISCIPLINAS.map(d => <option key={d}>{d}</option>)}
+                  </select>
+                </div>
+
+                <div className="cp-form-group cp-form-full">
+                  <label>Bimestre <span style={{ color:"#ef4444" }}>*</span></label>
+                  <select
+                    id="pdf-bim-select"
+                    className="cp-select cp-select-full"
+                    value={pdfBimestre}
+                    onChange={e => { setPdfBimestre(e.target.value); setPdfErr(""); }}
+                  >
+                    <option value="">Selecione o bimestre...</option>
+                    {BIMESTRES.map(b => <option key={b}>{b}</option>)}
+                  </select>
+                </div>
+
+              </div>
+
+              {/* Mensagem de erro */}
+              {pdfErr && (
+                <div style={{
+                  background: "#fef2f2", border: "1px solid #fca5a5",
+                  borderRadius: 8, padding: "10px 14px",
+                  color: "#b91c1c", fontSize: "0.82rem", marginTop: 8,
+                }}>
+                  ⚠️ {pdfErr}
+                </div>
+              )}
+
+              {/* Info */}
+              {pdfDisc && pdfBimestre && !pdfErr && (
+                <div style={{
+                  background: "#f0fdf4", border: "1px solid #86efac",
+                  borderRadius: 8, padding: "10px 14px",
+                  color: "#15803d", fontSize: "0.82rem", marginTop: 8,
+                }}>
+                  ✅ Pronto para gerar! O PDF incluirá todos os objetivos de <strong>{pdfDisc}</strong> do <strong>{parseInt(pdfBimestre)}º Bimestre</strong> para todas as séries (6º ao 9º Ano).
+                </div>
+              )}
+
+            </div>
+
+            {/* Footer */}
+            <div className="cp-modal-footer">
+              <button className="cp-btn-outline" onClick={() => setPdfModalOpen(false)} disabled={pdfLoading}>
+                Cancelar
+              </button>
+              <button
+                id="btn-gerar-pdf-confirm"
+                className="cp-btn-pdf"
+                style={{ padding: "10px 22px", fontSize: "0.9rem", fontWeight: 700 }}
+                disabled={!pdfDisc || !pdfBimestre || pdfLoading}
+                onClick={gerarPDF}
+              >
+                {pdfLoading
+                  ? <><span className="cp-spin">⏳</span> Gerando PDF...</>
+                  : <><IcoPDF /> GERAR PDF</>
+                }
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
+

@@ -18,6 +18,7 @@ export default function ModalAdicionarConteudo({
   onSave,
   contextoLabel,
   contextoObj,
+  escolaApelido,   // apelido da escola para label do Objetivo
 }) {
   const isOpen = !!open;
 
@@ -84,19 +85,19 @@ export default function ModalAdicionarConteudo({
 
   const temaTitulo = isGeometria
     ? `Temas da disciplina (${ctx?.disciplina_nome || "Geometria"})`
-    : "Temas BNCC";
+    : "Unidades Temáticas BNCC";
 
   const temaCampoLabel = isGeometria
-    ? `TEMA (${ctx?.disciplina_nome || "Geometria"})`
-    : "TEMA (BNCC)";
+    ? `UNIDADE TEMÁTICA - ${ctx?.disciplina_nome || "Geometria"}`
+    : "UNIDADE TEMÁTICA - BNCC";
 
   const temaCarregandoLabel = isGeometria
-    ? `Carregando Temas da disciplina (${ctx?.disciplina_nome || "Geometria"})...`
-    : "Carregando Temas BNCC...";
+    ? `Carregando Unidades Temáticas da disciplina (${ctx?.disciplina_nome || "Geometria"})...`
+    : "Carregando Unidades Temáticas BNCC...";
 
   const temaAusenciaTitulo = isGeometria
-    ? "Temas da disciplina ausentes para este contexto"
-    : "Temas BNCC ausentes para este contexto";
+    ? "Unidades Temáticas da disciplina ausentes para este contexto"
+    : "Unidades Temáticas BNCC ausentes para este contexto";
 
   const [apiLoading, setApiLoading] = useState(false);
 
@@ -340,7 +341,7 @@ export default function ModalAdicionarConteudo({
                       </div>
                     </div>
 
-                    <div className="mt-1 text-sm font-extrabold text-blue-900">TEMA</div>
+                    <div className="mt-1 text-sm font-extrabold text-blue-900">UNIDADE TEMÁTICA</div>
                     <div className="text-xs font-semibold text-blue-800/80">
                       Catálogo BNCC
                     </div>
@@ -443,11 +444,11 @@ export default function ModalAdicionarConteudo({
                     {temaAusenciaTitulo}
                   </div>
                   <div className="mt-1 text-sm font-semibold text-amber-800">
-                    Não há temas cadastrados para{" "}
+                    Não há Unidades Temáticas cadastradas para{" "}
                     <span className="font-extrabold">{ctx?.disciplina_nome || "esta disciplina"}</span>{" "}
                     na série{" "}
                     <span className="font-extrabold">{ctx?.serie_label || ctx?.serie || "selecionada"}</span>.
-                    Sem Tema, não é possível cadastrar o item.
+                    Sem Unidade Temática, não é possível cadastrar o item.
                   </div>
                 </div>
               )}
@@ -501,13 +502,13 @@ export default function ModalAdicionarConteudo({
                     <option value="" disabled>
                       {apiLoading
                         ? (isGeometria
-                            ? `Carregando temas da disciplina (${ctx?.disciplina_nome || "Geometria"})...`
-                            : "Carregando temas BNCC...")
+                            ? `Carregando unidades temáticas (${ctx?.disciplina_nome || "Geometria"})...`
+                            : "Carregando Unidades Temáticas BNCC...")
                         : apiErro
-                        ? "Falha ao carregar temas"
+                        ? "Falha ao carregar Unidades Temáticas"
                         : apiTemas.length === 0
-                        ? (isGeometria ? "Nenhum tema da disciplina disponível" : "Nenhum tema BNCC disponível")
-                        : (isGeometria ? "Selecione um tema da disciplina..." : "Selecione um tema BNCC...")}
+                        ? (isGeometria ? "Nenhuma Unidade Temática disponível" : "Nenhuma Unidade Temática BNCC disponível")
+                        : (isGeometria ? "Selecione uma Unidade Temática..." : "Selecione uma Unidade Temática BNCC...")}
                     </option>
 
 
@@ -525,7 +526,7 @@ export default function ModalAdicionarConteudo({
 
                   <div className="flex items-center justify-between gap-3">
                     <label className="text-sm font-extrabold text-emerald-900">
-                      CONTEÚDO (SEEDF)
+                      CONTEÚDO - Currículo em Movimento - SEEDF
                     </label>
                     <span className="text-[11px] font-extrabold px-3 py-1 rounded-full bg-emerald-300 text-emerald-950 border border-emerald-400">
                       ETAPA 2
@@ -536,10 +537,10 @@ export default function ModalAdicionarConteudo({
                   {!apiLoading && !apiErro && Array.isArray(apiConteudos) && apiConteudos.length === 0 && (
                     <div className="mt-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
                       <div className="text-sm font-extrabold text-amber-900">
-                        Conteúdos SEEDF ausentes para este contexto
+                        Conteúdos - Currículo em Movimento - SEEDF ausentes para este contexto
                       </div>
                       <div className="mt-1 text-sm font-semibold text-amber-800">
-                        Ainda não há conteúdos SEEDF cadastrados para este contexto (e/ou para o tema selecionado).
+                        Ainda não há conteúdos do Currículo em Movimento - SEEDF cadastrados para este contexto (e/ou para a Unidade Temática selecionada).
                         Próximo passo: povoar <span className="font-extrabold">seedf_conteudos</span>.
                       </div>
                     </div>
@@ -566,10 +567,10 @@ export default function ModalAdicionarConteudo({
                   >
                     <option value="" disabled>
                       {!Number.isFinite(Number(temaId))
-                        ? "Selecione um tema BNCC primeiro..."
+                        ? "Selecione uma Unidade Temática BNCC primeiro..."
                         : apiConteudos.length === 0
-                        ? "Nenhum conteúdo SEEDF disponível"
-                        : "Selecione um conteúdo SEEDF..."}
+                        ? "Nenhum conteúdo do Currículo em Movimento - SEEDF disponível"
+                        : "Selecione um conteúdo do Currículo em Movimento - SEEDF..."}
                     </option>
 
                     {Array.isArray(apiConteudos) &&
@@ -585,7 +586,8 @@ export default function ModalAdicionarConteudo({
                 <div className="rounded-3xl border border-violet-400 bg-violet-200 p-5">
                   <div className="flex items-center justify-between gap-3">
                     <label className="text-sm font-extrabold text-violet-900">
-                      OBJETIVO <span className="font-bold">(opcional)</span>
+                      OBJETIVO DE APRENDIZAGEM{escolaApelido ? ` - ${escolaApelido}` : ""}{" "}
+                      <span className="font-bold">(opcional)</span>
                     </label>
                     <span className="text-[11px] font-extrabold px-3 py-1 rounded-full bg-violet-300 text-violet-950 border border-violet-400">
                       ETAPA 3
@@ -597,7 +599,7 @@ export default function ModalAdicionarConteudo({
                     value={objetivoTexto}
                     onChange={(e) => setObjetivoTexto(e.target.value)}
                     rows={3}
-                    placeholder="Opcional: descreva o objetivo (texto livre)"
+                    placeholder={`Opcional: descreva o objetivo de aprendizagem${escolaApelido ? ` (${escolaApelido})` : ""}`}
                     className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:ring-2 focus:ring-violet-300 bg-white"
                   />
                 </div>

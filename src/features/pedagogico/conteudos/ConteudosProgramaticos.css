@@ -50,12 +50,27 @@
 .cp-btn-outline:hover { border-color: #6366f1; color: #6366f1; background: #f0f0ff; }
 
 .cp-btn-success {
-  display: flex; align-items: center; gap: 7px;
-  background: #10b981; color: #fff; border: none;
-  border-radius: 10px; padding: 9px 18px;
-  font-size: 0.87rem; font-weight: 600; cursor: pointer; transition: all .2s;
+  display: flex; align-items: center; gap: 6px;
+  padding: 10px 18px; border-radius: 10px; border: none; cursor: pointer;
+  font-weight: 600; font-size: 0.875rem; transition: all .2s;
+  background: linear-gradient(135deg,#10b981,#059669); color:#fff;
 }
-.cp-btn-success:hover { background: #059669; }
+.cp-btn-success:hover { background: linear-gradient(135deg,#059669,#047857); transform: translateY(-1px); box-shadow: 0 4px 12px #10b98144; }
+
+/* Botão "Gera PDF" — esmeralda premium */
+.cp-btn-pdf {
+  display: flex; align-items: center; gap: 6px;
+  padding: 10px 18px; border-radius: 10px; border: none; cursor: pointer;
+  font-weight: 600; font-size: 0.875rem; transition: all .2s;
+  background: linear-gradient(135deg,#f59e0b,#d97706); color:#fff;
+  box-shadow: 0 2px 8px #f59e0b33;
+}
+.cp-btn-pdf:hover:not(:disabled) { background: linear-gradient(135deg,#d97706,#b45309); transform: translateY(-1px); box-shadow: 0 4px 14px #f59e0b55; }
+.cp-btn-pdf:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* Spinner de loading */
+@keyframes cpSpin { to { transform: rotate(360deg); } }
+.cp-spin { display: inline-block; animation: cpSpin 1s linear infinite; }
 
 /* ── KPI Cards ───────────────────────────────────────────────────────────── */
 .cp-kpi-row {
@@ -251,8 +266,190 @@
 }
 .cp-detalhe-actions-bar p { font-size: 0.84rem; color: #92400e; margin: 0; font-weight: 500; }
 
+/* ── Unidade Temática: dica e erro ───────────────────────────────────────── */
+.cp-ut-hint {
+  padding: 10px 14px;
+  background: #f0f4ff;
+  border: 1.5px dashed #a5b4fc;
+  border-radius: 9px;
+  font-size: 0.83rem;
+  color: #4f46e5;
+  font-weight: 500;
+}
+.cp-ut-vazio {
+  background: #fffbeb;
+  border-color: #fcd34d;
+  color: #92400e;
+}
+.cp-ut-erro {
+  padding: 10px 14px;
+  background: #fef2f2;
+  border: 1.5px solid #fca5a5;
+  border-radius: 9px;
+  font-size: 0.83rem;
+  color: #dc2626;
+  font-weight: 500;
+}
+
+/* ── Input error state (tópico vazio ao confirmar) ──────────────────────── */
+@keyframes cpShake {
+  0%, 100% { transform: translateX(0); }
+  20%       { transform: translateX(-6px); }
+  40%       { transform: translateX(6px); }
+  60%       { transform: translateX(-4px); }
+  80%       { transform: translateX(4px); }
+}
+.cp-input-error {
+  border-color: #ef4444 !important;
+  box-shadow: 0 0 0 2px #fca5a555 !important;
+  animation: cpShake 0.35s ease;
+}
+
+/* ── Disabled state para botões primário e sucesso ──────────────────────── */
+.cp-btn-primary:disabled,
+.cp-btn-success:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 /* ── Icon size ───────────────────────────────────────────────────────────── */
 .cp-icon { width: 16px; height: 16px; flex-shrink: 0; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   OBJETIVO DE APRENDIZAGEM — editor inline
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Lista de tópicos já confirmados */
+.cp-obj-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+/* Card de cada tópico */
+.cp-obj-card {
+  background: #f8faff;
+  border: 1.5px solid #c7d2fe;
+  border-radius: 10px;
+  padding: 10px 12px;
+  transition: border-color .2s;
+}
+.cp-obj-card:hover { border-color: #818cf8; }
+
+.cp-obj-card-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.cp-obj-num {
+  min-width: 22px; height: 22px;
+  border-radius: 50%;
+  background: #6366f1; color: #fff;
+  font-size: 0.72rem; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; margin-top: 1px;
+}
+.cp-obj-texto {
+  flex: 1;
+  font-size: 0.87rem;
+  font-weight: 600;
+  color: #1e293b;
+  line-height: 1.45;
+}
+.cp-obj-del {
+  background: none; border: none; cursor: pointer;
+  color: #cbd5e1; font-size: 0.85rem; padding: 2px 5px;
+  border-radius: 4px; transition: color .15s;
+  flex-shrink: 0;
+}
+.cp-obj-del:hover { color: #ef4444; }
+
+/* Botão de edição inline do tópico */
+.cp-obj-edit {
+  background: none; border: none; cursor: pointer;
+  color: #94a3b8; font-size: 0.82rem; padding: 2px 5px;
+  border-radius: 4px; transition: color .15s;
+  flex-shrink: 0;
+}
+.cp-obj-edit:hover { color: #6366f1; }
+
+.cp-obj-del-sm  { font-size: 0.72rem; padding: 1px 3px; }
+
+/* Lista de subitens */
+.cp-obj-subitens {
+  list-style: none; margin: 7px 0 0 30px; padding: 0;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.cp-obj-subitens li {
+  display: flex; align-items: center; gap: 6px;
+}
+.cp-obj-bullet { color: #818cf8; font-size: 0.9rem; flex-shrink: 0; }
+.cp-obj-sub-txt { font-size: 0.82rem; color: #475569; flex: 1; }
+
+/* Botão "Adicionar objetivo" */
+.cp-obj-add-btn {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; padding: 10px 14px;
+  background: #f0f4ff; border: 1.5px dashed #a5b4fc;
+  border-radius: 9px; cursor: pointer;
+  font-size: 0.84rem; font-weight: 600; color: #4f46e5;
+  transition: all .2s;
+}
+.cp-obj-add-btn:hover {
+  background: #e0e7ff; border-color: #6366f1; color: #3730a3;
+}
+.cp-obj-add-icon {
+  width: 20px; height: 20px; border-radius: 50%;
+  background: #6366f1; color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1rem; font-weight: 700; line-height: 1; flex-shrink: 0;
+}
+
+/* Editor expandido */
+.cp-obj-editor {
+  background: #fafbff;
+  border: 1.5px solid #c7d2fe;
+  border-radius: 12px;
+  padding: 14px;
+  display: flex; flex-direction: column; gap: 12px;
+  animation: cpFadeIn .15s ease;
+}
+.cp-obj-editor-label {
+  font-size: 0.76rem; font-weight: 700;
+  color: #6366f1; margin-bottom: 5px;
+  text-transform: uppercase; letter-spacing: .05em;
+}
+.cp-obj-editor-topico { display: flex; flex-direction: column; }
+.cp-obj-editor-subs   { display: flex; flex-direction: column; }
+
+/* Linhas de subitem — recuadas ~1cm e largura igual ao tópico */
+.cp-obj-sub-row {
+  display: flex; align-items: center; gap: 6px;
+  margin-bottom: 6px;
+  padding-left: 28px;           /* ≈ 1 cm de recuo visual */
+}
+.cp-obj-sub-row .cp-input {
+  flex: 1;                      /* mesma largura do campo de tópico */
+  width: 100%;
+}
+
+/* Botão "+ subitem" */
+.cp-obj-add-sub {
+  background: none; border: none; cursor: pointer;
+  color: #64748b; font-size: 0.79rem; font-weight: 600;
+  padding: 4px 0; text-align: left;
+  transition: color .15s;
+}
+.cp-obj-add-sub:hover { color: #6366f1; }
+
+/* Ações do editor */
+.cp-obj-editor-actions {
+  display: flex; justify-content: flex-end; gap: 8px;
+  padding-top: 6px; border-top: 1px solid #e2e8f0;
+}
+
 
 /* ── Responsive ──────────────────────────────────────────────────────────── */
 @media (max-width: 640px) {

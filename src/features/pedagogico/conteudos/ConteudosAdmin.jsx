@@ -42,6 +42,9 @@ export default function ConteudosAdmin() {
   const [disciplinasProfessor, setDisciplinasProfessor] = useState([]); // array de { id, nome }
   const [disciplinaSelecionadaId, setDisciplinaSelecionadaId] = useState(null); // number | null
 
+  // Apelido da escola (para label do campo Objetivo)
+  const escolaApelido = localStorage.getItem("escola_apelido") || "";
+
   const disciplinaSelecionadaNome = useMemo(() => {
     const found = Array.isArray(disciplinasProfessor)
       ? disciplinasProfessor.find((d) => Number(d?.id) === Number(disciplinaSelecionadaId))
@@ -1197,6 +1200,7 @@ export default function ConteudosAdmin() {
         onClose={() => setModalAddOpen(false)}
         onSave={handleSalvarNovoConteudoViaModal}
         contextoLabel={resumoPlano}
+        escolaApelido={escolaApelido}
         contextoObj={{
           disciplina_id,
           disciplina_nome: disciplinaSelecionadaNome || null,
@@ -2100,13 +2104,13 @@ export default function ConteudosAdmin() {
             <thead className="bg-blue-100">
               <tr>
                 <th className="text-left px-4 py-3 text-sm font-extrabold text-blue-900 border-b border-blue-200">
-                  TEMA
+                  UNIDADE TEMÁTICA - BNCC
                 </th>
                 <th className="text-left px-4 py-3 text-sm font-extrabold text-blue-900 border-b border-blue-200">
-                  CONTEÚDO
+                  CONTEÚDO - Currículo em Movimento - SEEDF
                 </th>
                 <th className="text-left px-4 py-3 text-sm font-extrabold text-blue-900 border-b border-blue-200">
-                  OBJETIVO
+                  OBJETIVO DE APRENDIZAGEM{escolaApelido ? ` - ${escolaApelido}` : ""}
                 </th>
                 <th className="text-center px-4 py-3 text-sm font-extrabold text-blue-900 border-b border-blue-200 w-[140px]">
                   AÇÕES
@@ -2293,10 +2297,10 @@ export default function ConteudosAdmin() {
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <div className="text-sm font-extrabold text-slate-900">
-                    Editar objetivo
+                    Editar Objetivo de Aprendizagem{escolaApelido ? ` - ${escolaApelido}` : ""}
                   </div>
                   <div className="mt-1 text-sm font-semibold text-slate-700">
-                    Você está editando apenas o <span className="font-extrabold">OBJETIVO</span>. Tema e Conteúdo são fixos (catálogo).
+                    Você está editando apenas o <span className="font-extrabold">OBJETIVO DE APRENDIZAGEM</span>. Unidade Temática e Conteúdo são fixos (catálogo).
                   </div>
                 </div>
 
@@ -2312,19 +2316,19 @@ export default function ConteudosAdmin() {
 
             <div className="px-6 py-5">
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-xs font-bold text-slate-600">TEMA (BNCC)</div>
+                <div className="text-xs font-bold text-slate-600">UNIDADE TEMÁTICA - BNCC</div>
                 <div className="mt-1 text-sm font-extrabold text-slate-900">
                   {modalEditarObjetivo.tema || "—"}
                 </div>
 
-                <div className="mt-3 text-xs font-bold text-slate-600">CONTEÚDO (SEEDF)</div>
+                <div className="mt-3 text-xs font-bold text-slate-600">CONTEÚDO - Currículo em Movimento - SEEDF</div>
                 <div className="mt-1 text-sm font-semibold text-slate-800 whitespace-pre-wrap">
                   {modalEditarObjetivo.conteudo || "—"}
                 </div>
               </div>
 
               <div className="mt-4">
-                <div className="text-xs font-bold text-slate-600">OBJETIVO</div>
+                <div className="text-xs font-bold text-slate-600">OBJETIVO DE APRENDIZAGEM{escolaApelido ? ` - ${escolaApelido}` : ""}</div>
                 <textarea
                   value={modalEditarObjetivo.objetivo}
                   onChange={(e) =>
@@ -2333,7 +2337,7 @@ export default function ConteudosAdmin() {
                     )
                   }
                   className="mt-2 w-full min-h-[120px] rounded-xl border border-slate-200 px-4 py-3 outline-none focus:ring-2 focus:ring-emerald-300"
-                  placeholder="Descreva o objetivo..."
+                  placeholder={`Descreva o objetivo de aprendizagem${escolaApelido ? ` (${escolaApelido})` : ""}...`}
                 />
               </div>
 
@@ -2351,7 +2355,7 @@ export default function ConteudosAdmin() {
                   onClick={salvarObjetivoModal}
                   className="rounded-xl px-5 py-3 text-sm font-extrabold shadow bg-emerald-600 hover:bg-emerald-700 text-white transition"
                 >
-                  Salvar objetivo
+                  Salvar objetivo de aprendizagem
                 </button>
               </div>
             </div>

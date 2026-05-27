@@ -344,8 +344,11 @@ export default function ConteudosProgramaticos() {
         }
         doc.setFillColor(15, 23, 42);
         doc.roundedRect(MX, curY, CW, 12, 3, 3, "F");
+        // Linha decorativa esquerda
+        doc.setFillColor(99, 102, 241);
+        doc.roundedRect(MX, curY, 4, 12, 2, 2, "F");
         doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(255, 255, 255);
-        doc.text(`📅  ${bimLabel}`, MX + 6, curY + 8.5);
+        doc.text(bimLabel, MX + 8, curY + 8.5);
         curY += 16;
       }
 
@@ -387,33 +390,9 @@ export default function ConteudosProgramaticos() {
         doc.text(`${cntTotal} conteúdo${cntTotal!==1?"s":""}`, W - MX - 4, curY + 7, { align:"right" });
         curY += 14;
 
-        for (const [conteudoKey, grupo] of Object.entries(porConteudo)) {
+        let numIdx = 1; // numerador contínuo por série
+        for (const [, grupo] of Object.entries(porConteudo)) {
           if (!grupo.objetivos.length) continue;
-          if (curY > PAGE_BOTTOM - 20) {
-            doc.addPage();
-            buildPdfHeaderOficial(doc, W, logos, hoje, "OBJETIVOS DE APRENDIZAGEM", data.disciplina_nome, bimStr, data.ano_letivo || 2026);
-            drawFooter(doc, W, H, data.escola_nome, !bimNum ? bimLabel : bimStr);
-            curY = 54;
-          }
-          doc.setFillColor(...meta.light);
-          doc.roundedRect(MX, curY, CW, 8, 1.5, 1.5, "F");
-          doc.setDrawColor(r, g, b); doc.setLineWidth(0.4);
-          doc.roundedRect(MX, curY, CW, 8, 1.5, 1.5, "S");
-          if (grupo.ut) {
-            const utW = Math.min(doc.getTextWidth(grupo.ut) + 8, 55);
-            doc.setFillColor(r, g, b);
-            doc.roundedRect(MX + 2, curY + 1.5, utW, 5, 1, 1, "F");
-            doc.setFont("helvetica","bold"); doc.setFontSize(6); doc.setTextColor(255,255,255);
-            doc.text(grupo.ut.substring(0,30), MX + 6, curY + 5);
-          }
-          const ctX = grupo.ut ? MX + 60 : MX + 4;
-          const ctMaxW = CW - (ctX - MX) - 4;
-          doc.setFont("helvetica","bold"); doc.setFontSize(7); doc.setTextColor(30,41,59);
-          const ctLines = doc.splitTextToSize(conteudoKey, ctMaxW);
-          doc.text(ctLines[0], ctX, curY + 5.4);
-          curY += 11;
-
-          let numIdx = 1;
           for (const objTxt of grupo.objetivos) {
             const topicos = parseObjetivo(objTxt);
             const maxTextW = CW - 24;
@@ -470,7 +449,6 @@ export default function ConteudosProgramaticos() {
             }
             curY += blockH + 3;
           }
-          curY += 3;
         }
         curY += 5;
       }

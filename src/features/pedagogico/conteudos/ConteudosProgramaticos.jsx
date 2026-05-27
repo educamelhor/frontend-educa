@@ -68,14 +68,18 @@ export default function ConteudosProgramaticos() {
   // Estado do modal PDF
   const [pdfModalOpen, setPdfModalOpen]   = useState(false);
   const [pdfDisc, setPdfDisc]             = useState("");
-  const [pdfBimestre, setPdfBimestre]     = useState("");
+  const [pdfSerie, setPdfSerie]           = useState(""); // opcional
+  const [pdfBimestre, setPdfBimestre]     = useState(""); // opcional
   const [pdfLoading, setPdfLoading]       = useState(false);
   const [pdfErr, setPdfErr]               = useState("");
   const [pdfTipo, setPdfTipo]             = useState("interno"); // "interno" | "alunos"
 
+  // Opções de Ano/Série para o modal PDF
+  const SERIES_PDF = ["6º Ano", "7º Ano", "8º Ano", "9º Ano"];
+
   // Abre / fecha modal PDF
   const openPdfModal = () => {
-    setPdfDisc(""); setPdfBimestre(""); setPdfErr(""); setPdfTipo("interno"); setPdfModalOpen(true);
+    setPdfDisc(""); setPdfSerie(""); setPdfBimestre(""); setPdfErr(""); setPdfTipo("interno"); setPdfModalOpen(true);
   };
 
   // ── Helper: carrega imagem como base64 (async) ─────────────────────────────
@@ -302,13 +306,12 @@ export default function ConteudosProgramaticos() {
       });
       curY = doc.lastAutoTable.finalY + 7;
     }
-    // Garante rodapé na última página
     drawFooter(doc, W, H, data.escola_nome, bimStr);
   };
 
   // ── PDF ALUNOS premium — cards com objetivos e subitens ─────────────────────
   const gerarPdfAlunos = async (doc, W, H, hoje, data, bimNum) => {
-    const bimStr = `${bimNum}º Bimestre`;
+    const bimStr = bimNum ? `${bimNum}º Bimestre` : "Ano Letivo";
     const logos = {};
     try {
       logos.left  = await loadImageAsBase64("/logo-escola-left.png");
@@ -317,170 +320,181 @@ export default function ConteudosProgramaticos() {
     buildPdfHeaderOficial(doc, W, logos, hoje, "OBJETIVOS DE APRENDIZAGEM", data.disciplina_nome, bimStr, data.ano_letivo || 2026);
 
     const SERIES_ORDER = ["6º ANO","7º ANO","8º ANO","9º ANO"];
-    const bySerie = {};
-    for (const item of data.itens) {
-      const s = (item.serie || "Sem série").toUpperCase();
-      if (!bySerie[s]) bySerie[s] = [];
-      bySerie[s].push(item);
-    }
+    const bimestresPresentes = bimNum
+      ? [bimNum]
+      : [...new Set(data.itens.map(i => i.bimestre))].sort();
 
     let curY = 54;
     const PAGE_BOTTOM = H - 18;
     const MX = 10;
     const CW = W - 20;
+    const LINE_H = 4.5;
+    const SUB_LINE_H = 4.2;
 
-    for (const serie of [...SERIES_ORDER, ...Object.keys(bySerie).filter(s => !SERIES_ORDER.includes(s))]) {
-      const itens = bySerie[serie]; if (!itens) continue;
-      const meta = SERIE_META[serie] || SERIE_META["6º ANO"];
-      const [r,g,b] = meta.rgb;
+    for (const bim of bimestresPresentes) {
+      const itensBim = bimNum ? data.itens : data.itens.filter(i => i.bimestre === bim);
+      const bimLabel = `${bim}º Bimestre`;
 
-      // Agrupa por conteúdo SEEDF (para listar objetivos agrupados)
-      const porConteudo = {};
-      for (const item of itens) {
-        const chave = item.conteudo_seedf || "Conteúdo";
-        if (!porConteudo[chave]) porConteudo[chave] = { ut: item.unidade_tematica || "", objetivos: [] };
-        const txt = (item.objetivo_texto || "").trim();
-        if (txt) porConteudo[chave].objetivos.push(txt);
-      }
-      if (Object.keys(porConteudo).every(k => !porConteudo[k].objetivos.length)) continue;
-
-      // ── Cabeçalho da série ──────────────────────────────────────────────────
-      if (curY > PAGE_BOTTOM - 28) {
-        doc.addPage();
-        buildPdfHeaderOficial(doc, W, logos, hoje, "OBJETIVOS DE APRENDIZAGEM", data.disciplina_nome, bimStr, data.ano_letivo || 2026);
-        drawFooter(doc, W, H, data.escola_nome, bimStr);
-        curY = 54;
-      }
-
-      // Faixa da série
-      doc.setFillColor(r, g, b);
-      doc.roundedRect(MX, curY, CW, 10, 2, 2, "F");
-      // Detalhe: triângulo decorativo direita
-      doc.setFillColor(...meta.rgb.map(c => Math.max(c-25,0)));
-      doc.triangle(W - MX - 25, curY, W - MX, curY, W - MX, curY + 10, "F");
-      doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(255, 255, 255);
-      doc.text(serie, MX + 5, curY + 7);
-      const cntTotal = itens.length;
-      doc.setFont("helvetica","normal"); doc.setFontSize(7); doc.setTextColor(220,235,255);
-      doc.text(`${cntTotal} conteúdo${cntTotal!==1?"s":""}`, W - MX - 4, curY + 7, { align:"right" });
-      curY += 14;
-
-      // ── Para cada agrupamento de conteúdo SEEDF ─────────────────────────────
-      for (const [conteudoKey, grupo] of Object.entries(porConteudo)) {
-        if (!grupo.objetivos.length) continue;
-
-        // Sub-cabeçalho: Unidade Temática + Conteúdo SEEDF
-        if (curY > PAGE_BOTTOM - 20) {
+      if (!bimNum) {
+        if (curY > PAGE_BOTTOM - 18) {
           doc.addPage();
           buildPdfHeaderOficial(doc, W, logos, hoje, "OBJETIVOS DE APRENDIZAGEM", data.disciplina_nome, bimStr, data.ano_letivo || 2026);
-          drawFooter(doc, W, H, data.escola_nome, bimStr);
+          drawFooter(doc, W, H, data.escola_nome, bimLabel);
           curY = 54;
         }
+        doc.setFillColor(15, 23, 42);
+        doc.roundedRect(MX, curY, CW, 12, 3, 3, "F");
+        doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(255, 255, 255);
+        doc.text(`📅  ${bimLabel}`, MX + 6, curY + 8.5);
+        curY += 16;
+      }
 
-        // Faixa de sub-cabeçalho
-        doc.setFillColor(...meta.light);
-        doc.roundedRect(MX, curY, CW, 8, 1.5, 1.5, "F");
-        doc.setDrawColor(r, g, b); doc.setLineWidth(0.4);
-        doc.roundedRect(MX, curY, CW, 8, 1.5, 1.5, "S");
-        // Pill UT
-        if (grupo.ut) {
-          const utW = doc.getTextWidth(grupo.ut) + 8;
-          doc.setFillColor(r, g, b);
-          doc.roundedRect(MX + 2, curY + 1.5, Math.min(utW, 55), 5, 1, 1, "F");
-          doc.setFont("helvetica","bold"); doc.setFontSize(6); doc.setTextColor(255,255,255);
-          doc.text(grupo.ut.substring(0,30), MX + 6, curY + 5);
+      const bySerie = {};
+      for (const item of itensBim) {
+        const s = (item.serie || "Sem série").toUpperCase();
+        if (!bySerie[s]) bySerie[s] = [];
+        bySerie[s].push(item);
+      }
+
+      for (const serie of [...SERIES_ORDER, ...Object.keys(bySerie).filter(s => !SERIES_ORDER.includes(s))]) {
+        const itens = bySerie[serie]; if (!itens) continue;
+        const meta = SERIE_META[serie] || SERIE_META["6º ANO"];
+        const [r,g,b] = meta.rgb;
+
+        const porConteudo = {};
+        for (const item of itens) {
+          const chave = item.conteudo_seedf || "Conteúdo";
+          if (!porConteudo[chave]) porConteudo[chave] = { ut: item.unidade_tematica || "", objetivos: [] };
+          const txt = (item.objetivo_texto || "").trim();
+          if (txt) porConteudo[chave].objetivos.push(txt);
         }
-        // Texto do conteúdo
-        const ctX = grupo.ut ? MX + 60 : MX + 4;
-        doc.setFont("helvetica","bold"); doc.setFontSize(7); doc.setTextColor(30,41,59);
-        const ctLines = doc.splitTextToSize(conteudoKey, CW - (ctX - MX) - 4);
-        doc.text(ctLines[0].substring(0,80), ctX, curY + 5.4);
-        curY += 11;
+        if (Object.keys(porConteudo).every(k => !porConteudo[k].objetivos.length)) continue;
 
-        // Cada objetivo desta seção
-        let numIdx = 1;
-        for (const objTxt of grupo.objetivos) {
-          const topicos = parseObjetivo(objTxt);
+        if (curY > PAGE_BOTTOM - 28) {
+          doc.addPage();
+          buildPdfHeaderOficial(doc, W, logos, hoje, "OBJETIVOS DE APRENDIZAGEM", data.disciplina_nome, bimStr, data.ano_letivo || 2026);
+          drawFooter(doc, W, H, data.escola_nome, !bimNum ? bimLabel : bimStr);
+          curY = 54;
+        }
+        doc.setFillColor(r, g, b);
+        doc.roundedRect(MX, curY, CW, 10, 2, 2, "F");
+        doc.setFillColor(...meta.rgb.map(c => Math.max(c-25,0)));
+        doc.triangle(W - MX - 25, curY, W - MX, curY, W - MX, curY + 10, "F");
+        doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(255, 255, 255);
+        doc.text(serie, MX + 5, curY + 7);
+        const cntTotal = itens.length;
+        doc.setFont("helvetica","normal"); doc.setFontSize(7); doc.setTextColor(220,235,255);
+        doc.text(`${cntTotal} conteúdo${cntTotal!==1?"s":""}`, W - MX - 4, curY + 7, { align:"right" });
+        curY += 14;
 
-          // Calcula altura do bloco
-          let blockH = 5;
-          if (topicos.length > 0) {
-            for (const top of topicos) {
-              const linhasTop = doc.splitTextToSize(top.texto, CW - 22);
-              blockH += linhasTop.length * 4.5 + 2;
-              for (const sub of top.subitens) {
-                const linhasSub = doc.splitTextToSize(`\u2022 ${sub}`, CW - 34);
-                blockH += linhasSub.length * 4 + 1.5;
-              }
-            }
-          } else {
-            const linhas = doc.splitTextToSize(objTxt, CW - 22);
-            blockH += linhas.length * 4.8;
-          }
-          blockH += 4;
-
-          if (curY + blockH > PAGE_BOTTOM) {
+        for (const [conteudoKey, grupo] of Object.entries(porConteudo)) {
+          if (!grupo.objetivos.length) continue;
+          if (curY > PAGE_BOTTOM - 20) {
             doc.addPage();
             buildPdfHeaderOficial(doc, W, logos, hoje, "OBJETIVOS DE APRENDIZAGEM", data.disciplina_nome, bimStr, data.ano_letivo || 2026);
-            drawFooter(doc, W, H, data.escola_nome, bimStr);
+            drawFooter(doc, W, H, data.escola_nome, !bimNum ? bimLabel : bimStr);
             curY = 54;
           }
-
-          // Card do objetivo
-          doc.setFillColor(250, 251, 254);
-          doc.roundedRect(MX, curY, CW, blockH, 2, 2, "F");
-          doc.setDrawColor(215, 220, 235); doc.setLineWidth(0.2);
-          doc.roundedRect(MX, curY, CW, blockH, 2, 2, "S");
-          // Borda esquerda grossa colorida
-          doc.setFillColor(r, g, b);
-          doc.roundedRect(MX, curY, 3.5, blockH, 1, 1, "F");
-
-          // Badge numerado
-          doc.setFillColor(r, g, b);
-          doc.circle(MX + 11, curY + 7, 4, "F");
-          doc.setFont("helvetica","bold"); doc.setFontSize(7.5); doc.setTextColor(255,255,255);
-          doc.text(String(numIdx++), MX + 11, curY + 8.5, { align:"center" });
-
-          let ty = curY + 4;
-          if (topicos.length > 0) {
-            for (const top of topicos) {
-              const linhasTop = doc.splitTextToSize(top.texto, CW - 24);
-              doc.setFont("helvetica","bold"); doc.setFontSize(8.5); doc.setTextColor(22, 38, 68);
-              doc.text(linhasTop, MX + 18, ty + 4.8);
-              ty += linhasTop.length * 4.8 + 2;
-              for (const sub of top.subitens) {
-                const linhasSub = doc.splitTextToSize(`\u2022 ${sub}`, CW - 36);
-                doc.setFont("helvetica","normal"); doc.setFontSize(7.8); doc.setTextColor(60, 80, 110);
-                doc.text(linhasSub, MX + 25, ty + 3.5);
-                ty += linhasSub.length * 4.2 + 1.5;
-              }
-            }
-          } else {
-            const linhas = doc.splitTextToSize(objTxt, CW - 24);
-            doc.setFont("helvetica","bold"); doc.setFontSize(8.5); doc.setTextColor(22,38,68);
-            doc.text(linhas, MX + 18, curY + 9);
+          doc.setFillColor(...meta.light);
+          doc.roundedRect(MX, curY, CW, 8, 1.5, 1.5, "F");
+          doc.setDrawColor(r, g, b); doc.setLineWidth(0.4);
+          doc.roundedRect(MX, curY, CW, 8, 1.5, 1.5, "S");
+          if (grupo.ut) {
+            const utW = Math.min(doc.getTextWidth(grupo.ut) + 8, 55);
+            doc.setFillColor(r, g, b);
+            doc.roundedRect(MX + 2, curY + 1.5, utW, 5, 1, 1, "F");
+            doc.setFont("helvetica","bold"); doc.setFontSize(6); doc.setTextColor(255,255,255);
+            doc.text(grupo.ut.substring(0,30), MX + 6, curY + 5);
           }
-          curY += blockH + 3;
+          const ctX = grupo.ut ? MX + 60 : MX + 4;
+          const ctMaxW = CW - (ctX - MX) - 4;
+          doc.setFont("helvetica","bold"); doc.setFontSize(7); doc.setTextColor(30,41,59);
+          const ctLines = doc.splitTextToSize(conteudoKey, ctMaxW);
+          doc.text(ctLines[0], ctX, curY + 5.4);
+          curY += 11;
+
+          let numIdx = 1;
+          for (const objTxt of grupo.objetivos) {
+            const topicos = parseObjetivo(objTxt);
+            const maxTextW = CW - 24;
+            let blockH = 6;
+            if (topicos.length > 0) {
+              for (const top of topicos) {
+                const linhasTop = doc.splitTextToSize(top.texto, maxTextW);
+                blockH += linhasTop.length * LINE_H + 2;
+                for (const sub of top.subitens) {
+                  const linhasSub = doc.splitTextToSize(`• ${sub}`, maxTextW - 10);
+                  blockH += linhasSub.length * SUB_LINE_H + 1.5;
+                }
+              }
+            } else {
+              const linhas = doc.splitTextToSize(objTxt, maxTextW);
+              blockH += linhas.length * LINE_H;
+            }
+            blockH += 5;
+            blockH = Math.max(blockH, 16);
+            if (curY + blockH > PAGE_BOTTOM) {
+              doc.addPage();
+              buildPdfHeaderOficial(doc, W, logos, hoje, "OBJETIVOS DE APRENDIZAGEM", data.disciplina_nome, bimStr, data.ano_letivo || 2026);
+              drawFooter(doc, W, H, data.escola_nome, !bimNum ? bimLabel : bimStr);
+              curY = 54;
+            }
+            doc.setFillColor(250, 251, 254);
+            doc.roundedRect(MX, curY, CW, blockH, 2, 2, "F");
+            doc.setDrawColor(215, 220, 235); doc.setLineWidth(0.2);
+            doc.roundedRect(MX, curY, CW, blockH, 2, 2, "S");
+            doc.setFillColor(r, g, b);
+            doc.roundedRect(MX, curY, 3.5, blockH, 1, 1, "F");
+            doc.setFillColor(r, g, b);
+            doc.circle(MX + 11, curY + 7, 4, "F");
+            doc.setFont("helvetica","bold"); doc.setFontSize(7.5); doc.setTextColor(255,255,255);
+            doc.text(String(numIdx++), MX + 11, curY + 8.5, { align:"center" });
+            let ty = curY + 6;
+            if (topicos.length > 0) {
+              for (const top of topicos) {
+                const linhasTop = doc.splitTextToSize(top.texto, maxTextW);
+                doc.setFont("helvetica","bold"); doc.setFontSize(8.5); doc.setTextColor(22, 38, 68);
+                doc.text(linhasTop, MX + 18, ty + 4);
+                ty += linhasTop.length * LINE_H + 2;
+                for (const sub of top.subitens) {
+                  const linhasSub = doc.splitTextToSize(`• ${sub}`, maxTextW - 10);
+                  doc.setFont("helvetica","normal"); doc.setFontSize(7.8); doc.setTextColor(60, 80, 110);
+                  doc.text(linhasSub, MX + 25, ty + 3.5);
+                  ty += linhasSub.length * SUB_LINE_H + 1.5;
+                }
+              }
+            } else {
+              const linhas = doc.splitTextToSize(objTxt, maxTextW);
+              doc.setFont("helvetica","bold"); doc.setFontSize(8.5); doc.setTextColor(22,38,68);
+              doc.text(linhas, MX + 18, ty + 4);
+            }
+            curY += blockH + 3;
+          }
+          curY += 3;
         }
-        curY += 3;
+        curY += 5;
       }
-      curY += 5;
+      if (!bimNum) curY += 8;
     }
     drawFooter(doc, W, H, data.escola_nome, bimStr);
   };
 
-  // ── Orquestra: chama o gerador correto conforme o tipo ──────────────────
+  // ── Orquestra: chama o gerador correto conforme o tipo ──────────────────────
   const gerarPDF = async () => {
-    if (!pdfDisc || !pdfBimestre) return;
+    if (!pdfDisc) return;
     const discId = DISC_ID_MAP[pdfDisc];
-    const bimNum = parseInt(pdfBimestre);
     if (!discId) { setPdfErr("Disciplina não mapeada."); return; }
+
+    const bimNum = pdfBimestre ? parseInt(pdfBimestre) : null;
+    const serieParam = pdfSerie ? pdfSerie.toUpperCase().replace("ANO", "ANO").trim() : null;
 
     setPdfLoading(true); setPdfErr("");
     try {
-      const { data } = await api.get("/conteudos/admin/relatorio/pdf-data", {
-        params: { disciplina_id: discId, bimestre: bimNum, ano_letivo: 2026 },
-      });
+      const params = { disciplina_id: discId, ano_letivo: 2026 };
+      if (bimNum) params.bimestre = bimNum;
+      if (serieParam) params.serie = serieParam;
+
+      const { data } = await api.get("/conteudos/admin/relatorio/pdf-data", { params });
       if (!data?.ok || !data.itens?.length) {
         setPdfErr("Nenhum dado encontrado para essa seleção.");
         setPdfLoading(false);
@@ -497,7 +511,6 @@ export default function ConteudosProgramaticos() {
         await gerarPdfAlunos(doc, W, H, hoje, data, bimNum);
       }
 
-      // Abre no navegador (botão de impressão nativo)
       const blob    = doc.output("blob");
       const blobUrl = URL.createObjectURL(blob);
       window.open(blobUrl, "_blank");
@@ -1493,13 +1506,18 @@ export default function ConteudosProgramaticos() {
                         {pdfDisc}
                       </span>
                     )}
+                    {pdfSerie && (
+                      <span style={{ background: "#4f46e5", color: "#e0e7ff", fontSize: "0.7rem", borderRadius: 6, padding: "2px 8px", fontWeight: 600 }}>
+                        {pdfSerie}
+                      </span>
+                    )}
                     {pdfBimestre && (
                       <span style={{ background: "#4f46e5", color: "#e0e7ff", fontSize: "0.7rem", borderRadius: 6, padding: "2px 8px", fontWeight: 600 }}>
                         {parseInt(pdfBimestre)}º Bimestre
                       </span>
                     )}
-                    {!pdfDisc && !pdfBimestre && (
-                      <span style={{ color: "#a5b4fc", fontSize: "0.7rem" }}>Selecione os filtros abaixo ↓</span>
+                    {!pdfDisc && (
+                      <span style={{ color: "#a5b4fc", fontSize: "0.7rem" }}>Selecione a disciplina abaixo ↓</span>
                     )}
                   </div>
                 </div>
@@ -1561,28 +1579,51 @@ export default function ConteudosProgramaticos() {
               {/* Seletores */}
               <div className="cp-form-grid">
 
+                {/* Disciplina (obrigatório) */}
                 <div className="cp-form-group cp-form-full">
-                  <label>Disciplina <span style={{ color:"#ef4444" }}>*</span></label>
                   <select
                     id="pdf-disc-select"
                     className="cp-select cp-select-full"
                     value={pdfDisc}
                     onChange={e => { setPdfDisc(e.target.value); setPdfErr(""); }}
+                    style={{
+                      borderColor: !pdfDisc ? "#f97316" : "#e2e8f0",
+                      background: !pdfDisc ? "#fff7ed" : "#fff",
+                    }}
                   >
-                    <option value="">Selecione a disciplina...</option>
+                    <option value="">📚 Selecione a disciplina... (obrigatório)</option>
                     {DISCIPLINAS.map(d => <option key={d}>{d}</option>)}
                   </select>
                 </div>
 
+                {/* Ano/Série (opcional) */}
                 <div className="cp-form-group cp-form-full">
-                  <label>Bimestre <span style={{ color:"#ef4444" }}>*</span></label>
+                  <label style={{ fontSize:"0.82rem", color:"#64748b", marginBottom:4, display:"block" }}>
+                    Ano / Série <span style={{ color:"#94a3b8", fontWeight:400 }}>(opcional — vazio = todas as séries)</span>
+                  </label>
+                  <select
+                    id="pdf-serie-select"
+                    className="cp-select cp-select-full"
+                    value={pdfSerie}
+                    onChange={e => { setPdfSerie(e.target.value); setPdfErr(""); }}
+                  >
+                    <option value="">Todas as séries</option>
+                    {SERIES_PDF.map(s => <option key={s}>{s}</option>)}
+                  </select>
+                </div>
+
+                {/* Bimestre (opcional) */}
+                <div className="cp-form-group cp-form-full">
+                  <label style={{ fontSize:"0.82rem", color:"#64748b", marginBottom:4, display:"block" }}>
+                    Bimestre <span style={{ color:"#94a3b8", fontWeight:400 }}>(opcional — vazio = todos os bimestres)</span>
+                  </label>
                   <select
                     id="pdf-bim-select"
                     className="cp-select cp-select-full"
                     value={pdfBimestre}
                     onChange={e => { setPdfBimestre(e.target.value); setPdfErr(""); }}
                   >
-                    <option value="">Selecione o bimestre...</option>
+                    <option value="">Todos os bimestres</option>
                     {BIMESTRES.map(b => <option key={b}>{b}</option>)}
                   </select>
                 </div>
@@ -1600,14 +1641,16 @@ export default function ConteudosProgramaticos() {
                 </div>
               )}
 
-              {/* Info */}
-              {pdfDisc && pdfBimestre && !pdfErr && (
+              {/* Info pré-geração */}
+              {pdfDisc && !pdfErr && (
                 <div style={{
                   background: "#f0fdf4", border: "1px solid #86efac",
                   borderRadius: 8, padding: "10px 14px",
                   color: "#15803d", fontSize: "0.82rem", marginTop: 8,
                 }}>
-                  ✅ Pronto para gerar! O PDF incluirá todos os objetivos de <strong>{pdfDisc}</strong> do <strong>{parseInt(pdfBimestre)}º Bimestre</strong> para todas as séries (6º ao 9º Ano).
+                  ✅ O PDF incluirá <strong>{pdfDisc}</strong>
+                  {pdfSerie ? <>, série <strong>{pdfSerie}</strong></> : <>, <strong>todas as séries</strong></>}
+                  {pdfBimestre ? <>, <strong>{parseInt(pdfBimestre)}º Bimestre</strong></> : <>, <strong>todos os bimestres</strong></>}.
                 </div>
               )}
 
@@ -1622,7 +1665,7 @@ export default function ConteudosProgramaticos() {
                 id="btn-gerar-pdf-confirm"
                 className="cp-btn-pdf"
                 style={{ padding: "10px 22px", fontSize: "0.9rem", fontWeight: 700 }}
-                disabled={!pdfDisc || !pdfBimestre || pdfLoading}
+                disabled={!pdfDisc || pdfLoading}
                 onClick={gerarPDF}
               >
                 {pdfLoading

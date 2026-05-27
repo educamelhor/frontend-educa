@@ -1554,81 +1554,191 @@ export default function ConteudosProgramaticos() {
                 </div>
               </div>
 
-              {/* Seletores */}
-              <div className="cp-form-grid">
+              {/* ── Filtros Premium ── */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
 
-                {/* Disciplina (obrigatório) */}
-                <div className="cp-form-group cp-form-full">
+                {/* Card: Disciplina (obrigatória) */}
+                <div style={{
+                  border: pdfDisc ? "1.5px solid #6366f1" : "1.5px solid #fed7aa",
+                  borderRadius: 12,
+                  background: pdfDisc ? "#fafbff" : "#fffbf7",
+                  padding: "12px 14px",
+                  transition: "all .2s",
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                      <span style={{
+                        width: 28, height: 28, borderRadius: 8,
+                        background: pdfDisc ? "#eef2ff" : "#fff7ed",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: "1rem",
+                      }}>📚</span>
+                      <span style={{ fontWeight: 700, fontSize: "0.85rem", color: "#1e293b" }}>Disciplina</span>
+                    </div>
+                    <span style={{
+                      fontSize: "0.68rem", fontWeight: 600, padding: "2px 8px", borderRadius: 20,
+                      background: pdfDisc ? "#eef2ff" : "#fef3c7",
+                      color: pdfDisc ? "#4f46e5" : "#d97706",
+                    }}>
+                      {pdfDisc ? "✓ Selecionada" : "Obrigatório"}
+                    </span>
+                  </div>
                   <select
                     id="pdf-disc-select"
-                    className="cp-select cp-select-full"
                     value={pdfDisc}
                     onChange={e => { setPdfDisc(e.target.value); setPdfErr(""); }}
                     style={{
-                      borderColor: !pdfDisc ? "#f97316" : "#e2e8f0",
-                      background: !pdfDisc ? "#fff7ed" : "#fff",
+                      width: "100%", padding: "9px 12px", borderRadius: 8,
+                      border: pdfDisc ? "1.5px solid #a5b4fc" : "1.5px solid #fbbf24",
+                      background: "#fff", fontSize: "0.88rem", color: "#1e293b",
+                      fontWeight: pdfDisc ? 600 : 400,
+                      cursor: "pointer", outline: "none", appearance: "none",
+                      backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236366f1' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E\")",
+                      backgroundRepeat: "no-repeat", backgroundPosition: "right 10px center", backgroundSize: 16,
                     }}
                   >
-                    <option value="">📚 Selecione a disciplina... (obrigatório)</option>
+                    <option value="">Selecione a disciplina...</option>
                     {DISCIPLINAS.map(d => <option key={d}>{d}</option>)}
                   </select>
                 </div>
 
-                {/* Ano/Série (opcional) */}
-                <div className="cp-form-group cp-form-full">
-                  <label style={{ fontSize:"0.82rem", color:"#64748b", marginBottom:4, display:"block" }}>
-                    Ano / Série <span style={{ color:"#94a3b8", fontWeight:400 }}>(opcional — vazio = todas as séries)</span>
-                  </label>
-                  <select
-                    id="pdf-serie-select"
-                    className="cp-select cp-select-full"
-                    value={pdfSerie}
-                    onChange={e => { setPdfSerie(e.target.value); setPdfErr(""); }}
-                  >
-                    <option value="">Todas as séries</option>
-                    {SERIES_PDF.map(s => <option key={s}>{s}</option>)}
-                  </select>
+                {/* Linha divisória com label "Filtros opcionais" */}
+                <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "2px 0" }}>
+                  <div style={{ flex: 1, height: 1, background: "#e2e8f0" }} />
+                  <span style={{ fontSize: "0.7rem", fontWeight: 600, color: "#94a3b8", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                    Filtros opcionais
+                  </span>
+                  <div style={{ flex: 1, height: 1, background: "#e2e8f0" }} />
                 </div>
 
-                {/* Bimestre (opcional) */}
-                <div className="cp-form-group cp-form-full">
-                  <label style={{ fontSize:"0.82rem", color:"#64748b", marginBottom:4, display:"block" }}>
-                    Bimestre <span style={{ color:"#94a3b8", fontWeight:400 }}>(opcional — vazio = todos os bimestres)</span>
-                  </label>
-                  <select
-                    id="pdf-bim-select"
-                    className="cp-select cp-select-full"
-                    value={pdfBimestre}
-                    onChange={e => { setPdfBimestre(e.target.value); setPdfErr(""); }}
-                  >
-                    <option value="">Todos os bimestres</option>
-                    {BIMESTRES.map(b => <option key={b}>{b}</option>)}
-                  </select>
-                </div>
+                {/* Cards opcionais: Série + Bimestre lado a lado */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
 
+                  {/* Card: Ano/Série */}
+                  <div style={{
+                    border: pdfSerie ? "1.5px solid #3b82f6" : "1.5px solid #e2e8f0",
+                    borderRadius: 12,
+                    background: pdfSerie ? "#eff6ff" : "#f8fafc",
+                    padding: "12px 12px",
+                    transition: "all .2s",
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{
+                          width: 24, height: 24, borderRadius: 6,
+                          background: pdfSerie ? "#dbeafe" : "#f1f5f9",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: "0.85rem",
+                        }}>🎓</span>
+                        <span style={{ fontWeight: 700, fontSize: "0.8rem", color: "#1e293b" }}>Ano / Série</span>
+                      </div>
+                    </div>
+                    <select
+                      id="pdf-serie-select"
+                      value={pdfSerie}
+                      onChange={e => { setPdfSerie(e.target.value); setPdfErr(""); }}
+                      style={{
+                        width: "100%", padding: "8px 10px", borderRadius: 8,
+                        border: pdfSerie ? "1.5px solid #93c5fd" : "1.5px solid #e2e8f0",
+                        background: "#fff", fontSize: "0.82rem", color: pdfSerie ? "#1d4ed8" : "#64748b",
+                        fontWeight: pdfSerie ? 600 : 400,
+                        cursor: "pointer", outline: "none", appearance: "none",
+                        backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%233b82f6' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E\")",
+                        backgroundRepeat: "no-repeat", backgroundPosition: "right 8px center", backgroundSize: 14,
+                      }}
+                    >
+                      <option value="">Todas as séries</option>
+                      {SERIES_PDF.map(s => <option key={s}>{s}</option>)}
+                    </select>
+                    {!pdfSerie && (
+                      <div style={{ fontSize: "0.67rem", color: "#94a3b8", marginTop: 5, textAlign: "center" }}>
+                        vazio = todas
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Card: Bimestre */}
+                  <div style={{
+                    border: pdfBimestre ? "1.5px solid #10b981" : "1.5px solid #e2e8f0",
+                    borderRadius: 12,
+                    background: pdfBimestre ? "#f0fdf4" : "#f8fafc",
+                    padding: "12px 12px",
+                    transition: "all .2s",
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span style={{
+                          width: 24, height: 24, borderRadius: 6,
+                          background: pdfBimestre ? "#d1fae5" : "#f1f5f9",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: "0.85rem",
+                        }}>📅</span>
+                        <span style={{ fontWeight: 700, fontSize: "0.8rem", color: "#1e293b" }}>Bimestre</span>
+                      </div>
+                    </div>
+                    <select
+                      id="pdf-bim-select"
+                      value={pdfBimestre}
+                      onChange={e => { setPdfBimestre(e.target.value); setPdfErr(""); }}
+                      style={{
+                        width: "100%", padding: "8px 10px", borderRadius: 8,
+                        border: pdfBimestre ? "1.5px solid #6ee7b7" : "1.5px solid #e2e8f0",
+                        background: "#fff", fontSize: "0.82rem", color: pdfBimestre ? "#065f46" : "#64748b",
+                        fontWeight: pdfBimestre ? 600 : 400,
+                        cursor: "pointer", outline: "none", appearance: "none",
+                        backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2310b981' stroke-width='2'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E\")",
+                        backgroundRepeat: "no-repeat", backgroundPosition: "right 8px center", backgroundSize: 14,
+                      }}
+                    >
+                      <option value="">Todos os bimestres</option>
+                      {BIMESTRES.map(b => <option key={b}>{b}</option>)}
+                    </select>
+                    {!pdfBimestre && (
+                      <div style={{ fontSize: "0.67rem", color: "#94a3b8", marginTop: 5, textAlign: "center" }}>
+                        vazio = todos
+                      </div>
+                    )}
+                  </div>
+
+                </div>
               </div>
 
               {/* Mensagem de erro */}
               {pdfErr && (
                 <div style={{
                   background: "#fef2f2", border: "1px solid #fca5a5",
-                  borderRadius: 8, padding: "10px 14px",
-                  color: "#b91c1c", fontSize: "0.82rem", marginTop: 8,
+                  borderRadius: 10, padding: "10px 14px",
+                  color: "#b91c1c", fontSize: "0.82rem", marginTop: 4,
+                  display: "flex", alignItems: "center", gap: 8,
                 }}>
-                  ⚠️ {pdfErr}
+                  <span style={{ fontSize: "1rem" }}>⚠️</span> {pdfErr}
                 </div>
               )}
 
-              {/* Info pré-geração */}
+              {/* Resumo do que será gerado */}
               {pdfDisc && !pdfErr && (
                 <div style={{
-                  background: "#f0fdf4", border: "1px solid #86efac",
-                  borderRadius: 8, padding: "10px 14px",
-                  color: "#15803d", fontSize: "0.82rem", marginTop: 8,
+                  background: "linear-gradient(135deg, #f0fdf4, #eff6ff)",
+                  border: "1.5px solid #6ee7b7",
+                  borderRadius: 10, padding: "12px 14px", marginTop: 4,
+                  display: "flex", alignItems: "flex-start", gap: 10,
                 }}>
-                  ✅ O PDF incluirá <strong>{pdfDisc}</strong>
-                  {pdfSerie ? <>, série <strong>{pdfSerie}</strong></> : <>, <strong>todas as séries</strong></>}
-                  {pdfBimestre ? <>, <strong>{parseInt(pdfBimestre)}º Bimestre</strong></> : <>, <strong>todos os bimestres</strong></>}.
+                  <span style={{
+                    width: 28, height: 28, borderRadius: 8,
+                    background: "#d1fae5", display: "flex", alignItems: "center",
+                    justifyContent: "center", fontSize: "1rem", flexShrink: 0,
+                  }}>✅</span>
+                  <div style={{ fontSize: "0.82rem", color: "#15803d", lineHeight: 1.5 }}>
+                    <strong>{pdfDisc}</strong>
+                    {" · "}
+                    <span style={{ color: pdfSerie ? "#1d4ed8" : "#64748b" }}>
+                      {pdfSerie ? <strong>{pdfSerie}</strong> : "Todas as séries"}
+                    </span>
+                    {" · "}
+                    <span style={{ color: pdfBimestre ? "#065f46" : "#64748b" }}>
+                      {pdfBimestre ? <strong>{parseInt(pdfBimestre)}º Bimestre</strong> : "Todos os bimestres"}
+                    </span>
+                  </div>
                 </div>
               )}
 

@@ -504,7 +504,17 @@ export default function ConteudosProgramaticos() {
       setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
       setPdfModalOpen(false);
     } catch (e) {
-      setPdfErr(e?.response?.data?.message || "Erro ao gerar PDF. Tente novamente.");
+      const status = e?.response?.status;
+      const errData = e?.response?.data;
+      if (status === 403) {
+        setPdfErr("Sem permissão para gerar este relatório. Fale com o administrador.");
+      } else if (status === 404) {
+        setPdfErr("Recurso não encontrado no servidor. Verifique a conexão.");
+      } else if (status === 500) {
+        setPdfErr("Erro interno no servidor. Tente novamente em instantes.");
+      } else {
+        setPdfErr(errData?.message || errData?.erro || "Erro ao gerar PDF. Tente novamente.");
+      }
     } finally {
       setPdfLoading(false);
     }

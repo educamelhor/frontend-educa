@@ -324,6 +324,11 @@ export default function ConteudosProgramaticos() {
       ? [bimNum]
       : [...new Set(data.itens.map(i => i.bimestre))].sort();
 
+    // Coleta todas as séries presentes
+    const todasSeries = [...new Set(data.itens.map(i => (i.serie || "Sem série").toUpperCase()))];
+    const seriesOrdenadas = [...SERIES_ORDER.filter(s => todasSeries.includes(s)),
+                             ...todasSeries.filter(s => !SERIES_ORDER.includes(s))];
+
     let curY = 54;
     const PAGE_BOTTOM = H - 18;
     const MX = 10;
@@ -331,66 +336,73 @@ export default function ConteudosProgramaticos() {
     const LINE_H = 4.5;
     const SUB_LINE_H = 4.2;
 
-    for (const bim of bimestresPresentes) {
-      const itensBim = bimNum ? data.itens : data.itens.filter(i => i.bimestre === bim);
-      const bimLabel = `${bim}º Bimestre`;
+    // ── Loop externo: SÉRIE → interno: BIMESTRE ─────────────────────────────
+    for (const serie of seriesOrdenadas) {
+      const meta = SERIE_META[serie] || SERIE_META["6º ANO"];
+      const [r,g,b] = meta.rgb;
 
-      if (!bimNum) {
-        if (curY > PAGE_BOTTOM - 18) {
-          doc.addPage();
-          buildPdfHeaderOficial(doc, W, logos, hoje, "OBJETIVOS DE APRENDIZAGEM", data.disciplina_nome, bimStr, data.ano_letivo || 2026);
-          drawFooter(doc, W, H, data.escola_nome, bimLabel);
-          curY = 54;
+      // Verifica se esta série tem dados em algum bimestre
+      const itensDeSSerie = data.itens.filter(i => (i.serie || "Sem série").toUpperCase() === serie);
+      if (!itensDeSSerie.length) continue;
+
+      // Banner principal da SÉRIE (aparece uma vez, antes de todos os bimestres)
+      if (curY > PAGE_BOTTOM - 28) {
+        doc.addPage();
+        buildPdfHeaderOficial(doc, W, logos, hoje, "OBJETIVOS DE APRENDIZAGEM", data.disciplina_nome, bimStr, data.ano_letivo || 2026);
+        drawFooter(doc, W, H, data.escola_nome, bimStr);
+        curY = 54;
+      }
+      doc.setFillColor(r, g, b);
+      doc.roundedRect(MX, curY, CW, 12, 2, 2, "F");
+      doc.setFillColor(...meta.rgb.map(c => Math.max(c - 25, 0)));
+      doc.triangle(W - MX - 30, curY, W - MX, curY, W - MX, curY + 12, "F");
+      doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(255, 255, 255);
+      doc.text(serie, MX + 5, curY + 8.5);
+      const cntSerie = itensDeSSerie.length;
+      doc.setFont("helvetica", "normal"); doc.setFontSize(7); doc.setTextColor(220, 235, 255);
+      doc.text(`${cntSerie} objetivo${cntSerie !== 1 ? "s" : ""}`, W - MX - 4, curY + 8, { align: "right" });
+      curY += 16;
+
+      // ── Loop interno: BIMESTRES desta série ──────────────────────────────
+      for (const bim of bimestresPresentes) {
+        const itensBim = data.itens.filter(i =>
+          (i.serie || "Sem série").toUpperCase() === serie &&
+          i.bimestre === bim
+        );
+        if (!itensBim.length) continue;
+
+        const bimLabel = `${bim}º Bimestre`;
+
+        // Banner do bimestre (só quando há múltiplos bimestres)
+        if (!bimNum) {
+          if (curY > PAGE_BOTTOM - 18) {
+            doc.addPage();
+            buildPdfHeaderOficial(doc, W, logos, hoje, "OBJETIVOS DE APRENDIZAGEM", data.disciplina_nome, bimStr, data.ano_letivo || 2026);
+            drawFooter(doc, W, H, data.escola_nome, bimLabel);
+            curY = 54;
+          }
+          doc.setFillColor(241, 245, 249); // slate-100
+          doc.roundedRect(MX + 2, curY, CW - 4, 9, 2, 2, "F");
+          doc.setDrawColor(r, g, b); doc.setLineWidth(0.3);
+          doc.roundedRect(MX + 2, curY, CW - 4, 9, 2, 2, "S");
+          // Pill esquerda colorida
+          doc.setFillColor(r, g, b);
+          doc.roundedRect(MX + 2, curY, 3, 9, 1, 1, "F");
+          doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.setTextColor(r, g, b);
+          doc.text(bimLabel, MX + 9, curY + 6.2);
+          curY += 13;
         }
-        doc.setFillColor(15, 23, 42);
-        doc.roundedRect(MX, curY, CW, 12, 3, 3, "F");
-        // Linha decorativa esquerda
-        doc.setFillColor(99, 102, 241);
-        doc.roundedRect(MX, curY, 4, 12, 2, 2, "F");
-        doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(255, 255, 255);
-        doc.text(bimLabel, MX + 8, curY + 8.5);
-        curY += 16;
-      }
 
-      const bySerie = {};
-      for (const item of itensBim) {
-        const s = (item.serie || "Sem série").toUpperCase();
-        if (!bySerie[s]) bySerie[s] = [];
-        bySerie[s].push(item);
-      }
-
-      for (const serie of [...SERIES_ORDER, ...Object.keys(bySerie).filter(s => !SERIES_ORDER.includes(s))]) {
-        const itens = bySerie[serie]; if (!itens) continue;
-        const meta = SERIE_META[serie] || SERIE_META["6º ANO"];
-        const [r,g,b] = meta.rgb;
-
+        // Conteúdos agrupados por conteudo_seedf
         const porConteudo = {};
-        for (const item of itens) {
+        for (const item of itensBim) {
           const chave = item.conteudo_seedf || "Conteúdo";
           if (!porConteudo[chave]) porConteudo[chave] = { ut: item.unidade_tematica || "", objetivos: [] };
           const txt = (item.objetivo_texto || "").trim();
           if (txt) porConteudo[chave].objetivos.push(txt);
         }
-        if (Object.keys(porConteudo).every(k => !porConteudo[k].objetivos.length)) continue;
 
-        if (curY > PAGE_BOTTOM - 28) {
-          doc.addPage();
-          buildPdfHeaderOficial(doc, W, logos, hoje, "OBJETIVOS DE APRENDIZAGEM", data.disciplina_nome, bimStr, data.ano_letivo || 2026);
-          drawFooter(doc, W, H, data.escola_nome, !bimNum ? bimLabel : bimStr);
-          curY = 54;
-        }
-        doc.setFillColor(r, g, b);
-        doc.roundedRect(MX, curY, CW, 10, 2, 2, "F");
-        doc.setFillColor(...meta.rgb.map(c => Math.max(c-25,0)));
-        doc.triangle(W - MX - 25, curY, W - MX, curY, W - MX, curY + 10, "F");
-        doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(255, 255, 255);
-        doc.text(serie, MX + 5, curY + 7);
-        const cntTotal = itens.length;
-        doc.setFont("helvetica","normal"); doc.setFontSize(7); doc.setTextColor(220,235,255);
-        doc.text(`${cntTotal} conteúdo${cntTotal!==1?"s":""}`, W - MX - 4, curY + 7, { align:"right" });
-        curY += 14;
-
-        let numIdx = 1; // numerador contínuo por série
+        let numIdx = 1;
         for (const [, grupo] of Object.entries(porConteudo)) {
           if (!grupo.objetivos.length) continue;
           for (const objTxt of grupo.objetivos) {
@@ -426,33 +438,33 @@ export default function ConteudosProgramaticos() {
             doc.roundedRect(MX, curY, 3.5, blockH, 1, 1, "F");
             doc.setFillColor(r, g, b);
             doc.circle(MX + 11, curY + 7, 4, "F");
-            doc.setFont("helvetica","bold"); doc.setFontSize(7.5); doc.setTextColor(255,255,255);
-            doc.text(String(numIdx++), MX + 11, curY + 8.5, { align:"center" });
+            doc.setFont("helvetica", "bold"); doc.setFontSize(7.5); doc.setTextColor(255, 255, 255);
+            doc.text(String(numIdx++), MX + 11, curY + 8.5, { align: "center" });
             let ty = curY + 6;
             if (topicos.length > 0) {
               for (const top of topicos) {
                 const linhasTop = doc.splitTextToSize(top.texto, maxTextW);
-                doc.setFont("helvetica","bold"); doc.setFontSize(8.5); doc.setTextColor(22, 38, 68);
+                doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.setTextColor(22, 38, 68);
                 doc.text(linhasTop, MX + 18, ty + 4);
                 ty += linhasTop.length * LINE_H + 2;
                 for (const sub of top.subitens) {
                   const linhasSub = doc.splitTextToSize(`• ${sub}`, maxTextW - 10);
-                  doc.setFont("helvetica","normal"); doc.setFontSize(7.8); doc.setTextColor(60, 80, 110);
+                  doc.setFont("helvetica", "normal"); doc.setFontSize(7.8); doc.setTextColor(60, 80, 110);
                   doc.text(linhasSub, MX + 25, ty + 3.5);
                   ty += linhasSub.length * SUB_LINE_H + 1.5;
                 }
               }
             } else {
               const linhas = doc.splitTextToSize(objTxt, maxTextW);
-              doc.setFont("helvetica","bold"); doc.setFontSize(8.5); doc.setTextColor(22,38,68);
+              doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.setTextColor(22, 38, 68);
               doc.text(linhas, MX + 18, ty + 4);
             }
             curY += blockH + 3;
           }
         }
-        curY += 5;
+        curY += 4; // espaço entre bimestres
       }
-      if (!bimNum) curY += 8;
+      curY += 8; // espaço entre séries
     }
     drawFooter(doc, W, H, data.escola_nome, bimStr);
   };

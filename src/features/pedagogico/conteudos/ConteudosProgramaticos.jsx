@@ -78,53 +78,95 @@ export default function ConteudosProgramaticos() {
     setPdfDisc(""); setPdfBimestre(""); setPdfErr(""); setPdfTipo("interno"); setPdfModalOpen(true);
   };
 
-  // ── Helper: faz o cabeçalho premium (compartilhado) ────────────────────────
-  const buildPdfHeader = (doc, W, H, hoje, escolaNome, titulo, badges, corFundo) => {
-    const [cr,cg,cb]   = corFundo || [99,102,241];
-    const [cr2,cg2,cb2] = [Math.max(cr-20,0), Math.max(cg-32,0), Math.max(cb-12,0)];
-    doc.setFillColor(cr,cg,cb); doc.rect(0, 0, W, 42, "F");
-    doc.setFillColor(cr2,cg2,cb2); doc.rect(0, 34, W, 8, "F");
-    doc.setFillColor(251,191,36); doc.rect(0, 42, W, 1.5, "F");
-    doc.setTextColor(255,255,255);
-    doc.setFont("helvetica", "bold"); doc.setFontSize(15);
-    doc.text(escolaNome, 14, 13);
-    doc.setFontSize(9); doc.setFont("helvetica", "normal");
-    doc.setTextColor(199,210,254);
-    doc.text("Centro de Ensino Fundamental 04 — CCMDF — SEEDF", 14, 19);
-    doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.setTextColor(255,255,255);
-    doc.text(titulo, 14, 29);
-    let bx = 14;
-    badges.forEach(b => {
-      doc.setFillColor(cr2,cg2,cb2);
-      const tw = doc.getTextWidth(b.val) + 14;
-      doc.roundedRect(bx, 35, tw, 6, 1, 1, "F");
-      doc.setFont("helvetica", "bold"); doc.setFontSize(7);
-      doc.setTextColor(199,210,254); doc.text(b.label + ":  ", bx + 2, 38.8);
-      doc.setTextColor(255,255,255); doc.text(b.val, bx + 2 + doc.getTextWidth(b.label + ":  "), 38.8);
-      bx += tw + 4;
+  // ── Helper: carrega imagem como base64 (async) ─────────────────────────────
+  const loadImageAsBase64 = (src) => new Promise((resolve) => {
+    const img = new window.Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+      canvas.getContext("2d").drawImage(img, 0, 0);
+      resolve({ data: canvas.toDataURL("image/png"), w: img.naturalWidth, h: img.naturalHeight });
+    };
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+
+  // ── Helper: cabeçalho OFICIAL premium (estilo Lista de Assinatura) ───────────
+  const buildPdfHeaderOficial = (doc, W, logos, hoje, titulo, disciplina, bimStr, anoLetivo) => {
+    // Fundo branco para o cabeçalho
+    doc.setFillColor(255, 255, 255);
+    doc.rect(0, 0, W, 44, "F");
+
+    // Logos
+    const logoH = 20;
+    if (logos.left)  doc.addImage(logos.left.data,  "PNG", 10,  4, (logos.left.w  / logos.left.h)  * logoH, logoH);
+    if (logos.right) doc.addImage(logos.right.data, "PNG", W - 10 - (logos.right.w / logos.right.h) * logoH, 4, (logos.right.w / logos.right.h) * logoH, logoH);
+
+    // Texto central do cabeçalho oficial
+    const cx = W / 2;
+    doc.setFont("helvetica", "bold"); doc.setFontSize(8); doc.setTextColor(15, 40, 85);
+    doc.text("SECRETARIA DE ESTADO DE EDUCAÇÃO DO DISTRITO FEDERAL", cx, 8, { align: "center" });
+    doc.text("COORDENAÇÃO REGIONAL DE ENSINO DE PLANALTINA", cx, 13, { align: "center" });
+    doc.text("CENTRO DE ENSINO FUNDAMENTAL 04 DE PLANALTINA — CEF04-CCMDF", cx, 18, { align: "center" });
+    doc.setFont("helvetica", "normal"); doc.setFontSize(7); doc.setTextColor(50, 60, 80);
+    doc.text("Setor Educacional, Lotes C/D", cx, 23, { align: "center" });
+
+    // Linha dupla separadora dourada
+    doc.setDrawColor(192, 152, 40); doc.setLineWidth(0.9);
+    doc.line(10, 27, W - 10, 27);
+    doc.setDrawColor(192, 152, 40); doc.setLineWidth(0.3);
+    doc.line(10, 28.5, W - 10, 28.5);
+
+    // Título principal
+    doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(15, 40, 85);
+    doc.text(titulo, cx, 35.5, { align: "center" });
+
+    // Faixa de metadados
+    doc.setFillColor(12, 28, 68); doc.roundedRect(10, 39, W - 20, 8, 0, 0, "F");
+    doc.setFont("helvetica", "bold"); doc.setFontSize(7.5); doc.setTextColor(255, 255, 255);
+    const metaY = 44.2;
+    const colW  = (W - 20) / 4;
+    const metaItems = [
+      { label: "DISCIPLINA", val: disciplina },
+      { label: "BIMESTRE",   val: bimStr },
+      { label: "ANO LETIVO", val: String(anoLetivo) },
+      { label: "EMISSÃO",    val: hoje },
+    ];
+    metaItems.forEach((m, i) => {
+      const xPos = 10 + colW * i + colW / 2;
+      doc.setFont("helvetica", "normal"); doc.setFontSize(6); doc.setTextColor(180, 200, 255);
+      doc.text(m.label, xPos, metaY - 1.8, { align: "center" });
+      doc.setFont("helvetica", "bold"); doc.setFontSize(7.5); doc.setTextColor(255, 255, 255);
+      doc.text(m.val, xPos, metaY + 1.5, { align: "center" });
     });
-    doc.setFont("helvetica", "normal"); doc.setFontSize(7); doc.setTextColor(199,210,254);
-    doc.text(`Emitido em: ${hoje}`, W - 14, 13, { align: "right" });
+
+    // Linha dourada abaixo da faixa
+    doc.setDrawColor(192, 152, 40); doc.setLineWidth(1.2);
+    doc.line(10, 48, W - 10, 48);
   };
 
-  // ── Helper: rodapé de página ───────────────────────────────────────────────────
-  const drawFooter = (doc, W, H, escolaNome, bimNum) => {
+  // ── Helper: rodapé de página premium ─────────────────────────────────────────
+  const drawFooter = (doc, W, H, escolaNome, bimStr) => {
     const pn = doc.internal.getCurrentPageInfo().pageNumber;
-    doc.setFont("helvetica", "normal"); doc.setFontSize(7); doc.setTextColor(148,163,184);
-    doc.text(`${escolaNome} — ${bimNum}º Bimestre / 2026`, 14, H - 8);
-    doc.text(`Pág. ${pn}`, W - 14, H - 8, { align: "right" });
-    doc.setDrawColor(226,232,240); doc.line(14, H - 11, W - 14, H - 11);
+    // Linha fina
+    doc.setDrawColor(192, 152, 40); doc.setLineWidth(0.4);
+    doc.line(10, H - 12, W - 10, H - 12);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(6.5); doc.setTextColor(80, 90, 110);
+    doc.text(`${escolaNome} — ${bimStr} — Ano Letivo 2026`, 10, H - 8);
+    doc.text(`Página ${pn}`, W - 10, H - 8, { align: "right" });
+    doc.setFont("helvetica", "italic"); doc.setFontSize(5.5); doc.setTextColor(150, 160, 180);
+    doc.text("Gerado automaticamente pelo Sistema EDUCA MELHOR — Uso interno pedagógico", W / 2, H - 4.5, { align: "center" });
   };
 
-  // ── Helper: parseia objetivo_texto em tópicos + subitens ───────────────────────
+  // ── Helper: parseia objetivo_texto em tópicos + subitens ─────────────────────
   const parseObjetivo = (texto) => {
     if (!texto) return [];
     const topicos = [];
     let atual = null;
     for (const linha of texto.split("\n")) {
       const tMatch = linha.match(/^\s*(\d+)[\.\)\s]+(.+)/);
-      const sMatch = linha.match(/^\s*[\u2022\-\*\.\s]{1,4}\s+(.+)/) ||
-                     linha.match(/^\s{3,}(.+)/) ;
+      const sMatch = linha.match(/^\s*[\u2022\-\*]\s+(.+)/) || linha.match(/^\s{3,}(.+)/);
       if (tMatch) {
         atual = { num: tMatch[1], texto: tMatch[2].trim(), subitens: [] };
         topicos.push(atual);
@@ -144,163 +186,287 @@ export default function ConteudosProgramaticos() {
     return topicos;
   };
 
-  // ── PDF INTERNO (4 colunas, com UT e conteúdo SEEDF) ──────────────────────────
-  const gerarPdfInterno = (doc, W, H, hoje, data, bimNum) => {
-    buildPdfHeader(doc, W, H, hoje, data.escola_nome, "CONTEÚDO PROGRAMÁTICO",
-      [{ label:"DISCIPLINA", val: data.disciplina_nome },
-       { label:"BIMESTRE",   val: `${bimNum}º Bimestre` },
-       { label:"ANO LETIVO", val: "2026" }], [99,102,241]);
-
-    const SERIES_ORDER = ["6º ANO","7º ANO","8º ANO","9º ANO"];
-    const BG_SERIE = { "6º ANO":[99,102,241],"7º ANO":[14,165,233],"8º ANO":[16,185,129],"9º ANO":[245,158,11] };
-    const bySerie = {};
-    for (const item of data.itens) {
-      const s = item.serie || "Sem série";
-      if (!bySerie[s]) bySerie[s] = [];
-      bySerie[s].push(item);
-    }
-    let curY = 50;
-    const PAGE_BOTTOM = H - 18;
-    for (const serie of [...SERIES_ORDER, ...Object.keys(bySerie).filter(s => !SERIES_ORDER.includes(s))]) {
-      const itens = bySerie[serie]; if (!itens) continue;
-      if (curY > PAGE_BOTTOM - 20) { doc.addPage(); curY = 15; }
-      const [r,g,b] = BG_SERIE[serie] || [99,102,241];
-      doc.setFillColor(r,g,b); doc.roundedRect(14, curY, W-28, 8, 1.5,1.5,"F");
-      doc.setFont("helvetica","bold"); doc.setFontSize(9); doc.setTextColor(255,255,255);
-      doc.text(serie, 19, curY+5.4); curY += 11;
-      const rows = itens.map((item,idx) => [
-        String(idx+1), item.unidade_tematica||"—", item.conteudo_seedf||"—", item.objetivo_texto||"—"
-      ]);
-      autoTable(doc, {
-        startY: curY,
-        head: [["#","Unidade Temática - BNCC","Conteúdo - Currículo em Movimento","Objetivo de Aprendizagem"]],
-        body: rows,
-        styles: { fontSize:7.5, cellPadding:{top:2.5,bottom:2.5,left:3,right:3}, valign:"top", overflow:"linebreak" },
-        headStyles: { fillColor:[r,g,b], textColor:[255,255,255], fontStyle:"bold", fontSize:7.5 },
-        alternateRowStyles: { fillColor:[248,250,252] },
-        columnStyles: { 0:{cellWidth:8,halign:"center",fontStyle:"bold"}, 1:{cellWidth:38}, 2:{cellWidth:58}, 3:{cellWidth:"auto"} },
-        margin: { left:14, right:14 }, tableLineColor:[226,232,240], tableLineWidth:0.1,
-        didDrawPage: () => drawFooter(doc, W, H, data.escola_nome, bimNum),
-      });
-      curY = doc.lastAutoTable.finalY + 8;
-    }
+  // Paletas por série
+  const SERIE_META = {
+    "6º ANO": { rgb:[63,81,181],  light:[235,238,252], accent:[92,107,192],  label:"6° ANO" },
+    "7º ANO": { rgb:[2,136,209],  light:[225,245,254], accent:[3,155,229],   label:"7° ANO" },
+    "8º ANO": { rgb:[0,137,123],  light:[224,242,241], accent:[0,150,136],   label:"8° ANO" },
+    "9º ANO": { rgb:[230,81,0],   light:[255,243,224], accent:[245,124,0],   label:"9° ANO" },
   };
 
-  // ── PDF ALUNOS (só objetivos únicos, formato lista) ────────────────────────────
-  const gerarPdfAlunos = (doc, W, H, hoje, data, bimNum) => {
-    buildPdfHeader(doc, W, H, hoje, data.escola_nome, "OBJETIVOS DE APRENDIZAGEM",
-      [{ label:"DISCIPLINA", val: data.disciplina_nome },
-       { label:"BIMESTRE",   val: `${bimNum}º Bimestre` },
-       { label:"ANO LETIVO", val: "2026" }], [16,185,129]); // emerald
+  // ── PDF INTERNO premium — tabela hierárquica por série ────────────────────────
+  const gerarPdfInterno = async (doc, W, H, hoje, data, bimNum) => {
+    const bimStr = `${bimNum}º Bimestre`;
+    const logos = {};
+    try {
+      logos.left  = await loadImageAsBase64("/logo-escola-left.png");
+      logos.right = await loadImageAsBase64("/LOGO_CCMDF.jpg");
+    } catch (_) {}
+    buildPdfHeaderOficial(doc, W, logos, hoje, "CONTEÚDO PROGRAMÁTICO", data.disciplina_nome, bimStr, data.ano_letivo || 2026);
 
     const SERIES_ORDER = ["6º ANO","7º ANO","8º ANO","9º ANO"];
-    const BG_SERIE = { "6º ANO":[99,102,241],"7º ANO":[14,165,233],"8º ANO":[16,185,129],"9º ANO":[245,158,11] };
     const bySerie = {};
     for (const item of data.itens) {
-      const s = item.serie || "Sem série";
+      const s = (item.serie || "Sem série").toUpperCase();
+      if (!bySerie[s]) bySerie[s] = [];
+      bySerie[s].push(item);
+    }
+    let curY = 54;
+    const PAGE_BOTTOM = H - 18;
+    const MX = 10; const CW = W - 20;
+
+    for (const serie of [...SERIES_ORDER, ...Object.keys(bySerie).filter(s => !SERIES_ORDER.includes(s))]) {
+      const itens = bySerie[serie]; if (!itens) continue;
+      const meta = SERIE_META[serie] || SERIE_META["6º ANO"];
+      const [r,g,b] = meta.rgb;
+
+      if (curY > PAGE_BOTTOM - 30) {
+        doc.addPage();
+        buildPdfHeaderOficial(doc, W, logos, hoje, "CONTEÚDO PROGRAMÁTICO", data.disciplina_nome, bimStr, data.ano_letivo || 2026);
+        drawFooter(doc, W, H, data.escola_nome, bimStr);
+        curY = 54;
+      }
+
+      // Cabeçalho da série — estilo faixa sólida com texto branco
+      doc.setFillColor(r, g, b);
+      doc.roundedRect(MX, curY, CW, 9, 1.5, 1.5, "F");
+      // Ícone de badge lateral claro
+      doc.setFillColor(255, 255, 255, 0.15);
+      doc.roundedRect(MX + 2, curY + 1.5, 18, 6, 1, 1, "F");
+      doc.setFont("helvetica", "bold"); doc.setFontSize(7.5); doc.setTextColor(r, g, b);
+      doc.text(serie, MX + 11, curY + 5.8, { align: "center" });
+      doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.setTextColor(255, 255, 255);
+      const cntTxt = `${itens.length} registro${itens.length !== 1 ? "s" : ""}`;
+      doc.setFont("helvetica","normal"); doc.setFontSize(7); doc.setTextColor(220,235,255);
+      doc.text(cntTxt, W - MX - 3, curY + 5.8, { align: "right" });
+      curY += 12;
+
+      // Tabela premium com cores da série
+      const rows = itens.map((item, idx) => {
+        // Formata o objetivo_texto com tópicos e subitems
+        const objTexto = item.objetivo_texto || "—";
+        return [String(idx + 1), item.unidade_tematica || "—", item.conteudo_seedf || "—", objTexto];
+      });
+
+      autoTable(doc, {
+        startY: curY,
+        head: [["#", "Unidade Temática\nBNCC", "Conteúdo\nCurrículo em Movimento - SEEDF", "Objetivo de Aprendizagem\nCEF04-CCMDF"]],
+        body: rows,
+        styles: {
+          fontSize: 7.5,
+          cellPadding: { top: 3, bottom: 3, left: 3, right: 3 },
+          valign: "top",
+          overflow: "linebreak",
+          lineColor: [210, 220, 235],
+          lineWidth: 0.15,
+          textColor: [30, 41, 59],
+        },
+        headStyles: {
+          fillColor: [r, g, b],
+          textColor: [255, 255, 255],
+          fontStyle: "bold",
+          fontSize: 7,
+          cellPadding: { top: 3.5, bottom: 3.5, left: 3, right: 3 },
+          halign: "center",
+        },
+        alternateRowStyles: { fillColor: meta.light },
+        columnStyles: {
+          0: { cellWidth: 7,  halign: "center", fontStyle: "bold", textColor: [r, g, b] },
+          1: { cellWidth: 38, fontStyle: "bold", textColor: [30,41,59] },
+          2: { cellWidth: 58 },
+          3: { cellWidth: "auto" },
+        },
+        margin: { left: MX, right: MX },
+        tableLineColor: [210, 220, 235],
+        tableLineWidth: 0.2,
+        didParseCell: (hookData) => {
+          // Subitens na coluna do Objetivo (col 3) renderizados com recuo
+          if (hookData.column.index === 3 && hookData.section === "body") {
+            const txt = hookData.cell.raw || "";
+            if (txt.includes("\n")) {
+              hookData.cell.text = txt.split("\n");
+            }
+          }
+        },
+        didDrawCell: (hookData) => {
+          // Linha esquerda colorida na coluna #
+          if (hookData.column.index === 0 && hookData.section === "body") {
+            doc.setFillColor(...meta.accent.split ? [r,g,b] : meta.rgb);
+            doc.rect(hookData.cell.x, hookData.cell.y, 1.2, hookData.cell.height, "F");
+          }
+        },
+        didDrawPage: () => {
+          buildPdfHeaderOficial(doc, W, logos, hoje, "CONTEÚDO PROGRAMÁTICO", data.disciplina_nome, bimStr, data.ano_letivo || 2026);
+          drawFooter(doc, W, H, data.escola_nome, bimStr);
+        },
+      });
+      curY = doc.lastAutoTable.finalY + 7;
+    }
+    // Garante rodapé na última página
+    drawFooter(doc, W, H, data.escola_nome, bimStr);
+  };
+
+  // ── PDF ALUNOS premium — cards com objetivos e subitens ─────────────────────
+  const gerarPdfAlunos = async (doc, W, H, hoje, data, bimNum) => {
+    const bimStr = `${bimNum}º Bimestre`;
+    const logos = {};
+    try {
+      logos.left  = await loadImageAsBase64("/logo-escola-left.png");
+      logos.right = await loadImageAsBase64("/LOGO_CCMDF.jpg");
+    } catch (_) {}
+    buildPdfHeaderOficial(doc, W, logos, hoje, "OBJETIVOS DE APRENDIZAGEM", data.disciplina_nome, bimStr, data.ano_letivo || 2026);
+
+    const SERIES_ORDER = ["6º ANO","7º ANO","8º ANO","9º ANO"];
+    const bySerie = {};
+    for (const item of data.itens) {
+      const s = (item.serie || "Sem série").toUpperCase();
       if (!bySerie[s]) bySerie[s] = [];
       bySerie[s].push(item);
     }
 
-    let curY = 50;
-    const PAGE_BOTTOM = H - 20;
-    const MX = 14; // margem X
-    const CW = W - 28; // largura útil
+    let curY = 54;
+    const PAGE_BOTTOM = H - 18;
+    const MX = 10;
+    const CW = W - 20;
 
     for (const serie of [...SERIES_ORDER, ...Object.keys(bySerie).filter(s => !SERIES_ORDER.includes(s))]) {
       const itens = bySerie[serie]; if (!itens) continue;
-      const [r,g,b] = BG_SERIE[serie] || [99,102,241];
+      const meta = SERIE_META[serie] || SERIE_META["6º ANO"];
+      const [r,g,b] = meta.rgb;
 
-      // Deduplica os objetivos desta série
-      const vistos = new Set();
-      const unicos = [];
+      // Agrupa por conteúdo SEEDF (para listar objetivos agrupados)
+      const porConteudo = {};
       for (const item of itens) {
+        const chave = item.conteudo_seedf || "Conteúdo";
+        if (!porConteudo[chave]) porConteudo[chave] = { ut: item.unidade_tematica || "", objetivos: [] };
         const txt = (item.objetivo_texto || "").trim();
-        if (txt && !vistos.has(txt)) { vistos.add(txt); unicos.push(txt); }
+        if (txt) porConteudo[chave].objetivos.push(txt);
       }
-      if (!unicos.length) continue;
+      if (Object.keys(porConteudo).every(k => !porConteudo[k].objetivos.length)) continue;
 
-      // ── Cabeçalho da série ──
-      if (curY > PAGE_BOTTOM - 20) { doc.addPage(); curY = 15; }
-      doc.setFillColor(r,g,b);
-      doc.roundedRect(MX, curY, CW, 9, 1.5,1.5,"F");
-      doc.setFont("helvetica","bold"); doc.setFontSize(10); doc.setTextColor(255,255,255);
-      doc.text(serie, MX+5, curY+6.2);
-      // contador de objetivos
-      const cntTxt = `${unicos.length} objetivo${unicos.length>1?"s":""}`;
-      doc.setFontSize(7.5); doc.setFont("helvetica","normal");
-      doc.text(cntTxt, W - MX - 2, curY+6.2, { align:"right" });
-      curY += 13;
+      // ── Cabeçalho da série ──────────────────────────────────────────────────
+      if (curY > PAGE_BOTTOM - 28) {
+        doc.addPage();
+        buildPdfHeaderOficial(doc, W, logos, hoje, "OBJETIVOS DE APRENDIZAGEM", data.disciplina_nome, bimStr, data.ano_letivo || 2026);
+        drawFooter(doc, W, H, data.escola_nome, bimStr);
+        curY = 54;
+      }
 
-      // ── Lista de objetivos (card-style) ──
-      let numGlobal = 1;
-      for (const objTxt of unicos) {
-        const topicos = parseObjetivo(objTxt);
+      // Faixa da série
+      doc.setFillColor(r, g, b);
+      doc.roundedRect(MX, curY, CW, 10, 2, 2, "F");
+      // Detalhe: triângulo decorativo direita
+      doc.setFillColor(...meta.rgb.map(c => Math.max(c-25,0)));
+      doc.triangle(W - MX - 25, curY, W - MX, curY, W - MX, curY + 10, "F");
+      doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(255, 255, 255);
+      doc.text(serie, MX + 5, curY + 7);
+      const cntTotal = itens.length;
+      doc.setFont("helvetica","normal"); doc.setFontSize(7); doc.setTextColor(220,235,255);
+      doc.text(`${cntTotal} conteúdo${cntTotal!==1?"s":""}`, W - MX - 4, curY + 7, { align:"right" });
+      curY += 14;
 
-        // Calcula altura total necessária para este bloco
-        let blockH = 4; // padding top
-        for (const top of topicos) {
-          const linhasTop = doc.splitTextToSize(top.texto, CW - 20);
-          blockH += linhasTop.length * 4.5 + 1.5;
-          for (const sub of top.subitens) {
-            const linhasSub = doc.splitTextToSize(`\u2022 ${sub}`, CW - 32);
-            blockH += linhasSub.length * 4 + 1.5;
-          }
+      // ── Para cada agrupamento de conteúdo SEEDF ─────────────────────────────
+      for (const [conteudoKey, grupo] of Object.entries(porConteudo)) {
+        if (!grupo.objetivos.length) continue;
+
+        // Sub-cabeçalho: Unidade Temática + Conteúdo SEEDF
+        if (curY > PAGE_BOTTOM - 20) {
+          doc.addPage();
+          buildPdfHeaderOficial(doc, W, logos, hoje, "OBJETIVOS DE APRENDIZAGEM", data.disciplina_nome, bimStr, data.ano_letivo || 2026);
+          drawFooter(doc, W, H, data.escola_nome, bimStr);
+          curY = 54;
         }
-        if (!topicos.length) {
-          const linhas = doc.splitTextToSize(objTxt, CW - 20);
-          blockH += linhas.length * 4.5;
+
+        // Faixa de sub-cabeçalho
+        doc.setFillColor(...meta.light);
+        doc.roundedRect(MX, curY, CW, 8, 1.5, 1.5, "F");
+        doc.setDrawColor(r, g, b); doc.setLineWidth(0.4);
+        doc.roundedRect(MX, curY, CW, 8, 1.5, 1.5, "S");
+        // Pill UT
+        if (grupo.ut) {
+          const utW = doc.getTextWidth(grupo.ut) + 8;
+          doc.setFillColor(r, g, b);
+          doc.roundedRect(MX + 2, curY + 1.5, Math.min(utW, 55), 5, 1, 1, "F");
+          doc.setFont("helvetica","bold"); doc.setFontSize(6); doc.setTextColor(255,255,255);
+          doc.text(grupo.ut.substring(0,30), MX + 6, curY + 5);
         }
-        blockH += 4; // padding bottom
+        // Texto do conteúdo
+        const ctX = grupo.ut ? MX + 60 : MX + 4;
+        doc.setFont("helvetica","bold"); doc.setFontSize(7); doc.setTextColor(30,41,59);
+        const ctLines = doc.splitTextToSize(conteudoKey, CW - (ctX - MX) - 4);
+        doc.text(ctLines[0].substring(0,80), ctX, curY + 5.4);
+        curY += 11;
 
-        // Nova página se não cabe
-        if (curY + blockH > PAGE_BOTTOM) { doc.addPage(); curY = 15; drawFooter(doc, W, H, data.escola_nome, bimNum); }
+        // Cada objetivo desta seção
+        let numIdx = 1;
+        for (const objTxt of grupo.objetivos) {
+          const topicos = parseObjetivo(objTxt);
 
-        // Fundo do card de objetivo
-        doc.setFillColor(248,250,252);
-        doc.roundedRect(MX, curY, CW, blockH, 2, 2, "F");
-        // Borda esquerda colorida
-        doc.setFillColor(r,g,b);
-        doc.roundedRect(MX, curY, 3, blockH, 1, 1, "F");
-
-        // Número do objetivo (badge)
-        doc.setFillColor(r,g,b);
-        doc.circle(MX + 10, curY + 7, 3.5, "F");
-        doc.setFont("helvetica","bold"); doc.setFontSize(7); doc.setTextColor(255,255,255);
-        doc.text(String(numGlobal++), MX + 10, curY + 8.4, { align:"center" });
-
-        let ty = curY + 4;
-        if (topicos.length > 0) {
-          for (let ti = 0; ti < topicos.length; ti++) {
-            const top = topicos[ti];
-            // Tópico — sem prefixo numérico (a bolinha já numera)
-            const linhasTop = doc.splitTextToSize(top.texto, CW - 22);
-            doc.setFont("helvetica", "bold");
-            doc.setFontSize(8.5); doc.setTextColor(30,41,59);
-            doc.text(linhasTop, MX + 17, ty + 4.5);
-            ty += linhasTop.length * 4.5 + 2;
-            // Subitens — recuados com bullet
-            for (const sub of top.subitens) {
-              const linhasSub = doc.splitTextToSize(`\u2022 ${sub}`, CW - 36);
-              doc.setFont("helvetica","normal"); doc.setFontSize(7.8);
-              doc.setTextColor(71,85,105);
-              doc.text(linhasSub, MX + 24, ty + 3.5);
-              ty += linhasSub.length * 4.2 + 1.5;
+          // Calcula altura do bloco
+          let blockH = 5;
+          if (topicos.length > 0) {
+            for (const top of topicos) {
+              const linhasTop = doc.splitTextToSize(top.texto, CW - 22);
+              blockH += linhasTop.length * 4.5 + 2;
+              for (const sub of top.subitens) {
+                const linhasSub = doc.splitTextToSize(`\u2022 ${sub}`, CW - 34);
+                blockH += linhasSub.length * 4 + 1.5;
+              }
             }
+          } else {
+            const linhas = doc.splitTextToSize(objTxt, CW - 22);
+            blockH += linhas.length * 4.8;
           }
-        } else {
-          // Texto plano (sem estrutura numerada)
-          const linhas = doc.splitTextToSize(objTxt, CW - 22);
-          doc.setFont("helvetica","bold"); doc.setFontSize(8.5); doc.setTextColor(30,41,59);
-          doc.text(linhas, MX + 17, curY + 8.5);
+          blockH += 4;
+
+          if (curY + blockH > PAGE_BOTTOM) {
+            doc.addPage();
+            buildPdfHeaderOficial(doc, W, logos, hoje, "OBJETIVOS DE APRENDIZAGEM", data.disciplina_nome, bimStr, data.ano_letivo || 2026);
+            drawFooter(doc, W, H, data.escola_nome, bimStr);
+            curY = 54;
+          }
+
+          // Card do objetivo
+          doc.setFillColor(250, 251, 254);
+          doc.roundedRect(MX, curY, CW, blockH, 2, 2, "F");
+          doc.setDrawColor(215, 220, 235); doc.setLineWidth(0.2);
+          doc.roundedRect(MX, curY, CW, blockH, 2, 2, "S");
+          // Borda esquerda grossa colorida
+          doc.setFillColor(r, g, b);
+          doc.roundedRect(MX, curY, 3.5, blockH, 1, 1, "F");
+
+          // Badge numerado
+          doc.setFillColor(r, g, b);
+          doc.circle(MX + 11, curY + 7, 4, "F");
+          doc.setFont("helvetica","bold"); doc.setFontSize(7.5); doc.setTextColor(255,255,255);
+          doc.text(String(numIdx++), MX + 11, curY + 8.5, { align:"center" });
+
+          let ty = curY + 4;
+          if (topicos.length > 0) {
+            for (const top of topicos) {
+              const linhasTop = doc.splitTextToSize(top.texto, CW - 24);
+              doc.setFont("helvetica","bold"); doc.setFontSize(8.5); doc.setTextColor(22, 38, 68);
+              doc.text(linhasTop, MX + 18, ty + 4.8);
+              ty += linhasTop.length * 4.8 + 2;
+              for (const sub of top.subitens) {
+                const linhasSub = doc.splitTextToSize(`\u2022 ${sub}`, CW - 36);
+                doc.setFont("helvetica","normal"); doc.setFontSize(7.8); doc.setTextColor(60, 80, 110);
+                doc.text(linhasSub, MX + 25, ty + 3.5);
+                ty += linhasSub.length * 4.2 + 1.5;
+              }
+            }
+          } else {
+            const linhas = doc.splitTextToSize(objTxt, CW - 24);
+            doc.setFont("helvetica","bold"); doc.setFontSize(8.5); doc.setTextColor(22,38,68);
+            doc.text(linhas, MX + 18, curY + 9);
+          }
+          curY += blockH + 3;
         }
-
-        curY += blockH + 3;
+        curY += 3;
       }
-
-      curY += 4; // espaço entre séries
-      drawFooter(doc, W, H, data.escola_nome, bimNum);
+      curY += 5;
     }
+    drawFooter(doc, W, H, data.escola_nome, bimStr);
   };
 
   // ── Orquestra: chama o gerador correto conforme o tipo ──────────────────
@@ -326,9 +492,9 @@ export default function ConteudosProgramaticos() {
       const hoje = new Date().toLocaleDateString("pt-BR", { day:"2-digit", month:"long", year:"numeric" });
 
       if (pdfTipo === "interno") {
-        gerarPdfInterno(doc, W, H, hoje, data, bimNum);
+        await gerarPdfInterno(doc, W, H, hoje, data, bimNum);
       } else {
-        gerarPdfAlunos(doc, W, H, hoje, data, bimNum);
+        await gerarPdfAlunos(doc, W, H, hoje, data, bimNum);
       }
 
       // Abre no navegador (botão de impressão nativo)

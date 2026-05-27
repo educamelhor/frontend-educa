@@ -33,17 +33,8 @@ const COR_SERIE = {
   "8º Ano": "#10b981", "9º Ano": "#f59e0b",
 };
 
-// Mock de conteúdos por série+disciplina+bimestre
-const MOCK_CONTEUDOS = [
-  { id: 1, serie: "6º Ano", disciplina: "Língua Portuguesa", bimestre: "1º Bimestre", unidade: "Leitura e Interpretação", conteudo: "Gêneros textuais: narrativo, descritivo e argumentativo", objetivo: "Identificar e interpretar diferentes gêneros textuais", status: "APROVADO", itens: 4 },
-  { id: 2, serie: "6º Ano", disciplina: "Língua Portuguesa", bimestre: "2º Bimestre", unidade: "Produção Textual", conteudo: "Conto, crônica e poema — características e produção", objetivo: "Produzir textos com coesão e coerência", status: "ENVIADO", itens: 3 },
-  { id: 3, serie: "6º Ano", disciplina: "Matemática", bimestre: "1º Bimestre", unidade: "Números Naturais", conteudo: "Operações fundamentais, potenciação e radiciação", objetivo: "Resolver problemas com operações de números naturais", status: "APROVADO", itens: 6 },
-  { id: 4, serie: "6º Ano", disciplina: "Matemática", bimestre: "2º Bimestre", unidade: "Frações e Decimais", conteudo: "Fração como parte de um todo, operações com frações", objetivo: "Compreender frações e aplicar em situações-problema", status: "RASCUNHO", itens: 2 },
-  { id: 5, serie: "7º Ano", disciplina: "Ciências", bimestre: "1º Bimestre", unidade: "Célula e Vida", conteudo: "Célula animal e vegetal, organelas e funções vitais", objetivo: "Reconhecer as estruturas celulares e suas funções", status: "APROVADO", itens: 5 },
-  { id: 6, serie: "7º Ano", disciplina: "História", bimestre: "1º Bimestre", unidade: "Idade Média", conteudo: "Feudalismo, Igreja Católica e poder medieval", objetivo: "Analisar o sistema feudal e sua estrutura social", status: "PENDENTE", itens: 0 },
-  { id: 7, serie: "8º Ano", disciplina: "Geografia", bimestre: "1º Bimestre", unidade: "Geopolítica", conteudo: "Globalização, blocos econômicos e relações internacionais", objetivo: "Compreender o cenário geopolítico contemporâneo", status: "ENVIADO", itens: 3 },
-  { id: 8, serie: "9º Ano", disciplina: "Matemática", bimestre: "1º Bimestre", unidade: "Álgebra", conteudo: "Funções: linear, quadrática e exponencial", objetivo: "Representar e analisar funções matemáticas", status: "APROVADO", itens: 7 },
-];
+// (MOCK_CONTEUDOS mantido apenas como referência de formato — substituído por dados reais da API)
+const MOCK_CONTEUDOS = [];
 
 // ── Ícones SVG inline ──────────────────────────────────────────────────────
 const IcoPlus  = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} className="cp-icon"><path d="M12 5v14M5 12h14"/></svg>;
@@ -64,6 +55,45 @@ export default function ConteudosProgramaticos() {
   const [viewMode, setViewMode]               = useState("cards"); // "cards" | "table"
   const [modalOpen, setModalOpen]             = useState(false);
   const [detalheItem, setDetalheItem]         = useState(null);
+
+  // Lista real vinda do backend
+  const [listaReal, setListaReal]             = useState([]);
+  const [listaLoading, setListaLoading]       = useState(false);
+  const [listaErr, setListaErr]               = useState(null);
+
+  // Normaliza série do BD ("6º ANO") para exibição ("6º Ano")
+  const normSerieDisplay = (s) => {
+    if (!s) return "";
+    return s.replace(/\bANO\b/i, "Ano").replace(/\bano\b/i, "Ano")
+            .replace(/º /g, "º ").trim();
+  };
+
+  // Recarrega a lista sempre que os filtros de tela mudam
+  const carregarLista = async () => {
+    try {
+      setListaLoading(true);
+      setListaErr(null);
+      const params = { ano_letivo: 2026 };
+      if (serieFiltro    !== "Todas") params.serie       = serieFiltro.toUpperCase().replace("Ano", "ANO");
+      if (discFiltro     !== "Todas") params.disciplina_nome = discFiltro;
+      if (bimestreFiltro !== "Todos") params.bimestre    = parseInt(bimestreFiltro);
+      if (statusFiltro   !== "Todos") params.status       = statusFiltro;
+      const { data } = await api.get("/conteudos/admin/lista", { params });
+      if (data?.ok) {
+        // Normaliza serie para exibição
+        setListaReal((data.registros || []).map(r => ({
+          ...r,
+          serie:          normSerieDisplay(r.serie),
+          bimestre:       r.bimestre_label || `${r.bimestre}º Bimestre`,
+          objetivo:       r.objetivo_preview || "",
+        })));
+      }
+    } catch (e) {
+      setListaErr("Não foi possível carregar os conteúdos.");
+    } finally {
+      setListaLoading(false);
+    }
+  };
 
   // Estado do modal PDF
   const [pdfModalOpen, setPdfModalOpen]   = useState(false);
@@ -688,7 +718,7 @@ export default function ConteudosProgramaticos() {
       });
       if (data?.ok) {
         setSaveMsg(statusEnvio === "enviar" ? "✅ Conteúdo enviado com sucesso!" : "✅ Salvo como rascunho!");
-        setTimeout(() => { setModalOpen(false); setSaveMsg(""); }, 1200);
+        setTimeout(() => { setModalOpen(false); setSaveMsg(""); carregarLista(); }, 1200);
       } else {
         setSaveMsg(data?.message || "Erro ao salvar.");
       }
@@ -816,20 +846,18 @@ export default function ConteudosProgramaticos() {
     setModalOpen(true);
   };
 
-  // Filtros aplicados
-  const filtered = MOCK_CONTEUDOS.filter(c =>
-    (serieFiltro    === "Todas" || c.serie       === serieFiltro) &&
-    (discFiltro     === "Todas" || c.disciplina  === discFiltro) &&
-    (bimestreFiltro === "Todos" || c.bimestre    === bimestreFiltro) &&
-    (statusFiltro   === "Todos" || c.status      === statusFiltro)
-  );
+  // Carrega lista real ao montar e ao fechar modal (para refletir novos cadastros)
+  useEffect(() => { carregarLista(); }, [serieFiltro, discFiltro, bimestreFiltro, statusFiltro]);
 
-  // KPIs
-  const total    = MOCK_CONTEUDOS.length;
-  const aprovado = MOCK_CONTEUDOS.filter(c => c.status === "APROVADO").length;
-  const revisao  = MOCK_CONTEUDOS.filter(c => c.status === "ENVIADO").length;
-  const pendente = MOCK_CONTEUDOS.filter(c => c.status === "PENDENTE" || c.status === "RASCUNHO").length;
-  const pctOk    = Math.round((aprovado / total) * 100);
+  // Filtros aplicados (dados reais, filtro já aplicado via API)
+  const filtered = listaReal;
+
+  // KPIs calculados a partir dos dados reais
+  const total    = listaReal.length;
+  const aprovado = listaReal.filter(c => c.status === "APROVADO").length;
+  const revisao  = listaReal.filter(c => c.status === "ENVIADO").length;
+  const pendente = listaReal.filter(c => c.status === "PENDENTE" || c.status === "RASCUNHO").length;
+  const pctOk    = total > 0 ? Math.round((aprovado / total) * 100) : 0;
 
   return (
     <div className="cp-root">
@@ -921,7 +949,33 @@ export default function ConteudosProgramaticos() {
       </div>
 
       {/* ── Conteúdo principal ── */}
-      {viewMode === "cards" ? (
+      {listaLoading ? (
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "center",
+          gap: 12, padding: "48px 0", color: "#6366f1", fontSize: "0.92rem",
+        }}>
+          <span style={{
+            width: 22, height: 22, border: "3px solid #e0e7ff",
+            borderTopColor: "#6366f1", borderRadius: "50%",
+            display: "inline-block", animation: "cp-spin 0.7s linear infinite",
+          }} />
+          Carregando conteúdos...
+        </div>
+      ) : listaErr ? (
+        <div style={{
+          background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 10,
+          padding: "16px 20px", color: "#b91c1c", fontSize: "0.85rem", margin: "16px 0",
+          display: "flex", alignItems: "center", gap: 10,
+        }}>
+          <span style={{ fontSize: "1.2rem" }}>⚠️</span>
+          {listaErr}
+          <button onClick={carregarLista} style={{
+            marginLeft: "auto", padding: "4px 12px", borderRadius: 6,
+            border: "1px solid #fca5a5", background: "#fff", color: "#b91c1c",
+            cursor: "pointer", fontSize: "0.8rem",
+          }}>Tentar novamente</button>
+        </div>
+      ) : viewMode === "cards" ? (
         <div className="cp-cards-grid">
           {filtered.length === 0 && (
             <div className="cp-empty">

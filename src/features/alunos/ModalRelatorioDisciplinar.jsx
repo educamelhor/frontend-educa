@@ -437,6 +437,18 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
                                                             {oc.status === 'CANCELADA' ? 'Cancelado por:' : 'Finalizado por:'} {oc.nome_usuario_finalizacao}
                                                         </span>
                                                     )}
+                                                    {oc.nome_usuario_impressao && (
+                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-purple-700 bg-purple-50 rounded-full border border-purple-200" title="Usuário que imprimiu">
+                                                            <PrinterIcon className="h-3 w-3" />
+                                                            Impresso por: {oc.nome_usuario_impressao}
+                                                        </span>
+                                                    )}
+                                                    {oc.nome_usuario_edicao && (
+                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-amber-700 bg-amber-50 rounded-full border border-amber-200" title="Usuário que editou por último">
+                                                            <PencilSquareIcon className="h-3 w-3" />
+                                                            Editado por: {oc.nome_usuario_edicao}
+                                                        </span>
+                                                    )}
                                                 </div>
                                                 {Boolean(oc.convocar_responsavel) && (
                                                     <div className="mt-2">

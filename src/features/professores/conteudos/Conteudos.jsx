@@ -399,13 +399,12 @@ function DisciplinaCard({ disciplina, onSelect }) {
   const serieLabel = selectedSerie ? normSerieName(selectedSerie) : "Todos os Anos";
 
   return (
-    <div style={{ perspective: 1100, width: "100%", minHeight: 200 }}>
+    <div style={{ perspective: 1100, width: "100%" }}>
       <div style={{
         position: "relative", width: "100%",
         transformStyle: "preserve-3d",
         transition: "transform 0.55s cubic-bezier(0.4,0,0.2,1)",
         transform: phase === 0 ? "rotateY(0deg)" : "rotateY(180deg)",
-        minHeight: 200,
       }}>
 
         {/* ══ FRENTE ══ */}
@@ -413,7 +412,8 @@ function DisciplinaCard({ disciplina, onSelect }) {
           onClick={handleFrontClick}
           style={{
             position: phase === 0 ? "relative" : "absolute",
-            inset: 0, minHeight: 200,
+            inset: 0,
+            minHeight: 180,
             backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden",
             background: `linear-gradient(135deg, ${palette.from}, ${palette.to})`,
             borderRadius: 18, padding: 24,
@@ -451,14 +451,15 @@ function DisciplinaCard({ disciplina, onSelect }) {
 
         {/* ══ VERSO (phases 1 e 2 — com inner flip interno) ══ */}
         <div style={{
-          position: "absolute", inset: 0, minHeight: 200,
+          position: phase > 0 ? "relative" : "absolute",
+          inset: phase > 0 ? "auto" : 0,
+          minHeight: 180,
           backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden",
           transform: "rotateY(180deg)",
           background: "#fff",
           borderRadius: 18,
           border: `2px solid ${palette.from}30`,
           boxShadow: `0 8px 32px ${palette.from}20`,
-          overflow: "hidden",
         }}>
           {/* Mini header fixo do verso */}
           <div style={{
@@ -486,22 +487,20 @@ function DisciplinaCard({ disciplina, onSelect }) {
           </div>
 
           {/* Inner container com 2º flip */}
-          <div style={{
-            perspective: 900,
-            padding: "10px 14px 14px",
-          }}>
+          <div style={{ perspective: 900, padding: "10px 14px 14px" }}>
             <div style={{
               transformStyle: "preserve-3d",
               transition: "transform 0.45s cubic-bezier(0.4,0,0.2,1)",
               transform: innerFlipped ? "rotateY(180deg)" : "rotateY(0deg)",
               position: "relative",
+              minHeight: 60,
             }}>
 
               {/* ── Fase 1: Seleção de Ano/Série ── */}
               <div style={{
                 backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden",
                 position: innerFlipped ? "absolute" : "relative",
-                inset: 0,
+                ...(innerFlipped ? { inset: 0, pointerEvents: "none" } : {}),
               }}>
                 <p style={{
                   margin: "0 0 8px", fontSize: "0.72rem", color: palette.from,
@@ -539,7 +538,7 @@ function DisciplinaCard({ disciplina, onSelect }) {
                 backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden",
                 transform: "rotateY(180deg)",
                 position: innerFlipped ? "relative" : "absolute",
-                inset: 0,
+                ...(innerFlipped ? {} : { inset: 0, pointerEvents: "none" }),
               }}>
                 <p style={{
                   margin: "0 0 6px", fontSize: "0.72rem", color: palette.from,

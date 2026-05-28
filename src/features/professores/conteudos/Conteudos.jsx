@@ -193,7 +193,7 @@ function ConteudoViewer({ disciplina, bimestre, onClose }) {
           ano_letivo: 2026,
         };
         if (bimestre !== 0) params.bimestre = bimestre;
-        const { data } = await api.get("/conteudos/admin/relatorio/pdf-data", { params });
+        const { data } = await api.get("/conteudos/professor/meus-conteudos", { params });
         if (cancelled) return;
         if (data?.ok) setDados(data);
         else setErro("Nenhum conteúdo encontrado para esta disciplina.");

@@ -24,6 +24,47 @@ export default function ListaTurmas() {
   const [editingTurma, setEditingTurma] = useState(null);
   const [successMessage, setSuccessMessage] = useState("");
 
+  // Normalização / Mapeamento
+  const [isNormalizationOpen, setIsNormalizationOpen] = useState(false);
+  const [normalizationMap, setNormalizationMap] = useState({});
+  const [savingNormalization, setSavingNormalization] = useState(false);
+
+  // Sincroniza o mapa de normalização ao carregar ou abrir o modal
+  useEffect(() => {
+    const initialMap = {};
+    turmas.forEach((t) => {
+      initialMap[t.id] = t.nome_oficial || "";
+    });
+    setNormalizationMap(initialMap);
+  }, [turmas, isNormalizationOpen]);
+
+  // Salva normalizações de turmas via PATCH individual por turma
+  const handleSaveNormalization = async () => {
+    setSavingNormalization(true);
+    try {
+      const targetTurmas = turmas.filter(t => Number(t.ano) === Number(anoLetivo));
+      await Promise.all(
+        targetTurmas.map(t =>
+          api.patch(`/api/turmas/${t.id}/nome-oficial`, {
+            nome_oficial: normalizationMap[t.id] || ""
+          })
+        )
+      );
+
+      // Recarrega
+      const { data } = await api.get("/api/turmas");
+      setTurmas(data);
+      setIsNormalizationOpen(false);
+      setSuccessMessage("✅ Normalização das turmas salva com sucesso!");
+      setTimeout(() => setSuccessMessage(""), 3000);
+    } catch (err) {
+      console.error("Erro ao salvar normalização de turmas:", err);
+      alert("❌ Erro ao salvar normalização de turmas.");
+    } finally {
+      setSavingNormalization(false);
+    }
+  };
+
   // Carrega lista de turmas ao iniciar
   useEffect(() => {
     async function load() {
@@ -150,19 +191,28 @@ export default function ListaTurmas() {
 
       <div className="flex justify-between items-start mb-3">
         {/* Botões à esquerda */}
-        <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-3">
           {anoLetivo === anoLetivoPadrao() && (
             <button
               onClick={() => {
                 setEditingTurma(null);
                 setFormOpen(true);
               }}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-sm"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-sm font-semibold text-sm"
               title="Adicionar Turma"
             >
               + Adicionar Turma
             </button>
           )}
+          <button
+            onClick={() => setIsNormalizationOpen(true)}
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-white text-gray-800 rounded-lg hover:bg-gray-50 border border-gray-200 transition shadow-sm font-bold text-sm shadow-inner"
+            title="Mapeamento e Normalização de Turmas"
+          >
+            <span className="text-orange-500 font-extrabold tracking-tight">EDUCA.MELHOR</span>
+            <span className="text-gray-400 font-light">/</span>
+            <span className="text-emerald-500 font-extrabold tracking-tight">EDUCADF</span>
+          </button>
         </div>
 
         {/* Filtro de Ano Letivo (Centro) */}
@@ -299,6 +349,79 @@ export default function ListaTurmas() {
               className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
             >
               Sim
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal de Normalização / Mapeamento (EDUCA.MELHOR / EDUCADF) */}
+      <Modal open={isNormalizationOpen} onClose={() => setIsNormalizationOpen(false)}>
+        <div className="p-6 space-y-4 max-w-2xl w-full">
+          <div className="flex items-center justify-between border-b pb-3">
+            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <span>Mapeamento Global de Turmas</span>
+              <span className="text-xs bg-purple-50 text-purple-700 border border-purple-200 px-2.5 py-0.5 rounded-full font-bold">
+                Ano Letivo {anoLetivo}
+              </span>
+            </h3>
+            <button
+              type="button"
+              onClick={() => setIsNormalizationOpen(false)}
+              className="text-gray-400 hover:text-gray-600 text-lg font-bold"
+            >
+              ×
+            </button>
+          </div>
+
+          <p className="text-xs text-gray-500">
+            Mapeie o nome de cada turma local do <strong>EDUCA.MELHOR</strong> para a nomenclatura padrão correspondente no <strong>EDUCADF</strong>. Esses valores serão usados por todos os módulos do sistema.
+          </p>
+
+          <div className="max-h-[350px] overflow-y-auto pr-1 border rounded-xl divide-y divide-gray-100 bg-white">
+            {turmas
+              .filter(t => Number(t.ano) === Number(anoLetivo))
+              .map((t) => (
+                <div key={t.id} className="p-3 flex items-center justify-between gap-4 hover:bg-gray-50/50 transition-colors">
+                  <div className="min-w-0">
+                    <span className="text-xs font-bold text-gray-400 block">NOME LOCAL (EDUCA.MELHOR)</span>
+                    <span className="text-sm font-bold text-gray-800 uppercase">{t.turma}</span>
+                  </div>
+                  <div className="flex flex-col gap-1 w-1/2">
+                    <span className="text-[10px] font-bold text-emerald-600">PADRÃO OFICIAL (EDUCADF)</span>
+                    <input
+                      type="text"
+                      value={normalizationMap[t.id] || ""}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setNormalizationMap(prev => ({ ...prev, [t.id]: val }));
+                      }}
+                      placeholder="Ex: 6º Ano - A"
+                      className="rounded-lg border border-gray-200 p-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 w-full"
+                    />
+                  </div>
+                </div>
+              ))}
+            {turmas.filter(t => Number(t.ano) === Number(anoLetivo)).length === 0 && (
+              <div className="p-6 text-center text-gray-400 text-sm">
+                Nenhuma turma cadastrada para o ano letivo {anoLetivo}.
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3 border-t">
+            <button
+              onClick={() => setIsNormalizationOpen(false)}
+              disabled={savingNormalization}
+              className="px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300 font-semibold text-sm disabled:opacity-50"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleSaveNormalization}
+              disabled={savingNormalization}
+              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold text-sm disabled:opacity-50"
+            >
+              {savingNormalization ? "Salvando..." : "Salvar Mapeamento"}
             </button>
           </div>
         </div>

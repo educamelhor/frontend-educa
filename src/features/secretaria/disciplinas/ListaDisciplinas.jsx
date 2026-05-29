@@ -75,6 +75,46 @@ export default function ListaDisciplinas() {
   const [similarModal, setSimilarModal] = useState(null);
   // similarModal = { dadosPendentes, nomeExistente, mensagem } | null
 
+  // Normalização / Mapeamento
+  const [isNormalizationOpen, setIsNormalizationOpen] = useState(false);
+  const [normalizationMap, setNormalizationMap] = useState({});
+  const [savingNormalization, setSavingNormalization] = useState(false);
+
+  // Sincroniza o mapa de normalização ao carregar ou abrir o modal
+  useEffect(() => {
+    const initialMap = {};
+    disciplinas.forEach((d) => {
+      initialMap[d.id] = d.nome_oficial || "";
+    });
+    setNormalizationMap(initialMap);
+  }, [disciplinas, isNormalizationOpen]);
+
+  // Salva normalizações de disciplinas via PATCH individual por disciplina
+  const handleSaveNormalization = async () => {
+    setSavingNormalization(true);
+    try {
+      await Promise.all(
+        disciplinas.map(d =>
+          api.patch(`/api/disciplinas/${d.id}/nome-oficial`, {
+            nome_oficial: normalizationMap[d.id] || ""
+          })
+        )
+      );
+
+      // Recarrega
+      const { data } = await api.get('/api/disciplinas');
+      setDisciplinas(data);
+      setIsNormalizationOpen(false);
+      setSuccessMessage("✅ Normalização das disciplinas salva com sucesso!");
+      setTimeout(() => setSuccessMessage(""), 3000);
+    } catch (err) {
+      console.error("Erro ao salvar normalização de disciplinas:", err);
+      alert("❌ Erro ao salvar normalização de disciplinas.");
+    } finally {
+      setSavingNormalization(false);
+    }
+  };
+
 // ─────────────────────────────────────────────────────────────
   useEffect(() => {
     async function load() {
@@ -280,13 +320,24 @@ export default function ListaDisciplinas() {
         <>
           {/* Botão e campo de busca */}
           <div className="flex justify-between items-center mb-4">
-            <button
-              onClick={() => setFormOpen(true)}
-              className="bg-blue-600 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-blue-700"
-            >
-              <PlusIcon className="w-5 h-5" />
-              Adicionar Disciplina
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setFormOpen(true)}
+                className="bg-blue-600 text-white px-4 py-2 rounded flex items-center gap-2 hover:bg-blue-700 font-semibold text-sm"
+              >
+                <PlusIcon className="w-5 h-5" />
+                Adicionar Disciplina
+              </button>
+              <button
+                onClick={() => setIsNormalizationOpen(true)}
+                className="inline-flex items-center gap-1.5 px-4 py-2 bg-white text-gray-800 rounded border border-gray-200 hover:bg-gray-50 transition shadow-sm font-bold text-sm shadow-inner"
+                title="Mapeamento e Normalização de Disciplinas"
+              >
+                <span className="text-orange-500 font-extrabold tracking-tight">EDUCA.MELHOR</span>
+                <span className="text-gray-400 font-light">/</span>
+                <span className="text-emerald-500 font-extrabold tracking-tight">EDUCADF</span>
+              </button>
+            </div>
 
             <input
               type="text"
@@ -511,6 +562,110 @@ export default function ListaDisciplinas() {
                   São distintas, criar mesmo assim
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── Modal de Normalização / Mapeamento de Disciplinas (EDUCA.MELHOR / EDUCADF) ── */}
+      {isNormalizationOpen && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 60,
+          background: 'rgba(15,23,42,0.6)', backdropFilter: 'blur(4px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+        }}>
+          <div style={{
+            background: '#fff', borderRadius: 16, maxWidth: 640, width: '100%',
+            boxShadow: '0 24px 60px rgba(0,0,0,0.22)',
+            overflow: 'hidden',
+          }}>
+            {/* Cabeçalho */}
+            <div style={{
+              background: 'linear-gradient(135deg, #1e3a8a, #3b82f6)',
+              padding: '18px 22px',
+              display: 'flex', alignItems: 'center',
+              justifyContent: 'space-between',
+            }}>
+              <h3 style={{ margin: 0, color: '#fff', fontSize: 16, fontBold: 700 }}>
+                Mapeamento Global de Disciplinas
+              </h3>
+              <button
+                onClick={() => setIsNormalizationOpen(false)}
+                style={{
+                  border: 'none', background: 'none', color: '#fff',
+                  fontSize: 20, cursor: 'pointer', fontWeight: 'bold'
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Corpo */}
+            <div style={{ padding: '20px 24px', maxHeight: 380, overflowY: 'auto' }}>
+              <p style={{ margin: '0 0 16px', fontSize: 12, color: '#6b7280', lineHeight: 1.6 }}>
+                Mapeie o nome de cada disciplina local do <strong>EDUCA.MELHOR</strong> para a nomenclatura padrão correspondente no <strong>EDUCADF</strong>. Esses valores serão usados por todos os módulos do sistema de forma canônica.
+              </p>
+
+              <div className="border border-gray-200 rounded-xl divide-y divide-gray-100 overflow-hidden bg-white">
+                {disciplinas.map((d) => (
+                  <div key={d.id} className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-gray-50/50 transition-colors">
+                    <div>
+                      <span className="text-[10px] font-bold text-gray-400 block">NOME LOCAL (EDUCA.MELHOR)</span>
+                      <span className="text-sm font-bold text-gray-800 uppercase">{d.disciplina}</span>
+                    </div>
+                    <div className="flex flex-col gap-1 sm:w-1/2">
+                      <span className="text-[10px] font-bold text-emerald-600">PADRÃO OFICIAL (EDUCADF)</span>
+                      <input
+                        type="text"
+                        value={normalizationMap[d.id] || ""}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setNormalizationMap(prev => ({ ...prev, [d.id]: val }));
+                        }}
+                        placeholder="Ex: Língua Portuguesa"
+                        className="rounded-lg border border-gray-200 p-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 w-full"
+                      />
+                    </div>
+                  </div>
+                ))}
+                {disciplinas.length === 0 && (
+                  <div className="p-6 text-center text-gray-400 text-sm">
+                    Nenhuma disciplina cadastrada.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Rodapé */}
+            <div style={{
+              padding: '12px 24px 20px',
+              display: 'flex', justifyContent: 'flex-end', gap: 10,
+              borderTop: '1px solid #f0f0f0',
+            }}>
+              <button
+                onClick={() => setIsNormalizationOpen(false)}
+                disabled={savingNormalization}
+                style={{
+                  padding: '9px 20px', border: '1.5px solid #d1d5db',
+                  borderRadius: 10, background: '#fff', color: '#374151',
+                  fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                  opacity: savingNormalization ? 0.5 : 1,
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveNormalization}
+                disabled={savingNormalization}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-md"
+                style={{
+                  padding: '9px 20px', border: 'none',
+                  borderRadius: 10,
+                  fontSize: 14, cursor: 'pointer',
+                  opacity: savingNormalization ? 0.5 : 1,
+                }}
+              >
+                {savingNormalization ? "Salvando..." : "Salvar Mapeamento"}
+              </button>
             </div>
           </div>
         </div>

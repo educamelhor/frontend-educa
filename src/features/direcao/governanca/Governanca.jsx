@@ -93,6 +93,13 @@ export default function Governanca() {
   const [expandedCats, setExpandedCats] = useState(new Set());
   const [pendingChanges, setPendingChanges] = useState({}); // { id: valor }
 
+  // ── Estados adicionais para exceções de disciplinas ──
+  const [disciplinas, setDisciplinas] = useState([]);
+  const [showExceptionModal, setShowExceptionModal] = useState(false);
+  const [modalExcConfigId, setModalExcConfigId] = useState(null);
+  const [selectedExceptions, setSelectedExceptions] = useState([]);
+  const [excSearch, setExcSearch] = useState("");
+
   const escolaId = localStorage.getItem("escola_id");
   const token = localStorage.getItem("token");
   const perfil = String(localStorage.getItem("perfil") || "").toLowerCase();
@@ -123,9 +130,62 @@ export default function Governanca() {
     }
   }, [escolaId, token, perfil]);
 
+  // ── Fetch disciplinas da escola ──
+  const fetchDisciplinas = useCallback(async () => {
+    try {
+      const res = await fetch(`${API}/api/disciplinas`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "x-escola-id": escolaId,
+          "x-perfil": perfil,
+        },
+      });
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        setDisciplinas(data);
+      }
+    } catch (err) {
+      console.error("Erro ao buscar disciplinas:", err);
+    }
+  }, [escolaId, token, perfil]);
+
   useEffect(() => {
-    if (escolaId && token) fetchConfigs();
-  }, [fetchConfigs, escolaId, token]);
+    if (escolaId && token) {
+      fetchConfigs();
+      fetchDisciplinas();
+    }
+  }, [fetchConfigs, fetchDisciplinas, escolaId, token]);
+
+  // ── Abrir modal de exceções ──
+  const handleOpenExceptionsModal = useCallback(() => {
+    const allConfigs = Object.values(configsPorCategoria).flat();
+    const excConfig = allConfigs.find(
+      (c) => c.chave === "escola.avaliacao_padrao_bimestral.excecoes"
+    );
+    if (!excConfig) {
+      showToast("Configuração de exceções não encontrada. Sincronize com o CEO.", "error");
+      return;
+    }
+
+    setModalExcConfigId(excConfig.id);
+    
+    // Pega o valor atual (se houver pendente, usa o pendente; senão o original)
+    const currentValStr = pendingChanges[excConfig.id] !== undefined
+      ? pendingChanges[excConfig.id]
+      : excConfig.valor;
+      
+    let selectedIds = [];
+    try {
+      selectedIds = JSON.parse(currentValStr || "[]");
+      if (!Array.isArray(selectedIds)) selectedIds = [];
+    } catch {
+      selectedIds = [];
+    }
+    
+    setSelectedExceptions(selectedIds.map(Number));
+    setExcSearch("");
+    setShowExceptionModal(true);
+  }, [configsPorCategoria, pendingChanges]);
 
   // ── Toast ──
   const showToast = (msg, type = "success") => {
@@ -156,6 +216,17 @@ export default function Governanca() {
       }
       return copy;
     });
+
+    // Intercepta se for ativação da chave escola.avaliacao_padrao_bimestral
+    let configChave = "";
+    Object.values(configsPorCategoria).flat().forEach((c) => {
+      if (c.id === id) configChave = c.chave;
+    });
+    if (configChave === "escola.avaliacao_padrao_bimestral" && String(newVal) === "1") {
+      setTimeout(() => {
+        handleOpenExceptionsModal();
+      }, 150);
+    }
   };
 
   // ── Salvar tudo ──
@@ -342,15 +413,18 @@ export default function Governanca() {
                 {/* Items */}
                 {isExpanded && (
                   <div style={styles.itemsList}>
-                    {items.map((cfg) => (
-                      <ConfigItem
-                        key={cfg.id}
-                        cfg={cfg}
-                        color={meta.color}
-                        onChange={handleChange}
-                        isPending={pendingChanges[cfg.id] !== undefined}
-                      />
-                    ))}
+                    {items
+                      .filter((cfg) => cfg.chave !== "escola.avaliacao_padrao_bimestral.excecoes")
+                      .map((cfg) => (
+                        <ConfigItem
+                          key={cfg.id}
+                          cfg={cfg}
+                          color={meta.color}
+                          onChange={handleChange}
+                          isPending={pendingChanges[cfg.id] !== undefined}
+                          onOpenExceptions={handleOpenExceptionsModal}
+                        />
+                      ))}
                   </div>
                 )}
               </div>
@@ -371,6 +445,204 @@ export default function Governanca() {
           </span>
         </div>
       )}
+
+      {/* ── MODAL PREMIUM DE EXCEÇÕES ── */}
+      {showExceptionModal && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modalContent}>
+            {/* Cabeçalho do Modal */}
+            <div style={styles.modalHeader}>
+              <div>
+                <h2 style={styles.modalTitle}>Configurar Disciplinas de Exceção</h2>
+                <p style={styles.modalSubtitle}>
+                  Selecione as disciplinas que <strong>NÃO</strong> adotam o padrão de avaliação bimestral.
+                </p>
+              </div>
+              <button
+                type="button"
+                style={styles.modalCloseBtn}
+                onClick={() => setShowExceptionModal(false)}
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Barra de Busca e Ações Rápidas */}
+            <div style={styles.modalSearchBarRow}>
+              <input
+                type="text"
+                placeholder="🔍 Buscar disciplina por nome, etapa ou turno..."
+                value={excSearch}
+                onChange={(e) => setExcSearch(e.target.value)}
+                style={styles.modalSearchInput}
+              />
+              <div style={styles.modalBatchActions}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const filteredIds = disciplinas
+                      .filter((disc) => {
+                        const q = excSearch.toLowerCase().trim();
+                        if (!q) return true;
+                        return (
+                          String(disc.disciplina || "").toLowerCase().includes(q) ||
+                          String(disc.nome_oficial || "").toLowerCase().includes(q) ||
+                          String(disc.etapa || "").toLowerCase().includes(q) ||
+                          String(disc.turno || "").toLowerCase().includes(q)
+                        );
+                      })
+                      .map((d) => Number(d.id));
+
+                    setSelectedExceptions((prev) => {
+                      const next = new Set([...prev, ...filteredIds]);
+                      return Array.from(next);
+                    });
+                  }}
+                  style={styles.modalBatchBtn}
+                >
+                  Selecionar Filtradas
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const filteredIds = new Set(
+                      disciplinas
+                        .filter((disc) => {
+                          const q = excSearch.toLowerCase().trim();
+                          if (!q) return true;
+                          return (
+                            String(disc.disciplina || "").toLowerCase().includes(q) ||
+                            String(disc.nome_oficial || "").toLowerCase().includes(q) ||
+                            String(disc.etapa || "").toLowerCase().includes(q) ||
+                            String(disc.turno || "").toLowerCase().includes(q)
+                          );
+                        })
+                        .map((d) => Number(d.id))
+                    );
+
+                    setSelectedExceptions((prev) => prev.filter((id) => !filteredIds.has(id)));
+                  }}
+                  style={styles.modalBatchBtnSec}
+                >
+                  Limpar Filtradas
+                </button>
+              </div>
+            </div>
+
+            {/* Grid de Disciplinas */}
+            <div style={styles.modalGridContainer}>
+              {disciplinas.filter((disc) => {
+                const q = excSearch.toLowerCase().trim();
+                if (!q) return true;
+                return (
+                  String(disc.disciplina || "").toLowerCase().includes(q) ||
+                  String(disc.nome_oficial || "").toLowerCase().includes(q) ||
+                  String(disc.etapa || "").toLowerCase().includes(q) ||
+                  String(disc.turno || "").toLowerCase().includes(q)
+                );
+              }).length === 0 ? (
+                <div style={styles.modalEmptyState}>
+                  Nenhuma disciplina encontrada para o termo digitado.
+                </div>
+              ) : (
+                <div style={styles.modalDisciplinesGrid}>
+                  {disciplinas
+                    .filter((disc) => {
+                      const q = excSearch.toLowerCase().trim();
+                      if (!q) return true;
+                      return (
+                        String(disc.disciplina || "").toLowerCase().includes(q) ||
+                        String(disc.nome_oficial || "").toLowerCase().includes(q) ||
+                        String(disc.etapa || "").toLowerCase().includes(q) ||
+                        String(disc.turno || "").toLowerCase().includes(q)
+                      );
+                    })
+                    .map((disc) => {
+                      const isChecked = selectedExceptions.includes(Number(disc.id));
+                      return (
+                        <button
+                          key={disc.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedExceptions((prev) =>
+                              prev.includes(Number(disc.id))
+                                ? prev.filter((id) => id !== Number(disc.id))
+                                : [...prev, Number(disc.id)]
+                            );
+                          }}
+                          style={{
+                            ...styles.disciplineCard,
+                            borderColor: isChecked ? "#6366f1" : "#e2e8f0",
+                            backgroundColor: isChecked ? "rgba(99, 102, 241, 0.04)" : "#fff",
+                            boxShadow: isChecked ? "0 4px 12px rgba(99, 102, 241, 0.1)" : "none",
+                          }}
+                        >
+                          <div style={styles.cardHeader}>
+                            <span style={styles.disciplineName}>{disc.disciplina}</span>
+                            <div
+                              style={{
+                                ...styles.cardCheckbox,
+                                backgroundColor: isChecked ? "#6366f1" : "transparent",
+                                borderColor: isChecked ? "#6366f1" : "#cbd5e1",
+                              }}
+                            >
+                              {isChecked && (
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  style={{ width: 12, height: 12, color: "#fff" }}
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                  strokeWidth={3}
+                                >
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                                </svg>
+                              )}
+                            </div>
+                          </div>
+                          <div style={styles.cardBadges}>
+                            <span style={styles.badge}>{disc.etapa}</span>
+                            <span style={{ ...styles.badge, backgroundColor: "#f1f5f9", color: "#64748b" }}>
+                              {disc.turno}
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
+
+            {/* Rodapé do Modal */}
+            <div style={styles.modalFooter}>
+              <div style={styles.modalSelectedCount}>
+                <strong>{selectedExceptions.length}</strong>{" "}
+                {selectedExceptions.length === 1 ? "disciplina de exceção" : "disciplinas de exceção"}
+              </div>
+              <div style={{ display: "flex", gap: 12 }}>
+                <button
+                  type="button"
+                  style={styles.modalCancelBtn}
+                  onClick={() => setShowExceptionModal(false)}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  style={styles.modalConfirmBtn}
+                  onClick={() => {
+                    handleChange(modalExcConfigId, JSON.stringify(selectedExceptions));
+                    setShowExceptionModal(false);
+                    showToast("Exceções configuradas. Lembre-se de salvar as alterações no topo do painel! 💾", "success");
+                  }}
+                >
+                  Confirmar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -378,10 +650,11 @@ export default function Governanca() {
 // ═══════════════════════════════════════════════════════════════
 // CONFIG ITEM — Linha individual de configuração
 // ═══════════════════════════════════════════════════════════════
-function ConfigItem({ cfg, color, onChange, isPending }) {
+function ConfigItem({ cfg, color, onChange, isPending, onOpenExceptions }) {
   const isBool = cfg.tipo === "boolean";
   const isSelect = cfg.tipo === "select";
   const isOn = String(cfg.valor) === "1" || String(cfg.valor).toLowerCase() === "true";
+  const isBimestralKey = cfg.chave === "escola.avaliacao_padrao_bimestral";
 
   return (
     <div
@@ -389,54 +662,86 @@ function ConfigItem({ cfg, color, onChange, isPending }) {
         ...styles.configItem,
         borderLeft: isPending ? `3px solid ${color}` : "3px solid transparent",
         background: isPending ? "rgba(99, 102, 241, 0.03)" : "transparent",
+        flexDirection: "column",
+        alignItems: "stretch",
       }}
     >
-      <div style={styles.configInfo}>
-        <div style={styles.configDescricao}>{cfg.descricao || cfg.chave}</div>
-        <div style={styles.configChave}>{cfg.chave}</div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, width: "100%" }}>
+        <div style={styles.configInfo}>
+          <div style={styles.configDescricao}>{cfg.descricao || cfg.chave}</div>
+          <div style={styles.configChave}>{cfg.chave}</div>
+        </div>
+
+        <div style={styles.configControl}>
+          {isBool ? (
+            <button
+              type="button"
+              onClick={() => onChange(cfg.id, isOn ? "0" : "1")}
+              style={{
+                ...styles.toggle,
+                background: isOn
+                  ? `linear-gradient(135deg, ${color}, ${color}cc)`
+                  : "#e5e7eb",
+              }}
+              title={isOn ? "Ativado — clique para desativar" : "Desativado — clique para ativar"}
+            >
+              <div
+                style={{
+                  ...styles.toggleKnob,
+                  transform: isOn ? "translateX(20px)" : "translateX(2px)",
+                }}
+              />
+            </button>
+          ) : isSelect ? (
+            <select
+              value={cfg.valor}
+              onChange={(e) => onChange(cfg.id, e.target.value)}
+              style={styles.selectInput}
+            >
+              {(cfg.opcoes_json || []).map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              type="text"
+              value={cfg.valor}
+              onChange={(e) => onChange(cfg.id, e.target.value)}
+              style={styles.textInput}
+            />
+          )}
+        </div>
       </div>
 
-      <div style={styles.configControl}>
-        {isBool ? (
+      {isBimestralKey && isOn && (
+        <div style={{ marginTop: 8, display: "flex", justifyContent: "flex-start" }}>
           <button
             type="button"
-            onClick={() => onChange(cfg.id, isOn ? "0" : "1")}
+            onClick={onOpenExceptions}
             style={{
-              ...styles.toggle,
-              background: isOn
-                ? `linear-gradient(135deg, ${color}, ${color}cc)`
-                : "#e5e7eb",
+              background: "none",
+              border: "none",
+              color: color || "#6366f1",
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "6px 12px",
+              borderRadius: 8,
+              transition: "all 0.2s",
+              backgroundColor: "rgba(99, 102, 241, 0.08)",
             }}
-            title={isOn ? "Ativado — clique para desativar" : "Desativado — clique para ativar"}
+            onMouseOver={(e) => e.currentTarget.style.backgroundColor = "rgba(99, 102, 241, 0.15)"}
+            onMouseOut={(e) => e.currentTarget.style.backgroundColor = "rgba(99, 102, 241, 0.08)"}
           >
-            <div
-              style={{
-                ...styles.toggleKnob,
-                transform: isOn ? "translateX(20px)" : "translateX(2px)",
-              }}
-            />
+            ⚙️ Configurar disciplinas de exceção
           </button>
-        ) : isSelect ? (
-          <select
-            value={cfg.valor}
-            onChange={(e) => onChange(cfg.id, e.target.value)}
-            style={styles.selectInput}
-          >
-            {(cfg.opcoes_json || []).map((opt) => (
-              <option key={opt} value={opt}>
-                {opt}
-              </option>
-            ))}
-          </select>
-        ) : (
-          <input
-            type="text"
-            value={cfg.valor}
-            onChange={(e) => onChange(cfg.id, e.target.value)}
-            style={styles.textInput}
-          />
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -722,6 +1027,216 @@ const styles = {
     padding: "16px 0",
     borderTop: "1px solid #f1f5f9",
   },
+
+  // Modal styles
+  modalOverlay: {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(15, 23, 42, 0.6)",
+    backdropFilter: "blur(4px)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 10000,
+    animation: "fadeIn 0.25s ease",
+  },
+  modalContent: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    width: "90%",
+    maxWidth: 780,
+    maxHeight: "85vh",
+    display: "flex",
+    flexDirection: "column",
+    boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+    overflow: "hidden",
+    animation: "scaleIn 0.25s ease",
+  },
+  modalHeader: {
+    padding: "20px 24px",
+    borderBottom: "1px solid #f1f5f9",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 700,
+    color: "#1e293b",
+    margin: 0,
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    color: "#64748b",
+    margin: "6px 0 0",
+    fontWeight: 500,
+  },
+  modalCloseBtn: {
+    background: "none",
+    border: "none",
+    fontSize: 24,
+    color: "#94a3b8",
+    cursor: "pointer",
+    padding: "4px 8px",
+    borderRadius: 8,
+    lineHeight: 1,
+    transition: "all 0.2s",
+  },
+  modalSearchBarRow: {
+    padding: "16px 24px",
+    backgroundColor: "#f8fafc",
+    borderBottom: "1px solid #f1f5f9",
+    display: "flex",
+    gap: 12,
+    alignItems: "center",
+    flexWrap: "wrap",
+  },
+  modalSearchInput: {
+    flex: 1,
+    minWidth: 200,
+    padding: "10px 16px",
+    borderRadius: 12,
+    border: "1px solid #e2e8f0",
+    fontSize: 13,
+    fontWeight: 500,
+    outline: "none",
+    transition: "border 0.2s",
+  },
+  modalBatchActions: {
+    display: "flex",
+    gap: 8,
+  },
+  modalBatchBtn: {
+    padding: "8px 12px",
+    borderRadius: 8,
+    border: "none",
+    backgroundColor: "rgba(99, 102, 241, 0.08)",
+    color: "#6366f1",
+    fontSize: 12,
+    fontWeight: 600,
+    cursor: "pointer",
+    transition: "all 0.2s",
+  },
+  modalBatchBtnSec: {
+    padding: "8px 12px",
+    borderRadius: 8,
+    border: "none",
+    backgroundColor: "#f1f5f9",
+    color: "#475569",
+    fontSize: 12,
+    fontWeight: 600,
+    cursor: "pointer",
+    transition: "all 0.2s",
+  },
+  modalGridContainer: {
+    flex: 1,
+    overflowY: "auto",
+    padding: "24px",
+    minHeight: 200,
+  },
+  modalEmptyState: {
+    textAlign: "center",
+    color: "#64748b",
+    fontSize: 14,
+    padding: "40px 0",
+    fontWeight: 500,
+  },
+  modalDisciplinesGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+    gap: 12,
+  },
+  disciplineCard: {
+    background: "#fff",
+    border: "1.5px solid #e2e8f0",
+    borderRadius: 12,
+    padding: "12px 14px",
+    textAlign: "left",
+    cursor: "pointer",
+    transition: "all 0.2s",
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+  },
+  cardHeader: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 8,
+    width: "100%",
+  },
+  disciplineName: {
+    fontSize: 14,
+    fontWeight: 700,
+    color: "#1e293b",
+    wordBreak: "break-word",
+    lineHeight: 1.2,
+  },
+  cardCheckbox: {
+    width: 18,
+    height: 18,
+    borderRadius: 5,
+    border: "1.5px solid #cbd5e1",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+    transition: "all 0.2s",
+  },
+  cardBadges: {
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: "auto",
+  },
+  badge: {
+    fontSize: 10,
+    fontWeight: 600,
+    padding: "4px 8px",
+    borderRadius: 6,
+    backgroundColor: "rgba(99, 102, 241, 0.06)",
+    color: "#6366f1",
+  },
+  modalFooter: {
+    padding: "16px 24px",
+    borderTop: "1px solid #f1f5f9",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#f8fafc",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  modalSelectedCount: {
+    fontSize: 13,
+    color: "#334155",
+  },
+  modalCancelBtn: {
+    padding: "10px 20px",
+    borderRadius: 10,
+    border: "1px solid #cbd5e1",
+    backgroundColor: "#fff",
+    color: "#475569",
+    fontSize: 13,
+    fontWeight: 600,
+    cursor: "pointer",
+    transition: "all 0.2s",
+  },
+  modalConfirmBtn: {
+    padding: "10px 20px",
+    borderRadius: 10,
+    border: "none",
+    backgroundColor: "#6366f1",
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: 600,
+    cursor: "pointer",
+    transition: "all 0.2s",
+    boxShadow: "0 4px 12px rgba(99, 102, 241, 0.2)",
+  },
 };
 
 // ── CSS Keyframes (injected once) ──
@@ -732,6 +1247,14 @@ if (typeof document !== "undefined") {
     @keyframes slideIn {
       from { transform: translateX(60px); opacity: 0; }
       to   { transform: translateX(0);    opacity: 1; }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+    @keyframes scaleIn {
+      from { transform: scale(0.95); opacity: 0; }
+      to   { transform: scale(1);    opacity: 1; }
     }
   `;
   document.head.appendChild(styleEl);

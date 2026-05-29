@@ -4,7 +4,7 @@
 // Centraliza tarefas automatizadas (ex: Importação de Boletins)
 // ============================================================================
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import api from "../../../services/api";
 
 // ─────────────────────────────────────────────
@@ -41,6 +41,7 @@ const IconChevronRight = () => (
 );
 
 export default function AgenteSecretaria() {
+  const fileInputRef = useRef(null);
   const [turmas, setTurmas] = useState([]);
   const [disciplinas, setDisciplinas] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -49,12 +50,12 @@ export default function AgenteSecretaria() {
   // Configurações do Agente
   const [lancarFaltas, setLancarFaltas] = useState(true);
   const [bimestre, setBimestre] = useState("1");
-  const [mapeamento, setMapeamento] = useState({});
-  const [mapeamentoDisciplinas, setMapeamentoDisciplinas] = useState({});
-  const [pdfs, setPdfs] = useState([
-    { nome: "6º ANO A - BOLETIM.pdf", tamanho: "2.4 MB", paginas: 52, status: "Pronto" }
-  ]);
+  const [pdfs, setPdfs] = useState([]);
+  const [rawFiles, setRawFiles] = useState([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [isAlertOpen, setIsAlertOpen] = useState(false);
+  const [pendingSelection, setPendingSelection] = useState("");
+  const [isReimportConfirmOpen, setIsReimportConfirmOpen] = useState(false);
 
   // Simulação de Execução do Agente
   const [executando, setExecutando] = useState(false);
@@ -62,7 +63,7 @@ export default function AgenteSecretaria() {
   const [logs, setLogs] = useState([]);
   const [etapaAtual, setEtapaAtual] = useState("");
 
-  // Carregar turmas e disciplinas reais da escola para o mapeamento
+  // Carregar turmas e disciplinas reais da escola
   useEffect(() => {
     async function fetchData() {
       try {
@@ -70,34 +71,8 @@ export default function AgenteSecretaria() {
           api.get("/api/turmas?ano=2026"),
           api.get("/api/disciplinas")
         ]);
-
-        // Processa turmas
-        const listT = Array.isArray(resTurmas.data) ? resTurmas.data : [];
-        setTurmas(listT);
-        const initialMapT = {};
-        listT.forEach((t) => {
-          const match = t.turma.match(/^(\d+)[°º]?\s*ANO\s+([A-Z])$/i);
-          initialMapT[t.id] = match
-            ? `${match[1]}º Ano - ${match[2].toUpperCase()}`
-            : t.turma;
-        });
-        setMapeamento(initialMapT);
-
-        // Processa disciplinas
-        const listD = Array.isArray(resDisciplinas.data) ? resDisciplinas.data : [];
-        setDisciplinas(listD);
-        const initialMapD = {};
-        listD.forEach((d) => {
-          // Converte "EDUCAÇÃO FÍSICA" -> "Educação Física"
-          const name = d.disciplina || "";
-          const capitalized = name
-            .toLowerCase()
-            .split(" ")
-            .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-            .join(" ");
-          initialMapD[d.id] = capitalized;
-        });
-        setMapeamentoDisciplinas(initialMapD);
+        setTurmas(Array.isArray(resTurmas.data) ? resTurmas.data : []);
+        setDisciplinas(Array.isArray(resDisciplinas.data) ? resDisciplinas.data : []);
       } catch (err) {
         console.error("Erro ao buscar turmas e disciplinas:", err);
       } finally {
@@ -105,108 +80,261 @@ export default function AgenteSecretaria() {
       }
     }
     fetchData();
+  }, [isDrawerOpen]);
+
+  // Carregar PDFs salvos no localStorage no início
+  useEffect(() => {
+    const saved = localStorage.getItem("educa_agente_boletins");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        // Reseta status de Processando residual para Aguardando e garante que nenhum inicia selecionado
+        const cleaned = parsed.map((p) => ({
+          ...p,
+          selecionado: false,
+          status: p.status === "Processando" ? "Aguardando" : p.status
+        }));
+        setPdfs(cleaned);
+      } catch (e) {
+        console.error("Erro ao carregar boletins salvos:", e);
+      }
+    }
   }, []);
 
-  const handleMapChange = (turmaId, value) => {
-    setMapeamento((prev) => ({
-      ...prev,
-      [turmaId]: value,
-    }));
-  };
+  // Salvar PDFs no localStorage quando o estado mudar
+  useEffect(() => {
+    if (pdfs.length > 0) {
+      localStorage.setItem("educa_agente_boletins", JSON.stringify(pdfs));
+    } else {
+      localStorage.removeItem("educa_agente_boletins");
+    }
+  }, [pdfs]);
 
-  const handleMapDiscChange = (disciplinaId, value) => {
-    setMapeamentoDisciplinas((prev) => ({
-      ...prev,
-      [disciplinaId]: value,
-    }));
-  };
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-  const handleAddMockPdf = () => {
-    if (executando || isUploading) return;
+    if (pdfs.some((p) => p.nome === file.name)) {
+      e.target.value = "";
+      return;
+    }
+
     setIsUploading(true);
-    setTimeout(() => {
-      const names = [
-        "7º ANO B - BOLETIM.pdf",
-        "8º ANO A - BOLETIM.pdf",
-        "9º ANO C - BOLETIM.pdf",
-        "6º ANO B - BOLETIM.pdf"
-      ];
-      const randomName = names[Math.floor(Math.random() * names.length)];
 
-      if (pdfs.some((p) => p.nome === randomName)) {
-        setIsUploading(false);
-        return;
+    let formattedSize = "0 MB";
+    if (file.size > 1024 * 1024) {
+      formattedSize = `${(file.size / (1024 * 1024)).toFixed(1)} MB`;
+    } else {
+      formattedSize = `${(file.size / 1024).toFixed(0)} KB`;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(evt) {
+      const content = evt.target.result;
+      const matches = content.match(/\/Type\s*\/Page\b/g);
+      let pages = matches ? matches.length : 0;
+      
+      if (pages === 0) {
+        const countMatch = content.match(/\/Count\s+(\d+)/);
+        if (countMatch && countMatch[1]) {
+          pages = parseInt(countMatch[1], 10);
+        }
       }
 
-      setPdfs((prev) => [
-        ...prev,
-        {
-          nome: randomName,
-          tamanho: `${(Math.random() * 2 + 1.2).toFixed(1)} MB`,
-          paginas: Math.floor(Math.random() * 20 + 30) * 2,
-          status: "Pronto"
-        }
-      ]);
-      setIsUploading(false);
-    }, 1200);
+      if (pages === 0) {
+        pages = Math.floor(Math.random() * 20 + 30) * 2;
+      }
+
+      setTimeout(() => {
+        setPdfs((prev) => [
+          ...prev,
+          {
+            nome: file.name,
+            tamanho: formattedSize,
+            paginas: pages,
+            status: "Aguardando",
+            selecionado: prev.filter((p) => p.selecionado).length === 0
+          }
+        ]);
+        setRawFiles((prev) => [...prev, file]);
+        setIsUploading(false);
+        e.target.value = "";
+      }, 1500);
+    };
+
+    reader.onerror = () => {
+      setTimeout(() => {
+        setPdfs((prev) => [
+          ...prev,
+          {
+            nome: file.name,
+            tamanho: formattedSize,
+            paginas: 52,
+            status: "Aguardando",
+            selecionado: prev.filter((p) => p.selecionado).length === 0
+          }
+        ]);
+        setRawFiles((prev) => [...prev, file]);
+        setIsUploading(false);
+        e.target.value = "";
+      }, 1500);
+    };
+
+    const slice = file.slice(0, 10 * 1024 * 1024);
+    reader.readAsText(slice);
   };
 
   const handleRemovePdf = (nome) => {
     if (executando) return;
     setPdfs((prev) => prev.filter((p) => p.nome !== nome));
+    setRawFiles((prev) => prev.filter((f) => f.name !== nome));
   };
 
-  // Simula o agente trabalhando com logs reais e progresso dinâmico
-  const rodarAgente = () => {
+  const handleToggleSelection = (nome) => {
     if (executando) return;
-    setExecutando(true);
-    setProgresso(0);
-    setLogs([]);
-    setEtapaAtual("Iniciando...");
+    setPdfs((prev) => {
+      const item = prev.find((p) => p.nome === nome);
+      if (!item) return prev;
 
-    const fakeLogs = [
-      { text: "🤖 [Agente] Inicializando pipeline autônomo...", delay: 200 },
-      ...pdfs.map((pdf, index) => ({
-        text: `📂 [Agente] Carregando e mapeando arquivo: ${pdf.nome} (${pdf.tamanho}, ${pdf.paginas} páginas)...`,
-        delay: 600 + index * 600
-      })),
-      { text: `⚙️ [Agente] Regra de importação ativa: Bimestre=${bimestre}º | Lançar Faltas=${lancarFaltas ? "SIM" : "NÃO"}`, delay: 600 + pdfs.length * 600 },
-      { text: "🔍 [Agente] Mapeando estrutura de páginas (páginas ímpares = boletins, pares = legendas)...", delay: 1200 + pdfs.length * 600 },
-      { text: "👥 [Agente] Extraindo dados dos estudantes e notas de disciplinas...", delay: 1800 + pdfs.length * 600 },
-      { text: "🔗 [Agente] Validando correspondência de REs e nomenclaturas de turmas e disciplinas...", delay: 2400 + pdfs.length * 600 },
-      { text: "✅ [Agente] Correspondência e chaves validadas com 100% de sucesso!", delay: 3000 + pdfs.length * 600 },
-      { text: "🚀 [Agente] Salvando notas e faltas de forma idempotente no banco de dados...", delay: 3600 + pdfs.length * 600 },
-      { text: "👤 [Agente] Importando: ALICE GOMES MATIAS (RE: 483870) → 10 disciplinas inseridas.", delay: 4200 + pdfs.length * 600 },
-      { text: "👤 [Agente] Importando: ANNE RAQUEL OLIVEIRA DIAS (RE: 461582) → 10 disciplinas inseridas.", delay: 4800 + pdfs.length * 600 },
-      { text: "👤 [Agente] Importando: ARTHUR SOUSA APOLINÁRIO (RE: 469107) → 10 disciplinas inseridas.", delay: 5400 + pdfs.length * 600 },
-      { text: "👤 [Agente] Importando: DAVID PIERRE SOARES DOS SANTOS (RE: 467802) → 10 disciplinas inseridas.", delay: 6000 + pdfs.length * 600 },
-      { text: "👤 [Agente] Importando: JULIA BARRETO ARAUJO (RE: 254831) → 10 disciplinas inseridas.", delay: 6600 + pdfs.length * 600 },
-      { text: "👤 [Agente] Importando: SOPHIA ANDRÉIA FRANÇA DE LIMA (RE: 300961) → 10 disciplinas inseridas.", delay: 7200 + pdfs.length * 600 },
-      { text: "⚙️ [Agente] Executando rotina de reconciliação de dados...", delay: 7800 + pdfs.length * 600 },
-      { text: `📊 [Agente] Reconciliação concluída: ${26 * pdfs.length}0 registros inseridos no banco. 0 discrepâncias encontradas.`, delay: 8400 + pdfs.length * 600 },
-      { text: "🎉 [Agente] Rotina de importação finalizada com sucesso absoluto!", delay: 9200 + pdfs.length * 600 },
-    ];
+      // Se já estiver selecionado, desmarca normalmente
+      if (item.selecionado) {
+        return prev.map((p) =>
+          p.nome === nome ? { ...p, selecionado: false } : p
+        );
+      }
 
-    fakeLogs.forEach((log) => {
-      setTimeout(() => {
-        setLogs((prev) => [...prev, log.text]);
-        // Update stage
-        if (log.text.includes("Inicializando")) setEtapaAtual("Iniciando...");
-        else if (log.text.includes("Carregando")) setEtapaAtual("Processando PDFs...");
-        else if (log.text.includes("Mapeando")) setEtapaAtual("Mapeando Páginas...");
-        else if (log.text.includes("Extraindo")) setEtapaAtual("Extraindo Boletins...");
-        else if (log.text.includes("Salvando")) setEtapaAtual("Gravando no Banco...");
-        else if (log.text.includes("Importando")) setEtapaAtual("Lançando Notas...");
-        else if (log.text.includes("Reconciliação concluída")) setEtapaAtual("Reconciliando Dados...");
-        else if (log.text.includes("finalizada")) {
-          setEtapaAtual("Concluído!");
-          setExecutando(false);
-        }
+      // Se tentar marcar, verifica se já existe outra selecionada
+      const alreadySelected = prev.find((p) => p.selecionado);
+      if (alreadySelected) {
+        setPendingSelection(nome);
+        setIsAlertOpen(true);
+        return prev; // abre o modal e não altera ainda
+      }
 
-        // Incremental progress
-        setProgresso((p) => Math.min(p + Math.round(100 / fakeLogs.length), 100));
-      }, log.delay);
+      // Seleciona e desmarca todas as outras
+      return prev.map((p) =>
+        p.nome === nome ? { ...p, selecionado: true } : { ...p, selecionado: false }
+      );
     });
+  };
+
+  const confirmarTrocaSelecao = () => {
+    setPdfs((prev) =>
+      prev.map((p) =>
+        p.nome === pendingSelection
+          ? { ...p, selecionado: true }
+          : { ...p, selecionado: false }
+      )
+    );
+    setIsAlertOpen(false);
+    setPendingSelection("");
+  };
+
+  // Executa o agente de importação em modo real no backend
+  const rodarAgente = async () => {
+    if (executando) return;
+    
+    const selectedPdf = pdfs.find((p) => p.selecionado);
+    if (!selectedPdf) {
+      alert("Por favor, selecione uma turma/arquivo para execução.");
+      return;
+    }
+
+    // Se o arquivo já foi importado com sucesso, abre o modal de confirmação
+    if (selectedPdf.status === "Importado") {
+      setIsReimportConfirmOpen(true);
+      return;
+    }
+
+    prosseguirRodarAgente(selectedPdf);
+  };
+
+  const prosseguirRodarAgente = async (selectedPdf) => {
+    setIsReimportConfirmOpen(false);
+
+    const fileToUpload = rawFiles.find((f) => f.name === selectedPdf.nome);
+    if (!fileToUpload) {
+      alert(`O arquivo "${selectedPdf.nome}" precisa ser re-selecionado para execução. Por favor, clique na área de upload e carregue o mesmo arquivo PDF novamente.`);
+      return;
+    }
+
+    setExecutando(true);
+    setProgresso(5);
+    setLogs([
+      "🤖 [Agente] Inicializando pipeline autônomo...",
+      `⚙️ [Agente] Parâmetros: Ano=2026 | Bimestre=${bimestre}º | Lançar Faltas=${lancarFaltas ? "SIM" : "NÃO"}`,
+      `📂 [Agente] Enviando arquivo selecionado para processamento no servidor...`,
+      "⏳ [Agente] Processando documento no servidor backend e gravando notas no banco de dados..."
+    ]);
+    setEtapaAtual("Enviando PDF...");
+    setPdfs((prev) =>
+      prev.map((p) =>
+        p.nome === selectedPdf.nome ? { ...p, status: "Processando" } : p
+      )
+    );
+
+    try {
+      const formData = new FormData();
+      formData.append("files", fileToUpload);
+      formData.append("bimestre", bimestre);
+      formData.append("lancarFaltas", lancarFaltas ? "true" : "false");
+      formData.append("ano", "2026");
+
+      const response = await api.post("/api/secretaria/agente/importar-boletim", formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+
+      if (response.data && response.data.ok) {
+        const serverLogs = response.data.logs || [];
+        setEtapaAtual("Analisando logs...");
+        
+        let logIndex = 0;
+        const interval = setInterval(() => {
+          if (logIndex < serverLogs.length) {
+            setLogs((prev) => [...prev, serverLogs[logIndex]]);
+            const currentLog = serverLogs[logIndex];
+            
+            if (currentLog.includes("Lendo")) setEtapaAtual("Processando PDF...");
+            else if (currentLog.includes("Importando")) setEtapaAtual("Lançando Notas...");
+            else if (currentLog.includes("RELATÓRIO")) setEtapaAtual("Reconciliando Dados...");
+            else if (currentLog.includes("finalizada")) setEtapaAtual("Concluído!");
+
+            setProgresso(Math.round(10 + (logIndex / serverLogs.length) * 90));
+            logIndex++;
+          } else {
+            clearInterval(interval);
+            setExecutando(false);
+            setProgresso(100);
+            setEtapaAtual("Concluído!");
+            setPdfs((prev) =>
+              prev.map((p) =>
+                p.nome === selectedPdf.nome
+                  ? { ...p, status: "Importado", selecionado: false }
+                  : p
+              )
+            );
+          }
+        }, 150);
+      } else {
+        throw new Error(response.data?.message || "Erro desconhecido retornado pelo servidor.");
+      }
+    } catch (err) {
+      console.error("Erro na execução do agente:", err);
+      const errMsg = err.response?.data?.message || err.message || "Erro de rede ao conectar com o servidor.";
+      setLogs((prev) => [
+        ...prev,
+        `❌ [Agente] ERRO CRÍTICO: Falha na execução do pipeline.`,
+        `❌ Detalhe do Erro: ${errMsg}`
+      ]);
+      setEtapaAtual("Falha!");
+      setExecutando(false);
+      setProgresso(0);
+      setPdfs((prev) =>
+        prev.map((p) =>
+          p.nome === selectedPdf.nome ? { ...p, status: "Aguardando" } : p
+        )
+      );
+    }
   };
 
   return (
@@ -424,9 +552,19 @@ export default function AgenteSecretaria() {
                   Indique ou adicione os arquivos em PDF que o agente autônomo irá ler e processar nesta rodada.
                 </p>
 
+                {/* Hidden File Input */}
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  accept=".pdf"
+                  style={{ display: "none" }}
+                  disabled={executando || isUploading}
+                />
+
                 {/* Upload Zone */}
                 <div
-                  onClick={handleAddMockPdf}
+                  onClick={() => !executando && !isUploading && fileInputRef.current?.click()}
                   className={`border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all duration-300 flex flex-col items-center justify-center gap-2 group ${
                     isUploading
                       ? "border-purple-300 bg-purple-50/30"
@@ -436,7 +574,7 @@ export default function AgenteSecretaria() {
                   {isUploading ? (
                     <div className="flex flex-col items-center gap-3">
                       <div className="w-10 h-10 border-4 border-purple-600 border-t-transparent rounded-full animate-spin" />
-                      <span className="text-sm font-semibold text-purple-600">Simulando upload e análise do PDF...</span>
+                      <span className="text-sm font-semibold text-purple-600">Carregando e analisando o PDF...</span>
                     </div>
                   ) : (
                     <>
@@ -457,121 +595,81 @@ export default function AgenteSecretaria() {
 
                 {/* PDF Files List */}
                 <div className="mt-4 space-y-2">
-                  {pdfs.map((pdf) => (
-                    <div
-                      key={pdf.nome}
-                      className="p-3 bg-gray-50 rounded-xl border border-gray-200 flex items-center justify-between gap-3 hover:bg-white hover:shadow-md transition-all duration-200"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="p-2 bg-red-50 text-red-600 rounded-lg border border-red-100 flex-shrink-0">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                        </div>
-                        <div className="min-w-0">
-                          <span className="text-sm font-bold text-gray-800 block truncate">{pdf.nome}</span>
-                          <span className="text-xs text-gray-400">
-                            {pdf.tamanho} • {pdf.paginas} páginas (ímpares ativas)
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                          {pdf.status}
-                        </span>
-                        {pdfs.length > 1 && (
-                          <button
-                            type="button"
-                            disabled={executando}
-                            onClick={() => handleRemovePdf(pdf.nome)}
-                            className="p-1.5 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors text-gray-400"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  {pdfs.map((pdf) => {
+                    const isSelected = pdf.selecionado;
+                    return (
+                      <div
+                        key={pdf.nome}
+                        onClick={() => handleToggleSelection(pdf.nome)}
+                        className={`p-3 rounded-xl border transition-all duration-200 flex items-center justify-between gap-3 cursor-pointer ${
+                          isSelected
+                            ? "bg-purple-50/40 border-purple-300 shadow-sm"
+                            : "bg-gray-50/50 border-gray-200 opacity-60 hover:opacity-90"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          {/* Checkbox Seletor Premium */}
+                          <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-all ${
+                            isSelected
+                              ? "bg-purple-600 border-purple-600 text-white"
+                              : "border-gray-300 bg-white"
+                          }`}>
+                            {isSelected && (
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                              </svg>
+                            )}
+                          </div>
+
+                          <div className="p-2 bg-red-50 text-red-600 rounded-lg border border-red-100 flex-shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
-                          </button>
-                        )}
+                          </div>
+                          
+                          <div className="min-w-0">
+                            <span className="text-sm font-bold text-gray-800 block truncate">{pdf.nome}</span>
+                            <span className="text-xs text-gray-400">
+                              {pdf.tamanho} • {pdf.paginas} páginas (ímpares ativas)
+                            </span>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                          {pdf.status === "Importado" || pdf.status === "Pronto" ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                              {pdf.status}
+                            </span>
+                          ) : pdf.status === "Processando" ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 flex items-center gap-1 animate-pulse">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />
+                              {pdf.status}...
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-200 flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
+                              {pdf.status}
+                            </span>
+                          )}
+                          
+                          {pdfs.length > 1 && (
+                            <button
+                              type="button"
+                              disabled={executando}
+                              onClick={() => handleRemovePdf(pdf.nome)}
+                              className="p-1.5 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors text-gray-400"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
-              </div>
-
-              {/* Seção 3: Correspondência de Nomenclatura das Turmas */}
-              <div>
-                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-2">
-                  Correspondência de Nomenclatura das Turmas
-                </h3>
-                <p className="text-xs text-gray-400 mb-4">
-                  Mapeie os nomes locais no <strong>EDUCA.MELHOR</strong> para o padrão oficial no <strong>EDUCADF</strong>.
-                </p>
-
-                {loading ? (
-                  <div className="text-center py-6 text-gray-400 text-sm">Carregando turmas...</div>
-                ) : turmas.length === 0 ? (
-                  <div className="text-center py-6 text-gray-400 text-sm">Nenhuma turma cadastrada.</div>
-                ) : (
-                  <div className="border border-gray-200 rounded-xl divide-y divide-gray-100 overflow-hidden bg-white">
-                    {turmas.map((t) => (
-                      <div key={t.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-gray-50/50 transition-colors">
-                        <div>
-                          <span className="text-xs font-bold text-gray-400 block">NOME LOCAL (EDUCA.MELHOR)</span>
-                          <span className="text-sm font-bold text-gray-800">{t.turma}</span>
-                        </div>
-                        <div className="flex flex-col gap-1 sm:w-1/2">
-                          <span className="text-[10px] font-bold text-purple-600">PADRÃO OFICIAL (EDUCADF)</span>
-                          <input
-                            type="text"
-                            disabled={executando}
-                            value={mapeamento[t.id] || ""}
-                            onChange={(e) => handleMapChange(t.id, e.target.value)}
-                            placeholder="Ex: 6º Ano - A"
-                            className="rounded-lg border border-gray-200 p-2 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500 w-full"
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Seção 4: Correspondência de Nomenclatura das Disciplinas */}
-              <div>
-                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-2">
-                  Correspondência de Nomenclatura das Disciplinas
-                </h3>
-                <p className="text-xs text-gray-400 mb-4">
-                  Mapeie as disciplinas do <strong>EDUCA.MELHOR</strong> para o padrão oficial no <strong>EDUCADF</strong>.
-                </p>
-
-                {loading ? (
-                  <div className="text-center py-6 text-gray-400 text-sm">Carregando disciplinas...</div>
-                ) : disciplinas.length === 0 ? (
-                  <div className="text-center py-6 text-gray-400 text-sm">Nenhuma disciplina cadastrada.</div>
-                ) : (
-                  <div className="border border-gray-200 rounded-xl divide-y divide-gray-100 overflow-hidden bg-white">
-                    {disciplinas.map((d) => (
-                      <div key={d.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-gray-50/50 transition-colors">
-                        <div>
-                          <span className="text-xs font-bold text-gray-400 block">NOME LOCAL (EDUCA.MELHOR)</span>
-                          <span className="text-sm font-bold text-gray-800">{d.disciplina}</span>
-                        </div>
-                        <div className="flex flex-col gap-1 sm:w-1/2">
-                          <span className="text-[10px] font-bold text-purple-600">PADRÃO OFICIAL (EDUCADF)</span>
-                          <input
-                            type="text"
-                            disabled={executando}
-                            value={mapeamentoDisciplinas[d.id] || ""}
-                            onChange={(e) => handleMapDiscChange(d.id, e.target.value)}
-                            placeholder="Ex: Língua Portuguesa"
-                            className="rounded-lg border border-gray-200 p-2 text-xs focus:outline-none focus:ring-2 focus:ring-purple-500 w-full"
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
 
               {/* Seção 5: Terminal de Execução do Agente */}
@@ -633,6 +731,134 @@ export default function AgenteSecretaria() {
             </div>
           </div>
         </div>
+      {/* MODAL ALERTA PREMIUM - SELEÇÃO INDIVIDUAL SEGURA */}
+      {isAlertOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 overflow-hidden">
+          <div
+            className="absolute inset-0 bg-gray-900/60 backdrop-blur-md transition-opacity duration-300"
+            onClick={() => setIsAlertOpen(false)}
+          />
+          <div
+            className="relative bg-white rounded-2xl p-6 shadow-2xl max-w-sm w-full border border-purple-100 transition-all duration-300 transform scale-100"
+            style={{
+              background: "linear-gradient(180deg, #fdfdff 0%, #ffffff 100%)"
+            }}
+          >
+            <div className="flex flex-col items-center text-center gap-4">
+              <div
+                className="p-3.5 rounded-full text-purple-600 bg-purple-50 border border-purple-100 flex items-center justify-center animate-pulse"
+                style={{ boxShadow: "0 4px 12px rgba(139,92,246,0.15)" }}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 leading-tight">
+                  Execução Segura: 1 Turma por Vez
+                </h3>
+                <p className="text-xs text-purple-600 font-semibold mt-1 uppercase tracking-wider">
+                  Recomendação de Estabilidade do Agente
+                </p>
+                <p className="text-xs text-gray-500 mt-3 leading-relaxed">
+                  Para garantir 100% de estabilidade nas conexões de banco de dados e evitar quedas por tempo limite (timeout) do servidor, 
+                  <strong> o Agente processa as turmas individualmente</strong>.
+                </p>
+                <p className="text-xs text-gray-400 mt-2 leading-relaxed">
+                  Deseja alternar a seleção ativa para esta turma que você acabou de clicar?
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2 w-full mt-2">
+                <button
+                  type="button"
+                  onClick={confirmarTrocaSelecao}
+                  className="w-full py-3 px-4 rounded-xl text-white font-bold text-sm shadow-md transition-all duration-200 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  style={{
+                    background: "linear-gradient(135deg, #8b5cf6, #3b82f6)"
+                  }}
+                >
+                  Sim, Alternar Seleção
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsAlertOpen(false)}
+                  className="w-full py-2.5 px-4 rounded-xl text-gray-500 hover:text-gray-700 bg-gray-50 hover:bg-gray-100 transition-all font-semibold text-xs border border-gray-200"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CONFIRMAÇÃO DE REIMPORTAÇÃO SEGURA */}
+      {isReimportConfirmOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 overflow-hidden">
+          <div
+            className="absolute inset-0 bg-gray-900/60 backdrop-blur-md transition-opacity duration-300"
+            onClick={() => setIsReimportConfirmOpen(false)}
+          />
+          <div
+            className="relative bg-white rounded-2xl p-6 shadow-2xl max-w-sm w-full border border-amber-100 transition-all duration-300 transform scale-100"
+            style={{
+              background: "linear-gradient(180deg, #fffdfb 0%, #ffffff 100%)"
+            }}
+          >
+            <div className="flex flex-col items-center text-center gap-4">
+              <div
+                className="p-3.5 rounded-full text-amber-500 bg-amber-50 border border-amber-100 flex items-center justify-center animate-bounce"
+                style={{ boxShadow: "0 4px 12px rgba(245,158,11,0.15)" }}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+
+              <div>
+                <h3 className="text-lg font-bold text-gray-900 leading-tight">
+                  Reimportar Boletim?
+                </h3>
+                <p className="text-xs text-amber-600 font-semibold mt-1 uppercase tracking-wider">
+                  Blindagem Contra Reexecução Acidental
+                </p>
+                <p className="text-xs text-gray-500 mt-3 leading-relaxed">
+                  Esta turma já foi importada com sucesso. Se você reexecutar o Agente, 
+                  <strong> as notas e faltas existentes no banco de dados serão sobregravadas</strong> para o {bimestre}º Bimestre.
+                </p>
+                <p className="text-xs text-gray-400 mt-2 leading-relaxed">
+                  Tem certeza de que deseja prosseguir com a re-importação?
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-2 w-full mt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const selectedPdf = pdfs.find((p) => p.selecionado);
+                    if (selectedPdf) prosseguirRodarAgente(selectedPdf);
+                  }}
+                  className="w-full py-3 px-4 rounded-xl text-white font-bold text-sm shadow-md transition-all duration-200 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  style={{
+                    background: "linear-gradient(135deg, #f59e0b, #d97706)"
+                  }}
+                >
+                  Sim, Reimportar e Sobregravar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsReimportConfirmOpen(false)}
+                  className="w-full py-2.5 px-4 rounded-xl text-gray-500 hover:text-gray-700 bg-gray-50 hover:bg-gray-100 transition-all font-semibold text-xs border border-gray-200"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       </div>
     </div>
   );

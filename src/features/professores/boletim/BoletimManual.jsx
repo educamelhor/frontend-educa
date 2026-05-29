@@ -526,22 +526,43 @@ export default function BoletimManual() {
 
                     {/* Nome Aluno */}
                     <div className="col-span-5 flex items-center gap-3">
-                      <div
-                        style={{
-                          width: 34,
-                          height: 34,
-                          borderRadius: "50%",
-                          background: badge.bg,
-                          color: badge.text,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontSize: "0.8rem",
-                          fontWeight: 800,
-                          boxShadow: "inset 0 1px 2px rgba(0,0,0,0.06)",
-                        }}
-                      >
-                        {badge.chars}
+                      <div className="relative w-8.5 h-8.5 flex-shrink-0 flex items-center justify-center">
+                        {al.foto ? (
+                          <img
+                            src={al.foto}
+                            alt={al.nome}
+                            onError={(e) => {
+                              e.target.style.display = 'none';
+                              const initialsBadge = e.target.nextSibling;
+                              if (initialsBadge) initialsBadge.style.display = 'flex';
+                            }}
+                            style={{
+                              width: 34,
+                              height: 34,
+                              borderRadius: "50%",
+                              objectFit: "cover",
+                              border: "1.5px solid #e2e8f0",
+                              boxShadow: "0 2px 5px rgba(0,0,0,0.06)"
+                            }}
+                          />
+                        ) : null}
+                        <div
+                          style={{
+                            width: 34,
+                            height: 34,
+                            borderRadius: "50%",
+                            background: badge.bg,
+                            color: badge.text,
+                            display: al.foto ? "none" : "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: "0.8rem",
+                            fontWeight: 800,
+                            boxShadow: "inset 0 1px 2px rgba(0,0,0,0.06)",
+                          }}
+                        >
+                          {badge.chars}
+                        </div>
                       </div>
                       <span className="text-sm font-extrabold text-gray-800 leading-tight">
                         {al.nome}

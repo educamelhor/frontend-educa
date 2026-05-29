@@ -91,7 +91,7 @@ export default function Sidebar({ isOpen, onClose }) {
   const [avaliacaoGovConfig, setAvaliacaoGovConfig] = useState(null);
 
   useEffect(() => {
-    if (!isScopeEscola || isDisciplinar || isProfessor) return;
+    if (!isScopeEscola || isDisciplinar) return;
     const escolaId = localStorage.getItem('escola_id');
     if (!escolaId) return;
     (async () => {
@@ -105,6 +105,10 @@ export default function Sidebar({ isOpen, onClose }) {
       }
     })();
   }, []);
+
+  const isDirecao = perfil === 'diretor' || perfil === 'vice_diretor';
+  const isBoletimManualEnabled = avaliacaoGovConfig?.["escola.permitir_boletim_manual"] === "1";
+  const canSeeBoletimManual = isBoletimManualEnabled || isDirecao;
 
   // Quem pode ver o módulo Gabarito?
   // - Diretor / vice_diretor / secretaria: SEMPRE
@@ -362,6 +366,16 @@ export default function Sidebar({ isOpen, onClose }) {
                   <DocumentTextIcon className="h-5 w-5 mr-2" /> Provas
                 </Link>
               </li>
+              {canSeeBoletimManual && (
+                <li>
+                  <Link
+                    to="/professores/boletim"
+                    className={getSubmenuLinkClasses('/professores/boletim')}
+                  >
+                    <ClipboardDocumentListIcon className="h-5 w-5 mr-2" /> Boletim
+                  </Link>
+                </li>
+              )}
             </ul>
 
             </>
@@ -415,6 +429,16 @@ export default function Sidebar({ isOpen, onClose }) {
                     <DocumentTextIcon className="h-5 w-5 mr-2" /> Provas
                   </Link>
                 </li>
+                {canSeeBoletimManual && (
+                  <li>
+                    <Link
+                      to="/professores/boletim"
+                      className={getSubmenuLinkClasses('/professores/boletim')}
+                    >
+                      <ClipboardDocumentListIcon className="h-5 w-5 mr-2" /> Boletim
+                    </Link>
+                  </li>
+                )}
               </ul>
             )}
             </>
@@ -1286,6 +1310,16 @@ export default function Sidebar({ isOpen, onClose }) {
                     className={getSubmenuLinkClasses('/secretaria/boletim')}
                   >
                     <DocumentTextIcon className="h-5 w-5 mr-2" /> Boletim
+                  </Link>
+                </li>
+
+                {/* NOVO SUBMENU: Agente */}
+                <li>
+                  <Link
+                    to="/secretaria/agente"
+                    className={getSubmenuLinkClasses('/secretaria/agente')}
+                  >
+                    <BoltIcon className="h-5 w-5 mr-2" /> Agente
                   </Link>
                 </li>
 

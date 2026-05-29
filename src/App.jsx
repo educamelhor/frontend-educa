@@ -39,6 +39,7 @@ import Planos from "./features/professores/planos/Planos";
 import Avaliacoes from "./features/professores/avaliacoes/Avaliacoes";
 import ConteudosProfessor from "./features/professores/conteudos/Conteudos";
 import ProvasProfessor from "./features/professores/provas/Provas";
+import BoletimManual from "./features/professores/boletim/BoletimManual";
 import SolicitacoesConteudos from "./features/pedagogico/coordenacao/SolicitacoesConteudos.jsx";
 import LandingPage from "./features/landing/LandingPage";
 import PrivacidadePage from "./pages/PrivacidadePage";
@@ -332,6 +333,7 @@ export default function App() {
           <Route path="/professores/avaliacoes" element={<Avaliacoes />} />
           <Route path="/professores/conteudos"  element={<ConteudosProfessor />} />
           <Route path="/professores/provas"     element={<ProvasProfessor />} />
+          <Route path="/professores/boletim"    element={<BoletimManual />} />
 
           {/* ── Frequência ───────────────────────────────────────────────── */}
           <Route path="/frequencia/atestados"       element={<Atestados />} />

@@ -16,6 +16,7 @@ import Alunos from "./alunos";
 import CargasHorariasPage from "./cargas-horarias";
 import ListaResponsaveis from "./responsaveis";
 import SincronizarSEEDF from "./sincronizar-seedf";
+import AgenteSecretaria from "./agente";
 
 // ============================================================================
 // Componente principal da Secretaria
@@ -43,6 +44,9 @@ export default function Secretaria() {
 
       {/* Sincronizar com SEEDF */}
       <Route path="sincronizar-seedf" element={<SincronizarSEEDF />} />
+
+      {/* Agente */}
+      <Route path="agente" element={<AgenteSecretaria />} />
     </Routes>
   );
 }

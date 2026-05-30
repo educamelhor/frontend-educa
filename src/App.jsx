@@ -333,6 +333,7 @@ export default function App() {
           <Route path="/professores/avaliacoes" element={<Avaliacoes />} />
           <Route path="/professores/conteudos"  element={<ConteudosProfessor />} />
           <Route path="/professores/provas"     element={<ProvasProfessor />} />
+          <Route path="/pedagogico/provas"      element={<ProvasProfessor />} />
           <Route path="/professores/boletim"    element={<BoletimManual />} />
 
           {/* ── Frequência ───────────────────────────────────────────────── */}

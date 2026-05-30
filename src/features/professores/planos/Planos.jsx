@@ -199,10 +199,24 @@ export default function Planos() {
         const ano = new Date().getFullYear();
         const turmaObj = turmas.find(t => String(t.id) === String(turmaSelecionada) || t.nome === turmaSelecionada);
         const turmaNome = turmaObj?.nome || turmaSelecionada;
+        const turmaId = turmaObj?.id || turmaSelecionada;
 
-        // Para cada disciplina do professor, busca o plano correspondente à turma+bimestre
+        // Busca apenas as disciplinas que o professor leciona nesta turma específica
+        let disciplinasDaTurma = [];
+        try {
+          const resDisc = await api.get(`/professores/me/turmas/${turmaId}/disciplinas`);
+          if (resDisc.data?.ok) {
+            disciplinasDaTurma = resDisc.data.disciplinas.map(d => d.nome);
+          }
+        } catch (err) {
+          console.error("Erro ao buscar disciplinas da turma:", err);
+          // Fallback de segurança: usa todas as disciplinas do professor
+          disciplinasDaTurma = disciplinas;
+        }
+
+        // Para cada disciplina específica da turma, busca o plano correspondente
         const resultados = await Promise.all(
-          disciplinas.map(async (disc) => {
+          disciplinasDaTurma.map(async (disc) => {
             try {
               const res = await api.get("/avaliacoes", {
                 params: { disciplina: disc, bimestre: bimestreSelecionado, ano }

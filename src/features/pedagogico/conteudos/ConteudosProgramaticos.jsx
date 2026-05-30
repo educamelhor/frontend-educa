@@ -3,6 +3,7 @@ import api from "../../../services/api";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import "./ConteudosProgramaticos.css";
+import useEscolaLogos from "../../../hooks/useEscolaLogos";
 
 // ── Dados mock ─────────────────────────────────────────────────────────────
 const SERIES = ["6º Ano", "7º Ano", "8º Ano", "9º Ano"];
@@ -48,6 +49,7 @@ const IcoPDF    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColo
 
 // ── Componente principal ───────────────────────────────────────────────────
 export default function ConteudosProgramaticos() {
+  const { logoEsquerda, logoDireita } = useEscolaLogos();
   const [serieFiltro, setSerieFiltro]         = useState("Todas");
   const [discFiltro, setDiscFiltro]           = useState("Todas");
   const [bimestreFiltro, setBimestreFiltro]   = useState("Todos");
@@ -233,8 +235,8 @@ export default function ConteudosProgramaticos() {
     const bimStr = `${bimNum}º Bimestre`;
     const logos = {};
     try {
-      logos.left  = await loadImageAsBase64("/logo-escola-left.png");
-      logos.right = await loadImageAsBase64("/LOGO_CCMDF.jpg");
+      logos.left  = await loadImageAsBase64(logoEsquerda);
+      logos.right = await loadImageAsBase64(logoDireita);
     } catch (_) {}
     buildPdfHeaderOficial(doc, W, logos, hoje, "CONTEÚDO PROGRAMÁTICO", data.disciplina_nome, bimStr, data.ano_letivo || 2026);
 
@@ -344,8 +346,8 @@ export default function ConteudosProgramaticos() {
     const bimStr = bimNum ? `${bimNum}º Bimestre` : "Ano Letivo";
     const logos = {};
     try {
-      logos.left  = await loadImageAsBase64("/logo-escola-left.png");
-      logos.right = await loadImageAsBase64("/LOGO_CCMDF.jpg");
+      logos.left  = await loadImageAsBase64(logoEsquerda);
+      logos.right = await loadImageAsBase64(logoDireita);
     } catch (_) {}
     buildPdfHeaderOficial(doc, W, logos, hoje, "OBJETIVOS DE APRENDIZAGEM", data.disciplina_nome, bimStr, data.ano_letivo || 2026);
 

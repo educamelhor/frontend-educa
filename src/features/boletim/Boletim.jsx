@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import api from "../../services/api";
 import styles from "../boletim/Boletim.module.css";
+import useEscolaLogos from "../../hooks/useEscolaLogos";
 
 export default function Boletim({ codigo: codigoProp, exibirBotaoImprimir = true, onLoaded }) {
   const params = useParams?.() || {};
@@ -13,6 +14,7 @@ export default function Boletim({ codigo: codigoProp, exibirBotaoImprimir = true
   const [erro, setErro] = useState("");
   const [ranking, setRanking] = useState(null);
   const [showSemNotas, setShowSemNotas] = useState(true);
+  const { logoEsquerda, logoDireita } = useEscolaLogos();
 
   useEffect(() => {
     let cancelado = false;
@@ -163,9 +165,10 @@ export default function Boletim({ codigo: codigoProp, exibirBotaoImprimir = true
       {/* Cabeçalho da escola */}
       <div className="bg-white rounded-lg shadow p-4 flex justify-center items-center mb-4">
         <img
-          src="/logo-escola-left.png"
+          src={logoEsquerda}
           alt="Logo esquerda"
           className="h-[6rem] mr-4"
+          onError={e => { e.target.style.display = "none"; }}
         />
         <div className="text-center">
           <div>GOVERNO DO DISTRITO FEDERAL</div>
@@ -174,9 +177,10 @@ export default function Boletim({ codigo: codigoProp, exibirBotaoImprimir = true
           <div>INEP 53006160</div>
         </div>
         <img
-          src="/logo-escola-right.png"
+          src={logoDireita}
           alt="Logo direita"
           className="h-[4.5rem] ml-4"
+          onError={e => { e.target.style.display = "none"; }}
         />
       </div>
 

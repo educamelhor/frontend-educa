@@ -11,6 +11,7 @@ import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import api from "../../services/api";
 import s from "./BoletimAnual.module.css";
+import useEscolaLogos from "../../hooks/useEscolaLogos";
 
 // Ano letivo corrente
 const ANO_CORRENTE = new Date().getFullYear();
@@ -27,6 +28,7 @@ export default function BoletimAnual({
 }) {
   const params = useParams?.() || {};
   const codigo = codigoProp || params.codigo;
+  const { logoEsquerda, logoDireita } = useEscolaLogos();
 
   const [aluno, setAluno] = useState(null);
   const [notas, setNotas] = useState(notasPreCarregadas);
@@ -276,9 +278,10 @@ export default function BoletimAnual({
       {/* ──── CABEÇALHO INSTITUCIONAL ──── */}
       <div className={s.cabecalho}>
         <img
-          src="/logo-escola-left.png"
+          src={logoEsquerda}
           alt="Logo esquerda"
           className={s.cabecalhoLogo}
+          onError={e => { e.target.style.display = "none"; }}
         />
         <div className={s.cabecalhoTexto}>
           <div>GOVERNO DO DISTRITO FEDERAL</div>
@@ -290,9 +293,10 @@ export default function BoletimAnual({
           </div>
         </div>
         <img
-          src="/logo-escola-right.png"
+          src={logoDireita}
           alt="Logo direita"
           className={s.cabecalhoLogoSmall}
+          onError={e => { e.target.style.display = "none"; }}
         />
       </div>
 

@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, Navigate } from "react-router-dom";
 import api from "../services/api";
+import useEscolaLogos from "../hooks/useEscolaLogos";
 
 export default function Boletim() {
   const { alunoId } = useParams();
@@ -10,6 +11,7 @@ export default function Boletim() {
   const [aluno, setAluno] = useState(null);
   const [notas, setNotas] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { logoEsquerda, logoDireita } = useEscolaLogos();
 
   useEffect(() => {
     api.get(`/api/alunos/${alunoId}`)
@@ -42,7 +44,7 @@ export default function Boletim() {
     <div className="pt-0 px-6 pb-0 bg-blue-50 min-h-screen">
       {/* cabeçalho */}
       <div className="bg-white rounded shadow p-2 mb-3 flex items-center justify-between">
-        <img src="/LOGO_EDUCA_MELHOR.jpeg" alt="Educa.Melhor" className="h-12" />
+        <img src={logoEsquerda} alt="Logo esquerda" className="h-12" onError={e => { e.target.style.display='none'; }} />
         <div className="text-center text-xs leading-tight space-y-0">
           <div>GOVERNO DO DISTRITO FEDERAL</div>
           <div>SECRETARIA DE ESTADO DE EDUCAÇÃO</div>
@@ -50,7 +52,7 @@ export default function Boletim() {
           <div>CENTRO DE ENSINO FUNDAMENTAL 04 – COLÉGIO CÍVICO MILITAR</div>
           <div>INEP 53006160</div>
         </div>
-        <img src="/LOGO_CCMDF.jpg" alt="CCMDF" className="h-12" />
+        <img src={logoDireita} alt="Logo direita" className="h-12" onError={e => { e.target.style.display='none'; }} />
       </div>
 
       {/* informações do aluno inline */}

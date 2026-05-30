@@ -4,6 +4,7 @@
 // Diretor e Vice-Diretor gerenciam permissões e políticas do EDUCA.MELHOR
 // ============================================================================
 import React, { useState, useEffect, useCallback } from "react";
+import LogosEscola from "./LogosEscola.jsx";
 
 // URL de produção — mesma lógica do src/services/api.js
 function getApiRoot() {
@@ -86,6 +87,7 @@ const CATEGORY_META = {
 // Categorias serão exibidas na ordem retornada pelo backend (definida pelo CEO)
 
 export default function Governanca() {
+  const [activeTab, setActiveTab] = useState("configs"); // 'configs' | 'logos'
   const [configsPorCategoria, setConfigsPorCategoria] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -278,8 +280,58 @@ export default function Governanca() {
 
   return (
     <div style={styles.root}>
-      {/* ── TOAST ── */}
+      {/* ── TOAST GLOBAL (visível em ambas as abas) ── */}
       {toast && (
+        <div
+          style={{
+            ...styles.toast,
+            background:
+              toast.type === "error"
+                ? "linear-gradient(135deg, #ef4444, #dc2626)"
+                : toast.type === "info"
+                ? "linear-gradient(135deg, #3b82f6, #2563eb)"
+                : "linear-gradient(135deg, #10b981, #059669)",
+          }}
+        >
+          {toast.msg}
+        </div>
+      )}
+
+      {/* ── ABAS PRINCIPAIS ── */}
+      <div style={styles.tabBar}>
+
+        <button
+          style={activeTab === "configs" ? styles.tabActive : styles.tabInactive}
+          onClick={() => setActiveTab("configs")}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" style={{ width: 16, height: 16, marginRight: 6 }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          Configurações
+        </button>
+        <button
+          style={activeTab === "logos" ? styles.tabActive : styles.tabInactive}
+          onClick={() => setActiveTab("logos")}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" style={{ width: 16, height: 16, marginRight: 6 }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+          </svg>
+          🏛️ Logos &amp; Identidade Visual
+        </button>
+      </div>
+
+      {/* ── ABA LOGOS ── */}
+      {activeTab === "logos" && (
+        <LogosEscola showToast={(msg, type) => showToast(msg, type)} />
+      )}
+
+      {/* ── ABA CONFIGURAÇÕES (conteúdo original abaixo) ── */}
+      {activeTab === "configs" && (
+        <>
+        {/* ── TOAST ── */}
+        {toast && (
+
         <div
           style={{
             ...styles.toast,
@@ -643,9 +695,12 @@ export default function Governanca() {
           </div>
         </div>
       )}
+        </>
+      )}
     </div>
   );
 }
+
 
 // ═══════════════════════════════════════════════════════════════
 // CONFIG ITEM — Linha individual de configuração
@@ -755,6 +810,49 @@ const styles = {
     margin: "0 auto",
     padding: "0 8px",
     fontFamily: "'Montserrat', 'Inter', system-ui, sans-serif",
+  },
+
+  // Tab bar
+  tabBar: {
+    display: "flex",
+    gap: 4,
+    marginBottom: 20,
+    background: "#f8fafc",
+    borderRadius: 12,
+    padding: 4,
+    border: "1px solid #e2e8f0",
+  },
+  tabActive: {
+    flex: 1,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "10px 16px",
+    borderRadius: 9,
+    border: "none",
+    background: "linear-gradient(135deg, #1e293b, #0f172a)",
+    color: "#fff",
+    fontWeight: 700,
+    fontSize: 13,
+    cursor: "pointer",
+    boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+    fontFamily: "inherit",
+  },
+  tabInactive: {
+    flex: 1,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "10px 16px",
+    borderRadius: 9,
+    border: "none",
+    background: "transparent",
+    color: "#64748b",
+    fontWeight: 600,
+    fontSize: 13,
+    cursor: "pointer",
+    fontFamily: "inherit",
+    transition: "background .15s",
   },
 
   // Toast

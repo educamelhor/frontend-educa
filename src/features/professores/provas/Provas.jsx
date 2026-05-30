@@ -1,52 +1,503 @@
-import React from "react";
-import { DocumentTextIcon, ArrowPathIcon } from "@heroicons/react/24/outline";
+// src/features/professores/provas/Provas.jsx
+import React, { useState, useEffect, useCallback } from 'react';
+import { AREAS, TEMPLATES, SERIES_OPTIONS, TURNOS_OPTIONS, BIMESTRES_OPTIONS } from './templateDefinitions';
+import CapaPreview from './CapaPreview';
+import useEscolaLogos from '../../../hooks/useEscolaLogos';
 
-/**
- * Provas — Módulo Professores
- * ──────────────────────────────────────────
- * Placeholder para o submenu de Provas.
- * Será implementado no próximo passo.
- */
+const ANO_CORRENTE = new Date().getFullYear();
+
+function getToken() { return localStorage.getItem('token'); }
+function getEscolaId() { return localStorage.getItem('escola_id'); }
+function getApiRoot() {
+  const env = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL;
+  if (env) return String(env).replace(/\/api$/, '').replace(/\/$/, '');
+  if (window.location.hostname === 'localhost') return 'http://localhost:3000';
+  return 'https://educa-backend-docker-659zo.ondigitalocean.app';
+}
+const API = getApiRoot();
+
+function authH() {
+  return { Authorization: `Bearer ${getToken()}`, 'x-escola-id': getEscolaId() || '' };
+}
+
 export default function Provas() {
-  return (
-    <div className="flex flex-col gap-6 w-full pb-20">
-      {/* Header */}
-      <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 lg:p-8">
-        <div className="flex items-center gap-4">
-          <div className="p-3 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl shadow-md">
-            <DocumentTextIcon className="w-7 h-7 text-white" />
-          </div>
-          <div>
-            <h2 className="text-2xl font-black text-gray-800 tracking-tight">
-              Provas
-            </h2>
-            <p className="text-sm text-gray-500 font-medium mt-1">
-              Crie, gerencie e envie provas para aprovação da coordenação.
-            </p>
-          </div>
-        </div>
-      </section>
+  const [activeTab, setActiveTab] = useState('capas'); // 'capas' | 'nova'
+  const [step, setStep] = useState(1); // wizard step 1-3
+  const [capas, setCapas] = useState([]);
+  const [loadingCapas, setLoadingCapas] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+  const [toast, setToast] = useState(null);
 
-      {/* Área principal — Em construção */}
-      <section className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="p-5 bg-gradient-to-br from-violet-50 to-purple-50 rounded-2xl mb-6">
-            <DocumentTextIcon className="w-16 h-16 text-violet-300" />
-          </div>
-          <h3 className="text-xl font-bold text-gray-600 mb-2">
-            Módulo em desenvolvimento
-          </h3>
-          <p className="text-sm text-gray-400 max-w-md leading-relaxed">
-            A gestão de provas estará disponível em breve.
-            Aqui você poderá criar provas, enviá-las para aprovação da coordenação
-            e acompanhar o status de cada prova.
-          </p>
-          <div className="mt-6 flex items-center gap-2 text-violet-600 bg-violet-50 px-4 py-2 rounded-full">
-            <ArrowPathIcon className="w-4 h-4 animate-spin" />
-            <span className="text-xs font-bold uppercase tracking-wider">Em breve</span>
-          </div>
+  // Wizard state
+  const [selectedArea, setSelectedArea] = useState(null); // AREAS item
+  const [selectedTemplate, setSelectedTemplate] = useState(null); // TEMPLATES item
+  const [form, setForm] = useState({
+    titulo: '',
+    serie: '',
+    turno: '',
+    bimestre: 1,
+    ano: ANO_CORRENTE,
+    instrucoes: '',
+  });
+
+  const { logoEsquerda, logoDireita } = useEscolaLogos();
+  const escolaNome = localStorage.getItem('escola_nome') || 'ESCOLA';
+
+  // ── Toast helper ────────────────────────────────────────────────────────
+  const showToast = useCallback((msg, type = 'success') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3500);
+  }, []);
+
+  // ── Load capas ──────────────────────────────────────────────────────────
+  const loadCapas = useCallback(async () => {
+    setLoadingCapas(true);
+    try {
+      const res = await fetch(`${API}/api/capa-provas`, { headers: authH() });
+      const data = await res.json();
+      if (data.ok) setCapas(data.capas || []);
+    } catch (err) {
+      showToast('Erro ao carregar capas.', 'error');
+    } finally {
+      setLoadingCapas(false);
+    }
+  }, []);
+
+  useEffect(() => { loadCapas(); }, [loadCapas]);
+
+  // ── Wizard navigation ───────────────────────────────────────────────────
+  function goToStep(n) {
+    if (n === 2 && !selectedArea) return;
+    if (n === 3 && !selectedTemplate) return;
+    setStep(n);
+  }
+
+  function selectArea(area) {
+    setSelectedArea(area);
+    setForm(f => ({
+      ...f,
+      titulo: `PROVÃO DE ${area.label}`,
+      instrucoes: area.instrucoesPadrao,
+    }));
+    setStep(2);
+  }
+
+  function selectTemplate(t) {
+    setSelectedTemplate(t);
+    setStep(3);
+  }
+
+  // ── Generate PDF ────────────────────────────────────────────────────────
+  async function handleGerar() {
+    if (!selectedArea || !selectedTemplate) return;
+    if (!form.titulo.trim() || !form.bimestre || !form.ano) {
+      showToast('Preencha título, bimestre e ano.', 'error');
+      return;
+    }
+    setGenerating(true);
+    try {
+      // 1) Create the cover record
+      const res = await fetch(`${API}/api/capa-provas`, {
+        method: 'POST',
+        headers: { ...authH(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          titulo: form.titulo.trim(),
+          area: selectedArea.id,
+          serie: form.serie || null,
+          turno: form.turno || null,
+          bimestre: form.bimestre,
+          ano: form.ano,
+          template_id: selectedTemplate.id,
+          instrucoes: form.instrucoes.trim() || null,
+        }),
+      });
+      const created = await res.json();
+      if (!created.ok) throw new Error(created.message || 'Erro ao salvar capa.');
+
+      // 2) Download PDF
+      const pdfRes = await fetch(`${API}/api/capa-provas/${created.id}/pdf`, { headers: authH() });
+      if (!pdfRes.ok) throw new Error('Erro ao gerar PDF.');
+      const blob = await pdfRes.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `capa-${selectedArea.id.toLowerCase()}-${form.bimestre}bim-${form.ano}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      showToast('✅ Capa gerada e baixada com sucesso!', 'success');
+      loadCapas();
+      setActiveTab('capas');
+      resetWizard();
+    } catch (err) {
+      showToast(err.message || 'Erro ao gerar capa.', 'error');
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  async function handleDelete(id) {
+    setDeletingId(id);
+    try {
+      const res = await fetch(`${API}/api/capa-provas/${id}`, { method: 'DELETE', headers: authH() });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.message);
+      showToast('Capa removida.', 'success');
+      loadCapas();
+    } catch (err) {
+      showToast(err.message || 'Erro ao remover capa.', 'error');
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  async function handleDownload(id, area, bim, ano) {
+    try {
+      const res = await fetch(`${API}/api/capa-provas/${id}/pdf`, { headers: authH() });
+      if (!res.ok) throw new Error('Erro ao baixar PDF.');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `capa-${area.toLowerCase()}-${bim}bim-${ano}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  }
+
+  function resetWizard() {
+    setStep(1);
+    setSelectedArea(null);
+    setSelectedTemplate(null);
+    setForm({ titulo: '', serie: '', turno: '', bimestre: 1, ano: ANO_CORRENTE, instrucoes: '' });
+  }
+
+  // ── Area badge color helper ─────────────────────────────────────────────
+  function getAreaDef(areaId) {
+    return AREAS.find(a => a.id === areaId) || AREAS[4];
+  }
+
+  // ── RENDER ──────────────────────────────────────────────────────────────
+  return (
+    <div style={s.root}>
+      {/* Toast */}
+      {toast && (
+        <div style={{ ...s.toast, background: toast.type === 'error' ? 'linear-gradient(135deg,#ef4444,#dc2626)' : 'linear-gradient(135deg,#10b981,#059669)' }}>
+          {toast.msg}
         </div>
-      </section>
+      )}
+
+      {/* Page header */}
+      <div style={s.pageHeader}>
+        <div style={s.pageIconWrap}>
+          <span style={{ fontSize: 22 }}>📄</span>
+        </div>
+        <div>
+          <h1 style={s.pageTitle}>Capas de Provas</h1>
+          <p style={s.pageDesc}>Crie e baixe capas institucionais com QR code para identificação pelo EDUCA-SCAN</p>
+        </div>
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 10 }}>
+          <button
+            style={{ ...s.tabBtn, ...(activeTab === 'capas' ? s.tabBtnActive : {}) }}
+            onClick={() => { setActiveTab('capas'); resetWizard(); }}
+          >📋 Capas Criadas ({capas.length})</button>
+          <button
+            style={{ ...s.tabBtn, ...(activeTab === 'nova' ? s.tabBtnActive : {}), background: activeTab === 'nova' ? 'linear-gradient(135deg,#6366f1,#8b5cf6)' : undefined, color: activeTab === 'nova' ? '#fff' : undefined }}
+            onClick={() => { setActiveTab('nova'); setStep(1); }}
+          >➕ Nova Capa</button>
+        </div>
+      </div>
+
+      {/* ── TAB: CAPAS CRIADAS ─────────────────────────────────────────── */}
+      {activeTab === 'capas' && (
+        <div>
+          {loadingCapas ? (
+            <div style={s.emptyBox}><div style={s.spinner} /><p style={{ color:'#64748b', marginTop:12 }}>Carregando capas...</p></div>
+          ) : capas.length === 0 ? (
+            <div style={s.emptyBox}>
+              <div style={{ fontSize:56, marginBottom:12 }}>📄</div>
+              <h3 style={{ fontWeight:700, color:'#374151', marginBottom:6 }}>Nenhuma capa criada ainda</h3>
+              <p style={{ color:'#6b7280', fontSize:14, marginBottom:20 }}>Clique em "Nova Capa" para criar a primeira.</p>
+              <button style={s.primaryBtn} onClick={() => { setActiveTab('nova'); setStep(1); }}>➕ Criar primeira capa</button>
+            </div>
+          ) : (
+            <div style={s.grid}>
+              {capas.map(capa => {
+                const areaDef = getAreaDef(capa.area);
+                const templateDef = TEMPLATES.find(t => t.id === capa.template_id);
+                return (
+                  <div key={capa.id} style={s.capaCard}>
+                    {/* Mini preview */}
+                    <div style={{ ...s.capaThumb, background: areaDef.corClaro, borderBottom: `3px solid ${areaDef.cor}` }}>
+                      <div style={{ position:'relative', overflow:'hidden', width:'100%', height:'100%' }}>
+                        <CapaPreview
+                          area={areaDef}
+                          template={templateDef || TEMPLATES[0]}
+                          titulo={capa.titulo}
+                          serie={capa.serie}
+                          bimestre={capa.bimestre}
+                          instrucoes={capa.instrucoes || areaDef.instrucoesPadrao}
+                          scale={0.185}
+                          escolaNome={escolaNome}
+                          logoEsq={logoEsquerda}
+                          logoDir={logoDireita}
+                        />
+                      </div>
+                    </div>
+                    {/* Info */}
+                    <div style={s.capaCardBody}>
+                      <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
+                        <span style={{ ...s.areaBadge, background:areaDef.corClaro, color:areaDef.cor, border:`1px solid ${areaDef.cor}40` }}>
+                          {areaDef.emoji} {areaDef.label}
+                        </span>
+                        <span style={{ ...s.areaBadge, background:'#f1f5f9', color:'#64748b' }}>
+                          {templateDef?.nome || 'Clássico'}
+                        </span>
+                      </div>
+                      <div style={s.capaTitle}>{capa.titulo}</div>
+                      <div style={s.capaMeta}>
+                        {capa.serie && <span>{capa.serie}</span>}
+                        {capa.serie && <span>·</span>}
+                        <span>{capa.bimestre}º Bimestre</span>
+                        <span>·</span>
+                        <span>{capa.ano}</span>
+                      </div>
+                      <div style={s.capaActions}>
+                        <button
+                          style={s.btnDownload}
+                          onClick={() => handleDownload(capa.id, capa.area, capa.bimestre, capa.ano)}
+                        >⬇️ Baixar PDF</button>
+                        <button
+                          style={s.btnDelete}
+                          onClick={() => handleDelete(capa.id)}
+                          disabled={deletingId === capa.id}
+                        >{deletingId === capa.id ? '...' : '🗑️'}</button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── TAB: NOVA CAPA — WIZARD ────────────────────────────────────── */}
+      {activeTab === 'nova' && (
+        <div>
+          {/* Steps indicator */}
+          <div style={s.stepsBar}>
+            {['Área', 'Modelo', 'Configurar'].map((label, i) => {
+              const n = i + 1;
+              const active = step === n;
+              const done = step > n;
+              return (
+                <React.Fragment key={n}>
+                  <button style={{ ...s.stepBtn, ...(active ? s.stepActive : done ? s.stepDone : s.stepIdle) }} onClick={() => goToStep(n)}>
+                    <span style={s.stepNum}>{done ? '✓' : n}</span>
+                    <span style={s.stepLabel}>{label}</span>
+                  </button>
+                  {i < 2 && <div style={{ ...s.stepLine, background: done ? '#6366f1' : '#e2e8f0' }} />}
+                </React.Fragment>
+              );
+            })}
+          </div>
+
+          {/* ── Step 1: Choose Area ── */}
+          {step === 1 && (
+            <div>
+              <h2 style={s.stepTitle}>Escolha a Área de Conhecimento</h2>
+              <div style={s.areaGrid}>
+                {AREAS.map(area => (
+                  <button key={area.id} style={{ ...s.areaCard, border: `2px solid ${selectedArea?.id === area.id ? area.cor : '#e2e8f0'}`, background: selectedArea?.id === area.id ? area.corClaro : '#fff' }}
+                    onClick={() => selectArea(area)}
+                  >
+                    <div style={{ fontSize:42, marginBottom:10 }}>{area.emoji}</div>
+                    <div style={{ fontSize:18, fontWeight:800, color: area.cor, marginBottom:4 }}>{area.label}</div>
+                    <div style={{ fontSize:11, color:'#64748b', lineHeight:1.4 }}>{area.disciplinas}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── Step 2: Choose Template ── */}
+          {step === 2 && selectedArea && (
+            <div>
+              <h2 style={s.stepTitle}>Escolha o Modelo Visual</h2>
+              <p style={s.stepDesc}>Todos os modelos suportam a cor de <strong style={{ color: selectedArea.cor }}>{selectedArea.label}</strong></p>
+              <div style={s.templateGrid}>
+                {TEMPLATES.map(t => (
+                  <button key={t.id}
+                    style={{ ...s.templateCard, border: `2px solid ${selectedTemplate?.id === t.id ? selectedArea.cor : '#e2e8f0'}`, outline: 'none' }}
+                    onClick={() => selectTemplate(t)}
+                  >
+                    {/* Mini preview */}
+                    <div style={{ width: 595*0.17, height: 842*0.17, overflow:'hidden', borderRadius:4, marginBottom:10, border:'1px solid #e2e8f0', position:'relative', flexShrink:0 }}>
+                      <CapaPreview
+                        area={selectedArea}
+                        template={t}
+                        titulo={`PROVÃO DE ${selectedArea.label}`}
+                        serie="6º ANO"
+                        bimestre={1}
+                        instrucoes={selectedArea.instrucoesPadrao}
+                        scale={0.17}
+                        escolaNome={escolaNome}
+                      />
+                    </div>
+                    <div style={{ fontWeight:800, fontSize:13, color:'#1e293b', marginBottom:3 }}>{t.nome}</div>
+                    <div style={{ fontSize:11, color:'#64748b', textAlign:'center' }}>{t.desc}</div>
+                    {selectedTemplate?.id === t.id && (
+                      <div style={{ position:'absolute', top:8, right:8, background: selectedArea.cor, borderRadius:'50%', width:20, height:20, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:12, fontWeight:900 }}>✓</div>
+                    )}
+                  </button>
+                ))}
+              </div>
+              <div style={{ display:'flex', gap:10, marginTop:20 }}>
+                <button style={s.secondaryBtn} onClick={() => setStep(1)}>← Voltar</button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Step 3: Configure + Preview ── */}
+          {step === 3 && selectedArea && selectedTemplate && (
+            <div style={{ display:'flex', gap:24, alignItems:'flex-start' }}>
+              {/* Form */}
+              <div style={{ flex:'0 0 380px' }}>
+                <h2 style={s.stepTitle}>Configurar a Capa</h2>
+
+                <label style={s.label}>Título da prova *</label>
+                <input style={s.input} value={form.titulo} onChange={e => setForm(f => ({ ...f, titulo: e.target.value }))} placeholder="Ex: PROVÃO DE EXATAS" />
+
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                  <div>
+                    <label style={s.label}>Série / Ano</label>
+                    <select style={s.input} value={form.serie} onChange={e => setForm(f => ({ ...f, serie: e.target.value }))}>
+                      <option value="">-- Selecione --</option>
+                      {SERIES_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={s.label}>Turno</label>
+                    <select style={s.input} value={form.turno} onChange={e => setForm(f => ({ ...f, turno: e.target.value }))}>
+                      <option value="">-- Selecione --</option>
+                      {TURNOS_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                  <div>
+                    <label style={s.label}>Bimestre *</label>
+                    <select style={s.input} value={form.bimestre} onChange={e => setForm(f => ({ ...f, bimestre: Number(e.target.value) }))}>
+                      {BIMESTRES_OPTIONS.map(b => <option key={b.value} value={b.value}>{b.label}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={s.label}>Ano letivo *</label>
+                    <input style={s.input} type="number" value={form.ano} min={2020} max={2099} onChange={e => setForm(f => ({ ...f, ano: Number(e.target.value) }))} />
+                  </div>
+                </div>
+
+                <label style={s.label}>Instruções (editável)</label>
+                <textarea
+                  style={{ ...s.input, height:240, resize:'vertical', fontFamily:'inherit', lineHeight:1.5 }}
+                  value={form.instrucoes}
+                  onChange={e => setForm(f => ({ ...f, instrucoes: e.target.value }))}
+                  placeholder="Instruções que aparecerão na capa..."
+                />
+
+                <div style={{ display:'flex', gap:10, marginTop:16 }}>
+                  <button style={s.secondaryBtn} onClick={() => setStep(2)}>← Voltar</button>
+                  <button
+                    style={{ ...s.primaryBtn, flex:1, opacity: generating ? 0.7 : 1 }}
+                    onClick={handleGerar}
+                    disabled={generating}
+                  >
+                    {generating ? '⏳ Gerando PDF...' : '📄 Gerar e Baixar PDF'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Live Preview */}
+              <div style={{ flex:1 }}>
+                <h3 style={{ fontSize:13, fontWeight:700, color:'#64748b', marginBottom:12, textTransform:'uppercase', letterSpacing:'0.05em' }}>Pré-visualização</h3>
+                <div style={{ width: 595*0.55, height: 842*0.55, overflow:'hidden', borderRadius:8, boxShadow:'0 8px 32px rgba(0,0,0,0.15)', border:'1px solid #e2e8f0', position:'relative' }}>
+                  <CapaPreview
+                    area={selectedArea}
+                    template={selectedTemplate}
+                    titulo={form.titulo}
+                    serie={form.serie}
+                    bimestre={form.bimestre}
+                    instrucoes={form.instrucoes}
+                    scale={0.55}
+                    escolaNome={escolaNome}
+                    logoEsq={logoEsquerda}
+                    logoDir={logoDireita}
+                  />
+                </div>
+                <p style={{ fontSize:11, color:'#94a3b8', marginTop:8, textAlign:'center' }}>Preview aproximado · PDF gerado em A4</p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
+
+// ── STYLES ───────────────────────────────────────────────────────────────────
+const s = {
+  root: { padding:'0 0 40px', maxWidth:1200, margin:'0 auto' },
+
+  toast: { position:'fixed', top:20, right:20, zIndex:9999, padding:'12px 22px', borderRadius:10, color:'#fff', fontWeight:700, fontSize:14, boxShadow:'0 8px 24px rgba(0,0,0,0.18)', animation:'none' },
+
+  pageHeader: { display:'flex', alignItems:'center', gap:14, marginBottom:28, padding:'20px 24px', background:'linear-gradient(135deg,#1e293b,#0f172a)', borderRadius:14, flexWrap:'wrap' },
+  pageIconWrap: { width:46, height:46, borderRadius:11, background:'linear-gradient(135deg,#6366f1,#8b5cf6)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 },
+  pageTitle: { color:'#fff', fontSize:18, fontWeight:800, margin:0 },
+  pageDesc: { color:'#94a3b8', fontSize:13, margin:'3px 0 0' },
+
+  tabBtn: { padding:'9px 18px', borderRadius:8, fontSize:13, fontWeight:700, cursor:'pointer', background:'rgba(255,255,255,0.08)', color:'#94a3b8', border:'1px solid rgba(255,255,255,0.12)', transition:'all .2s' },
+  tabBtnActive: { background:'rgba(99,102,241,0.18)', color:'#a78bfa', border:'1px solid rgba(99,102,241,0.4)' },
+
+  stepsBar: { display:'flex', alignItems:'center', marginBottom:28, background:'#fff', borderRadius:12, padding:'16px 24px', boxShadow:'0 1px 8px rgba(0,0,0,0.06)', border:'1px solid #e2e8f0' },
+  stepBtn: { display:'flex', alignItems:'center', gap:8, padding:'6px 12px', borderRadius:8, border:'none', cursor:'pointer', background:'transparent', transition:'all .2s' },
+  stepActive: { background:'#eef2ff', color:'#4f46e5' },
+  stepDone: { background:'#f0fdf4', color:'#16a34a' },
+  stepIdle: { color:'#94a3b8' },
+  stepNum: { width:22, height:22, borderRadius:'50%', background:'currentColor', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:900 },
+  stepLabel: { fontSize:13, fontWeight:700 },
+  stepLine: { flex:1, height:2, margin:'0 6px' },
+
+  stepTitle: { fontSize:20, fontWeight:800, color:'#1e293b', marginBottom:8 },
+  stepDesc: { fontSize:13, color:'#64748b', marginBottom:20 },
+
+  areaGrid: { display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(180px, 1fr))', gap:16, marginBottom:24 },
+  areaCard: { display:'flex', flexDirection:'column', alignItems:'center', padding:'28px 16px', borderRadius:14, cursor:'pointer', transition:'all .2s', background:'#fff', boxShadow:'0 1px 8px rgba(0,0,0,0.06)', textAlign:'center' },
+
+  templateGrid: { display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(200px, 1fr))', gap:16 },
+  templateCard: { display:'flex', flexDirection:'column', alignItems:'center', padding:'16px', borderRadius:14, cursor:'pointer', transition:'all .2s', background:'#fff', boxShadow:'0 1px 8px rgba(0,0,0,0.06)', position:'relative' },
+
+  label: { display:'block', fontSize:12, fontWeight:700, color:'#374151', marginBottom:5, marginTop:14 },
+  input: { width:'100%', padding:'9px 12px', borderRadius:8, border:'1.5px solid #e2e8f0', fontSize:13, color:'#1e293b', outline:'none', boxSizing:'border-box', fontFamily:'inherit', background:'#fff' },
+
+  primaryBtn: { padding:'10px 20px', borderRadius:8, border:'none', background:'linear-gradient(135deg,#6366f1,#8b5cf6)', color:'#fff', fontWeight:700, fontSize:14, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 },
+  secondaryBtn: { padding:'9px 18px', borderRadius:8, border:'1.5px solid #e2e8f0', background:'#f8fafc', color:'#475569', fontWeight:700, fontSize:13, cursor:'pointer' },
+
+  grid: { display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(240px, 1fr))', gap:18 },
+  capaCard: { background:'#fff', borderRadius:14, boxShadow:'0 1px 8px rgba(0,0,0,0.07)', border:'1px solid #e2e8f0', overflow:'hidden' },
+  capaThumb: { height: Math.round(842*0.185), overflow:'hidden', position:'relative' },
+  capaCardBody: { padding:'12px 14px' },
+  capaTitle: { fontWeight:700, fontSize:14, color:'#1e293b', margin:'6px 0 4px' },
+  capaMeta: { display:'flex', gap:6, fontSize:11, color:'#64748b', flexWrap:'wrap' },
+  capaActions: { display:'flex', gap:8, marginTop:12 },
+  btnDownload: { flex:1, padding:'7px 10px', borderRadius:7, border:'none', background:'linear-gradient(135deg,#6366f1,#8b5cf6)', color:'#fff', fontWeight:700, fontSize:12, cursor:'pointer' },
+  btnDelete: { padding:'7px 10px', borderRadius:7, border:'1px solid #fee2e2', background:'#fff', fontSize:14, cursor:'pointer' },
+  areaBadge: { padding:'2px 8px', borderRadius:20, fontSize:11, fontWeight:700, display:'inline-flex', alignItems:'center', gap:3 },
+
+  emptyBox: { textAlign:'center', padding:'60px 24px', background:'#fff', borderRadius:14, border:'1px dashed #e2e8f0' },
+  spinner: { width:36, height:36, border:'3px solid #e2e8f0', borderTop:'3px solid #6366f1', borderRadius:'50%', animation:'spin 0.7s linear infinite', margin:'0 auto' },
+};

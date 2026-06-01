@@ -146,10 +146,13 @@ export default function ImportPDF({ open, onClose, onFinish }) {
     setInativando(true);
     try {
       const { data } = await api.post("/api/alunos/inativar-lote", { alunoIds: ids });
-      const msg = data?.message || `${ids.length} aluno(s) inativado(s).`;
+      const qtdInativados = data?.inativados ?? ids.length;
+      const msg = data?.message || `${qtdInativados} aluno(s) inativado(s).`;
       setPendentesModal(null);
       onFinish && onFinish({
+        _tipo: "inativacao",       // sinaliza ao pai que é o resultado da inativação
         status: "sucesso",
+        inativados: qtdInativados, // quantidade real retornada pelo backend
         message: msg,
       });
       onClose && onClose();
@@ -160,6 +163,7 @@ export default function ImportPDF({ open, onClose, onFinish }) {
       setInativando(false);
     }
   }
+
 
   // ─────────────────────────────────────────────
   // Toggle de seleção individual

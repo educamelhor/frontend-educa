@@ -542,7 +542,16 @@ export default function Alunos() {
             if (res.status === "erro") {
               setImportOpen(false);
               setResultadoImportacao({ message: res.message || "Erro na importação." });
+            } else if (res._tipo === "inativacao") {
+              // Confirmação de inativação: apenas acumula o campo inativados no resultado anterior
+              setResultadoImportacao((prev) => ({
+                ...(prev || {}),
+                inativados: (prev?.inativados ?? 0) + (res.inativados ?? 0),
+                message: res.message,
+              }));
+              setImportOpen(false);
             } else {
+              // Resultado principal da importação do PDF/XLSX
               setResultadoImportacao({
                 localizados: res.localizados ?? 0,
                 inseridos: res.inseridos ?? 0,

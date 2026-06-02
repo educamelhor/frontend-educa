@@ -193,12 +193,13 @@ export default function BoletimPrint({
   };
 
   const calcMedia = (arr) => {
-    const vals = arr.map((x) => x.nota).filter((x) => x != null);
-    return vals.length
-      ? (
-          vals.reduce((a, b) => Number(a) + Number(b), 0) / vals.length
-        ).toFixed(2)
-      : "";
+    const hasAnyGrade = arr.some((x) => x.nota != null && x.nota !== "");
+    if (!hasAnyGrade) return "";
+    const sum = arr.reduce((acc, x) => {
+      const val = x.nota != null && x.nota !== "" ? Number(x.nota) : 0;
+      return acc + val;
+    }, 0);
+    return (sum / 4).toFixed(2);
   };
 
   const somaNotas = notas
@@ -344,12 +345,8 @@ export default function BoletimPrint({
               const m24 = calcMedia(b24);
               const m25 = calcMedia(b25);
 
-              const todasFin = [...b24, ...b25];
-              const notasFin = todasFin.map((x) => x.nota).filter((x) => x != null);
-              const mediaFin = notasFin.length
-                ? (notasFin.reduce((a, b) => Number(a) + Number(b), 0) / notasFin.length).toFixed(2)
-                : "";
-              const faltasFin = todasFin.reduce((a, b) => a + (b.faltas || 0), 0);
+              const mediaFin = m25;
+              const faltasFin = b25.reduce((a, b) => a + (Number(b.faltas) || 0), 0);
 
               return (
                 <tr key={disc.id}>

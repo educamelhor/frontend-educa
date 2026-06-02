@@ -956,6 +956,7 @@ export default function BoletimEdicao() {
                     ) : (
                       alunosModalFiltrados.map((aluno, i) => {
                         const hasNota = aluno.nota != null && aluno.nota !== "";
+                        const hasLancamento = hasNota || (aluno.faltas != null && aluno.faltas !== "");
                         
                         return (
                           <tr key={aluno.aluno_id || i} className="hover:bg-blue-50/20">
@@ -980,7 +981,7 @@ export default function BoletimEdicao() {
                               {hasNota ? Number(aluno.nota).toFixed(2).replace(".", ",") : "—"}
                             </td>
                             <td className="px-4 py-2 text-center">
-                              {hasNota ? (
+                              {hasLancamento ? (
                                 <span className="px-2 py-0.5 bg-green-50 text-green-700 border border-green-200 rounded-full font-bold text-[10px]">
                                   Lançada
                                 </span>

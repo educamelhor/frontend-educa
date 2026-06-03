@@ -6,6 +6,54 @@ import api from "../../services/api";
 import styles from "../boletim/Boletim.module.css";
 import useEscolaLogos from "../../hooks/useEscolaLogos";
 
+const normalizeName = (name) => {
+  if (!name) return "";
+  let n = name
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .replace(/\s+/g, " ");
+  if (n === "ED. FISICA" || n === "EDUCACAO FISICA") return "EDUCACAO FISICA";
+  if (n === "PORTUGUES" || n === "LINGUA PORTUGUESA") return "PORTUGUES";
+  if (
+    n === "PRATICA ESTUDANTIL" ||
+    n === "PD1" ||
+    n === "PD2" ||
+    n === "PARTE DIVERSIFICADA I" ||
+    n === "PARTE DIVERSIFICADA II"
+  ) {
+    return "PRATICA ESTUDANTIL";
+  }
+  return n;
+};
+
+const getEscolaDetalhes = (escolaId) => {
+  const id = Number(escolaId);
+  if (id === 3) {
+    return {
+      nome: "CENTRO EDUCACIONAL POMPÍLIO MARQUES DE SOUSA",
+      inep: "53014308",
+      cre: "CRE – PLANALTINA",
+      estado: "GOVERNO DO DISTRITO FEDERAL",
+    };
+  }
+  if (id === 2) {
+    return {
+      nome: "CENTRO DE ENSINO FUNDAMENTAL 08 DE PLANALTINA",
+      inep: "53006240",
+      cre: "CRE – PLANALTINA",
+      estado: "GOVERNO DO DISTRITO FEDERAL",
+    };
+  }
+  return {
+    nome: "CENTRO DE ENSINO FUNDAMENTAL 04 – COLÉGIO CÍVICO MILITAR",
+    inep: "53006160",
+    cre: "CRE – PLANALTINA",
+    estado: "GOVERNO DO DISTRITO FEDERAL",
+  };
+};
+
 export default function Boletim({ codigo: codigoProp, exibirBotaoImprimir = true, onLoaded }) {
   const params = useParams?.() || {};
   const codigo = codigoProp || params.codigo;
@@ -89,14 +137,22 @@ export default function Boletim({ codigo: codigoProp, exibirBotaoImprimir = true
 
   // Busca nota por disciplina_id, ano e bimestre
   const findNota = (discId, ano, bim) => {
+    const targetDisc = disciplinas.find((d) => d.id === discId);
+    if (!targetDisc) return {};
+    const targetNameNorm = normalizeName(targetDisc.nome);
+
     return (
-      notas.find(n =>
-        (n.disciplina_id === undefined
-          ? n.disciplina === disciplinas.find(d => d.id === discId)?.nome
-          : Number(n.disciplina_id) === Number(discId)) &&
-        Number(n.ano) === Number(ano) &&
-        Number(n.bimestre) === Number(bim)
-      ) || {}
+      notas.find((n) => {
+        const noteNameNorm = normalizeName(n.disciplina);
+        const matchName = noteNameNorm === targetNameNorm;
+        const matchId = n.disciplina_id !== undefined && Number(n.disciplina_id) === Number(discId);
+
+        return (
+          (matchId || matchName) &&
+          Number(n.ano) === Number(ano) &&
+          Number(n.bimestre) === Number(bim)
+        );
+      }) || {}
     );
   };
 
@@ -168,26 +224,38 @@ export default function Boletim({ codigo: codigoProp, exibirBotaoImprimir = true
       )}
 
       {/* Cabeçalho da escola */}
-      <div className="bg-white rounded-lg shadow p-4 flex justify-center items-center mb-4">
-        <img
-          src={logoEsquerda}
-          alt="Logo esquerda"
-          className="h-[6rem] mr-4"
-          onError={e => { e.target.style.display = "none"; }}
-        />
-        <div className="text-center">
-          <div>GOVERNO DO DISTRITO FEDERAL</div>
-          <div>SECRETARIA DE ESTADO DE EDUCAÇÃO – CRE – PLANALTINA</div>
-          <div>CENTRO DE ENSINO FUNDAMENTAL 04 – COLÉGIO CÍVICO MILITAR</div>
-          <div>INEP 53006160</div>
-        </div>
-        <img
-          src={logoDireita}
-          alt="Logo direita"
-          className="h-[4.5rem] ml-4"
-          onError={e => { e.target.style.display = "none"; }}
-        />
-      </div>
+      {(() => {
+        const escolaInfo = getEscolaDetalhes(aluno?.escola_id);
+        const showLogoEsquerda = logoEsquerda && logoEsquerda !== "/logo-escola-left.png";
+        const showLogoDireita = logoDireita && logoDireita !== "/logo-escola-right.png";
+
+        return (
+          <div className="bg-white rounded-lg shadow p-4 flex justify-center items-center mb-4">
+            {showLogoEsquerda && (
+              <img
+                src={logoEsquerda}
+                alt="Logo esquerda"
+                className="h-[6rem] mr-4"
+                onError={e => { e.target.style.display = "none"; }}
+              />
+            )}
+            <div className="text-center">
+              <div>{escolaInfo.estado}</div>
+              <div>SECRETARIA DE ESTADO DE EDUCAÇÃO – {escolaInfo.cre}</div>
+              <div>{escolaInfo.nome}</div>
+              <div>INEP {escolaInfo.inep}</div>
+            </div>
+            {showLogoDireita && (
+              <img
+                src={logoDireita}
+                alt="Logo direita"
+                className="h-[4.5rem] ml-4"
+                onError={e => { e.target.style.display = "none"; }}
+              />
+            )}
+          </div>
+        );
+      })()}
 
       {/* Dados do aluno */}
       <div className="bg-gray-200 rounded-lg shadow p-4 mb-4 grid grid-cols-2 gap-x-8">

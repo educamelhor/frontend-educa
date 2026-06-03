@@ -249,7 +249,7 @@ export default function BoletimAnual({
   // ───────────────────────────────────────────────────────────────
   // Disciplinas (mesma lista canônica do sistema)
   // ───────────────────────────────────────────────────────────────
-  const disciplinas = [
+  const DEFAULT_DISCIPLINAS = [
     { id: 26, nome: "Artes" },
     { id: 25, nome: "Ciências" },
     { id: 27, nome: "Ed. Física" },
@@ -261,6 +261,8 @@ export default function BoletimAnual({
     { id: 21, nome: "Matemática" },
     { id: 51, nome: "Prática Estudantil" },
   ];
+
+  const disciplinas = disciplinasList.length > 0 ? disciplinasList : DEFAULT_DISCIPLINAS;
 
   // ───────────────────────────────────────────────────────────────
   // Helpers

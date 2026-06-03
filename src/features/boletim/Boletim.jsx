@@ -62,6 +62,7 @@ export default function Boletim({ codigo: codigoProp, exibirBotaoImprimir = true
   const [erro, setErro] = useState("");
   const [ranking, setRanking] = useState(null);
   const [showSemNotas, setShowSemNotas] = useState(true);
+  const [disciplinasList, setDisciplinasList] = useState([]);
   const { logoEsquerda, logoDireita } = useEscolaLogos();
 
   useEffect(() => {
@@ -88,6 +89,25 @@ export default function Boletim({ codigo: codigoProp, exibirBotaoImprimir = true
           if (!cancelado) setRanking(resRanking.data);
         } catch {
           if (!cancelado) setRanking(null);
+        }
+
+        // 4. Buscar disciplinas dinamicamente
+        try {
+          const resDisc = await api.get("/api/disciplinas", {
+            params: {
+              escola_id: resAluno.data.escola_id,
+              etapa: resAluno.data.etapa,
+            },
+          });
+          if (!cancelado && Array.isArray(resDisc.data)) {
+            const parsed = resDisc.data.map((d) => ({
+              id: d.id,
+              nome: d.nome || d.disciplina,
+            }));
+            setDisciplinasList(parsed);
+          }
+        } catch (err) {
+          console.error("Erro ao carregar disciplinas do aluno:", err);
         }
       } catch (err) {
         if (!cancelado) {
@@ -121,8 +141,8 @@ export default function Boletim({ codigo: codigoProp, exibirBotaoImprimir = true
     );
   }
 
-  // Disciplinas com id e nome EXATAMENTE como no seu banco!
-  const disciplinas = [
+  // Disciplinas com fallback para a lista padrão
+  const DEFAULT_DISCIPLINAS = [
     { id: 26, nome: "Artes" },
     { id: 25, nome: "Ciências" },
     { id: 27, nome: "Ed. Física" },
@@ -134,6 +154,8 @@ export default function Boletim({ codigo: codigoProp, exibirBotaoImprimir = true
     { id: 21, nome: "Matemática" },
     { id: 51, nome: "Prática Estudantil" }
   ];
+
+  const disciplinas = disciplinasList.length > 0 ? disciplinasList : DEFAULT_DISCIPLINAS;
 
   // Busca nota por disciplina_id, ano e bimestre
   const findNota = (discId, ano, bim) => {

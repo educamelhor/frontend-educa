@@ -84,6 +84,7 @@ export default function BoletimPrint({
   const [ranking, setRanking] = useState(null);
   const [erro, setErro] = useState("");
   const [showSemNotas, setShowSemNotas] = useState(true);
+  const [disciplinasList, setDisciplinasList] = useState([]);
 
   // -------------------------------------------------------------------------
   // Efeito: carrega dados (individual ou em lote)
@@ -92,6 +93,9 @@ export default function BoletimPrint({
     let cancelado = false;
 
     async function fetchData() {
+      let currentEscolaId = null;
+      let currentEtapa = null;
+
       // ---------------------------------------------------------------
       // Fluxo 2 → Impressão em lote (dados já pré-carregados)
       // ---------------------------------------------------------------
@@ -104,90 +108,118 @@ export default function BoletimPrint({
             turno: alunoPreCarregado?.turno || "",
             id: alunoPreCarregado?.id || null,
             escola_id: alunoPreCarregado?.escola_id || null,
+            etapa: alunoPreCarregado?.etapa || null,
           });
           setNotas(notasPreCarregadas);
 
           // Ranking já vem pronto no fluxo de impressão em lote
           setRanking(alunoPreCarregado?.ranking || null);
+          currentEscolaId = alunoPreCarregado?.escola_id;
+          currentEtapa = alunoPreCarregado?.etapa;
         }
-        if (typeof onLoaded === "function") onLoaded();
-        return;
-      }
-
-      // ---------------------------------------------------------------
-      // Fluxo 1 → Impressão individual (busca backend)
-      // ---------------------------------------------------------------
-      try {
-        setErro("");
-        setShowSemNotas(true);
-
-        // 1) Buscar aluno pelo CÓDIGO
-        const resAluno = await api.get(`/api/alunos/${codigo}`);
-        if (cancelado) return;
-        setAluno(resAluno.data);
-
-        // 2) Buscar notas (detalhadas → fallback para básicas)
-        const alunoId = resAluno.data.id;
-        let resNotas;
+      } else {
+        // ---------------------------------------------------------------
+        // Fluxo 1 → Impressão individual (busca backend)
+        // ---------------------------------------------------------------
         try {
-          resNotas = await api.get(`/api/alunos/${alunoId}/notas-detalhadas`);
-        } catch {
-          resNotas = await api.get(`/api/alunos/${alunoId}/notas`);
-        }
-        if (cancelado) return;
+          setErro("");
+          setShowSemNotas(true);
 
-        const dados = Array.isArray(resNotas.data) ? resNotas.data : [];
-        // Normalização para compatibilidade (valor → nota)
-        const norm = dados.map((n) => ({
-          ...n,
-          nota:
-            n.nota != null
-              ? n.nota
-              : n.valor != null
-              ? Number(n.valor)
-              : n.nota,
-        }));
-        setNotas(norm);
+          // 1) Buscar aluno pelo CÓDIGO
+          const resAluno = await api.get(`/api/alunos/${codigo}`);
+          if (cancelado) return;
+          setAluno(resAluno.data);
+          currentEscolaId = resAluno.data.escola_id;
+          currentEtapa = resAluno.data.etapa;
 
-        // 3) Buscar RANKING (Escola + Turma) com fallback
-        try {
-          // Endpoint novo: escola + turma (formato igual ao PDF/Impressão)
-          const rk = await api.get(
-            `/api/notas/alunos/${alunoId}/ranking-completo?ts=${Date.now()}`
-          );
-          if (!cancelado) setRanking(rk.data);
-        } catch {
-          // Fallback: endpoint antigo (apenas escola)
+          // 2) Buscar notas (detalhadas → fallback para básicas)
+          const alunoId = resAluno.data.id;
+          let resNotas;
           try {
-            const rkOld = await api.get(
-              `/api/notas/alunos/${alunoId}/ranking?ts=${Date.now()}`
-            );
-            if (!cancelado) {
-              const r = rkOld.data || {};
-              setRanking({
-                escola:
-                  r.ranking != null
-                    ? {
-                        ranking: r.ranking,
-                        total_alunos: r.total_alunos,
-                        semNotas: false,
-                      }
-                    : null,
-                turma: null, // endpoint antigo não retorna ranking por turma
-              });
-            }
+            resNotas = await api.get(`/api/alunos/${alunoId}/notes-detalhadas`);
           } catch {
-            if (!cancelado) setRanking(null);
+            try {
+              resNotas = await api.get(`/api/alunos/${alunoId}/notas-detalhadas`);
+            } catch {
+              resNotas = await api.get(`/api/alunos/${alunoId}/notas`);
+            }
+          }
+          if (cancelado) return;
+
+          const dados = Array.isArray(resNotas.data) ? resNotas.data : [];
+          // Normalização para compatibilidade (valor → nota)
+          const norm = dados.map((n) => ({
+            ...n,
+            nota:
+              n.nota != null
+                ? n.nota
+                : n.valor != null
+                ? Number(n.valor)
+                : n.nota,
+          }));
+          setNotas(norm);
+
+          // 3) Buscar RANKING (Escola + Turma) com fallback
+          try {
+            // Endpoint novo: escola + turma (formato igual ao PDF/Impressão)
+            const rk = await api.get(
+              `/api/notas/alunos/${alunoId}/ranking-completo?ts=${Date.now()}`
+            );
+            if (!cancelado) setRanking(rk.data);
+          } catch {
+            // Fallback: endpoint antigo (apenas escola)
+            try {
+              const rkOld = await api.get(
+                `/api/notas/alunos/${alunoId}/ranking?ts=${Date.now()}`
+              );
+              if (!cancelado) {
+                const r = rkOld.data || {};
+                setRanking({
+                  escola:
+                    r.ranking != null
+                      ? {
+                          ranking: r.ranking,
+                          total_alunos: r.total_alunos,
+                          semNotas: false,
+                        }
+                      : null,
+                  turma: null, // endpoint antigo não retorna ranking por turma
+                });
+              }
+            } catch {
+              if (!cancelado) setRanking(null);
+            }
+          }
+        } catch (e) {
+          if (!cancelado) {
+            setErro("Erro ao buscar dados do boletim. Tente novamente.");
+            setAluno(null);
           }
         }
-      } catch (e) {
-        if (!cancelado) {
-          setErro("Erro ao buscar dados do boletim. Tente novamente.");
-          setAluno(null);
-        }
-      } finally {
-        if (typeof onLoaded === "function") onLoaded();
       }
+
+      // Buscar disciplinas correspondentes de forma dinâmica
+      if (currentEscolaId) {
+        try {
+          const resDisc = await api.get("/api/disciplinas", {
+            params: {
+              escola_id: currentEscolaId,
+              etapa: currentEtapa,
+            },
+          });
+          if (!cancelado && Array.isArray(resDisc.data)) {
+            const parsed = resDisc.data.map((d) => ({
+              id: d.id,
+              nome: d.nome || d.disciplina,
+            }));
+            setDisciplinasList(parsed);
+          }
+        } catch (err) {
+          console.error("Erro ao carregar disciplinas do aluno:", err);
+        }
+      }
+
+      if (typeof onLoaded === "function") onLoaded();
     }
 
     fetchData();
@@ -212,9 +244,9 @@ export default function BoletimPrint({
   }
 
   // -------------------------------------------------------------------------
-  // Lista fixa de disciplinas
+  // Lista de disciplinas (com fallback para a lista padrão)
   // -------------------------------------------------------------------------
-  const disciplinas = [
+  const DEFAULT_DISCIPLINAS = [
     { id: 26, nome: "Artes" },
     { id: 25, nome: "Ciências" },
     { id: 27, nome: "Ed. Física" },
@@ -226,6 +258,8 @@ export default function BoletimPrint({
     { id: 21, nome: "Matemática" },
     { id: 51, nome: "Prática Estudantil" },
   ];
+
+  const disciplinas = disciplinasList.length > 0 ? disciplinasList : DEFAULT_DISCIPLINAS;
 
   // -------------------------------------------------------------------------
   // Funções auxiliares

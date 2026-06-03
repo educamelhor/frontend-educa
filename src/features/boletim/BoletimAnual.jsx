@@ -83,6 +83,7 @@ export default function BoletimAnual({
   const [ranking, setRanking] = useState(null);
   const [erro, setErro] = useState("");
   const [showSemNotas, setShowSemNotas] = useState(true);
+  const [disciplinasList, setDisciplinasList] = useState([]);
 
   // Governança: config flags do boletim
   const [govConfig, setGovConfig] = useState({
@@ -98,23 +99,8 @@ export default function BoletimAnual({
     let cancelado = false;
 
     async function fetchData() {
-      // Fluxo pre-carregado (impressão em lote)
-      if (notasPreCarregadas) {
-        if (!cancelado) {
-          setAluno({
-            codigo,
-            estudante: alunoPreCarregado?.nome || alunoPreCarregado?.estudante || "",
-            turma: alunoPreCarregado?.turma || "",
-            turno: alunoPreCarregado?.turno || "",
-            serie: alunoPreCarregado?.serie || "",
-            id: alunoPreCarregado?.id || null,
-          });
-          setNotas(notasPreCarregadas);
-          setRanking(alunoPreCarregado?.ranking || null);
-        }
-        if (typeof onLoaded === "function") onLoaded();
-        return;
-      }
+      let currentEscolaId = null;
+      let currentEtapa = null;
 
       // Buscar configs de governança (só se não veio como prop)
       const configPromise = boletimConfigProp
@@ -132,68 +118,112 @@ export default function BoletimAnual({
             }
           })();
 
-      // Fluxo individual
-      try {
-        setErro("");
-        setShowSemNotas(true);
-
-        // 1) Buscar aluno + config em PARALELO
-        const [resAluno, resolvedConfig] = await Promise.all([
-          api.get(`/api/alunos/${codigo}`),
-          configPromise,
-        ]);
-        if (cancelado) return;
-        setAluno(resAluno.data);
-
-        // Aplicar config de governança
-        if (resolvedConfig && !cancelado) {
-          setGovConfig({
-            exibirFaltas: resolvedConfig["boletim.exibir_faltas"] !== "0",
-            exibirRanking: resolvedConfig["boletim.exibir_ranking"] !== "0",
-            exibirMediaRodape: resolvedConfig["boletim.exibir_media_rodape"] !== "0",
-          });
+      // Fluxo pre-carregado (impressão em lote)
+      if (notasPreCarregadas) {
+        if (!cancelado) {
+          const studentObj = {
+            codigo,
+            estudante: alunoPreCarregado?.nome || alunoPreCarregado?.estudante || "",
+            turma: alunoPreCarregado?.turma || "",
+            turno: alunoPreCarregado?.turno || "",
+            serie: alunoPreCarregado?.serie || "",
+            id: alunoPreCarregado?.id || null,
+            escola_id: alunoPreCarregado?.escola_id || null,
+            etapa: alunoPreCarregado?.etapa || null,
+          };
+          setAluno(studentObj);
+          setNotas(notasPreCarregadas);
+          setRanking(alunoPreCarregado?.ranking || null);
+          currentEscolaId = studentObj.escola_id;
+          currentEtapa = studentObj.etapa;
         }
-
-        const alunoId = resAluno.data.id;
-
-        // 2) Buscar notas (filtra apenas o ano corrente no front)
-        const resNotas = await api.get(`/api/notas/alunos/${alunoId}/notas`);
-        if (cancelado) return;
-        const todas = Array.isArray(resNotas.data) ? resNotas.data : [];
-        // Normalização nota/valor
-        const norm = todas.map((n) => ({
-          ...n,
-          nota: n.nota != null ? n.nota : n.valor != null ? Number(n.valor) : n.nota,
-        }));
-        // Filtra apenas o ano corrente
-        const notasAno = norm.filter((n) => Number(n.ano) === ANO_CORRENTE);
-        setNotas(notasAno);
-
-        // 3) Buscar ranking expandido (4 dimensões)
+      } else {
+        // Fluxo individual
         try {
-          const rk = await api.get(
-            `/api/notas/alunos/${alunoId}/ranking-anual?ano=${ANO_CORRENTE}&ts=${Date.now()}`
-          );
-          if (!cancelado) setRanking(rk.data);
-        } catch {
-          // Fallback para ranking-completo (2 dimensões)
+          setErro("");
+          setShowSemNotas(true);
+
+          // 1) Buscar aluno + config em PARALELO
+          const [resAluno, resolvedConfig] = await Promise.all([
+            api.get(`/api/alunos/${codigo}`),
+            configPromise,
+          ]);
+          if (cancelado) return;
+          setAluno(resAluno.data);
+          currentEscolaId = resAluno.data.escola_id;
+          currentEtapa = resAluno.data.etapa;
+
+          // Aplicar config de governança
+          if (resolvedConfig && !cancelado) {
+            setGovConfig({
+              exibirFaltas: resolvedConfig["boletim.exibir_faltas"] !== "0",
+              exibirRanking: resolvedConfig["boletim.exibir_ranking"] !== "0",
+              exibirMediaRodape: resolvedConfig["boletim.exibir_media_rodape"] !== "0",
+            });
+          }
+
+          const alunoId = resAluno.data.id;
+
+          // 2) Buscar notas (filtra apenas o ano corrente no front)
+          const resNotas = await api.get(`/api/notas/alunos/${alunoId}/notas`);
+          if (cancelado) return;
+          const todas = Array.isArray(resNotas.data) ? resNotas.data : [];
+          // Normalização nota/valor
+          const norm = todas.map((n) => ({
+            ...n,
+            nota: n.nota != null ? n.nota : n.valor != null ? Number(n.valor) : n.nota,
+          }));
+          // Filtra apenas o ano corrente
+          const notasAno = norm.filter((n) => Number(n.ano) === ANO_CORRENTE);
+          setNotas(notasAno);
+
+          // 3) Buscar ranking expandido (4 dimensões)
           try {
-            const rkFb = await api.get(
-              `/api/notas/alunos/${alunoId}/ranking-completo?ts=${Date.now()}`
+            const rk = await api.get(
+              `/api/notas/alunos/${alunoId}/ranking-anual?ano=${ANO_CORRENTE}&ts=${Date.now()}`
             );
-            if (!cancelado) setRanking(rkFb.data);
+            if (!cancelado) setRanking(rk.data);
           } catch {
-            if (!cancelado) setRanking(null);
+            // Fallback para ranking-completo (2 dimensões)
+            try {
+              const rkFb = await api.get(
+                `/api/notas/alunos/${alunoId}/ranking-completo?ts=${Date.now()}`
+              );
+              if (!cancelado) setRanking(rkFb.data);
+            } catch {
+              if (!cancelado) setRanking(null);
+            }
+          }
+        } catch {
+          if (!cancelado) {
+            setErro("Erro ao buscar dados do boletim. Tente novamente.");
+            setAluno(null);
           }
         }
-      } catch {
-        if (!cancelado) {
-          setErro("Erro ao buscar dados do boletim. Tente novamente.");
-          setAluno(null);
-        }
-      } finally {
-        if (typeof onLoaded === "function") onLoaded();
       }
+
+      // Buscar disciplinas correspondentes de forma dinâmica
+      if (currentEscolaId) {
+        try {
+          const resDisc = await api.get("/api/disciplinas", {
+            params: {
+              escola_id: currentEscolaId,
+              etapa: currentEtapa,
+            },
+          });
+          if (!cancelado && Array.isArray(resDisc.data)) {
+            const parsed = resDisc.data.map((d) => ({
+              id: d.id,
+              nome: d.nome || d.disciplina,
+            }));
+            setDisciplinasList(parsed);
+          }
+        } catch (err) {
+          console.error("Erro ao carregar disciplinas do aluno:", err);
+        }
+      }
+
+      if (typeof onLoaded === "function") onLoaded();
     }
 
     fetchData();

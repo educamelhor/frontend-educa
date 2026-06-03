@@ -101,6 +101,7 @@ export default function BoletimAnual({
     async function fetchData() {
       let currentEscolaId = null;
       let currentEtapa = null;
+      let currentTurno = null;
 
       // Buscar configs de governança (só se não veio como prop)
       const configPromise = boletimConfigProp
@@ -136,6 +137,7 @@ export default function BoletimAnual({
           setRanking(alunoPreCarregado?.ranking || null);
           currentEscolaId = studentObj.escola_id;
           currentEtapa = studentObj.etapa;
+          currentTurno = studentObj.turno;
         }
       } else {
         // Fluxo individual
@@ -152,6 +154,7 @@ export default function BoletimAnual({
           setAluno(resAluno.data);
           currentEscolaId = resAluno.data.escola_id;
           currentEtapa = resAluno.data.etapa;
+          currentTurno = resAluno.data.turno;
 
           // Aplicar config de governança
           if (resolvedConfig && !cancelado) {
@@ -209,6 +212,7 @@ export default function BoletimAnual({
             params: {
               escola_id: currentEscolaId,
               etapa: currentEtapa,
+              turno: currentTurno,
             },
           });
           if (!cancelado && Array.isArray(resDisc.data)) {

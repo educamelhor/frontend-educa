@@ -97,6 +97,7 @@ export default function Boletim({ codigo: codigoProp, exibirBotaoImprimir = true
             params: {
               escola_id: resAluno.data.escola_id,
               etapa: resAluno.data.etapa,
+              turno: resAluno.data.turno,
             },
           });
           if (!cancelado && Array.isArray(resDisc.data)) {

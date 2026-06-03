@@ -95,6 +95,7 @@ export default function BoletimPrint({
     async function fetchData() {
       let currentEscolaId = null;
       let currentEtapa = null;
+      let currentTurno = null;
 
       // ---------------------------------------------------------------
       // Fluxo 2 → Impressão em lote (dados já pré-carregados)
@@ -116,6 +117,7 @@ export default function BoletimPrint({
           setRanking(alunoPreCarregado?.ranking || null);
           currentEscolaId = alunoPreCarregado?.escola_id;
           currentEtapa = alunoPreCarregado?.etapa;
+          currentTurno = alunoPreCarregado?.turno;
         }
       } else {
         // ---------------------------------------------------------------
@@ -131,6 +133,7 @@ export default function BoletimPrint({
           setAluno(resAluno.data);
           currentEscolaId = resAluno.data.escola_id;
           currentEtapa = resAluno.data.etapa;
+          currentTurno = resAluno.data.turno;
 
           // 2) Buscar notas (detalhadas → fallback para básicas)
           const alunoId = resAluno.data.id;
@@ -205,6 +208,7 @@ export default function BoletimPrint({
             params: {
               escola_id: currentEscolaId,
               etapa: currentEtapa,
+              turno: currentTurno,
             },
           });
           if (!cancelado && Array.isArray(resDisc.data)) {

@@ -156,7 +156,10 @@ export default function Boletim({ codigo: codigoProp, exibirBotaoImprimir = true
     { id: 51, nome: "Prática Estudantil" }
   ];
 
-  const disciplinas = disciplinasList.length > 0 ? disciplinasList : DEFAULT_DISCIPLINAS;
+  const disciplinas = (disciplinasList.length > 0 ? disciplinasList : DEFAULT_DISCIPLINAS).map((d) => ({
+    ...d,
+    nome: String(d.nome || "").toUpperCase(),
+  }));
 
   // Busca nota por disciplina_id, ano e bimestre
   const findNota = (discId, ano, bim) => {

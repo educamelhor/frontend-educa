@@ -284,9 +284,7 @@ export default function FichaAluno({ codigo: codigoProp }) {
     );
   }
 
-  // Foto só é exibida se o responsável concedeu consentimento de imagem
-  const consentimentoOk = aluno.consentimento_imagem === true || aluno.consentimento_imagem === 1;
-  const fotoURL = consentimentoOk ? buildFotoURL(aluno.foto) : null;
+  const fotoURL = buildFotoURL(aluno.foto);
 
   // Placeholder (bolinha cinza) — evita texto do alt
   const PLACEHOLDER =
@@ -326,15 +324,9 @@ export default function FichaAluno({ codigo: codigoProp }) {
         </div>
 
         <div className="grid grid-cols-3 gap-6 items-center">
-          {/* Foto — só exibida com consentimento de imagem */}
-          <div className="flex flex-col items-center gap-1">
-            {!consentimentoOk ? (
-              // Sem consentimento: mostra aviso em vez da foto
-              <div className="w-32 h-32 rounded-full bg-amber-50 border-2 border-amber-300 flex flex-col items-center justify-center gap-1 text-center px-2">
-                <span className="text-2xl">🔒</span>
-                <span className="text-xs text-amber-700 font-medium leading-tight">Sem consentimento</span>
-              </div>
-            ) : fotoURL ? (
+          {/* Foto */}
+          <div className="flex justify-center">
+            {fotoURL ? (
               <img
                 key={fotoURL}
                 src={fotoURL}
@@ -349,11 +341,13 @@ export default function FichaAluno({ codigo: codigoProp }) {
                       u.searchParams.set("t", Date.now().toString());
                       e.currentTarget.src = u.toString();
                     } catch {
+                      // se não conseguir parsear URL, cai para placeholder
                       e.currentTarget.onerror = null;
                       e.currentTarget.src = PLACEHOLDER;
                     }
                     return;
                   }
+                  // 2º erro (ou mais): para o loop e mostra placeholder
                   e.currentTarget.onerror = null;
                   e.currentTarget.src = PLACEHOLDER;
                 }}
@@ -362,11 +356,6 @@ export default function FichaAluno({ codigo: codigoProp }) {
               <div className="w-32 h-32 bg-gray-200 rounded-full flex items-center justify-center">
                 <span className="text-gray-500">Sem foto</span>
               </div>
-            )}
-            {!consentimentoOk && (
-              <p className="text-xs text-amber-600 text-center max-w-[8rem]">
-                Foto bloqueada até autorização do responsável
-              </p>
             )}
           </div>
 

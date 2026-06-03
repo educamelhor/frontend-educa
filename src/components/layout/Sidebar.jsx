@@ -72,6 +72,7 @@ export default function Sidebar({ isOpen, onClose }) {
   const perfil = getPerfil();
   const isDisciplinar = perfil === 'disciplinar' || perfil === 'diretor_disciplinar' || perfil === 'militar';
   const isProfessor = perfil === 'professor';
+  const isSecretario = perfil === 'secretario' || perfil === 'secretaria';
 
   // Começando pelos 3 módulos solicitados
   const canConteudos = isScopeEscola && !isDisciplinar && !isProfessor && hasPerm('conteudos:ver');
@@ -119,7 +120,7 @@ export default function Sidebar({ isOpen, onClose }) {
   const canGabarito = (() => {
     if (isDisciplinar) return false;          // militar/comandante: sem acesso
     if (!isScopeEscola) return false;
-    if (perfil === 'secretaria') return false; // secretário: sem acesso ao Gabarito
+    if (isSecretario) return false; // secretário: sem acesso ao Gabarito
     if (isProfessor) return true;              // professor: acesso limitado (Corrigir + Resultados)
     if (isCoord) return avaliacaoGovConfig?.['coordenador.acessa_gabarito'] === '1';
     if (isSuperv) return avaliacaoGovConfig?.['supervisor.acessa_gabarito'] === '1';
@@ -304,7 +305,7 @@ export default function Sidebar({ isOpen, onClose }) {
         ) : (
           <>
             {/* LINK: Home */}
-            {!isDisciplinar && !isProfessor && !isCoord && (
+            {!isDisciplinar && !isProfessor && !isCoord && !isSecretario && (
             <Link to="/" className={getMainLinkClasses('/')}>
               <HomeIcon className="h-5 w-5 mr-2" />
               Home
@@ -312,7 +313,7 @@ export default function Sidebar({ isOpen, onClose }) {
             )}
 
             {/* LINK: Estudantes */}
-            {!isDisciplinar && !isProfessor && !isCoord && (
+            {!isDisciplinar && !isProfessor && !isCoord && !isSecretario && (
             <Link to="/alunos" className={getMainLinkClasses('/alunos')}>
               <UserGroupIcon className="h-5 w-5 mr-2" />
               Estudantes
@@ -379,7 +380,7 @@ export default function Sidebar({ isOpen, onClose }) {
             </ul>
 
             </>
-            ) : !isDisciplinar && !isCoord && (
+            ) : !isDisciplinar && !isCoord && !isSecretario && (
             <>
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-2 transition"
@@ -490,7 +491,7 @@ export default function Sidebar({ isOpen, onClose }) {
             )}
 
             {/* LINK: Ferramentas */}
-            {!isDisciplinar && !isProfessor && !isCoord && (
+            {!isDisciplinar && !isProfessor && !isCoord && !isSecretario && (
             <Link to="/ferramentas" className={getMainLinkClasses('/ferramentas')}>
               <WrenchIcon className="h-5 w-5 mr-2" />
               Ferramentas
@@ -502,7 +503,7 @@ export default function Sidebar({ isOpen, onClose }) {
                 Acesso: direção, coordenação, supervisão, sala recurso
                 Restrito: professor, militar/disciplinar, coordenador de turma
             ──────────────────────────────── */}
-            {isScopeEscola && !isDisciplinar && !isProfessor && !isCoord && (
+            {isScopeEscola && !isDisciplinar && !isProfessor && !isCoord && !isSecretario && (
             <>
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-2 transition"
@@ -860,7 +861,7 @@ export default function Sidebar({ isOpen, onClose }) {
 
 
 
-        {isScopeEscola && !isProfessor && !isCoord && (
+        {isScopeEscola && !isProfessor && !isCoord && !isSecretario && (
           <>
             {/* ───────────────────────────────
                 GRUPO: Disciplinar
@@ -1101,7 +1102,7 @@ export default function Sidebar({ isOpen, onClose }) {
             MENUS INDEPENDENTES: Regimentos, Manual, Suporte
             (Acessíveis a qualquer usuário logado)
         ─────────────────────────────── */}
-        {isScopeEscola && (
+        {isScopeEscola && !isSecretario && (
           <>
             <Link
               to="/disciplinar/regimentos"
@@ -1132,72 +1133,76 @@ export default function Sidebar({ isOpen, onClose }) {
             {/* ───────────────────────────────
                 GRUPO: Agente EDUCA
             ─────────────────────────────── */}
-            <button
-              className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-6 transition"
-              onClick={() => setOpenGroup(openGroup === 'agente-educa' ? null : 'agente-educa')}
-              type="button"
-              style={{
-                background: openGroup === 'agente-educa'
-                  ? 'linear-gradient(90deg, rgba(234,179,8,0.15), transparent)'
-                  : undefined,
-              }}
-            >
-              <BoltIcon className="h-5 w-5 mr-2" style={{ color: openGroup === 'agente-educa' ? '#eab308' : undefined }} />
-              <span className="flex-1 text-left font-bold">Agente EDUCA</span>
-              {openGroup === 'agente-educa' ? (
-                <ChevronDownIcon className="h-4 w-4" />
-              ) : (
-                <ChevronRightIcon className="h-4 w-4" />
-              )}
-            </button>
+            {!isSecretario && (
+              <>
+                <button
+                  className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-6 transition"
+                  onClick={() => setOpenGroup(openGroup === 'agente-educa' ? null : 'agente-educa')}
+                  type="button"
+                  style={{
+                    background: openGroup === 'agente-educa'
+                      ? 'linear-gradient(90deg, rgba(234,179,8,0.15), transparent)'
+                      : undefined,
+                  }}
+                >
+                  <BoltIcon className="h-5 w-5 mr-2" style={{ color: openGroup === 'agente-educa' ? '#eab308' : undefined }} />
+                  <span className="flex-1 text-left font-bold">Agente EDUCA</span>
+                  {openGroup === 'agente-educa' ? (
+                    <ChevronDownIcon className="h-4 w-4" />
+                  ) : (
+                    <ChevronRightIcon className="h-4 w-4" />
+                  )}
+                </button>
 
-            {openGroup === 'agente-educa' && (
-              <ul className="ml-4 mb-2">
-                <li>
-                  <Link
-                    to="/agente-educa/credenciais"
-                    className={getSubmenuLinkClasses('/agente-educa/credenciais')}
-                  >
-                    <Cog6ToothIcon className="h-5 w-5 mr-2" /> Credenciais
-                    <span style={{
-                      marginLeft: 6, fontSize: '0.52rem', fontWeight: 800,
-                      background: 'linear-gradient(135deg,#475569,#64748b)',
-                      color: '#fff', padding: '1px 5px', borderRadius: 6,
-                      letterSpacing: '0.4px', whiteSpace: 'nowrap',
-                    }}>ETAPA 0</span>
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    to="/agente-educa/planos"
-                    className={getSubmenuLinkClasses('/agente-educa/planos')}
-                  >
-                    <ClipboardDocumentListIcon className="h-5 w-5 mr-2" />
-                    Planos
-                    <span style={{
-                      marginLeft: 6, fontSize: '0.52rem', fontWeight: 800,
-                      background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
-                      color: '#fff', padding: '1px 5px', borderRadius: 6,
-                      letterSpacing: '0.4px',
-                    }}>ETAPA 1</span>
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    to="/agente-educa/notas"
-                    className={getSubmenuLinkClasses('/agente-educa/notas')}
-                  >
-                    <ChartBarIcon className="h-5 w-5 mr-2" />
-                    Notas
-                    <span style={{
-                      marginLeft: 6, fontSize: '0.52rem', fontWeight: 800,
-                      background: 'linear-gradient(135deg,#10b981,#0891b2)',
-                      color: '#fff', padding: '1px 5px', borderRadius: 6,
-                      letterSpacing: '0.4px',
-                    }}>ETAPA 2</span>
-                  </Link>
-                </li>
-              </ul>
+                {openGroup === 'agente-educa' && (
+                  <ul className="ml-4 mb-2">
+                    <li>
+                      <Link
+                        to="/agente-educa/credenciais"
+                        className={getSubmenuLinkClasses('/agente-educa/credenciais')}
+                      >
+                        <Cog6ToothIcon className="h-5 w-5 mr-2" /> Credenciais
+                        <span style={{
+                          marginLeft: 6, fontSize: '0.52rem', fontWeight: 800,
+                          background: 'linear-gradient(135deg,#475569,#64748b)',
+                          color: '#fff', padding: '1px 5px', borderRadius: 6,
+                          letterSpacing: '0.4px', whiteSpace: 'nowrap',
+                        }}>ETAPA 0</span>
+                      </Link>
+                    </li>
+                    <li>
+                      <Link
+                        to="/agente-educa/planos"
+                        className={getSubmenuLinkClasses('/agente-educa/planos')}
+                      >
+                        <ClipboardDocumentListIcon className="h-5 w-5 mr-2" />
+                        Planos
+                        <span style={{
+                          marginLeft: 6, fontSize: '0.52rem', fontWeight: 800,
+                          background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
+                          color: '#fff', padding: '1px 5px', borderRadius: 6,
+                          letterSpacing: '0.4px',
+                        }}>ETAPA 1</span>
+                      </Link>
+                    </li>
+                    <li>
+                      <Link
+                        to="/agente-educa/notas"
+                        className={getSubmenuLinkClasses('/agente-educa/notas')}
+                      >
+                        <ChartBarIcon className="h-5 w-5 mr-2" />
+                        Notas
+                        <span style={{
+                          marginLeft: 6, fontSize: '0.52rem', fontWeight: 800,
+                          background: 'linear-gradient(135deg,#10b981,#0891b2)',
+                          color: '#fff', padding: '1px 5px', borderRadius: 6,
+                          letterSpacing: '0.4px',
+                        }}>ETAPA 2</span>
+                      </Link>
+                    </li>
+                  </ul>
+                )}
+              </>
             )}
 
             {/* ─── GRUPO: Secretaria (Professor NÃO tem acesso) ─── */}
@@ -1390,7 +1395,7 @@ export default function Sidebar({ isOpen, onClose }) {
           </>
         )}
 
-        {isScopeEscola && !isDisciplinar && !isProfessor && (
+        {isScopeEscola && !isDisciplinar && !isProfessor && !isSecretario && (
           <>
             {/* ───────────────────────────────
                 GRUPO: Pedagógico
@@ -1532,7 +1537,7 @@ export default function Sidebar({ isOpen, onClose }) {
           </>
         )}
 
-        {isScopeEscola && !isDisciplinar && !isProfessor && (
+        {isScopeEscola && !isDisciplinar && !isProfessor && !isSecretario && (
           <>
             {/* ───────────────────────────────
                 GRUPO: Frequência

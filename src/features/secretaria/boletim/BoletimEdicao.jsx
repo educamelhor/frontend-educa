@@ -105,6 +105,14 @@ export default function BoletimEdicao() {
   const [buscaAlunoModal, setBuscaAlunoModal] = useState("");
   const [loadingModal, setLoadingModal] = useState(false);
 
+  // Perfil e controle de governança gestora
+  const perfil = String(localStorage.getItem("perfil") || "").toLowerCase().trim();
+  const isDiretorOuVice = perfil === "diretor" || perfil === "vice_diretor";
+
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [confirmSaveOpen, setConfirmSaveOpen] = useState(false);
+  const [savingLancamentos, setSavingLancamentos] = useState(false);
+
   // --- Estados do Mock Original (Aba 1) ---
   const [controlesBimestre, setControlesBimestre] = useState({
     1: { edicaoProf: true, visivelPais: false, bianual: false },
@@ -176,6 +184,7 @@ export default function BoletimEdicao() {
   const abrirDetalhesLançamento = async (item) => {
     setModalData(item);
     setModalOpen(true);
+    setIsEditMode(false);
     setLoadingModal(true);
     setBuscaAlunoModal("");
     try {
@@ -193,6 +202,78 @@ export default function BoletimEdicao() {
       setAlunosNotas([]);
     } finally {
       setLoadingModal(false);
+    }
+  };
+
+  const handleEditChange = (alunoId, field, value) => {
+    setAlunosNotas((prev) =>
+      prev.map((a) => {
+        if (a.aluno_id === alunoId) {
+          return {
+            ...a,
+            [field]: value === "" ? null : value,
+          };
+        }
+        return a;
+      })
+    );
+  };
+
+  const handleAbrirConfirmacaoSalvar = () => {
+    for (const a of alunosNotas) {
+      if (a.nota !== null && a.nota !== undefined && a.nota !== "") {
+        const val = parseFloat(String(a.nota).replace(",", "."));
+        if (Number.isNaN(val) || val < 0 || val > 10) {
+          alert(`Nota inválida para o aluno ${a.nome}. Deve ser entre 0 e 10.`);
+          return;
+        }
+      }
+      if (a.faltas !== null && a.faltas !== undefined && a.faltas !== "") {
+        const val = parseInt(a.faltas, 10);
+        if (Number.isNaN(val) || val < 0) {
+          alert(`Faltas inválidas para o aluno ${a.nome}. Deve ser maior ou igual a 0.`);
+          return;
+        }
+      }
+    }
+    setConfirmSaveOpen(true);
+  };
+
+  const handleConfirmarSalvar = async () => {
+    setSavingLancamentos(true);
+    try {
+      const payload = {
+        turma_id: modalData.turma_id,
+        disciplina_id: modalData.disciplina_id,
+        bimestre: filtroBimestre,
+        ano: filtroAnoLetivo,
+        lancamentos: alunosNotas.map((a) => {
+          let notaVal = a.nota === "" || a.nota === null || a.nota === undefined ? null : parseFloat(String(a.nota).replace(",", "."));
+          let faltasVal = a.faltas === "" || a.faltas === null || a.faltas === undefined ? null : parseInt(a.faltas, 10);
+          return {
+            aluno_id: a.aluno_id,
+            nota: notaVal,
+            faltas: faltasVal,
+          };
+        }),
+      };
+
+      const res = await api.post("/api/professores/boletim/salvar", payload);
+      if (res.data?.ok) {
+        setIsEditMode(false);
+        setConfirmSaveOpen(false);
+        // Recarrega os dados do modal para ter certeza de que o backend salvou e formatou
+        await abrirDetalhesLançamento(modalData);
+        // Atualiza a tabela principal
+        await fetchAcompanhamento();
+      } else {
+        alert(res.data?.message || "Erro ao salvar lançamentos.");
+      }
+    } catch (err) {
+      console.error("Erro ao salvar lançamentos gestor:", err);
+      alert(err?.response?.data?.message || "Erro interno ao salvar.");
+    } finally {
+      setSavingLancamentos(false);
     }
   };
 
@@ -873,13 +954,34 @@ export default function BoletimEdicao() {
                   🔍 Visualização de Lançamento
                 </h2>
               </div>
-              <button
-                onClick={() => setModalOpen(false)}
-                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition focus:outline-none"
-                aria-label="Fechar"
-              >
-                <XMarkIcon className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-3">
+                {isDiretorOuVice && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditMode(!isEditMode);
+                    }}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border ${
+                      isEditMode
+                        ? "bg-amber-500 hover:bg-amber-600 text-white border-amber-400"
+                        : "bg-white/10 hover:bg-white/25 text-white border-white/20"
+                    }`}
+                  >
+                    <span>{isEditMode ? "🔒" : "✏️"}</span>
+                    {isEditMode ? "Cancelar Edição" : "Editar Lançamento"}
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    setModalOpen(false);
+                    setIsEditMode(false);
+                  }}
+                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition focus:outline-none"
+                  aria-label="Fechar"
+                >
+                  <XMarkIcon className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* Sub-Header Detalhes */}
@@ -976,9 +1078,35 @@ export default function BoletimEdicao() {
                             </td>
                             <td className="px-4 py-2 font-mono font-bold text-gray-500">{aluno.matricula || "—"}</td>
                             <td className="px-4 py-2 font-bold text-gray-800 text-sm">{aluno.nome}</td>
-                            <td className="px-4 py-2 text-right font-bold text-gray-700 text-sm">{aluno.faltas ?? "—"}</td>
-                            <td className={`px-4 py-2 text-right font-extrabold text-sm ${hasNota ? "text-blue-700" : "text-gray-400"}`}>
-                              {hasNota ? Number(aluno.nota).toFixed(2).replace(".", ",") : "—"}
+                            <td className="px-4 py-2 text-right font-bold text-gray-700 text-sm">
+                              {isEditMode ? (
+                                <input
+                                  type="number"
+                                  min="0"
+                                  placeholder="0"
+                                  value={aluno.faltas ?? ""}
+                                  onChange={(e) => handleEditChange(aluno.aluno_id, "faltas", e.target.value)}
+                                  className="w-16 px-2 py-1 text-right border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 font-bold bg-amber-50/15 text-gray-900"
+                                />
+                              ) : (
+                                aluno.faltas ?? "—"
+                              )}
+                            </td>
+                            <td className="px-4 py-2 text-right font-bold text-gray-700 text-sm">
+                              {isEditMode ? (
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="10"
+                                  step="0.1"
+                                  placeholder="0,0"
+                                  value={aluno.nota ?? ""}
+                                  onChange={(e) => handleEditChange(aluno.aluno_id, "nota", e.target.value)}
+                                  className="w-20 px-2 py-1 text-right border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 font-extrabold bg-amber-50/15 text-blue-700"
+                                />
+                              ) : (
+                                hasNota ? Number(aluno.nota).toFixed(2).replace(".", ",") : "—"
+                              )}
                             </td>
                             <td className="px-4 py-2 text-center">
                               {hasLancamento ? (
@@ -1005,14 +1133,63 @@ export default function BoletimEdicao() {
               <span className="text-[11px] text-gray-500 self-center font-medium mr-auto">
                 📋 Visualização administrativa. As notas apresentadas são em tempo real.
               </span>
+              {isEditMode && (
+                <button
+                  onClick={handleAbrirConfirmacaoSalvar}
+                  className="px-4 py-2 rounded-xl text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-sm flex items-center gap-1.5 animate-in fade-in slide-in-from-bottom-2 duration-150"
+                >
+                  💾 Salvar Lançamentos
+                </button>
+              )}
               <button
-                onClick={() => setModalOpen(false)}
+                onClick={() => {
+                  setModalOpen(false);
+                  setIsEditMode(false);
+                }}
                 className="px-4 py-2 rounded-xl text-sm font-bold bg-blue-600 text-white hover:bg-blue-700 transition shadow-sm"
               >
                 Concluir Visualização
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRMAÇÃO DO LANÇAMENTO GESTOR (PREMIUM MODAL) */}
+      {confirmSaveOpen && (
+        <div className="fixed inset-0 bg-gray-900/70 backdrop-blur-md z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 border border-emerald-100 animate-in fade-in zoom-in-95 duration-200 text-center">
+            <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4 border border-emerald-100 shadow-sm text-3xl">
+              📝
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Confirmar Lançamento de Notas/Faltas</h3>
+            <p className="text-sm text-gray-600 leading-relaxed mb-6">
+              Você está prestes a salvar as alterações de notas e faltas de toda a turma como <strong>Gestor Escolar</strong>.
+              Isso atualizará os boletins oficiais e as informações dos diários dos alunos.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmSaveOpen(false)}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-gray-700 font-semibold text-sm hover:bg-gray-50 transition"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmarSalvar}
+                disabled={savingLancamentos}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-emerald-600 text-white font-semibold text-sm hover:bg-emerald-700 transition shadow-sm flex items-center justify-center gap-2"
+              >
+                {savingLancamentos ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  "Confirmar Lançamento"
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

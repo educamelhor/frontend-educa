@@ -958,6 +958,210 @@ export default function ConteudosProgramaticos() {
   const aprovado = listaReal.filter(c => c.status === "APROVADO").length;
   const revisao  = listaReal.filter(c => c.status === "ENVIADO").length;
   const pendente = listaReal.filter(c => c.status === "PENDENTE" || c.status === "RASCUNHO").length;
+
+  // ── Helper: renderiza o modal VISUALIZAR de forma segura (sem IIFE no JSX) ──
+  const renderModalVisualizarConteudo = () => {
+    if (!detalheItem) return null;
+    try {
+      const item     = detalheItem;
+      const st       = STATUS_COLORS[String(item.status)] || STATUS_COLORS.RASCUNHO;
+      const corSerie = COR_SERIE[item.serie] || "#6366f1";
+      const textoObj = item.texto_completo || item.objetivo_preview || item.objetivo || "";
+      const topicos  = parseObjetivo(textoObj);
+      return (
+        <div
+          style={{
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999,
+            background: "rgba(15,23,42,0.72)",
+            display: "flex", alignItems: "flex-start", justifyContent: "center",
+            padding: "24px 16px", overflowY: "auto",
+          }}
+          onClick={() => setDetalheItem(null)}
+        >
+          <div
+            style={{
+              background: "#fff", borderRadius: 20, width: "100%", maxWidth: 640,
+              boxShadow: "0 32px 80px rgba(0,0,0,.28)", overflow: "hidden",
+              marginTop: 8,
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{
+              background: `linear-gradient(135deg, ${corSerie}dd, ${corSerie})`,
+              padding: "20px 24px",
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                <div style={{
+                  width: 48, height: 48, borderRadius: 14,
+                  background: "rgba(255,255,255,0.2)",
+                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.5rem",
+                }}>📋</div>
+                <div>
+                  <h2 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 800, color: "#fff" }}>
+                    {item.disciplina || ""}
+                  </h2>
+                  <div style={{ display: "flex", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
+                    {[item.serie, item.bimestre].filter(Boolean).map((tag, i) => (
+                      <span key={i} style={{
+                        fontSize: "0.72rem", color: "rgba(255,255,255,0.85)", fontWeight: 600,
+                        background: "rgba(255,255,255,0.18)", borderRadius: 20, padding: "2px 10px",
+                      }}>{tag}</span>
+                    ))}
+                    <span style={{
+                      fontSize: "0.72rem", fontWeight: 700,
+                      background: st.bg, color: st.text,
+                      borderRadius: 20, padding: "2px 10px",
+                      display: "inline-flex", alignItems: "center", gap: 4,
+                    }}>
+                      <span style={{ background: st.dot, width: 6, height: 6, borderRadius: "50%", display: "inline-block" }}></span>
+                      {st.label}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={() => openEditModal(item)}
+                  style={{
+                    background: "rgba(255,255,255,0.2)", border: "1.5px solid rgba(255,255,255,0.4)",
+                    borderRadius: 10, padding: "7px 14px", cursor: "pointer",
+                    color: "#fff", fontSize: "0.8rem", fontWeight: 700,
+                    display: "flex", alignItems: "center", gap: 6,
+                  }}
+                >
+                  <IcoEdit /> Editar
+                </button>
+                <button
+                  onClick={() => setDetalheItem(null)}
+                  style={{
+                    width: 36, height: 36, borderRadius: "50%",
+                    background: "rgba(255,255,255,0.2)", border: "none",
+                    color: "#fff", fontSize: "1.2rem", cursor: "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}
+                >✕</button>
+              </div>
+            </div>
+
+            {/* Corpo */}
+            <div style={{ padding: "20px 24px", maxHeight: "72vh", overflowY: "auto" }}>
+
+              {/* Metadados em grid */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
+                {[
+                  { label: "Unidade Temática - BNCC", value: item.unidade || "—" },
+                  { label: "Conteúdo SEEDF",          value: item.conteudo || "—" },
+                  { label: "Ano Letivo",               value: String(item.ano_letivo || "2026") },
+                  { label: "Itens de Aprendizagem",   value: `${item.itens || 0} objetivo${item.itens !== 1 ? "s" : ""}` },
+                ].map(({ label, value }) => (
+                  <div key={label} style={{
+                    background: "#f8fafc", border: "1px solid #e5e7eb",
+                    borderRadius: 10, padding: "10px 14px",
+                  }}>
+                    <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3 }}>{label}</div>
+                    <div style={{ fontSize: "0.88rem", fontWeight: 600, color: "#1e293b", lineHeight: 1.4 }}>{value}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Objetivos de Aprendizagem */}
+              <div style={{ marginBottom: 8 }}>
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 8, marginBottom: 12,
+                  paddingBottom: 8, borderBottom: `2px solid ${corSerie}30`,
+                }}>
+                  <span style={{
+                    width: 28, height: 28, borderRadius: 8,
+                    background: corSerie + "20", display: "flex", alignItems: "center",
+                    justifyContent: "center", fontSize: "0.9rem",
+                  }}>🎯</span>
+                  <h3 style={{ margin: 0, fontSize: "0.9rem", fontWeight: 800, color: "#1e293b" }}>
+                    Objetivos de Aprendizagem
+                  </h3>
+                  <span style={{
+                    marginLeft: "auto", fontSize: "0.72rem", fontWeight: 700,
+                    background: corSerie + "18", color: corSerie,
+                    borderRadius: 20, padding: "2px 10px",
+                  }}>{topicos.length} tópico{topicos.length !== 1 ? "s" : ""}</span>
+                </div>
+
+                {topicos.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: "24px 0", color: "#94a3b8" }}>
+                    <p style={{ margin: 0, fontSize: "0.85rem" }}>Nenhum objetivo registrado.</p>
+                  </div>
+                ) : (
+                  topicos.map((top, ti) => (
+                    <div key={ti} style={{
+                      background: "#fafbff", border: "1px solid #e5e7eb",
+                      borderRadius: 10, padding: "12px 14px 12px 44px",
+                      position: "relative", marginBottom: 8,
+                    }}>
+                      <div style={{
+                        position: "absolute", left: 0, top: 0, bottom: 0, width: 4,
+                        borderRadius: "10px 0 0 10px", background: corSerie,
+                      }} />
+                      <div style={{
+                        position: "absolute", left: 10, top: 10,
+                        width: 22, height: 22, borderRadius: "50%",
+                        background: corSerie,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: "0.68rem", fontWeight: 800, color: "#fff",
+                      }}>{top.num || ti + 1}</div>
+                      <p style={{ margin: 0, fontSize: "0.87rem", fontWeight: 600, color: "#1e293b", lineHeight: 1.5 }}>
+                        {String(top.texto || "")}
+                      </p>
+                      {Array.isArray(top.subitens) && top.subitens.length > 0 && (
+                        <ul style={{ margin: "6px 0 0", paddingLeft: 16, listStyle: "none" }}>
+                          {top.subitens.map((sub, si) => (
+                            <li key={si} style={{ display: "flex", gap: 6, marginBottom: 3, fontSize: "0.8rem", color: "#475569" }}>
+                              <span style={{ color: corSerie, flexShrink: 0 }}>•</span>
+                              <span>{typeof sub === "string" ? sub : String(sub?.texto || "")}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div style={{
+              padding: "14px 24px", borderTop: "1px solid #f1f5f9",
+              display: "flex", justifyContent: "flex-end", gap: 10,
+              background: "#fafbff",
+            }}>
+              <button
+                onClick={() => { setDetalheItem(null); openEditModal(item); }}
+                style={{
+                  background: `linear-gradient(135deg, ${corSerie}, ${corSerie}cc)`,
+                  border: "none", borderRadius: 10, padding: "9px 20px",
+                  color: "#fff", fontSize: "0.85rem", fontWeight: 700, cursor: "pointer",
+                  display: "flex", alignItems: "center", gap: 8,
+                }}
+              >
+                <IcoEdit /> Editar este conteúdo
+              </button>
+              <button
+                onClick={() => setDetalheItem(null)}
+                style={{
+                  background: "#f1f5f9", border: "none", borderRadius: 10,
+                  padding: "9px 20px", color: "#64748b", fontSize: "0.85rem",
+                  fontWeight: 600, cursor: "pointer",
+                }}
+              >Fechar</button>
+            </div>
+          </div>
+        </div>
+      );
+    } catch (err) {
+      console.error("[ModalVisualizarConteudo] erro ao renderizar:", err);
+      return null;
+    }
+  };
   const pctOk    = total > 0 ? Math.round((aprovado / total) * 100) : 0;
 
   return (
@@ -1182,204 +1386,7 @@ export default function ConteudosProgramaticos() {
         </div>
       )}
       {/* ── Modal VISUALIZAR ── */}
-      {detalheItem && (() => {
-        const item = detalheItem;
-        const st = STATUS_COLORS[item.status] || STATUS_COLORS.RASCUNHO;
-        const corSerie = COR_SERIE[item.serie] || "#6366f1";
-        const topicos = parseObjetivo(item.texto_completo || item.objetivo || "");
-        return (
-          <div
-            style={{
-              position: "fixed", inset: 0, zIndex: 9999,
-              background: "rgba(15,23,42,0.72)", backdropFilter: "blur(6px)",
-              display: "flex", alignItems: "flex-start", justifyContent: "center",
-              padding: "24px 16px", overflowY: "auto",
-            }}
-            onClick={() => setDetalheItem(null)}
-          >
-            <div
-              style={{
-                background: "#fff", borderRadius: 20, width: "100%", maxWidth: 640,
-                boxShadow: "0 32px 80px rgba(0,0,0,.28)", overflow: "hidden",
-                marginTop: 8, animation: "cp-fadein .2s ease",
-              }}
-              onClick={e => e.stopPropagation()}
-            >
-              {/* Header do modal */}
-              <div style={{
-                background: `linear-gradient(135deg, ${corSerie}dd, ${corSerie})`,
-                padding: "20px 24px",
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-              }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                  <div style={{
-                    width: 48, height: 48, borderRadius: 14,
-                    background: "rgba(255,255,255,0.2)", backdropFilter: "blur(4px)",
-                    display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.5rem",
-                  }}>📋</div>
-                  <div>
-                    <h2 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 800, color: "#fff" }}>
-                      {item.disciplina}
-                    </h2>
-                    <div style={{ display: "flex", gap: 8, marginTop: 4, flexWrap: "wrap" }}>
-                      {[item.serie, item.bimestre].map((tag, i) => (
-                        <span key={i} style={{
-                          fontSize: "0.72rem", color: "rgba(255,255,255,0.85)", fontWeight: 600,
-                          background: "rgba(255,255,255,0.18)", borderRadius: 20, padding: "2px 10px",
-                        }}>{tag}</span>
-                      ))}
-                      <span style={{
-                        fontSize: "0.72rem", fontWeight: 700,
-                        background: st.bg, color: st.text,
-                        borderRadius: 20, padding: "2px 10px",
-                      }}>
-                        <span style={{ background: st.dot, width: 6, height: 6, borderRadius: "50%", display: "inline-block", marginRight: 4 }} />
-                        {st.label}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div style={{ display: "flex", gap: 8 }}>
-                  <button
-                    onClick={() => openEditModal(item)}
-                    style={{
-                      background: "rgba(255,255,255,0.2)", border: "1.5px solid rgba(255,255,255,0.4)",
-                      borderRadius: 10, padding: "7px 14px", cursor: "pointer",
-                      color: "#fff", fontSize: "0.8rem", fontWeight: 700,
-                      display: "flex", alignItems: "center", gap: 6,
-                    }}
-                  >
-                    <IcoEdit /> Editar
-                  </button>
-                  <button
-                    onClick={() => setDetalheItem(null)}
-                    style={{
-                      width: 36, height: 36, borderRadius: "50%",
-                      background: "rgba(255,255,255,0.2)", border: "none",
-                      color: "#fff", fontSize: "1.2rem", cursor: "pointer",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                    }}
-                  >✕</button>
-                </div>
-              </div>
-
-              {/* Corpo */}
-              <div style={{ padding: "20px 24px", maxHeight: "72vh", overflowY: "auto" }}>
-
-                {/* Metadados em grid */}
-                <div style={{
-                  display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20,
-                }}>
-                  {[
-                    { label: "Unidade Temática - BNCC", value: item.unidade || "—" },
-                    { label: "Conteúdo SEEDF", value: item.conteudo || "—" },
-                    { label: "Ano Letivo", value: item.ano_letivo || "2026" },
-                    { label: "Itens de Aprendizagem", value: `${item.itens || 0} objetivo${item.itens !== 1 ? "s" : ""}` },
-                  ].map(({ label, value }) => (
-                    <div key={label} style={{
-                      background: "#f8fafc", border: "1px solid #e5e7eb",
-                      borderRadius: 10, padding: "10px 14px",
-                    }}>
-                      <div style={{ fontSize: "0.68rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 3 }}>{label}</div>
-                      <div style={{ fontSize: "0.88rem", fontWeight: 600, color: "#1e293b", lineHeight: 1.4 }}>{value}</div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Objetivos de Aprendizagem */}
-                <div style={{ marginBottom: 8 }}>
-                  <div style={{
-                    display: "flex", alignItems: "center", gap: 8, marginBottom: 12,
-                    paddingBottom: 8, borderBottom: `2px solid ${corSerie}30`,
-                  }}>
-                    <span style={{
-                      width: 28, height: 28, borderRadius: 8,
-                      background: corSerie + "20", display: "flex", alignItems: "center",
-                      justifyContent: "center", fontSize: "0.9rem",
-                    }}>🎯</span>
-                    <h3 style={{ margin: 0, fontSize: "0.9rem", fontWeight: 800, color: "#1e293b" }}>
-                      Objetivos de Aprendizagem
-                    </h3>
-                    <span style={{
-                      marginLeft: "auto", fontSize: "0.72rem", fontWeight: 700,
-                      background: corSerie + "18", color: corSerie,
-                      borderRadius: 20, padding: "2px 10px",
-                    }}>{topicos.length} tópico{topicos.length !== 1 ? "s" : ""}</span>
-                  </div>
-
-                  {topicos.length === 0 ? (
-                    <div style={{ textAlign: "center", padding: "24px 0", color: "#94a3b8" }}>
-                      <p style={{ margin: 0, fontSize: "0.85rem" }}>Nenhum objetivo registrado.</p>
-                    </div>
-                  ) : (
-                    topicos.map((top, ti) => (
-                      <div key={ti} style={{
-                        background: "#fafbff", border: "1px solid #e5e7eb",
-                        borderRadius: 10, padding: "12px 14px 12px 44px",
-                        position: "relative", marginBottom: 8,
-                      }}>
-                        {/* Barra lateral */}
-                        <div style={{
-                          position: "absolute", left: 0, top: 0, bottom: 0, width: 4,
-                          borderRadius: "10px 0 0 10px", background: corSerie,
-                        }} />
-                        {/* Número */}
-                        <div style={{
-                          position: "absolute", left: 10, top: 10,
-                          width: 22, height: 22, borderRadius: "50%",
-                          background: corSerie,
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          fontSize: "0.68rem", fontWeight: 800, color: "#fff",
-                        }}>{top.num || ti + 1}</div>
-                        <p style={{ margin: 0, fontSize: "0.87rem", fontWeight: 600, color: "#1e293b", lineHeight: 1.5 }}>
-                          {top.texto}
-                        </p>
-                        {top.subitens?.length > 0 && (
-                          <ul style={{ margin: "6px 0 0", paddingLeft: 16, listStyle: "none" }}>
-                            {top.subitens.map((sub, si) => (
-                              <li key={si} style={{ display: "flex", gap: 6, marginBottom: 3, fontSize: "0.8rem", color: "#475569" }}>
-                                <span style={{ color: corSerie, flexShrink: 0 }}>•</span>
-                                <span>{typeof sub === "string" ? sub : sub.texto}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              {/* Footer */}
-              <div style={{
-                padding: "14px 24px", borderTop: "1px solid #f1f5f9",
-                display: "flex", justifyContent: "flex-end", gap: 10,
-                background: "#fafbff",
-              }}>
-                <button
-                  onClick={() => { setDetalheItem(null); openEditModal(item); }}
-                  style={{
-                    background: `linear-gradient(135deg, ${corSerie}, ${corSerie}cc)`,
-                    border: "none", borderRadius: 10, padding: "9px 20px",
-                    color: "#fff", fontSize: "0.85rem", fontWeight: 700, cursor: "pointer",
-                    display: "flex", alignItems: "center", gap: 8,
-                  }}
-                >
-                  <IcoEdit /> Editar este conteúdo
-                </button>
-                <button
-                  onClick={() => setDetalheItem(null)}
-                  style={{
-                    background: "#f1f5f9", border: "none", borderRadius: 10,
-                    padding: "9px 20px", color: "#64748b", fontSize: "0.85rem",
-                    fontWeight: 600, cursor: "pointer",
-                  }}
-                >Fechar</button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      {renderModalVisualizarConteudo()}
 
       {/* ── Modal Novo Conteúdo ── */}
       {modalOpen && (

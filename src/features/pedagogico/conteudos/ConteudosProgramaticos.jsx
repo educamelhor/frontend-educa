@@ -1183,10 +1183,15 @@ export default function ConteudosProgramaticos() {
       )}
       {/* ── Modal VISUALIZAR ── */}
       {detalheItem && (() => {
+        try {
         const item = detalheItem;
-        const st = STATUS_COLORS[item.status] || STATUS_COLORS.RASCUNHO;
+        const statusKey = typeof item.status === "string" ? item.status : String(item.status || "RASCUNHO");
+        const st = STATUS_COLORS[statusKey] || STATUS_COLORS.RASCUNHO;
         const corSerie = COR_SERIE[item.serie] || "#6366f1";
-        const topicos = parseObjetivo(item.texto_completo || item.objetivo || "");
+        const textoObj = typeof (item.texto_completo || item.objetivo) === "string"
+          ? (item.texto_completo || item.objetivo || "")
+          : String(item.texto_completo || item.objetivo || "");
+        const topicos = parseObjetivo(textoObj);
         return (
           <div
             style={{
@@ -1379,6 +1384,10 @@ export default function ConteudosProgramaticos() {
             </div>
           </div>
         );
+        } catch (err) {
+          console.error("[ModalVisualizarConteudo] erro ao renderizar:", err);
+          return null;
+        }
       })()}
 
       {/* ── Modal Novo Conteúdo ── */}

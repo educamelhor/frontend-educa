@@ -879,7 +879,7 @@ export default function ConteudosProgramaticos() {
   const openEditModal = async (item) => {
     // Reseta tudo primeiro (sem pré-preenchimento)
     prefillRef.current = { unidadeId: null, conteudoId: null };
-    setMSerie(""); setMDisciplina(""); setMBimestre(BIMESTRES_OPTS[0]);
+    setMSerie(""); setMDisciplina(""); setMBimestre(BIMESTRES[0]);
     setMAno("2026"); setMUnidadeId(""); setUnidades([]); setErroUTs(null);
     setMConteudoId(""); setConteudos([]); setErroCTs(null);
     setObjetivos([]); setObjSubVisible(false); setNovoTopico(""); setNovosSubitens([""]);

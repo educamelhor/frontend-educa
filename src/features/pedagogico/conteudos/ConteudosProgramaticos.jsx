@@ -1806,50 +1806,6 @@ function ConteudosProgramaticosPage() {
         </div>
       )}
 
-      {/* ── Modal Detalhe ── */}
-      {detalheItem && (
-        <div className="cp-modal-overlay" onClick={() => setDetalheItem(null)}>
-          <div className="cp-modal cp-modal-detalhe" onClick={e => e.stopPropagation()}>
-            <div className="cp-modal-header">
-              <span className="cp-modal-icon" style={{ background: (COR_SERIE[detalheItem.serie] || "#6366f1") + "22", color: COR_SERIE[detalheItem.serie] || "#6366f1" }}>
-                <IcoBook />
-              </span>
-              <div>
-                <h2>{detalheItem.disciplina}</h2>
-                <p style={{ color: "#64748b", fontSize: "0.85rem" }}>{detalheItem.serie} — {detalheItem.bimestre}</p>
-              </div>
-            </div>
-            <div className="cp-modal-body">
-              <div className="cp-detalhe-grid">
-                <div className="cp-detalhe-field"><span>Unidade Temática - BNCC</span><strong>{detalheItem.unidade}</strong></div>
-                <div className="cp-detalhe-field"><span>Status</span>
-                  <span className="cp-status-badge" style={{ background: STATUS_COLORS[detalheItem.status].bg, color: STATUS_COLORS[detalheItem.status].text }}>
-                    <span className="cp-status-dot" style={{ background: STATUS_COLORS[detalheItem.status].dot }} />
-                    {STATUS_COLORS[detalheItem.status].label}
-                  </span>
-                </div>
-                <div className="cp-detalhe-field cp-detalhe-full"><span>Conteúdo - Currículo em Movimento - SEEDF</span><p>{detalheItem.conteudo}</p></div>
-                <div className="cp-detalhe-field cp-detalhe-full"><span>Objetivo de Aprendizagem - {localStorage.getItem("escola_apelido") || "Escola"}</span><p>{detalheItem.objetivo}</p></div>
-                <div className="cp-detalhe-field"><span>Total de Itens</span><strong>{detalheItem.itens} itens cadastrados</strong></div>
-              </div>
-              {detalheItem.status === "ENVIADO" && (
-                <div className="cp-detalhe-actions-bar">
-                  <p>Este conteúdo está aguardando aprovação da coordenação.</p>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button className="cp-btn-outline">Solicitar Ajuste</button>
-                    <button className="cp-btn-success"><IcoCheck /> Aprovar Conteúdo</button>
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="cp-modal-footer">
-              <button className="cp-btn-outline" onClick={() => setDetalheItem(null)}>Fechar</button>
-              <button className="cp-btn-primary"><IcoEdit /> Editar</button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ── Modal Gera PDF ── */}
       {pdfModalOpen && (
         <div className="cp-modal-overlay" onClick={() => setPdfModalOpen(false)}>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import api from "../../../services/api";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -574,6 +574,10 @@ export default function ConteudosProgramaticos() {
   const [loadingCTs, setLoadingCTs]     = useState(false);
   const [erroCTs, setErroCTs]           = useState(null);
 
+  // Ref para pré-preencher UT e Conteúdo SEEDF ao abrir modal em modo edição
+  // Evita que os useEffects de carregamento cascata apaguem os IDs originais
+  const prefillRef = useRef({ unidadeId: null, conteudoId: null });
+
   // ── Objetivos de Aprendizagem (tópicos + subitens) ──────────────────────
   const escolaApelido = localStorage.getItem("escola_apelido")
                      || localStorage.getItem("nome_escola")
@@ -736,13 +740,16 @@ export default function ConteudosProgramaticos() {
 
   // 1º Efeito: carrega UTs quando série + disciplina são selecionadas
   useEffect(() => {
-    setMUnidadeId("");
-    setUnidades([]);
-    setErroUTs(null);
-    // Também reseta conteúdos
-    setMConteudoId("");
-    setConteudos([]);
-    setErroCTs(null);
+    // Ao trocar série/disciplina só reseta UT/Conteúdo se NÃO há pré-preenchimento pendente
+    const hasPrefill = prefillRef.current.unidadeId != null;
+    if (!hasPrefill) {
+      setMUnidadeId("");
+      setUnidades([]);
+      setErroUTs(null);
+      setMConteudoId("");
+      setConteudos([]);
+      setErroCTs(null);
+    }
 
     const ano_id = serieToAnoId[mSerie];
     if (!ano_id || !mDisciplina) return;
@@ -757,6 +764,11 @@ export default function ConteudosProgramaticos() {
         if (cancelled) return;
         setUnidades(Array.isArray(data?.unidades) ? data.unidades : []);
         setErroUTs(null);
+        // Se há pré-preenchimento pendente (modo edição), aplica o ID da UT
+        if (prefillRef.current.unidadeId != null) {
+          setMUnidadeId(String(prefillRef.current.unidadeId));
+          // NÃO limpa o prefillRef aqui — o 2º efeito (UTs → Conteúdos) ainda precisa do conteudoId
+        }
       } catch (e) {
         if (!cancelled) { setUnidades([]); setErroUTs("Não foi possível carregar as Unidades Temáticas."); }
       } finally {
@@ -768,9 +780,13 @@ export default function ConteudosProgramaticos() {
 
   // 2º Efeito: carrega Conteúdos SEEDF quando UT é selecionada
   useEffect(() => {
-    setMConteudoId("");
-    setConteudos([]);
-    setErroCTs(null);
+    // Ao trocar UT só reseta Conteúdo se NÃO há pré-preenchimento pendente
+    const hasPrefill = prefillRef.current.conteudoId != null;
+    if (!hasPrefill) {
+      setMConteudoId("");
+      setConteudos([]);
+      setErroCTs(null);
+    }
 
     if (!mUnidadeId || !mDisciplina || !mSerie) return;
 
@@ -788,6 +804,12 @@ export default function ConteudosProgramaticos() {
         if (cancelled) return;
         setConteudos(Array.isArray(data?.conteudos) ? data.conteudos : []);
         setErroCTs(null);
+        // Se há pré-preenchimento pendente (modo edição), aplica o ID do Conteúdo SEEDF
+        if (prefillRef.current.conteudoId != null) {
+          setMConteudoId(String(prefillRef.current.conteudoId));
+          // Limpa o ref após aplicar ambos os valores
+          prefillRef.current = { unidadeId: null, conteudoId: null };
+        }
       } catch (e) {
         if (!cancelled) { setConteudos([]); setErroCTs("Não foi possível carregar os Conteúdos SEEDF."); }
       } finally {
@@ -839,6 +861,7 @@ export default function ConteudosProgramaticos() {
 
   // Reseta estado completo do modal ao abrir (NOVO)
   const openModal = () => {
+    prefillRef.current = { unidadeId: null, conteudoId: null }; // garante sem pré-preenchimento
     setMSerie(""); setMDisciplina(""); setMBimestre(BIMESTRES_OPTS[0]);
     setMAno("2026"); setMUnidadeId(""); setUnidades([]); setErroUTs(null);
     setMConteudoId(""); setConteudos([]); setErroCTs(null);
@@ -854,7 +877,8 @@ export default function ConteudosProgramaticos() {
 
   // Abre modal PRÉ-POPULADO com dados do item para EDITAR
   const openEditModal = async (item) => {
-    // Reseta tudo primeiro
+    // Reseta tudo primeiro (sem pré-preenchimento)
+    prefillRef.current = { unidadeId: null, conteudoId: null };
     setMSerie(""); setMDisciplina(""); setMBimestre(BIMESTRES_OPTS[0]);
     setMAno("2026"); setMUnidadeId(""); setUnidades([]); setErroUTs(null);
     setMConteudoId(""); setConteudos([]); setErroCTs(null);
@@ -866,17 +890,9 @@ export default function ConteudosProgramaticos() {
     setModalOpen(true);
 
     // Pré-popula campos básicos (sem esperar API — já temos os dados do item da lista)
-    // Normaliza série: "6º Ano" → "6º Ano"
     const serieDisplay = normSerieDisplay(item.serie);
-    setMSerie(serieDisplay);
-
-    // Disciplina: vem como nome completo da API
     const discNome = item.disciplina || "";
-    setMDisciplina(discNome);
-
-    // Bimestre: vem como "1º Bimestre" ou número
     const bimStr = item.bimestre || "1º Bimestre";
-    setMBimestre(bimStr);
 
     // Objetivos: parseia o texto completo do item
     if (item.texto_completo) {
@@ -885,7 +901,7 @@ export default function ConteudosProgramaticos() {
       setObjetivos(parseTextoToObjetivos(item.objetivo));
     }
 
-    // Busca o registro completo do backend para preencher unidade + conteudo_seedf
+    // Busca o registro completo do backend para obter bncc_unidade_tematica_id e seedf_conteudo_id
     try {
       const { data } = await api.get("/conteudos/admin/planejamento/check", {
         params: {
@@ -898,14 +914,28 @@ export default function ConteudosProgramaticos() {
       });
       if (data?.found && data.registro) {
         const reg = data.registro;
-        if (reg.bncc_unidade_tematica_id) setMUnidadeId(String(reg.bncc_unidade_tematica_id));
-        if (reg.seedf_conteudo_id) setMConteudoId(String(reg.seedf_conteudo_id));
         if (reg.texto) setObjetivos(parseTextoToObjetivos(reg.texto));
         setExistingId(reg.id);
+
+        // ✅ Guarda os IDs no ref ANTES de disparar os useEffects de cascata.
+        // Ao setar mSerie + mDisciplina, o 1º efeito carregará as UTs e,
+        // ao terminar, aplicará o mUnidadeId do ref; em seguida o 2º efeito
+        // carregará os Conteúdos SEEDF e aplicará o mConteudoId do ref.
+        if (reg.bncc_unidade_tematica_id && reg.seedf_conteudo_id) {
+          prefillRef.current = {
+            unidadeId: reg.bncc_unidade_tematica_id,
+            conteudoId: reg.seedf_conteudo_id,
+          };
+        }
       }
     } catch (e) {
       console.warn("[openEditModal] erro ao buscar registro:", e?.message);
     }
+
+    // Dispara os useEffects de cascata APÓS definir o prefillRef
+    setMBimestre(bimStr);
+    setMSerie(serieDisplay);
+    setMDisciplina(discNome);
   };
 
   // Carrega lista real ao montar e ao fechar modal (para refletir novos cadastros)

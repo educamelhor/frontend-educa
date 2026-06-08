@@ -894,42 +894,51 @@ export default function ConteudosProgramaticos() {
     const discNome = item.disciplina || "";
     const bimStr = item.bimestre || "1º Bimestre";
 
-    // Objetivos: parseia o texto completo do item
+    // Objetivos: parseia o texto completo do item (já vem na lista)
     if (item.texto_completo) {
       setObjetivos(parseTextoToObjetivos(item.texto_completo));
     } else if (item.objetivo) {
       setObjetivos(parseTextoToObjetivos(item.objetivo));
     }
 
-    // Busca o registro completo do backend para obter bncc_unidade_tematica_id e seedf_conteudo_id
-    try {
-      const { data } = await api.get("/conteudos/admin/planejamento/check", {
-        params: {
-          disciplina_id: DISC_ID_MAP[discNome] || item.disciplina_id,
-          serie:         serieDisplay.toUpperCase().replace("Ano", "ANO"),
-          bimestre:      parseInt(bimStr),
-          ano_letivo:    2026,
-          seedf_conteudo_id: item.seedf_conteudo_id || item.conteudo_id,
-        },
-      });
-      if (data?.found && data.registro) {
-        const reg = data.registro;
-        if (reg.texto) setObjetivos(parseTextoToObjetivos(reg.texto));
-        setExistingId(reg.id);
+    // ✅ IDs de UT BNCC e Conteúdo SEEDF vêm diretamente do item da lista
+    // (o backend foi corrigido para incluir bncc_unidade_tematica_id e seedf_conteudo_id)
+    const unidadeId  = item.bncc_unidade_tematica_id || null;
+    const conteudoId = item.seedf_conteudo_id || null;
 
-        // ✅ Guarda os IDs no ref ANTES de disparar os useEffects de cascata.
-        // Ao setar mSerie + mDisciplina, o 1º efeito carregará as UTs e,
-        // ao terminar, aplicará o mUnidadeId do ref; em seguida o 2º efeito
-        // carregará os Conteúdos SEEDF e aplicará o mConteudoId do ref.
-        if (reg.bncc_unidade_tematica_id && reg.seedf_conteudo_id) {
-          prefillRef.current = {
-            unidadeId: reg.bncc_unidade_tematica_id,
-            conteudoId: reg.seedf_conteudo_id,
-          };
+    if (unidadeId && conteudoId) {
+      // Define prefillRef ANTES de setar mSerie/mDisciplina para que os
+      // useEffects de cascata apliquem os valores corretos ao terminar de carregar as listas
+      prefillRef.current = { unidadeId, conteudoId };
+    } else {
+      // Fallback: busca os IDs no backend caso o item não os tenha
+      try {
+        const discId = DISC_ID_MAP[discNome] || item.disciplina_id;
+        if (discId) {
+          const { data } = await api.get("/conteudos/admin/planejamento/check", {
+            params: {
+              disciplina_id: discId,
+              serie:         serieDisplay.toUpperCase().replace("Ano", "ANO"),
+              bimestre:      parseInt(bimStr),
+              ano_letivo:    2026,
+              seedf_conteudo_id: conteudoId || 0,
+            },
+          });
+          if (data?.found && data.registro) {
+            const reg = data.registro;
+            if (reg.texto) setObjetivos(parseTextoToObjetivos(reg.texto));
+            setExistingId(reg.id);
+            if (reg.bncc_unidade_tematica_id && reg.seedf_conteudo_id) {
+              prefillRef.current = {
+                unidadeId:  reg.bncc_unidade_tematica_id,
+                conteudoId: reg.seedf_conteudo_id,
+              };
+            }
+          }
         }
+      } catch (e) {
+        console.warn("[openEditModal] erro ao buscar IDs:", e?.message);
       }
-    } catch (e) {
-      console.warn("[openEditModal] erro ao buscar registro:", e?.message);
     }
 
     // Dispara os useEffects de cascata APÓS definir o prefillRef

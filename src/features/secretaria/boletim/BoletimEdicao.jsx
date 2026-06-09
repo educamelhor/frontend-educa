@@ -126,27 +126,41 @@ export default function BoletimEdicao() {
   const [notasEdicaoMock, setNotasEdicaoMock] = useState({});
 
   // ---------------------------------------------------------------------------
-  // Carregamento de filtros no boot
+  // Carregamento de filtros no boot (disciplinas + anos letivos)
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    async function carregarFiltros() {
+    async function carregarFiltrosEstaticos() {
       try {
-        const [resTurmas, resDiscs, resAnos] = await Promise.all([
-          api.get("/api/turmas"),
+        const [resDiscs, resAnos] = await Promise.all([
           api.get("/api/disciplinas"),
           api.get("/api/secretaria/relatorios/anos-letivos").catch(() => ({ data: [anoLetivoPadrao()] }))
         ]);
-        setTurmas(resTurmas.data || []);
         setDisciplinas(resDiscs.data || []);
         if (Array.isArray(resAnos.data) && resAnos.data.length > 0) {
           setAnosLetivos(resAnos.data);
         }
       } catch (err) {
-        console.error("Erro ao carregar dados dos filtros:", err);
+        console.error("Erro ao carregar disciplinas/anos:", err);
       }
     }
-    carregarFiltros();
+    carregarFiltrosEstaticos();
   }, []);
+
+  // ---------------------------------------------------------------------------
+  // Recarrega turmas sempre que o ano letivo selecionado mudar
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    async function carregarTurmas() {
+      try {
+        const res = await api.get("/api/turmas", { params: { ano: filtroAnoLetivo } });
+        setTurmas(res.data || []);
+        setFiltroTurma("todas"); // reseta seleção ao trocar de ano
+      } catch (err) {
+        console.error("Erro ao carregar turmas:", err);
+      }
+    }
+    carregarTurmas();
+  }, [filtroAnoLetivo]);
 
   // ---------------------------------------------------------------------------
   // Carregar dados de Acompanhamento

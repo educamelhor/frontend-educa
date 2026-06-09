@@ -138,6 +138,15 @@ export default function BoletimAnual({
           currentEscolaId = studentObj.escola_id;
           currentEtapa = studentObj.etapa;
           currentTurno = studentObj.turno;
+
+          // Aplicar config de governança pre-carregada (evita re-fetch no modo batch)
+          if (boletimConfigProp) {
+            setGovConfig({
+              exibirFaltas: boletimConfigProp["boletim.exibir_faltas"] !== "0",
+              exibirRanking: boletimConfigProp["boletim.exibir_ranking"] !== "0",
+              exibirMediaRodape: boletimConfigProp["boletim.exibir_media_rodape"] !== "0",
+            });
+          }
         }
       } else {
         // Fluxo individual

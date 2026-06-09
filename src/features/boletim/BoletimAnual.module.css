@@ -10,6 +10,8 @@
   background: linear-gradient(135deg, #f0f4ff 0%, #e8eef9 50%, #f5f0ff 100%);
   min-height: 100vh;
   padding: 1.5rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* ─── Cabeçalho Institucional ──────────────────────────────────────── */

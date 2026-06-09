@@ -113,7 +113,7 @@ export default function PrintBoletinsTurma() {
   //   exibirAnoAnterior = false → BoletimAnual  (1 coluna de ano — padrão)
   // -------------------------------------------------------------------------
   return (
-    <div id="boletins-pronto" style={{ background: "#fff" }}>
+    <div id="boletins-pronto" style={{ background: "#fff", width: "100%" }}>
       {carregado && alunos.length === 0 ? (
         <div
           style={{
@@ -126,7 +126,7 @@ export default function PrintBoletinsTurma() {
           Nenhum aluno encontrado para essa turma.
         </div>
       ) : (
-        <div ref={printRef}>
+        <div ref={printRef} style={{ width: "100%" }}>
           {alunos.map((aluno, idx) =>
             aluno && aluno.codigo ? (
               <div
@@ -136,6 +136,7 @@ export default function PrintBoletinsTurma() {
                   pageBreakAfter: idx < alunos.length - 1 ? "always" : "auto",
                   breakAfter: idx < alunos.length - 1 ? "always" : "auto",
                   background: "#fff",
+                  width: "100%",
                 }}
               >
                 {exibirAnoAnterior ? (

@@ -559,13 +559,16 @@
 @media print {
   @page {
     size: landscape;
-    margin: 5mm;
+    margin: 0;
   }
 
   .boletimAnualWrapper {
     background: #fff !important;
-    padding: 0 !important;
     min-height: auto !important;
+    /* Margens visuais via padding (Playwright ignora @page margin) */
+    padding: 10mm 14mm !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
   }
 
   .cabecalho {
@@ -578,9 +581,12 @@
     display: none !important;
   }
 
+  /* Centraliza a tabela na página */
   .tabelaContainer {
     box-shadow: none !important;
     border-radius: 0 !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
   }
 
   .rodape {
@@ -626,8 +632,19 @@
   }
 
   :global(#root) {
-    width: 100vw !important;
+    width: 100% !important;
     margin: 0 !important;
     padding: 0 !important;
   }
+
+  /* Cada boletim em uma página separada */
+  :global(.boletim-print-page) {
+    page-break-inside: avoid !important;
+    page-break-after: always !important;
+  }
+
+  :global(.boletim-print-page:last-child) {
+    page-break-after: auto !important;
+  }
 }
+

@@ -15,8 +15,12 @@ function getUsuarioIdFromToken() {
   try {
     const token = localStorage.getItem("token");
     if (!token) return null;
-    const payload = JSON.parse(atob(token.split(".")[1]));
-    return payload?.usuario_id || payload?.id || null;
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const payload = JSON.parse(atob(parts[1]));
+    // JWT pode conter: usuario_id, usuarioId, id — tenta todos
+    const uid = payload?.usuario_id ?? payload?.usuarioId ?? payload?.id ?? null;
+    return uid ? Number(uid) : null;
   } catch {
     return null;
   }

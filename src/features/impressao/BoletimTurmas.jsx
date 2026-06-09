@@ -123,35 +123,31 @@ export default function BoletimTurmas() {
         ))}
       </div>
 
-      {/* Mini cards de turmas */}
+      {/* Cards de turmas */}
       {turnoSelecionado && (
-        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2 mb-8">
+        <div className="flex flex-wrap gap-3 justify-center mb-8">
           {loadingTurmas ? (
-            <p className="col-span-full text-center text-gray-500">
-              Turmas sendo carregadas...
-            </p>
+            <p className="text-center text-gray-500 w-full">Turmas sendo carregadas...</p>
           ) : turmasFiltradas.length > 0 ? (
             turmasFiltradas.map((turma) => (
-              <div
+              <button
                 key={turma.id}
                 onClick={() => !gerando && handleGerarBoletins(turma)}
-                className={`bg-gradient-to-b from-blue-200 to-blue-50 rounded-md px-9 py-2 shadow-md cursor-pointer hover:shadow-xl transition-transform hover:scale-105 text-center font-bold text-blue-900 text-base ${
-                  gerando ? "opacity-70 pointer-events-none" : ""
-                }`}
-                style={{
-                  minWidth: "80px",
-                  maxWidth: "100px",
-                  margin: "0 auto",
-                }}
+                disabled={gerando}
                 title={`Gerar boletins da turma ${turma.turma}`}
                 aria-label={`Gerar boletins da turma ${turma.turma}`}
-                tabIndex={0}
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl shadow-sm border font-semibold text-sm
+                  whitespace-nowrap transition-all duration-150 select-none
+                  bg-gradient-to-br from-blue-50 to-indigo-100 border-blue-300 text-blue-900
+                  hover:from-blue-100 hover:to-indigo-200 hover:shadow-md hover:scale-105 active:scale-95
+                  ${gerando ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}`}
               >
-                {turma.turma}
-              </div>
+                <span className="text-base">📋</span>
+                <span>{turma.turma}</span>
+              </button>
             ))
           ) : (
-            <p className="col-span-full text-center text-gray-500">
+            <p className="text-center text-gray-500 w-full">
               Nenhuma turma encontrada para {turnoSelecionado}.
             </p>
           )}

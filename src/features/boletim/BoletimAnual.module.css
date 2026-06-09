@@ -558,14 +558,16 @@
 /* ─── Print Styles ─────────────────────────────────────────────────── */
 @media print {
   @page {
-    size: landscape;
-    margin: 5mm;
+    margin: 0;
   }
 
   .boletimAnualWrapper {
     background: #fff !important;
-    padding: 0 !important;
+    padding: 0.5rem !important;
     min-height: auto !important;
+    max-width: 100% !important;
+    margin: 0 auto !important;
+    box-sizing: border-box !important;
   }
 
   .cabecalho {
@@ -631,3 +633,4 @@
     padding: 0 !important;
   }
 }
+

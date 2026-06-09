@@ -496,7 +496,7 @@ export default function BoletimEdicao() {
                 </label>
                 <select
                   value={filtroTurno}
-                  onChange={(e) => setFiltroTurno(e.target.value)}
+                  onChange={(e) => { setFiltroTurno(e.target.value); setFiltroTurma("todas"); }}
                   className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition"
                 >
                   <option value="todos">Todos</option>
@@ -516,9 +516,14 @@ export default function BoletimEdicao() {
                   className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition"
                 >
                   <option value="todas">Todas</option>
-                  {turmas.map((t) => (
-                    <option key={t.id} value={t.id}>{t.turma} ({t.turno})</option>
-                  ))}
+                  {turmas
+                    .filter((t) =>
+                      filtroTurno === "todos" ||
+                      (t.turno || "").toLowerCase() === filtroTurno.toLowerCase()
+                    )
+                    .map((t) => (
+                      <option key={t.id} value={t.id}>{t.turma} ({t.turno})</option>
+                    ))}
                 </select>
               </div>
 

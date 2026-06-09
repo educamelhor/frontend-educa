@@ -32,10 +32,6 @@ export default function FichaAluno({ codigo: codigoProp }) {
   const [modalRelatorioOpen, setModalRelatorioOpen] = useState(false);
   const [modalPedagogicoOpen, setModalPedagogicoOpen] = useState(false);
 
-  // Perfil do usuário logado
-  const perfil = String(localStorage.getItem("perfil") || "").toLowerCase();
-  const isProfessor = perfil === "professor";
-
   // 🔐 trava anti-reentrada de upload
   const isUploadingRef = useRef(false);
 
@@ -373,12 +369,31 @@ export default function FichaAluno({ codigo: codigoProp }) {
           </div>
         </div>
 
+        {/* Upload de foto - Oculto no módulo disciplinar */}
+        {!isDisciplinar && (
+          <div className="space-y-4">
+            <h3 className="font-medium">Selecionar Pasta e Inserir Foto</h3>
+            <label className="inline-block">
+              <span className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded cursor-pointer">
+                Escolher pasta
+              </span>
+              <input
+                type="file"
+                webkitdirectory="true"
+                directory="true"
+                multiple
+                accept=".jpg,.jpeg,.png,.webp,.jfif,image/*"
+                onChange={handleFolderSelect}
+                className="hidden"
+                disabled={uploading}
+              />
+            </label>
+            {uploading && <p>Enviando foto…</p>}
+          </div>
+        )}
 
-
-
-        {/* Cards de relatórios */}
+        {/* Seções futuras */}
         <div className="grid grid-cols-2 gap-4">
-          {/* Relatório Pedagógico — sempre acessível */}
           <div
             className="bg-emerald-50 p-4 rounded shadow cursor-pointer hover:bg-emerald-100 transition border border-transparent hover:border-emerald-200"
             onClick={() => setModalPedagogicoOpen(true)}
@@ -388,31 +403,15 @@ export default function FichaAluno({ codigo: codigoProp }) {
             <h2 className="text-lg font-semibold mb-2 text-emerald-900">Relatório Pedagógico</h2>
             <p className="text-gray-600">Clique para visualizar o histórico pedagógico.</p>
           </div>
-
-          {/* Relatório Disciplinar — bloqueado para professor */}
-          {isProfessor ? (
-            <div
-              className="relative bg-gray-100 p-4 rounded shadow border border-gray-200 cursor-not-allowed select-none"
-              title="Acesso restrito"
-            >
-              {/* Badge de bloqueio */}
-              <span className="absolute top-2 right-2 inline-flex items-center gap-1 text-xs font-bold text-amber-700 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full">
-                🔒 Momentaneamente bloqueado
-              </span>
-              <h2 className="text-lg font-semibold mb-2 text-gray-400">Relatório Disciplinar</h2>
-              <p className="text-gray-400 text-sm">Este recurso está temporariamente indisponível para o perfil Professor.</p>
-            </div>
-          ) : (
-            <div
-              className="bg-blue-50 p-4 rounded shadow cursor-pointer hover:bg-blue-100 transition border border-transparent hover:border-blue-200"
-              onClick={() => setModalRelatorioOpen(true)}
-              role="button"
-              tabIndex={0}
-            >
-              <h2 className="text-lg font-semibold mb-2 text-blue-900">Relatório Disciplinar</h2>
-              <p className="text-gray-600">Clique para visualizar o histórico de ocorrências.</p>
-            </div>
-          )}
+          <div
+            className="bg-blue-50 p-4 rounded shadow cursor-pointer hover:bg-blue-100 transition border border-transparent hover:border-blue-200"
+            onClick={() => setModalRelatorioOpen(true)}
+            role="button"
+            tabIndex={0}
+          >
+            <h2 className="text-lg font-semibold mb-2 text-blue-900">Relatório Disciplinar</h2>
+            <p className="text-gray-600">Clique para visualizar o histórico de ocorrências.</p>
+          </div>
         </div>
 
         {/* Modais */}

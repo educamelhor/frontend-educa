@@ -2,12 +2,12 @@ import React, { useState, useEffect } from "react";
 import api from "../../../services/api";
 import ModalBoletim from "../../boletim/ModalBoletim";
 import ModalFichaAluno from "./ModalFichaAluno";
-import ModalZoomFoto from "./ModalZoomFoto";
-import ModalRegistroConselho from "./ModalRegistroConselho";
+import ModalZoomFoto from "./ModalZoomFoto"; // 👈 Import do modal de zoom
 import {
   EyeIcon,
   DocumentTextIcon,
   IdentificationIcon,
+  PencilIcon,
 } from "@heroicons/react/24/outline";
 import { getFotoURL } from "../../../utils/foto";
 
@@ -54,10 +54,6 @@ export default function ConselhoClasse() {
   const [zoomOpen, setZoomOpen] = useState(false);
   const [zoomSrc, setZoomSrc] = useState("");
   const [zoomAlt, setZoomAlt] = useState("");
-
-  // Registro de Conselho de Classe (modal premium)
-  const [modalRegistroOpen, setModalRegistroOpen] = useState(false);
-  const [alunoRegistro, setAlunoRegistro]         = useState(null);
 
   function abrirModalBoletim(codigo) {
     setCodigoAlunoBoletim(codigo);
@@ -264,10 +260,7 @@ export default function ConselhoClasse() {
                       {/* Ações */}
                       <td className="py-2 px-2 text-center">
                         <div className="flex justify-center gap-3">
-                          <button
-                            title="Registro de Conselho"
-                            onClick={() => { setAlunoRegistro(aluno); setModalRegistroOpen(true); }}
-                          >
+                          <button>
                             <EyeIcon className="h-6 w-6 text-gray-600 hover:text-blue-600" />
                           </button>
 
@@ -283,6 +276,10 @@ export default function ConselhoClasse() {
                             title="Ficha do estudante"
                           >
                             <IdentificationIcon className="h-6 w-6 text-gray-600 hover:text-purple-600" />
+                          </button>
+
+                          <button>
+                            <PencilIcon className="h-6 w-6 text-gray-600 hover:text-yellow-600" />
                           </button>
                         </div>
                       </td>
@@ -320,14 +317,6 @@ export default function ConselhoClasse() {
           src={zoomSrc}
           alt={zoomAlt}
           onClose={() => setZoomOpen(false)}
-        />
-      )}
-
-      {modalRegistroOpen && alunoRegistro && (
-        <ModalRegistroConselho
-          aluno={alunoRegistro}
-          turma={turmaSelecionada}
-          onClose={() => { setModalRegistroOpen(false); setAlunoRegistro(null); }}
         />
       )}
     </div>

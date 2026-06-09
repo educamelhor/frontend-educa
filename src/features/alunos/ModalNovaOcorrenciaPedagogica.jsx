@@ -90,13 +90,6 @@ export default function ModalNovaOcorrenciaPedagogica({
     // Perfis que podem convocar responsável
     const isPerfConvocacao = ["coordenador", "supervisor", "diretor", "vice_diretor", "diretor_disciplinar"].includes(perfilUsuario);
 
-    // Professor só seleciona Categoria + Ocorrência — sem Descrição, Registro Interno ou Convocação
-    const isProfessor = perfilUsuario === "professor";
-
-    // Campos bloqueados = readonly OU professor
-    const descricaoDisabled   = readonly || isProfessor;
-    const registroIntDisabled = readonly || isProfessor;
-
     // Itens filtrados pela categoria selecionada
     const itensFiltrados = React.useMemo(() => {
         if (!categoriaSelecionada) return [];
@@ -258,27 +251,14 @@ export default function ModalNovaOcorrenciaPedagogica({
 
                     {/* Descrição */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Descrição
-                            {isProfessor && !readonly && (
-                                <span className="ml-2 inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
-                                    🔒 Restrito — apenas coordenação/direção
-                                </span>
-                            )}
-                        </label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
                         <textarea
-                            disabled={descricaoDisabled}
+                            disabled={readonly}
                             rows="3"
-                            placeholder={isProfessor ? "Campo restrito ao perfil coordenação / direção" : "Relato detalhado da situação pedagógica..."}
+                            placeholder="Relato detalhado da situação pedagógica..."
                             value={descricao}
                             onChange={(e) => setDescricao(e.target.value)}
-                            className={`w-full border rounded p-2 focus:ring focus:border-emerald-300 outline-none resize-none ${
-                                descricaoDisabled
-                                    ? isProfessor && !readonly
-                                        ? "bg-amber-50 text-amber-700 cursor-not-allowed border-amber-200"
-                                        : "bg-gray-100 text-gray-600 cursor-not-allowed"
-                                    : ""
-                            }`}
+                            className={`w-full border rounded p-2 focus:ring focus:border-emerald-300 outline-none resize-none ${readonly ? "bg-gray-100 text-gray-600 cursor-not-allowed" : ""}`}
                         />
                     </div>
 
@@ -286,26 +266,15 @@ export default function ModalNovaOcorrenciaPedagogica({
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                             Registro Interno
-                            {!readonly && !isProfessor && <span className="ml-1 text-xs text-gray-400 font-normal">(uso interno — não será impresso)</span>}
-                            {isProfessor && !readonly && (
-                                <span className="ml-2 inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
-                                    🔒 Restrito — apenas coordenação/direção
-                                </span>
-                            )}
+                            {!readonly && <span className="ml-1 text-xs text-gray-400 font-normal">(uso interno — não será impresso)</span>}
                         </label>
                         <textarea
-                            disabled={registroIntDisabled}
+                            disabled={readonly}
                             rows="2"
-                            placeholder={isProfessor ? "Campo restrito ao perfil coordenação / direção" : "Anotações internas..."}
+                            placeholder="Anotações internas..."
                             value={registroInterno}
                             onChange={(e) => setRegistroInterno(e.target.value)}
-                            className={`w-full border rounded p-2 focus:ring focus:border-emerald-300 outline-none resize-none ${
-                                registroIntDisabled
-                                    ? isProfessor && !readonly
-                                        ? "bg-amber-50 text-amber-700 cursor-not-allowed border-amber-200"
-                                        : "bg-gray-100 text-gray-600 cursor-not-allowed"
-                                    : ""
-                            }`}
+                            className={`w-full border rounded p-2 focus:ring focus:border-emerald-300 outline-none resize-none ${readonly ? "bg-gray-100 text-gray-600 cursor-not-allowed" : ""}`}
                         />
                     </div>
 
@@ -326,42 +295,17 @@ export default function ModalNovaOcorrenciaPedagogica({
                         </div>
                     )}
 
-                    {/* Rastreabilidade — modo visualização */}
+                    {/* Registrado por / Finalizado por */}
                     {readonly && ocorrenciaInicial?.nome_usuario_registro && (
-                        <div className="p-3 bg-gray-50 border border-gray-100 rounded-md space-y-1.5">
-                            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">Rastreabilidade</p>
+                        <div className="p-3 bg-gray-50 border border-gray-100 rounded-md">
                             <p className="text-sm text-gray-700">
-                                <span className="font-semibold">📝 Registrado por: </span>
+                                <span className="font-semibold">Registrado por: </span>
                                 {ocorrenciaInicial.nome_usuario_registro}
-                                {ocorrenciaInicial.data_registro && (
-                                    <span className="text-gray-500 ml-1 text-xs">em {ocorrenciaInicial.data_registro}</span>
-                                )}
                             </p>
-                            {ocorrenciaInicial.nome_usuario_edicao && (
-                                <p className="text-sm text-gray-700">
-                                    <span className="font-semibold">✏️ Editado por: </span>
-                                    {ocorrenciaInicial.nome_usuario_edicao}
-                                    {ocorrenciaInicial.data_edicao && (
-                                        <span className="text-gray-500 ml-1 text-xs">em {ocorrenciaInicial.data_edicao}</span>
-                                    )}
-                                </p>
-                            )}
                             {ocorrenciaInicial.nome_usuario_finalizacao && (
-                                <p className="text-sm text-gray-700">
-                                    <span className="font-semibold">✅ Finalizado por: </span>
+                                <p className="text-sm text-gray-700 mt-1">
+                                    <span className="font-semibold">Finalizado por: </span>
                                     {ocorrenciaInicial.nome_usuario_finalizacao}
-                                    {ocorrenciaInicial.data_finalizacao && (
-                                        <span className="text-gray-500 ml-1 text-xs">em {ocorrenciaInicial.data_finalizacao}</span>
-                                    )}
-                                </p>
-                            )}
-                            {ocorrenciaInicial.nome_usuario_cancelamento && (
-                                <p className="text-sm text-red-700">
-                                    <span className="font-semibold">🚫 Cancelado por: </span>
-                                    {ocorrenciaInicial.nome_usuario_cancelamento}
-                                    {ocorrenciaInicial.data_cancelamento && (
-                                        <span className="text-red-400 ml-1 text-xs">em {ocorrenciaInicial.data_cancelamento}</span>
-                                    )}
                                 </p>
                             )}
                         </div>

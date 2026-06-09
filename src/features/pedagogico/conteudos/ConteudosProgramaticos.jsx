@@ -760,6 +760,7 @@ function ConteudosProgramaticosPage() {
     try {
       setSavingConteudo(true);
       setSaveMsg("");
+      const statusParaEnvio = statusEnvio === "enviar" ? "ENVIADO" : "RASCUNHO";
       const { data } = await api.post("/conteudos/admin/planejamento", {
         disciplina_id:            disciplinaId,
         serie:                    mSerie.toUpperCase(),
@@ -768,10 +769,24 @@ function ConteudosProgramaticosPage() {
         bncc_unidade_tematica_id: Number(mUnidadeId),
         seedf_conteudo_id:        mConteudoId ? Number(mConteudoId) : null,
         texto:                    textoObj,
+        status:                   statusParaEnvio,
       });
       if (data?.ok) {
         setSaveMsg(statusEnvio === "enviar" ? "✅ Conteúdo enviado com sucesso!" : "✅ Salvo como rascunho!");
-        setTimeout(() => { setModalOpen(false); setSaveMsg(""); carregarLista(); }, 1200);
+        // Captura os valores do formulário antes do modal fechar
+        const serieParaFiltro = mSerie;       // ex: "6º Ano"
+        const discParaFiltro  = mDisciplina;  // ex: "Arte"
+        const bimParaFiltro   = mBimestre;    // ex: "1º Bimestre"
+        setTimeout(() => {
+          setModalOpen(false);
+          setSaveMsg("");
+          // Ajusta filtros para garantir que o novo registro apareça na lista
+          setSerieFiltro(serieParaFiltro);
+          setDiscFiltro(discParaFiltro);
+          setBimestreFiltro(bimParaFiltro);
+          setStatusFiltro("Todos");
+          // A mudança nos filtros dispara o useEffect que chama carregarLista automaticamente
+        }, 1200);
       } else {
         setSaveMsg(data?.message || "Erro ao salvar.");
       }

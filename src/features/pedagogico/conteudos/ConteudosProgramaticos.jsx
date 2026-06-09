@@ -734,9 +734,9 @@ function ConteudosProgramaticosPage() {
 
   // Salva o conteúdo programatico na API
   const salvarConteudo = async (statusEnvio) => {
-    // Validações mínimas
-    if (!mSerie || !mDisciplina || !mBimestre || !mAno || !mUnidadeId || !mConteudoId) {
-      setSaveMsg("Preencha todos os campos: Série, Disciplina, Bimestre, Ano, Unidade Temática e Conteúdo SEEDF.");
+    // Validações mínimas (Conteúdo SEEDF é opcional quando não há itens catalogados)
+    if (!mSerie || !mDisciplina || !mBimestre || !mAno || !mUnidadeId) {
+      setSaveMsg("Preencha todos os campos: Série, Disciplina, Bimestre, Ano e Unidade Temática.");
       return;
     }
     if (objetivos.length === 0) {
@@ -766,7 +766,7 @@ function ConteudosProgramaticosPage() {
         bimestre:                 bimestreNum,
         ano_letivo:               Number(mAno),
         bncc_unidade_tematica_id: Number(mUnidadeId),
-        seedf_conteudo_id:        Number(mConteudoId),
+        seedf_conteudo_id:        mConteudoId ? Number(mConteudoId) : null,
         texto:                    textoObj,
       });
       if (data?.ok) {

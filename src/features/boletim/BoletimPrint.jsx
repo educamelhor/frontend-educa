@@ -458,8 +458,18 @@ export default function BoletimPrint({
             </tr>
           </thead>
           <tbody>
-            {/* Linhas por disciplina */}
-            {disciplinas.map((disc) => {
+            {/* Linhas por disciplina — exibe apenas as que têm ao menos 1 nota ou falta */}
+            {disciplinas
+              .filter((disc) => {
+                const b24 = [1, 2, 3, 4].map((b) => findNota(disc.id, 2024, b));
+                const b25 = [1, 2, 3, 4].map((b) => findNota(disc.id, 2025, b));
+                return [...b24, ...b25].some(
+                  (x) =>
+                    (x.nota != null && x.nota !== "") ||
+                    (x.faltas != null && Number(x.faltas) > 0)
+                );
+              })
+              .map((disc) => {
               const b24 = [1, 2, 3, 4].map((b) => findNota(disc.id, 2024, b));
               const b25 = [1, 2, 3, 4].map((b) => findNota(disc.id, 2025, b));
 

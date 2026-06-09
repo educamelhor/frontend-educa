@@ -57,7 +57,7 @@ export default function BoletimTurmas() {
       const { data } = await api.post(
         "/api/boletins/gerar",
         { turma_id: turma.id }, // <-- ATENÇÃO: sempre .id
-        { responseType: "blob" }
+        { responseType: "blob", timeout: 180000 }
       );
 
       setProgress(80);

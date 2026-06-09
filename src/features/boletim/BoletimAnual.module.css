@@ -565,8 +565,7 @@
   .boletimAnualWrapper {
     background: #fff !important;
     min-height: auto !important;
-    /* Margens visuais via padding (Playwright ignora @page margin) */
-    padding: 10mm 14mm !important;
+    padding: 8mm 12mm !important;
     box-sizing: border-box !important;
     width: 100% !important;
   }
@@ -575,23 +574,152 @@
     box-shadow: none !important;
     border: 1px solid #ddd !important;
     border-radius: 0 !important;
+    padding: 0.5rem 1rem !important;
+    margin-bottom: 0.4rem !important;
+    gap: 0.8rem !important;
   }
 
   .cabecalho::before {
     display: none !important;
   }
 
-  /* Centraliza a tabela na página */
+  .cabecalhoTexto div {
+    font-size: 0.7rem !important;
+    line-height: 1.3 !important;
+  }
+
+  .anoLetivoBadge {
+    font-size: 0.7rem !important;
+    padding: 0.2rem 0.8rem !important;
+    margin-top: 0.15rem !important;
+  }
+
+  .dadosAluno {
+    padding: 0.4rem 1rem !important;
+    margin-bottom: 0.4rem !important;
+    gap: 0.15rem 2rem !important;
+  }
+
+  .dadosAluno div {
+    font-size: 0.72rem !important;
+  }
+
+  /* Tabela ocupa 100% da largura (resolve o alinhamento à esquerda) */
   .tabelaContainer {
     box-shadow: none !important;
     border-radius: 0 !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
+    margin-bottom: 0.4rem !important;
   }
 
+  .tabela {
+    table-layout: fixed !important;
+    width: 100% !important;
+  }
+
+  .tabela th,
+  .tabela td {
+    padding: 2px 3px !important;
+    font-size: 0.68rem !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+  }
+
+  .disc {
+    text-align: left !important;
+    font-size: 0.68rem !important;
+    white-space: normal !important;
+  }
+
+  .cabDisc {
+    width: 16% !important;
+  }
+
+  .situacaoHeader,
+  .situacaoCell {
+    width: 55px !important;
+    font-size: 0.6rem !important;
+  }
+
+  .rotated {
+    font-size: 0.55rem !important;
+    padding: 3px 1px !important;
+    width: 18px !important;
+    min-width: 18px !important;
+  }
+
+  /* Rodapé compacto */
   .rodape {
     box-shadow: none !important;
     border-radius: 0 !important;
+    padding: 0.4rem 0.8rem !important;
+    margin-bottom: 0.3rem !important;
+  }
+
+  .somaNotas {
+    margin-bottom: 0.3rem !important;
+    padding-bottom: 0.3rem !important;
+  }
+
+  .somaNotasLabel {
+    font-size: 0.75rem !important;
+  }
+
+  .somaNotasValor {
+    font-size: 0.75rem !important;
+    padding: 0.2rem 0.7rem !important;
+  }
+
+  /* Rankings compactos */
+  .rankingGrid {
+    gap: 0.4rem !important;
+    margin-bottom: 0.3rem !important;
+  }
+
+  .rankingCard {
+    padding: 0.3rem !important;
+    border-radius: 6px !important;
+  }
+
+  .rankingIcon {
+    font-size: 0.9rem !important;
+    margin-bottom: 0 !important;
+  }
+
+  .rankingTitulo {
+    font-size: 0.55rem !important;
+    margin-bottom: 0.1rem !important;
+  }
+
+  .rankingValor {
+    font-size: 0.85rem !important;
+  }
+
+  /* Observações compactas */
+  .observacoes {
+    padding: 0.3rem 0.6rem !important;
+    font-size: 0.68rem !important;
+  }
+
+  /* Badges de média bimestral */
+  .mediaBimBadge {
+    padding: 0.2rem 0.4rem !important;
+    min-width: 50px !important;
+  }
+
+  .mediaBimLabel {
+    font-size: 0.5rem !important;
+  }
+
+  .mediaBimValor {
+    font-size: 0.75rem !important;
+  }
+
+  .cabecalhoLogo {
+    height: 3.5rem !important;
+  }
+
+  .cabecalhoLogoSmall {
+    height: 2.5rem !important;
   }
 
   .btnImprimir {
@@ -601,23 +729,6 @@
   .rankingCard:hover {
     transform: none !important;
     box-shadow: none !important;
-  }
-
-  body {
-    font-size: 8pt;
-  }
-
-  .tabela th,
-  .tabela td {
-    padding: 2px !important;
-  }
-
-  .cabecalhoLogo {
-    height: 4rem;
-  }
-
-  .cabecalhoLogoSmall {
-    height: 2.5rem;
   }
 
   /* Esconde sidebar e header global */
@@ -647,4 +758,5 @@
     page-break-after: auto !important;
   }
 }
+
 

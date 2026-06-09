@@ -268,6 +268,11 @@ export default function BoletimPrint({
     nome: String(d.nome || "").toUpperCase(),
   }));
 
+  // Anos dinâmicos — derivados das notas reais (evita hardcode 2024/2025)
+  const anosPresentes = [...new Set((notas || []).map((n) => Number(n.ano)).filter(Boolean))].sort();
+  const ANO2 = anosPresentes.length > 0 ? anosPresentes[anosPresentes.length - 1] : new Date().getFullYear();
+  const ANO1 = anosPresentes.length > 1 ? anosPresentes[anosPresentes.length - 2] : ANO2 - 1;
+
   // -------------------------------------------------------------------------
   // Funções auxiliares
   // -------------------------------------------------------------------------
@@ -431,8 +436,8 @@ export default function BoletimPrint({
               <th rowSpan={3} className={styles.cabDisc}>
                 Componentes<br />Curriculares
               </th>
-              <th colSpan={9} className={styles.ano2024}>2024</th>
-              <th colSpan={9} className={styles.ano2025}>2025</th>
+              <th colSpan={9} className={styles.ano2024}>{ANO1}</th>
+              <th colSpan={9} className={styles.ano2025}>{ANO2}</th>
               <th rowSpan={2} colSpan={2} className={styles.final}>Resultado Final</th>
               <th rowSpan={3} className={styles.situacao}>Situação Final</th>
             </tr>
@@ -461,46 +466,46 @@ export default function BoletimPrint({
             {/* Linhas por disciplina — exibe apenas as que têm ao menos 1 nota ou falta */}
             {disciplinas
               .filter((disc) => {
-                const b24 = [1, 2, 3, 4].map((b) => findNota(disc.id, 2024, b));
-                const b25 = [1, 2, 3, 4].map((b) => findNota(disc.id, 2025, b));
-                return [...b24, ...b25].some(
+                const b1 = [1, 2, 3, 4].map((b) => findNota(disc.id, ANO1, b));
+                const b2 = [1, 2, 3, 4].map((b) => findNota(disc.id, ANO2, b));
+                return [...b1, ...b2].some(
                   (x) =>
                     (x.nota != null && x.nota !== "") ||
                     (x.faltas != null && Number(x.faltas) > 0)
                 );
               })
               .map((disc) => {
-              const b24 = [1, 2, 3, 4].map((b) => findNota(disc.id, 2024, b));
-              const b25 = [1, 2, 3, 4].map((b) => findNota(disc.id, 2025, b));
+              const b1 = [1, 2, 3, 4].map((b) => findNota(disc.id, ANO1, b));
+              const b2 = [1, 2, 3, 4].map((b) => findNota(disc.id, ANO2, b));
 
-              const m24 = calcMedia(b24);
-              const m25 = calcMedia(b25);
+              const m1 = calcMedia(b1);
+              const m2 = calcMedia(b2);
 
-              const mediaFin = m25;
-              const faltasFin = b25.reduce((a, b) => a + (Number(b.faltas) || 0), 0);
+              const mediaFin = m2;
+              const faltasFin = b2.reduce((a, b) => a + (Number(b.faltas) || 0), 0);
 
               return (
                 <tr key={disc.id}>
                   <td className={styles.disc}>{disc.nome}</td>
-                  {b24.map((x, i) => (
-                    <React.Fragment key={`24-${i}`}>
+                  {b1.map((x, i) => (
+                    <React.Fragment key={`a1-${i}`}>
                       <td>{x.nota != null ? Number(x.nota).toFixed(2).replace(".", ",") : ""}</td>
                       <td>{x.faltas != null ? x.faltas : ""}</td>
                     </React.Fragment>
                   ))}
-                  <td>{m24.replace(".", ",")}</td>
+                  <td>{m1.replace(".", ",")}</td>
 
-                  {b25.map((x, i) => (
-                    <React.Fragment key={`25-${i}`}>
+                  {b2.map((x, i) => (
+                    <React.Fragment key={`a2-${i}`}>
                       <td>{x.nota != null ? Number(x.nota).toFixed(2).replace(".", ",") : ""}</td>
                       <td>{x.faltas != null ? x.faltas : ""}</td>
                     </React.Fragment>
                   ))}
-                  <td>{m25.replace(".", ",")}</td>
+                  <td>{m2.replace(".", ",")}</td>
 
                   <td className={styles.finalCell}>{mediaFin.replace(".", ",")}</td>
                   <td className={styles.faltasCell}>{faltasFin || ""}</td>
-                  <td className={styles.situacaoCell}>{getSituacaoFinal(b24, b25)}</td>
+                  <td className={styles.situacaoCell}>{getSituacaoFinal(b1, b2)}</td>
                 </tr>
               );
             })}

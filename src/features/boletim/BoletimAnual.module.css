@@ -135,6 +135,7 @@
 .tabela {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
   font-size: 0.75rem;
 }
 
@@ -148,7 +149,7 @@
 
 /* Cabeçalho da tabela */
 .cabDisc {
-  width: 18%;
+  width: 20%;
   padding: 0.6rem;
   background: linear-gradient(135deg, #f8fafc, #f1f5f9);
   font-weight: 700;
@@ -157,6 +158,8 @@
   color: #1e293b;
   font-size: 0.72rem;
   letter-spacing: 0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .anoHeader {

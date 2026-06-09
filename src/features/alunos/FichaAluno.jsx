@@ -369,28 +369,8 @@ export default function FichaAluno({ codigo: codigoProp }) {
           </div>
         </div>
 
-        {/* Upload de foto - Oculto no módulo disciplinar */}
-        {!isDisciplinar && (
-          <div className="space-y-4">
-            <h3 className="font-medium">Selecionar Pasta e Inserir Foto</h3>
-            <label className="inline-block">
-              <span className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded cursor-pointer">
-                Escolher pasta
-              </span>
-              <input
-                type="file"
-                webkitdirectory="true"
-                directory="true"
-                multiple
-                accept=".jpg,.jpeg,.png,.webp,.jfif,image/*"
-                onChange={handleFolderSelect}
-                className="hidden"
-                disabled={uploading}
-              />
-            </label>
-            {uploading && <p>Enviando foto…</p>}
-          </div>
-        )}
+
+
 
         {/* Seções futuras */}
         <div className="grid grid-cols-2 gap-4">

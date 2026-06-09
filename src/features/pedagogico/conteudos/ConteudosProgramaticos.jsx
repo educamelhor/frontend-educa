@@ -1222,6 +1222,12 @@ function ConteudosProgramaticosPage() {
                       <div className="cp-td-actions">
                         <button className="cp-icon-btn cp-icon-btn-view" title="Visualizar" onClick={() => setDetalheItem(item)}><IcoEye /></button>
                         <button className="cp-icon-btn cp-icon-btn-edit" title="Editar" onClick={() => openEditModal(item)}><IcoEdit /></button>
+                         <button
+                           className="cp-icon-btn"
+                           title="Excluir"
+                           onClick={() => { setDeleteErr(""); setDeleteItem(item); }}
+                           style={{ color: "#ef4444" }}
+                         ><IcoTrash /></button>
                         {item.status === "ENVIADO" && (
                           <button className="cp-icon-btn cp-icon-btn-approve" title="Aprovar"><IcoCheck /></button>
                         )}

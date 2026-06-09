@@ -183,22 +183,27 @@ export default function ConselhoClasse() {
 
       {/* Cards de Turmas */}
       {turnoSelecionado && (
-        <div className="flex flex-wrap justify-center gap-4 mb-8">
+        <div className="flex flex-wrap justify-center gap-3 mb-8">
           {loadingTurmas ? (
             <p className="w-full text-center text-gray-500">
               Turmas sendo carregadas...
             </p>
           ) : turmasFiltradas.length > 0 ? (
             turmasFiltradas.map((turma) => (
-              <div
+              <button
                 key={turma.id}
                 onClick={() => handleClickTurma(turma)}
-                className={`bg-gradient-to-b from-blue-200 to-blue-50 rounded-lg px-6 py-3 shadow-md cursor-pointer hover:shadow-xl transition-transform hover:scale-105 text-center font-bold text-blue-900 text-base flex items-center justify-center whitespace-nowrap min-w-[120px] ${
-                  turmaSelecionada?.id === turma.id ? "ring-2 ring-green-600" : ""
-                }`}
+                title={`Selecionar turma ${turma.turma}`}
+                aria-label={`Selecionar turma ${turma.turma}`}
+                className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl shadow-sm border font-semibold text-sm
+                  whitespace-nowrap transition-all duration-150 select-none
+                  bg-gradient-to-br from-blue-50 to-indigo-100 border-blue-300 text-blue-900
+                  hover:from-blue-100 hover:to-indigo-200 hover:shadow-md hover:scale-105 active:scale-95
+                  ${turmaSelecionada?.id === turma.id ? "ring-2 ring-green-500 border-green-400 from-green-50 to-emerald-100" : "cursor-pointer"}`}
               >
-                {turma.turma}
-              </div>
+                <span className="text-base">📋</span>
+                <span>{turma.turma}</span>
+              </button>
             ))
           ) : (
             <p className="w-full text-center text-gray-500">

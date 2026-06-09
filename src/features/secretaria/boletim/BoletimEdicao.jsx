@@ -503,7 +503,7 @@ export default function BoletimEdicao() {
                 >
                   <option value="todas">Todas</option>
                   {turmas.map((t) => (
-                    <option key={t.id} value={t.id}>{t.nome} ({t.turno})</option>
+                    <option key={t.id} value={t.id}>{t.turma} ({t.turno})</option>
                   ))}
                 </select>
               </div>

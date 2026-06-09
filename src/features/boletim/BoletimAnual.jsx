@@ -466,7 +466,16 @@ export default function BoletimAnual({
             </tr>
           </thead>
           <tbody>
-            {disciplinas.map((disc) => {
+            {disciplinas
+              .filter((disc) => {
+                const bims = [1, 2, 3, 4].map((b) => findNota(disc.id, b));
+                return bims.some(
+                  (x) =>
+                    (x.nota != null && x.nota !== "") ||
+                    (x.faltas != null && Number(x.faltas) > 0)
+                );
+              })
+              .map((disc) => {
               const bims = [1, 2, 3, 4].map((b) => findNota(disc.id, b));
               const media = calcMedia(bims);
               const mediaFin = media;

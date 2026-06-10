@@ -80,9 +80,10 @@ export default function FichaAlunoProfessor({ codigo }) {
       try {
         const res = await api.get(`/api/alunos/${alunoId}/ocorrencias`);
         const lista = Array.isArray(res.data) ? res.data : (res.data?.ocorrencias || []);
-        if (alive) setOcorrenciasTotal(lista.length);
+        const pontos = lista.reduce((sum, o) => sum + (Number(o.pontos) || 0), 0);
+        if (alive) setOcorrenciasTotal({ count: lista.length, pontos });
       } catch {
-        if (alive) setOcorrenciasTotal(0);
+        if (alive) setOcorrenciasTotal({ count: 0, pontos: 0 });
       }
     }
 
@@ -105,7 +106,7 @@ export default function FichaAlunoProfessor({ codigo }) {
   );
 
   const fotoURL = buildFotoURL(aluno.foto, apiBase);
-  const badge   = ocorrenciasTotal !== null ? disciplinarBadge(ocorrenciasTotal) : null;
+  const badge   = ocorrenciasTotal !== null ? disciplinarBadge(ocorrenciasTotal.count) : null;
   const iniciais = (aluno.estudante || "?").split(" ").slice(0, 2).map(p => p[0]).join("").toUpperCase();
 
   return (
@@ -201,13 +202,13 @@ export default function FichaAlunoProfessor({ codigo }) {
             </p>
             <div style={{ background: "#f8fafc", borderRadius: "1rem", overflow: "hidden", border: "1px solid #e2e8f0" }}>
               {[
-                { label: "Código",           value: aluno.codigo ?? "—" },
-                { label: "Data de Nascimento", value: formatDate(aluno.data_nascimento) },
-                { label: "Sexo",              value: aluno.sexo ?? "—" },
+                { label: "Código",             value: aluno.codigo ?? "—" },
+                { label: "Data de Nascimento",  value: formatDate(aluno.data_nascimento) },
+                { label: "Sexo",               value: aluno.sexo ?? "—" },
               ].map(({ label, value }) => (
-                <div key={label} className="fap-info-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.65rem 1rem" }}>
-                  <span style={{ color: "#64748b", fontSize: "0.82rem", fontWeight: 600 }}>{label}</span>
-                  <span style={{ color: "#1e293b", fontSize: "0.85rem", fontWeight: 700 }}>{value}</span>
+                <div key={label} className="fap-info-row" style={{ padding: "0.65rem 1rem" }}>
+                  <span style={{ color: "#64748b", fontSize: "0.75rem", fontWeight: 600, display: "block", marginBottom: "0.1rem" }}>{label}</span>
+                  <span style={{ color: "#1e293b", fontSize: "0.9rem", fontWeight: 700 }}>{value}</span>
                 </div>
               ))}
             </div>
@@ -278,7 +279,21 @@ export default function FichaAlunoProfessor({ codigo }) {
                       {badge.label}
                     </span>
                   </div>
-                  <span style={{ color: "#94a3b8", fontSize: "0.7rem", fontWeight: 500 }}>
+                  {/* Pontuação total */}
+                  <div style={{
+                    display: "inline-flex", alignItems: "center", gap: "0.35rem",
+                    background: "rgba(0,0,0,0.05)", borderRadius: "0.5rem",
+                    padding: "0.25rem 0.6rem", width: "fit-content", marginTop: "0.1rem",
+                  }}>
+                    <span style={{ fontSize: "0.85rem" }}>🏷️</span>
+                    <span style={{ color: badge.color, fontWeight: 800, fontSize: "0.82rem" }}>
+                      {ocorrenciasTotal.pontos > 0
+                        ? `${ocorrenciasTotal.pontos} pt${ocorrenciasTotal.pontos !== 1 ? "s" : ""}`
+                        : "0 pts"}
+                    </span>
+                    <span style={{ color: "#94a3b8", fontSize: "0.72rem", fontWeight: 500 }}>pontuação</span>
+                  </div>
+                  <span style={{ color: "#94a3b8", fontSize: "0.7rem", fontWeight: 500, marginTop: "0.15rem" }}>
                     🔒 Acesso restrito à direção
                   </span>
                 </div>

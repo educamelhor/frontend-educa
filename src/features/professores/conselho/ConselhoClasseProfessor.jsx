@@ -15,7 +15,6 @@ import {
   EyeIcon,
   DocumentTextIcon,
   IdentificationIcon,
-  CheckCircleIcon,
 } from "@heroicons/react/24/outline";
 import { getFotoURL } from "../../../utils/foto";
 
@@ -28,7 +27,6 @@ function anoLetivoPadrao() {
 
 function nomeProfessor() {
   return (
-    localStorage.getItem("userName") ||
     localStorage.getItem("nome_usuario") ||
     localStorage.getItem("nome") ||
     "Professor"

@@ -33,6 +33,7 @@ import Login from "./features/login/Login.jsx";
 import AtivarDiretor from "./features/login/AtivarDiretor.jsx";
 import GerarGabaritos from "./features/impressao/GerarGabaritos";
 import ConselhoClasse from "./features/pedagogico/conselho/ConselhoClasse";
+import ConselhoClasseProfessor from "./features/professores/conselho/ConselhoClasseProfessor";
 import ConteudosAdmin from "./features/pedagogico/conteudos/ConteudosAdmin.jsx";
 import ConteudosProgramaticos from "./features/pedagogico/conteudos/ConteudosProgramaticos.jsx";
 import Planos from "./features/professores/planos/Planos";
@@ -316,7 +317,7 @@ export default function App() {
           <Route path="/gabarito/corrigir"     element={<GabaritoModule />} />
           <Route path="/gabarito/resultados"   element={<GabaritoModule />} />
           <Route path="/pedagogico/conselho" element={<ConselhoClasse />} />
-          <Route path="/professores/conselho" element={<ConselhoClasse />} />
+          <Route path="/professores/conselho" element={<ConselhoClasseProfessor />} />
           <Route path="/pedagogico/conteudos" element={
             <RequirePerm perm="conteudos:ver"><ConteudosAdmin /></RequirePerm>
           } />

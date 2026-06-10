@@ -374,13 +374,12 @@ export default function FichaAluno({ codigo: codigoProp }) {
         {/* Seções futuras */}
         <div className="grid grid-cols-2 gap-4">
           <div
-            className="bg-emerald-50 p-4 rounded shadow cursor-pointer hover:bg-emerald-100 transition border border-transparent hover:border-emerald-200"
+            className="bg-emerald-50 p-4 rounded shadow cursor-pointer hover:bg-emerald-100 transition border border-transparent hover:border-emerald-200 flex items-center justify-center"
             onClick={() => setModalPedagogicoOpen(true)}
             role="button"
             tabIndex={0}
           >
-            <h2 className="text-lg font-semibold mb-2 text-emerald-900">Relatório Pedagógico</h2>
-            <p className="text-gray-600">Clique para visualizar o histórico pedagógico.</p>
+            <h2 className="text-lg font-semibold text-emerald-900 text-center">Relatório Pedagógico</h2>
           </div>
 
           {/* Relatório Disciplinar — bloqueado para professor */}

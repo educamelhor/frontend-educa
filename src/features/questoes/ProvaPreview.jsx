@@ -3,9 +3,9 @@
 // Renderiza a prova em formato LaTeX-fiel no browser + download PDF via backend
 
 import React, { useState, useEffect, useCallback } from 'react';
+import apiService from '../../services/api';
 
 /* ── API helper ────────────────────────────────────────────────────────────── */
-const apiToken = () => localStorage.getItem('token') || '';
 
 /* ── LaTeX inline renderer ─────────────────────────────────────────────────── */
 function LatexText({ text = '' }) {
@@ -185,9 +185,8 @@ export default function ProvaPreview({ provaId, onClose }) {
   useEffect(() => {
     if (!provaId) return;
     setLoading(true);
-    fetch(`/api/provas/${provaId}`, { headers: { Authorization: `Bearer ${apiToken()}` } })
-      .then(r => r.ok ? r.json() : Promise.reject('not found'))
-      .then(d => setData(d))
+    apiService.get(`/api/provas/${provaId}`)
+      .then(res => setData(res.data))
       .catch(() => setFeedback({ msg: 'Erro ao carregar prova.', type: 'error' }))
       .finally(() => setLoading(false));
   }, [provaId]);
@@ -334,14 +333,10 @@ export default function ProvaPreview({ provaId, onClose }) {
     try {
       const escola = encodeURIComponent(localStorage.getItem('escola_nome') || 'EDUCA.MELHOR');
       const gab = incGab ? '&gabarito=1' : '';
-      const res = await fetch(`/api/provas/${provaId}/pdf?escola=${escola}${gab}`, {
-        headers: { Authorization: `Bearer ${apiToken()}` },
+      const res = await apiService.get(`/api/provas/${provaId}/pdf?escola=${escola}${gab}`, {
+        responseType: 'blob',
       });
-      if (!res.ok) {
-        const e = await res.json().catch(() => ({}));
-        throw new Error(e.message || 'Erro no servidor');
-      }
-      const blob = await res.blob();
+      const blob = res.data;
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -352,7 +347,7 @@ export default function ProvaPreview({ provaId, onClose }) {
       URL.revokeObjectURL(url);
       toast('✅ PDF gerado e baixado com sucesso!', 'success');
     } catch (err) {
-      toast(`❌ ${err.message}. Use "Imprimir" como alternativa.`, 'error');
+      toast(`❌ ${err?.response?.data?.message || err.message}. Use "Imprimir" como alternativa.`, 'error');
     } finally {
       setGerando(false);
     }

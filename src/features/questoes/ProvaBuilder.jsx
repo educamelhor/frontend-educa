@@ -4,6 +4,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import ProvaPreview from './ProvaPreview';
+import apiService from '../../services/api';
 
 
 /* ── Templates ──────────────────────────────────────────────────────────────── */
@@ -46,17 +47,20 @@ const NIVEL_LABEL  = { facil: 'Fácil', medio: 'Médio', dificil: 'Difícil', en
 const TIPO_LABEL   = { objetiva: 'Obj', discursiva: 'Disc', verdadeiro_falso: 'V/F', associacao: 'Assoc', lacuna: 'Lac' };
 
 /* ── API helpers ────────────────────────────────────────────────────────────── */
+// Usa o apiService (axios) configurado com a base URL correta do backend.
+// NOTA: anteriormente usava fetch nativo com URL relativa, que apontava para o
+// servidor Vercel em vez do backend DigitalOcean — causando "Nenhuma questão encontrada".
 const api = async (path, opts = {}) => {
-  const token = localStorage.getItem('token');
-  const r = await fetch(path, {
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    ...opts,
+  const method = (opts.method || 'GET').toUpperCase();
+  const body   = opts.body ? JSON.parse(opts.body) : undefined;
+
+  const response = await apiService.request({
+    url:    path,
+    method,
+    data:   body,
   });
-  if (!r.ok && r.status !== 204) {
-    const e = await r.json().catch(() => ({}));
-    throw new Error(e.message || `HTTP ${r.status}`);
-  }
-  return r.status === 204 ? null : r.json().catch(() => null);
+
+  return response.data ?? null;
 };
 
 /* ══════════════════════════════════════════════════════════════════════════════

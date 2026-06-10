@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import ProvaPreview from './ProvaPreview';
+import apiService from '../../services/api';
 
 
 const STATUS_CFG = {
@@ -18,16 +19,10 @@ const TEMPLATE_LABEL = {
 };
 
 const api = async (path, opts = {}) => {
-  const token = localStorage.getItem('token');
-  const r = await fetch(path, {
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    ...opts,
-  });
-  if (!r.ok && r.status !== 204) {
-    const e = await r.json().catch(() => ({}));
-    throw new Error(e.message || `HTTP ${r.status}`);
-  }
-  return r.status === 204 ? null : r.json().catch(() => null);
+  const method = (opts.method || 'GET').toUpperCase();
+  const body   = opts.body ? JSON.parse(opts.body) : undefined;
+  const response = await apiService.request({ url: path, method, data: body });
+  return response.data ?? null;
 };
 
 function fmtDate(d) {

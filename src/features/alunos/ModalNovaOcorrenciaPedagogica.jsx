@@ -2,103 +2,69 @@ import React, { useState, useEffect } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import api from "../../services/api";
 
-// ─── Categorias e Ocorrências pedagógicas — fonte: LISTA_REGISTROS.xlsx ───
+// ─── Lista MOCK provisória de categorias e ocorrências pedagógicas ───
 const CATEGORIAS_PEDAGOGICAS = [
     {
-        categoria: "Rendimento e Participação Pedagógica (Positivo)",
+        categoria: "Desempenho Acadêmico",
         itens: [
-            "Apresenta boa participação nas discussões em sala.",
-            "Apresenta bom desempenho nas atividades realizadas.",
-            "Apresenta progresso contínuo em seu rendimento escolar.",
-            "Busca aprimorar seu desempenho escolar.",
-            "Compreende com facilidade os conteúdos trabalhados.",
-            "Contribui com ideias durante as atividades.",
-            "Demonstra dedicação às atividades propostas.",
-            "Demonstra evolução significativa na aprendizagem.",
-            "Demonstra interesse pelas atividades propostas.",
-            "Esforça-se para superar suas dificuldades.",
-            "Mostra persistência diante dos desafios.",
-            "Mostra-se envolvido nas propostas pedagógicas.",
-            "Participa ativamente das aulas.",
-            "Realiza as atividades com autonomia.",
-            "Solicita ajuda quando necessário, demonstrando interesse em aprender.",
+            "Dificuldade de aprendizagem persistente",
+            "Baixo rendimento em avaliações",
+            "Não realiza atividades em sala",
+            "Não entrega tarefas/trabalhos",
+            "Progresso significativo na disciplina",
+            "Destaque em atividade avaliativa",
         ],
     },
     {
-        categoria: "Rendimento e Participação Pedagógica (Negativo)",
+        categoria: "Comportamento em Sala",
         itens: [
-            "Apresenta baixa participação nas atividades propostas.",
-            "Apresenta dificuldade em manter a atenção durante as atividades propostas.",
-            "Apresenta dificuldades em seguir instruções sequenciais.",
-            "Apresenta dificuldades na compreensão das orientações dadas.",
-            "Demonstra baixo rendimento nas atividades avaliativas.",
-            "Demonstra dificuldade em aplicar os conteúdos trabalhados.",
-            "Demonstra falta de organização na realização das atividades.",
-            "Demonstra pouca autonomia na execução das tarefas.",
-            "Demonstra pouco interesse em aprimorar seu desempenho escolar.",
-            "Demostra ter dificuldades por falta de pré-requisitos.",
-            "Estudante dorme em sala de aula.",
-            "Evita envolver-se em atividades que exigem maior esforço cognitivo.",
-            "Não acompanha o ritmo da turma nas propostas pedagógicas.",
-            "Não busca esclarecimento de dúvidas durante as atividades.",
-            "Não revisa ou corrige as atividades quando orientado.",
-            "Necessita de constante mediação para realizar as atividades.",
-            "Necessita de incentivo constante para manter-se engajado.",
-            "Realiza as atividades com pouca dedicação e capricho.",
-            "Realiza outras atividades durante a aula.",
+            "Falta de atenção/concentração recorrente",
+            "Uso indevido de celular em aula",
+            "Conversa excessiva durante a aula",
+            "Recusa em participar de atividades",
+            "Participação exemplar na aula",
+            "Colaboração positiva com colegas",
         ],
     },
     {
-        categoria: "Qualidade das Atividades (Positivo)",
+        categoria: "Frequência e Pontualidade",
         itens: [
-            "Apresenta capricho na realização das atividades.",
-            "Cumpre os prazos estabelecidos para entrega das atividades.",
-            "Demonstra responsabilidade com as tarefas escolares.",
-            "Mantém o material organizado.",
-            "Registra adequadamente os conteúdos no caderno.",
+            "Faltas consecutivas sem justificativa",
+            "Atrasos recorrentes",
+            "Saídas antecipadas frequentes",
+            "Evasão de aula (saiu sem autorização)",
+            "Frequência regular e comprometida",
         ],
     },
     {
-        categoria: "Qualidade das Atividades (Negativo)",
+        categoria: "Socioemocional",
         itens: [
-            "Apresenta dificuldade em gerenciar o tempo durante as atividades.",
-            "Apresenta dificuldade em registrar o conteúdo trabalhado.",
-            "Apresenta registros desorganizados no caderno.",
-            "Depende excessivamente de apoio para concluir tarefas.",
-            "Entrega atividades incompletas ou com baixa qualidade.",
-            "Esquece frequentemente de realizar tarefas de casa.",
-            "Não cumpre prazos para entrega das atividades.",
-            "Não demonstra evolução no desempenho das atividades propostas.",
-            "Não mantém organização dos materiais e atividades escolares.",
-            "Não mantém regularidade nos registros das atividades.",
-            "Realiza as atividades de forma apressada, comprometendo o resultado.",
+            "Dificuldade de socialização",
+            "Comportamento de isolamento",
+            "Sinais de ansiedade ou estresse",
+            "Conflito recorrente com colegas",
+            "Demonstração de empatia e solidariedade",
+            "Melhora perceptível na convivência",
         ],
     },
     {
-        categoria: "Convivência e Atitudes (Positivo)",
+        categoria: "Necessidades Especiais",
         itens: [
-            "Contribui para um ambiente harmonioso em sala de aula.",
-            "Demonstra atitudes de respeito e colaboração.",
-            "Demostra ter hábito de estudo.",
-            "É cooperativo nas atividades em grupo.",
-            "Mantém bom relacionamento com colegas e professores.",
-            "Respeita as normas e combinados da turma.",
+            "Necessidade de atendimento individualizado",
+            "Adequação curricular necessária",
+            "Encaminhamento para equipe multidisciplinar",
+            "Adaptação de atividades/provas",
+            "Evolução no plano educacional individualizado",
         ],
     },
     {
-        categoria: "Convivência e Atitudes (Negativo)",
+        categoria: "Outros",
         itens: [
-            "Conversa durante as orientações e explicações.",
-            "Não contribui para um ambiente harmonioso em sala de aula.",
-            "Não demonstra atitudes de respeito e colaboração.",
-            "Não demostra ter hábito de estudo.",
-            "Não é cooperativo nas atividades em grupo.",
-            "Não mantém bom relacionamento com colegas e professores.",
-            "Não respeita as normas e combinados da turma.",
+            "Ocorrência não categorizada",
+            "Observação geral do professor",
         ],
     },
 ];
-
 
 export default function ModalNovaOcorrenciaPedagogica({
     open,
@@ -123,9 +89,6 @@ export default function ModalNovaOcorrenciaPedagogica({
 
     // Perfis que podem convocar responsável
     const isPerfConvocacao = ["coordenador", "supervisor", "diretor", "vice_diretor", "diretor_disciplinar"].includes(perfilUsuario);
-
-    // Professor não pode editar Descrição nem Registro Interno
-    const isProfessor = String(perfilUsuario || "").toLowerCase().trim() === "professor";
 
     // Itens filtrados pela categoria selecionada
     const itensFiltrados = React.useMemo(() => {
@@ -288,25 +251,14 @@ export default function ModalNovaOcorrenciaPedagogica({
 
                     {/* Descrição */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Descrição
-                            {isProfessor && !readonly && (
-                                <span className="ml-2 text-xs bg-amber-100 text-amber-700 border border-amber-300 rounded-full px-2 py-0.5 font-semibold">
-                                    🔒 Restrito à direção/coordenação
-                                </span>
-                            )}
-                        </label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
                         <textarea
-                            disabled={readonly || isProfessor}
+                            disabled={readonly}
                             rows="3"
-                            placeholder={isProfessor ? "Campo restrito ao seu perfil." : "Relato detalhado da situação pedagógica..."}
+                            placeholder="Relato detalhado da situação pedagógica..."
                             value={descricao}
                             onChange={(e) => setDescricao(e.target.value)}
-                            className={`w-full border rounded p-2 focus:ring focus:border-emerald-300 outline-none resize-none ${
-                                readonly || isProfessor
-                                    ? "bg-amber-50 text-gray-400 cursor-not-allowed border-amber-200"
-                                    : ""
-                            }`}
+                            className={`w-full border rounded p-2 focus:ring focus:border-emerald-300 outline-none resize-none ${readonly ? "bg-gray-100 text-gray-600 cursor-not-allowed" : ""}`}
                         />
                     </div>
 
@@ -314,24 +266,15 @@ export default function ModalNovaOcorrenciaPedagogica({
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                             Registro Interno
-                            {!readonly && !isProfessor && <span className="ml-1 text-xs text-gray-400 font-normal">(uso interno — não será impresso)</span>}
-                            {isProfessor && !readonly && (
-                                <span className="ml-2 text-xs bg-amber-100 text-amber-700 border border-amber-300 rounded-full px-2 py-0.5 font-semibold">
-                                    🔒 Restrito à direção/coordenação
-                                </span>
-                            )}
+                            {!readonly && <span className="ml-1 text-xs text-gray-400 font-normal">(uso interno — não será impresso)</span>}
                         </label>
                         <textarea
-                            disabled={readonly || isProfessor}
+                            disabled={readonly}
                             rows="2"
-                            placeholder={isProfessor ? "Campo restrito ao seu perfil." : "Anotações internas..."}
+                            placeholder="Anotações internas..."
                             value={registroInterno}
                             onChange={(e) => setRegistroInterno(e.target.value)}
-                            className={`w-full border rounded p-2 focus:ring focus:border-emerald-300 outline-none resize-none ${
-                                readonly || isProfessor
-                                    ? "bg-amber-50 text-gray-400 cursor-not-allowed border-amber-200"
-                                    : ""
-                            }`}
+                            className={`w-full border rounded p-2 focus:ring focus:border-emerald-300 outline-none resize-none ${readonly ? "bg-gray-100 text-gray-600 cursor-not-allowed" : ""}`}
                         />
                     </div>
 

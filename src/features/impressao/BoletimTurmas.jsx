@@ -10,10 +10,21 @@ function normalizaTexto(str) {
     .trim();
 }
 
+// Retorna o ano letivo padrão (ano atual; se janeiro, usa ano anterior)
+function anoLetivoPadrao() {
+  const hoje = new Date();
+  const mes = hoje.getMonth() + 1;
+  return mes <= 1 ? hoje.getFullYear() - 1 : hoje.getFullYear();
+}
+
 export default function BoletimTurmas() {
   const [turnoSelecionado, setTurnoSelecionado] = useState(null);
   const [turmas, setTurmas] = useState([]);
   const [loadingTurmas, setLoadingTurmas] = useState(false);
+
+  // Ano letivo
+  const [anosLetivos, setAnosLetivos] = useState([]);
+  const [anoLetivo, setAnoLetivo] = useState(anoLetivoPadrao());
 
   // Para barra de progresso
   const [progress, setProgress] = useState(0);
@@ -23,6 +34,16 @@ export default function BoletimTurmas() {
   const turnos = ["Matutino", "Vespertino", "Noturno"];
 
   useEffect(() => {
+    // Busca anos letivos disponíveis
+    async function carregarAnos() {
+      try {
+        const res = await api.get("/api/matriculas/anos");
+        setAnosLetivos(Array.isArray(res.data) ? res.data : []);
+      } catch {
+        setAnosLetivos([anoLetivoPadrao()]);
+      }
+    }
+    carregarAnos();
     fetchTurmas();
   }, []);
 
@@ -44,7 +65,8 @@ export default function BoletimTurmas() {
   const turmasFiltradas = turmas.filter(
     (t) =>
       turnoSelecionado &&
-      normalizaTexto(t.turno) === normalizaTexto(turnoSelecionado)
+      normalizaTexto(t.turno) === normalizaTexto(turnoSelecionado) &&
+      Number(t.ano) === anoLetivo
   );
 
   const handleGerarBoletins = async (turma) => {
@@ -103,6 +125,27 @@ export default function BoletimTurmas() {
       >
         Impressão de Boletins
       </h1>
+
+      {/* Seletor de Ano Letivo */}
+      <div className="flex justify-center mb-8">
+        <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-lg shadow-sm border border-blue-200">
+          <label htmlFor="filtro-ano-boletim" className="text-sm font-semibold text-gray-700">Ano Letivo:</label>
+          <select
+            id="filtro-ano-boletim"
+            value={anoLetivo}
+            onChange={(e) => {
+              setAnoLetivo(Number(e.target.value));
+              setTurnoSelecionado(null);
+              setSucesso(false);
+            }}
+            className="border rounded px-2 py-1 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {anosLetivos.map((a) => (
+              <option key={a} value={a}>{a}</option>
+            ))}
+          </select>
+        </div>
+      </div>
 
       {/* Botões de Turnos */}
       <div className="flex justify-center gap-4 mb-10">

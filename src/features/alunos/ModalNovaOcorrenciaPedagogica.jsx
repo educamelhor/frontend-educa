@@ -124,6 +124,9 @@ export default function ModalNovaOcorrenciaPedagogica({
     // Perfis que podem convocar responsável
     const isPerfConvocacao = ["coordenador", "supervisor", "diretor", "vice_diretor", "diretor_disciplinar"].includes(perfilUsuario);
 
+    // Professor não pode editar Descrição nem Registro Interno
+    const isProfessor = String(perfilUsuario || "").toLowerCase().trim() === "professor";
+
     // Itens filtrados pela categoria selecionada
     const itensFiltrados = React.useMemo(() => {
         if (!categoriaSelecionada) return [];
@@ -285,14 +288,25 @@ export default function ModalNovaOcorrenciaPedagogica({
 
                     {/* Descrição */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Descrição
+                            {isProfessor && !readonly && (
+                                <span className="ml-2 text-xs bg-amber-100 text-amber-700 border border-amber-300 rounded-full px-2 py-0.5 font-semibold">
+                                    🔒 Restrito à direção/coordenação
+                                </span>
+                            )}
+                        </label>
                         <textarea
-                            disabled={readonly}
+                            disabled={readonly || isProfessor}
                             rows="3"
-                            placeholder="Relato detalhado da situação pedagógica..."
+                            placeholder={isProfessor ? "Campo restrito ao seu perfil." : "Relato detalhado da situação pedagógica..."}
                             value={descricao}
                             onChange={(e) => setDescricao(e.target.value)}
-                            className={`w-full border rounded p-2 focus:ring focus:border-emerald-300 outline-none resize-none ${readonly ? "bg-gray-100 text-gray-600 cursor-not-allowed" : ""}`}
+                            className={`w-full border rounded p-2 focus:ring focus:border-emerald-300 outline-none resize-none ${
+                                readonly || isProfessor
+                                    ? "bg-amber-50 text-gray-400 cursor-not-allowed border-amber-200"
+                                    : ""
+                            }`}
                         />
                     </div>
 
@@ -300,15 +314,24 @@ export default function ModalNovaOcorrenciaPedagogica({
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                             Registro Interno
-                            {!readonly && <span className="ml-1 text-xs text-gray-400 font-normal">(uso interno — não será impresso)</span>}
+                            {!readonly && !isProfessor && <span className="ml-1 text-xs text-gray-400 font-normal">(uso interno — não será impresso)</span>}
+                            {isProfessor && !readonly && (
+                                <span className="ml-2 text-xs bg-amber-100 text-amber-700 border border-amber-300 rounded-full px-2 py-0.5 font-semibold">
+                                    🔒 Restrito à direção/coordenação
+                                </span>
+                            )}
                         </label>
                         <textarea
-                            disabled={readonly}
+                            disabled={readonly || isProfessor}
                             rows="2"
-                            placeholder="Anotações internas..."
+                            placeholder={isProfessor ? "Campo restrito ao seu perfil." : "Anotações internas..."}
                             value={registroInterno}
                             onChange={(e) => setRegistroInterno(e.target.value)}
-                            className={`w-full border rounded p-2 focus:ring focus:border-emerald-300 outline-none resize-none ${readonly ? "bg-gray-100 text-gray-600 cursor-not-allowed" : ""}`}
+                            className={`w-full border rounded p-2 focus:ring focus:border-emerald-300 outline-none resize-none ${
+                                readonly || isProfessor
+                                    ? "bg-amber-50 text-gray-400 cursor-not-allowed border-amber-200"
+                                    : ""
+                            }`}
                         />
                     </div>
 

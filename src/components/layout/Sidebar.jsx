@@ -377,6 +377,14 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
               )}
+              <li>
+                <Link
+                  to="/professores/conselho"
+                  className={getSubmenuLinkClasses('/professores/conselho')}
+                >
+                  <CheckCircleIcon className="h-5 w-5 mr-2" /> Conselho de Classe
+                </Link>
+              </li>
             </ul>
 
             </>

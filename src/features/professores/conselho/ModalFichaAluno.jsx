@@ -47,7 +47,7 @@ export default function ModalFichaAluno({ open, codigo, onClose }) {
         aria-modal="true"
         aria-label="Ficha do Estudante"
         tabIndex={-1}
-        className="relative bg-white rounded-2xl shadow-2xl w-[95vw] max-w-6xl h-[90vh] overflow-hidden outline-none"
+        className="relative bg-white rounded-2xl shadow-2xl w-[95vw] max-w-lg overflow-hidden outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b">
@@ -62,8 +62,7 @@ export default function ModalFichaAluno({ open, codigo, onClose }) {
           </button>
         </div>
 
-        {/* A ficha funciona em modo "modal" quando recebe o código por prop */}
-        <div className="w-full h-full overflow-auto p-4 bg-blue-50">
+        <div className="w-full overflow-auto">
           <FichaAlunoProfessor codigo={codigo} />
         </div>
       </div>

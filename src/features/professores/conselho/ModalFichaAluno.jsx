@@ -1,7 +1,9 @@
-// src/features/pedagogico/conselho/ModalFichaAluno.jsx
+// src/features/professores/conselho/ModalFichaAluno.jsx
+// Usa FichaAlunoProfessor (arquivo independente) — sem "Escolher Pasta",
+// com card Disciplinar informativo (score) e layout premium.
 import React, { useEffect, useRef } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
-import FichaAluno from "../../alunos/FichaAluno";
+import FichaAlunoProfessor from "./FichaAlunoProfessor";
 
 export default function ModalFichaAluno({ open, codigo, onClose }) {
   const dialogRef = useRef(null);
@@ -62,7 +64,7 @@ export default function ModalFichaAluno({ open, codigo, onClose }) {
 
         {/* A ficha funciona em modo "modal" quando recebe o código por prop */}
         <div className="w-full h-full overflow-auto p-4 bg-blue-50">
-          <FichaAluno codigo={codigo} />
+          <FichaAlunoProfessor codigo={codigo} />
         </div>
       </div>
     </div>

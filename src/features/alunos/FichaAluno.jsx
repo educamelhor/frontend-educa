@@ -23,6 +23,7 @@ export default function FichaAluno({ codigo: codigoProp }) {
   const navigate = useNavigate();
   const location = useLocation();
   const isDisciplinar = location.pathname.includes("/disciplinar");
+  const isProfessor = String(localStorage.getItem('perfil') || '').toLowerCase().trim() === 'professor';
 
   // Estados principais
   const [aluno, setAluno] = useState(null);
@@ -403,6 +404,8 @@ export default function FichaAluno({ codigo: codigoProp }) {
             <h2 className="text-lg font-semibold mb-2 text-emerald-900">Relatório Pedagógico</h2>
             <p className="text-gray-600">Clique para visualizar o histórico pedagógico.</p>
           </div>
+          {/* Relatório Disciplinar: oculto para professor */}
+          {!isProfessor && (
           <div
             className="bg-blue-50 p-4 rounded shadow cursor-pointer hover:bg-blue-100 transition border border-transparent hover:border-blue-200"
             onClick={() => setModalRelatorioOpen(true)}
@@ -412,6 +415,7 @@ export default function FichaAluno({ codigo: codigoProp }) {
             <h2 className="text-lg font-semibold mb-2 text-blue-900">Relatório Disciplinar</h2>
             <p className="text-gray-600">Clique para visualizar o histórico de ocorrências.</p>
           </div>
+          )}
         </div>
 
         {/* Modais */}
@@ -425,6 +429,7 @@ export default function FichaAluno({ codigo: codigoProp }) {
           open={modalPedagogicoOpen}
           onClose={() => setModalPedagogicoOpen(false)}
           aluno={aluno}
+          somenteLeitura={isProfessor}
         />
       </div>
     </div>

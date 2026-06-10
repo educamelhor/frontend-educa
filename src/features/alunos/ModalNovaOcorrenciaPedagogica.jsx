@@ -89,6 +89,8 @@ export default function ModalNovaOcorrenciaPedagogica({
 
     // Perfis que podem convocar responsável
     const isPerfConvocacao = ["coordenador", "supervisor", "diretor", "vice_diretor", "diretor_disciplinar"].includes(perfilUsuario);
+    // Professor não pode preencher Descrição e Registro Interno
+    const isProfessorPerfil = perfilUsuario === "professor";
 
     // Itens filtrados pela categoria selecionada
     const itensFiltrados = React.useMemo(() => {
@@ -249,7 +251,8 @@ export default function ModalNovaOcorrenciaPedagogica({
                         )}
                     </div>
 
-                    {/* Descrição */}
+                    {/* Descrição — oculto para professor (exceto visualização) */}
+                    {(!isProfessorPerfil || readonly) && (
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
                         <textarea
@@ -261,8 +264,10 @@ export default function ModalNovaOcorrenciaPedagogica({
                             className={`w-full border rounded p-2 focus:ring focus:border-emerald-300 outline-none resize-none ${readonly ? "bg-gray-100 text-gray-600 cursor-not-allowed" : ""}`}
                         />
                     </div>
+                    )}
 
-                    {/* Registro Interno */}
+                    {/* Registro Interno — oculto para professor (exceto visualização) */}
+                    {(!isProfessorPerfil || readonly) && (
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                             Registro Interno
@@ -277,6 +282,7 @@ export default function ModalNovaOcorrenciaPedagogica({
                             className={`w-full border rounded p-2 focus:ring focus:border-emerald-300 outline-none resize-none ${readonly ? "bg-gray-100 text-gray-600 cursor-not-allowed" : ""}`}
                         />
                     </div>
+                    )}
 
                     {/* Convocar Responsável — só coord/supervisor/direção */}
                     {isPerfConvocacao && (

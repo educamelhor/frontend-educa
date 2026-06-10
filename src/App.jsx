@@ -316,6 +316,7 @@ export default function App() {
           <Route path="/gabarito/corrigir"     element={<GabaritoModule />} />
           <Route path="/gabarito/resultados"   element={<GabaritoModule />} />
           <Route path="/pedagogico/conselho" element={<ConselhoClasse />} />
+          <Route path="/professores/conselho" element={<ConselhoClasse />} />
           <Route path="/pedagogico/conteudos" element={
             <RequirePerm perm="conteudos:ver"><ConteudosAdmin /></RequirePerm>
           } />

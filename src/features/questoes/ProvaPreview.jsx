@@ -94,8 +94,21 @@ function QuestaoA4({ item, idx, template, modoGabarito }) {
       </p>
 
       {item.imagem_base64 && (
-        <div style={{ textAlign: 'center', margin: '4px 0' }}>
-          <img src={item.imagem_base64} alt="Figura" style={{ maxWidth: '85%', maxHeight: 130, border: '0.5pt solid #ccc' }} />
+        <div style={{ textAlign: 'center', margin: '6px 0' }}>
+          <img
+            src={item.imagem_base64}
+            alt="Figura"
+            style={{
+              maxWidth: '100%',
+              width: 'auto',
+              height: 'auto',
+              maxHeight: alts.length > 3 ? 90 : alts.length > 0 ? 120 : 180,
+              objectFit: 'contain',
+              border: '0.5pt solid #ccc',
+              display: 'block',
+              margin: '0 auto',
+            }}
+          />
         </div>
       )}
 
@@ -260,12 +273,13 @@ function CabecalhoA4({ prova, cfg, escola }) {
    COMPONENTE PRINCIPAL
 ══════════════════════════════════════════════════════════════════════════════ */
 export default function ProvaPreview({ provaId, onClose }) {
-  const [data,     setData]     = useState(null);
-  const [loading,  setLoading]  = useState(true);
-  const [view,     setView]     = useState('prova');
-  const [gerando,  setGerando]  = useState(false);
-  const [feedback, setFeedback] = useState(null);
-  const [incGab,   setIncGab]   = useState(false);
+  const [data,        setData]        = useState(null);
+  const [loading,     setLoading]     = useState(true);
+  const [view,        setView]        = useState('prova');
+  const [gerando,     setGerando]     = useState(false);
+  const [gerandoLatex,setGerandoLatex]= useState(false);
+  const [feedback,    setFeedback]    = useState(null);
+  const [incGab,      setIncGab]      = useState(false);
 
   useEffect(() => {
     const h = e => { if (e.key === 'Escape') onClose(); };
@@ -387,11 +401,22 @@ export default function ProvaPreview({ provaId, onClose }) {
       </table>
     </div>` : '';
 
+    // Injeta MathJax no popup para renderizar fórmulas no PDF Rápido
+    const mathJaxScript = `
+      <script>
+        window.MathJax = {
+          tex: { inlineMath: [['$','$'],['\\\\(','\\\\)']], displayMath: [['$$','$$'],['\\\\[','\\\\]']], processEscapes: true },
+          startup: { ready() { MathJax.startup.defaultReady(); MathJax.startup.promise.then(() => { setTimeout(() => window.print(), 600); }); } }
+        };
+      </script>
+      <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>`;
+
     const margem = comMarg ? '10mm 12mm 14mm' : '4mm';
     win.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
       <title>${prova.titulo||'Prova'}</title>
       <link rel="preconnect" href="https://fonts.googleapis.com">
       <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+      ${mathJaxScript}
       <style>
         *{box-sizing:border-box;margin:0;padding:0}
         body{font-family:'Source Serif 4','Times New Roman',serif;font-size:11pt;line-height:1.55;color:#000;background:#fff}
@@ -400,6 +425,7 @@ export default function ProvaPreview({ provaId, onClose }) {
         .pagina{width:210mm;min-height:297mm;margin:0 auto;padding:${margem}}
         .questoes-grid{${is2col?'column-count:2;column-gap:10mm;column-rule:0.8pt solid #555':''}}
         @media print{.pagina{width:100%}}
+        img{max-width:100%;height:auto;object-fit:contain}
       </style>
     </head><body>
       <div class="pagina">
@@ -413,7 +439,7 @@ export default function ProvaPreview({ provaId, onClose }) {
       </div>
     </body></html>`);
     win.document.close();
-    setTimeout(() => { win.focus(); win.print(); }, 800);
+    // Não chama win.print() aqui — MathJax chama após o typeset estar pronto
   }, [data, itens, incGab, cfg, comCab, comMarg, mostrarInstr, rodapeStr, is2col, template, totalPts, escola, prova, sh]);
 
   // ── Download PDF via backend ───────────────────────────────────────────────
@@ -505,12 +531,21 @@ export default function ProvaPreview({ provaId, onClose }) {
         )}
 
         {data && (
-          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
-            <button onClick={imprimirBrowser} style={{ padding: '7px 14px', borderRadius: 8, border: '1.5px solid rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.1)', color: '#fff', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.8rem', fontWeight: 700 }}>
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            <button onClick={imprimirBrowser}
+              style={{ padding: '7px 14px', borderRadius: 8, border: '1.5px solid rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.1)', color: '#fff', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.78rem', fontWeight: 700 }}>
               🖨️ Imprimir
             </button>
-            <button onClick={downloadPdf} disabled={gerando} style={{ padding: '7px 16px', borderRadius: 8, border: 'none', background: gerando ? '#64748b' : 'linear-gradient(135deg, #f59e0b, #ea580c)', color: '#fff', cursor: gerando ? 'not-allowed' : 'pointer', fontFamily: 'inherit', fontSize: '0.8rem', fontWeight: 800 }}>
-              {gerando ? '⏳ Gerando...' : '📥 Baixar PDF'}
+            <button onClick={downloadPdf} disabled={gerando || gerandoLatex}
+              style={{ padding: '7px 14px', borderRadius: 8, border: 'none', background: gerando ? '#64748b' : 'linear-gradient(135deg, #0e7490, #1d4ed8)', color: '#fff', cursor: (gerando||gerandoLatex) ? 'not-allowed' : 'pointer', fontFamily: 'inherit', fontSize: '0.78rem', fontWeight: 800, opacity: gerandoLatex ? 0.5 : 1 }}>
+              {gerando ? '⏳ Gerando...' : '📥 PDF Rápido'}
+            </button>
+            <button onClick={downloadLatexPdf} disabled={gerando || gerandoLatex}
+              title="PDF compilado via LaTeX/Tectonic — fórmulas e imagens em qualidade gráfica profissional"
+              style={{ padding: '7px 14px', borderRadius: 8, border: 'none', background: gerandoLatex ? '#64748b' : 'linear-gradient(135deg, #7c3aed, #db2777)', color: '#fff', cursor: (gerando||gerandoLatex) ? 'not-allowed' : 'pointer', fontFamily: 'inherit', fontSize: '0.78rem', fontWeight: 800, opacity: gerando ? 0.5 : 1, display: 'flex', alignItems: 'center', gap: 5 }}>
+              {gerandoLatex
+                ? <><span style={{ width: 12, height: 12, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', animation: 'spin 0.7s linear infinite', display: 'inline-block' }} /> Compilando LaTeX…</>
+                : <>⭐ PDF Premium</>}
             </button>
           </div>
         )}

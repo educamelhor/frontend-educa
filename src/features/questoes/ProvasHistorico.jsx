@@ -48,10 +48,22 @@ export default function ProvasHistorico({ onEdit, refreshKey }) {
 
   useEffect(() => { carregar(); }, [carregar, refreshKey]);
 
+  const [deletando, setDeletando] = useState(false);
+
   const excluir = async (id) => {
-    await api(`/api/provas/${id}`, { method: 'DELETE' });
-    setProvas(p => p.filter(prova => prova.id !== id));
-    setDelId(null);
+    if (deletando) return;
+    setDeletando(true);
+    try {
+      await apiService.delete(`/api/provas/${id}`);
+      setProvas(p => p.filter(prova => prova.id !== id));
+      setDelId(null);
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.response?.data?.detail || 'Erro ao excluir prova. Tente novamente.';
+      alert(msg);
+      setDelId(null);
+    } finally {
+      setDeletando(false);
+    }
   };
 
   const filtradas = provas.filter(p =>
@@ -173,8 +185,9 @@ export default function ProvasHistorico({ onEdit, refreshKey }) {
                   </button>
                   {delId === prova.id ? (
                     <button onClick={() => excluir(prova.id)}
-                      style={{ padding: '5px 12px', borderRadius: 7, border: '1.5px solid #fca5a5', background: '#fef2f2', color: '#dc2626', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.76rem', fontWeight: 700 }}>
-                      Confirmar ×
+                      disabled={deletando}
+                      style={{ padding: '5px 12px', borderRadius: 7, border: '1.5px solid #fca5a5', background: '#fef2f2', color: '#dc2626', cursor: deletando ? 'wait' : 'pointer', fontFamily: 'inherit', fontSize: '0.76rem', fontWeight: 700, opacity: deletando ? 0.7 : 1 }}>
+                      {deletando ? 'Excluindo...' : 'Confirmar ×'}
                     </button>
                   ) : (
                     <button onClick={() => setDelId(prova.id)}

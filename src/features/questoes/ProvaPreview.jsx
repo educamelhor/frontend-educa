@@ -543,6 +543,8 @@ export default function ProvaPreview({ provaId, onClose }) {
             fontFamily: "'Source Serif 4', 'Times New Roman', serif",
             fontSize: '11pt', lineHeight: 1.55, color: '#000',
             position: 'relative',
+            outline: !comMarg ? '2px dashed #0e7490' : 'none',
+            outlineOffset: -2,
             ...(view === 'latex' ? { fontFamily: "'Fira Code', 'Courier New', monospace", fontSize: '8.5pt', background: '#0f172a', color: '#7dd3fc' } : {}),
           }}>
 
@@ -565,9 +567,16 @@ export default function ProvaPreview({ provaId, onClose }) {
                     <QuestaoA4 key={it.id || idx} item={it} idx={idx} template={template} modoGabarito={false} />
                   ))}
                 </div>
-                <div style={{ marginTop: 16, borderTop: '0.5pt solid #999', paddingTop: 4, display: 'flex', justifyContent: 'space-between', fontSize: '7.5pt', color: '#666' }}>
+                {/* Rodapé — sempre visível no fim do conteúdo */}
+                <div style={{
+                  marginTop: 24, paddingTop: 5,
+                  borderTop: '0.5pt solid #999',
+                  display: 'flex', justifyContent: 'space-between',
+                  fontSize: '7.5pt', color: '#555',
+                  background: '#fff',
+                }}>
                   <span>{escola} — {prova.disciplina || ''} — {prova.bimestre ? prova.bimestre + 'º Bimestre' : ''} {prova.ano_letivo || ''}</span>
-                  <span>{rodapeStr}</span>
+                  <span style={{ fontWeight: 700, color: '#0e7490' }}>{rodapeStr}</span>
                 </div>
               </>
             )}

@@ -209,10 +209,14 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
     }));
   };
 
-  /* Validação */
+  /* Validação — tipo, nível e temas agora são obrigatórios */
   const validar = () => {
-    if (!form.disciplina) return 'Selecione a disciplina.';
-    if (!form.enunciado.trim()) return 'O enunciado é obrigatório.';
+    if (!form.disciplina)         return 'Selecione a disciplina.';
+    if (!form.tipo)               return 'Selecione o tipo de questão.';
+    if (!form.nivel)              return 'Selecione o nível de dificuldade.';
+    if (!form.temas || form.temas.length === 0)
+                                  return 'Adicione ao menos 1 tema/conteúdo.';
+    if (!form.enunciado.trim())   return 'O enunciado é obrigatório.';
     if (form.tipo === 'objetiva') {
       const preenchidas = form.alternativas.filter(a => a.texto.trim());
       if (preenchidas.length < 2) return 'Adicione ao menos 2 alternativas.';
@@ -266,14 +270,13 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
     }
   };
 
-  /* Publicar no banco global (rascunho existente ou novo) */
+  /* Salvar no banco (rascunho ou ativa) */
   const handlePublicar = async () => {
     const erro = validar();
-    if (erro) { setModalResultado({ tipo: 'error', titulo: 'Atenção', mensagem: erro }); return; }
+    if (erro) { setModalResultado({ tipo: 'error', titulo: 'Campo obrigatório', mensagem: erro }); return; }
     setSaving(true);
     try {
       let questaoId;
-      // Se já existe um rascunho salvo, atualiza-o; senao cria novo
       const draftId = savedDraftId || (editingQuestao?.id);
       if (draftId) {
         await api.put(`/api/questoes/${draftId}`, buildPayload('ativa'));
@@ -282,16 +285,13 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
         const { data } = await api.post('/api/questoes', buildPayload('ativa'));
         questaoId = data.id;
       }
-      // Publica no banco global
-      const { data: pub } = await api.post(`/api/questoes/${questaoId}/publicar`);
       setSavedDraftId(null);
       setModalResultado({
         tipo: 'success',
         titulo: editingQuestao ? 'Questão Atualizada!' : 'Questão Publicada!',
         mensagem: editingQuestao
-          ? 'As alterações foram salvas e o banco global foi sincronizado.'
-          : 'Sua questão foi publicada no Banco Global EDUCA.MELHOR. Qualquer escola pode utilizá-la agora!',
-        codigo: pub.codigo,
+          ? 'As alterações foram salvas com sucesso.'
+          : 'Sua questão foi salva e está disponível no Banco Global. Qualquer escola pode visualizá-la!',
         acoes: [
           {
             label: '➕ Nova Questão', primary: true,
@@ -299,16 +299,15 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
               setModalResultado(null);
               setForm(INITIAL_STATE);
               setSavedDraftId(null);
-              onSaved?.(); // Chama aqui: após o usuário confirmar, não antes do modal aparecer
+              onSaved?.();
             },
           },
           { label: 'Fechar', onClick: () => setModalResultado(null) },
         ],
       });
-      // ⚠️ NÃO chamar onSaved() aqui — desmontaria o componente antes do modal renderizar
     } catch (err) {
       const msg = err.response?.data?.message || err.message || 'Erro ao publicar.';
-      setModalResultado({ tipo: 'error', titulo: 'Erro ao Publicar', mensagem: msg });
+      setModalResultado({ tipo: 'error', titulo: 'Erro ao Salvar', mensagem: msg });
     } finally {
       setSaving(false);
     }
@@ -442,15 +441,15 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
             </div>
           </div>
 
-          {/* Tema / Conteúdo — obrigatório para publicar no banco global */}
+          {/* Tema / Conteúdo — obrigatório */}
           <div className="bq-field" style={{ marginBottom: 12 }}>
             <label className="bq-label">
-              Tema / Conteúdo
+              Tema / Conteúdo <span className="required">*</span>
               <span style={{
-                fontSize: '0.7rem', color: '#0369a1', fontWeight: 600,
-                marginLeft: 8, background: '#e0f2fe', padding: '1px 7px',
+                fontSize: '0.7rem', color: '#059669', fontWeight: 600,
+                marginLeft: 8, background: '#f0fdf4', padding: '1px 7px',
                 borderRadius: 99, letterSpacing: '0.01em',
-              }}>obrigatório para o banco global</span>
+              }}>para busca no banco global</span>
             </label>
             <TagsInput
               tags={form.temas}
@@ -462,7 +461,7 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
 
           {/* Tipo */}
           <div className="bq-field" style={{ marginBottom: 12 }}>
-            <label className="bq-label">Tipo de Questão</label>
+            <label className="bq-label">Tipo de Questão <span className="required">*</span></label>
             <div className="bq-tipo-pills">
               {TIPOS.map(t => (
                 <button
@@ -479,7 +478,7 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
 
           {/* Nível */}
           <div className="bq-field">
-            <label className="bq-label">Nível de Dificuldade</label>
+            <label className="bq-label">Nível de Dificuldade <span className="required">*</span></label>
             <div className="bq-nivel-pills">
               {NIVEIS.map(n => (
                 <button
@@ -748,7 +747,7 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
               </svg>
             )}
-            {isEditing ? 'Salvar Alterações' : '🌐 Publicar no Banco Global'}
+            {isEditing ? 'Salvar Alterações' : '🌐 Salvar no Banco Global'}
           </button>
         </div>
       </div>

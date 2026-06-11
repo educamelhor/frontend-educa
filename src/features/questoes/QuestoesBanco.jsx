@@ -341,6 +341,7 @@ export default function QuestoesBanco({ onEdit, refreshKey, onRemovida }) {
   const [pagination, setPagination] = useState({ total: 0, page: 1, pages: 1 });
   const [detalhes,   setDetalhes]   = useState(null);  // questão aberta no modal
   const [questaoParaExcluir, setQuestaoParaExcluir] = useState(null); // controla modal
+  const [escopo,     setEscopo]     = useState('escola'); // global | escola | meu
 
   // Filtros
   const [busca,       setBusca]       = useState('');

@@ -350,7 +350,9 @@ const CABECALHO_ITENS = [
   { key: 'cab_turma',    label: '👥 Turma',                        desc: 'Linha para o aluno escrever a turma' },
   { key: 'cab_bimestre', label: '📅 Bimestre',                    desc: 'Número do bimestre letivo' },
   { key: 'cab_ano',      label: '🗓️ Ano letivo',                   desc: `Automático — ${new Date().getFullYear()}` },
+  { key: 'cab_data',     label: '📆 Data',                        desc: 'Espaço para o aluno escrever a data' },
   { key: 'cab_nota',     label: '⭐ Nota',                         desc: 'Campo para o professor registrar a nota' },
+  { key: 'cab_instrucoes', label: '📋 Instruções aos estudantes', desc: 'Bloco de instruções gerais da avaliação' },
 ];
 
 // Limite de caracteres do rodapé considerando o espaço fixo de "EDUCA.PROVA · "
@@ -743,7 +745,27 @@ export default function ProvaBuilder({ onProvasSalvas }) {
     setSaving(true);
     try {
       let id = provaId;
-      const body = { ...config, status: statusFinal };
+      // Extrai campos de layout para config_json (persistido no BD)
+      const {
+        titulo, disciplina, turma, bimestre, ano_letivo, template_slug,
+        embaralhar_alternativas,
+        // campos de layout — vão para config_json
+        com_cabecalho, cabecalho_itens, com_margem,
+        com_rodape, rodape_texto,
+        embaralhar_questoes,
+        ...restConfig
+      } = config;
+      const config_json = {
+        com_cabecalho:          com_cabecalho  ?? true,
+        cabecalho_itens:        cabecalho_itens ?? {},
+        com_margem:             com_margem     ?? true,
+        com_rodape:             com_rodape     ?? false,
+        rodape_texto:           rodape_texto   ?? '',
+        embaralhar_alternativas: embaralhar_alternativas ?? 0,
+        embaralhar_questoes:    embaralhar_questoes ?? 0,
+        ...restConfig,
+      };
+      const body = { titulo, disciplina, turma, bimestre, ano_letivo, template_slug, config_json, status: statusFinal };
 
       if (!id) {
         const res = await api('/api/provas', { method: 'POST', body: JSON.stringify(body) });

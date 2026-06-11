@@ -543,8 +543,7 @@ export default function ProvaPreview({ provaId, onClose }) {
             fontFamily: "'Source Serif 4', 'Times New Roman', serif",
             fontSize: '11pt', lineHeight: 1.55, color: '#000',
             position: 'relative',
-            outline: !comMarg ? '2px dashed #0e7490' : 'none',
-            outlineOffset: -2,
+            border: '1.5px solid #000',
             ...(view === 'latex' ? { fontFamily: "'Fira Code', 'Courier New', monospace", fontSize: '8.5pt', background: '#0f172a', color: '#7dd3fc' } : {}),
           }}>
 
@@ -567,16 +566,21 @@ export default function ProvaPreview({ provaId, onClose }) {
                     <QuestaoA4 key={it.id || idx} item={it} idx={idx} template={template} modoGabarito={false} />
                   ))}
                 </div>
-                {/* Rodapé — sempre visível no fim do conteúdo */}
+                {/* Rodapé — 1cm fixo ao fim do conteúdo */}
                 <div style={{
-                  marginTop: 24, paddingTop: 5,
-                  borderTop: '0.5pt solid #999',
-                  display: 'flex', justifyContent: 'space-between',
-                  fontSize: '7.5pt', color: '#555',
-                  background: '#fff',
+                  marginTop: 24,
+                  height: '10mm', maxHeight: '10mm',
+                  borderTop: '0.5px solid #aaa',
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  fontSize: '6.5pt', color: '#555',
+                  overflow: 'hidden', background: '#fff',
                 }}>
-                  <span>{escola} — {prova.disciplina || ''} — {prova.bimestre ? prova.bimestre + 'º Bimestre' : ''} {prova.ano_letivo || ''}</span>
-                  <span style={{ fontWeight: 700, color: '#0e7490' }}>{rodapeStr}</span>
+                  <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '48%' }}>
+                    {[escola, prova.bimestre ? prova.bimestre + 'º Bimestre' : prova.ano_letivo].filter(Boolean).join(' — ')}
+                  </span>
+                  <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '48%', fontWeight: 700, color: '#0e7490', textAlign: 'right' }}>
+                    {rodapeStr}
+                  </span>
                 </div>
               </>
             )}

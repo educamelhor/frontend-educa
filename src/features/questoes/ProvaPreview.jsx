@@ -94,19 +94,18 @@ function QuestaoA4({ item, idx, template, modoGabarito }) {
       </p>
 
       {item.imagem_base64 && (
-        <div style={{ textAlign: 'center', margin: '6px 0' }}>
+        <div style={{ margin: '8px 0' }}>
           <img
             src={item.imagem_base64}
             alt="Figura"
             style={{
-              maxWidth: '100%',
-              width: 'auto',
-              height: 'auto',
-              maxHeight: alts.length > 3 ? 90 : alts.length > 0 ? 120 : 180,
-              objectFit: 'contain',
-              border: '0.5pt solid #ccc',
               display: 'block',
-              margin: '0 auto',
+              width: '100%',
+              height: 'auto',
+              maxHeight: alts.length > 0 ? 240 : 360,
+              objectFit: 'contain',
+              objectPosition: 'left top',
+              border: '0.5pt solid #ccc',
             }}
           />
         </div>
@@ -380,7 +379,7 @@ export default function ProvaPreview({ provaId, onClose }) {
         <div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-weight:700;font-size:10pt;text-transform:uppercase">QUESTÃO ${num}</span><span style="font-size:7.5pt;color:#666">${it.disciplina||''} ${it.habilidade_bncc?`· ${it.habilidade_bncc}`:''} · ${Number(it.valor_pontos||1).toFixed(1)}pt</span></div>
         ${it.texto_apoio?`<blockquote style="border-left:3px solid #555;padding:4px 8px;font-style:italic;font-size:9.5pt;margin:4px 0;background:#f8f8f8">${it.texto_apoio}</blockquote>`:''}
         <p style="font-size:10.5pt;line-height:1.6;text-align:justify;margin:3px 0 4px">${(it.conteudo_bruto||'').replace(/\$([^$]+)\$/g,'<i>$1</i>')}</p>
-        ${it.imagem_base64?`<div style="text-align:center;margin:4px 0"><img src="${it.imagem_base64}" style="max-width:85%;max-height:130px;border:0.5pt solid #ccc"/></div>`:''}
+        ${it.imagem_base64?`<div style="margin:8px 0"><img src="${it.imagem_base64}" style="display:block;width:100%;height:auto;max-height:${alts.length>0?240:360}px;object-fit:contain;object-position:left top;border:0.5pt solid #ccc"/></div>`:''}
         ${isDisc ? linhasHtml : altsHtml}
       </div>`;
     }).join('');

@@ -404,12 +404,15 @@ export default function ProvaPreview({ provaId, onClose }) {
     // Injeta MathJax no popup para renderizar fórmulas no PDF Rápido
     const mathJaxScript = `
       <script>
+        window.__printed = false;
+        function doPrint() { if (!window.__printed) { window.__printed = true; window.print(); } }
+        setTimeout(doPrint, 2500);
         window.MathJax = {
           tex: { inlineMath: [['$','$'],['\\\\(','\\\\)']], displayMath: [['$$','$$'],['\\\\[','\\\\]']], processEscapes: true },
-          startup: { ready() { MathJax.startup.defaultReady(); MathJax.startup.promise.then(() => { setTimeout(() => window.print(), 600); }); } }
+          startup: { ready() { MathJax.startup.defaultReady(); MathJax.startup.promise.then(() => setTimeout(doPrint, 400)); } }
         };
       </script>
-      <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>`;
+      <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" onerror="doPrint()"></script>`;
 
     const margem = comMarg ? '10mm 12mm 14mm' : '4mm';
     win.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
@@ -439,7 +442,9 @@ export default function ProvaPreview({ provaId, onClose }) {
       </div>
     </body></html>`);
     win.document.close();
-    // Não chama win.print() aqui — MathJax chama após o typeset estar pronto
+    // Se MathJax não carregar (popup sem rede, CDN lento), fallback chama print após 3s
+    // O script inline já tem fallback de 2.5s; este é o último recurso do lado React
+    setTimeout(() => { try { if (win && !win.closed) win.focus(); } catch {} }, 500);
   }, [data, itens, incGab, cfg, comCab, comMarg, mostrarInstr, rodapeStr, is2col, template, totalPts, escola, prova, sh]);
 
   // ── Download PDF via backend ───────────────────────────────────────────────

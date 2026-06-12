@@ -472,6 +472,34 @@ export default function ProvaPreview({ provaId, onClose }) {
     }
   }, [data, provaId, incGab, escola]);
 
+  // ── Download PDF Premium via LaTeX/Tectonic ───────────────────────────────
+  const downloadLatexPdf = useCallback(async () => {
+    if (!data) return;
+    setGerandoLatex(true);
+    try {
+      const escolaEnc = encodeURIComponent(escola);
+      const gab = incGab ? '&gabarito=1' : '';
+      const res = await apiService.get(
+        `/api/provas/${provaId}/pdf-latex?escola=${escolaEnc}${gab}`,
+        { responseType: 'blob' }
+      );
+      const blob = res.data;
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = `${(data.titulo||'prova').toLowerCase().replace(/[^a-z0-9]/g,'-').replace(/-+/g,'-')}-premium.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast('\u2705 PDF Premium gerado com sucesso!', 'success');
+    } catch (err) {
+      toast(`\u274C ${err?.response?.data?.message || err.message || 'Erro ao gerar PDF Premium.'}`, 'error');
+    } finally {
+      setGerandoLatex(false);
+    }
+  }, [data, provaId, incGab, escola]);
+
   if (!provaId) return null;
 
   return (

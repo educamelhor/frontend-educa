@@ -451,12 +451,12 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
                 borderRadius: 99, letterSpacing: '0.01em',
               }}>para busca no banco global</span>
             </label>
-            <TagsInput
-              tags={form.temas}
-              onChange={(val) => set('temas', val)}
-              placeholder="Ex: Fotossíntese, Célula... pressione Enter para adicionar"
-            />
-            <p className="bq-helper">Adicione os temas/conteúdos desta questão. Pressione Enter para confirmar cada tema.</p>
+          <TagsInput
+            tags={form.temas}
+            onChange={(val) => set('temas', val)}
+            inputId="bq-temas-input"
+          />
+          <p className="bq-helper">Adicione os temas/conteúdos desta questão. Pressione Enter ou clique fora para confirmar.</p>
           </div>
 
           {/* Tipo */}
@@ -666,7 +666,7 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
           <div className="bq-field-row">
             <div className="bq-field" style={{ gridColumn: '1 / -1' }}>
               <label className="bq-label">Tags</label>
-              <TagsInput tags={form.tags} onChange={(val) => set('tags', val)} />
+              <TagsInput tags={form.tags} onChange={(val) => set('tags', val)} inputId="bq-tags-input" />
             </div>
           </div>
 

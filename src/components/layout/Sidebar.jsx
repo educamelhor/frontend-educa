@@ -390,7 +390,7 @@ export default function Sidebar({ isOpen, onClose }) {
           <>
             {/* LINK: Home */}
             {!isDisciplinar && !isProfessor && !isCoord && !isSecretario && (
-            <Link to="/" className={getMainLinkClasses('/')}>
+            <Link to="/home" className={getMainLinkClasses('/home')}>
               <HomeIcon className="h-5 w-5 mr-2" />
               Home
             </Link>
@@ -1726,14 +1726,6 @@ export default function Sidebar({ isOpen, onClose }) {
                 </li>
                 )}
 
-                <li>
-                  <Link
-                    to="/pedagogico/graficos"
-                    className={getSubmenuLinkClasses('/pedagogico/graficos')}
-                  >
-                    <ChartBarIcon className="h-5 w-5 mr-2" /> Gráficos
-                  </Link>
-                </li>
               </ul>
             )}
           </>

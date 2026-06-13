@@ -92,6 +92,14 @@ import Relatorios from "./features/frequencia/Relatorios.jsx";
 import BuscaAtiva from "./features/frequencia/BuscaAtiva.jsx";
 import ConselhoTutelar from "./features/frequencia/ConselhoTutelar.jsx";
 
+// ✅ MÓDULO MONITORAMENTO — Visitantes
+import VisitantesRegistrar from "./features/monitoramento/Visitantes/VisitantesRegistrar.jsx";
+import VisitantesHistorico from "./features/monitoramento/Visitantes/VisitantesHistorico.jsx";
+
+// ✅ SECRETARIA — Agente e Sincronizar SEEDF
+import AgenteSecretaria from "./features/secretaria/agente/index.jsx";
+import SincronizarSEEDF from "./features/secretaria/sincronizar-seedf/index.jsx";
+
 // ✅ NOVO IMPORT — Configurações Pedagógicas
 import ConfiguracoesPedagogicas from "./features/secretaria/horarios/ConfiguracoesPedagogicas.jsx";
 
@@ -303,6 +311,9 @@ export default function App() {
           <Route path="/monitoramento/alertas-teste" element={<RequireModulo modulo="monitoramento"><RequirePerm perm="monitoramento.visualizar"><MonitoramentoAlertasTeste /></RequirePerm></RequireModulo>} />
           <Route path="/monitoramento/painel"    element={<RequireModulo modulo="monitoramento"><RequirePerm perm="monitoramento.visualizar"><MonitoramentoPainel /></RequirePerm></RequireModulo>} />
           <Route path="/monitoramento/embeddings" element={<RequireModulo modulo="monitoramento"><RequirePerm perm="monitoramento.visualizar"><EmbeddingsGerar /></RequirePerm></RequireModulo>} />
+          {/* ✅ Visitantes (Monitoramento) */}
+          <Route path="/monitoramento/visitantes/registrar" element={<RequireModulo modulo="monitoramento"><RequirePerm perm="monitoramento.visualizar"><VisitantesRegistrar /></RequirePerm></RequireModulo>} />
+          <Route path="/monitoramento/visitantes/historico"  element={<RequireModulo modulo="monitoramento"><RequirePerm perm="monitoramento.visualizar"><VisitantesHistorico /></RequirePerm></RequireModulo>} />
 
           {/* ── Alunos individuais ───────────────────────────────────────── */}
           <Route path="/alunos/:codigo/boletim"       element={<Boletim />} />
@@ -316,6 +327,9 @@ export default function App() {
           <Route path="/secretaria/professores/:id/ficha" element={<RequireModulo modulo="secretaria"><FichaProfessor /></RequireModulo>} />
           <Route path="/secretaria/boletim"    element={<RequireModulo modulo="secretaria"><BoletimEdicao /></RequireModulo>} />
           <Route path="/secretaria/relatorios" element={<RequireModulo modulo="secretaria"><RelatoriosSecretaria /></RequireModulo>} />
+          {/* ✅ Agente Secretaria e Sincronizar SEEDF */}
+          <Route path="/secretaria/agente"           element={<RequireModulo modulo="secretaria"><AgenteSecretaria /></RequireModulo>} />
+          <Route path="/secretaria/sincronizar-seedf" element={<RequireModulo modulo="secretaria"><SincronizarSEEDF /></RequireModulo>} />
           <Route path="/secretaria/*"          element={<RequireModulo modulo="secretaria"><Secretaria /></RequireModulo>} />
           <Route path="/secretaria/modulacao"  element={<RequireModulo modulo="secretaria"><Modulacao /></RequireModulo>} />
           <Route path="/secretaria/horarios"   element={<RequireModulo modulo="secretaria"><HorariosPage /></RequireModulo>} />

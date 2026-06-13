@@ -432,7 +432,7 @@ function ModuloGrupo({ grupo, colorDef, ativos, onToggle, expandido, onToggleExp
         {/* Group toggle */}
         <div onClick={e => e.stopPropagation()}>
           <ToggleSwitch
-            isActive={groupState === 'all'}
+            isActive={ativos.has(grupo.id)}
             onClick={() => onToggle(grupo.id, 'group')}
           />
         </div>
@@ -622,13 +622,13 @@ export default function PlataformaModulos() {
           return next;
         }
 
-        const allOn = g.filhos.every(f => next.has(f.id));
-        if (allOn) {
-          // Turn off all children → group off
+        // Usa estado REAL do pai no Set (não depende se todos filhos estão on)
+        if (next.has(id)) {
+          // Pai estava ON → desliga tudo
           g.filhos.forEach(f => next.delete(f.id));
           next.delete(id);
         } else {
-          // Turn on all children + group
+          // Pai estava OFF → liga tudo
           g.filhos.forEach(f => next.add(f.id));
           next.add(id);
         }

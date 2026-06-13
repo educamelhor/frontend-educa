@@ -33,7 +33,6 @@ import Login from "./features/login/Login.jsx";
 import AtivarDiretor from "./features/login/AtivarDiretor.jsx";
 import GerarGabaritos from "./features/impressao/GerarGabaritos";
 import ConselhoClasse from "./features/pedagogico/conselho/ConselhoClasse";
-import ConselhoClasseProfessor from "./features/professores/conselho/ConselhoClasseProfessor";
 import ConteudosAdmin from "./features/pedagogico/conteudos/ConteudosAdmin.jsx";
 import ConteudosProgramaticos from "./features/pedagogico/conteudos/ConteudosProgramaticos.jsx";
 import Planos from "./features/professores/planos/Planos";
@@ -71,6 +70,7 @@ import PlataformaUsageInsights from "./features/plataforma/PlataformaUsageInsigh
 import UsageEscolaDetalhe from "./features/plataforma/UsageEscolaDetalhe.jsx";
 import PlataformaSuporte from "./features/plataforma/PlataformaSuporte.jsx";
 import PlataformaGovernanca from "./features/plataforma/PlataformaGovernanca.jsx";
+import PlataformaDashboard from "./features/plataforma/PlataformaDashboard.jsx";
 import BoletimTurmas from "./features/impressao/BoletimTurmas";
 import ListasImpressao from "./features/impressao/ListasImpressao";
 import DocumentosImpressao from "./features/impressao/DocumentosImpressao";
@@ -246,6 +246,7 @@ export default function App() {
 
         {/* Rotas protegidas da PLATAFORMA */}
         <Route element={<RequirePlatformAuth><ProtectedLayout /></RequirePlatformAuth>}>
+          <Route path="/plataforma/dashboard"     element={<RequireCeo><PlataformaDashboard /></RequireCeo>} />
           <Route path="/plataforma/escolas"       element={<RequireCeo><PlataformaEscolas /></RequireCeo>} />
           <Route path="/plataforma/diretores"     element={<RequireCeo><PlataformaDiretores /></RequireCeo>} />
           <Route path="/plataforma/auditoria-rbac" element={<RequireCeo><PlataformaAuditoriaRBAC /></RequireCeo>} />
@@ -317,7 +318,7 @@ export default function App() {
           <Route path="/gabarito/corrigir"     element={<GabaritoModule />} />
           <Route path="/gabarito/resultados"   element={<GabaritoModule />} />
           <Route path="/pedagogico/conselho" element={<ConselhoClasse />} />
-          <Route path="/professores/conselho" element={<ConselhoClasseProfessor />} />
+          <Route path="/professores/conselho" element={<ConselhoClasse />} />
           <Route path="/pedagogico/conteudos" element={
             <RequirePerm perm="conteudos:ver"><ConteudosAdmin /></RequirePerm>
           } />

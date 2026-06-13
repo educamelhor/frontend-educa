@@ -197,6 +197,30 @@ export default function Sidebar({ isOpen, onClose }) {
         </div>
         {isScopePlataforma ? (
           <>
+            {/* LINK: Plataforma - Dashboard */}
+            <Link
+              to="/plataforma/dashboard"
+              className={getMainLinkClasses('/plataforma/dashboard')}
+              style={{
+                marginBottom: 4,
+                background: isActive('/plataforma/dashboard')
+                  ? 'linear-gradient(90deg, rgba(99,102,241,0.2), transparent)'
+                  : undefined,
+              }}
+            >
+              <HomeIcon className="h-5 w-5 mr-2" style={{ color: isActive('/plataforma/dashboard') ? '#818cf8' : undefined }} />
+              <span className="flex-1 text-left" style={{ fontWeight: 700 }}>Dashboard</span>
+              <span style={{
+                fontSize: '0.55rem',
+                fontWeight: 800,
+                background: 'linear-gradient(135deg, #6366f1, #a855f7)',
+                color: '#fff',
+                padding: '2px 6px',
+                borderRadius: '8px',
+                letterSpacing: '0.5px',
+              }}>CEO</span>
+            </Link>
+
             {/* ─── GRUPO: Escolas (submenus) ─── */}
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 transition"

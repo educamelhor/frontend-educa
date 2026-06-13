@@ -12,11 +12,17 @@ const MODULOS_TREE = [
     id: 'secretaria', label: 'Secretaria', icon: '📋',
     filhos: [
       { id: 'secretaria.alunos', label: 'Alunos' },
+      { id: 'secretaria.responsaveis', label: 'Responsáveis' },
+      { id: 'secretaria.cargas_horarias', label: 'Cargas Horárias' },
+      { id: 'secretaria.disciplinas', label: 'Disciplinas' },
+      { id: 'secretaria.turmas', label: 'Turmas' },
       { id: 'secretaria.professores', label: 'Professores' },
       { id: 'secretaria.boletim', label: 'Boletim (Edição)' },
       { id: 'secretaria.relatorios', label: 'Relatórios' },
       { id: 'secretaria.horarios', label: 'Horários' },
+      { id: 'secretaria.agente', label: 'Agente' },
       { id: 'secretaria.tabela_codigos', label: 'Tabela de Códigos' },
+      { id: 'secretaria.sincronizar_seedf', label: 'Sincronizar SEEDF' },
       { id: 'secretaria.modulacao', label: 'Modulação' },
     ]
   },

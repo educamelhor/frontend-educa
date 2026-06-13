@@ -568,6 +568,23 @@ export default function PlataformaModulos() {
       const ativos = new Set(
         list.filter(m => m.ativo).map(m => m.modulo)
       );
+
+      // ── Normalizar estado: se filho está ativo, pai DEVE estar ativo ──────
+      // Corrige estados inconsistentes que possam ter sido salvos no banco.
+      MODULOS_TREE.forEach(grupo => {
+        if (grupo.filhos.length > 0) {
+          const algumFilhoAtivo = grupo.filhos.some(f => ativos.has(f.id));
+          if (algumFilhoAtivo) ativos.add(grupo.id);
+        }
+      });
+      // ── Direção inversa: pai ativo mas nenhum filho → desativa pai ────────
+      MODULOS_TREE.forEach(grupo => {
+        if (grupo.filhos.length > 0 && ativos.has(grupo.id)) {
+          const algumFilhoAtivo = grupo.filhos.some(f => ativos.has(f.id));
+          if (!algumFilhoAtivo) ativos.delete(grupo.id);
+        }
+      });
+
       setModulosAtivos(ativos);
       // Update count cache
       setSchoolModulosCounts(prev => ({ ...prev, [id]: ativos.size }));

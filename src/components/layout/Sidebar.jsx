@@ -101,9 +101,14 @@ export default function Sidebar({ isOpen, onClose }) {
 
   // ── Refresh automático: busca módulos atualizados do servidor ──
   // Detecta mudanças feitas pelo CEO sem precisar fazer logout/login
+  // Usa debounce de 5 min para não sobrecarregar o backend em navegações rápidas
   useEffect(() => {
     const refreshFromServer = async () => {
       try {
+        const lastRefresh = parseInt(sessionStorage.getItem('modulos_last_refresh') || '0');
+        const agora = Date.now();
+        if (agora - lastRefresh < 5 * 60 * 1000) return; // aguarda 5 min entre chamadas
+
         const token = localStorage.getItem('token');
         const escolaId = localStorage.getItem('escola_id');
         if (!token || !escolaId) return;
@@ -114,6 +119,7 @@ export default function Sidebar({ isOpen, onClose }) {
         if (!res.ok) return;
         const data = await res.json();
         if (data.ok && Array.isArray(data.modulos_ativos)) {
+          sessionStorage.setItem('modulos_last_refresh', String(Date.now()));
           const current = JSON.parse(localStorage.getItem('modulos_ativos') || '[]');
           const incoming = data.modulos_ativos;
           const sortedCurrent = [...current].sort().join(',');
@@ -126,7 +132,7 @@ export default function Sidebar({ isOpen, onClose }) {
       } catch (_) { /* silent fail — não bloqueia o sidebar */ }
     };
     refreshFromServer();
-  }, []); // executa uma vez ao montar (reload/nova aba)
+  }, [location.pathname]); // verifica a cada navegação, mas só chama API após 5 min
 
   // hasModulo: null = sem restrição = true; array = verifica se contém o módulo
   const hasModulo = (mod) => _modulos === null || _modulos.includes(mod);
@@ -1344,7 +1350,7 @@ export default function Sidebar({ isOpen, onClose }) {
         {/* ───────────────────────────────
             MENU INDEPENDENTE: Suporte
         ─────────────────────────────── */}
-        {isScopeEscola && !isSecretario && (
+        {isScopeEscola && !isSecretario && hasModulo('disciplinar.suporte') && (
           <Link
             to="/disciplinar/suporte"
             className={getMainLinkClasses('/disciplinar/suporte')}

@@ -179,7 +179,7 @@ export default function Sidebar({ isOpen, onClose }) {
     if (p.startsWith('/secretaria')) {
       setOpenGroup('secretaria');
     }
-    else if (p.startsWith('/disciplinar') && !/^\/(disciplinar\/(regimentos|manual|suporte))/.test(p)) setOpenGroup('disciplinar');
+    else if (p.startsWith('/disciplinar') && !/^\/(disciplinar\/suporte)/.test(p)) setOpenGroup('disciplinar');
     else if (p.startsWith('/pedagogico')) {
       setOpenGroup('pedagogico');
       // Auto-abrir submenu Correções se estiver em rota de correções
@@ -1128,6 +1128,26 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
                 )}
+                {hasModulo('disciplinar.regimentos') && (
+                <li>
+                  <Link
+                    to="/disciplinar/regimentos"
+                    className={getSubmenuLinkClasses('/disciplinar/regimentos')}
+                  >
+                    <DocumentTextIcon className="h-5 w-5 mr-2" /> Regimentos
+                  </Link>
+                </li>
+                )}
+                {hasModulo('disciplinar.manual') && (
+                <li>
+                  <Link
+                    to="/disciplinar/manual"
+                    className={getSubmenuLinkClasses('/disciplinar/manual')}
+                  >
+                    <BookOpenIcon className="h-5 w-5 mr-2" /> Manual
+                  </Link>
+                </li>
+                )}
               </ul>
             </>
             ) : (
@@ -1265,6 +1285,26 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
                 )}
+                {hasModulo('disciplinar.regimentos') && (
+                <li>
+                  <Link
+                    to="/disciplinar/regimentos"
+                    className={getSubmenuLinkClasses('/disciplinar/regimentos')}
+                  >
+                    <DocumentTextIcon className="h-5 w-5 mr-2" /> Regimentos
+                  </Link>
+                </li>
+                )}
+                {hasModulo('disciplinar.manual') && (
+                <li>
+                  <Link
+                    to="/disciplinar/manual"
+                    className={getSubmenuLinkClasses('/disciplinar/manual')}
+                  >
+                    <BookOpenIcon className="h-5 w-5 mr-2" /> Manual
+                  </Link>
+                </li>
+                )}
               </ul>
             )}
             </>
@@ -1273,37 +1313,15 @@ export default function Sidebar({ isOpen, onClose }) {
         )}
 
         {/* ───────────────────────────────
-            MENUS INDEPENDENTES: Regimentos, Manual, Suporte
-            (Acessíveis a qualquer usuário logado)
+            MENU INDEPENDENTE: Suporte
         ─────────────────────────────── */}
         {isScopeEscola && !isSecretario && (
-          <>
-            {hasModulo('disciplinar.regimentos') && (
-            <Link
-              to="/disciplinar/regimentos"
-              className={getMainLinkClasses('/disciplinar/regimentos')}
-              style={{ marginTop: 8 }}
-            >
-              <DocumentTextIcon className="h-5 w-5 mr-2" /> Regimentos
-            </Link>
-            )}
-
-            {hasModulo('disciplinar.manual') && (
-            <Link
-              to="/disciplinar/manual"
-              className={getMainLinkClasses('/disciplinar/manual')}
-            >
-              <BookOpenIcon className="h-5 w-5 mr-2" /> Manual
-            </Link>
-            )}
-
-            <Link
-              to="/disciplinar/suporte"
-              className={getMainLinkClasses('/disciplinar/suporte')}
-            >
-              <QuestionMarkCircleIcon className="h-5 w-5 mr-2" /> Suporte
-            </Link>
-          </>
+          <Link
+            to="/disciplinar/suporte"
+            className={getMainLinkClasses('/disciplinar/suporte')}
+          >
+            <QuestionMarkCircleIcon className="h-5 w-5 mr-2" /> Suporte
+          </Link>
         )}
 
         {canAgenteEduca && hasModulo('agente_educa') && (
@@ -1388,10 +1406,12 @@ export default function Sidebar({ isOpen, onClose }) {
                 )}
               </>
             )}
+          </>
+        )}
 
-            {/* ─── GRUPO: Secretaria (Professor NÃO tem acesso) ─── */}
-            {!isProfessor && hasModulo('secretaria') && (
-            <>
+        {/* ─── GRUPO: Secretaria (Professor NÃO tem acesso) ─── */}
+        {isScopeEscola && !isProfessor && hasModulo('secretaria') && (
+        <>
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-6 transition"
               onClick={() => setOpenGroup(openGroup === 'secretaria' ? null : 'secretaria')}
@@ -1588,9 +1608,7 @@ export default function Sidebar({ isOpen, onClose }) {
                 </li>
               </ul>
             )}
-            </>
-            )}
-          </>
+        </>
         )}
 
         {isScopeEscola && !isDisciplinar && !isProfessor && !isSecretario && hasModulo('pedagogico') && (

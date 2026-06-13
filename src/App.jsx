@@ -61,6 +61,7 @@ import DiretorPedagogico from "./features/direcao/diretor/DiretorPedagogico.jsx"
 import GestaoEquipe from "./features/direcao/gestao-acessos/GestaoEquipe.jsx";
 import CadastroMembros from "./features/direcao/cadastro/CadastroMembros.jsx";
 import Governanca from "./features/direcao/governanca/Governanca.jsx";
+import GovernanModulos from "./features/direcao/GovernanModulos.jsx";
 
 // ✅ PLATAFORMA (CEO) — v1
 import PlataformaEscolas from "./features/plataforma/PlataformaEscolas.jsx";
@@ -414,6 +415,9 @@ export default function App() {
           } />
           <Route path="/direcao/governanca" element={
             <RequireModulo modulo="direcao"><RequireDiretor><Governanca /></RequireDiretor></RequireModulo>
+          } />
+          <Route path="/direcao/modulos-perfil" element={
+            <RequireModulo modulo="direcao"><RequireDiretor><GovernanModulos /></RequireDiretor></RequireModulo>
           } />
 
           <Route path="*" element={<Navigate to="/home" replace />} />

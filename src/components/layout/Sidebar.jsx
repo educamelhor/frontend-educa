@@ -963,6 +963,33 @@ export default function Sidebar({ isOpen, onClose }) {
                   </button>
                 </li>
                 )}
+                {canGovernanca && hasModulo('direcao') && (
+                <li>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setOpenGroup('direcao');
+                      navigate('/direcao/modulos-perfil');
+                    }}
+                    className={getSubmenuLinkClasses('/direcao/modulos-perfil', true)}
+                    style={{
+                      background: isActive('/direcao/modulos-perfil', true)
+                        ? 'linear-gradient(90deg, rgba(16,185,129,0.18), transparent)'
+                        : undefined,
+                      width: '100%',
+                      border: 'none',
+                      color: 'inherit',
+                      font: 'inherit',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                  >
+                    <Cog6ToothIcon className="h-5 w-5 mr-2" style={{ color: isActive('/direcao/modulos-perfil', true) ? '#10b981' : undefined }} /> Módulos por Perfil
+                  </button>
+                </li>
+                )}
               </ul>
             )}
           </>
@@ -1350,7 +1377,7 @@ export default function Sidebar({ isOpen, onClose }) {
         {/* ───────────────────────────────
             MENU INDEPENDENTE: Suporte
         ─────────────────────────────── */}
-        {isScopeEscola && !isSecretario && hasModulo('disciplinar.suporte') && (
+        {isScopeEscola && !isSecretario && (
           <Link
             to="/disciplinar/suporte"
             className={getMainLinkClasses('/disciplinar/suporte')}

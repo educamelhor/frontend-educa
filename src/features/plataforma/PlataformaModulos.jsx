@@ -39,7 +39,6 @@ const MODULOS_TREE = [
       { id: 'disciplinar.equipe', label: 'Gestão de Equipe' },
       { id: 'disciplinar.regimentos', label: 'Regimentos' },
       { id: 'disciplinar.manual', label: 'Manual' },
-      { id: 'disciplinar.suporte', label: 'Suporte Técnico' },
     ]
   },
   {

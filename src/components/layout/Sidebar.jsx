@@ -72,7 +72,7 @@ export default function Sidebar({ isOpen, onClose }) {
   // [] = nada licenciado
   // ['gabarito', 'gabarito.gerar'] = apenas esses
   // ─────────────────────────────────────────────────────────────
-  const getModulos = () => {
+  const parseModulos = () => {
     try {
       const raw = localStorage.getItem('modulos_ativos');
       if (!raw) return null; // backward compatible: mostra tudo
@@ -82,7 +82,23 @@ export default function Sidebar({ isOpen, onClose }) {
       return null;
     }
   };
-  const _modulos = getModulos();
+
+  // Estado reativo: atualiza quando localStorage muda (ex: após login/logout)
+  const [_modulos, setModulos] = React.useState(parseModulos);
+
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (e.key === 'modulos_ativos' || e.key === null) {
+        setModulos(parseModulos());
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    // Relê ao montar E ao navegar (login redireciona para /home na mesma tab,
+    // o evento 'storage' NÃO dispara na mesma tab — useLocation resolve isso)
+    setModulos(parseModulos());
+    return () => window.removeEventListener('storage', onStorage);
+  }, [location.pathname]);
+
   // hasModulo: null = sem restrição = true; array = verifica se contém o módulo
   const hasModulo = (mod) => _modulos === null || _modulos.includes(mod);
 

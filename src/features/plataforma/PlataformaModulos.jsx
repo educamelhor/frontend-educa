@@ -621,15 +621,16 @@ export default function PlataformaModulos() {
       // Child toggle
       if (next.has(id)) {
         next.delete(id);
-        // If all siblings now off, deactivate parent
-        if (grupo) {
-          const anyOn = grupo.filhos.some(f => f.id !== id && next.has(f.id));
-          if (!anyOn) next.delete(grupo.id);
-        }
+        // Qualquer filho OFF → pai desativa imediatamente
+        if (grupo) next.delete(grupo.id);
       } else {
         next.add(id);
-        // Activate parent too
-        if (grupo) next.add(grupo.id);
+        // Pai só ativa se TODOS os filhos estiverem ON agora
+        if (grupo) {
+          const allOn = grupo.filhos.every(f => next.has(f.id));
+          if (allOn) next.add(grupo.id);
+          // senão: pai permanece desligado
+        }
       }
       return next;
     });

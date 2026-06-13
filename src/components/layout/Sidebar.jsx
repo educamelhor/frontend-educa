@@ -1262,6 +1262,7 @@ export default function Sidebar({ isOpen, onClose }) {
         ─────────────────────────────── */}
         {isScopeEscola && !isSecretario && (
           <>
+            {hasModulo('disciplinar.regimentos') && (
             <Link
               to="/disciplinar/regimentos"
               className={getMainLinkClasses('/disciplinar/regimentos')}
@@ -1269,13 +1270,16 @@ export default function Sidebar({ isOpen, onClose }) {
             >
               <DocumentTextIcon className="h-5 w-5 mr-2" /> Regimentos
             </Link>
+            )}
 
+            {hasModulo('disciplinar.manual') && (
             <Link
               to="/disciplinar/manual"
               className={getMainLinkClasses('/disciplinar/manual')}
             >
               <BookOpenIcon className="h-5 w-5 mr-2" /> Manual
             </Link>
+            )}
 
             <Link
               to="/disciplinar/suporte"

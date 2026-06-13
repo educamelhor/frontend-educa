@@ -294,8 +294,8 @@ export default function App() {
           <Route path="/disciplinar/atas"       element={<RequireModulo modulo="disciplinar"><AtasDisciplinar /></RequireModulo>} />
           <Route path="/disciplinar/liberacao"  element={<RequireModulo modulo="disciplinar"><LiberacaoDisciplinar /></RequireModulo>} />
           <Route path="/disciplinar/metadados"  element={<RequireModulo modulo="disciplinar"><MetadadosDisciplinar /></RequireModulo>} />
-          <Route path="/disciplinar/regimentos" element={<RequireModulo modulo="disciplinar"><RegimentosDisciplinar /></RequireModulo>} />
-          <Route path="/disciplinar/manual"     element={<ManualDisciplinar />} />
+          <Route path="/disciplinar/regimentos" element={<RequireModulo modulo="disciplinar.regimentos"><RegimentosDisciplinar /></RequireModulo>} />
+          <Route path="/disciplinar/manual"     element={<RequireModulo modulo="disciplinar.manual"><ManualDisciplinar /></RequireModulo>} />
           <Route path="/disciplinar/suporte"    element={<SuporteSAC />} />
 
           {/* ── Monitoramento ────────────────────────────────────────────── */}

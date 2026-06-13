@@ -453,6 +453,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
               )}
+              {hasModulo('professores.conselho') && (
               <li>
                 <Link
                   to="/professores/conselho"
@@ -461,6 +462,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   <CheckCircleIcon className="h-5 w-5 mr-2" /> Conselho de Classe
                 </Link>
               </li>
+              )}
             </ul>
 
             </>
@@ -532,6 +534,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     </Link>
                   </li>
                 )}
+                {hasModulo('professores.conselho') && (
                 <li>
                   <Link
                     to="/professores/conselho"
@@ -540,6 +543,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     <CheckCircleIcon className="h-5 w-5 mr-2" /> Conselho de Classe
                   </Link>
                 </li>
+                )}
               </ul>
             )}
             </>

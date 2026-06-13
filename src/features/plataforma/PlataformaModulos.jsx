@@ -78,6 +78,7 @@ const MODULOS_TREE = [
       { id: 'professores.avaliacoes', label: 'Avaliações' },
       { id: 'professores.conteudos', label: 'Conteúdos' },
       { id: 'professores.provas', label: 'Provas' },
+      { id: 'professores.conselho', label: 'Conselho de Classe' },
       { id: 'professores.boletim', label: 'Boletim Manual' },
     ]
   },

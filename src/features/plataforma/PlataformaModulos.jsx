@@ -30,6 +30,7 @@ const MODULOS_TREE = [
       { id: 'disciplinar.responsaveis', label: 'Responsáveis' },
       { id: 'disciplinar.liberacao', label: 'Liberação' },
       { id: 'disciplinar.metadados', label: 'Metadados' },
+      { id: 'disciplinar.equipe', label: 'Gestão de Equipe' },
       { id: 'disciplinar.regimentos', label: 'Regimentos' },
       { id: 'disciplinar.manual', label: 'Manual' },
     ]

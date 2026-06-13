@@ -66,6 +66,26 @@ export default function Sidebar({ isOpen, onClose }) {
 
   const hasPerm = (perm) => getPermissoes().includes(perm);
 
+  // ─────────────────────────────────────────────────────────────
+  // MÓDULOS — Licenciamento por escola (CEO configura)
+  // null = sem restrição (backward compatible)
+  // [] = nada licenciado
+  // ['gabarito', 'gabarito.gerar'] = apenas esses
+  // ─────────────────────────────────────────────────────────────
+  const getModulos = () => {
+    try {
+      const raw = localStorage.getItem('modulos_ativos');
+      if (!raw) return null; // backward compatible: mostra tudo
+      const arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr : null;
+    } catch {
+      return null;
+    }
+  };
+  const _modulos = getModulos();
+  // hasModulo: null = sem restrição = true; array = verifica se contém o módulo
+  const hasModulo = (mod) => _modulos === null || _modulos.includes(mod);
+
   // ── Perfil do usuário logado ──
   const getPerfil = () =>
     String(localStorage.getItem('perfil') || '').toLowerCase().trim();
@@ -257,6 +277,30 @@ export default function Sidebar({ isOpen, onClose }) {
               </ul>
             )}
 
+            {/* LINK: Plataforma - Módulos */}
+            <Link
+              to="/plataforma/modulos"
+              className={getMainLinkClasses('/plataforma/modulos')}
+              style={{
+                marginTop: 4,
+                background: isActive('/plataforma/modulos')
+                  ? 'linear-gradient(90deg, rgba(16,185,129,0.15), transparent)'
+                  : undefined,
+              }}
+            >
+              <Cog6ToothIcon className="h-5 w-5 mr-2" style={{ color: isActive('/plataforma/modulos') ? '#34d399' : undefined }} />
+              <span className="flex-1 text-left" style={{ fontWeight: 600 }}>Módulos</span>
+              <span style={{
+                fontSize: '0.55rem',
+                fontWeight: 800,
+                background: 'linear-gradient(135deg, #10b981, #059669)',
+                color: '#fff',
+                padding: '2px 6px',
+                borderRadius: '8px',
+                letterSpacing: '0.5px',
+              }}>LIC</span>
+            </Link>
+
             {/* LINK: Plataforma - Usage Insights */}
             <Link
               to="/plataforma/usage"
@@ -337,7 +381,7 @@ export default function Sidebar({ isOpen, onClose }) {
             )}
 
             {/* LINK: Estudantes */}
-            {!isDisciplinar && !isProfessor && !isCoord && !isSecretario && (
+            {!isDisciplinar && !isProfessor && !isCoord && !isSecretario && hasModulo('secretaria.alunos') && (
             <Link to="/alunos" className={getMainLinkClasses('/alunos')}>
               <UserGroupIcon className="h-5 w-5 mr-2" />
               Estudantes
@@ -345,7 +389,7 @@ export default function Sidebar({ isOpen, onClose }) {
             )}
 
             {/* GRUPO: Professores (fora de Secretaria) */}
-            {isProfessor ? (
+            {isProfessor && hasModulo('professores') ? (
             /* ── Professor: mostra grupo Professores sempre aberto + Gabarito ── */
             <>
             {/* Título do grupo Professores (sem toggle, sempre aberto) */}
@@ -359,6 +403,7 @@ export default function Sidebar({ isOpen, onClose }) {
 
             {/* Submenus sempre visíveis */}
             <ul className="ml-4 mb-2">
+              {hasModulo('professores.planos') && (
               <li>
                 <Link
                   to="/professores/planos"
@@ -367,6 +412,8 @@ export default function Sidebar({ isOpen, onClose }) {
                   <PencilSquareIcon className="h-5 w-5 mr-2" /> Planos
                 </Link>
               </li>
+              )}
+              {hasModulo('professores.avaliacoes') && (
               <li>
                 <Link
                   to="/professores/avaliacoes"
@@ -375,6 +422,8 @@ export default function Sidebar({ isOpen, onClose }) {
                   <TableCellsIcon className="h-5 w-5 mr-2" /> Avaliações
                 </Link>
               </li>
+              )}
+              {hasModulo('professores.conteudos') && (
               <li>
                 <Link
                   to="/professores/conteudos"
@@ -383,6 +432,8 @@ export default function Sidebar({ isOpen, onClose }) {
                   <BookOpenIcon className="h-5 w-5 mr-2" /> Conteúdos
                 </Link>
               </li>
+              )}
+              {hasModulo('professores.provas') && (
               <li>
                 <Link
                   to="/professores/provas"
@@ -391,7 +442,8 @@ export default function Sidebar({ isOpen, onClose }) {
                   <DocumentTextIcon className="h-5 w-5 mr-2" /> Provas
                 </Link>
               </li>
-              {canSeeBoletimManual && (
+              )}
+              {canSeeBoletimManual && hasModulo('professores.boletim') && (
                 <li>
                   <Link
                     to="/professores/boletim"
@@ -412,7 +464,7 @@ export default function Sidebar({ isOpen, onClose }) {
             </ul>
 
             </>
-            ) : !isDisciplinar && !isCoord && !isSecretario && (
+            ) : !isDisciplinar && !isCoord && !isSecretario && hasModulo('professores') && (
             <>
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-2 transition"
@@ -430,6 +482,7 @@ export default function Sidebar({ isOpen, onClose }) {
 
             {openGroup === 'professores' && (
               <ul className="ml-4 mb-2">
+                {hasModulo('professores.planos') && (
                 <li>
                   <Link
                     to="/professores/planos"
@@ -438,6 +491,8 @@ export default function Sidebar({ isOpen, onClose }) {
                     <PencilSquareIcon className="h-5 w-5 mr-2" /> Planos
                   </Link>
                 </li>
+                )}
+                {hasModulo('professores.avaliacoes') && (
                 <li>
                   <Link
                     to="/professores/avaliacoes"
@@ -446,6 +501,8 @@ export default function Sidebar({ isOpen, onClose }) {
                     <TableCellsIcon className="h-5 w-5 mr-2" /> Avaliações
                   </Link>
                 </li>
+                )}
+                {hasModulo('professores.conteudos') && (
                 <li>
                   <Link
                     to="/professores/conteudos"
@@ -454,6 +511,8 @@ export default function Sidebar({ isOpen, onClose }) {
                     <BookOpenIcon className="h-5 w-5 mr-2" /> Conteúdos
                   </Link>
                 </li>
+                )}
+                {hasModulo('professores.provas') && (
                 <li>
                   <Link
                     to="/professores/provas"
@@ -462,7 +521,8 @@ export default function Sidebar({ isOpen, onClose }) {
                     <DocumentTextIcon className="h-5 w-5 mr-2" /> Provas
                   </Link>
                 </li>
-                {canSeeBoletimManual && (
+                )}
+                {canSeeBoletimManual && hasModulo('professores.boletim') && (
                   <li>
                     <Link
                       to="/professores/boletim"
@@ -509,7 +569,7 @@ export default function Sidebar({ isOpen, onClose }) {
             )}
 
             {/* LINK: Banco de Questões — restrito a Direção e Coordenação */}
-            {canBancoQuestoes && (
+            {canBancoQuestoes && hasModulo('questoes') && (
             <Link
               to="/questoes"
               className={getMainLinkClasses('/questoes')}
@@ -531,7 +591,7 @@ export default function Sidebar({ isOpen, onClose }) {
             )}
 
             {/* LINK: Ferramentas */}
-            {!isDisciplinar && !isProfessor && !isCoord && !isSecretario && (
+            {!isDisciplinar && !isProfessor && !isCoord && !isSecretario && hasModulo('ferramentas') && (
             <Link to="/ferramentas" className={getMainLinkClasses('/ferramentas')}>
               <WrenchIcon className="h-5 w-5 mr-2" />
               Ferramentas
@@ -543,7 +603,7 @@ export default function Sidebar({ isOpen, onClose }) {
                 Acesso: direção, coordenação, supervisão, sala recurso
                 Restrito: professor, militar/disciplinar, coordenador de turma
             ──────────────────────────────── */}
-            {isScopeEscola && !isDisciplinar && !isProfessor && !isCoord && !isSecretario && (
+            {isScopeEscola && !isDisciplinar && !isProfessor && !isCoord && !isSecretario && hasModulo('biblioteca') && (
             <>
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-2 transition"
@@ -576,6 +636,7 @@ export default function Sidebar({ isOpen, onClose }) {
 
             {openGroup === 'biblioteca' && (
               <ul className="ml-4 mb-2">
+                {hasModulo('biblioteca.acervo') && (
                 <li>
                   <Link
                     to="/biblioteca/acervo"
@@ -590,6 +651,8 @@ export default function Sidebar({ isOpen, onClose }) {
                     <span className="flex-1">Acervo</span>
                   </Link>
                 </li>
+                )}
+                {hasModulo('biblioteca.emprestimos') && (
                 <li>
                   <Link
                     to="/biblioteca/emprestimos"
@@ -604,6 +667,8 @@ export default function Sidebar({ isOpen, onClose }) {
                     <span className="flex-1">Empréstimos</span>
                   </Link>
                 </li>
+                )}
+                {hasModulo('biblioteca.alunos') && (
                 <li>
                   <Link
                     to="/biblioteca/alunos"
@@ -618,6 +683,8 @@ export default function Sidebar({ isOpen, onClose }) {
                     <span className="flex-1">Alunos Leitores</span>
                   </Link>
                 </li>
+                )}
+                {hasModulo('biblioteca.leitor_destaque') && (
                 <li>
                   <Link
                     to="/biblioteca/leitor-destaque"
@@ -632,6 +699,8 @@ export default function Sidebar({ isOpen, onClose }) {
                     <span className="flex-1" style={{ color: isActive('/biblioteca/leitor-destaque') ? '#fbbf24' : undefined }}>Leitor Destaque</span>
                   </Link>
                 </li>
+                )}
+                {hasModulo('biblioteca.concurso') && (
                 <li>
                   <Link
                     to="/biblioteca/concurso"
@@ -646,6 +715,8 @@ export default function Sidebar({ isOpen, onClose }) {
                     <span className="flex-1">Ranking & Concurso</span>
                   </Link>
                 </li>
+                )}
+                {hasModulo('biblioteca.metadados') && (
                 <li>
                   <Link
                     to="/biblioteca/metadados"
@@ -660,6 +731,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     <span className="flex-1">Painel / Metadados</span>
                   </Link>
                 </li>
+                )}
               </ul>
             )}
             </>
@@ -673,7 +745,7 @@ export default function Sidebar({ isOpen, onClose }) {
             Direção/Supervisor: TODAS as etapas
             Secretário/Militar: sem acesso
         ═══════════════════════════════ */}
-        {canGabarito && (
+        {canGabarito && hasModulo('gabarito') && (
           <>
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-2 transition"
@@ -707,7 +779,7 @@ export default function Sidebar({ isOpen, onClose }) {
             {openGroup === 'gabarito' && (
               <ul className="ml-4 mb-2">
                 {/* Gerar / Imprimir — somente direção/supervisor */}
-                {canGabaritoAdmin && (
+                {canGabaritoAdmin && hasModulo('gabarito.gerar') && (
                 <li>
                   <Link
                     to="/gabarito/gerar"
@@ -718,7 +790,7 @@ export default function Sidebar({ isOpen, onClose }) {
                 </li>
                 )}
                 {/* Corrigir Lote — somente direção/supervisor */}
-                {canGabaritoAdmin && (
+                {canGabaritoAdmin && hasModulo('gabarito.corrigir_lote') && (
                 <li>
                   <Link
                     to="/gabarito/corrigir-lote"
@@ -729,6 +801,7 @@ export default function Sidebar({ isOpen, onClose }) {
                 </li>
                 )}
                 {/* Corrigir — todos com canGabarito */}
+                {hasModulo('gabarito.corrigir') && (
                 <li>
                   <Link
                     to="/gabarito/corrigir"
@@ -737,7 +810,9 @@ export default function Sidebar({ isOpen, onClose }) {
                     <CheckCircleIcon className="h-5 w-5 mr-2" /> Corrigir
                   </Link>
                 </li>
+                )}
                 {/* Resultados — todos com canGabarito */}
+                {hasModulo('gabarito.resultados') && (
                 <li>
                   <Link
                     to="/gabarito/resultados"
@@ -746,6 +821,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     <ChartBarIcon className="h-5 w-5 mr-2" /> Resultados
                   </Link>
                 </li>
+                )}
               </ul>
             )}
           </>
@@ -755,7 +831,7 @@ export default function Sidebar({ isOpen, onClose }) {
             GRUPO: Direção (Diretor)
             (Dispositivos EDUCA-CAPTURE)
         ─────────────────────────────── */}
-        {(canDirecaoDevices || canGovernanca) && (
+        {(canDirecaoDevices || canGovernanca) && hasModulo('direcao') && (
           <>
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-2 transition"
@@ -775,6 +851,7 @@ export default function Sidebar({ isOpen, onClose }) {
 
             {openGroup === 'direcao' && (
               <ul className="ml-4 mb-2">
+                {hasModulo('direcao.educa_capture') && (
                 <li>
                   <Link
                     to="/direcao/diretor"
@@ -783,6 +860,8 @@ export default function Sidebar({ isOpen, onClose }) {
                     <ClipboardDocumentListIcon className="h-5 w-5 mr-2" /> Educa-Capture
                   </Link>
                 </li>
+                )}
+                {hasModulo('direcao.responsaveis') && (
                 <li>
                   <Link
                     to="/direcao/responsaveis"
@@ -791,6 +870,8 @@ export default function Sidebar({ isOpen, onClose }) {
                     <UserGroupIcon className="h-5 w-5 mr-2" /> Responsáveis
                   </Link>
                 </li>
+                )}
+                {hasModulo('direcao.cadastro') && (
                 <li>
                   <Link
                     to="/direcao/cadastro"
@@ -799,7 +880,8 @@ export default function Sidebar({ isOpen, onClose }) {
                     <UsersIcon className="h-5 w-5 mr-2" /> Cadastro
                   </Link>
                 </li>
-                {canGovernanca && (
+                )}
+                {canGovernanca && hasModulo('direcao.governanca') && (
                 <li>
                   <button
                     type="button"
@@ -835,7 +917,7 @@ export default function Sidebar({ isOpen, onClose }) {
             GRUPO: Monitoramento
             (Painel + Visitantes: Registrar / Histórico)
         ─────────────────────────────── */}
-        {canMonitoramento && (
+        {canMonitoramento && hasModulo('monitoramento') && (
           <>
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-2 transition"
@@ -855,6 +937,7 @@ export default function Sidebar({ isOpen, onClose }) {
 
             {openGroup === 'monitoramento' && (
               <ul className="ml-4 mb-2">
+                {hasModulo('monitoramento.painel') && (
                 <li>
                   {/* Match EXATO para não ficar ativo em /monitoramento/visitantes/... */}
                   <Link
@@ -864,6 +947,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     <UserGroupIcon className="h-5 w-5 mr-2" /> Painel ao vivo
                   </Link>
                 </li>
+                )}
 
                 <li>
                   <Link
@@ -881,6 +965,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     <ClockIcon className="h-5 w-5 mr-2" /> Visitantes — Histórico
                   </Link>
                 </li>
+                {hasModulo('monitoramento.embeddings') && (
                 <li>
                   <Link
                     to="/monitoramento/embeddings"
@@ -889,6 +974,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     <ChartBarIcon className="h-5 w-5 mr-2" /> Embeddings — Gerar
                   </Link>
                 </li>
+                )}
               </ul>
             )}
           </>
@@ -901,7 +987,7 @@ export default function Sidebar({ isOpen, onClose }) {
 
 
 
-        {isScopeEscola && !isProfessor && !isCoord && !isSecretario && (
+        {isScopeEscola && !isProfessor && !isCoord && !isSecretario && hasModulo('disciplinar') && (
           <>
             {/* ───────────────────────────────
                 GRUPO: Disciplinar
@@ -918,6 +1004,7 @@ export default function Sidebar({ isOpen, onClose }) {
             </div>
 
             <ul className="ml-4 mb-2">
+                {hasModulo('disciplinar.alunos') && (
                 <li>
                   <Link
                     to="/disciplinar/alunos"
@@ -926,6 +1013,8 @@ export default function Sidebar({ isOpen, onClose }) {
                     <UsersIcon className="h-5 w-5 mr-2" /> Alunos
                   </Link>
                 </li>
+                )}
+                {hasModulo('disciplinar.responsaveis') && (
                 <li>
                   <Link
                     to="/disciplinar/responsaveis"
@@ -934,6 +1023,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     <UserGroupIcon className="h-5 w-5 mr-2" /> Responsáveis
                   </Link>
                 </li>
+                )}
                 {(perfil === 'diretor' || perfil === 'militar') && (
                 <li>
                   <Link
@@ -944,6 +1034,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
                 )}
+                {hasModulo('disciplinar.fo_coletivo') && (
                 <li>
                   <Link
                     to="/disciplinar/fo-coletivo"
@@ -958,6 +1049,8 @@ export default function Sidebar({ isOpen, onClose }) {
                     <span className="flex-1">F.O. Coletivo</span>
                   </Link>
                 </li>
+                )}
+                {hasModulo('disciplinar.historico') && (
                 <li>
                   <Link
                     to="/disciplinar/historico"
@@ -972,6 +1065,8 @@ export default function Sidebar({ isOpen, onClose }) {
                     <span className="flex-1">Histórico</span>
                   </Link>
                 </li>
+                )}
+                {hasModulo('disciplinar.atas') && (
                 <li>
                   <Link
                     to="/disciplinar/atas"
@@ -986,6 +1081,8 @@ export default function Sidebar({ isOpen, onClose }) {
                     <span className="flex-1">Atas</span>
                   </Link>
                 </li>
+                )}
+                {hasModulo('disciplinar.liberacao') && (
                 <li>
                   <Link
                     to="/disciplinar/liberacao"
@@ -1000,6 +1097,8 @@ export default function Sidebar({ isOpen, onClose }) {
                     <span className="flex-1">Liberação</span>
                   </Link>
                 </li>
+                )}
+                {hasModulo('disciplinar.metadados') && (
                 <li>
                   <Link
                     to="/disciplinar/metadados"
@@ -1008,6 +1107,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     <TableCellsIcon className="h-5 w-5 mr-2" /> Metadados
                   </Link>
                 </li>
+                )}
               </ul>
             </>
             ) : (
@@ -1030,6 +1130,7 @@ export default function Sidebar({ isOpen, onClose }) {
 
             {openGroup === 'disciplinar' && (
               <ul className="ml-4 mb-2">
+                {hasModulo('disciplinar.alunos') && (
                 <li>
                   <Link
                     to="/disciplinar/alunos"
@@ -1038,6 +1139,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     <UsersIcon className="h-5 w-5 mr-2" /> Alunos
                   </Link>
                 </li>
+                )}
                 {/* ── DESABILITADO no EDUCA.MELHOR_escola ──
                     Será recriado futuramente no EDUCA.MELHOR_ceo
                 <li>
@@ -1049,6 +1151,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
                 ── FIM DESABILITADO ── */}
+                {hasModulo('disciplinar.responsaveis') && (
                 <li>
                   <Link
                     to="/disciplinar/responsaveis"
@@ -1057,6 +1160,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     <UserGroupIcon className="h-5 w-5 mr-2" /> Responsáveis
                   </Link>
                 </li>
+                )}
                 {(perfil === 'diretor' || perfil === 'militar') && (
                 <li>
                   <Link
@@ -1067,6 +1171,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
                 )}
+                {hasModulo('disciplinar.fo_coletivo') && (
                 <li>
                   <Link
                     to="/disciplinar/fo-coletivo"
@@ -1081,6 +1186,8 @@ export default function Sidebar({ isOpen, onClose }) {
                     <span className="flex-1">F.O. Coletivo</span>
                   </Link>
                 </li>
+                )}
+                {hasModulo('disciplinar.historico') && (
                 <li>
                   <Link
                     to="/disciplinar/historico"
@@ -1095,6 +1202,8 @@ export default function Sidebar({ isOpen, onClose }) {
                     <span className="flex-1">Histórico</span>
                   </Link>
                 </li>
+                )}
+                {hasModulo('disciplinar.atas') && (
                 <li>
                   <Link
                     to="/disciplinar/atas"
@@ -1109,6 +1218,8 @@ export default function Sidebar({ isOpen, onClose }) {
                     <span className="flex-1">Atas</span>
                   </Link>
                 </li>
+                )}
+                {hasModulo('disciplinar.liberacao') && (
                 <li>
                   <Link
                     to="/disciplinar/liberacao"
@@ -1123,6 +1234,8 @@ export default function Sidebar({ isOpen, onClose }) {
                     <span className="flex-1">Liberação</span>
                   </Link>
                 </li>
+                )}
+                {hasModulo('disciplinar.metadados') && (
                 <li>
                   <Link
                     to="/disciplinar/metadados"
@@ -1131,6 +1244,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     <TableCellsIcon className="h-5 w-5 mr-2" /> Metadados
                   </Link>
                 </li>
+                )}
               </ul>
             )}
             </>
@@ -1168,7 +1282,7 @@ export default function Sidebar({ isOpen, onClose }) {
           </>
         )}
 
-        {canAgenteEduca && (
+        {canAgenteEduca && hasModulo('agente_educa') && (
           <>
             {/* ───────────────────────────────
                 GRUPO: Agente EDUCA
@@ -1196,6 +1310,7 @@ export default function Sidebar({ isOpen, onClose }) {
 
                 {openGroup === 'agente-educa' && (
                   <ul className="ml-4 mb-2">
+                    {hasModulo('agente_educa.credenciais') && (
                     <li>
                       <Link
                         to="/agente-educa/credenciais"
@@ -1210,6 +1325,8 @@ export default function Sidebar({ isOpen, onClose }) {
                         }}>ETAPA 0</span>
                       </Link>
                     </li>
+                    )}
+                    {hasModulo('agente_educa.planos') && (
                     <li>
                       <Link
                         to="/agente-educa/planos"
@@ -1225,6 +1342,8 @@ export default function Sidebar({ isOpen, onClose }) {
                         }}>ETAPA 1</span>
                       </Link>
                     </li>
+                    )}
+                    {hasModulo('agente_educa.notas') && (
                     <li>
                       <Link
                         to="/agente-educa/notas"
@@ -1240,13 +1359,14 @@ export default function Sidebar({ isOpen, onClose }) {
                         }}>ETAPA 2</span>
                       </Link>
                     </li>
+                    )}
                   </ul>
                 )}
               </>
             )}
 
             {/* ─── GRUPO: Secretaria (Professor NÃO tem acesso) ─── */}
-            {!isProfessor && (
+            {!isProfessor && hasModulo('secretaria') && (
             <>
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-6 transition"
@@ -1276,6 +1396,7 @@ export default function Sidebar({ isOpen, onClose }) {
 
             {openGroup === 'secretaria' && (
               <ul className="ml-4 mb-2">
+                {hasModulo('secretaria.alunos') && (
                 <li>
                   <Link
                     to="/secretaria/alunos"
@@ -1284,6 +1405,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     <UsersIcon className="h-5 w-5 mr-2" /> Alunos
                   </Link>
                 </li>
+                )}
 
                 <li>
                   <Link
@@ -1312,6 +1434,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
 
+                {hasModulo('secretaria.modulacao') && (
                 <li>
                   <Link
                     to="/secretaria/modulacao"
@@ -1320,7 +1443,9 @@ export default function Sidebar({ isOpen, onClose }) {
                     <ClockIcon className="h-5 w-5 mr-2" /> Modulação
                   </Link>
                 </li>
+                )}
 
+                {hasModulo('secretaria.horarios') && (
                 <li>
                   <Link
                     to="/secretaria/horarios"
@@ -1329,7 +1454,9 @@ export default function Sidebar({ isOpen, onClose }) {
                     <ClockIcon className="h-5 w-5 mr-2" /> Horários
                   </Link>
                 </li>
+                )}
 
+                {hasModulo('secretaria.professores') && (
                 <li>
                   <Link
                     to="/secretaria/professores"
@@ -1338,6 +1465,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     <UsersIcon className="h-5 w-5 mr-2" /> Professores
                   </Link>
                 </li>
+                )}
 
                 <li>
                   <Link
@@ -1349,6 +1477,7 @@ export default function Sidebar({ isOpen, onClose }) {
                 </li>
 
                 {/* NOVO SUBMENU: Boletim */}
+                {hasModulo('secretaria.boletim') && (
                 <li>
                   <Link
                     to="/secretaria/boletim"
@@ -1357,6 +1486,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     <DocumentTextIcon className="h-5 w-5 mr-2" /> Boletim
                   </Link>
                 </li>
+                )}
 
                 {/* NOVO SUBMENU: Agente */}
                 <li>
@@ -1368,6 +1498,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
 
+                {hasModulo('secretaria.tabela_codigos') && (
                 <li>
                   <Link
                     to="/secretaria/tabela-codigos"
@@ -1376,8 +1507,10 @@ export default function Sidebar({ isOpen, onClose }) {
                     <TableCellsIcon className="h-5 w-5 mr-2" /> Tabela Códigos
                   </Link>
                 </li>
+                )}
 
                 {/* Relatórios */}
+                {hasModulo('secretaria.relatorios') && (
                 <li>
                   <Link
                     to="/secretaria/relatorios"
@@ -1401,6 +1534,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     }}>NOVO</span>
                   </Link>
                 </li>
+                )}
 
                 {/* Sincronizar SEEDF */}
                 <li>
@@ -1435,7 +1569,7 @@ export default function Sidebar({ isOpen, onClose }) {
           </>
         )}
 
-        {isScopeEscola && !isDisciplinar && !isProfessor && !isSecretario && (
+        {isScopeEscola && !isDisciplinar && !isProfessor && !isSecretario && hasModulo('pedagogico') && (
           <>
             {/* ───────────────────────────────
                 GRUPO: Pedagógico
@@ -1464,6 +1598,7 @@ export default function Sidebar({ isOpen, onClose }) {
 
             {openGroup === 'pedagogico' && (
               <ul className="ml-4 mb-2">
+                {hasModulo('pedagogico.conselho') && (
                 <li>
                   <Link
                     to="/pedagogico/conselho"
@@ -1475,8 +1610,9 @@ export default function Sidebar({ isOpen, onClose }) {
                     <CheckCircleIcon className="h-5 w-5 mr-2" /> Conselho de Classe
                   </Link>
                 </li>
+                )}
 
-                {canConteudos && (
+                {canConteudos && hasModulo('pedagogico.conteudos') && (
                   <li>
                     <Link
                       to="/pedagogico/conteudos-programaticos"
@@ -1540,6 +1676,7 @@ export default function Sidebar({ isOpen, onClose }) {
                 {/* Gabarito migrado para menu unificado (/gabarito) */}
 
                 {/* Relatórios Pedagógicos */}
+                {hasModulo('pedagogico.relatorios') && (
                 <li>
                   <Link
                     to="/pedagogico/relatorios"
@@ -1563,6 +1700,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     }}>NOVO</span>
                   </Link>
                 </li>
+                )}
 
                 <li>
                   <Link
@@ -1577,7 +1715,7 @@ export default function Sidebar({ isOpen, onClose }) {
           </>
         )}
 
-        {isScopeEscola && !isDisciplinar && !isProfessor && !isSecretario && (
+        {isScopeEscola && !isDisciplinar && !isProfessor && !isSecretario && hasModulo('frequencia') && (
           <>
             {/* ───────────────────────────────
                 GRUPO: Frequência
@@ -1613,6 +1751,7 @@ export default function Sidebar({ isOpen, onClose }) {
 
             {openGroup === 'frequencia' && (
               <ul className="ml-4 mb-2">
+                {hasModulo('frequencia.atestados') && (
                 <li>
                   <Link
                     to="/frequencia/atestados"
@@ -1621,6 +1760,8 @@ export default function Sidebar({ isOpen, onClose }) {
                     <DocumentTextIcon className="h-5 w-5 mr-2" /> Atestados
                   </Link>
                 </li>
+                )}
+                {hasModulo('frequencia.relatorios') && (
                 <li>
                   <Link
                     to="/frequencia/relatorios"
@@ -1629,6 +1770,8 @@ export default function Sidebar({ isOpen, onClose }) {
                     <ChartBarIcon className="h-5 w-5 mr-2" /> Relatórios
                   </Link>
                 </li>
+                )}
+                {hasModulo('frequencia.busca_ativa') && (
                 <li>
                   <Link
                     to="/frequencia/busca-ativa"
@@ -1637,6 +1780,8 @@ export default function Sidebar({ isOpen, onClose }) {
                     <UsersIcon className="h-5 w-5 mr-2" /> Busca Ativa
                   </Link>
                 </li>
+                )}
+                {hasModulo('frequencia.conselho_tutelar') && (
                 <li>
                   <Link
                     to="/frequencia/conselho-tutelar"
@@ -1645,12 +1790,13 @@ export default function Sidebar({ isOpen, onClose }) {
                     <ClipboardDocumentListIcon className="h-5 w-5 mr-2" /> Conselho Tutelar
                   </Link>
                 </li>
+                )}
               </ul>
             )}
           </>
         )}
 
-        {isScopeEscola && !isDisciplinar && !isProfessor && !isCoord && (
+        {isScopeEscola && !isDisciplinar && !isProfessor && !isCoord && hasModulo('impressao') && (
           <>
             {/* ───────────────────────────────
                 GRUPO: Impressão
@@ -1671,6 +1817,7 @@ export default function Sidebar({ isOpen, onClose }) {
 
             {openGroup === 'impressao' && (
               <ul className="ml-4 mb-2">
+                {hasModulo('impressao.boletins') && (
                 <li>
                   <Link
                     to="/impressao/boletins"
@@ -1679,6 +1826,8 @@ export default function Sidebar({ isOpen, onClose }) {
                     <ChartBarIcon className="h-5 w-5 mr-2" /> Boletins
                   </Link>
                 </li>
+                )}
+                {hasModulo('impressao.gabaritos') && (
                 <li>
                   <Link
                     to="/impressao/gabaritos"
@@ -1687,6 +1836,8 @@ export default function Sidebar({ isOpen, onClose }) {
                     <DocumentTextIcon className="h-5 w-5 mr-2" /> Gabaritos
                   </Link>
                 </li>
+                )}
+                {hasModulo('impressao.listas') && (
                 <li>
                   <Link
                     to="/impressao/listas"
@@ -1695,6 +1846,8 @@ export default function Sidebar({ isOpen, onClose }) {
                     <ClipboardDocumentListIcon className="h-5 w-5 mr-2" /> Listas
                   </Link>
                 </li>
+                )}
+                {hasModulo('impressao.documentos') && (
                 <li>
                   <Link
                     to="/impressao/documentos"
@@ -1710,6 +1863,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     }}>NOVO</span>
                   </Link>
                 </li>
+                )}
               </ul>
             )}
           </>

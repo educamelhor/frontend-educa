@@ -165,6 +165,25 @@ export default function Sidebar({ isOpen, onClose }) {
   const isProfessor = perfil === 'professor';
   const isSecretario = perfil === 'secretario' || perfil === 'secretaria';
 
+  // canSeeDisciplinar: grupo Disciplinar só renderiza se ao menos 1 sub-módulo
+  // está ativo para este perfil. Evita header vazio e clicável sem conteúdo.
+  const canSeeDisciplinar = isScopeEscola
+    && !isProfessor
+    && perfil !== 'coordenador'  // coordenador não acessa disciplinar
+    && !isSecretario
+    && (
+      hasModulo('disciplinar.alunos') ||
+      hasModulo('disciplinar.responsaveis') ||
+      hasModulo('disciplinar.fo_coletivo') ||
+      hasModulo('disciplinar.historico') ||
+      hasModulo('disciplinar.atas') ||
+      hasModulo('disciplinar.liberacao') ||
+      hasModulo('disciplinar.metadados') ||
+      hasModulo('disciplinar.regimentos') ||
+      hasModulo('disciplinar.manual') ||
+      ((perfil === 'diretor' || perfil === 'militar') && hasModulo('disciplinar.equipe'))
+    );
+
   // Começando pelos 3 módulos solicitados
   const canConteudos = isScopeEscola && !isDisciplinar && !isProfessor && hasPerm('conteudos:ver');
   const canAvaliacoes = isScopeEscola && !isDisciplinar && !isProfessor && hasPerm('avaliacoes.visualizar');
@@ -1062,7 +1081,7 @@ export default function Sidebar({ isOpen, onClose }) {
 
 
 
-        {isScopeEscola && !isProfessor && !isCoord && !isSecretario && hasModulo('disciplinar') && (
+        {canSeeDisciplinar && (
           <>
             {/* ───────────────────────────────
                 GRUPO: Disciplinar

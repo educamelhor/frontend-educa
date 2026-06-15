@@ -48,6 +48,8 @@ const MODULOS_TREE = [
       { id: 'pedagogico.conteudos', label: 'Conteúdos' },
       { id: 'pedagogico.relatorios', label: 'Relatórios' },
       { id: 'pedagogico.correcoes', label: 'Correções' },
+      { id: 'pedagogico.solicitacao', label: 'Solicitação' },
+      { id: 'pedagogico.provas', label: 'Provas' },
     ]
   },
   {

@@ -99,15 +99,28 @@ export default function Sidebar({ isOpen, onClose }) {
     return () => window.removeEventListener('storage', onStorage);
   }, [location.pathname]);
 
+  // ── Garante que o refresh rode sempre após um page load (hard refresh incluído) ──
+  // O Ctrl+Shift+R no Chrome NÃO limpa sessionStorage, então o debounce ficaria
+  // bloqueado. Este effect roda uma vez na montagem e zera o timestamp.
+  useEffect(() => {
+    sessionStorage.removeItem('modulos_last_refresh');
+  }, []); // apenas na montagem do componente
+
   // ── Refresh automático: busca módulos atualizados do servidor ──
   // Detecta mudanças feitas pelo CEO sem precisar fazer logout/login
-  // Usa debounce de 5 min para não sobrecarregar o backend em navegações rápidas
+  // Debounce de 5 min entre chamadas — mas bypassa se modulos_ativos estiver vazio
   useEffect(() => {
     const refreshFromServer = async () => {
       try {
         const lastRefresh = parseInt(sessionStorage.getItem('modulos_last_refresh') || '0');
         const agora = Date.now();
-        if (agora - lastRefresh < 5 * 60 * 1000) return; // aguarda 5 min entre chamadas
+        const rawModulos = localStorage.getItem('modulos_ativos');
+
+        // Bypass do debounce se modulos_ativos está vazio ('[]') — estado claramente errado.
+        // Cobre o caso do CEO que ficou com [] por conta da regressão.
+        // Nos demais casos aplica o debounce de 5 min normalmente.
+        const modulosParecemVazios = rawModulos === '[]' || rawModulos === '';
+        if (!modulosParecemVazios && agora - lastRefresh < 5 * 60 * 1000) return;
 
         const token = localStorage.getItem('token');
         if (!token) return; // sem token, nada a fazer
@@ -147,7 +160,7 @@ export default function Sidebar({ isOpen, onClose }) {
       } catch (_) { /* silent fail — não bloqueia o sidebar */ }
     };
     refreshFromServer();
-  }, [location.pathname]); // verifica a cada navegação, mas só chama API após 5 min
+  }, [location.pathname]); // verifica a cada navegação
 
   // hasModulo: null = sem restrição = true; array = verifica se contém o módulo
   const hasModulo = (mod) => _modulos === null || _modulos.includes(mod);

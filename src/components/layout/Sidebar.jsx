@@ -99,6 +99,61 @@ export default function Sidebar({ isOpen, onClose }) {
     return () => window.removeEventListener('storage', onStorage);
   }, [location.pathname]);
 
+  // ── Garante que o refresh rode sempre após um page load (hard refresh incluído) ──
+  // Ctrl+Shift+R no Chrome NÃO limpa sessionStorage, então o debounce ficaria bloqueado.
+  useEffect(() => {
+    sessionStorage.removeItem('modulos_last_refresh');
+  }, []); // apenas na montagem do componente
+
+  // ── Refresh automático: busca módulos atualizados do servidor ──
+  // CEO muda configuração → escola reflete em até 30 segundos sem precisar de logout.
+  useEffect(() => {
+    const refreshFromServer = async () => {
+      try {
+        const lastRefresh = parseInt(sessionStorage.getItem('modulos_last_refresh') || '0');
+        const agora = Date.now();
+        const rawModulos = localStorage.getItem('modulos_ativos');
+        // Bypass se modulos está [] (estado errado) OU se passou o debounce de 30s
+        const modulosParecemVazios = rawModulos === '[]' || rawModulos === '';
+        if (!modulosParecemVazios && agora - lastRefresh < 30 * 1000) return;
+
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        const apiBase = import.meta.env.VITE_API_URL || '';
+        const res = await fetch(`${apiBase}/api/auth/modulos`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data.ok) return;
+
+        sessionStorage.setItem('modulos_last_refresh', String(Date.now()));
+
+        if (Array.isArray(data.modulos_ativos)) {
+          const rawCurrent = localStorage.getItem('modulos_ativos');
+          const current = rawCurrent && rawCurrent !== 'null'
+            ? JSON.parse(rawCurrent) : [];
+          const incoming = data.modulos_ativos;
+          const sortedCurrent = Array.isArray(current)
+            ? [...current].sort().join(',') : '';
+          const sortedIncoming = [...incoming].sort().join(',');
+          if (sortedCurrent !== sortedIncoming) {
+            localStorage.setItem('modulos_ativos', JSON.stringify(incoming));
+            setModulos(incoming);
+          }
+        } else if (data.modulos_ativos === null) {
+          // CEO / super_admin / sem escola → acesso IRRESTRITO
+          const rawCurrent = localStorage.getItem('modulos_ativos');
+          if (rawCurrent && rawCurrent !== 'null') {
+            localStorage.removeItem('modulos_ativos');
+            setModulos(null);
+          }
+        }
+      } catch (_) { /* silent fail */ }
+    };
+    refreshFromServer();
+  }, [location.pathname]); // verifica a cada navegação
+
   // hasModulo: null = sem restrição = true; array = verifica se contém o módulo
   const hasModulo = (mod) => _modulos === null || _modulos.includes(mod);
 
@@ -1044,7 +1099,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
                 )}
-                {(perfil === 'diretor' || perfil === 'militar') && (
+                {(perfil === 'diretor' || perfil === 'militar') && hasModulo('disciplinar.equipe') && (
                 <li>
                   <Link
                     to="/disciplinar/equipe"
@@ -1181,7 +1236,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
                 )}
-                {(perfil === 'diretor' || perfil === 'militar') && (
+                {(perfil === 'diretor' || perfil === 'militar') && hasModulo('disciplinar.equipe') && (
                 <li>
                   <Link
                     to="/disciplinar/equipe"

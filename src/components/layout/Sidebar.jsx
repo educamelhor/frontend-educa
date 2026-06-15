@@ -212,6 +212,32 @@ export default function Sidebar({ isOpen, onClose }) {
     hasModulo('secretaria.modulacao')
   );
 
+  // canSeePedagogico: grupo só aparece se ao menos 1 sub-módulo ativo
+  const canSeePedagogico = isScopeEscola && !isDisciplinar && !isProfessor && !isSecretario && (
+    hasModulo('pedagogico.conselho') ||
+    hasModulo('pedagogico.conteudos') ||
+    hasModulo('pedagogico.relatorios') ||
+    hasModulo('pedagogico.correcoes') ||
+    hasModulo('pedagogico.solicitacao') ||
+    hasModulo('pedagogico.provas')
+  );
+
+  // canSeeFrequencia: grupo só aparece se ao menos 1 sub-módulo ativo
+  const canSeeFrequencia = isScopeEscola && !isDisciplinar && !isProfessor && !isSecretario && (
+    hasModulo('frequencia.atestados') ||
+    hasModulo('frequencia.relatorios') ||
+    hasModulo('frequencia.busca_ativa') ||
+    hasModulo('frequencia.conselho_tutelar')
+  );
+
+  // canSeeImpressao: grupo só aparece se ao menos 1 sub-módulo ativo
+  const canSeeImpressao = isScopeEscola && !isDisciplinar && !isProfessor && perfil !== 'coordenador' && (
+    hasModulo('impressao.boletins') ||
+    hasModulo('impressao.gabaritos') ||
+    hasModulo('impressao.listas') ||
+    hasModulo('impressao.documentos')
+  );
+
   // Banco de Questões — restrito a Direção e Coordenação (em desenvolvimento/aprovação)
   const canBancoQuestoes = isScopeEscola && !isDisciplinar && (perfil === 'diretor' || perfil === 'vice_diretor' || perfil === 'coordenador');
 
@@ -1696,7 +1722,7 @@ export default function Sidebar({ isOpen, onClose }) {
           </>
         )}
 
-        {isScopeEscola && !isDisciplinar && !isProfessor && !isSecretario && hasModulo('pedagogico') && (
+        {canSeePedagogico && (
           <>
             {/* ───────────────────────────────
                 GRUPO: Pedagógico
@@ -1750,6 +1776,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   </li>
                 )}
 
+                {hasModulo('pedagogico.solicitacao') && (
                 <li>
                   <Link
                     to="/pedagogico/coordenacao/solicitacoes"
@@ -1758,9 +1785,11 @@ export default function Sidebar({ isOpen, onClose }) {
                     <ClipboardDocumentListIcon className="h-5 w-5 mr-2" /> Solicitações
                   </Link>
                 </li>
+                )}
 
 
 
+                {hasModulo('pedagogico.provas') && (
                 <li>
                   <Link
                     to="/pedagogico/provas"
@@ -1769,8 +1798,10 @@ export default function Sidebar({ isOpen, onClose }) {
                     <DocumentTextIcon className="h-5 w-5 mr-2" /> Provas
                   </Link>
                 </li>
+                )}
 
                 {/* Submenu Correções */}
+                {hasModulo('pedagogico.correcoes') && (
                 <li>
                   <button
                     className="flex items-center w-full py-2 pl-6 pr-3 rounded hover:bg-blue-700 transition"
@@ -1799,6 +1830,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     </ul>
                   )}
                 </li>
+                )}
 
                 {/* Gabarito migrado para menu unificado (/gabarito) */}
 
@@ -1834,7 +1866,7 @@ export default function Sidebar({ isOpen, onClose }) {
           </>
         )}
 
-        {isScopeEscola && !isDisciplinar && !isProfessor && !isSecretario && hasModulo('frequencia') && (
+        {canSeeFrequencia && (
           <>
             {/* ───────────────────────────────
                 GRUPO: Frequência
@@ -1915,7 +1947,7 @@ export default function Sidebar({ isOpen, onClose }) {
           </>
         )}
 
-        {isScopeEscola && !isDisciplinar && !isProfessor && !isCoord && hasModulo('impressao') && (
+        {canSeeImpressao && (
           <>
             {/* ───────────────────────────────
                 GRUPO: Impressão

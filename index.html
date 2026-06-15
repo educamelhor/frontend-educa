@@ -6,23 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Sistema de Gestão de Alunos" />
     <title>Gestão de Alunos</title>
-
-    <!-- MathJax 3 — renderização de fórmulas LaTeX ($...$ e \[...\]) -->
-    <script>
-      window.MathJax = {
-        tex: {
-          inlineMath: [['$', '$'], ['\\(', '\\)']],
-          displayMath: [['$$', '$$'], ['\\[', '\\]']],
-          processEscapes: true,
-          tags: 'ams',
-        },
-        options: {
-          skipHtmlTags: ['script','noscript','style','textarea','pre'],
-        },
-        startup: { typeset: false }, // não faz typeset automático global — controlado por componente
-      };
-    </script>
-    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" async defer></script>
   </head>
   <body class="bg-blue-50 min-h-screen">
     <div id="root"></div>

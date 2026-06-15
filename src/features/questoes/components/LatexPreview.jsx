@@ -1,23 +1,15 @@
 // src/features/questoes/components/LatexPreview.jsx
-import React, { useMemo, useEffect, useRef } from 'react';
+import React, { useMemo } from 'react';
 
 /**
- * Pré-visualização AO VIVO da questão com MathJax 3.
- * Fórmulas $...$ e \[...\] são renderizadas em tempo real.
- * Fallback: destaque em código se MathJax ainda não carregou.
+ * Gera uma pré-visualização estilizada da questão.
+ * Mostra os dados como aparecerão na prova (sem renderização LaTeX real no MVP).
+ * LaTeX inline ($...$) é destacado com estilo código para indicar fórmulas.
  */
 
-/** Dispara MathJax em um elemento específico */
-function typesetElement(el) {
-  if (!el) return;
-  if (window.MathJax?.typesetPromise) {
-    window.MathJax.typesetPromise([el]).catch(() => {});
-  }
-}
-
-/** Texto simples para fallback (antes do MathJax carregar) */
-function TextoFallback({ text }) {
+function renderTextWithLatex(text) {
   if (!text) return null;
+  // Divide o texto em partes: texto normal e expressões LaTeX inline ($...$)
   const parts = text.split(/(\$[^$]+\$)/g);
   return parts.map((part, i) => {
     if (part.startsWith('$') && part.endsWith('$')) {
@@ -40,15 +32,6 @@ function TextoFallback({ text }) {
 }
 
 export default function LatexPreview({ questao }) {
-  const previewRef = useRef(null);
-
-  // Re-tipeseta sempre que o enunciado ou alternativas mudam
-  useEffect(() => {
-    const el = previewRef.current;
-    if (!el) return;
-    const timer = setTimeout(() => typesetElement(el), 120);
-    return () => clearTimeout(timer);
-  }, [questao?.enunciado, questao?.alternativas]);
   const { disciplina, tipo, nivel, serie, enunciado, alternativas = [], tags = [], habilidade_bncc, imagem } = questao;
 
   const hasContent = enunciado || alternativas.some(a => a.texto);
@@ -62,7 +45,7 @@ export default function LatexPreview({ questao }) {
   };
 
   return (
-    <div className="bq-preview-panel" ref={previewRef}>
+    <div className="bq-preview-panel">
       <div className="bq-preview-header">
         <span className="bq-preview-title">👁️ Pré-visualização</span>
         <span className="bq-preview-pill">AO VIVO</span>
@@ -100,10 +83,10 @@ export default function LatexPreview({ questao }) {
             {/* Número e linha decorativa */}
             <div className="bq-preview-questao-num">QUESTÃO 1</div>
 
-            {/* Enunciado — MathJax renderiza $...$ automaticamente via typesetPromise */}
+            {/* Enunciado */}
             {enunciado && (
               <p className="bq-preview-enunciado">
-                {enunciado}
+                {renderTextWithLatex(enunciado)}
               </p>
             )}
 
@@ -130,7 +113,7 @@ export default function LatexPreview({ questao }) {
                 {alternativas.filter(a => a.texto).map(alt => (
                   <li key={alt.id} className={`bq-preview-alt${alt.correta ? ' correct' : ''}`}>
                     <span className="bq-preview-alt-letra">({alt.letra})</span>
-                    <span>{alt.texto}</span>
+                    <span>{renderTextWithLatex(alt.texto)}</span>
                     {alt.correta && (
                       <span style={{ marginLeft: 6, fontSize: '0.75rem' }}>✓</span>
                     )}

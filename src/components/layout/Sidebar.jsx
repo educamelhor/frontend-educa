@@ -99,69 +99,6 @@ export default function Sidebar({ isOpen, onClose }) {
     return () => window.removeEventListener('storage', onStorage);
   }, [location.pathname]);
 
-  // ── Garante que o refresh rode sempre após um page load (hard refresh incluído) ──
-  // O Ctrl+Shift+R no Chrome NÃO limpa sessionStorage, então o debounce ficaria
-  // bloqueado. Este effect roda uma vez na montagem e zera o timestamp.
-  useEffect(() => {
-    sessionStorage.removeItem('modulos_last_refresh');
-  }, []); // apenas na montagem do componente
-
-  // ── Refresh automático: busca módulos atualizados do servidor ──
-  // Detecta mudanças feitas pelo CEO sem precisar fazer logout/login
-  // Debounce de 5 min entre chamadas — mas bypassa se modulos_ativos estiver vazio
-  useEffect(() => {
-    const refreshFromServer = async () => {
-      try {
-        const lastRefresh = parseInt(sessionStorage.getItem('modulos_last_refresh') || '0');
-        const agora = Date.now();
-        const rawModulos = localStorage.getItem('modulos_ativos');
-
-        // Bypass do debounce se modulos_ativos está vazio ('[]') — estado claramente errado.
-        // Cobre o caso do CEO que ficou com [] por conta da regressão.
-        // Nos demais casos aplica o debounce de 5 min normalmente.
-        const modulosParecemVazios = rawModulos === '[]' || rawModulos === '';
-        if (!modulosParecemVazios && agora - lastRefresh < 5 * 60 * 1000) return;
-
-        const token = localStorage.getItem('token');
-        if (!token) return; // sem token, nada a fazer
-        // Nota: escolaId pode ser null para CEO/super_admin — não bloquear por isso
-        const apiBase = import.meta.env.VITE_API_URL || '';
-        const res = await fetch(`${apiBase}/api/auth/modulos`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!data.ok) return;
-
-        sessionStorage.setItem('modulos_last_refresh', String(Date.now()));
-
-        if (Array.isArray(data.modulos_ativos)) {
-          // Escola com módulos configurados → atualiza se mudou
-          const rawCurrent = localStorage.getItem('modulos_ativos');
-          const current = rawCurrent && rawCurrent !== 'null'
-            ? JSON.parse(rawCurrent) : [];
-          const incoming = data.modulos_ativos;
-          const sortedCurrent = Array.isArray(current)
-            ? [...current].sort().join(',') : '';
-          const sortedIncoming = [...incoming].sort().join(',');
-          if (sortedCurrent !== sortedIncoming) {
-            localStorage.setItem('modulos_ativos', JSON.stringify(incoming));
-            setModulos(incoming);
-          }
-        } else if (data.modulos_ativos === null) {
-          // CEO / super_admin / sem escola → acesso IRRESTRITO
-          // Garante que qualquer [] anterior seja limpo
-          const rawCurrent = localStorage.getItem('modulos_ativos');
-          if (rawCurrent && rawCurrent !== 'null') {
-            localStorage.removeItem('modulos_ativos');
-            setModulos(null);
-          }
-        }
-      } catch (_) { /* silent fail — não bloqueia o sidebar */ }
-    };
-    refreshFromServer();
-  }, [location.pathname]); // verifica a cada navegação
-
   // hasModulo: null = sem restrição = true; array = verifica se contém o módulo
   const hasModulo = (mod) => _modulos === null || _modulos.includes(mod);
 
@@ -242,7 +179,7 @@ export default function Sidebar({ isOpen, onClose }) {
     if (p.startsWith('/secretaria')) {
       setOpenGroup('secretaria');
     }
-    else if (p.startsWith('/disciplinar') && !/^\/(disciplinar\/suporte)/.test(p)) setOpenGroup('disciplinar');
+    else if (p.startsWith('/disciplinar') && !/^\/(disciplinar\/(regimentos|manual|suporte))/.test(p)) setOpenGroup('disciplinar');
     else if (p.startsWith('/pedagogico')) {
       setOpenGroup('pedagogico');
       // Auto-abrir submenu Correções se estiver em rota de correções
@@ -991,33 +928,6 @@ export default function Sidebar({ isOpen, onClose }) {
                   </button>
                 </li>
                 )}
-                {canGovernanca && hasModulo('direcao') && (
-                <li>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setOpenGroup('direcao');
-                      navigate('/direcao/modulos-perfil');
-                    }}
-                    className={getSubmenuLinkClasses('/direcao/modulos-perfil', true)}
-                    style={{
-                      background: isActive('/direcao/modulos-perfil', true)
-                        ? 'linear-gradient(90deg, rgba(16,185,129,0.18), transparent)'
-                        : undefined,
-                      width: '100%',
-                      border: 'none',
-                      color: 'inherit',
-                      font: 'inherit',
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                    }}
-                  >
-                    <Cog6ToothIcon className="h-5 w-5 mr-2" style={{ color: isActive('/direcao/modulos-perfil', true) ? '#10b981' : undefined }} /> Módulos por Perfil
-                  </button>
-                </li>
-                )}
               </ul>
             )}
           </>
@@ -1134,7 +1044,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
                 )}
-                {(perfil === 'diretor' || perfil === 'militar') && hasModulo('disciplinar.equipe') && (
+                {(perfil === 'diretor' || perfil === 'militar') && (
                 <li>
                   <Link
                     to="/disciplinar/equipe"
@@ -1215,26 +1125,6 @@ export default function Sidebar({ isOpen, onClose }) {
                     className={getSubmenuLinkClasses('/disciplinar/metadados')}
                   >
                     <TableCellsIcon className="h-5 w-5 mr-2" /> Metadados
-                  </Link>
-                </li>
-                )}
-                {hasModulo('disciplinar.regimentos') && (
-                <li>
-                  <Link
-                    to="/disciplinar/regimentos"
-                    className={getSubmenuLinkClasses('/disciplinar/regimentos')}
-                  >
-                    <DocumentTextIcon className="h-5 w-5 mr-2" /> Regimentos
-                  </Link>
-                </li>
-                )}
-                {hasModulo('disciplinar.manual') && (
-                <li>
-                  <Link
-                    to="/disciplinar/manual"
-                    className={getSubmenuLinkClasses('/disciplinar/manual')}
-                  >
-                    <BookOpenIcon className="h-5 w-5 mr-2" /> Manual
                   </Link>
                 </li>
                 )}
@@ -1291,7 +1181,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
                 )}
-                {(perfil === 'diretor' || perfil === 'militar') && hasModulo('disciplinar.equipe') && (
+                {(perfil === 'diretor' || perfil === 'militar') && (
                 <li>
                   <Link
                     to="/disciplinar/equipe"
@@ -1375,26 +1265,6 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
                 )}
-                {hasModulo('disciplinar.regimentos') && (
-                <li>
-                  <Link
-                    to="/disciplinar/regimentos"
-                    className={getSubmenuLinkClasses('/disciplinar/regimentos')}
-                  >
-                    <DocumentTextIcon className="h-5 w-5 mr-2" /> Regimentos
-                  </Link>
-                </li>
-                )}
-                {hasModulo('disciplinar.manual') && (
-                <li>
-                  <Link
-                    to="/disciplinar/manual"
-                    className={getSubmenuLinkClasses('/disciplinar/manual')}
-                  >
-                    <BookOpenIcon className="h-5 w-5 mr-2" /> Manual
-                  </Link>
-                </li>
-                )}
               </ul>
             )}
             </>
@@ -1403,15 +1273,37 @@ export default function Sidebar({ isOpen, onClose }) {
         )}
 
         {/* ───────────────────────────────
-            MENU INDEPENDENTE: Suporte
+            MENUS INDEPENDENTES: Regimentos, Manual, Suporte
+            (Acessíveis a qualquer usuário logado)
         ─────────────────────────────── */}
         {isScopeEscola && !isSecretario && (
-          <Link
-            to="/disciplinar/suporte"
-            className={getMainLinkClasses('/disciplinar/suporte')}
-          >
-            <QuestionMarkCircleIcon className="h-5 w-5 mr-2" /> Suporte
-          </Link>
+          <>
+            {hasModulo('disciplinar.regimentos') && (
+            <Link
+              to="/disciplinar/regimentos"
+              className={getMainLinkClasses('/disciplinar/regimentos')}
+              style={{ marginTop: 8 }}
+            >
+              <DocumentTextIcon className="h-5 w-5 mr-2" /> Regimentos
+            </Link>
+            )}
+
+            {hasModulo('disciplinar.manual') && (
+            <Link
+              to="/disciplinar/manual"
+              className={getMainLinkClasses('/disciplinar/manual')}
+            >
+              <BookOpenIcon className="h-5 w-5 mr-2" /> Manual
+            </Link>
+            )}
+
+            <Link
+              to="/disciplinar/suporte"
+              className={getMainLinkClasses('/disciplinar/suporte')}
+            >
+              <QuestionMarkCircleIcon className="h-5 w-5 mr-2" /> Suporte
+            </Link>
+          </>
         )}
 
         {canAgenteEduca && hasModulo('agente_educa') && (
@@ -1496,12 +1388,10 @@ export default function Sidebar({ isOpen, onClose }) {
                 )}
               </>
             )}
-          </>
-        )}
 
-        {/* ─── GRUPO: Secretaria (Professor NÃO tem acesso) ─── */}
-        {isScopeEscola && !isProfessor && hasModulo('secretaria') && (
-        <>
+            {/* ─── GRUPO: Secretaria (Professor NÃO tem acesso) ─── */}
+            {!isProfessor && hasModulo('secretaria') && (
+            <>
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-6 transition"
               onClick={() => setOpenGroup(openGroup === 'secretaria' ? null : 'secretaria')}
@@ -1541,7 +1431,6 @@ export default function Sidebar({ isOpen, onClose }) {
                 </li>
                 )}
 
-                {hasModulo('secretaria.responsaveis') && (
                 <li>
                   <Link
                     to="/secretaria/responsaveis"
@@ -1550,9 +1439,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     <UserGroupIcon className="h-5 w-5 mr-2" /> Responsáveis
                   </Link>
                 </li>
-                )}
 
-                {hasModulo('secretaria.cargas_horarias') && (
                 <li>
                   <Link
                     to="/secretaria/cargas-horarias"
@@ -1561,9 +1448,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     <ClockIcon className="h-5 w-5 mr-2" /> Cargas Horárias
                   </Link>
                 </li>
-                )}
 
-                {hasModulo('secretaria.disciplinas') && (
                 <li>
                   <Link
                     to="/secretaria/disciplinas"
@@ -1572,7 +1457,6 @@ export default function Sidebar({ isOpen, onClose }) {
                     <BookOpenIcon className="h-5 w-5 mr-2" /> Disciplinas
                   </Link>
                 </li>
-                )}
 
                 {hasModulo('secretaria.modulacao') && (
                 <li>
@@ -1607,7 +1491,6 @@ export default function Sidebar({ isOpen, onClose }) {
                 </li>
                 )}
 
-                {hasModulo('secretaria.turmas') && (
                 <li>
                   <Link
                     to="/secretaria/turmas"
@@ -1616,7 +1499,6 @@ export default function Sidebar({ isOpen, onClose }) {
                     <AcademicCapIcon className="h-5 w-5 mr-2" /> Turmas
                   </Link>
                 </li>
-                )}
 
                 {/* NOVO SUBMENU: Boletim */}
                 {hasModulo('secretaria.boletim') && (
@@ -1631,7 +1513,6 @@ export default function Sidebar({ isOpen, onClose }) {
                 )}
 
                 {/* NOVO SUBMENU: Agente */}
-                {hasModulo('secretaria.agente') && (
                 <li>
                   <Link
                     to="/secretaria/agente"
@@ -1640,7 +1521,6 @@ export default function Sidebar({ isOpen, onClose }) {
                     <BoltIcon className="h-5 w-5 mr-2" /> Agente
                   </Link>
                 </li>
-                )}
 
                 {hasModulo('secretaria.tabela_codigos') && (
                 <li>
@@ -1681,7 +1561,6 @@ export default function Sidebar({ isOpen, onClose }) {
                 )}
 
                 {/* Sincronizar SEEDF */}
-                {hasModulo('secretaria.sincronizar_seedf') && (
                 <li>
                   <Link
                     to="/secretaria/sincronizar-seedf"
@@ -1707,10 +1586,11 @@ export default function Sidebar({ isOpen, onClose }) {
                     }}>NOVO</span>
                   </Link>
                 </li>
-                )}
               </ul>
             )}
-        </>
+            </>
+            )}
+          </>
         )}
 
         {isScopeEscola && !isDisciplinar && !isProfessor && !isSecretario && hasModulo('pedagogico') && (

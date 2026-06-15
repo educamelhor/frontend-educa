@@ -1,5 +1,5 @@
 // src/features/questoes/QuestoesBanco.jsx
-// Sprint 3 — Banco de Questões: 3 níveis (Global/Escola/Meu), autoria, Q-number
+// Sprint 2 — Banco de Questões com paginação server-side, filtros completos e modal de detalhes
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import apiService from '../../services/api';
@@ -12,12 +12,7 @@ function decodificarToken() {
     const token = localStorage.getItem('token');
     if (!token) return {};
     const payload = JSON.parse(atob(token.split('.')[1]));
-    return {
-      professor_id: payload.professor_id || null,
-      perfil: payload.perfil || '',
-      escola_id: payload.escola_id || null,
-      nome: payload.nome || '',
-    };
+    return { professor_id: payload.professor_id || null, perfil: payload.perfil || '' };
   } catch { return {}; }
 }
 
@@ -198,32 +193,20 @@ function parseTags(raw) {
   catch { return []; }
 }
 
-/* ── Card de questão ───────────────────────────── */
-function QuestaoCard({ questao, onEdit, onDuplicate, onGerenciar, onClick, isAutor, minhaEscolaId }) {
+/* ── Card de questão ─────────────────────────────────────── */
+function QuestaoCard({ questao, onEdit, onDuplicate, onGerenciar, onClick, isAutor }) {
   const nivel = questao.nivel || 'medio';
   const tags = parseTags(questao.tags);
   let alts = [];
   try { alts = JSON.parse(questao.alternativas_json || '[]'); } catch {}
-
-  const numQ = questao.numero_q
-    ? `Q${String(questao.numero_q).padStart(4, '0')}`
-    : null;
-  const deOutraEscola = questao.escola_id && minhaEscolaId && Number(questao.escola_id) !== Number(minhaEscolaId);
 
   return (
     <div className="bq-question-card" onClick={() => onClick(questao)}>
       <div className={`bq-question-card-top nivel-${nivel}`} />
 
       <div className="bq-question-card-body">
-        {/* Número Q + Meta */}
+        {/* Meta */}
         <div className="bq-question-card-meta">
-          {numQ && (
-            <span style={{
-              fontFamily: 'monospace', fontWeight: 800, fontSize: '0.75rem',
-              background: '#0f172a', color: '#e2e8f0',
-              padding: '1px 7px', borderRadius: 5, letterSpacing: '0.04em',
-            }}>{numQ}</span>
-          )}
           {questao.disciplina && <span className="bq-badge bq-badge-disc">{questao.disciplina}</span>}
           {questao.tipo       && <span className="bq-badge bq-badge-tipo">{TIPO_LABEL[questao.tipo] || questao.tipo}</span>}
           {nivel && (
@@ -240,11 +223,6 @@ function QuestaoCard({ questao, onEdit, onDuplicate, onGerenciar, onClick, isAut
           {questao.status === 'rascunho' && (
             <span className="bq-badge" style={{ background: '#f5f5f4', color: '#78716c' }}>Rascunho</span>
           )}
-          {deOutraEscola && (
-            <span className="bq-badge" style={{ background: '#f0fdf4', color: '#166534', fontSize: '0.63rem' }}>
-              🌐 Global
-            </span>
-          )}
         </div>
 
         {/* Enunciado preview */}
@@ -252,22 +230,13 @@ function QuestaoCard({ questao, onEdit, onDuplicate, onGerenciar, onClick, isAut
           {questao.conteudo_bruto || '(sem enunciado)'}
         </p>
 
-        {/* Autor */}
-        {questao.professor_nome && (
-          <div style={{ fontSize: '0.68rem', color: '#64748b', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
-            <span>👤</span>
-            <span style={{ fontStyle: 'italic' }}>{questao.professor_nome}</span>
-            {isAutor && <span style={{ color: '#7c3aed', fontWeight: 700, fontStyle: 'normal' }}>· Minha</span>}
-          </div>
-        )}
-
         {/* Info rápida */}
         {alts.length > 0 && (
           <div style={{ fontSize: '0.72rem', color: '#94a3b8', marginTop: 5 }}>
             {alts.length} alternativas{questao.correta ? ` · Gabarito: (${questao.correta})` : ''}
           </div>
         )}
-        {/* uso + compartilhada */}
+        {/* Sprint 5: uso + compartilhada */}
         <div style={{ display: 'flex', gap: 5, marginTop: 6, flexWrap: 'wrap' }}>
           {(questao.vezes_utilizada > 0) && (
             <span style={{ fontSize: '0.66rem', padding: '1px 7px', borderRadius: 99, background: '#f0f9ff', color: '#0369a1', border: '1px solid #bae6fd', fontWeight: 700 }}>
@@ -279,60 +248,57 @@ function QuestaoCard({ questao, onEdit, onDuplicate, onGerenciar, onClick, isAut
               🤝 Compartilhada
             </span>
           )}
+          {isAutor && (
+            <span style={{ fontSize: '0.66rem', padding: '1px 7px', borderRadius: 99, background: '#f5f3ff', color: '#7c3aed', border: '1px solid #ddd6fe', fontWeight: 700 }}>
+              ✍️ Minha
+            </span>
+          )}
         </div>
       </div>
 
       {/* Footer */}
       <div className="bq-question-card-foot" onClick={e => e.stopPropagation()}>
+
         <div className="bq-card-tags">
           {tags.slice(0, 2).map(t => <span key={t} className="bq-tag-chip">{t}</span>)}
           {tags.length > 2 && <span className="bq-tag-chip">+{tags.length - 2}</span>}
           {tags.length === 0 && <span style={{ fontSize: '0.7rem', color: '#cbd5e1' }}>sem tags</span>}
         </div>
 
-        <div className="bq-card-actions">
-          {/* Duplicar — visível para TODOS os usuários */}
-          <button
-            className="bq-icon-btn"
-            onClick={() => onDuplicate(questao)}
-            title={isAutor ? 'Duplicar (criar cópia)' : 'Duplicar para editar como minha versão'}
-            style={!isAutor ? { background: '#f0fdf4', color: '#059669', border: '1px solid #bbf7d0' } : {}}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-            </svg>
-          </button>
+        {/* Ações — só aparecem se o usuário é o autor */}
+        {isAutor && (
+          <div className="bq-card-actions">
+            {/* Editar */}
+            <button className="bq-icon-btn" onClick={() => onEdit(questao)} title="Editar">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+            </button>
 
-          {/* Editar e Gerenciar — apenas para autor ou gestor */}
-          {isAutor && (
-            <>
-              <button className="bq-icon-btn" onClick={() => onEdit(questao)} title="Editar">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
-              </button>
-              <button className="bq-icon-btn danger" onClick={() => onGerenciar(questao)} title="Arquivar ou Excluir">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </button>
-            </>
-          )}
-          {!isAutor && (
-            <span title="Você não é o autor" style={{ fontSize: '0.65rem', color: '#94a3b8', padding: '3px 6px', cursor: 'default' }}>
-              🔒
-            </span>
-          )}
-        </div>
+            {/* Duplicar */}
+            <button className="bq-icon-btn" onClick={() => onDuplicate(questao)} title="Duplicar">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+            </button>
+
+            {/* Gerenciar (arquivar / excluir) */}
+            <button className="bq-icon-btn danger" onClick={() => onGerenciar(questao)} title="Arquivar ou Excluir">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-/* ── Componente principal ──────────────────────────── */
+/* ── Componente principal ─────────────────────────────────── */
 export default function QuestoesBanco({ onEdit, refreshKey, onRemovida }) {
   // Quem sou eu?
-  const { professor_id: meuProfId, perfil: meuPerfil, escola_id: minhaEscolaId } = decodificarToken();
+  const { professor_id: meuProfId, perfil: meuPerfil } = decodificarToken();
   const isGestor = ['diretor', 'coordenador', 'admin', 'militar'].includes(meuPerfil);
 
   const [questoes,   setQuestoes]   = useState([]);
@@ -341,7 +307,6 @@ export default function QuestoesBanco({ onEdit, refreshKey, onRemovida }) {
   const [pagination, setPagination] = useState({ total: 0, page: 1, pages: 1 });
   const [detalhes,   setDetalhes]   = useState(null);  // questão aberta no modal
   const [questaoParaExcluir, setQuestaoParaExcluir] = useState(null); // controla modal
-  const [escopo,     setEscopo]     = useState('escola'); // global | escola | meu
 
   // Filtros
   const [busca,       setBusca]       = useState('');
@@ -361,7 +326,7 @@ export default function QuestoesBanco({ onEdit, refreshKey, onRemovida }) {
   const carregar = useCallback(async (currentPage = 1) => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ page: currentPage, limit: LIMIT, escopo });
+      const params = new URLSearchParams({ page: currentPage, limit: LIMIT });
       if (busca)        params.set('busca', busca);
       if (filtDisc)     params.set('disciplina', filtDisc);
       if (filtTipo)     params.set('tipo', filtTipo);
@@ -389,7 +354,7 @@ export default function QuestoesBanco({ onEdit, refreshKey, onRemovida }) {
     } finally {
       setLoading(false);
     }
-  }, [busca, filtDisc, filtTipo, filtNivel, filtSerie, filtBimestre, filtStatus, escopo]);
+  }, [busca, filtDisc, filtTipo, filtNivel, filtSerie, filtBimestre, filtStatus]);
 
   /* Fetch stats */
   const carregarStats = useCallback(async () => {
@@ -401,29 +366,22 @@ export default function QuestoesBanco({ onEdit, refreshKey, onRemovida }) {
 
   useEffect(() => { carregarStats(); }, [carregarStats, refreshKey]);
 
-  /* Recarrega quando filtros ou escopo mudam */
+  /* Recarrega quando filtros mudam (com debounce na busca) */
   useEffect(() => {
     clearTimeout(buscaTimer.current);
     buscaTimer.current = setTimeout(() => { setPage(1); carregar(1); }, busca ? 350 : 0);
     return () => clearTimeout(buscaTimer.current);
-  }, [busca, filtDisc, filtTipo, filtNivel, filtSerie, filtBimestre, filtStatus, escopo, refreshKey]);
+  }, [busca, filtDisc, filtTipo, filtNivel, filtSerie, filtBimestre, filtStatus, refreshKey]);
 
   useEffect(() => { carregar(page); }, [page]);
 
-  /* Duplicar — qualquer usuário pode duplicar qualquer questão */
+  /* Duplicar — usa endpoint Sprint 5 */
   const duplicar = async (questao) => {
     try {
-      const { data } = await apiService.post(`/api/questoes/${questao.id}/duplicar`);
+      await apiService.post(`/api/questoes/${questao.id}/duplicar`);
       carregar(page);
       carregarStats();
-      // Abre o editor da cópia automaticamente para o usuário editar
-      if (data?.id && onEdit) {
-        onEdit({ id: data.id, _duplicada: true });
-      }
-    } catch (err) {
-      const msg = err?.response?.data?.message || 'Erro ao duplicar.';
-      alert(msg);
-    }
+    } catch {}
   };
 
   /* Arquivar (soft delete) */
@@ -489,31 +447,7 @@ export default function QuestoesBanco({ onEdit, refreshKey, onRemovida }) {
         />
       )}
 
-      {/* ── Abas de Escopo: Global / Escola / Minhas ────────────── */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 18, flexWrap: 'wrap' }}>
-        {[
-          { id: 'global', label: '🌐 Banco Global', desc: 'Todas as questões do sistema' },
-          { id: 'escola', label: '🏫 Banco da Escola', desc: 'Questões da minha escola' },
-          { id: 'meu',    label: '👤 Minhas Questões', desc: 'Apenas as que eu criei' },
-        ].map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => { setEscopo(tab.id); setPage(1); }}
-            title={tab.desc}
-            style={{
-              padding: '7px 16px', borderRadius: 20, border: '1.5px solid',
-              cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700,
-              fontSize: '0.82rem', transition: 'all 0.15s',
-              borderColor: escopo === tab.id ? '#0e7490' : '#e2e8f0',
-              background: escopo === tab.id ? '#0e7490' : '#fff',
-              color: escopo === tab.id ? '#fff' : '#475569',
-              boxShadow: escopo === tab.id ? '0 2px 8px rgba(14,116,144,0.2)' : 'none',
-            }}
-          >{tab.label}</button>
-        ))}
-      </div>
-
-      {/* ── Stats ─────────────────────────────────────────────── */}
+      {/* ── Stats ───────────────────────────────────────────── */}
       {stats && (
         <div style={{ display: 'flex', gap: 12, marginBottom: 22, flexWrap: 'wrap' }}>
           {/* Total */}
@@ -672,7 +606,6 @@ export default function QuestoesBanco({ onEdit, refreshKey, onRemovida }) {
               onGerenciar={(questao) => setQuestaoParaExcluir(questao)}
               onClick={(q) => setDetalhes(q)}
               isAutor={isGestor || (meuProfId && Number(q.professor_id) === Number(meuProfId))}
-              minhaEscolaId={minhaEscolaId}
             />
           ))}
         </div>

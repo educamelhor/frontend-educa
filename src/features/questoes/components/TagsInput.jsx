@@ -5,13 +5,13 @@ const SUGESTOES = [
   'álgebra', 'funções', 'geometria', 'trigonometria', 'estatística',
   'probabilidade', 'equações', 'inequações', 'matrizes', 'vetores',
   'leitura', 'interpretação', 'gramática', 'redação', 'literatura',
-  'fotosíntese', 'ecossistemas', 'células', 'genética', 'evolução',
+  'fotossíntese', 'ecossistemas', 'células', 'genética', 'evolução',
   'segunda guerra', 'brasil colônia', 'revolução industrial',
   'cartografia', 'clima', 'biomas', 'urbanização',
   'ENEM', 'SAEB', 'vestibular', 'fácil', 'médio', 'difícil',
 ];
 
-export default function TagsInput({ tags = [], onChange, inputId = 'bq-tag-input' }) {
+export default function TagsInput({ tags = [], onChange }) {
   const [input, setInput] = useState('');
   const [showSugest, setShowSugest] = useState(false);
 
@@ -44,17 +44,11 @@ export default function TagsInput({ tags = [], onChange, inputId = 'bq-tag-input
     if (e.key === 'Escape') setShowSugest(false);
   };
 
-  // ✅ FIX: confirma automaticamente o texto pendente ao perder o foco
-  const handleBlur = () => {
-    if (input.trim()) addTag(input);
-    setTimeout(() => setShowSugest(false), 150);
-  };
-
   return (
     <div style={{ position: 'relative' }}>
       <div
         className="bq-tags-container"
-        onClick={() => document.getElementById(inputId)?.focus()}
+        onClick={() => document.getElementById('bq-tag-input')?.focus()}
       >
         {tags.map(tag => (
           <span key={tag} className="bq-tag">
@@ -69,13 +63,13 @@ export default function TagsInput({ tags = [], onChange, inputId = 'bq-tag-input
           </span>
         ))}
         <input
-          id={inputId}
+          id="bq-tag-input"
           className="bq-tag-input"
           value={input}
           onChange={e => { setInput(e.target.value); setShowSugest(true); }}
           onKeyDown={handleKey}
           onFocus={() => setShowSugest(true)}
-          onBlur={handleBlur}
+          onBlur={() => setTimeout(() => setShowSugest(false), 150)}
           placeholder={tags.length === 0 ? 'Digite e pressione Enter...' : ''}
           autoComplete="off"
         />

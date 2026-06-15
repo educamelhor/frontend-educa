@@ -33,6 +33,7 @@ import Login from "./features/login/Login.jsx";
 import AtivarDiretor from "./features/login/AtivarDiretor.jsx";
 import GerarGabaritos from "./features/impressao/GerarGabaritos";
 import ConselhoClasse from "./features/pedagogico/conselho/ConselhoClasse";
+import ConselhoClasseProfessor from "./features/professores/conselho/ConselhoClasseProfessor";
 import ConteudosAdmin from "./features/pedagogico/conteudos/ConteudosAdmin.jsx";
 import ConteudosProgramaticos from "./features/pedagogico/conteudos/ConteudosProgramaticos.jsx";
 import Planos from "./features/professores/planos/Planos";
@@ -61,7 +62,6 @@ import DiretorPedagogico from "./features/direcao/diretor/DiretorPedagogico.jsx"
 import GestaoEquipe from "./features/direcao/gestao-acessos/GestaoEquipe.jsx";
 import CadastroMembros from "./features/direcao/cadastro/CadastroMembros.jsx";
 import Governanca from "./features/direcao/governanca/Governanca.jsx";
-import GovernanModulos from "./features/direcao/GovernanModulos.jsx";
 
 // ✅ PLATAFORMA (CEO) — v1
 import PlataformaEscolas from "./features/plataforma/PlataformaEscolas.jsx";
@@ -352,7 +352,7 @@ export default function App() {
           <Route path="/gabarito/corrigir"     element={<RequireModulo modulo="gabarito"><GabaritoModule /></RequireModulo>} />
           <Route path="/gabarito/resultados"   element={<RequireModulo modulo="gabarito"><GabaritoModule /></RequireModulo>} />
           <Route path="/pedagogico/conselho" element={<RequireModulo modulo="pedagogico"><ConselhoClasse /></RequireModulo>} />
-          <Route path="/professores/conselho" element={<RequireModulo modulo="professores"><ConselhoClasse /></RequireModulo>} />
+          <Route path="/professores/conselho" element={<RequireModulo modulo="professores"><ConselhoClasseProfessor /></RequireModulo>} />
           <Route path="/pedagogico/conteudos" element={
             <RequireModulo modulo="pedagogico"><RequirePerm perm="conteudos:ver"><ConteudosAdmin /></RequirePerm></RequireModulo>
           } />
@@ -415,9 +415,6 @@ export default function App() {
           } />
           <Route path="/direcao/governanca" element={
             <RequireModulo modulo="direcao"><RequireDiretor><Governanca /></RequireDiretor></RequireModulo>
-          } />
-          <Route path="/direcao/modulos-perfil" element={
-            <RequireModulo modulo="direcao"><RequireDiretor><GovernanModulos /></RequireDiretor></RequireModulo>
           } />
 
           <Route path="*" element={<Navigate to="/home" replace />} />

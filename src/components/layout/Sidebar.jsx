@@ -195,6 +195,23 @@ export default function Sidebar({ isOpen, onClose }) {
   // Governança — Diretor e Vice-Diretor
   const canGovernanca = isScopeEscola && !isDisciplinar && !isProfessor && (perfil === 'diretor' || perfil === 'vice_diretor');
 
+  // canSeeSecretaria: grupo só renderiza se ao menos 1 sub-módulo ativo (mesmo padrão do Disciplinar)
+  const canSeeSecretaria = !isProfessor && (
+    hasModulo('secretaria.alunos') ||
+    hasModulo('secretaria.responsaveis') ||
+    hasModulo('secretaria.cargas_horarias') ||
+    hasModulo('secretaria.disciplinas') ||
+    hasModulo('secretaria.turmas') ||
+    hasModulo('secretaria.professores') ||
+    hasModulo('secretaria.boletim') ||
+    hasModulo('secretaria.relatorios') ||
+    hasModulo('secretaria.horarios') ||
+    hasModulo('secretaria.agente') ||
+    hasModulo('secretaria.tabela_codigos') ||
+    hasModulo('secretaria.sincronizar_seedf') ||
+    hasModulo('secretaria.modulacao')
+  );
+
   // Banco de Questões — restrito a Direção e Coordenação (em desenvolvimento/aprovação)
   const canBancoQuestoes = isScopeEscola && !isDisciplinar && (perfil === 'diretor' || perfil === 'vice_diretor' || perfil === 'coordenador');
 
@@ -1464,7 +1481,7 @@ export default function Sidebar({ isOpen, onClose }) {
             )}
 
             {/* ─── GRUPO: Secretaria (Professor NÃO tem acesso) ─── */}
-            {!isProfessor && hasModulo('secretaria') && (
+            {canSeeSecretaria && (
             <>
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-6 transition"
@@ -1505,6 +1522,7 @@ export default function Sidebar({ isOpen, onClose }) {
                 </li>
                 )}
 
+                {hasModulo('secretaria.responsaveis') && (
                 <li>
                   <Link
                     to="/secretaria/responsaveis"
@@ -1513,7 +1531,9 @@ export default function Sidebar({ isOpen, onClose }) {
                     <UserGroupIcon className="h-5 w-5 mr-2" /> Responsáveis
                   </Link>
                 </li>
+                )}
 
+                {hasModulo('secretaria.cargas_horarias') && (
                 <li>
                   <Link
                     to="/secretaria/cargas-horarias"
@@ -1522,7 +1542,9 @@ export default function Sidebar({ isOpen, onClose }) {
                     <ClockIcon className="h-5 w-5 mr-2" /> Cargas Horárias
                   </Link>
                 </li>
+                )}
 
+                {hasModulo('secretaria.disciplinas') && (
                 <li>
                   <Link
                     to="/secretaria/disciplinas"
@@ -1531,6 +1553,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     <BookOpenIcon className="h-5 w-5 mr-2" /> Disciplinas
                   </Link>
                 </li>
+                )}
 
                 {hasModulo('secretaria.modulacao') && (
                 <li>
@@ -1565,6 +1588,7 @@ export default function Sidebar({ isOpen, onClose }) {
                 </li>
                 )}
 
+                {hasModulo('secretaria.turmas') && (
                 <li>
                   <Link
                     to="/secretaria/turmas"
@@ -1573,6 +1597,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     <AcademicCapIcon className="h-5 w-5 mr-2" /> Turmas
                   </Link>
                 </li>
+                )}
 
                 {/* NOVO SUBMENU: Boletim */}
                 {hasModulo('secretaria.boletim') && (
@@ -1587,6 +1612,7 @@ export default function Sidebar({ isOpen, onClose }) {
                 )}
 
                 {/* NOVO SUBMENU: Agente */}
+                {hasModulo('secretaria.agente') && (
                 <li>
                   <Link
                     to="/secretaria/agente"
@@ -1595,6 +1621,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     <BoltIcon className="h-5 w-5 mr-2" /> Agente
                   </Link>
                 </li>
+                )}
 
                 {hasModulo('secretaria.tabela_codigos') && (
                 <li>
@@ -1635,6 +1662,7 @@ export default function Sidebar({ isOpen, onClose }) {
                 )}
 
                 {/* Sincronizar SEEDF */}
+                {hasModulo('secretaria.sincronizar_seedf') && (
                 <li>
                   <Link
                     to="/secretaria/sincronizar-seedf"
@@ -1660,6 +1688,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     }}>NOVO</span>
                   </Link>
                 </li>
+                )}
               </ul>
             )}
             </>

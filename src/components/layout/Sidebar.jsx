@@ -110,23 +110,38 @@ export default function Sidebar({ isOpen, onClose }) {
         if (agora - lastRefresh < 5 * 60 * 1000) return; // aguarda 5 min entre chamadas
 
         const token = localStorage.getItem('token');
-        const escolaId = localStorage.getItem('escola_id');
-        if (!token || !escolaId) return;
+        if (!token) return; // sem token, nada a fazer
+        // Nota: escolaId pode ser null para CEO/super_admin — não bloquear por isso
         const apiBase = import.meta.env.VITE_API_URL || '';
         const res = await fetch(`${apiBase}/api/auth/modulos`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (!res.ok) return;
         const data = await res.json();
-        if (data.ok && Array.isArray(data.modulos_ativos)) {
-          sessionStorage.setItem('modulos_last_refresh', String(Date.now()));
-          const current = JSON.parse(localStorage.getItem('modulos_ativos') || '[]');
+        if (!data.ok) return;
+
+        sessionStorage.setItem('modulos_last_refresh', String(Date.now()));
+
+        if (Array.isArray(data.modulos_ativos)) {
+          // Escola com módulos configurados → atualiza se mudou
+          const rawCurrent = localStorage.getItem('modulos_ativos');
+          const current = rawCurrent && rawCurrent !== 'null'
+            ? JSON.parse(rawCurrent) : [];
           const incoming = data.modulos_ativos;
-          const sortedCurrent = [...current].sort().join(',');
+          const sortedCurrent = Array.isArray(current)
+            ? [...current].sort().join(',') : '';
           const sortedIncoming = [...incoming].sort().join(',');
           if (sortedCurrent !== sortedIncoming) {
             localStorage.setItem('modulos_ativos', JSON.stringify(incoming));
             setModulos(incoming);
+          }
+        } else if (data.modulos_ativos === null) {
+          // CEO / super_admin / sem escola → acesso IRRESTRITO
+          // Garante que qualquer [] anterior seja limpo
+          const rawCurrent = localStorage.getItem('modulos_ativos');
+          if (rawCurrent && rawCurrent !== 'null') {
+            localStorage.removeItem('modulos_ativos');
+            setModulos(null);
           }
         }
       } catch (_) { /* silent fail — não bloqueia o sidebar */ }

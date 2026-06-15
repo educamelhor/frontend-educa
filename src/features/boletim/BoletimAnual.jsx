@@ -288,17 +288,26 @@ export default function BoletimAnual({
     if (!targetDisc) return {};
     const targetNameNorm = normalizeName(targetDisc.nome);
 
+    // Verificar se as notas têm disciplina_id disponível
+    const notasComId = notas.filter(
+      (n) => n.disciplina_id !== undefined && n.disciplina_id !== null
+    );
+    const usarMatchPorId = notasComId.length > 0;
+
     return (
       notas.find((n) => {
-        const noteNameNorm = normalizeName(n.disciplina);
-        const matchName = noteNameNorm === targetNameNorm;
-        const matchId = n.disciplina_id !== undefined && Number(n.disciplina_id) === Number(discId);
+        const anoOk = Number(n.ano) === ANO_CORRENTE;
+        const bimOk = Number(n.bimestre) === Number(bim);
+        if (!anoOk || !bimOk) return false;
 
-        return (
-          (matchId || matchName) &&
-          Number(n.ano) === ANO_CORRENTE &&
-          Number(n.bimestre) === Number(bim)
-        );
+        if (usarMatchPorId) {
+          // ✅ Prioridade: match por ID — evita confundir PD1 (59) com PD2 (60)
+          return n.disciplina_id !== undefined &&
+            n.disciplina_id !== null &&
+            Number(n.disciplina_id) === Number(discId);
+        }
+        // Fallback: match por nome normalizado (quando não há IDs)
+        return normalizeName(n.disciplina) === targetNameNorm;
       }) || {}
     );
   };

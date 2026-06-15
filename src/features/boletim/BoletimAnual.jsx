@@ -26,15 +26,12 @@ const normalizeName = (name) => {
     .replace(/\s+/g, " ");
   if (n === "ED. FISICA" || n === "EDUCACAO FISICA") return "EDUCACAO FISICA";
   if (n === "PORTUGUES" || n === "LINGUA PORTUGUESA") return "PORTUGUES";
-  if (
-    n === "PRATICA ESTUDANTIL" ||
-    n === "PD1" ||
-    n === "PD2" ||
-    n === "PARTE DIVERSIFICADA I" ||
-    n === "PARTE DIVERSIFICADA II"
-  ) {
-    return "PRATICA ESTUDANTIL";
-  }
+  // ATENÇÃO: PD1 e PD2 são disciplinas DISTINTAS no POMPS (Parte Diversificada 1 e 2).
+  // "Prática Estudantil" é uma disciplina separada, exclusiva do CEF04-CCMDF.
+  // NÃO colapsar PD1/PD2 com PRATICA ESTUDANTIL — cada uma deve manter seu próprio nome.
+  if (n === "PRATICA ESTUDANTIL") return "PRATICA ESTUDANTIL";
+  if (n === "PD1" || n === "PARTE DIVERSIFICADA I")   return "PD1";
+  if (n === "PD2" || n === "PARTE DIVERSIFICADA II")  return "PD2";
   return n;
 };
 

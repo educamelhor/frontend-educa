@@ -81,8 +81,7 @@ export default function BoletimAnual({
   const [erro, setErro] = useState("");
   const [showSemNotas, setShowSemNotas] = useState(true);
   const [disciplinasList, setDisciplinasList] = useState([]);
-  // Ref para notas carregadas — acessível dentro do useEffect sem depêndencia de state
-  const notasCarregadasRef = React.useRef(notasPreCarregadas || []);
+
 
   // Governança: config flags do boletim
   const [govConfig, setGovConfig] = useState({
@@ -133,7 +132,6 @@ export default function BoletimAnual({
           };
           setAluno(studentObj);
           setNotas(notasPreCarregadas);
-          notasCarregadasRef.current = notasPreCarregadas || [];
           setRanking(alunoPreCarregado?.ranking || null);
           currentEscolaId = studentObj.escola_id;
           currentEtapa = studentObj.etapa;
@@ -187,7 +185,6 @@ export default function BoletimAnual({
           }));
           // Filtra apenas o ano corrente
           const notasAno = norm.filter((n) => Number(n.ano) === ANO_CORRENTE);
-          notasCarregadasRef.current = notasAno;
           setNotas(notasAno);
 
           // 3) Buscar ranking expandido (4 dimensões)
@@ -215,10 +212,9 @@ export default function BoletimAnual({
         }
       }
 
-      // Buscar disciplinas correspondentes de forma dinâmica
+      // Buscar disciplinas da escola (etapa + turno do aluno)
       if (currentEscolaId) {
         try {
-          // 1ª consulta: disciplinas filtradas por turno (lista principal)
           const resDisc = await api.get("/api/disciplinas", {
             params: {
               escola_id: currentEscolaId,
@@ -226,41 +222,8 @@ export default function BoletimAnual({
               turno: currentTurno,
             },
           });
-
-          // 2ª consulta: TODAS as disciplinas da escola (sem filtro de turno)
-          // Garante que disciplinas cadastradas com turno divergente não sumam
-          // quando a nota já foi lançada (ex: GEOGRAFIA registrada como MATUTINO
-          // mas com nota no turno NOTURNO).
-          const resDiscAll = await api.get("/api/disciplinas", {
-            params: {
-              escola_id: currentEscolaId,
-              etapa: currentEtapa,
-              // sem turno → retorna todas
-            },
-          });
-
-          if (!cancelado) {
-            const fromFiltered = Array.isArray(resDisc.data) ? resDisc.data : [];
-            const fromAll = Array.isArray(resDiscAll.data) ? resDiscAll.data : [];
-
-            // Merge: começa com a lista filtrada e adiciona qualquer disciplina
-            // extra que tenha nota no ano corrente mas não estava no filtro por turno
-            const idsNaLista = new Set(fromFiltered.map((d) => d.id));
-            const extras = fromAll.filter((d) => !idsNaLista.has(d.id));
-
-            // Só inclui extras que de fato têm nota lançada no ano corrente
-            // (evita poluição com disciplinas de outros segmentos sem nota)
-            // notasCarregadasRef.current funçiona tanto no fluxo individual
-            // quanto no fluxo batch (notasPreCarregadas)
-            const idsComNota = new Set(
-              notasCarregadasRef.current
-                .filter((n) => Number(n.ano) === ANO_CORRENTE)
-                .map((n) => n.disciplina_id)
-            );
-            const extrasComNota = extras.filter((d) => idsComNota.has(d.id));
-
-            const merged = [...fromFiltered, ...extrasComNota];
-            const parsed = merged.map((d) => ({
+          if (!cancelado && Array.isArray(resDisc.data)) {
+            const parsed = resDisc.data.map((d) => ({
               id: d.id,
               nome: d.nome || d.disciplina,
             }));
@@ -270,6 +233,7 @@ export default function BoletimAnual({
           console.error("Erro ao carregar disciplinas do aluno:", err);
         }
       }
+
 
       if (typeof onLoaded === "function") onLoaded();
     }
@@ -323,29 +287,37 @@ export default function BoletimAnual({
     if (!targetDisc) return {};
     const targetNameNorm = normalizeName(targetDisc.nome);
 
-    // Verificar se as notas têm disciplina_id disponível
-    const notasComId = notas.filter(
-      (n) => n.disciplina_id !== undefined && n.disciplina_id !== null
+    const anoOk = (n) => Number(n.ano) === ANO_CORRENTE;
+    const bimOk = (n) => Number(n.bimestre) === Number(bim);
+
+    // ── 1ª PASSAGEM: match por disciplina_id exato ──────────────────
+    // Garante que PD1 (59) e PD2 (60) nunca se confundam, mesmo
+    // que compartilhassem nome normalizado.
+    const porId = notas.find(
+      (n) =>
+        anoOk(n) &&
+        bimOk(n) &&
+        n.disciplina_id != null &&
+        Number(n.disciplina_id) === Number(discId)
     );
-    const usarMatchPorId = notasComId.length > 0;
+    if (porId) return porId;
 
+    // ── 2ª PASSAGEM: fallback por nome normalizado ───────────────────
+    // Cobre casos onde o disciplina_id da nota diverge do ID atual no
+    // cadastro (ex: GEOGRAFIA foi deletada e recriada, gerando novo ID,
+    // mas as notas antigas ainda referenciam o ID anterior).
+    // Seguro porque normalizeName agora distingue corretamente PD1, PD2
+    // e Prática Estudantil — sem risco de colisão entre disciplinas distintas.
     return (
-      notas.find((n) => {
-        const anoOk = Number(n.ano) === ANO_CORRENTE;
-        const bimOk = Number(n.bimestre) === Number(bim);
-        if (!anoOk || !bimOk) return false;
-
-        if (usarMatchPorId) {
-          // ✅ Prioridade: match por ID — evita confundir PD1 (59) com PD2 (60)
-          return n.disciplina_id !== undefined &&
-            n.disciplina_id !== null &&
-            Number(n.disciplina_id) === Number(discId);
-        }
-        // Fallback: match por nome normalizado (quando não há IDs)
-        return normalizeName(n.disciplina) === targetNameNorm;
-      }) || {}
+      notas.find(
+        (n) =>
+          anoOk(n) &&
+          bimOk(n) &&
+          normalizeName(n.disciplina) === targetNameNorm
+      ) || {}
     );
   };
+
 
   const calcMedia = (arr) => {
     const hasAnyGrade = arr.some((x) => x.nota != null && x.nota !== "");

@@ -2,7 +2,8 @@ import React, { useState, useEffect } from "react";
 import api from "../../../services/api";
 import ModalBoletim from "../../boletim/ModalBoletim";
 import ModalFichaAluno from "./ModalFichaAluno";
-import ModalZoomFoto from "./ModalZoomFoto"; // 👈 Import do modal de zoom
+import ModalRegistroConselho from "./ModalRegistroConselho";
+import ModalZoomFoto from "./ModalZoomFoto";
 import {
   EyeIcon,
   DocumentTextIcon,
@@ -46,6 +47,10 @@ export default function ConselhoClasse() {
   // Ficha do Estudante (modal)
   const [modalFichaOpen, setModalFichaOpen] = useState(false);
   const [codigoAlunoFicha, setCodigoAlunoFicha] = useState(null);
+
+  // Registro de Conselho
+  const [modalRegistroOpen, setModalRegistroOpen] = useState(false);
+  const [alunoRegistro, setAlunoRegistro]         = useState(null);
 
   // Cache-buster p/ fotos na lista
   const [fotoStamp, setFotoStamp] = useState(0);
@@ -265,7 +270,10 @@ export default function ConselhoClasse() {
                       {/* Ações */}
                       <td className="py-2 px-2 text-center">
                         <div className="flex justify-center gap-3">
-                          <button>
+                          <button
+                            title="Registro de Conselho"
+                            onClick={() => { setAlunoRegistro(aluno); setModalRegistroOpen(true); }}
+                          >
                             <EyeIcon className="h-6 w-6 text-gray-600 hover:text-blue-600" />
                           </button>
 
@@ -305,6 +313,14 @@ export default function ConselhoClasse() {
           open={modalBoletimOpen}
           codigo={codigoAlunoBoletim}
           onClose={() => setModalBoletimOpen(false)}
+        />
+      )}
+
+      {modalRegistroOpen && alunoRegistro && (
+        <ModalRegistroConselho
+          aluno={alunoRegistro}
+          turma={turmaSelecionada}
+          onClose={() => { setModalRegistroOpen(false); setAlunoRegistro(null); }}
         />
       )}
 

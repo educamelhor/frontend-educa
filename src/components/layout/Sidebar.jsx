@@ -93,11 +93,74 @@ export default function Sidebar({ isOpen, onClose }) {
       }
     };
     window.addEventListener('storage', onStorage);
-    // Relê ao montar E ao navegar (login redireciona para /home na mesma tab,
-    // o evento 'storage' NÃO dispara na mesma tab — useLocation resolve isso)
     setModulos(parseModulos());
     return () => window.removeEventListener('storage', onStorage);
   }, [location.pathname]);
+
+  // ── Refresh de módulos do servidor ──────────────────────────────────────
+  // Busca a configuração atualizada do CEO sem precisar de logout/login.
+  // Chamado tanto por intervalo (usuário parado na mesma página) quanto
+  // por navegação (debounce de 30s para não sobrecarregar o backend).
+  const applyModulosFromServer = React.useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      const apiBase = import.meta.env.VITE_API_URL || '';
+      const res = await fetch(`${apiBase}/api/auth/modulos`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data.ok) return;
+
+      if (Array.isArray(data.modulos_ativos)) {
+        const rawCurrent = localStorage.getItem('modulos_ativos');
+        const current = rawCurrent && rawCurrent !== 'null'
+          ? JSON.parse(rawCurrent) : [];
+        const incoming = data.modulos_ativos;
+        const sortedCurrent = Array.isArray(current)
+          ? [...current].sort().join(',') : '';
+        const sortedIncoming = [...incoming].sort().join(',');
+        if (sortedCurrent !== sortedIncoming) {
+          localStorage.setItem('modulos_ativos', JSON.stringify(incoming));
+          setModulos(incoming);
+        }
+      } else if (data.modulos_ativos === null) {
+        // CEO / super_admin → acesso irrestrito
+        const rawCurrent = localStorage.getItem('modulos_ativos');
+        if (rawCurrent && rawCurrent !== 'null') {
+          localStorage.removeItem('modulos_ativos');
+          setModulos(null);
+        }
+      }
+    } catch (_) { /* silent — não bloqueia o sidebar */ }
+  }, []);
+
+  // ── Camada 1: Intervalo fixo de 30s ──────────────────────────────────────
+  // Garante que o usuário receba atualizações do CEO mesmo parado na mesma
+  // página (sem navegar). Este é o fix principal para o caso do Diretor que
+  // fica em /disciplinar/equipe enquanto o CEO desativa o módulo.
+  useEffect(() => {
+    // Executa imediatamente ao montar (primeira carga / Ctrl+Shift+R)
+    applyModulosFromServer();
+    // Depois a cada 30 segundos enquanto a aba estiver aberta
+    const interval = setInterval(applyModulosFromServer, 30 * 1000);
+    return () => clearInterval(interval);
+  }, [applyModulosFromServer]);
+
+  // ── Camada 2: Refresh por navegação (debounce 30s) ────────────────────────
+  // Complemento ao intervalo: antecipa o refresh quando o usuário navega,
+  // mas evita chamadas duplicadas se o intervalo acabou de rodar.
+  useEffect(() => {
+    const lastRefresh = parseInt(sessionStorage.getItem('modulos_last_refresh') || '0');
+    const agora = Date.now();
+    const rawModulos = localStorage.getItem('modulos_ativos');
+    const modulosParecemVazios = rawModulos === '[]' || rawModulos === '';
+    // Pula se o intervalo já rodou nos últimos 30s (evita duplo fetch)
+    if (!modulosParecemVazios && agora - lastRefresh < 30 * 1000) return;
+    sessionStorage.setItem('modulos_last_refresh', String(agora));
+    applyModulosFromServer();
+  }, [location.pathname, applyModulosFromServer]);
 
   // hasModulo: null = sem restrição = true; array = verifica se contém o módulo
   const hasModulo = (mod) => _modulos === null || _modulos.includes(mod);

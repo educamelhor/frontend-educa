@@ -17,7 +17,7 @@ import React, { useState, useEffect } from "react";
 import api from "../../../services/api";
 import ModalBoletim from "../../boletim/ModalBoletim";
 import ModalZoomFoto from "../../pedagogico/conselho/ModalZoomFoto";
-import ModalRegistroConselho from "./ModalRegistroConselho";
+import ModalRegistroConselho from "../../pedagogico/conselho/ModalRegistroConselho";
 import ModalFichaAluno from "./ModalFichaAluno";
 import {
   EyeIcon,

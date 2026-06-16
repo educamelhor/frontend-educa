@@ -6,6 +6,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../../../services/api';
+import ModalFOColetivoImpressao from './ModalFOColetivoImpressao';
 import {
   BoltIcon,
   PlusIcon,
@@ -17,6 +18,7 @@ import {
   ExclamationTriangleIcon,
   ArrowPathIcon,
   ChevronDownIcon,
+  PrinterIcon,
 } from '@heroicons/react/24/outline';
 
 // ── Animações premium ───────────────────────────────────────────────────────
@@ -75,6 +77,9 @@ function corMedida(medida) {
 // ============================================================================
 export default function FOColetivo() {
   injectAnims();
+
+  // ── Modal de Impressão ─────────────────────────────────────────────────
+  const [modalImpressaoOpen, setModalImpressaoOpen] = useState(false);
 
   // ── Filtros de seleção ───────────────────────────────────────────────────
   const [turno, setTurno]     = useState('');
@@ -305,7 +310,7 @@ export default function FOColetivo() {
     }
   }
 
-  // ── Alunos filtrados por busca ────────────────────────────────────────────
+  // ── Alunos filtrados por busca ──────────────────────────────────────────────────
   const alunosFiltradosBusca = alunosTurma.filter(a => {
     if (!buscaAluno) return true;
     const t = buscaAluno.toLowerCase();
@@ -315,9 +320,14 @@ export default function FOColetivo() {
   const turmaAtual = turnas.find(t => String(t.id) === String(turmaId));
   const cor = medidaConfirmada ? corMedida(medidaConfirmada.medidaSelecionada) : null;
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ── Render ───────────────────────────────────────────────────────────────────────────
   return (
     <div className="max-w-6xl mx-auto pb-16">
+
+      {/* Modal de Impressão F.O. Coletivo */}
+      {modalImpressaoOpen && (
+        <ModalFOColetivoImpressao onClose={() => setModalImpressaoOpen(false)} />
+      )}
 
       {/* ══ HERO HEADER ══════════════════════════════════════════════════════ */}
       <div
@@ -341,6 +351,45 @@ export default function FOColetivo() {
             <p style={{ color:'rgba(148,163,184,0.9)', fontSize:16, margin:0, maxWidth:520, lineHeight:1.6 }}>
               Registre medidas disciplinares para múltiplos alunos de forma ágil — mesmo fato, uma única operação em lote.
             </p>
+
+            {/* Botão F.O. COLETIVO IMPRESSÃO */}
+            <button
+              onClick={() => setModalImpressaoOpen(true)}
+              style={{
+                marginTop: 20,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '11px 22px',
+                borderRadius: 14,
+                border: '1.5px solid rgba(239,68,68,0.4)',
+                background: 'rgba(239,68,68,0.12)',
+                color: '#f87171',
+                fontSize: 13,
+                fontWeight: 800,
+                cursor: 'pointer',
+                backdropFilter: 'blur(8px)',
+                transition: 'all 0.2s',
+                letterSpacing: '0.01em',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = 'rgba(239,68,68,0.25)';
+                e.currentTarget.style.border = '1.5px solid rgba(239,68,68,0.6)';
+                e.currentTarget.style.color = '#fff';
+                e.currentTarget.style.transform = 'translateY(-1px)';
+                e.currentTarget.style.boxShadow = '0 6px 20px rgba(239,68,68,0.25)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = 'rgba(239,68,68,0.12)';
+                e.currentTarget.style.border = '1.5px solid rgba(239,68,68,0.4)';
+                e.currentTarget.style.color = '#f87171';
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            >
+              <PrinterIcon style={{ width:16, height:16 }} />
+              F.O. Coletivo Impressão
+            </button>
           </div>
 
           {/* Stats card */}

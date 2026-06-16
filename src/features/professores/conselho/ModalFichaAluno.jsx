@@ -1,27 +1,19 @@
-// src/features/pedagogico/conselho/ModalFichaAluno.jsx
-// Modal compacto (max-w-lg) — usa FichaAlunoConselho (premium, independente)
+// src/features/professores/conselho/ModalFichaAluno.jsx
+// Modal compacto (max-w-lg) — usa FichaAlunoProfessor (independente)
 import React, { useEffect, useRef } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
-import FichaAlunoConselho from "./FichaAlunoConselho";
+import FichaAlunoProfessor from "./FichaAlunoProfessor";
 
 export default function ModalFichaAluno({ open, codigo, onClose }) {
   const dialogRef = useRef(null);
 
   useEffect(() => {
     if (!open) return;
-
-    // trava o scroll do body e habilita fechar com ESC
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-
-    const onKey = (e) => {
-      if (e.key === "Escape") onClose?.();
-    };
+    const onKey = (e) => { if (e.key === "Escape") onClose?.(); };
     window.addEventListener("keydown", onKey);
-
-    // foca no modal para acessibilidade
     setTimeout(() => dialogRef.current?.focus(), 0);
-
     return () => {
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = prevOverflow;
@@ -32,14 +24,7 @@ export default function ModalFichaAluno({ open, codigo, onClose }) {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center">
-      {/* Fundo escurecido */}
-      <div
-        className="absolute inset-0 bg-black/50"
-        onClick={onClose}
-        aria-hidden="true"
-      />
-
-      {/* Conteúdo do modal */}
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} aria-hidden="true" />
       <div
         ref={dialogRef}
         role="dialog"
@@ -51,18 +36,12 @@ export default function ModalFichaAluno({ open, codigo, onClose }) {
       >
         <div className="flex items-center justify-between px-4 py-3 border-b">
           <h2 className="text-lg font-semibold text-blue-900">Ficha do Estudante</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 rounded-lg hover:bg-gray-100"
-            title="Fechar"
-          >
+          <button type="button" onClick={onClose} className="p-2 rounded-lg hover:bg-gray-100" title="Fechar">
             <XMarkIcon className="h-6 w-6 text-gray-700" />
           </button>
         </div>
-
         <div className="w-full overflow-auto">
-          <FichaAlunoConselho codigo={codigo} />
+          <FichaAlunoProfessor codigo={codigo} />
         </div>
       </div>
     </div>

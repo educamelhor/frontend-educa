@@ -17,7 +17,13 @@ import React, { useState, useEffect } from "react";
 import api from "../../../services/api";
 import ModalBoletim from "../../boletim/ModalBoletim";
 import ModalZoomFoto from "../../pedagogico/conselho/ModalZoomFoto";
-import { DocumentTextIcon } from "@heroicons/react/24/outline";
+import ModalRegistroConselho from "./ModalRegistroConselho";
+import ModalFichaAluno from "./ModalFichaAluno";
+import {
+  EyeIcon,
+  DocumentTextIcon,
+  IdentificationIcon,
+} from "@heroicons/react/24/outline";
 import { getFotoURL } from "../../../utils/foto";
 
 function normalizaTexto(str) {
@@ -48,9 +54,17 @@ export default function ConselhoClasseProfessor() {
   const [anosLetivos, setAnosLetivos] = useState([]);
   const [anoLetivo, setAnoLetivo] = useState(anoLetivoPadrao());
 
-  // Boletim (única ação disponível para professor)
-  const [modalBoletimOpen, setModalBoletimOpen] = useState(false);
+  // Boletim
+  const [modalBoletimOpen, setModalBoletimOpen]   = useState(false);
   const [codigoAlunoBoletim, setCodigoAlunoBoletim] = useState(null);
+
+  // Registro de Conselho
+  const [modalRegistroOpen, setModalRegistroOpen] = useState(false);
+  const [alunoRegistro, setAlunoRegistro]         = useState(null);
+
+  // Ficha do Estudante
+  const [modalFichaOpen, setModalFichaOpen]       = useState(false);
+  const [codigoAlunoFicha, setCodigoAlunoFicha]   = useState(null);
 
   // Cache-buster para fotos
   const [fotoStamp] = useState(Date.now());
@@ -63,6 +77,11 @@ export default function ConselhoClasseProfessor() {
   function abrirModalBoletim(codigo) {
     setCodigoAlunoBoletim(codigo);
     setModalBoletimOpen(true);
+  }
+
+  function abrirModalFicha(codigo) {
+    setCodigoAlunoFicha(codigo);
+    setModalFichaOpen(true);
   }
 
   const turnos = ["Matutino", "Vespertino", "Noturno"];
@@ -259,10 +278,16 @@ export default function ConselhoClasseProfessor() {
                         {aluno.estudante}
                       </td>
 
-                      {/* Ações — Professor: apenas Boletim */}
+                      {/* Ações — Registro de Conselho, Boletim, Ficha */}
                       <td className="py-2 px-2 text-center">
                         <div className="flex justify-center gap-3">
-                          {/* ✅ Boletim — permitido */}
+                          <button
+                            title="Registro de Conselho"
+                            onClick={() => { setAlunoRegistro(aluno); setModalRegistroOpen(true); }}
+                          >
+                            <EyeIcon className="h-6 w-6 text-gray-600 hover:text-blue-600" />
+                          </button>
+
                           <button
                             onClick={() => abrirModalBoletim(aluno.codigo)}
                             title="Visualizar boletim"
@@ -270,11 +295,12 @@ export default function ConselhoClasseProfessor() {
                             <DocumentTextIcon className="h-6 w-6 text-gray-600 hover:text-green-600" />
                           </button>
 
-                          {/*
-                            ❌ EyeIcon (Ficha) — oculto para professor
-                            ❌ IdentificationIcon (Relatórios) — oculto para professor
-                            ❌ PencilIcon (Edição) — oculto para professor
-                          */}
+                          <button
+                            onClick={() => abrirModalFicha(aluno.codigo)}
+                            title="Ficha do estudante"
+                          >
+                            <IdentificationIcon className="h-6 w-6 text-gray-600 hover:text-purple-600" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -294,6 +320,24 @@ export default function ConselhoClasseProfessor() {
           open={modalBoletimOpen}
           codigo={codigoAlunoBoletim}
           onClose={() => setModalBoletimOpen(false)}
+        />
+      )}
+
+      {/* Modal: Registro de Conselho */}
+      {modalRegistroOpen && alunoRegistro && (
+        <ModalRegistroConselho
+          aluno={alunoRegistro}
+          turma={turmaSelecionada}
+          onClose={() => { setModalRegistroOpen(false); setAlunoRegistro(null); }}
+        />
+      )}
+
+      {/* Modal: Ficha do Estudante */}
+      {modalFichaOpen && (
+        <ModalFichaAluno
+          open={modalFichaOpen}
+          codigo={codigoAlunoFicha}
+          onClose={() => setModalFichaOpen(false)}
         />
       )}
 

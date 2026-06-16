@@ -81,6 +81,8 @@ export default function BoletimAnual({
   const [erro, setErro] = useState("");
   const [showSemNotas, setShowSemNotas] = useState(true);
   const [disciplinasList, setDisciplinasList] = useState([]);
+  // Ref para notas carregadas — acessível dentro do useEffect sem depêndencia de state
+  const notasCarregadasRef = React.useRef(notasPreCarregadas || []);
 
   // Governança: config flags do boletim
   const [govConfig, setGovConfig] = useState({
@@ -131,6 +133,7 @@ export default function BoletimAnual({
           };
           setAluno(studentObj);
           setNotas(notasPreCarregadas);
+          notasCarregadasRef.current = notasPreCarregadas || [];
           setRanking(alunoPreCarregado?.ranking || null);
           currentEscolaId = studentObj.escola_id;
           currentEtapa = studentObj.etapa;
@@ -184,6 +187,7 @@ export default function BoletimAnual({
           }));
           // Filtra apenas o ano corrente
           const notasAno = norm.filter((n) => Number(n.ano) === ANO_CORRENTE);
+          notasCarregadasRef.current = notasAno;
           setNotas(notasAno);
 
           // 3) Buscar ranking expandido (4 dimensões)
@@ -214,6 +218,7 @@ export default function BoletimAnual({
       // Buscar disciplinas correspondentes de forma dinâmica
       if (currentEscolaId) {
         try {
+          // 1ª consulta: disciplinas filtradas por turno (lista principal)
           const resDisc = await api.get("/api/disciplinas", {
             params: {
               escola_id: currentEscolaId,
@@ -221,8 +226,41 @@ export default function BoletimAnual({
               turno: currentTurno,
             },
           });
-          if (!cancelado && Array.isArray(resDisc.data)) {
-            const parsed = resDisc.data.map((d) => ({
+
+          // 2ª consulta: TODAS as disciplinas da escola (sem filtro de turno)
+          // Garante que disciplinas cadastradas com turno divergente não sumam
+          // quando a nota já foi lançada (ex: GEOGRAFIA registrada como MATUTINO
+          // mas com nota no turno NOTURNO).
+          const resDiscAll = await api.get("/api/disciplinas", {
+            params: {
+              escola_id: currentEscolaId,
+              etapa: currentEtapa,
+              // sem turno → retorna todas
+            },
+          });
+
+          if (!cancelado) {
+            const fromFiltered = Array.isArray(resDisc.data) ? resDisc.data : [];
+            const fromAll = Array.isArray(resDiscAll.data) ? resDiscAll.data : [];
+
+            // Merge: começa com a lista filtrada e adiciona qualquer disciplina
+            // extra que tenha nota no ano corrente mas não estava no filtro por turno
+            const idsNaLista = new Set(fromFiltered.map((d) => d.id));
+            const extras = fromAll.filter((d) => !idsNaLista.has(d.id));
+
+            // Só inclui extras que de fato têm nota lançada no ano corrente
+            // (evita poluição com disciplinas de outros segmentos sem nota)
+            // notasCarregadasRef.current funçiona tanto no fluxo individual
+            // quanto no fluxo batch (notasPreCarregadas)
+            const idsComNota = new Set(
+              notasCarregadasRef.current
+                .filter((n) => Number(n.ano) === ANO_CORRENTE)
+                .map((n) => n.disciplina_id)
+            );
+            const extrasComNota = extras.filter((d) => idsComNota.has(d.id));
+
+            const merged = [...fromFiltered, ...extrasComNota];
+            const parsed = merged.map((d) => ({
               id: d.id,
               nome: d.nome || d.disciplina,
             }));

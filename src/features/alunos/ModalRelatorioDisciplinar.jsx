@@ -411,7 +411,28 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
                                             </td>
                                         </tr>
                                     )}
-                                    {ocorrencias.map((oc) => (
+                                    {/* Linhas de Bônus de Média Bimestral */}
+                                    {ocorrencias
+                                        .filter(oc => oc.tipo === 'BONUS_MEDIA')
+                                        .map(oc => (
+                                        <tr key={`bm-${oc.id}`} className="bg-teal-50/60 border-l-4 border-teal-400">
+                                            <td className="px-4 py-3 font-medium text-teal-700">🎓 Média</td>
+                                            <td className="px-4 py-3 text-teal-700 font-semibold">Bônus Bimestral</td>
+                                            <td className="px-4 py-3 text-gray-500 text-sm">{oc.data_ocorrencia}</td>
+                                            <td className="px-4 py-3">
+                                                <div className="font-semibold text-teal-700">Bônus de Média Bimestral</div>
+                                                <div className="text-xs text-teal-600 mt-1">{oc.descricao}</div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <span className="px-2 py-1 text-xs font-semibold rounded-full bg-teal-100 text-teal-700 border border-teal-200">FINALIZADA</span>
+                                            </td>
+                                            <td className="px-4 py-3 text-center">
+                                                <span className="text-teal-700 font-bold text-sm">+{Number(oc.pontos || 0.50).toFixed(2).replace('.', ',')}</span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {/* Demais ocorrências (exceto BONUS_MEDIA que já foram exibidas acima) */}
+                                    {ocorrencias.filter(oc => oc.tipo !== 'BONUS_MEDIA').map((oc) => (
                                         <tr key={oc.id} className="hover:bg-gray-50 transition">
                                             <td className="px-4 py-3 font-medium text-gray-800">{oc.registro || oc.id}</td>
                                             <td className="px-4 py-3 text-gray-600 capitalize">{oc.tipo || '-'}</td>

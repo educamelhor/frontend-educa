@@ -1,9 +1,9 @@
 // src/features/disciplinar/alunos/ModalFichaAluno.jsx
-// Modal independente do módulo Disciplinar — usa FichaAluno (genérico)
+// Modal independente do módulo Disciplinar — usa FichaAlunoDisciplinar (premium)
 // Alterações aqui NÃO afetam os modais de Secretaria, Professores ou Pedagógico
 import React, { useEffect, useRef } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
-import FichaAluno from "../../alunos/FichaAluno";
+import FichaAlunoDisciplinar from "./FichaAlunoDisciplinar";
 
 export default function ModalFichaAluno({ open, codigo, onClose }) {
   const dialogRef = useRef(null);
@@ -63,7 +63,7 @@ export default function ModalFichaAluno({ open, codigo, onClose }) {
         </div>
 
         <div className="w-full overflow-auto max-h-[85vh]">
-          <FichaAluno codigo={codigo} />
+          <FichaAlunoDisciplinar codigo={codigo} />
         </div>
       </div>
     </div>

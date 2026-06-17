@@ -17,6 +17,7 @@ import AlunoTable from "./AlunoTable";
 import AlunoForm from "./AlunoForm";
 import ModalExcluirOuInativar from "./ModalExcluirOuInativar";
 import ImportPDF from "./ImportPDF";
+import ModalFichaAluno from "./ModalFichaAluno";
 import Input from "../../../components/ui/Input";
 import styles from "./styles.module.css";
 import api from "../../../services/api";
@@ -75,6 +76,11 @@ export default function Alunos() {
 
   const [modalBoletimOpen, setModalBoletimOpen] = useState(false);
   const [codigoAlunoBoletim, setCodigoAlunoBoletim] = useState(null);
+
+  // Ficha do Estudante — modal independente
+  const [fichaOpen, setFichaOpen] = useState(false);
+  const [codigoFicha, setCodigoFicha] = useState(null);
+  const abrirFicha = (codigo) => { setCodigoFicha(codigo); setFichaOpen(true); };
   // Controla qual variante do boletim exibir: "anual" ou "2anos"
   const [boletimVariante, setBoletimVariante] = useState("anual");
   const [boletimConfigLoading, setBoletimConfigLoading] = useState(false);
@@ -389,8 +395,16 @@ export default function Alunos() {
         onDelete={handleExcluir}
         loading={loading}
         onBoletim={handleBoletim}
+        onVerFicha={abrirFicha}
         // (Se não for modo "inativos", a tabela pode ocultar inativos)
         somenteAtivos={!isBuscaInativos(debouncedFiltro)}
+      />
+
+      {/* Modal Ficha do Estudante — independente do módulo Secretaria */}
+      <ModalFichaAluno
+        open={fichaOpen}
+        codigo={codigoFicha}
+        onClose={() => setFichaOpen(false)}
       />
 
       {/* Paginação */}

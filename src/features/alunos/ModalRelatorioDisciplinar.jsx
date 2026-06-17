@@ -476,6 +476,34 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
                                                         </span>
                                                     )}
                                                 </div>
+                                                {/* Circunstâncias Atenuantes (Art. 34) */}
+                                                {(() => {
+                                                    let aten = [];
+                                                    try { aten = JSON.parse(oc.atenuantes || '[]'); } catch {}
+                                                    if (!aten.length) return null;
+                                                    return (
+                                                        <div className="flex flex-wrap gap-1 mt-1.5">
+                                                            <span className="text-xs font-semibold text-emerald-700 self-center">⚖️ Atenuantes:</span>
+                                                            {aten.map(a => (
+                                                                <span key={a} className="inline-block px-2 py-0.5 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-full border border-emerald-200">{a.replace(/ \(Art\..*\)/, '')}</span>
+                                                            ))}
+                                                        </div>
+                                                    );
+                                                })()}
+                                                {/* Circunstâncias Agravantes (Art. 35) */}
+                                                {(() => {
+                                                    let agrav = [];
+                                                    try { agrav = JSON.parse(oc.agravantes || '[]'); } catch {}
+                                                    if (!agrav.length) return null;
+                                                    return (
+                                                        <div className="flex flex-wrap gap-1 mt-1.5">
+                                                            <span className="text-xs font-semibold text-amber-700 self-center">⚠️ Agravantes:</span>
+                                                            {agrav.map(a => (
+                                                                <span key={a} className="inline-block px-2 py-0.5 text-xs font-medium text-amber-700 bg-amber-50 rounded-full border border-amber-200">{a.replace(/ \(Art\..*\)/, '')}</span>
+                                                            ))}
+                                                        </div>
+                                                    );
+                                                })()}
                                                 {Boolean(oc.convocar_responsavel) && (
                                                     <div className="mt-2">
                                                         <span className="inline-block px-2 py-1 text-xs font-medium text-red-700 bg-red-100 rounded-full border border-red-200">

@@ -39,6 +39,9 @@ export default function ModalNovaOcorrencia({ open, onClose, aluno, onOcorrencia
     const [registroInterno, setRegistroInterno] = useState("");
     const [convocarResponsavel, setConvocarResponsavel] = useState(false);
     const [diasSuspensao, setDiasSuspensao] = useState("");
+    const [atenuantes, setAtenuantes] = useState([]);
+    const [agravantes, setAgravantes] = useState([]);
+    const [circunstanciasOpen, setCircunstanciasOpen] = useState(false);
     const [salvando, setSalvando] = useState(false);
     const [nextRegistro, setNextRegistro] = useState("");
     const [registrosOcorrencias, setRegistrosOcorrencias] = useState([]);
@@ -104,6 +107,13 @@ export default function ModalNovaOcorrencia({ open, onClose, aluno, onOcorrencia
                 setRegistroInterno(ocorrenciaInicial.registro_interno || "");
                 setConvocarResponsavel(Boolean(ocorrenciaInicial.convocar_responsavel));
                 setDiasSuspensao(ocorrenciaInicial.dias_suspensao != null ? String(ocorrenciaInicial.dias_suspensao) : "");
+                // Carregar atenuantes/agravantes salvos
+                try { setAtenuantes(JSON.parse(ocorrenciaInicial.atenuantes || '[]')); } catch { setAtenuantes([]); }
+                try { setAgravantes(JSON.parse(ocorrenciaInicial.agravantes || '[]')); } catch { setAgravantes([]); }
+                setCircunstanciasOpen(
+                    (JSON.parse(ocorrenciaInicial.atenuantes || '[]').length > 0) ||
+                    (JSON.parse(ocorrenciaInicial.agravantes || '[]').length > 0)
+                );
             } else {
                 setData(new Date().toISOString().split("T")[0]);
                 setMedidaSelecionada("");
@@ -113,6 +123,9 @@ export default function ModalNovaOcorrencia({ open, onClose, aluno, onOcorrencia
                 setRegistroInterno("");
                 setConvocarResponsavel(false);
                 setDiasSuspensao("");
+                setAtenuantes([]);
+                setAgravantes([]);
+                setCircunstanciasOpen(false);
                 setNextRegistro("Carregando...");
                 if (aluno?.id) {
                     api.get(`/api/alunos/${aluno.id}/proxima-ocorrencia`)
@@ -197,7 +210,9 @@ export default function ModalNovaOcorrencia({ open, onClose, aluno, onOcorrencia
                 await api.put(`/api/alunos/${aluno.id}/ocorrencias/${ocorrenciaInicial.id}`, {
                     descricao,
                     registroInterno,
-                    convocarResponsavel
+                    convocarResponsavel,
+                    atenuantes,
+                    agravantes
                 });
             } else {
                 // Enviar tipo_ocorrencia junto para resolver ambiguidade de Elogios
@@ -207,7 +222,9 @@ export default function ModalNovaOcorrencia({ open, onClose, aluno, onOcorrencia
                     tipoOcorrencia: tipoSelecionado,
                     registroInterno,
                     descricao,
-                    convocarResponsavel
+                    convocarResponsavel,
+                    atenuantes,
+                    agravantes
                 };
                 // Incluir dias de suspensão se a medida for Suspensão
                 if (medidaSelecionada === "Suspensão" && diasSuspensao) {
@@ -363,6 +380,100 @@ export default function ModalNovaOcorrencia({ open, onClose, aluno, onOcorrencia
                             className={`w-full border rounded p-2 focus:ring focus:border-blue-300 outline-none resize-none ${readonly ? 'bg-gray-100 text-gray-600 placeholder-gray-400 cursor-not-allowed' : ''}`}
                         ></textarea>
                     </div>
+
+                    {/* ── Circunstâncias Atenuantes/Agravantes (Arts. 34/35) ────────────── */}
+                    {(() => {
+                        const ATENUANTES_LIST = [
+                            'Aluno novato ≤ 3 meses (Art. 34, I)',
+                            'Comportamento Ótimo ou Excepcional ≥ 9,0 (Art. 34, II)',
+                            'Primeira falta disciplinar (Art. 34, III)',
+                            'Histórico de atividades relevantes na escola (Art. 34, IV)',
+                            'Cometida em defesa própria ou de outrem (Art. 34, V)',
+                        ];
+                        const AGRAVANTES_LIST = [
+                            'Chefe de turma (Art. 35, I)',
+                            'Comportamento Insuficiente ou Incompatível < 5,0 (Art. 35, II)',
+                            'Reincidência em falta da mesma classificação (Art. 35, III)',
+                            'Prática simultânea de 2 ou mais faltas (Art. 35, IV)',
+                            'Participação coletiva — 2 ou mais alunos (Art. 35, V)',
+                            'Abuso de função ou posição de liderança (Art. 35, VI)',
+                            'Praticada em público, em forma ou na sala de aula (Art. 35, VII)',
+                            'Premeditação no cometimento da falta (Art. 35, VIII)',
+                            'Praticada contra chefe de turma (Art. 35, IX)',
+                        ];
+                        const toggleItem = (list, setList, item) => {
+                            setList(prev => prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item]);
+                        };
+                        const totalMarcadas = atenuantes.length + agravantes.length;
+                        return (
+                            <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden' }}>
+                                {/* Header colapsável */}
+                                <button
+                                    type="button"
+                                    onClick={() => setCircunstanciasOpen(o => !o)}
+                                    style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: circunstanciasOpen ? '#f8fafc' : '#f9fafb', border: 'none', cursor: 'pointer', gap: 8 }}
+                                >
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, color: '#374151' }}>
+                                        <span>⚖️</span>
+                                        Circunstâncias Atenuantes / Agravantes
+                                        <span style={{ fontSize: 10, color: '#9ca3af', fontWeight: 400 }}>(Arts. 34/35 — opcional)</span>
+                                    </span>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        {totalMarcadas > 0 && (
+                                            <span style={{ fontSize: 11, background: '#6366f1', color: '#fff', borderRadius: 99, padding: '2px 8px', fontWeight: 700 }}>
+                                                {totalMarcadas} marcada{totalMarcadas > 1 ? 's' : ''}
+                                            </span>
+                                        )}
+                                        <span style={{ fontSize: 16, color: '#6b7280', transition: 'transform 0.2s', transform: circunstanciasOpen ? 'rotate(180deg)' : 'rotate(0deg)', display: 'inline-block' }}>▾</span>
+                                    </span>
+                                </button>
+
+                                {/* Conteúdo */}
+                                {circunstanciasOpen && (
+                                    <div style={{ padding: '12px 14px 14px', background: '#fff', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                                        {/* Atenuantes */}
+                                        <div>
+                                            <div style={{ fontSize: 11, fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                <span style={{ width: 10, height: 10, borderRadius: 99, background: '#10b981', display: 'inline-block' }}></span>
+                                                Atenuantes
+                                            </div>
+                                            {ATENUANTES_LIST.map(item => (
+                                                <label key={item} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 6, cursor: readonly ? 'not-allowed' : 'pointer', opacity: readonly ? 0.6 : 1 }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        disabled={readonly}
+                                                        checked={atenuantes.includes(item)}
+                                                        onChange={() => toggleItem(atenuantes, setAtenuantes, item)}
+                                                        style={{ marginTop: 2, accentColor: '#10b981', width: 14, height: 14, flexShrink: 0 }}
+                                                    />
+                                                    <span style={{ fontSize: 12, color: atenuantes.includes(item) ? '#065f46' : '#374151', lineHeight: 1.4, fontWeight: atenuantes.includes(item) ? 600 : 400 }}>{item}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                        {/* Agravantes */}
+                                        <div>
+                                            <div style={{ fontSize: 11, fontWeight: 700, color: '#b45309', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                <span style={{ width: 10, height: 10, borderRadius: 99, background: '#f59e0b', display: 'inline-block' }}></span>
+                                                Agravantes
+                                            </div>
+                                            {AGRAVANTES_LIST.map(item => (
+                                                <label key={item} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 6, cursor: readonly ? 'not-allowed' : 'pointer', opacity: readonly ? 0.6 : 1 }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        disabled={readonly}
+                                                        checked={agravantes.includes(item)}
+                                                        onChange={() => toggleItem(agravantes, setAgravantes, item)}
+                                                        style={{ marginTop: 2, accentColor: '#f59e0b', width: 14, height: 14, flexShrink: 0 }}
+                                                    />
+                                                    <span style={{ fontSize: 12, color: agravantes.includes(item) ? '#92400e' : '#374151', lineHeight: 1.4, fontWeight: agravantes.includes(item) ? 600 : 400 }}>{item}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })()}
 
                     {/* Registro Interno — comunicação interna entre militares, não é impresso */}
                     <div>

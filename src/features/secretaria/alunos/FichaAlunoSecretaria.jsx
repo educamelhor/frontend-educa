@@ -158,7 +158,7 @@ export default function FichaAlunoSecretaria({ codigo }) {
       </div>
 
       {modalPedagogico && <ModalRelatorioPedagogico open={modalPedagogico} onClose={() => setModalPedagogico(false)} aluno={aluno} />}
-      {modalDisciplinar && <ModalRelatorioDisciplinar aluno={aluno} onClose={() => setModalDisciplinar(false)} />}
+      {modalDisciplinar && <ModalRelatorioDisciplinar open={modalDisciplinar} aluno={aluno} onClose={() => setModalDisciplinar(false)} />}
     </>
   );
 }

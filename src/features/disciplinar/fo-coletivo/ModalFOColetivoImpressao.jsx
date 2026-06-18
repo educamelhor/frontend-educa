@@ -93,10 +93,14 @@ function getToken() {
   return localStorage.getItem('token') || sessionStorage.getItem('token') || '';
 }
 function getEscolaId() {
+  // Lê diretamente a chave 'escola_id' — mesma que o api.js usa
+  const direct = localStorage.getItem("escola_id") || sessionStorage.getItem("escola_id");
+  if (direct) return direct;
+  // Fallback: tenta ler do objeto 'user' serializado
   try {
-    const raw = localStorage.getItem('user') || sessionStorage.getItem('user') || '{}';
-    return JSON.parse(raw)?.escola_id || '';
-  } catch { return ''; }
+    const raw = localStorage.getItem("user") || sessionStorage.getItem("user") || "{}";
+    return JSON.parse(raw)?.escola_id || "";
+  } catch { return ""; }
 }
 
 // ============================================================================

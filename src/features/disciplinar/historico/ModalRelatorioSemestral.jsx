@@ -1,7 +1,7 @@
 // src/features/disciplinar/historico/ModalRelatorioSemestral.jsx
 // Relatório Semestral Quantitativo — Arts. 23 e 52 do Regulamento Disciplinar CCMDF
-// Design premium com duas abas + impressão via window.print()
-import React, { useState, useEffect, useRef } from "react";
+// Design premium com duas abas + impressão via janela dedicada (evita PDF em branco)
+import React, { useState, useEffect } from "react";
 import { XMarkIcon, PrinterIcon } from "@heroicons/react/24/outline";
 import api from "../../../services/api";
 
@@ -26,31 +26,16 @@ function medidaMeta(medida) {
   return MEDIDA_META[medida] || { icon: "📋", color: "#6b7280", bg: "#f9fafb" };
 }
 
-// ── Estilos de impressão injetados via <style> ───────────────────────────────
-const PRINT_CSS = `
-@media print {
-  body > *:not(#semestral-print-root) { display: none !important; }
-  #semestral-print-root { display: block !important; position: static !important; }
-  .no-print { display: none !important; }
-  .print-page { page-break-after: always; }
-  table { border-collapse: collapse; width: 100%; }
-  th, td { border: 1px solid #ccc; padding: 6px 10px; font-size: 12px; }
-  th { background: #1e3a5f; color: #fff; }
-  h1, h2, h3 { color: #1e3a5f; }
-}
-`;
-
 export default function ModalRelatorioSemestral({ open, onClose, escolaNome }) {
   const anoAtual = new Date().getFullYear();
   const mesAtual = new Date().getMonth() + 1;
 
-  const [aba, setAba]             = useState("art23");
-  const [semestre, setSemestre]   = useState(mesAtual <= 6 ? 1 : 2);
-  const [ano, setAno]             = useState(anoAtual);
-  const [dados, setDados]         = useState(null);
-  const [loading, setLoading]     = useState(false);
-  const [erro, setErro]           = useState(null);
-  const printRef                  = useRef(null);
+  const [aba, setAba]           = useState("art23");
+  const [semestre, setSemestre] = useState(mesAtual <= 6 ? 1 : 2);
+  const [ano, setAno]           = useState(anoAtual);
+  const [dados, setDados]       = useState(null);
+  const [loading, setLoading]   = useState(false);
+  const [erro, setErro]         = useState(null);
 
   // Fechar com ESC
   useEffect(() => {
@@ -72,8 +57,146 @@ export default function ModalRelatorioSemestral({ open, onClose, escolaNome }) {
       .finally(() => setLoading(false));
   }, [open, semestre, ano]);
 
+  // ── Impressão: abre nova janela com HTML completo ──────────────────────────
   const handlePrint = () => {
-    window.print();
+    if (!dados) return;
+    const nomeSem = semestre === 1 ? "1º Semestre" : "2º Semestre";
+    const periodo = semestre === 1 ? `Jan–Jun/${ano}` : `Jul–Dez/${ano}`;
+    const escola  = escolaNome || "CEF04-CCMDF";
+
+    // ── Conteúdo Art. 23 ──
+    const rowsMedida = dados.art23.porMedida
+      .filter(m => m.medida !== "BONUS_MEDIA")
+      .map(m => `<tr><td>${m.medida}</td><td style="text-align:center">${m.total}</td><td style="text-align:center">${m.finalizadas}</td><td style="text-align:center">${m.registradas}</td></tr>`)
+      .join("");
+
+    const rowsTurma = dados.art23.porTurma
+      .map(r => `<tr><td>${r.turma}</td><td>${r.turno}</td><td style="text-align:center">${r.total}</td><td style="text-align:center">${r.ativas}</td><td style="text-align:center">${r.suspensoes}</td><td style="text-align:center">${r.dias_suspensao}</td><td style="text-align:center">${r.positivos}</td></tr>`)
+      .join("") || `<tr><td colspan="7" style="text-align:center;color:#6b7280">Nenhuma ocorrência no período.</td></tr>`;
+
+    const rowsMotivos = dados.art23.topMotivos
+      .map((m, i) => `<tr><td style="text-align:center">${i+1}º</td><td>${m.motivo}</td><td style="text-align:center">${m.total}</td></tr>`)
+      .join("") || `<tr><td colspan="3" style="text-align:center;color:#6b7280">Nenhum registro.</td></tr>`;
+
+    const resp = dados.art23.responsaveis;
+    const kpi  = dados.art23.kpi;
+
+    // ── Conteúdo Art. 52 ──
+    const rowsArt52 = dados.art52.length === 0
+      ? `<tr><td colspan="6" style="text-align:center;color:#059669;font-weight:bold">✅ Nenhum aluno abaixo de Bom neste semestre.</td></tr>`
+      : dados.art52.map(al => {
+          const conceito = getConceito(al.pontuacao);
+          return `<tr><td style="text-align:center;font-family:monospace">${al.codigo}</td><td>${al.nome}</td><td>${al.turma}</td><td style="text-align:center">${al.turno}</td><td style="text-align:center;font-weight:bold;color:${conceito.color}">${al.pontuacao.toFixed(2)}</td><td style="text-align:center"><span style="background:${conceito.bg};color:${conceito.color};padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700">${conceito.label}</span></td></tr>`;
+        }).join("");
+
+    const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Relatório Semestral — ${nomeSem} ${ano}</title>
+  <style>
+    @page { margin: 18mm 15mm; }
+    * { box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 12px; color: #1e293b; margin: 0; padding: 0; }
+    .header { background: #0f2044; color: #fff; padding: 18px 24px; border-radius: 0 0 8px 8px; margin-bottom: 18px; }
+    .header h1 { margin: 0 0 4px; font-size: 18px; }
+    .header p  { margin: 0; font-size: 11px; opacity: .7; }
+    .badge { display:inline-block; padding:2px 10px; border-radius:99px; font-size:11px; font-weight:700; margin-left:8px; }
+    .art-title { font-size:13px; font-weight:700; color:#0f2044; border-left:4px solid #1d4ed8; padding-left:10px; margin:20px 0 10px; }
+    .kpi-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:16px; }
+    .kpi-card { background:#f1f5f9; border:1px solid #e2e8f0; border-radius:8px; padding:12px; text-align:center; }
+    .kpi-card .val { font-size:22px; font-weight:800; color:#0f2044; }
+    .kpi-card .lbl { font-size:10px; color:#64748b; margin-top:2px; }
+    table { width:100%; border-collapse:collapse; margin-bottom:16px; font-size:11px; }
+    th { background:#1e3a5f; color:#fff; padding:7px 10px; text-align:left; font-size:10px; letter-spacing:.05em; }
+    td { padding:6px 10px; border-bottom:1px solid #e2e8f0; }
+    tr:nth-child(even) td { background:#f8fafc; }
+    .legal-box { background:#fef3c7; border:1px solid #fde68a; border-radius:8px; padding:10px 14px; margin-bottom:14px; font-size:11px; color:#92400e; }
+    .page-break { page-break-before: always; }
+    .footer { margin-top:24px; padding-top:10px; border-top:1px solid #e2e8f0; font-size:10px; color:#94a3b8; text-align:center; }
+    .subtitle { font-size:10px; color:#64748b; letter-spacing:.08em; text-transform:uppercase; margin:14px 0 6px; font-weight:700; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <p>📊 RELATÓRIO SEMESTRAL QUANTITATIVO · ${escola}</p>
+  <h1>${nomeSem} / ${ano} &nbsp;<span style="font-size:13px;font-weight:400;opacity:.7">${periodo}</span></h1>
+</div>
+
+<!-- ART. 23 -->
+<div class="art-title">Art. 23 — Dados Quantitativos (sem identificação nominal)</div>
+
+<div class="kpi-grid">
+  <div class="kpi-card"><div class="val">${kpi.total||0}</div><div class="lbl">Total de Registros</div></div>
+  <div class="kpi-card"><div class="val">${kpi.alunos_envolvidos||0}</div><div class="lbl">Alunos Envolvidos</div></div>
+  <div class="kpi-card"><div class="val" style="color:#059669">${kpi.finalizadas||0}</div><div class="lbl">Finalizadas</div></div>
+  <div class="kpi-card"><div class="val" style="color:#d97706">${kpi.registradas||0}</div><div class="lbl">Em Aberto</div></div>
+</div>
+
+<div class="subtitle">Ocorrências por Tipo de Medida</div>
+<table>
+  <thead><tr><th>Medida Disciplinar</th><th>Total</th><th>Finalizadas</th><th>Em Aberto</th></tr></thead>
+  <tbody>${rowsMedida}</tbody>
+</table>
+
+<div class="subtitle">Ocorrências por Turma — sem identificação nominal</div>
+<table>
+  <thead><tr><th>Turma</th><th>Turno</th><th>Total</th><th>Ativas</th><th>Suspensões</th><th>Dias Susp.</th><th>Positivos</th></tr></thead>
+  <tbody>${rowsTurma}</tbody>
+</table>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+  <div>
+    <div class="subtitle">Top 5 Motivos Mais Frequentes</div>
+    <table><thead><tr><th>#</th><th>Motivo</th><th>Total</th></tr></thead><tbody>${rowsMotivos}</tbody></table>
+  </div>
+  <div>
+    <div class="subtitle">Convocação de Responsáveis</div>
+    <table>
+      <thead><tr><th>Situação</th><th>Qtd.</th></tr></thead>
+      <tbody>
+        <tr><td>Convocados</td><td style="text-align:center">${resp.convocados||0}</td></tr>
+        <tr><td>Comparecidos</td><td style="text-align:center;color:#059669;font-weight:700">${resp.comparecidos||0}</td></tr>
+        <tr><td>Pendentes</td><td style="text-align:center;color:#dc2626;font-weight:700">${resp.pendentes||0}</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ART. 52 -->
+<div class="page-break"></div>
+<div class="art-title">Art. 52 — Relação de Alunos com Comportamento ≤ Regular (USO INTERNO)</div>
+
+<div class="legal-box">
+  ⚖️ <strong>Art. 52 — USO INTERNO:</strong> Esta relação deve ser encaminhada pelo Supervisor Disciplinar ao Comandante Disciplinar e ao Diretor Pedagógico-Administrativo ao final do semestre.
+  Alunos com comportamento <em>Regular, Insuficiente ou Incompatível</em> (pontuação &lt; 7,0).
+</div>
+
+<p style="margin:0 0 10px;font-size:12px">
+  <strong style="color:${dados.art52.length > 0 ? '#dc2626' : '#059669'};font-size:18px">${dados.art52.length}</strong>
+  aluno${dados.art52.length !== 1 ? "s" : ""} com comportamento abaixo do Bom
+  · <span style="color:#64748b">${nomeSem} ${ano}</span>
+</p>
+
+<table>
+  <thead><tr><th>Código</th><th>Nome</th><th>Turma</th><th>Turno</th><th>Pontuação</th><th>Conceito</th></tr></thead>
+  <tbody>${rowsArt52}</tbody>
+</table>
+
+<div class="footer">
+  Relatório gerado automaticamente pelo Sistema EducaDF · Módulo Disciplinar CCMDF · ${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})}
+</div>
+
+</body>
+</html>`;
+
+    const pw = window.open("", "_blank", "width=900,height=700");
+    if (!pw) { alert("Permita pop-ups para gerar o relatório."); return; }
+    pw.document.write(html);
+    pw.document.close();
+    pw.focus();
+    setTimeout(() => { pw.print(); }, 600);
   };
 
   if (!open) return null;
@@ -92,8 +215,6 @@ export default function ModalRelatorioSemestral({ open, onClose, escolaNome }) {
       >
         {/* Modal */}
         <div
-          id="semestral-print-root"
-          ref={printRef}
           style={{ position: "relative", background: "#fff", borderRadius: 20, width: "95vw", maxWidth: 860, maxHeight: "92vh", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 24px 80px rgba(0,0,0,0.3)", animation: "sem-in 0.25s cubic-bezier(0.16,1,0.3,1)" }}
           onClick={e => e.stopPropagation()}
         >

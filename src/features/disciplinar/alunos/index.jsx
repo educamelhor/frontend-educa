@@ -16,6 +16,7 @@ import AlunoTable from "../../secretaria/alunos/AlunoTable";
 import Input from "../../../components/ui/Input";
 import ModalTACE from "../../alunos/ModalTACE";
 import ModalConfirmTACE from "./ModalConfirmTACE";
+import ModalFichaAluno from "./ModalFichaAluno"; // ⭐ Modal premium independente do módulo Disciplinar
 
 function anoLetivoPadrao() {
     const hoje = new Date();
@@ -74,6 +75,11 @@ export default function AlunosDisciplinar() {
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [confirmAluno, setConfirmAluno] = useState(null);
     const [confirmPontuacao, setConfirmPontuacao] = useState(8.0);
+
+    // ⭐ Ficha do Estudante — modal premium independente
+    const [fichaOpen, setFichaOpen] = useState(false);
+    const [fichaCodigo, setFichaCodigo] = useState(null);
+    const handleVerFicha = (codigo) => { setFichaCodigo(codigo); setFichaOpen(true); };
 
     // Validação Relatório Disciplinar (dados ausentes)
     const [validacaoRelOpen, setValidacaoRelOpen] = useState(false);
@@ -312,6 +318,7 @@ export default function AlunosDisciplinar() {
                 mostrarBoletim={false}
                 onEditar={null}
                 onDelete={null}
+                onVerFicha={handleVerFicha}
                 onRelatorioDisciplinar={handleRelatorioDisciplinar}
             />
 
@@ -486,6 +493,13 @@ export default function AlunosDisciplinar() {
                 onClose={() => { setTaceOpen(false); setTaceAluno(null); }}
                 aluno={taceAluno}
                 onSaved={() => { /* Refresh handled by parent if needed */ }}
+            />
+
+            {/* ⭐ Modal Ficha do Estudante — design premium independente do módulo Disciplinar */}
+            <ModalFichaAluno
+                open={fichaOpen}
+                codigo={fichaCodigo}
+                onClose={() => { setFichaOpen(false); setFichaCodigo(null); }}
             />
 
             {/* Paginação */}

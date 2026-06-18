@@ -86,6 +86,7 @@ export default function Alunos() {
         localizados: res.data.localizados ?? 0,
         inseridos:   res.data.inseridos   ?? 0,
         reativados:  res.data.reativados  ?? 0,
+        atualizados: res.data.atualizados ?? 0,
         jaExistiam:  res.data.jaExistiam  ?? 0,
         inativados:  res.data.inativados  ?? 0,
       });
@@ -365,9 +366,14 @@ export default function Alunos() {
                 </button>
               </div>
 
-              {"inseridos" in resultadoImportacao ? (
+              {resultadoImportacao._loading ? (
+                <div className="text-gray-500 animate-pulse">⏳ Importando planilha...</div>
+              ) : "inseridos" in resultadoImportacao ? (
                 <>
                   <div className="text-green-600">✅ Inseridos: {resultadoImportacao.inseridos}</div>
+                  {resultadoImportacao.atualizados > 0 && (
+                    <div className="text-blue-500">🔄 Dados completados: {resultadoImportacao.atualizados}</div>
+                  )}
                   <div className="text-yellow-600">🟡 Já existiam: {resultadoImportacao.jaExistiam}</div>
                   <div className="text-blue-600">📘 Reativados: {resultadoImportacao.reativados}</div>
                   <div className="text-red-600">❌ Inativados: {resultadoImportacao.inativados}</div>

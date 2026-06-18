@@ -66,7 +66,28 @@ function statusBadge(status) {
   return { bg:'#dbeafe', color:'#1d4ed8', label:'Registrada' };
 }
 function getApiBase() {
-  return (import.meta.env?.VITE_API_URL || window.location.origin).replace(/\/$/, '');
+  // Mesma lógica do api.js — suporta ambos os nomes de variável
+  const envUrl =
+    import.meta.env?.VITE_API_BASE_URL ||
+    import.meta.env?.VITE_API_URL;
+
+  const normalize = (url) => {
+    let u = String(url || "").trim().replace(/\/+$/, "");
+    if (!u) return "";
+    // Remove /api do final para que a URL seja só a raiz (adicionamos /api nas chamadas)
+    if (u.endsWith("/api")) u = u.slice(0, -4);
+    return u;
+  };
+
+  const base = normalize(envUrl);
+  if (base) return base;
+
+  const host = window.location.hostname;
+  const isLocal = host === "localhost" || host === "127.0.0.1";
+  if (isLocal) return "http://localhost:3000";
+
+  // Produção: fallback explícito para o backend (igual ao api.js)
+  return "https://educa-backend-docker-659zo.ondigitalocean.app";
 }
 function getToken() {
   return localStorage.getItem('token') || sessionStorage.getItem('token') || '';

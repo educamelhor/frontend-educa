@@ -8,6 +8,7 @@ import {
   TrashIcon,
   PencilIcon,
   DocumentTextIcon,
+  TableCellsIcon,
   BookOpenIcon,
   PlusIcon,
 } from "@heroicons/react/24/solid";
@@ -26,6 +27,7 @@ export default function Alunos() {
   const [progress, setProgress] = useState(0);
 
   const fileInputRef = useRef();
+  const xlsxInputRef = useRef();
 
 
   // Carrega alunos ativos
@@ -115,6 +117,42 @@ export default function Alunos() {
   };
 
   const handleIncluirClick = () => fileInputRef.current?.click();
+  const handleXlsxClick = () => xlsxInputRef.current?.click();
+
+  // Importar XLSX diretamente (colunas: RE, estudante, data_nascimento, responsavel, cpf, turma)
+  const handleXlsxSelected = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("file", file);
+    // O nome do arquivo determina a turma (ex: "6º ANO A.xlsx" → turma "6º ANO A")
+    const turmaNome = file.name.replace(/\.[^.]+$/i, "").trim();
+    formData.append("turmaNome", turmaNome);
+
+    setFeedback({ status: "processando" });
+    setProgress(0);
+
+    try {
+      const res = await api.post("/alunos/importar-xlsx", formData);
+      await buscarAlunos();
+      setFeedback({
+        status: "sucesso",
+        localizados: res.data.localizados ?? 0,
+        inseridos: res.data.inseridos ?? 0,
+        duplicados: res.data.jaExistiam ?? 0,
+        inativados: res.data.inativados ?? 0,
+        baixado: null,
+      });
+    } catch (err) {
+      console.error("Erro ao importar XLSX:", err);
+      const msg = err.response?.data?.message || err.message;
+      setFeedback({ status: "erro", message: msg });
+    } finally {
+      e.target.value = null;
+      setProgress(0);
+    }
+  };
 
   // Adicionar ou editar
   const handleAdicionarOuEditarAluno = async (dados) => {
@@ -155,11 +193,13 @@ export default function Alunos() {
         >
           <PlusIcon className="w-5 h-5" /> Adicionar Estudante
         </button>
+        {/* Botão PDF */}
         <button
           onClick={handleIncluirClick}
           className="btn btn-success flex items-center gap-2"
+          title="Importar alunos a partir de PDF da Secretaria de Educação"
         >
-          <DocumentTextIcon className="w-5 h-5" /> Incluir Estudantes
+          <DocumentTextIcon className="w-5 h-5" /> Importar via PDF
         </button>
         <input
           type="file"
@@ -167,6 +207,23 @@ export default function Alunos() {
           ref={fileInputRef}
           style={{ display: "none" }}
           onChange={handleFileSelected}
+        />
+
+        {/* Botão XLSX */}
+        <button
+          onClick={handleXlsxClick}
+          className="btn btn-success flex items-center gap-2"
+          style={{ background: "#0f766e" }}
+          title="Importar alunos a partir de planilha Excel (.xlsx) com colunas: RE, estudante, data_nascimento, responsavel, cpf_responsavel, turma"
+        >
+          <TableCellsIcon className="w-5 h-5" /> Importar via XLSX
+        </button>
+        <input
+          type="file"
+          accept=".xlsx,.xls"
+          ref={xlsxInputRef}
+          style={{ display: "none" }}
+          onChange={handleXlsxSelected}
         />
       </div>
 

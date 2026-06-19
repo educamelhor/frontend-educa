@@ -105,7 +105,9 @@ export default function Sidebar({ isOpen, onClose }) {
     try {
       const token = localStorage.getItem('token');
       if (!token) return;
-      const apiBase = import.meta.env.VITE_API_URL || '';
+      // VITE_API_URL pode ser undefined em produção (Vercel usa VITE_API_BASE_URL).
+      // api.defaults.baseURL já foi resolvido corretamente pelo api service com fallback.
+      const apiBase = (api.defaults?.baseURL || '').replace(/\/api$/, '');
       const res = await fetch(`${apiBase}/api/auth/modulos`, {
         headers: { Authorization: `Bearer ${token}` }
       });

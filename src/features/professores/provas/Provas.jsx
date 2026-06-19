@@ -497,11 +497,11 @@ export default function Provas() {
           <button
             style={{ ...s.tabBtn, ...(activeTab === 'capas' ? s.tabBtnActive : {}) }}
             onClick={() => { setActiveTab('capas'); resetWizard(); }}
-          >📋 Capas Criadas ({capas.length})>✏️</button>
+          >📋 Capas Criadas ({capas.length})></button>
           <button
             style={{ ...s.tabBtn, ...(activeTab === 'nova' ? s.tabBtnActive : {}), background: activeTab === 'nova' ? 'linear-gradient(135deg,#6366f1,#8b5cf6)' : undefined, color: activeTab === 'nova' ? '#fff' : undefined }}
             onClick={() => { setActiveTab('nova'); setStep(1); }}
-          >➕ Nova Capa>✏️</button>
+          >➕ Nova Capa></button>
         </div>
       </div>
 
@@ -515,7 +515,7 @@ export default function Provas() {
               <div style={{ fontSize:56, marginBottom:12 }}>📄</div>
               <h3 style={{ fontWeight:700, color:'#374151', marginBottom:6 }}>Nenhuma capa criada ainda</h3>
               <p style={{ color:'#6b7280', fontSize:14, marginBottom:20 }}>Clique em "Nova Capa" para criar a primeira.</p>
-              <button style={s.primaryBtn} onClick={() => { setActiveTab('nova'); setStep(1); }}>➕ Criar primeira capa>✏️</button>
+              <button style={s.primaryBtn} onClick={() => { setActiveTab('nova'); setStep(1); }}>➕ Criar primeira capa></button>
             </div>
           ) : (
             <div style={s.grid}>
@@ -573,7 +573,7 @@ export default function Provas() {
                           style={s.btnDelete}
                           onClick={() => handleDelete(capa.id)}
                           disabled={deletingId === capa.id}
-                        >{deletingId === capa.id ? '...' : '🗑️'}>✏️</button>
+                        >{deletingId === capa.id ? '...' : '🗑️'}></button>
                       </div>
                     </div>
                   </div>
@@ -595,7 +595,7 @@ export default function Provas() {
               border:'1.5px solid #f59e0b', borderRadius:10,
               padding:'10px 16px', marginBottom:16,
             }}>
-              <span style={{ fontSize:20 }}>✏️</span>
+              <span style={{ fontSize:20 }}></span>
               <div>
                 <span style={{ fontWeight:800, fontSize:13, color:'#92400e' }}>Modo Edição</span>
                 <span style={{ fontSize:12, color:'#b45309', marginLeft:8 }}>
@@ -605,7 +605,7 @@ export default function Provas() {
               <button
                 style={{ marginLeft:'auto', padding:'5px 12px', borderRadius:6, border:'1.5px solid #f59e0b', background:'#fff', color:'#92400e', fontWeight:700, fontSize:12, cursor:'pointer' }}
                 onClick={() => { setEditingCapaId(null); resetWizard(); }}
-              >✕ Cancelar edição>✏️</button>
+              >✕ Cancelar edição></button>
             </div>
           )}
 
@@ -620,7 +620,7 @@ export default function Provas() {
                   <button style={{ ...s.stepBtn, ...(active ? s.stepActive : done ? s.stepDone : s.stepIdle) }} onClick={() => goToStep(n)}>
                     <span style={s.stepNum}>{done ? '✓' : n}</span>
                     <span style={s.stepLabel}>{label}</span>
-                  >✏️</button>
+                  ></button>
                   {i < 2 && <div style={{ ...s.stepLine, background: done ? '#6366f1' : '#e2e8f0' }} />}
                 </React.Fragment>
               );
@@ -639,7 +639,7 @@ export default function Provas() {
                     <div style={{ fontSize:42, marginBottom:10 }}>{area.emoji}</div>
                     <div style={{ fontSize:18, fontWeight:800, color: area.cor, marginBottom:4 }}>{area.label}</div>
                     <div style={{ fontSize:11, color:'#64748b', lineHeight:1.4 }}>{area.disciplinas}</div>
-                  >✏️</button>
+                  ></button>
                 ))}
               </div>
             </div>
@@ -674,7 +674,7 @@ export default function Provas() {
                     {selectedTemplate?.id === t.id && (
                       <div style={{ position:'absolute', top:8, right:8, background: effectiveArea.cor, borderRadius:'50%', width:20, height:20, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:12, fontWeight:900 }}>✓</div>
                     )}
-                  >✏️</button>
+                  ></button>
                 ))}
               </div>
 
@@ -689,7 +689,7 @@ export default function Provas() {
                     <button
                       style={{ fontSize:11, color:'#6366f1', fontWeight:700, background:'none', border:'none', cursor:'pointer', padding:'2px 8px', borderRadius:4, transition:'background .2s' }}
                       onClick={() => setCustomColor(null)}
-                    >↺ Restaurar padrão>✏️</button>
+                    >↺ Restaurar padrão></button>
                   )}
                 </div>
                 <p style={{ fontSize:11, color:'#94a3b8', margin:'0 0 14px', lineHeight:1.5 }}>
@@ -709,7 +709,7 @@ export default function Provas() {
                     onClick={() => setCustomColor(null)}
                   >
                     {!customColor && <span style={{ fontSize:10, color:'#fff', fontWeight:900 }}>✓</span>}
-                  >✏️</button>
+                  ></button>
                   {/* Paleta curada */}
                   {COLOR_PALETTE.map(({ hex, name }) => (
                     <button
@@ -726,7 +726,7 @@ export default function Provas() {
                       onClick={() => setCustomColor(hex)}
                     >
                       {customColor === hex && <span style={{ fontSize:10, color:'#fff', fontWeight:900 }}>✓</span>}
-                    >✏️</button>
+                    ></button>
                   ))}
                   {/* Picker personalizado */}
                   <label
@@ -766,7 +766,7 @@ export default function Provas() {
               </div>
 
               <div style={{ display:'flex', gap:10, marginTop:20 }}>
-                <button style={s.secondaryBtn} onClick={() => setStep(1)}>← Voltar>✏️</button>
+                <button style={s.secondaryBtn} onClick={() => setStep(1)}>← Voltar></button>
               </div>
             </div>
           )}
@@ -830,7 +830,7 @@ export default function Provas() {
                         onClick={() => fileInputRef.current?.click()}
                       >
                         + Inserir Imagem
-                      >✏️</button>
+                      ></button>
                     )}
                   </div>
 
@@ -853,8 +853,8 @@ export default function Provas() {
                         <div style={{ flex:1 }}>
                           <p style={{ fontSize:11, color:'#475569', margin:'0 0 8px' }}>Imagem carregada. Ajuste o zoom e a posição no preview ao lado.</p>
                           <div style={{ display:'flex', gap:6 }}>
-                            <button style={s.btnChangeImage} onClick={() => fileInputRef.current?.click()}>🔄 Trocar>✏️</button>
-                            <button style={s.btnRemoveImage} onClick={removeCustomImage}>✕ Remover>✏️</button>
+                            <button style={s.btnChangeImage} onClick={() => fileInputRef.current?.click()}>🔄 Trocar></button>
+                            <button style={s.btnRemoveImage} onClick={removeCustomImage}>✕ Remover></button>
                           </div>
                         </div>
                       </div>
@@ -865,7 +865,7 @@ export default function Provas() {
                         <button
                           style={s.zoomBtn}
                           onClick={() => setImageZoom(z => Math.max(0.5, parseFloat((z - 0.1).toFixed(1))))}
-                        >−>✏️</button>
+                        >−></button>
                         <input
                           type="range" min="0.5" max="2.5" step="0.05"
                           value={imageZoom}
@@ -875,35 +875,35 @@ export default function Provas() {
                         <button
                           style={s.zoomBtn}
                           onClick={() => setImageZoom(z => Math.min(2.5, parseFloat((z + 0.1).toFixed(1))))}
-                        >+>✏️</button>
+                        >+></button>
                         <span style={s.zoomValue}>{imageZoom.toFixed(1)}×</span>
                       </div>
 
                       {/* Offset X */}
                       <div style={s.zoomRow}>
                         <span style={s.zoomLabel}>↔ Pos. X</span>
-                        <button style={s.zoomBtn} onClick={() => setImageOffsetX(x => Math.max(-50, x - 5))}>−>✏️</button>
+                        <button style={s.zoomBtn} onClick={() => setImageOffsetX(x => Math.max(-50, x - 5))}>−></button>
                         <input
                           type="range" min="-50" max="50" step="1"
                           value={imageOffsetX}
                           onChange={e => setImageOffsetX(Number(e.target.value))}
                           style={s.zoomSlider}
                         />
-                        <button style={s.zoomBtn} onClick={() => setImageOffsetX(x => Math.min(50, x + 5))}>+>✏️</button>
+                        <button style={s.zoomBtn} onClick={() => setImageOffsetX(x => Math.min(50, x + 5))}>+></button>
                         <span style={s.zoomValue}>{imageOffsetX > 0 ? '+' : ''}{imageOffsetX}%</span>
                       </div>
 
                       {/* Offset Y */}
                       <div style={s.zoomRow}>
                         <span style={s.zoomLabel}>↕ Pos. Y</span>
-                        <button style={s.zoomBtn} onClick={() => setImageOffsetY(y => Math.max(-50, y - 5))}>−>✏️</button>
+                        <button style={s.zoomBtn} onClick={() => setImageOffsetY(y => Math.max(-50, y - 5))}>−></button>
                         <input
                           type="range" min="-50" max="50" step="1"
                           value={imageOffsetY}
                           onChange={e => setImageOffsetY(Number(e.target.value))}
                           style={s.zoomSlider}
                         />
-                        <button style={s.zoomBtn} onClick={() => setImageOffsetY(y => Math.min(50, y + 5))}>+>✏️</button>
+                        <button style={s.zoomBtn} onClick={() => setImageOffsetY(y => Math.min(50, y + 5))}>+></button>
                         <span style={s.zoomValue}>{imageOffsetY > 0 ? '+' : ''}{imageOffsetY}%</span>
                       </div>
 
@@ -913,28 +913,28 @@ export default function Provas() {
                       {/* Altura da imagem */}
                       <div style={s.zoomRow}>
                         <span style={s.zoomLabel}>⇕ Altura</span>
-                        <button style={s.zoomBtn} onClick={() => setImageHeight(h => Math.max(80, h - 10))}>−>✏️</button>
+                        <button style={s.zoomBtn} onClick={() => setImageHeight(h => Math.max(80, h - 10))}>−></button>
                         <input
                           type="range" min="80" max="340" step="10"
                           value={imageHeight}
                           onChange={e => setImageHeight(Number(e.target.value))}
                           style={s.zoomSlider}
                         />
-                        <button style={s.zoomBtn} onClick={() => setImageHeight(h => Math.min(340, h + 10))}>+>✏️</button>
+                        <button style={s.zoomBtn} onClick={() => setImageHeight(h => Math.min(340, h + 10))}>+></button>
                         <span style={s.zoomValue}>{imageHeight}px</span>
                       </div>
 
                       {/* Largura da imagem */}
                       <div style={s.zoomRow}>
                         <span style={s.zoomLabel}>⇔ Largura</span>
-                        <button style={s.zoomBtn} onClick={() => setImageWidthPct(w => Math.max(40, w - 5))}>−>✏️</button>
+                        <button style={s.zoomBtn} onClick={() => setImageWidthPct(w => Math.max(40, w - 5))}>−></button>
                         <input
                           type="range" min="40" max="100" step="5"
                           value={imageWidthPct}
                           onChange={e => setImageWidthPct(Number(e.target.value))}
                           style={s.zoomSlider}
                         />
-                        <button style={s.zoomBtn} onClick={() => setImageWidthPct(w => Math.min(100, w + 5))}>+>✏️</button>
+                        <button style={s.zoomBtn} onClick={() => setImageWidthPct(w => Math.min(100, w + 5))}>+></button>
                         <span style={s.zoomValue}>{imageWidthPct}%</span>
                       </div>
 
@@ -942,7 +942,7 @@ export default function Provas() {
                       <button
                         style={{ ...s.btnChangeImage, marginTop:4, fontSize:11 }}
                         onClick={() => { setImageZoom(1); setImageOffsetX(0); setImageOffsetY(0); setImageHeight(200); setImageWidthPct(100); }}
-                      >↺ Resetar tudo>✏️</button>
+                      >↺ Resetar tudo></button>
                     </div>
                   ) : (
                     <div style={s.imageEmptyHint}>
@@ -953,14 +953,14 @@ export default function Provas() {
                 </div>
 
                 <div style={{ display:'flex', gap:10, marginTop:16 }}>
-                  <button style={s.secondaryBtn} onClick={() => setStep(2)}>← Voltar>✏️</button>
+                  <button style={s.secondaryBtn} onClick={() => setStep(2)}>← Voltar></button>
                   <button
                     style={{ ...s.primaryBtn, flex:1, opacity: generating ? 0.7 : 1 }}
                     onClick={handleGerar}
                     disabled={generating}
                   >
                     {generating ? '⏳ Gerando PDF...' : '📄 Gerar e Baixar PDF'}
-                  >✏️</button>
+                  ></button>
                 </div>
               </div>
 

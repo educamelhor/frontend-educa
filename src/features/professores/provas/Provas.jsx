@@ -36,11 +36,14 @@ export default function Provas() {
   const [imageOffsetX, setImageOffsetX] = useState(0);
   const [imageOffsetY, setImageOffsetY] = useState(0);
   const fileInputRef = useRef(null);
-  const previewCaptureRef = useRef(null); // ref para captura do PDF local
+  const previewCaptureRef = useRef(null);
+
+  // ── Custom color state ─────────────────────────────────────────────────
+  const [customColor, setCustomColor] = useState(null); // null = usar cor da área
 
   // Wizard state
-  const [selectedArea, setSelectedArea] = useState(null); // AREAS item
-  const [selectedTemplate, setSelectedTemplate] = useState(null); // TEMPLATES item
+  const [selectedArea, setSelectedArea] = useState(null);
+  const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [form, setForm] = useState({
     titulo: '',
     serie: '',
@@ -270,12 +273,79 @@ export default function Provas() {
     setImageZoom(1);
     setImageOffsetX(0);
     setImageOffsetY(0);
+    setCustomColor(null);
   }
 
   // ── Area badge color helper ─────────────────────────────────────────────
   function getAreaDef(areaId) {
     return AREAS.find(a => a.id === areaId) || AREAS[4];
   }
+
+  // ── Utilitários de cor ──────────────────────────────────────────────────
+  // Converte hex para HSL [h, s, l]
+  function hexToHSL(hex) {
+    const r = parseInt(hex.slice(1,3),16)/255;
+    const g = parseInt(hex.slice(3,5),16)/255;
+    const b = parseInt(hex.slice(5,7),16)/255;
+    const max = Math.max(r,g,b), min = Math.min(r,g,b);
+    let h = 0, s = 0;
+    const l = (max+min)/2;
+    if (max !== min) {
+      const d = max-min;
+      s = l > 0.5 ? d/(2-max-min) : d/(max+min);
+      switch(max) {
+        case r: h = ((g-b)/d + (g<b?6:0))/6; break;
+        case g: h = ((b-r)/d + 2)/6; break;
+        case b: h = ((r-g)/d + 4)/6; break;
+      }
+    }
+    return [Math.round(h*360), Math.round(s*100), Math.round(l*100)];
+  }
+
+  // Converte HSL para hex
+  function hslToHex(h, s, l) {
+    s /= 100; l /= 100;
+    const a = s * Math.min(l, 1-l);
+    const f = n => {
+      const k = (n + h/30) % 12;
+      return Math.round(255*(l - a*Math.max(Math.min(k-3,9-k,1),-1)))
+        .toString(16).padStart(2,'0');
+    };
+    return `#${f(0)}${f(8)}${f(4)}`;
+  }
+
+  // Gera corClaro (alta luminosidade, mesma matiz)
+  function makeCorClaro(hex) {
+    const [h, s] = hexToHSL(hex);
+    return hslToHex(h, Math.max(s-15, 8), 94);
+  }
+
+  // Área efetiva (com cor sobrescrita se customColor)
+  const effectiveArea = selectedArea
+    ? customColor
+      ? { ...selectedArea, cor: customColor, corClaro: makeCorClaro(customColor) }
+      : selectedArea
+    : null;
+
+  // Paleta premium de cores curadas
+  const COLOR_PALETTE = [
+    { hex:'#6366F1', name:'Índigo' },
+    { hex:'#8B5CF6', name:'Violeta' },
+    { hex:'#EC4899', name:'Rosa' },
+    { hex:'#EF4444', name:'Vermelho' },
+    { hex:'#F97316', name:'Laranja' },
+    { hex:'#EAB308', name:'Âmbar' },
+    { hex:'#22C55E', name:'Verde' },
+    { hex:'#10B981', name:'Esmeralda' },
+    { hex:'#14B8A6', name:'Ciano' },
+    { hex:'#0EA5E9', name:'Azul Claro' },
+    { hex:'#3B82F6', name:'Azul' },
+    { hex:'#1E40AF', name:'Marinho' },
+    { hex:'#7C3AED', name:'Ametista' },
+    { hex:'#BE185D', name:'Carmesim' },
+    { hex:'#0F766E', name:'Petróleo' },
+    { hex:'#1E293B', name:'Grafite' },
+  ];
 
   // ── RENDER ──────────────────────────────────────────────────────────────
   return (
@@ -425,17 +495,17 @@ export default function Provas() {
           {step === 2 && selectedArea && (
             <div>
               <h2 style={s.stepTitle}>Escolha o Modelo Visual</h2>
-              <p style={s.stepDesc}>Todos os modelos suportam a cor de <strong style={{ color: selectedArea.cor }}>{selectedArea.label}</strong></p>
+              <p style={s.stepDesc}>Todos os modelos suportam a cor de <strong style={{ color: effectiveArea.cor }}>{selectedArea.label}</strong></p>
               <div style={s.templateGrid}>
                 {TEMPLATES.map(t => (
                   <button key={t.id}
-                    style={{ ...s.templateCard, border: `2px solid ${selectedTemplate?.id === t.id ? selectedArea.cor : '#e2e8f0'}`, outline: 'none' }}
+                    style={{ ...s.templateCard, border: `2px solid ${selectedTemplate?.id === t.id ? effectiveArea.cor : '#e2e8f0'}`, outline: 'none' }}
                     onClick={() => selectTemplate(t)}
                   >
                     {/* Mini preview */}
                     <div style={{ width: 595*0.17, height: 842*0.17, overflow:'hidden', borderRadius:4, marginBottom:10, border:'1px solid #e2e8f0', position:'relative', flexShrink:0 }}>
                       <CapaPreview
-                        area={selectedArea}
+                        area={effectiveArea}
                         template={t}
                         titulo={`PROVÃO DE ${selectedArea.label}`}
                         serie="6º ANO"
@@ -448,11 +518,99 @@ export default function Provas() {
                     <div style={{ fontWeight:800, fontSize:13, color:'#1e293b', marginBottom:3 }}>{t.nome}</div>
                     <div style={{ fontSize:11, color:'#64748b', textAlign:'center' }}>{t.desc}</div>
                     {selectedTemplate?.id === t.id && (
-                      <div style={{ position:'absolute', top:8, right:8, background: selectedArea.cor, borderRadius:'50%', width:20, height:20, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:12, fontWeight:900 }}>✓</div>
+                      <div style={{ position:'absolute', top:8, right:8, background: effectiveArea.cor, borderRadius:'50%', width:20, height:20, display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:12, fontWeight:900 }}>✓</div>
                     )}
                   </button>
                 ))}
               </div>
+
+              {/* ── Seletor de Cor Premium ── */}
+              <div style={s.colorSection}>
+                <div style={s.colorSectionHeader}>
+                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                    <div style={{ width:18, height:18, borderRadius:'50%', background: `linear-gradient(135deg, ${effectiveArea.cor}, ${makeCorClaro(effectiveArea.cor)})`, flexShrink:0, boxShadow:`0 0 8px ${effectiveArea.cor}55` }} />
+                    <span style={{ fontWeight:800, fontSize:13, color:'#f1f5f9' }}>Personalizar Cor da Capa</span>
+                  </div>
+                  {customColor && (
+                    <button
+                      style={{ fontSize:11, color:'#6366f1', fontWeight:700, background:'none', border:'none', cursor:'pointer', padding:'2px 8px', borderRadius:4, transition:'background .2s' }}
+                      onClick={() => setCustomColor(null)}
+                    >↺ Restaurar padrão</button>
+                  )}
+                </div>
+                <p style={{ fontSize:11, color:'#94a3b8', margin:'0 0 14px', lineHeight:1.5 }}>
+                  Escolha uma cor para bordas, cabeçalho e destaques — aplicada em tempo real no preview.
+                </p>
+                {/* Grade de cores */}
+                <div style={{ display:'flex', flexWrap:'wrap', gap:8, marginBottom:10 }}>
+                  {/* Cor da área (padrão) */}
+                  <button
+                    title={`Padrão — ${selectedArea.label}`}
+                    style={{
+                      ...s.colorSwatch,
+                      background: selectedArea.cor,
+                      boxShadow: !customColor ? `0 0 0 3px #fff, 0 0 0 5px ${selectedArea.cor}, 0 4px 12px ${selectedArea.cor}66` : `0 2px 8px ${selectedArea.cor}44`,
+                      transform: !customColor ? 'scale(1.15)' : 'scale(1)',
+                    }}
+                    onClick={() => setCustomColor(null)}
+                  >
+                    {!customColor && <span style={{ fontSize:10, color:'#fff', fontWeight:900 }}>✓</span>}
+                  </button>
+                  {/* Paleta curada */}
+                  {COLOR_PALETTE.map(({ hex, name }) => (
+                    <button
+                      key={hex}
+                      title={name}
+                      style={{
+                        ...s.colorSwatch,
+                        background: hex,
+                        boxShadow: customColor === hex
+                          ? `0 0 0 3px #fff, 0 0 0 5px ${hex}, 0 4px 12px ${hex}66`
+                          : `0 2px 8px ${hex}44`,
+                        transform: customColor === hex ? 'scale(1.15)' : 'scale(1)',
+                      }}
+                      onClick={() => setCustomColor(hex)}
+                    >
+                      {customColor === hex && <span style={{ fontSize:10, color:'#fff', fontWeight:900 }}>✓</span>}
+                    </button>
+                  ))}
+                  {/* Picker personalizado */}
+                  <label
+                    title="Cor personalizada"
+                    style={{
+                      ...s.colorSwatch,
+                      background: 'conic-gradient(red, yellow, lime, aqua, blue, magenta, red)',
+                      cursor:'pointer',
+                      overflow:'hidden',
+                      position:'relative',
+                      display:'flex', alignItems:'center', justifyContent:'center',
+                      boxShadow: COLOR_PALETTE.every(p => p.hex !== customColor) && customColor
+                        ? `0 0 0 3px #fff, 0 0 0 5px ${customColor}, 0 4px 12px ${customColor}66`
+                        : '0 2px 8px rgba(0,0,0,0.18)',
+                      transform: COLOR_PALETTE.every(p => p.hex !== customColor) && customColor ? 'scale(1.15)' : 'scale(1)',
+                    }}
+                  >
+                    <span style={{ fontSize:14, filter:'drop-shadow(0 1px 2px rgba(0,0,0,0.6))' }}>+</span>
+                    <input
+                      type="color"
+                      value={customColor || selectedArea.cor}
+                      onChange={e => setCustomColor(e.target.value)}
+                      style={{ position:'absolute', inset:0, opacity:0, cursor:'pointer', width:'100%', height:'100%' }}
+                    />
+                  </label>
+                </div>
+                {/* Chip cor ativa */}
+                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <div style={{ width:14, height:14, borderRadius:3, background: effectiveArea.cor, flexShrink:0 }} />
+                  <span style={{ fontSize:11, color:'#cbd5e1', fontWeight:600 }}>
+                    {customColor
+                      ? `Cor personalizada: ${customColor.toUpperCase()}`
+                      : `Cor padrão da área: ${selectedArea.cor.toUpperCase()}`
+                    }
+                  </span>
+                </div>
+              </div>
+
               <div style={{ display:'flex', gap:10, marginTop:20 }}>
                 <button style={s.secondaryBtn} onClick={() => setStep(1)}>← Voltar</button>
               </div>
@@ -460,7 +618,7 @@ export default function Provas() {
           )}
 
           {/* ── Step 3: Configure + Preview ── */}
-          {step === 3 && selectedArea && selectedTemplate && (
+          {step === 3 && effectiveArea && selectedTemplate && (
             <div style={{ display:'flex', gap:24, alignItems:'flex-start' }}>
               {/* Form */}
               <div style={{ flex:'0 0 380px' }}>
@@ -628,7 +786,7 @@ export default function Provas() {
                 <h3 style={{ fontSize:13, fontWeight:700, color:'#64748b', marginBottom:12, textTransform:'uppercase', letterSpacing:'0.05em' }}>Pré-visualização</h3>
                 <div style={{ width: 595*0.55, height: 842*0.55, overflow:'hidden', borderRadius:8, boxShadow:'0 8px 32px rgba(0,0,0,0.15)', border:'1px solid #e2e8f0', position:'relative' }}>
                   <CapaPreview
-                    area={selectedArea}
+                    area={effectiveArea}
                     template={selectedTemplate}
                     titulo={form.titulo}
                     serie={form.serie}
@@ -819,4 +977,35 @@ const s = {
     padding: '16px 0 8px',
     textAlign: 'center',
   },
+
+  // ── Color picker section ─────────────────────────────────────────────────
+  colorSection: {
+    marginTop: 20,
+    background: 'linear-gradient(135deg, #0f172a, #1e293b)',
+    border: '1px solid rgba(99,102,241,0.25)',
+    borderRadius: 14,
+    padding: '18px 20px',
+    boxShadow: '0 4px 24px rgba(0,0,0,0.12)',
+  },
+  colorSectionHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  colorSwatch: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    border: 'none',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    transition: 'transform 0.18s cubic-bezier(.34,1.56,.64,1), box-shadow 0.18s',
+    outline: 'none',
+    padding: 0,
+  },
 };
+

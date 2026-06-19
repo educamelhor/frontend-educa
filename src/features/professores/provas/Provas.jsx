@@ -7,6 +7,67 @@ import { jsPDF } from 'jspdf';
 
 const ANO_CORRENTE = new Date().getFullYear();
 
+// ── Utilitários de cor para manipulação de pixels no canvas ──────────────────
+function _rgbToHsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r,g,b), min = Math.min(r,g,b);
+  let h = 0, s = 0;
+  const l = (max+min)/2;
+  if (max !== min) {
+    const d = max-min;
+    s = l > 0.5 ? d/(2-max-min) : d/(max+min);
+    switch(max) {
+      case r: h = ((g-b)/d + (g<b?6:0))/6; break;
+      case g: h = ((b-r)/d + 2)/6; break;
+      case b: h = ((r-g)/d + 4)/6; break;
+    }
+  }
+  return [h*360, s*100, l*100];
+}
+
+function _hslToRgb(h, s, l) {
+  s /= 100; l /= 100;
+  const a = s * Math.min(l, 1-l);
+  const f = n => {
+    const k = (n + h/30) % 12;
+    return Math.round(255*(l - a*Math.max(Math.min(k-3,9-k,1),-1)));
+  };
+  return [f(0), f(8), f(4)];
+}
+
+function _hexToHsl(hex) {
+  return _rgbToHsl(
+    parseInt(hex.slice(1,3),16),
+    parseInt(hex.slice(3,5),16),
+    parseInt(hex.slice(5,7),16)
+  );
+}
+
+/**
+ * Percorre os pixels do canvas e substitui pixels cuja matiz (hue) esteja
+ * próxima de `fromHex` pela matiz de `toHex`, preservando luminosidade.
+ * Pixels neutros (baixa saturação) ou de hue diferente não são alterados.
+ */
+function recolorCanvas(ctx, W, H, fromHex, toHex) {
+  const [fH] = _hexToHsl(fromHex);
+  const [tH, tS] = _hexToHsl(toHex);
+  const img = ctx.getImageData(0, 0, W, H);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i+3] < 20) continue; // skip transparente
+    const [h, s, l] = _rgbToHsl(d[i], d[i+1], d[i+2]);
+    // Distância de matiz com wrap-around (0–360°)
+    const dist = Math.min(Math.abs(h-fH), 360-Math.abs(h-fH));
+    // Só altera pixels coloridos (s>20%) com hue próximo ao da área (±45°)
+    if (s > 20 && dist < 45) {
+      const newS = tS > 0 ? Math.max(tS * (s/100), 20) : 0;
+      const [nr, ng, nb] = _hslToRgb(tH, newS, l);
+      d[i] = nr; d[i+1] = ng; d[i+2] = nb;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
 function getToken() { return localStorage.getItem('token'); }
 function getEscolaId() { return localStorage.getItem('escola_id'); }
 function getApiRoot() {
@@ -157,14 +218,17 @@ export default function Provas() {
       if (!pdfRes.ok) throw new Error('Erro ao gerar PDF.');
       const pdfBytes = new Uint8Array(await pdfRes.arrayBuffer());
 
-      if (customImage) {
-        // ── Imagem customizada: renderiza PDF do backend em canvas e sobrepõe imagem ──
-        // Import dinâmico do pdfjs (já instalado no projeto)
+      // Verifica se precisa de processamento canvas (cor custom ou imagem custom)
+      const hasCustomColor = customColor && customColor.toLowerCase() !== selectedArea.cor.toLowerCase();
+      const needsCanvas = customImage || hasCustomColor;
+
+      if (needsCanvas) {
+        // ── Canvas pipeline: render PDF do backend + recolorir + overlay de imagem ──
         const pdfjsLib = await import('pdfjs-dist');
         pdfjsLib.GlobalWorkerOptions.workerSrc =
           `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
-        // Renderiza página 1 em canvas com 2× de escala (1190×1684px)
+        // Renderiza página 1 em canvas 2× (1190×1684px)
         const doc = await pdfjsLib.getDocument({ data: pdfBytes }).promise;
         const page = await doc.getPage(1);
         const viewport = page.getViewport({ scale: 2 });
@@ -174,45 +238,48 @@ export default function Provas() {
         const ctx = canvas.getContext('2d');
         await page.render({ canvasContext: ctx, viewport }).promise;
 
-        // Carrega a imagem customizada (dataURL — sem CORS)
-        const userImg = new Image();
-        userImg.src = customImage;
-        await new Promise((res, rej) => { userImg.onload = res; userImg.onerror = rej; });
-
-        // Área de rodapé: últimos ~38% da página (onde a imagem temática padrão fica)
-        const areaStartY = Math.round(canvas.height * 0.62);
-        const areaH = canvas.height - areaStartY;
-        const areaW = canvas.width;
-
-        // Simula object-fit: cover + zoom/offset do usuário
-        const iw = userImg.naturalWidth || userImg.width || 1;
-        const ih = userImg.naturalHeight || userImg.height || 1;
-        let coverW, coverH;
-        if (iw / ih > areaW / areaH) {
-          coverH = areaH; coverW = coverH * (iw / ih);
-        } else {
-          coverW = areaW; coverH = coverW / (iw / ih);
+        // 1) Recolorização — substitui pixels da cor padrão da área pela cor customizada
+        if (hasCustomColor) {
+          recolorCanvas(ctx, canvas.width, canvas.height, selectedArea.cor, customColor);
         }
-        const finalW = coverW * imageZoom;
-        const finalH = coverH * imageZoom;
-        const cx = areaW / 2 + (imageOffsetX / 100) * areaW;
-        const cy = areaStartY + areaH / 2 + (imageOffsetY / 100) * areaH;
 
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(0, areaStartY, areaW, areaH);
-        ctx.clip();
-        ctx.clearRect(0, areaStartY, areaW, areaH);
-        ctx.drawImage(userImg, cx - finalW / 2, cy - finalH / 2, finalW, finalH);
-        ctx.restore();
+        // 2) Overlay de imagem customizada no rodapé (~últimos 38%)
+        if (customImage) {
+          const userImg = new Image();
+          userImg.src = customImage;
+          await new Promise((res, rej) => { userImg.onload = res; userImg.onerror = rej; });
 
-        // Exporta como PDF A4
+          const areaStartY = Math.round(canvas.height * 0.62);
+          const areaH = canvas.height - areaStartY;
+          const areaW = canvas.width;
+          const iw = userImg.naturalWidth || userImg.width || 1;
+          const ih = userImg.naturalHeight || userImg.height || 1;
+          let coverW, coverH;
+          if (iw / ih > areaW / areaH) {
+            coverH = areaH; coverW = coverH * (iw / ih);
+          } else {
+            coverW = areaW; coverH = coverW / (iw / ih);
+          }
+          const finalW = coverW * imageZoom;
+          const finalH = coverH * imageZoom;
+          const cx = areaW / 2 + (imageOffsetX / 100) * areaW;
+          const cy = areaStartY + areaH / 2 + (imageOffsetY / 100) * areaH;
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(0, areaStartY, areaW, areaH);
+          ctx.clip();
+          ctx.clearRect(0, areaStartY, areaW, areaH);
+          ctx.drawImage(userImg, cx - finalW / 2, cy - finalH / 2, finalW, finalH);
+          ctx.restore();
+        }
+
+        // Exporta para PDF A4
         const imgData = canvas.toDataURL('image/jpeg', 0.92);
         const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
         pdf.addImage(imgData, 'JPEG', 0, 0, 595.28, 841.89);
         pdf.save(fileName);
       } else {
-        // ── Sem imagem customizada: baixa PDF do backend diretamente ──
+        // ── Download direto — nenhuma customização visual ──
         const blob = new Blob([pdfBytes], { type: 'application/pdf' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');

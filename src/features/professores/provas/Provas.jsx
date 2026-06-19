@@ -1,4 +1,4 @@
-﻿// src/features/professores/provas/Provas.jsx
+// src/features/professores/provas/Provas.jsx
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AREAS, TEMPLATES, SERIES_OPTIONS, TURNOS_OPTIONS, BIMESTRES_OPTIONS } from './templateDefinitions';
 import CapaPreview from './CapaPreview';
@@ -91,6 +91,7 @@ export default function Provas() {
   const [deletingId, setDeletingId] = useState(null);
   const [toast, setToast] = useState(null);
   const [editingCapaId, setEditingCapaId] = useState(null); // null = nova | id = editando
+  const [confirmDelete, setConfirmDelete] = useState(null); // null | { id, titulo }
 
   // ── Custom image state ─────────────────────────────────────────────────
   const [customImage, setCustomImage] = useState(null); // dataURL
@@ -484,6 +485,101 @@ export default function Provas() {
         </div>
       )}
 
+      {/* ── Modal Premium de Confirmação de Exclusão ────────────────── */}
+      {confirmDelete && (
+        <div style={{
+          position:'fixed', inset:0, zIndex:9999,
+          background:'rgba(15,23,42,0.72)',
+          backdropFilter:'blur(8px)',
+          display:'flex', alignItems:'center', justifyContent:'center',
+          animation:'fadeInOverlay .2s ease',
+        }} onClick={() => setConfirmDelete(null)}>
+          <div style={{
+            background:'linear-gradient(145deg,#1e293b,#0f172a)',
+            border:'1px solid rgba(99,102,241,0.3)',
+            borderRadius:20,
+            padding:'36px 32px 28px',
+            width:380, maxWidth:'92vw',
+            boxShadow:'0 25px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.05)',
+            display:'flex', flexDirection:'column', alignItems:'center', gap:16,
+            animation:'slideUpModal .25s cubic-bezier(0.34,1.56,0.64,1)',
+          }} onClick={e => e.stopPropagation()}>
+            {/* Ícone animado */}
+            <div style={{
+              width:72, height:72, borderRadius:'50%',
+              background:'linear-gradient(135deg,#fee2e2,#fecaca)',
+              display:'flex', alignItems:'center', justifyContent:'center',
+              fontSize:32, boxShadow:'0 0 0 8px rgba(239,68,68,0.15)',
+              animation:'pulseDelete 2s ease infinite',
+            }}>🗑️</div>
+
+            {/* Título */}
+            <div style={{ textAlign:'center' }}>
+              <div style={{ fontWeight:800, fontSize:18, color:'#f1f5f9', marginBottom:6 }}>
+                Excluir Capa?
+              </div>
+              <div style={{ fontSize:13, color:'#94a3b8', lineHeight:1.5 }}>
+                Você está prestes a excluir permanentemente:
+              </div>
+              <div style={{
+                marginTop:10, padding:'10px 16px', borderRadius:10,
+                background:'rgba(239,68,68,0.1)', border:'1px solid rgba(239,68,68,0.2)',
+                fontSize:13, fontWeight:700, color:'#fca5a5',
+              }}>
+                "{confirmDelete.titulo}"
+              </div>
+              <div style={{ fontSize:12, color:'#64748b', marginTop:8 }}>
+                Esta ação não pode ser desfeita.
+              </div>
+            </div>
+
+            {/* Botões */}
+            <div style={{ display:'flex', gap:10, width:'100%', marginTop:4 }}>
+              <button
+                style={{
+                  flex:1, padding:'12px 0', borderRadius:10,
+                  border:'1px solid rgba(255,255,255,0.1)',
+                  background:'rgba(255,255,255,0.06)',
+                  color:'#94a3b8', fontWeight:600, fontSize:14,
+                  cursor:'pointer', transition:'all .15s',
+                }}
+                onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,0.1)'}
+                onMouseLeave={e => e.currentTarget.style.background='rgba(255,255,255,0.06)'}
+                onClick={() => setConfirmDelete(null)}
+              >Cancelar</button>
+              <button
+                style={{
+                  flex:1, padding:'12px 0', borderRadius:10,
+                  border:'none',
+                  background: deletingId === confirmDelete.id
+                    ? 'rgba(239,68,68,0.4)'
+                    : 'linear-gradient(135deg,#ef4444,#dc2626)',
+                  color:'#fff', fontWeight:700, fontSize:14,
+                  cursor: deletingId === confirmDelete.id ? 'not-allowed' : 'pointer',
+                  boxShadow:'0 4px 14px rgba(239,68,68,0.4)',
+                  transition:'all .15s',
+                }}
+                onMouseEnter={e => { if(deletingId !== confirmDelete.id) e.currentTarget.style.transform='scale(1.03)'; }}
+                onMouseLeave={e => e.currentTarget.style.transform='scale(1)'}
+                disabled={deletingId === confirmDelete.id}
+                onClick={async () => {
+                  const id = confirmDelete.id;
+                  await handleDelete(id);
+                  setConfirmDelete(null);
+                }}
+              >
+                {deletingId === confirmDelete.id ? '⏳ Excluindo...' : '🗑️ Excluir'}
+              </button>
+            </div>
+          </div>
+          <style>{`
+            @keyframes fadeInOverlay { from { opacity:0 } to { opacity:1 } }
+            @keyframes slideUpModal { from { opacity:0; transform:translateY(24px) scale(0.96) } to { opacity:1; transform:translateY(0) scale(1) } }
+            @keyframes pulseDelete { 0%,100% { box-shadow:0 0 0 8px rgba(239,68,68,0.15) } 50% { box-shadow:0 0 0 14px rgba(239,68,68,0.08) } }
+          `}</style>
+        </div>
+      )}
+
       {/* Page header */}
       <div style={s.pageHeader}>
         <div style={s.pageIconWrap}>
@@ -571,8 +667,8 @@ export default function Provas() {
                         >✏️</button>
                         <button
                           style={s.btnDelete}
-                          onClick={() => handleDelete(capa.id)}
-                          disabled={deletingId === capa.id}
+                          onClick={() => setConfirmDelete({ id: capa.id, titulo: capa.titulo })}
+                          title="Excluir capa"
                         >{deletingId === capa.id ? '...' : '🗑️'}</button>
                       </div>
                     </div>

@@ -127,7 +127,7 @@ export default function CapaPreview({
             {/* Instruções — flex:1 ocupa todo o espaço restante */}
             <div style={{ flex:1, margin:'8px 10px 0', background:area.corClaro, border:`1px solid ${area.cor}`, borderRadius:4, padding:'8px 12px', overflow:'hidden', minHeight:0 }}>
               <div style={{ fontWeight:900, fontSize:10, textAlign:'center', marginBottom:6 }}>LEIA ATENTAMENTE AS INSTRUÇÕES SEGUINTES:</div>
-              <div style={{ fontSize:8, color:'#222', lineHeight:1.4, whiteSpace:'pre-wrap' }}>{instrucoes}</div>
+              <div style={{ fontSize:8, color:'#222', lineHeight:1.2, whiteSpace:'pre-wrap' }}>{instrucoes}</div>
             </div>
             {/* Imagem no rodapé */}
             <BottomImage mx={10} mt={6} borderRadius={4} />
@@ -165,7 +165,7 @@ export default function CapaPreview({
           <div style={{ padding:'0 14px', fontWeight:900, fontSize:10, color:'#222', marginBottom:6, flexShrink:0 }}>LEIA ATENTAMENTE AS INSTRUÇÕES:</div>
           {/* Instruções */}
           <div style={{ flex:1, padding:'0 14px', overflow:'hidden', minHeight:0 }}>
-            <div style={{ fontSize:8, color:'#333', lineHeight:1.4, whiteSpace:'pre-wrap' }}>{instrucoes}</div>
+            <div style={{ fontSize:8, color:'#333', lineHeight:1.2, whiteSpace:'pre-wrap' }}>{instrucoes}</div>
           </div>
           {/* Imagem no rodapé */}
           <BottomImage mx={14} mt={8} borderRadius={6} />
@@ -208,7 +208,7 @@ export default function CapaPreview({
             {/* Instruções — flex:1, minHeight:0 é CRÍTICO para flex funcionar em html-to-image */}
             <div style={{ flex:1, padding:'8px 16px 0', overflow:'hidden', minHeight:0 }}>
               <div style={{ fontWeight:900, fontSize:10, color:'#000', textAlign:'center', marginBottom:6 }}>INSTRUÇÕES AO ESTUDANTE:</div>
-              <div style={{ fontSize:8, color:'#222', lineHeight:1.4, whiteSpace:'pre-wrap' }}>{instrucoes}</div>
+              <div style={{ fontSize:8, color:'#222', lineHeight:1.2, whiteSpace:'pre-wrap' }}>{instrucoes}</div>
             </div>
             {/* Imagem no rodapé */}
             <BottomImage mx={16} mt={8} borderRadius={4} />
@@ -244,7 +244,7 @@ export default function CapaPreview({
           {serieText && <div style={{ fontSize:20, fontWeight:900, color:area.cor, textAlign:'center', marginBottom:8 }}>{serieText}</div>}
           <div style={{ background:area.corClaro, border:`1.5px solid ${area.cor}`, borderRadius:6, padding:'8px 12px', overflow:'hidden' }}>
             <div style={{ fontWeight:900, fontSize:10, color:area.cor, textAlign:'center', marginBottom:6 }}>LEIA ATENTAMENTE AS INSTRUÇÕES SEGUINTES:</div>
-            <div style={{ fontSize:8, color:'#222', lineHeight:1.4, whiteSpace:'pre-wrap' }}>{instrucoes}</div>
+            <div style={{ fontSize:8, color:'#222', lineHeight:1.2, whiteSpace:'pre-wrap' }}>{instrucoes}</div>
           </div>
         </div>
         {/* Imagem no rodapé */}
@@ -282,7 +282,7 @@ export default function CapaPreview({
         {/* Card dark — instruções */}
         <div style={{ flex:1, margin:'8px 16px 0', background:'#1e293b', borderRadius:'8px 8px 0 0', border:`1px solid ${area.cor}`, padding:'10px 14px', overflow:'hidden', minHeight:0 }}>
           <div style={{ fontWeight:900, fontSize:10, color:'#e2e8f0', textAlign:'center', marginBottom:6 }}>LEIA ATENTAMENTE AS INSTRUÇÕES SEGUINTES:</div>
-          <div style={{ fontSize:8, color:'#cbd5e1', lineHeight:1.4, whiteSpace:'pre-wrap' }}>{instrucoes}</div>
+          <div style={{ fontSize:8, color:'#cbd5e1', lineHeight:1.2, whiteSpace:'pre-wrap' }}>{instrucoes}</div>
         </div>
         {/* Imagem no rodapé */}
         <BottomImage mx={16} mt={8} borderRadius={0} />

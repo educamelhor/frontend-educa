@@ -67,6 +67,7 @@ export default function Alunos() {
   const [alunoParaExcluirOuInativar, setAlunoParaExcluirOuInativar] = useState(null);
   const [isImportOpen, setImportOpen] = useState(false);
   const [resultadoImportacao, setResultadoImportacao] = useState(null);
+  const [isXlsxModalOpen, setXlsxModalOpen] = useState(false);
   const xlsxInputRef = useRef();
 
   // Handler: Importar via XLSX direto (sem modal)
@@ -332,7 +333,7 @@ export default function Alunos() {
               {/* Botão XLSX */}
               <button
                 type="button"
-                onClick={() => xlsxInputRef.current?.click()}
+                onClick={() => setXlsxModalOpen(true)}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white hover:opacity-90 transition shadow-sm"
                 style={{ background: '#0f766e' }}
                 title="Importar alunos a partir de planilha Excel — colunas: RE, estudante, data_nascimento, responsavel, cpf_responsavel, turma"
@@ -602,7 +603,81 @@ export default function Alunos() {
         </div>
       )}
 
-      {/* Modal Importação */}
+      {/* ═══════════════════════════════════════════════════════
+          MODAL: Importar via XLSX
+          ═══════════════════════════════════════════════════════ */}
+      {isXlsxModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          aria-modal="true"
+          role="dialog"
+        >
+          <div className="w-full max-w-lg rounded-xl bg-white shadow-xl">
+            {/* Cabeçalho */}
+            <div className="flex items-center justify-between px-5 py-4 border-b">
+              <h2 className="text-lg font-semibold text-gray-800">
+                Importar via XLSX
+              </h2>
+              <button
+                onClick={() => setXlsxModalOpen(false)}
+                className="text-gray-500 hover:text-gray-700"
+                aria-label="Fechar"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Corpo */}
+            <div className="px-5 py-4 space-y-4">
+              <p className="text-sm text-gray-600">
+                Selecione a planilha <strong>Excel (.xlsx)</strong> contendo
+                os dados dos alunos. O nome do arquivo deve corresponder
+                exatamente ao nome da turma cadastrada no sistema.
+              </p>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-xs text-blue-800 space-y-1">
+                <p className="font-semibold">Colunas esperadas na planilha:</p>
+                <p>
+                  <code className="bg-blue-100 px-1 py-0.5 rounded">RE</code>{" "}
+                  <code className="bg-blue-100 px-1 py-0.5 rounded">estudante</code>{" "}
+                  <code className="bg-blue-100 px-1 py-0.5 rounded">data_nascimento</code>{" "}
+                  <code className="bg-blue-100 px-1 py-0.5 rounded">responsavel</code>{" "}
+                  <code className="bg-blue-100 px-1 py-0.5 rounded">cpf_responsavel</code>
+                </p>
+              </div>
+
+              {/* Botões */}
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => { setXlsxModalOpen(false); xlsxInputRef.current?.click(); }}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white font-medium hover:opacity-90 transition disabled:opacity-60"
+                  style={{ background: '#0f766e' }}
+                >
+                  <TableCellsIcon className="w-5 h-5" />
+                  Escolher arquivo
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setXlsxModalOpen(false)}
+                  className="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300 transition"
+                >
+                  Cancelar
+                </button>
+              </div>
+
+              <p className="text-xs text-gray-500">
+                💡 Cada linha da planilha será processada individualmente.
+                Alunos já existentes na turma terão seus dados complementados
+                (sem sobrescrever registros existentes).
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Importação PDF */}
       <ImportPDF
         open={isImportOpen}
         onClose={() => setImportOpen(false)}

@@ -310,7 +310,7 @@ export default function ImportPDF({ open, onClose, onFinish }) {
         {/* Cabeçalho */}
         <div className="flex items-center justify-between px-5 py-4 border-b">
           <h2 className="text-lg font-semibold text-gray-800">
-            Incluir Estudantes (PDF/XLSX)
+            Importar via PDF
           </h2>
           <button
             onClick={onClose}
@@ -324,16 +324,16 @@ export default function ImportPDF({ open, onClose, onFinish }) {
         {/* Corpo */}
         <div className="px-5 py-4 space-y-4">
           <p className="text-sm text-gray-600">
-            Selecione um arquivo <strong>PDF</strong> (padrão do sistema) ou{" "}
-            <strong>XLSX</strong> contendo os alunos. O nome do arquivo será usado
-            como rótulo da turma para o relatório de feedback.
+            Selecione o arquivo <strong>PDF</strong> da Secretaria de Educação
+            contendo a lista da turma. O nome do arquivo deve corresponder
+            exatamente ao nome da turma cadastrada no sistema.
           </p>
 
           {/* Input escondido */}
           <input
             ref={fileRef}
             type="file"
-            accept=".pdf,.xlsx"
+            accept=".pdf"
             hidden
             onChange={handleFileSelected}
           />
@@ -370,9 +370,8 @@ export default function ImportPDF({ open, onClose, onFinish }) {
           )}
 
           <p className="text-xs text-gray-500">
-            Dica: ao importar <strong>PDF</strong>, a planilha <em>.xlsx</em> será
-            baixada automaticamente com os alunos identificados, incluindo a coluna{" "}
-            <code>turma</code>.
+            💡 Após a importação, uma planilha <em>.xlsx</em> será
+            baixada automaticamente com os alunos identificados.
           </p>
         </div>
       </div>

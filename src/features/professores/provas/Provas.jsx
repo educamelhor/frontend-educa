@@ -152,12 +152,17 @@ export default function Provas() {
 
       if (customImage) {
         // 2a) Imagem customizada → gera PDF localmente capturando o preview DOM
+        // O container oculto usa logotipos null para evitar erro de CORS do CDN externo.
+        // A imagem customizada é um dataURL, não sofre restrição CORS.
         if (!previewCaptureRef.current) throw new Error('Preview não encontrado.');
+        // Pixel transparente 1×1 — substitui imagens externas que falharem por CORS
+        const TRANSPARENT = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
         const dataUrl = await toPng(previewCaptureRef.current, {
           width: 595,
           height: 842,
           pixelRatio: 2,
-          cacheBust: true,
+          cacheBust: false,
+          imagePlaceholder: TRANSPARENT,
         });
         const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
         // A4 em pt: 595.28 x 841.89
@@ -632,8 +637,8 @@ export default function Provas() {
               instrucoes={form.instrucoes}
               scale={1}
               escolaNome={escolaNome}
-              logoEsq={logoEsquerda}
-              logoDir={logoDireita}
+              logoEsq={null}
+              logoDir={null}
               customImage={customImage}
               imageZoom={imageZoom}
               imageOffsetX={imageOffsetX}

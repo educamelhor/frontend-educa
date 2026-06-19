@@ -1492,6 +1492,7 @@ export default function Sidebar({ isOpen, onClose }) {
                 </li>
                 )}
 
+                {hasModulo('secretaria.responsaveis') && (
                 <li>
                   <Link
                     to="/secretaria/responsaveis"
@@ -1500,7 +1501,9 @@ export default function Sidebar({ isOpen, onClose }) {
                     <UserGroupIcon className="h-5 w-5 mr-2" /> Responsáveis
                   </Link>
                 </li>
+                )}
 
+                {hasModulo('secretaria.cargas_horarias') && (
                 <li>
                   <Link
                     to="/secretaria/cargas-horarias"
@@ -1509,7 +1512,9 @@ export default function Sidebar({ isOpen, onClose }) {
                     <ClockIcon className="h-5 w-5 mr-2" /> Cargas Horárias
                   </Link>
                 </li>
+                )}
 
+                {hasModulo('secretaria.disciplinas') && (
                 <li>
                   <Link
                     to="/secretaria/disciplinas"
@@ -1518,6 +1523,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     <BookOpenIcon className="h-5 w-5 mr-2" /> Disciplinas
                   </Link>
                 </li>
+                )}
 
                 {hasModulo('secretaria.modulacao') && (
                 <li>
@@ -1552,6 +1558,7 @@ export default function Sidebar({ isOpen, onClose }) {
                 </li>
                 )}
 
+                {hasModulo('secretaria.turmas') && (
                 <li>
                   <Link
                     to="/secretaria/turmas"
@@ -1560,6 +1567,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     <AcademicCapIcon className="h-5 w-5 mr-2" /> Turmas
                   </Link>
                 </li>
+                )}
 
                 {/* NOVO SUBMENU: Boletim */}
                 {hasModulo('secretaria.boletim') && (
@@ -1574,6 +1582,7 @@ export default function Sidebar({ isOpen, onClose }) {
                 )}
 
                 {/* NOVO SUBMENU: Agente */}
+                {hasModulo('secretaria.agente') && (
                 <li>
                   <Link
                     to="/secretaria/agente"
@@ -1582,6 +1591,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     <BoltIcon className="h-5 w-5 mr-2" /> Agente
                   </Link>
                 </li>
+                )}
 
                 {hasModulo('secretaria.tabela_codigos') && (
                 <li>
@@ -1622,6 +1632,7 @@ export default function Sidebar({ isOpen, onClose }) {
                 )}
 
                 {/* Sincronizar SEEDF */}
+                {hasModulo('secretaria.sincronizar_seedf') && (
                 <li>
                   <Link
                     to="/secretaria/sincronizar-seedf"
@@ -1647,6 +1658,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     }}>NOVO</span>
                   </Link>
                 </li>
+                )}
               </ul>
             )}
             </>
@@ -1708,6 +1720,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   </li>
                 )}
 
+                {hasModulo('pedagogico.solicitacoes') && (
                 <li>
                   <Link
                     to="/pedagogico/coordenacao/solicitacoes"
@@ -1716,9 +1729,11 @@ export default function Sidebar({ isOpen, onClose }) {
                     <ClipboardDocumentListIcon className="h-5 w-5 mr-2" /> Solicitações
                   </Link>
                 </li>
+                )}
 
 
 
+                {hasModulo('pedagogico.provas') && (
                 <li>
                   <Link
                     to="/pedagogico/provas"
@@ -1727,8 +1742,10 @@ export default function Sidebar({ isOpen, onClose }) {
                     <DocumentTextIcon className="h-5 w-5 mr-2" /> Provas
                   </Link>
                 </li>
+                )}
 
                 {/* Submenu Correções */}
+                {hasModulo('pedagogico.correcoes') && (
                 <li>
                   <button
                     className="flex items-center w-full py-2 pl-6 pr-3 rounded hover:bg-blue-700 transition"
@@ -1757,6 +1774,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     </ul>
                   )}
                 </li>
+                )}
 
                 {/* Gabarito migrado para menu unificado (/gabarito) */}
 

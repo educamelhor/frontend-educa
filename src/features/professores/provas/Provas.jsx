@@ -563,7 +563,7 @@ export default function Provas() {
                         <button
                           style={s.btnDownload}
                           onClick={() => handleDownload(capa.id, capa.area, capa.bimestre, capa.ano)}
-                        >⬇️ Baixar PDF>✏️</button>
+                        >⬇️ Baixar PDF</button>
                         <button
                           style={s.btnEdit}
                           title="Editar capa"

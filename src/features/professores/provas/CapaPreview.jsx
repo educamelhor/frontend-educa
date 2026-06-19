@@ -29,6 +29,8 @@ export default function CapaPreview({
   imageZoom = 1,
   imageOffsetX = 0,
   imageOffsetY = 0,
+  imageHeight = 200,   // altura em px (escala 1:1) do bloco de imagem
+  imageWidthPct = 100, // largura em % do container de imagem (0–100)
 }) {
   if (!area || !template) return null;
 
@@ -49,17 +51,21 @@ export default function CapaPreview({
   };
 
   const serieText = [serie, bimestre ? `${bimestre}º BIMESTRE` : ''].filter(Boolean).join(' - ');
-  const IMG_H = 200; // altura fixa da imagem no rodapé
+  const IMG_H = imageHeight; // altura do bloco de imagem (controlado pelo usuário)
 
-  // ─── Bloco de imagem no rodapé (só quando customImage presente) ───────────
+  // ── Bloco de imagem no rodapé ───────────────────────────────────────────────
+  // mx = margem lateral do template; mt = margin-top
+  // imageWidthPct ajusta largura da imagem DENTRO do container (100% = total)
   function BottomImage({ mx = 0, mt = 0, borderRadius = 0 }) {
     if (!customImage) return null;
+    // Calcula margem lateral extra do redimensionamento (%)
+    const extraMxPx = mx + ((100 - imageWidthPct) / 2) * ((595 - mx * 2) / 100);
     return (
       <div style={{
         flexShrink: 0,
         height: IMG_H,
-        marginLeft: mx,
-        marginRight: mx,
+        marginLeft: extraMxPx,
+        marginRight: extraMxPx,
         marginTop: mt,
         overflow: 'hidden',
         borderRadius,

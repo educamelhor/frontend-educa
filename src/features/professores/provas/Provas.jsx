@@ -96,6 +96,8 @@ export default function Provas() {
   const [imageZoom, setImageZoom] = useState(1);
   const [imageOffsetX, setImageOffsetX] = useState(0);
   const [imageOffsetY, setImageOffsetY] = useState(0);
+  const [imageHeight, setImageHeight] = useState(200);  // altura em px (escala 1:1)
+  const [imageWidthPct, setImageWidthPct] = useState(100); // largura em % (50–100)
   const fileInputRef = useRef(null);
   const previewCaptureRef = useRef(null);
 
@@ -133,9 +135,10 @@ export default function Provas() {
       setImageZoom(1);
       setImageOffsetX(0);
       setImageOffsetY(0);
+      setImageHeight(200);
+      setImageWidthPct(100);
     };
     reader.readAsDataURL(file);
-    // Reset input so same file can be re-selected
     e.target.value = '';
   }
 
@@ -144,6 +147,8 @@ export default function Provas() {
     setImageZoom(1);
     setImageOffsetX(0);
     setImageOffsetY(0);
+    setImageHeight(200);
+    setImageWidthPct(100);
   }
 
   // ── Load capas ──────────────────────────────────────────────────────────
@@ -243,15 +248,32 @@ export default function Provas() {
           recolorCanvas(ctx, canvas.width, canvas.height, selectedArea.cor, customColor);
         }
 
-        // 2) Overlay de imagem customizada no rodapé (~últimos 38%)
+        // 2) Overlay de imagem customizada respeitando margens do template
         if (customImage) {
           const userImg = new Image();
           userImg.src = customImage;
           await new Promise((res, rej) => { userImg.onload = res; userImg.onerror = rej; });
 
-          const areaStartY = Math.round(canvas.height * 0.62);
-          const areaH = canvas.height - areaStartY;
-          const areaW = canvas.width;
+          // ── Margens do template (pt no PDF 1:1 → ×2 para canvas 2×) ─────────────────────
+          // Template 1 Clássico: border(3)+pad(4)+inner(1)=8 + mx=10 → 18pt
+          // Template 2 Moderno: faixa(55)+mx=14 → faixa fic 0 no rodapé (usa 55 só no conteúdo)
+          // Template 3 Formal: border(4)+pad(4)+inner(1)=9 + mx=16 → 25pt
+          // Template 4 Colorido: mx=0 → 0pt (edge-to-edge)
+          // Template 5 Dark: mx=16 → 16pt
+          const templateMxMap = { 1: 18, 2: 14, 3: 25, 4: 0, 5: 16 };
+          const templateMxPt = templateMxMap[selectedTemplate.id] ?? 16;
+          // Converte pt → px no canvas 2× (1pt = 2px)
+          const baseMx = templateMxPt * 2;
+
+          // Largura e altura da imagem customizada (aplicando imageWidthPct e imageHeight)
+          const extraMx = baseMx + ((100 - imageWidthPct) / 100) * (canvas.width - baseMx * 2) / 2;
+          const areaX = extraMx;
+          const areaW = canvas.width - extraMx * 2;
+
+          // Altura: imageHeight em pt ×2 para canvas 2×
+          const areaH = imageHeight * 2;
+          const areaStartY = canvas.height - areaH - baseMx; // margem inferior = baseMx
+
           const iw = userImg.naturalWidth || userImg.width || 1;
           const ih = userImg.naturalHeight || userImg.height || 1;
           let coverW, coverH;
@@ -262,13 +284,13 @@ export default function Provas() {
           }
           const finalW = coverW * imageZoom;
           const finalH = coverH * imageZoom;
-          const cx = areaW / 2 + (imageOffsetX / 100) * areaW;
+          const cx = areaX + areaW / 2 + (imageOffsetX / 100) * areaW;
           const cy = areaStartY + areaH / 2 + (imageOffsetY / 100) * areaH;
           ctx.save();
           ctx.beginPath();
-          ctx.rect(0, areaStartY, areaW, areaH);
+          ctx.rect(areaX, areaStartY, areaW, areaH);
           ctx.clip();
-          ctx.clearRect(0, areaStartY, areaW, areaH);
+          ctx.clearRect(areaX, areaStartY, areaW, areaH);
           ctx.drawImage(userImg, cx - finalW / 2, cy - finalH / 2, finalW, finalH);
           ctx.restore();
         }
@@ -340,6 +362,8 @@ export default function Provas() {
     setImageZoom(1);
     setImageOffsetX(0);
     setImageOffsetY(0);
+    setImageHeight(200);
+    setImageWidthPct(100);
     setCustomColor(null);
   }
 
@@ -778,7 +802,6 @@ export default function Provas() {
                         <button
                           style={s.zoomBtn}
                           onClick={() => setImageZoom(z => Math.max(0.5, parseFloat((z - 0.1).toFixed(1))))}
-                          title="Diminuir zoom"
                         >−</button>
                         <input
                           type="range" min="0.5" max="2.5" step="0.05"
@@ -789,7 +812,6 @@ export default function Provas() {
                         <button
                           style={s.zoomBtn}
                           onClick={() => setImageZoom(z => Math.min(2.5, parseFloat((z + 0.1).toFixed(1))))}
-                          title="Aumentar zoom"
                         >+</button>
                         <span style={s.zoomValue}>{imageZoom.toFixed(1)}×</span>
                       </div>
@@ -822,11 +844,42 @@ export default function Provas() {
                         <span style={s.zoomValue}>{imageOffsetY > 0 ? '+' : ''}{imageOffsetY}%</span>
                       </div>
 
-                      {/* Reset position */}
+                      {/* Separador tamanho */}
+                      <div style={{ height:'1px', background:'#e2e8f0', margin:'4px 0 6px' }} />
+
+                      {/* Altura da imagem */}
+                      <div style={s.zoomRow}>
+                        <span style={s.zoomLabel}>⇕ Altura</span>
+                        <button style={s.zoomBtn} onClick={() => setImageHeight(h => Math.max(80, h - 10))}>−</button>
+                        <input
+                          type="range" min="80" max="340" step="10"
+                          value={imageHeight}
+                          onChange={e => setImageHeight(Number(e.target.value))}
+                          style={s.zoomSlider}
+                        />
+                        <button style={s.zoomBtn} onClick={() => setImageHeight(h => Math.min(340, h + 10))}>+</button>
+                        <span style={s.zoomValue}>{imageHeight}px</span>
+                      </div>
+
+                      {/* Largura da imagem */}
+                      <div style={s.zoomRow}>
+                        <span style={s.zoomLabel}>⇔ Largura</span>
+                        <button style={s.zoomBtn} onClick={() => setImageWidthPct(w => Math.max(40, w - 5))}>−</button>
+                        <input
+                          type="range" min="40" max="100" step="5"
+                          value={imageWidthPct}
+                          onChange={e => setImageWidthPct(Number(e.target.value))}
+                          style={s.zoomSlider}
+                        />
+                        <button style={s.zoomBtn} onClick={() => setImageWidthPct(w => Math.min(100, w + 5))}>+</button>
+                        <span style={s.zoomValue}>{imageWidthPct}%</span>
+                      </div>
+
+                      {/* Reset tudo */}
                       <button
                         style={{ ...s.btnChangeImage, marginTop:4, fontSize:11 }}
-                        onClick={() => { setImageZoom(1); setImageOffsetX(0); setImageOffsetY(0); }}
-                      >↺ Resetar posição</button>
+                        onClick={() => { setImageZoom(1); setImageOffsetX(0); setImageOffsetY(0); setImageHeight(200); setImageWidthPct(100); }}
+                      >↺ Resetar tudo</button>
                     </div>
                   ) : (
                     <div style={s.imageEmptyHint}>
@@ -867,6 +920,8 @@ export default function Provas() {
                     imageZoom={imageZoom}
                     imageOffsetX={imageOffsetX}
                     imageOffsetY={imageOffsetY}
+                    imageHeight={imageHeight}
+                    imageWidthPct={imageWidthPct}
                   />
                 </div>
                 <p style={{ fontSize:11, color:'#94a3b8', marginTop:8, textAlign:'center' }}>Preview aproximado · PDF gerado em A4</p>

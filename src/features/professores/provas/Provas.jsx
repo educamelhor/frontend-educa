@@ -90,6 +90,7 @@ export default function Provas() {
   const [generating, setGenerating] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [toast, setToast] = useState(null);
+  const [editingCapaId, setEditingCapaId] = useState(null); // null = nova | id = editando
 
   // ── Custom image state ─────────────────────────────────────────────────
   const [customImage, setCustomImage] = useState(null); // dataURL
@@ -311,10 +312,18 @@ export default function Provas() {
         URL.revokeObjectURL(url);
       }
 
-      showToast('✅ Capa gerada e baixada com sucesso!', 'success');
+      const oldCapaId = editingCapaId; // captura antes do resetWizard
+      showToast(oldCapaId ? '✅ Capa atualizada e baixada com sucesso!' : '✅ Capa gerada e baixada com sucesso!', 'success');
       loadCapas();
       setActiveTab('capas');
       resetWizard();
+      // Exclui o registro antigo após criar o novo com sucesso
+      if (oldCapaId) {
+        try {
+          await fetch(`${API}/api/capa-provas/${oldCapaId}`, { method: 'DELETE', headers: authH() });
+          loadCapas();
+        } catch { /* ignora falha silenciosamente */ }
+      }
     } catch (err) {
       showToast(err.message || 'Erro ao gerar capa.', 'error');
     } finally {
@@ -365,6 +374,33 @@ export default function Provas() {
     setImageHeight(200);
     setImageWidthPct(100);
     setCustomColor(null);
+    setEditingCapaId(null);
+  }
+
+  // ── Inicia edição de uma capa existente ───────────────────────────────────────────────
+  function startEdit(capa) {
+    const areaDef = AREAS.find(a => a.id === capa.area) || AREAS[0];
+    const templateDef = TEMPLATES.find(t => t.id === capa.template_id) || TEMPLATES[0];
+    setSelectedArea(areaDef);
+    setSelectedTemplate(templateDef);
+    setForm({
+      titulo: capa.titulo || '',
+      serie: capa.serie || '',
+      turno: capa.turno || '',
+      bimestre: capa.bimestre || 1,
+      ano: capa.ano || ANO_CORRENTE,
+      instrucoes: capa.instrucoes || areaDef.instrucoesPadrao || '',
+    });
+    setEditingCapaId(capa.id);
+    setCustomColor(null);
+    setCustomImage(null);
+    setImageZoom(1);
+    setImageOffsetX(0);
+    setImageOffsetY(0);
+    setImageHeight(200);
+    setImageWidthPct(100);
+    setStep(3); // vai direto para Configurar
+    setActiveTab('nova');
   }
 
   // ── Area badge color helper ─────────────────────────────────────────────
@@ -546,6 +582,28 @@ export default function Provas() {
       {/* ── TAB: NOVA CAPA — WIZARD ────────────────────────────────────── */}
       {activeTab === 'nova' && (
         <div>
+          {/* Banner modo edição */}
+          {editingCapaId && (
+            <div style={{
+              display:'flex', alignItems:'center', gap:10,
+              background:'linear-gradient(135deg,#fef3c7,#fde68a)',
+              border:'1.5px solid #f59e0b', borderRadius:10,
+              padding:'10px 16px', marginBottom:16,
+            }}>
+              <span style={{ fontSize:20 }}>✏️</span>
+              <div>
+                <span style={{ fontWeight:800, fontSize:13, color:'#92400e' }}>Modo Edição</span>
+                <span style={{ fontSize:12, color:'#b45309', marginLeft:8 }}>
+                  Altere os dados e clique em “Gerar e Baixar PDF” para salvar as mudanças.
+                </span>
+              </div>
+              <button
+                style={{ marginLeft:'auto', padding:'5px 12px', borderRadius:6, border:'1.5px solid #f59e0b', background:'#fff', color:'#92400e', fontWeight:700, fontSize:12, cursor:'pointer' }}
+                onClick={() => { setEditingCapaId(null); resetWizard(); }}
+              >✕ Cancelar edição</button>
+            </div>
+          )}
+
           {/* Steps indicator */}
           <div style={s.stepsBar}>
             {['Área', 'Modelo', 'Configurar'].map((label, i) => {
@@ -981,6 +1039,7 @@ const s = {
   capaMeta: { display:'flex', gap:6, fontSize:11, color:'#64748b', flexWrap:'wrap' },
   capaActions: { display:'flex', gap:8, marginTop:12 },
   btnDownload: { flex:1, padding:'7px 10px', borderRadius:7, border:'none', background:'linear-gradient(135deg,#6366f1,#8b5cf6)', color:'#fff', fontWeight:700, fontSize:12, cursor:'pointer' },
+  btnEdit: { padding:'7px 10px', borderRadius:7, border:'1px solid #bfdbfe', background:'#eff6ff', color:'#1d4ed8', fontSize:14, cursor:'pointer', transition:'background .15s' },
   btnDelete: { padding:'7px 10px', borderRadius:7, border:'1px solid #fee2e2', background:'#fff', fontSize:14, cursor:'pointer' },
   areaBadge: { padding:'2px 8px', borderRadius:20, fontSize:11, fontWeight:700, display:'inline-flex', alignItems:'center', gap:3 },
 

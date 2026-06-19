@@ -5,6 +5,7 @@
 // ============================================================================
 import React, { useState, useEffect, useCallback } from "react";
 import ModalRelatorioDisciplinar from "../../alunos/ModalRelatorioDisciplinar";
+import ModalRelatorioSemestral from "./ModalRelatorioSemestral";
 import api from "../../../services/api";
 
 // ── Helpers ─────────────────────────────────────────────────────────────
@@ -54,6 +55,7 @@ export default function HistoricoDisciplinar() {
   const [apiError, setApiError] = useState(null);
   const [fichaOpen, setFichaOpen] = useState(false);
   const [fichaCodigo, setFichaCodigo] = useState(null);
+  const [semestralOpen, setSemestralOpen] = useState(false); // ⭐ Relatório Semestral
   // Filtros
   const [filtroStatus, setFiltroStatus] = useState("");
   const [filtroTurma, setFiltroTurma] = useState("");
@@ -315,10 +317,28 @@ export default function HistoricoDisciplinar() {
         {/* ── Header ──────────────────────────────────────────── */}
         <div className="disc-hist-header">
           <div className="disc-hist-header-icon">📋</div>
-          <div>
+          <div style={{ flex: 1 }}>
             <h2>Histórico Disciplinar</h2>
             <p>Registro completo de todas as ocorrências disciplinares da escola</p>
           </div>
+          {/* ⭐ Botão Relatório Semestral (Art. 23/52) */}
+          <button
+            onClick={() => setSemestralOpen(true)}
+            style={{
+              display: "flex", alignItems: "center", gap: 8,
+              padding: "10px 18px", borderRadius: 12,
+              background: "rgba(255,255,255,0.15)",
+              border: "1.5px solid rgba(255,255,255,0.3)",
+              color: "#fff", fontWeight: 700, fontSize: 13,
+              cursor: "pointer", transition: "all 0.2s", flexShrink: 0,
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.25)"; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.15)"; }}
+            title="Relatório Semestral Quantitativo (Arts. 23/52)"
+          >
+            <span style={{ fontSize: 16 }}>📊</span>
+            Relatório Semestral
+          </button>
         </div>
 
         {/* ── KPI Cards ──────────────────────────────────────── */}
@@ -576,6 +596,12 @@ export default function HistoricoDisciplinar() {
           aluno={fichaCodigo}
         />
       </div>
+
+      {/* ⭐ Modal Relatório Semestral — Arts. 23/52 */}
+      <ModalRelatorioSemestral
+        open={semestralOpen}
+        onClose={() => setSemestralOpen(false)}
+      />
       </>
     );
 }

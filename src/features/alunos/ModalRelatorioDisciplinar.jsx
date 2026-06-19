@@ -164,11 +164,16 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
     // Calcula a pontuação: pontos do BD já possuem sinal correto
     // (negativo para medidas disciplinares, positivo para elogios)
     // REGISTRADA + FINALIZADA afetam a pontuação; CANCELADA é ignorada
+    // Art. 46 III: Suspensão = −0,50 por dia (multiplica pelo nº de dias)
     const pontuacaoCalculada = React.useMemo(() => {
         let pontuacao = PONTUACAO_INICIAL;
         for (const oc of ocorrencias) {
             if (oc.status === 'CANCELADA') continue;
-            const pts = Number(oc.pontos) || 0;
+            let pts = Number(oc.pontos) || 0;
+            // Suspensão: pontos unitários (−0,50) × dias registrados
+            if (String(oc.medida_disciplinar).trim() === 'Suspensão' && Number(oc.dias_suspensao) > 0) {
+                pts = pts * Number(oc.dias_suspensao);
+            }
             pontuacao += pts;
         }
         // Adiciona bônus de mérito
@@ -411,7 +416,28 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
                                             </td>
                                         </tr>
                                     )}
-                                    {ocorrencias.map((oc) => (
+                                    {/* Linhas de Bônus de Média Bimestral */}
+                                    {ocorrencias
+                                        .filter(oc => oc.tipo === 'BONUS_MEDIA')
+                                        .map(oc => (
+                                        <tr key={`bm-${oc.id}`} className="bg-teal-50/60 border-l-4 border-teal-400">
+                                            <td className="px-4 py-3 font-medium text-teal-700">🎓 Média</td>
+                                            <td className="px-4 py-3 text-teal-700 font-semibold">Bônus Bimestral</td>
+                                            <td className="px-4 py-3 text-gray-500 text-sm">{oc.data_ocorrencia}</td>
+                                            <td className="px-4 py-3">
+                                                <div className="font-semibold text-teal-700">Bônus de Média Bimestral</div>
+                                                <div className="text-xs text-teal-600 mt-1">{oc.descricao}</div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <span className="px-2 py-1 text-xs font-semibold rounded-full bg-teal-100 text-teal-700 border border-teal-200">FINALIZADA</span>
+                                            </td>
+                                            <td className="px-4 py-3 text-center">
+                                                <span className="text-teal-700 font-bold text-sm">+{Number(oc.pontos || 0.50).toFixed(2).replace('.', ',')}</span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {/* Demais ocorrências (exceto BONUS_MEDIA que já foram exibidas acima) */}
+                                    {ocorrencias.filter(oc => oc.tipo !== 'BONUS_MEDIA').map((oc) => (
                                         <tr key={oc.id} className="hover:bg-gray-50 transition">
                                             <td className="px-4 py-3 font-medium text-gray-800">{oc.registro || oc.id}</td>
                                             <td className="px-4 py-3 text-gray-600 capitalize">{oc.tipo || '-'}</td>
@@ -450,6 +476,34 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
                                                         </span>
                                                     )}
                                                 </div>
+                                                {/* Circunstâncias Atenuantes (Art. 34) */}
+                                                {(() => {
+                                                    let aten = [];
+                                                    try { aten = JSON.parse(oc.atenuantes || '[]'); } catch {}
+                                                    if (!aten.length) return null;
+                                                    return (
+                                                        <div className="flex flex-wrap gap-1 mt-1.5">
+                                                            <span className="text-xs font-semibold text-emerald-700 self-center">⚖️ Atenuantes:</span>
+                                                            {aten.map(a => (
+                                                                <span key={a} className="inline-block px-2 py-0.5 text-xs font-medium text-emerald-700 bg-emerald-50 rounded-full border border-emerald-200">{a.replace(/ \(Art\..*\)/, '')}</span>
+                                                            ))}
+                                                        </div>
+                                                    );
+                                                })()}
+                                                {/* Circunstâncias Agravantes (Art. 35) */}
+                                                {(() => {
+                                                    let agrav = [];
+                                                    try { agrav = JSON.parse(oc.agravantes || '[]'); } catch {}
+                                                    if (!agrav.length) return null;
+                                                    return (
+                                                        <div className="flex flex-wrap gap-1 mt-1.5">
+                                                            <span className="text-xs font-semibold text-amber-700 self-center">⚠️ Agravantes:</span>
+                                                            {agrav.map(a => (
+                                                                <span key={a} className="inline-block px-2 py-0.5 text-xs font-medium text-amber-700 bg-amber-50 rounded-full border border-amber-200">{a.replace(/ \(Art\..*\)/, '')}</span>
+                                                            ))}
+                                                        </div>
+                                                    );
+                                                })()}
                                                 {Boolean(oc.convocar_responsavel) && (
                                                     <div className="mt-2">
                                                         <span className="inline-block px-2 py-1 text-xs font-medium text-red-700 bg-red-100 rounded-full border border-red-200">

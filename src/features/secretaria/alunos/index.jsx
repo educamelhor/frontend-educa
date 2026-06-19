@@ -11,8 +11,8 @@
 //     apenas INATIVOS via query param `status=inativo` (paginação normal).
 // ────────────────────────────────────────────────────────────────
 
-import React, { useState, useEffect } from "react";
-import { AcademicCapIcon, PlusCircleIcon, FolderOpenIcon } from "@heroicons/react/24/solid";
+import React, { useState, useEffect, useRef } from "react";
+import { AcademicCapIcon, PlusCircleIcon, FolderOpenIcon, TableCellsIcon } from "@heroicons/react/24/solid";
 import AlunoTable from "./AlunoTable";
 import AlunoForm from "./AlunoForm";
 import ModalExcluirOuInativar from "./ModalExcluirOuInativar";
@@ -67,6 +67,37 @@ export default function Alunos() {
   const [alunoParaExcluirOuInativar, setAlunoParaExcluirOuInativar] = useState(null);
   const [isImportOpen, setImportOpen] = useState(false);
   const [resultadoImportacao, setResultadoImportacao] = useState(null);
+  const xlsxInputRef = useRef();
+
+  // Handler: Importar via XLSX direto (sem modal)
+  const handleXlsxSelected = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append("file", file);
+    // Nome do arquivo determina a turma: "6º ANO A.xlsx" → "6º ANO A"
+    const turmaNome = file.name.replace(/\.[^.]+$/i, "").trim();
+    formData.append("turmaNome", turmaNome);
+    setResultadoImportacao({ _loading: true });
+    try {
+      const res = await api.post("/alunos/importar-xlsx", formData);
+      await fetchAlunos();
+      setResultadoImportacao({
+        localizados: res.data.localizados ?? 0,
+        inseridos:   res.data.inseridos   ?? 0,
+        reativados:  res.data.reativados  ?? 0,
+        atualizados: res.data.atualizados ?? 0,
+        jaExistiam:  res.data.jaExistiam  ?? 0,
+        inativados:  res.data.inativados  ?? 0,
+      });
+    } catch (err) {
+      const msg = err.response?.data?.message || err.message;
+      setErro(`Erro ao importar XLSX: ${msg}`);
+      setResultadoImportacao(null);
+    } finally {
+      e.target.value = null;
+    }
+  };
 
   // ────────────────────────────────────────────────────────────────
   // Filtro de Ano Letivo
@@ -287,15 +318,35 @@ export default function Alunos() {
                 Adicionar Estudante
               </button>
 
+              {/* Botão PDF */}
               <button
                 type="button"
                 onClick={() => setImportOpen(true)}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 transition shadow-sm"
-                title="Incluir Estudantes"
+                title="Importar alunos a partir de PDF da Secretaria de Educação"
               >
                 <FolderOpenIcon className="w-5 h-5" />
-                Incluir Estudantes
+                Importar via PDF
               </button>
+
+              {/* Botão XLSX */}
+              <button
+                type="button"
+                onClick={() => xlsxInputRef.current?.click()}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white hover:opacity-90 transition shadow-sm"
+                style={{ background: '#0f766e' }}
+                title="Importar alunos a partir de planilha Excel — colunas: RE, estudante, data_nascimento, responsavel, cpf_responsavel, turma"
+              >
+                <TableCellsIcon className="w-5 h-5" />
+                Importar via XLSX
+              </button>
+              <input
+                type="file"
+                accept=".xlsx,.xls"
+                ref={xlsxInputRef}
+                style={{ display: 'none' }}
+                onChange={handleXlsxSelected}
+              />
             </>
           )}
 
@@ -315,9 +366,14 @@ export default function Alunos() {
                 </button>
               </div>
 
-              {"inseridos" in resultadoImportacao ? (
+              {resultadoImportacao._loading ? (
+                <div className="text-gray-500 animate-pulse">⏳ Importando planilha...</div>
+              ) : "inseridos" in resultadoImportacao ? (
                 <>
                   <div className="text-green-600">✅ Inseridos: {resultadoImportacao.inseridos}</div>
+                  {resultadoImportacao.atualizados > 0 && (
+                    <div className="text-blue-500">🔄 Dados completados: {resultadoImportacao.atualizados}</div>
+                  )}
                   <div className="text-yellow-600">🟡 Já existiam: {resultadoImportacao.jaExistiam}</div>
                   <div className="text-blue-600">📘 Reativados: {resultadoImportacao.reativados}</div>
                   <div className="text-red-600">❌ Inativados: {resultadoImportacao.inativados}</div>

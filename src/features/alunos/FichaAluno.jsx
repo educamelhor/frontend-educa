@@ -1,4 +1,5 @@
 // src/features/alunos/FichaAluno.jsx
+// Design premium — mesma aparência em todos os módulos (Disciplinar, Secretaria, etc.)
 import React, { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import api from "../../services/api";
@@ -9,14 +10,13 @@ import ModalRelatorioDisciplinar from "./ModalRelatorioDisciplinar";
 import ModalRelatorioPedagogico from "./ModalRelatorioPedagogico";
 
 /* =========================================================
-   FICHA DO ESTUDANTE
+   FICHA DO ESTUDANTE — Design Premium
    - Abre via rota ou via modal (prop `codigo`)
    - Permite escolher pasta com fotos (nome=CODIGO) e faz:
      leitura → detecção facial → recorte → upload → refresh
    ========================================================= */
 
 export default function FichaAluno({ codigo: codigoProp }) {
-  // Pode vir pelo modal (prop) ou pela rota /alunos/:codigo/ficha
   const { codigo: codigoParam } = useParams();
   const codigo = codigoProp || codigoParam;
   const isModal = Boolean(codigoProp);
@@ -25,23 +25,17 @@ export default function FichaAluno({ codigo: codigoProp }) {
   const isDisciplinar = location.pathname.includes("/disciplinar");
   const isProfessor = String(localStorage.getItem('perfil') || '').toLowerCase().trim() === 'professor';
 
-  // Estados principais
   const [aluno, setAluno] = useState(null);
   const [erro, setErro] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const [modalRelatorioOpen, setModalRelatorioOpen] = useState(false);
   const [modalPedagogicoOpen, setModalPedagogicoOpen] = useState(false);
+  const [ocorrenciasCount, setOcorrenciasCount] = useState(null);
 
-  // 🔐 trava anti-reentrada de upload
   const isUploadingRef = useRef(false);
-
-  // 🔁 trava de "retry uma única vez" para a tag <img>
   const retryOnceRef = useRef(false);
 
-  // ==========================
-  // Utilidades
-  // ==========================
   const apiBase = (api.defaults?.baseURL || "").replace(/\/api$/, "");
   const buildFotoURL = (path) => {
     if (!path) return null;
@@ -49,7 +43,7 @@ export default function FichaAluno({ codigo: codigoProp }) {
   };
 
   const formatDate = (value) => {
-    if (!value) return "-";
+    if (!value) return "—";
     try {
       if (/^\d{4}-\d{2}-\d{2}/.test(value)) {
         const [y, m, d] = value.split("-");
@@ -57,15 +51,20 @@ export default function FichaAluno({ codigo: codigoProp }) {
       }
       const d = new Date(value);
       const s = d.toLocaleDateString();
-      return s && s !== "Invalid Date" ? s : "-";
+      return s && s !== "Invalid Date" ? s : "—";
     } catch {
-      return "-";
+      return "—";
     }
   };
 
-  // ==========================
-  // Carrega dados do aluno
-  // ==========================
+  // Iniciais para avatar
+  const getInitials = (nome) => {
+    if (!nome) return "?";
+    const parts = nome.trim().split(" ").filter(Boolean);
+    if (parts.length === 1) return parts[0][0].toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  };
+
   useEffect(() => {
     let alive = true;
     async function fetchAluno() {
@@ -81,260 +80,168 @@ export default function FichaAluno({ codigo: codigoProp }) {
       }
     }
     fetchAluno();
-    return () => {
-      alive = false;
-    };
+    return () => { alive = false; };
   }, [codigo]);
 
-  // ==========================
-  // Carrega modelo do face-api sob demanda
-  // ==========================
-  const ensureFaceModels = async () => {
-    try {
-      const MODELS_URL = "/models/faceapi/";
-      if (!faceapi.nets.tinyFaceDetector.params) {
-        await faceapi.nets.tinyFaceDetector.loadFromUri(MODELS_URL);
-      }
-      return true;
-    } catch (err) {
-      console.error("Falha ao carregar o detector facial:", err);
-      setFeedback({ tipo: "erro", mensagem: "Falha ao carregar o detector facial." });
-      setTimeout(() => setFeedback(null), 2500);
-      return false;
-    }
-  };
+  // Buscar contagem de ocorrências disciplinares
+  useEffect(() => {
+    if (!aluno?.id) return;
+    api.get(`/api/alunos/${aluno.id}/ocorrencias`)
+      .then(res => {
+        const lista = Array.isArray(res.data) ? res.data : [];
+        const ativas = lista.filter(o => o.status !== 'CANCELADA');
+        setOcorrenciasCount(ativas.length);
+      })
+      .catch(() => setOcorrenciasCount(0));
+  }, [aluno?.id]);
 
-  // ==========================
-  // Selecionar pasta (sempre substitui foto existente)
-  // ==========================
+  // ── Upload de foto ──────────────────────────────────────────
   const handleFolderSelect = async (e) => {
-    // evita reentrada
-    if (isUploadingRef.current) {
-      e.target.value = null;
+    if (isUploadingRef.current) return;
+    const files = Array.from(e.target.files || []);
+    if (!files.length || !aluno) return;
+    const codigoStr = String(aluno.codigo);
+    const exts = /\.(jpe?g|png|webp|jfif)$/i;
+    const match = files.find(f => {
+      const base = f.name.replace(/\.[^.]+$/, "");
+      return base === codigoStr && exts.test(f.name);
+    });
+    if (!match) {
+      setFeedback({ tipo: "erro", mensagem: `Nenhuma foto com o nome "${codigoStr}" encontrada na pasta.` });
       return;
     }
     isUploadingRef.current = true;
-
-    if (!aluno) {
-      alert("Aguarde: carregando dados do aluno.");
-      e.target.value = null;
-      isUploadingRef.current = false;
-      return;
-    }
-
-    // 1) garantir modelos carregados
-    const ok = await ensureFaceModels();
-    if (!ok) {
-      e.target.value = null;
-      isUploadingRef.current = false;
-      return;
-    }
-
-    // 2) procurar arquivo pelo código do aluno (matching resiliente)
-    const files = Array.from(e.target.files || []);
-    const alvo = String(aluno.codigo).trim().toLowerCase();
-    const alvoDigits = alvo.replace(/\D/g, "");
-
-    let arquivoAlvo =
-      files.find((f) => f.name?.toLowerCase().replace(/\.[^.]+$/i, "") === alvo) ||
-      files.find((f) => (f.webkitRelativePath || "").toLowerCase().includes(`/${alvo}.`)) ||
-      files.find((f) => f.name?.toLowerCase().includes(alvo)) ||
-      files.find((f) => f.name?.toLowerCase().replace(/\D/g, "").includes(alvoDigits));
-
-    if (!arquivoAlvo) {
-      alert(`Foto não encontrada na pasta para o código ${aluno.codigo}.`);
-      e.target.value = null;
-      isUploadingRef.current = false;
-      return;
-    }
-
-    try {
-      await recortarEEnviar(arquivoAlvo);
-    } finally {
-      e.target.value = null;
-      isUploadingRef.current = false;
-    }
+    setFeedback(null);
+    await processAndUpload(match);
+    isUploadingRef.current = false;
   };
 
-  // ==========================
-  // Recorta rosto + upload
-  // ==========================
-  const recortarEEnviar = async (arquivoFonte) => {
-    let imgEl;
+  const processAndUpload = async (arquivoFonte) => {
+    setUploading(true);
     try {
-      imgEl = await faceapi.bufferToImage(arquivoFonte);
-      await new Promise((resolve) => {
-        if (imgEl.complete && imgEl.naturalHeight !== 0) resolve();
-        else imgEl.onload = () => resolve();
+      const objectURL = URL.createObjectURL(arquivoFonte);
+      const imgEl = document.createElement("img");
+      imgEl.src = objectURL;
+      await new Promise((resolve, reject) => {
+        imgEl.onload = resolve;
+        imgEl.onerror = reject;
       });
-    } catch (err) {
-      console.error("Erro ao converter imagem:", err);
-      alert("Falha ao ler a imagem selecionada.");
-      return;
-    }
-
-    let detection;
-    try {
-      const canvasTemp = faceapi.createCanvasFromMedia(imgEl);
-      detection = await faceapi.detectSingleFace(
-        canvasTemp,
-        new faceapi.TinyFaceDetectorOptions()
-      );
-    } catch (err) {
-      console.error("Erro na detecção facial:", err);
-    }
-
-    let fileParaUpload = arquivoFonte;
-    if (detection) {
-      const box = detection.box;
-      const MARGEM = 0.1;
-      const x1 = Math.max(0, box.x - box.width * MARGEM);
-      const y1 = Math.max(0, box.y - box.height * MARGEM);
-      const x2 = Math.min(imgEl.width, box.x + box.width * (1 + MARGEM));
-      const y2 = Math.min(imgEl.height, box.y + box.height * (1 + MARGEM));
-      const w = x2 - x1;
-      const h = y2 - y1;
+      URL.revokeObjectURL(objectURL);
 
       try {
-        const canvas = document.createElement("canvas");
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(imgEl, x1, y1, w, h, 0, 0, w, h);
-        const blob = await new Promise((resolve) =>
-          canvas.toBlob(resolve, "image/jpeg", 0.9)
-        );
-        if (blob) {
-          fileParaUpload = new File([blob], `${aluno.codigo}.jpg`, {
-            type: "image/jpeg",
-          });
-        }
-      } catch (err) {
-        console.warn("Falha ao recortar: enviando original.", err);
-      }
-    }
+        await faceapi.nets.tinyFaceDetector.loadFromUri("/models");
+      } catch {}
 
-    await uploadFile(fileParaUpload);
+      let detection;
+      try {
+        const canvasTemp = faceapi.createCanvasFromMedia(imgEl);
+        detection = await faceapi.detectSingleFace(canvasTemp, new faceapi.TinyFaceDetectorOptions());
+      } catch {}
+
+      let fileParaUpload = arquivoFonte;
+      if (detection) {
+        const box = detection.box;
+        const MARGEM = 0.1;
+        const x1 = Math.max(0, box.x - box.width * MARGEM);
+        const y1 = Math.max(0, box.y - box.height * MARGEM);
+        const x2 = Math.min(imgEl.width, box.x + box.width * (1 + MARGEM));
+        const y2 = Math.min(imgEl.height, box.y + box.height * (1 + MARGEM));
+        try {
+          const canvas = document.createElement("canvas");
+          canvas.width = x2 - x1;
+          canvas.height = y2 - y1;
+          canvas.getContext("2d").drawImage(imgEl, x1, y1, x2 - x1, y2 - y1, 0, 0, x2 - x1, y2 - y1);
+          const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", 0.9));
+          if (blob) fileParaUpload = new File([blob], `${aluno.codigo}.jpg`, { type: "image/jpeg" });
+        } catch {}
+      }
+
+      await uploadFile(fileParaUpload);
+    } catch (err) {
+      console.error("Erro ao processar foto:", err);
+      setFeedback({ tipo: "erro", mensagem: "Erro ao processar a imagem." });
+      setUploading(false);
+    }
   };
 
-  // ==========================
-  // Upload e atualização imediata — robusto
-  // ==========================
   const uploadFile = async (file) => {
     setUploading(true);
     try {
       const formData = new FormData();
       formData.append("foto", file);
-
       const resp = await api.post(`/api/alunos/${codigo}/foto`, formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-
-      // Aceita várias chaves comuns de resposta
-      const base =
-        resp?.data?.foto ??
-        resp?.data?.url ??
-        resp?.data?.path ??
-        resp?.data?.caminho ??
-        "";
-
+      const base = resp?.data?.foto ?? resp?.data?.url ?? resp?.data?.path ?? resp?.data?.caminho ?? "";
       const baseURL = buildFotoURL(base);
-      const novaPath = baseURL
-        ? `${baseURL}${baseURL.includes("?") ? "&" : "?"}t=${Date.now()}`
-        : "";
-
-      console.log("Upload OK:", resp.data, "->", novaPath); // diagnóstico
-
-      // zera retry do <img> e aplica a nova URL com cache-buster
+      const novaPath = baseURL ? `${baseURL}${baseURL.includes("?") ? "&" : "?"}t=${Date.now()}` : "";
       retryOnceRef.current = false;
-      setAluno((old) => ({ ...(old || {}), foto: novaPath }));
-      setFeedback({ tipo: "sucesso", mensagem: "Foto inserida com sucesso!" });
-      setTimeout(() => setFeedback(null), 2200);
+      setAluno(old => ({ ...(old || {}), foto: novaPath }));
+      setFeedback({ tipo: "sucesso", mensagem: "Foto atualizada com sucesso!" });
     } catch (err) {
-      console.error("Erro no upload de foto:", err);
-      setFeedback({ tipo: "erro", mensagem: "Falha ao enviar foto." });
-      setTimeout(() => setFeedback(null), 3000);
+      setFeedback({ tipo: "erro", mensagem: "Falha no upload da foto." });
     } finally {
       setUploading(false);
     }
   };
 
-  // ==========================
-  // Render
-  // ==========================
-  if (erro) {
+  // ── PLACEHOLDER SVG ──────────────────────────────────────────
+  const PLACEHOLDER = "data:image/svg+xml;utf8," + encodeURIComponent(
+    `<svg xmlns='http://www.w3.org/2000/svg' width='128' height='128'><rect width='100%' height='100%' rx='64' ry='64' fill='#e5e7eb'/></svg>`
+  );
+
+  // ── LOADING ─────────────────────────────────────────────────
+  if (!aluno && !erro) {
     return (
-      <div className={`${isModal ? "bg-blue-50" : "min-h-screen bg-blue-50"} flex justify-center py-10 px-4`}>
-        <div className="w-full max-w-3xl bg-white rounded-lg shadow-lg p-6 space-y-6">
-          <p className="text-red-600">{erro}</p>
-          {!isModal && (
-            <Button onClick={() => navigate("/alunos")} className="mt-4 bg-gray-200 text-gray-800 hover:bg-gray-300">
-              ← Voltar à lista
-            </Button>
-          )}
+      <div style={{ padding: 40, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: isModal ? 200 : '100vh' }}>
+        <div style={{ textAlign: 'center', color: '#6b7280' }}>
+          <div style={{ width: 36, height: 36, border: '3px solid #e5e7eb', borderTopColor: '#1e3a5f', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 12px' }} />
+          <p style={{ fontSize: 14 }}>Carregando dados do aluno…</p>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
       </div>
     );
   }
 
-  if (!aluno) {
+  // ── ERRO ─────────────────────────────────────────────────────
+  if (erro) {
     return (
-      <div className={`${isModal ? "bg-blue-50" : "min-h-screen bg-blue-50"} flex justify-center items-center`}>
-        <p>Carregando dados do aluno…</p>
+      <div style={{ padding: 40, textAlign: 'center' }}>
+        <p style={{ color: '#dc2626' }}>{erro}</p>
+        {!isModal && <Button onClick={() => navigate("/alunos")} className="mt-4">← Voltar</Button>}
       </div>
     );
   }
 
   const fotoURL = buildFotoURL(aluno.foto);
-
-  // Placeholder (bolinha cinza) — evita texto do alt
-  const PLACEHOLDER =
-    "data:image/svg+xml;utf8," +
-    encodeURIComponent(
-      `<svg xmlns='http://www.w3.org/2000/svg' width='128' height='128'>
-        <rect width='100%' height='100%' rx='64' ry='64' fill='#e5e7eb'/>
-      </svg>`
-    );
+  const iniciais = getInitials(aluno.estudante);
+  const nomeTurma = aluno.turma ?? "—";
+  const nomeTurno = aluno.turno ?? "";
 
   return (
-    <div className={`${isModal ? "bg-blue-50" : "min-h-screen bg-blue-50"} flex justify-center py-10 px-4`}>
-      <div className="w-full max-w-3xl bg-white rounded-lg shadow-lg p-6 space-y-6">
-        {!isModal && (
-          <Button onClick={() => navigate("/alunos")} className="mb-4 bg-gray-200 text-gray-800 hover:bg-gray-300">
-            ← Voltar
-          </Button>
-        )}
-
-        {/* Mensagens de feedback */}
-        {feedback?.tipo === "sucesso" && (
-          <div className="mb-4 p-3 bg-green-100 text-green-800 rounded">
-            <span className="mr-2">✔️</span>
-            {feedback.mensagem}
-          </div>
-        )}
-        {feedback?.tipo === "erro" && (
-          <div className="mb-4 p-3 bg-red-100 text-red-800 rounded">
-            <span className="mr-2">❌</span>
-            {feedback.mensagem}
-          </div>
-        )}
-
-        <div className="flex items-center gap-4 mb-6">
-          <AcademicCapIcon className="h-8 w-8 text-blue-900" />
-          <h1 className="text-3xl font-bold text-blue-900">Ficha do Estudante</h1>
+    <div style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
+      {/* ── HEADER GRADIENTE PREMIUM ───────────────────────────── */}
+      <div style={{
+        background: 'linear-gradient(135deg, #1e3a5f 0%, #0f2847 60%, #1a4a7a 100%)',
+        borderRadius: '16px 16px 0 0',
+        padding: '24px 24px 20px',
+        color: '#fff',
+      }}>
+        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.55)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <AcademicCapIcon style={{ width: 14, height: 14 }} />
+          FICHA DO ESTUDANTE
         </div>
 
-        <div className="grid grid-cols-3 gap-6 items-center">
-          {/* Foto */}
-          <div className="flex justify-center">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          {/* Avatar */}
+          <div style={{ position: 'relative', flexShrink: 0 }}>
             {fotoURL ? (
               <img
                 key={fotoURL}
                 src={fotoURL}
-                alt={`Foto de ${aluno.estudante || ""}`}
-                className="w-32 h-32 rounded-full object-cover"
+                alt={aluno.estudante || ""}
+                style={{ width: 64, height: 64, borderRadius: '50%', objectFit: 'cover', border: '3px solid rgba(255,255,255,0.3)' }}
                 onError={(e) => {
-                  // 1º erro: tenta uma única vez com cache-buster
                   if (!retryOnceRef.current) {
                     retryOnceRef.current = true;
                     try {
@@ -342,41 +249,91 @@ export default function FichaAluno({ codigo: codigoProp }) {
                       u.searchParams.set("t", Date.now().toString());
                       e.currentTarget.src = u.toString();
                     } catch {
-                      // se não conseguir parsear URL, cai para placeholder
                       e.currentTarget.onerror = null;
                       e.currentTarget.src = PLACEHOLDER;
                     }
                     return;
                   }
-                  // 2º erro (ou mais): para o loop e mostra placeholder
                   e.currentTarget.onerror = null;
                   e.currentTarget.src = PLACEHOLDER;
                 }}
               />
             ) : (
-              <div className="w-32 h-32 bg-gray-200 rounded-full flex items-center justify-center">
-                <span className="text-gray-500">Sem foto</span>
+              <div style={{
+                width: 64, height: 64, borderRadius: '50%',
+                background: 'linear-gradient(135deg, #3b82f6, #1e40af)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 22, fontWeight: 700, color: '#fff',
+                border: '3px solid rgba(255,255,255,0.3)',
+                letterSpacing: '-1px',
+              }}>
+                {iniciais}
               </div>
             )}
           </div>
 
-          {/* Dados */}
-          <div className="col-span-2 space-y-2">
-            <p><strong>Código:</strong> {aluno.codigo ?? "-"}</p>
-            <p><strong>Nome:</strong> {aluno.estudante ?? "-"}</p>
-            <p><strong>Turma:</strong> {aluno.turma ?? "-"} {aluno.turno ? `(${aluno.turno})` : ""}</p>
-            <p><strong>Data de Nascimento:</strong> {formatDate(aluno.data_nascimento)}</p>
-            <p><strong>Sexo:</strong> {aluno.sexo ?? "-"}</p>
+          {/* Nome e badges */}
+          <div style={{ flex: 1 }}>
+            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: '#fff', lineHeight: 1.2 }}>
+              {aluno.estudante ?? "—"}
+            </h2>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+              {nomeTurma && (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, background: 'rgba(255,255,255,0.15)', color: '#fff', borderRadius: 99, padding: '3px 10px', border: '1px solid rgba(255,255,255,0.2)' }}>
+                  🎓 {nomeTurma}
+                </span>
+              )}
+              {nomeTurno && (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, background: 'rgba(255,255,255,0.15)', color: '#fff', borderRadius: 99, padding: '3px 10px', border: '1px solid rgba(255,255,255,0.2)' }}>
+                  🕐 {nomeTurno}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── CORPO ────────────────────────────────────────────────── */}
+      <div style={{ background: '#fff', borderRadius: '0 0 16px 16px', padding: '20px 24px 24px' }}>
+
+        {/* Feedback */}
+        {feedback?.tipo === "sucesso" && (
+          <div style={{ marginBottom: 16, padding: '10px 14px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 10, color: '#166534', fontSize: 13 }}>
+            ✔️ {feedback.mensagem}
+          </div>
+        )}
+        {feedback?.tipo === "erro" && (
+          <div style={{ marginBottom: 16, padding: '10px 14px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 10, color: '#991b1b', fontSize: 13 }}>
+            ❌ {feedback.mensagem}
+          </div>
+        )}
+
+        {/* Informações do estudante */}
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9ca3af', marginBottom: 12 }}>
+            INFORMAÇÕES DO ESTUDANTE
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+            {[
+              { label: 'CÓDIGO', value: aluno.codigo ?? '—' },
+              { label: 'DATA DE NASCIMENTO', value: formatDate(aluno.data_nascimento) },
+              { label: 'SEXO', value: aluno.sexo ?? '—' },
+            ].map(({ label, value }) => (
+              <div key={label}>
+                <div style={{ fontSize: 10, fontWeight: 600, color: '#9ca3af', letterSpacing: '0.08em', marginBottom: 4 }}>{label}</div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: '#1f2937' }}>{value}</div>
+              </div>
+            ))}
           </div>
         </div>
 
-        {/* Upload de foto - Oculto no módulo disciplinar */}
+        {/* Upload de foto — oculto no módulo disciplinar */}
         {!isDisciplinar && (
-          <div className="space-y-4">
-            <h3 className="font-medium">Selecionar Pasta e Inserir Foto</h3>
-            <label className="inline-block">
-              <span className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded cursor-pointer">
-                Escolher pasta
+          <div style={{ marginBottom: 20, padding: '12px 14px', background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: 10 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 8 }}>📷 Foto do Estudante</div>
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: uploading ? 'not-allowed' : 'pointer' }}>
+              <span style={{ padding: '7px 14px', background: uploading ? '#e5e7eb' : '#1e3a5f', color: '#fff', borderRadius: 8, fontSize: 12, fontWeight: 600, transition: 'background 0.2s' }}>
+                {uploading ? "Enviando…" : "Escolher pasta"}
               </span>
               <input
                 type="file"
@@ -385,53 +342,95 @@ export default function FichaAluno({ codigo: codigoProp }) {
                 multiple
                 accept=".jpg,.jpeg,.png,.webp,.jfif,image/*"
                 onChange={handleFolderSelect}
-                className="hidden"
+                style={{ display: 'none' }}
                 disabled={uploading}
               />
             </label>
-            {uploading && <p>Enviando foto…</p>}
           </div>
         )}
 
-        {/* Seções futuras */}
-        <div className="grid grid-cols-2 gap-4">
-          <div
-            className="bg-emerald-50 p-4 rounded shadow cursor-pointer hover:bg-emerald-100 transition border border-transparent hover:border-emerald-200"
-            onClick={() => setModalPedagogicoOpen(true)}
-            role="button"
-            tabIndex={0}
-          >
-            <h2 className="text-lg font-semibold mb-2 text-emerald-900">Relatório Pedagógico</h2>
-            <p className="text-gray-600">Clique para visualizar o histórico pedagógico.</p>
+        {/* Relatórios */}
+        <div>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9ca3af', marginBottom: 12 }}>
+            RELATÓRIOS
           </div>
-          {/* Relatório Disciplinar: oculto para professor */}
-          {!isProfessor && (
-          <div
-            className="bg-blue-50 p-4 rounded shadow cursor-pointer hover:bg-blue-100 transition border border-transparent hover:border-blue-200"
-            onClick={() => setModalRelatorioOpen(true)}
-            role="button"
-            tabIndex={0}
-          >
-            <h2 className="text-lg font-semibold mb-2 text-blue-900">Relatório Disciplinar</h2>
-            <p className="text-gray-600">Clique para visualizar o histórico de ocorrências.</p>
+          <div style={{ display: 'grid', gridTemplateColumns: isProfessor ? '1fr' : '1fr 1fr', gap: 12 }}>
+            {/* Relatório Pedagógico */}
+            <div
+              onClick={() => setModalPedagogicoOpen(true)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={e => e.key === 'Enter' && setModalPedagogicoOpen(true)}
+              style={{
+                background: 'linear-gradient(135deg, #064e3b 0%, #065f46 100%)',
+                borderRadius: 14, padding: '18px 20px', cursor: 'pointer',
+                transition: 'transform 0.15s, box-shadow 0.15s',
+                boxShadow: '0 2px 8px rgba(6,78,59,0.15)',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 20px rgba(6,78,59,0.25)'; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(6,78,59,0.15)'; }}
+            >
+              <div style={{ fontSize: 22, marginBottom: 8 }}>📋</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 4 }}>Relatório Pedagógico</div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', marginBottom: 10 }}>Histórico completo de registros pedagógicos do estudante.</div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>Ver histórico →</div>
+            </div>
+
+            {/* Relatório Disciplinar */}
+            {!isProfessor && (
+              <div
+                onClick={() => setModalRelatorioOpen(true)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={e => e.key === 'Enter' && setModalRelatorioOpen(true)}
+                style={{
+                  background: 'linear-gradient(135deg, #1e3a5f 0%, #0f2847 100%)',
+                  borderRadius: 14, padding: '18px 20px', cursor: 'pointer',
+                  transition: 'transform 0.15s, box-shadow 0.15s',
+                  boxShadow: '0 2px 8px rgba(15,40,71,0.15)',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 20px rgba(15,40,71,0.25)'; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(15,40,71,0.15)'; }}
+              >
+                <div style={{ fontSize: 22, marginBottom: 8 }}>🛡️</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 4 }}>Relatório Disciplinar</div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', marginBottom: 10 }}>
+                  {ocorrenciasCount === null
+                    ? 'Carregando…'
+                    : ocorrenciasCount === 0
+                      ? 'Sem ocorrências'
+                      : `${ocorrenciasCount} ocorrência${ocorrenciasCount > 1 ? 's' : ''} registrada${ocorrenciasCount > 1 ? 's' : ''}`
+                  }
+                </div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>Abrir relatório →</div>
+              </div>
+            )}
           </div>
-          )}
         </div>
 
-        {/* Modais */}
-        <ModalRelatorioDisciplinar
-          open={modalRelatorioOpen}
-          onClose={() => setModalRelatorioOpen(false)}
-          aluno={aluno}
-        />
-
-        <ModalRelatorioPedagogico
-          open={modalPedagogicoOpen}
-          onClose={() => setModalPedagogicoOpen(false)}
-          aluno={aluno}
-          somenteLeitura={isProfessor}
-        />
+        {/* Botão voltar (só fora do modal) */}
+        {!isModal && (
+          <div style={{ marginTop: 20 }}>
+            <Button onClick={() => navigate("/alunos")} className="bg-gray-200 text-gray-800 hover:bg-gray-300">
+              ← Voltar à lista
+            </Button>
+          </div>
+        )}
       </div>
+
+      {/* Modais */}
+      <ModalRelatorioDisciplinar
+        open={modalRelatorioOpen}
+        onClose={() => setModalRelatorioOpen(false)}
+        aluno={aluno}
+      />
+
+      <ModalRelatorioPedagogico
+        open={modalPedagogicoOpen}
+        onClose={() => setModalPedagogicoOpen(false)}
+        aluno={aluno}
+        somenteLeitura={isProfessor}
+      />
     </div>
   );
 }

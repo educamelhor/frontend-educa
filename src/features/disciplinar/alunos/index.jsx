@@ -12,11 +12,11 @@ import {
 import { ShieldExclamationIcon } from "@heroicons/react/24/outline";
 import { AcademicCapIcon } from "@heroicons/react/24/solid";
 import api from "../../../services/api";
-import ModalFichaAluno from "./ModalFichaAluno";
 import AlunoTable from "../../secretaria/alunos/AlunoTable";
 import Input from "../../../components/ui/Input";
 import ModalTACE from "../../alunos/ModalTACE";
 import ModalConfirmTACE from "./ModalConfirmTACE";
+import ModalFichaAluno from "./ModalFichaAluno"; // ⭐ Modal premium independente do módulo Disciplinar
 
 function anoLetivoPadrao() {
     const hoje = new Date();
@@ -27,13 +27,19 @@ function anoLetivoPadrao() {
 // Calcula pontuação disciplinar:
 // REGISTRADA + FINALIZADA contam normalmente
 // CANCELADA é ignorada (já não conta positivo nem negativo)
+// Art. 46 III: Suspensão = −0,50 por dia (multiplica pelo nº de dias registrado)
 function calcularPontuacao(ocorrencias) {
     const PONTUACAO_INICIAL = 8.0;
     let pts = PONTUACAO_INICIAL;
     const lista = Array.isArray(ocorrencias) ? ocorrencias : [];
     for (const oc of lista) {
         if (oc.status === "CANCELADA") continue; // cancelada não conta
-        pts += Number(oc.pontos) || 0;
+        let pontos = Number(oc.pontos) || 0;
+        // Suspensão: pontos unitários (−0,50) × dias
+        if (String(oc.medida_disciplinar).trim() === 'Suspensão' && Number(oc.dias_suspensao) > 0) {
+            pontos = pontos * Number(oc.dias_suspensao);
+        }
+        pts += pontos;
     }
     return Math.max(0, Math.min(10, parseFloat(pts.toFixed(2))));
 }
@@ -70,16 +76,16 @@ export default function AlunosDisciplinar() {
     const [confirmAluno, setConfirmAluno] = useState(null);
     const [confirmPontuacao, setConfirmPontuacao] = useState(8.0);
 
+    // ⭐ Ficha do Estudante — modal premium independente
+    const [fichaOpen, setFichaOpen] = useState(false);
+    const [fichaCodigo, setFichaCodigo] = useState(null);
+    const handleVerFicha = (codigo) => { setFichaCodigo(codigo); setFichaOpen(true); };
+
     // Validação Relatório Disciplinar (dados ausentes)
     const [validacaoRelOpen, setValidacaoRelOpen] = useState(false);
     const [camposAusentesRel, setCamposAusentesRel] = useState([]);
     const [loadingRelatorio, setLoadingRelatorio] = useState(false);
     const [loadingPontuacao, setLoadingPontuacao] = useState(false);
-
-    // Ficha do Estudante — modal independente
-    const [fichaOpen, setFichaOpen] = useState(false);
-    const [codigoFicha, setCodigoFicha] = useState(null);
-    const abrirFicha = (codigo) => { setCodigoFicha(codigo); setFichaOpen(true); };
 
     useEffect(() => {
         localStorage.setItem("manterFiltroDisciplinar", JSON.stringify(manterFiltro));
@@ -312,15 +318,8 @@ export default function AlunosDisciplinar() {
                 mostrarBoletim={false}
                 onEditar={null}
                 onDelete={null}
-                onVerFicha={abrirFicha}
+                onVerFicha={handleVerFicha}
                 onRelatorioDisciplinar={handleRelatorioDisciplinar}
-            />
-
-            {/* Modal Ficha do Estudante — independente do módulo Disciplinar */}
-            <ModalFichaAluno
-              open={fichaOpen}
-              codigo={codigoFicha}
-              onClose={() => setFichaOpen(false)}
             />
 
             {/* Loading overlay enquanto busca pontuação */}
@@ -494,6 +493,13 @@ export default function AlunosDisciplinar() {
                 onClose={() => { setTaceOpen(false); setTaceAluno(null); }}
                 aluno={taceAluno}
                 onSaved={() => { /* Refresh handled by parent if needed */ }}
+            />
+
+            {/* ⭐ Modal Ficha do Estudante — design premium independente do módulo Disciplinar */}
+            <ModalFichaAluno
+                open={fichaOpen}
+                codigo={fichaCodigo}
+                onClose={() => { setFichaOpen(false); setFichaCodigo(null); }}
             />
 
             {/* Paginação */}

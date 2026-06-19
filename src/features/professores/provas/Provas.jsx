@@ -3,6 +3,8 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AREAS, TEMPLATES, SERIES_OPTIONS, TURNOS_OPTIONS, BIMESTRES_OPTIONS } from './templateDefinitions';
 import CapaPreview from './CapaPreview';
 import useEscolaLogos from '../../../hooks/useEscolaLogos';
+import { jsPDF } from 'jspdf';
+import { toPng } from 'html-to-image';
 
 const ANO_CORRENTE = new Date().getFullYear();
 
@@ -35,6 +37,7 @@ export default function Provas() {
   const [imageOffsetX, setImageOffsetX] = useState(0);
   const [imageOffsetY, setImageOffsetY] = useState(0);
   const fileInputRef = useRef(null);
+  const previewCaptureRef = useRef(null); // ref para captura do PDF local
 
   // Wizard state
   const [selectedArea, setSelectedArea] = useState(null); // AREAS item
@@ -127,7 +130,7 @@ export default function Provas() {
     }
     setGenerating(true);
     try {
-      // 1) Create the cover record
+      // 1) Salvar registro da capa no backend
       const res = await fetch(`${API}/api/capa-provas`, {
         method: 'POST',
         headers: { ...authH(), 'Content-Type': 'application/json' },
@@ -145,16 +148,33 @@ export default function Provas() {
       const created = await res.json();
       if (!created.ok) throw new Error(created.message || 'Erro ao salvar capa.');
 
-      // 2) Download PDF
-      const pdfRes = await fetch(`${API}/api/capa-provas/${created.id}/pdf`, { headers: authH() });
-      if (!pdfRes.ok) throw new Error('Erro ao gerar PDF.');
-      const blob = await pdfRes.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `capa-${selectedArea.id.toLowerCase()}-${form.bimestre}bim-${form.ano}.pdf`;
-      a.click();
-      URL.revokeObjectURL(url);
+      const fileName = `capa-${selectedArea.id.toLowerCase()}-${form.bimestre}bim-${form.ano}.pdf`;
+
+      if (customImage) {
+        // 2a) Imagem customizada → gera PDF localmente capturando o preview DOM
+        if (!previewCaptureRef.current) throw new Error('Preview não encontrado.');
+        const dataUrl = await toPng(previewCaptureRef.current, {
+          width: 595,
+          height: 842,
+          pixelRatio: 2,
+          cacheBust: true,
+        });
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+        // A4 em pt: 595.28 x 841.89
+        pdf.addImage(dataUrl, 'PNG', 0, 0, 595.28, 841.89);
+        pdf.save(fileName);
+      } else {
+        // 2b) Sem imagem customizada → usa PDF gerado pelo backend (com imagem temática)
+        const pdfRes = await fetch(`${API}/api/capa-provas/${created.id}/pdf`, { headers: authH() });
+        if (!pdfRes.ok) throw new Error('Erro ao gerar PDF.');
+        const blob = await pdfRes.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
 
       showToast('✅ Capa gerada e baixada com sucesso!', 'success');
       loadCapas();
@@ -585,6 +605,41 @@ export default function Provas() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── Container oculto para captura do PDF com imagem customizada ── */}
+      {customImage && selectedArea && selectedTemplate && (
+        <div
+          style={{
+            position: 'fixed',
+            left: -9999,
+            top: -9999,
+            width: 595,
+            height: 842,
+            overflow: 'hidden',
+            pointerEvents: 'none',
+            zIndex: -1,
+          }}
+        >
+          <div ref={previewCaptureRef} style={{ width: 595, height: 842 }}>
+            <CapaPreview
+              area={selectedArea}
+              template={selectedTemplate}
+              titulo={form.titulo}
+              serie={form.serie}
+              bimestre={form.bimestre}
+              instrucoes={form.instrucoes}
+              scale={1}
+              escolaNome={escolaNome}
+              logoEsq={logoEsquerda}
+              logoDir={logoDireita}
+              customImage={customImage}
+              imageZoom={imageZoom}
+              imageOffsetX={imageOffsetX}
+              imageOffsetY={imageOffsetY}
+            />
+          </div>
         </div>
       )}
     </div>

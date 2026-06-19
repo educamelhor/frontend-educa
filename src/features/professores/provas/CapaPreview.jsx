@@ -14,7 +14,7 @@ import React from 'react';
  * - logoDir: url string or null
  * - escolaNome: string
  * - customImage: dataURL string or null  — imagem personalizada do usuário
- * - imageZoom: number (default 1) — fator de escala da imagem 0.5..2.0
+ * - imageZoom: number (default 1) — fator de escala 0.5..2.5
  * - imageOffsetX: number (default 0) — deslocamento horizontal em %
  * - imageOffsetY: number (default 0) — deslocamento vertical em %
  */
@@ -43,10 +43,9 @@ export default function CapaPreview({
 
   const serieText = [serie, bimestre ? `${bimestre}º BIMESTRE` : ''].filter(Boolean).join(' - ');
 
-  // ── Bloco de imagem customizada ──────────────────────────────────────────
-  // Inserido entre o header e as instruções em cada template.
-  // A altura varia por template para respeitar o espaço disponível.
-  function CustomImageBlock({ height = 200, borderRadius = 0, mx = 0, mt = 0, mb = 0 }) {
+  // ── Bloco de imagem no rodapé ────────────────────────────────────────────
+  // Exibido na parte INFERIOR da capa, substituindo o espaço vazio do final.
+  function BottomImageBlock({ height = 210, borderRadius = 0, mx = 0, mt = 0 }) {
     if (!customImage) return null;
     return (
       <div style={{
@@ -55,10 +54,9 @@ export default function CapaPreview({
         marginLeft: mx,
         marginRight: mx,
         marginTop: mt,
-        marginBottom: mb,
+        flexShrink: 0,
         overflow: 'hidden',
         borderRadius,
-        flexShrink: 0,
         position: 'relative',
       }}>
         <img
@@ -99,15 +97,13 @@ export default function CapaPreview({
               <div style={{ fontSize: 46, fontWeight: 900, color: '#111', lineHeight: 1.1 }}>{area.label}</div>
               {serieText && <div style={{ fontSize: 22, fontWeight: 900, color: area.cor, marginTop: 6 }}>{serieText}</div>}
             </div>
-
-            {/* Custom Image Block */}
-            <CustomImageBlock height={customImage ? 180 : 0} mx={10} mt={6} mb={6} borderRadius={4} />
-
             {/* Instructions */}
-            <div style={{ flex: 1, margin: `${customImage ? 0 : 8}px 10px 10px`, background: area.corClaro, border: `1px solid ${area.cor}`, borderRadius: 4, padding: '8px 12px', overflow: 'hidden' }}>
+            <div style={{ flex: 1, margin: '8px 10px 10px', background: area.corClaro, border: `1px solid ${area.cor}`, borderRadius: 4, padding: '8px 12px', overflow: 'hidden' }}>
               <div style={{ fontWeight: 900, fontSize: 10, textAlign: 'center', marginBottom: 6 }}>LEIA ATENTAMENTE AS INSTRUÇÕES SEGUINTES:</div>
-              <div style={{ fontSize: 8, color: '#222', lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>{instrucoes.slice(0, customImage ? 200 : 400)}{instrucoes.length > (customImage ? 200 : 400) ? '...' : ''}</div>
+              <div style={{ fontSize: 8, color: '#222', lineHeight: 1.4, whiteSpace: 'pre-wrap' }}>{instrucoes.slice(0, customImage ? 280 : 400)}{instrucoes.length > (customImage ? 280 : 400) ? '...' : ''}</div>
             </div>
+            {/* ── Imagem customizada no rodapé ── */}
+            <BottomImageBlock height={210} mx={10} mt={0} borderRadius={4} />
           </div>
         </div>
       </div>
@@ -134,12 +130,10 @@ export default function CapaPreview({
             <div style={{ fontSize: 50, fontWeight: 900, color: area.cor, lineHeight: 1 }}>{area.label}</div>
             {serieText && <div style={{ fontSize: 18, fontWeight: 900, color: '#222', marginTop: 6 }}>{serieText}</div>}
             <div style={{ height: 2, background: area.cor, margin: '12px 0 8px' }} />
-
-            {/* Custom Image Block */}
-            <CustomImageBlock height={customImage ? 170 : 0} mt={0} mb={8} borderRadius={6} />
-
             <div style={{ fontWeight: 900, fontSize: 10, color:'#222', marginBottom: 6 }}>LEIA ATENTAMENTE AS INSTRUÇÕES:</div>
-            <div style={{ fontSize: 8, color:'#333', lineHeight: 1.4, flex:1, overflow:'hidden', whiteSpace:'pre-wrap' }}>{instrucoes.slice(0, customImage ? 180 : 500)}</div>
+            <div style={{ fontSize: 8, color:'#333', lineHeight: 1.4, flex: 1, overflow:'hidden', whiteSpace:'pre-wrap' }}>{instrucoes.slice(0, customImage ? 300 : 500)}</div>
+            {/* ── Imagem customizada no rodapé ── */}
+            <BottomImageBlock height={200} mt={8} borderRadius={6} />
           </div>
         </div>
       </div>
@@ -167,15 +161,13 @@ export default function CapaPreview({
               {serieText && <div style={{ fontSize:20, fontWeight:900, color:area.cor, marginTop:4 }}>{serieText}</div>}
             </div>
             <div style={{ height:2, background:area.cor, margin:'0 16px' }} />
-
-            {/* Custom Image Block */}
-            <CustomImageBlock height={customImage ? 185 : 0} mx={16} mt={8} mb={8} borderRadius={4} />
-
             {/* Instructions */}
             <div style={{ flex:1, padding:'8px 16px', overflow:'hidden' }}>
               <div style={{ fontWeight:900, fontSize:10, color:'#000', textAlign:'center', marginBottom:6 }}>INSTRUÇÕES AO ESTUDANTE:</div>
-              <div style={{ fontSize:8, color:'#222', lineHeight:1.4, whiteSpace:'pre-wrap' }}>{instrucoes.slice(0, customImage ? 190 : 450)}</div>
+              <div style={{ fontSize:8, color:'#222', lineHeight:1.4, whiteSpace:'pre-wrap' }}>{instrucoes.slice(0, customImage ? 280 : 450)}</div>
             </div>
+            {/* ── Imagem customizada no rodapé ── */}
+            <BottomImageBlock height={210} mx={16} mt={8} borderRadius={4} />
           </div>
         </div>
       </div>
@@ -186,7 +178,7 @@ export default function CapaPreview({
   if (template.id === 4) {
     return (
       <div style={containerStyle}>
-        <div style={{ width:'100%', height:'100%', background: area.cor }}>
+        <div style={{ width:'100%', height:'100%', background: area.cor, display:'flex', flexDirection:'column' }}>
           {/* Header on color */}
           <div style={{ display:'flex', alignItems:'center', padding:'14px 16px', gap:10 }}>
             {logoEsq ? <img src={logoEsq} style={{ width:72, height:72, objectFit:'contain' }} alt="" /> : <div style={{ width:72, height:72, background:'rgba(255,255,255,0.15)', borderRadius:8, display:'flex', alignItems:'center', justifyContent:'center', fontSize:34 }}>{area.emoji}</div>}
@@ -200,33 +192,16 @@ export default function CapaPreview({
             <div style={{ fontSize:14, fontWeight:600, color: area.corClaro, opacity:0.9 }}>PROVÃO DE</div>
             <div style={{ fontSize:52, fontWeight:900, color:'#fff', lineHeight:1.1 }}>{area.label}</div>
           </div>
-
-          {/* Custom Image Block — shown above white card */}
-          {customImage && (
-            <div style={{ margin: '8px 16px 0', borderRadius: 8, overflow: 'hidden', height: 160, flexShrink: 0 }}>
-              <img
-                src={customImage}
-                alt="Imagem personalizada"
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'cover',
-                  transform: `scale(${imageZoom}) translate(${imageOffsetX}%, ${imageOffsetY}%)`,
-                  transformOrigin: 'center center',
-                  display: 'block',
-                }}
-              />
-            </div>
-          )}
-
-          {/* White card bottom */}
-          <div style={{ background:'#fff', margin: customImage ? '8px 16px 0' : '8px 16px 0', borderRadius:'8px 8px 0 0', flex:1, padding:'10px 14px', minHeight: customImage ? 230 : 460 }}>
+          {/* White card — instruções */}
+          <div style={{ background:'#fff', margin:'8px 16px 0', borderRadius:'8px 8px 0 0', flex:1, padding:'10px 14px', overflow:'hidden' }}>
             {serieText && <div style={{ fontSize:20, fontWeight:900, color:area.cor, textAlign:'center', marginBottom:8 }}>{serieText}</div>}
             <div style={{ background:area.corClaro, border:`1.5px solid ${area.cor}`, borderRadius:6, padding:'8px 12px' }}>
               <div style={{ fontWeight:900, fontSize:10, color:area.cor, textAlign:'center', marginBottom:6 }}>LEIA ATENTAMENTE AS INSTRUÇÕES SEGUINTES:</div>
-              <div style={{ fontSize:8, color:'#222', lineHeight:1.4, whiteSpace:'pre-wrap' }}>{instrucoes.slice(0, customImage ? 160 : 420)}</div>
+              <div style={{ fontSize:8, color:'#222', lineHeight:1.4, whiteSpace:'pre-wrap' }}>{instrucoes.slice(0, customImage ? 240 : 420)}</div>
             </div>
           </div>
+          {/* ── Imagem customizada no rodapé ── */}
+          <BottomImageBlock height={210} mx={16} mt={8} borderRadius={0} />
         </div>
       </div>
     );
@@ -255,15 +230,13 @@ export default function CapaPreview({
             <div style={{ fontSize:48, fontWeight:900, color:'#f1f5f9', lineHeight:1.1 }}>{area.label}</div>
             {serieText && <div style={{ fontSize:18, fontWeight:900, color:area.cor, marginTop:4 }}>{serieText}</div>}
           </div>
-
-          {/* Custom Image Block */}
-          <CustomImageBlock height={customImage ? 175 : 0} mx={16} mt={4} mb={8} borderRadius={8} />
-
           {/* Instructions dark card */}
-          <div style={{ flex:1, margin: customImage ? '0 16px 16px' : '8px 16px 16px', background:'#1e293b', borderRadius:8, border:`1px solid ${area.cor}`, padding:'10px 14px', overflow:'hidden' }}>
+          <div style={{ flex:1, margin:'8px 16px 0', background:'#1e293b', borderRadius:'8px 8px 0 0', border:`1px solid ${area.cor}`, padding:'10px 14px', overflow:'hidden' }}>
             <div style={{ fontWeight:900, fontSize:10, color:'#e2e8f0', textAlign:'center', marginBottom:6 }}>LEIA ATENTAMENTE AS INSTRUÇÕES SEGUINTES:</div>
-            <div style={{ fontSize:8, color:'#cbd5e1', lineHeight:1.4, whiteSpace:'pre-wrap' }}>{instrucoes.slice(0, customImage ? 180 : 450)}</div>
+            <div style={{ fontSize:8, color:'#cbd5e1', lineHeight:1.4, whiteSpace:'pre-wrap' }}>{instrucoes.slice(0, customImage ? 280 : 450)}</div>
           </div>
+          {/* ── Imagem customizada no rodapé ── */}
+          <BottomImageBlock height={210} mx={16} mt={8} borderRadius={0} />
         </div>
       </div>
     );

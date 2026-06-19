@@ -4,7 +4,6 @@ import { AREAS, TEMPLATES, SERIES_OPTIONS, TURNOS_OPTIONS, BIMESTRES_OPTIONS } f
 import CapaPreview from './CapaPreview';
 import useEscolaLogos from '../../../hooks/useEscolaLogos';
 import { jsPDF } from 'jspdf';
-import { toPng } from 'html-to-image';
 
 const ANO_CORRENTE = new Date().getFullYear();
 
@@ -150,29 +149,68 @@ export default function Provas() {
 
       const fileName = `capa-${selectedArea.id.toLowerCase()}-${form.bimestre}bim-${form.ano}.pdf`;
 
+      // Baixa o PDF do backend (cabeçaçalho institucional completo, QR, instruções)
+      const pdfRes = await fetch(`${API}/api/capa-provas/${created.id}/pdf`, { headers: authH() });
+      if (!pdfRes.ok) throw new Error('Erro ao gerar PDF.');
+      const pdfBytes = new Uint8Array(await pdfRes.arrayBuffer());
+
       if (customImage) {
-        // 2a) Imagem customizada → gera PDF localmente capturando o preview DOM
-        // O container oculto usa logotipos null para evitar erro de CORS do CDN externo.
-        // A imagem customizada é um dataURL, não sofre restrição CORS.
-        if (!previewCaptureRef.current) throw new Error('Preview não encontrado.');
-        // Pixel transparente 1×1 — substitui imagens externas que falharem por CORS
-        const TRANSPARENT = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-        const dataUrl = await toPng(previewCaptureRef.current, {
-          width: 595,
-          height: 842,
-          pixelRatio: 2,
-          cacheBust: false,
-          imagePlaceholder: TRANSPARENT,
-        });
+        // ── Imagem customizada: renderiza PDF do backend em canvas e sobrepõe imagem ──
+        // Import dinâmico do pdfjs (já instalado no projeto)
+        const pdfjsLib = await import('pdfjs-dist');
+        pdfjsLib.GlobalWorkerOptions.workerSrc =
+          `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+
+        // Renderiza página 1 em canvas com 2× de escala (1190×1684px)
+        const doc = await pdfjsLib.getDocument({ data: pdfBytes }).promise;
+        const page = await doc.getPage(1);
+        const viewport = page.getViewport({ scale: 2 });
+        const canvas = document.createElement('canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        const ctx = canvas.getContext('2d');
+        await page.render({ canvasContext: ctx, viewport }).promise;
+
+        // Carrega a imagem customizada (dataURL — sem CORS)
+        const userImg = new Image();
+        userImg.src = customImage;
+        await new Promise((res, rej) => { userImg.onload = res; userImg.onerror = rej; });
+
+        // Área de rodapé: últimos ~38% da página (onde a imagem temática padrão fica)
+        const areaStartY = Math.round(canvas.height * 0.62);
+        const areaH = canvas.height - areaStartY;
+        const areaW = canvas.width;
+
+        // Simula object-fit: cover + zoom/offset do usuário
+        const iw = userImg.naturalWidth || userImg.width || 1;
+        const ih = userImg.naturalHeight || userImg.height || 1;
+        let coverW, coverH;
+        if (iw / ih > areaW / areaH) {
+          coverH = areaH; coverW = coverH * (iw / ih);
+        } else {
+          coverW = areaW; coverH = coverW / (iw / ih);
+        }
+        const finalW = coverW * imageZoom;
+        const finalH = coverH * imageZoom;
+        const cx = areaW / 2 + (imageOffsetX / 100) * areaW;
+        const cy = areaStartY + areaH / 2 + (imageOffsetY / 100) * areaH;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, areaStartY, areaW, areaH);
+        ctx.clip();
+        ctx.clearRect(0, areaStartY, areaW, areaH);
+        ctx.drawImage(userImg, cx - finalW / 2, cy - finalH / 2, finalW, finalH);
+        ctx.restore();
+
+        // Exporta como PDF A4
+        const imgData = canvas.toDataURL('image/jpeg', 0.92);
         const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
-        // A4 em pt: 595.28 x 841.89
-        pdf.addImage(dataUrl, 'PNG', 0, 0, 595.28, 841.89);
+        pdf.addImage(imgData, 'JPEG', 0, 0, 595.28, 841.89);
         pdf.save(fileName);
       } else {
-        // 2b) Sem imagem customizada → usa PDF gerado pelo backend (com imagem temática)
-        const pdfRes = await fetch(`${API}/api/capa-provas/${created.id}/pdf`, { headers: authH() });
-        if (!pdfRes.ok) throw new Error('Erro ao gerar PDF.');
-        const blob = await pdfRes.blob();
+        // ── Sem imagem customizada: baixa PDF do backend diretamente ──
+        const blob = new Blob([pdfBytes], { type: 'application/pdf' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -613,40 +651,6 @@ export default function Provas() {
         </div>
       )}
 
-      {/* ── Container oculto para captura do PDF com imagem customizada ── */}
-      {customImage && selectedArea && selectedTemplate && (
-        <div
-          style={{
-            position: 'fixed',
-            left: -9999,
-            top: -9999,
-            width: 595,
-            height: 842,
-            overflow: 'hidden',
-            pointerEvents: 'none',
-            zIndex: -1,
-          }}
-        >
-          <div ref={previewCaptureRef} style={{ width: 595, height: 842 }}>
-            <CapaPreview
-              area={selectedArea}
-              template={selectedTemplate}
-              titulo={form.titulo}
-              serie={form.serie}
-              bimestre={form.bimestre}
-              instrucoes={form.instrucoes}
-              scale={1}
-              escolaNome={escolaNome}
-              logoEsq={null}
-              logoDir={null}
-              customImage={customImage}
-              imageZoom={imageZoom}
-              imageOffsetX={imageOffsetX}
-              imageOffsetY={imageOffsetY}
-            />
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -7,7 +7,7 @@ import { AcademicCapIcon } from "@heroicons/react/24/solid";
 import api from "../../services/api";
 import ModalNovaOcorrenciaPedagogica from "./ModalNovaOcorrenciaPedagogica";
 
-export default function ModalRelatorioPedagogico({ open, onClose, aluno, somenteLeitura = false }) {
+export default function ModalRelatorioPedagogico({ open, onClose, aluno }) {
     const [novaOcorrenciaOpen, setNovaOcorrenciaOpen] = useState(false);
     const [ocorrenciaSelecionada, setOcorrenciaSelecionada] = useState(null);
     const [viewMode, setViewMode] = useState(false);
@@ -210,7 +210,6 @@ export default function ModalRelatorioPedagogico({ open, onClose, aluno, somente
                             </div>
                         </div>
 
-                        {!somenteLeitura && (
                         <div className="flex-shrink-0">
                             <button
                                 onClick={() => {
@@ -224,7 +223,6 @@ export default function ModalRelatorioPedagogico({ open, onClose, aluno, somente
                                 + Adicionar
                             </button>
                         </div>
-                        )}
                     </div>
 
                     {/* Tabela */}
@@ -290,7 +288,6 @@ export default function ModalRelatorioPedagogico({ open, onClose, aluno, somente
                                             </td>
                                             <td className="px-4 py-3 text-center">
                                                 <div className="flex justify-center gap-2">
-                                                    {!somenteLeitura && (
                                                     <button
                                                         onClick={() => handleOpenFinalizar(oc)}
                                                         disabled={oc.status === "CANCELADA"}
@@ -305,7 +302,6 @@ export default function ModalRelatorioPedagogico({ open, onClose, aluno, somente
                                                     >
                                                         <ClipboardDocumentCheckIcon className="h-5 w-5" />
                                                     </button>
-                                                    )}
                                                     <button
                                                         onClick={() => {
                                                             setOcorrenciaSelecionada(oc);
@@ -318,16 +314,12 @@ export default function ModalRelatorioPedagogico({ open, onClose, aluno, somente
                                                     >
                                                         <EyeIcon className="h-5 w-5" />
                                                     </button>
-                                                    {!somenteLeitura && (
-                                                    <>
                                                     <button onClick={() => handleOpenEdit(oc)} className="text-blue-600 hover:text-blue-800" title="Editar">
                                                         <PencilSquareIcon className="h-5 w-5" />
                                                     </button>
                                                     <button onClick={() => handleOpenDelete(oc)} className="text-red-600 hover:text-red-800" title="Excluir">
                                                         <TrashIcon className="h-5 w-5" />
                                                     </button>
-                                                    </>
-                                                    )}
                                                 </div>
                                             </td>
                                         </tr>

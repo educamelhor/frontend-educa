@@ -1,5 +1,5 @@
 // src/features/professores/provas/Provas.jsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AREAS, TEMPLATES, SERIES_OPTIONS, TURNOS_OPTIONS, BIMESTRES_OPTIONS } from './templateDefinitions';
 import CapaPreview from './CapaPreview';
 import useEscolaLogos from '../../../hooks/useEscolaLogos';
@@ -29,6 +29,13 @@ export default function Provas() {
   const [deletingId, setDeletingId] = useState(null);
   const [toast, setToast] = useState(null);
 
+  // ── Custom image state ─────────────────────────────────────────────────
+  const [customImage, setCustomImage] = useState(null); // dataURL
+  const [imageZoom, setImageZoom] = useState(1);
+  const [imageOffsetX, setImageOffsetX] = useState(0);
+  const [imageOffsetY, setImageOffsetY] = useState(0);
+  const fileInputRef = useRef(null);
+
   // Wizard state
   const [selectedArea, setSelectedArea] = useState(null); // AREAS item
   const [selectedTemplate, setSelectedTemplate] = useState(null); // TEMPLATES item
@@ -49,6 +56,29 @@ export default function Provas() {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3500);
   }, []);
+
+  // ── Image upload handler ────────────────────────────────────────────────
+  function handleImageUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setCustomImage(ev.target.result);
+      setImageZoom(1);
+      setImageOffsetX(0);
+      setImageOffsetY(0);
+    };
+    reader.readAsDataURL(file);
+    // Reset input so same file can be re-selected
+    e.target.value = '';
+  }
+
+  function removeCustomImage() {
+    setCustomImage(null);
+    setImageZoom(1);
+    setImageOffsetX(0);
+    setImageOffsetY(0);
+  }
 
   // ── Load capas ──────────────────────────────────────────────────────────
   const loadCapas = useCallback(async () => {
@@ -173,6 +203,10 @@ export default function Provas() {
     setSelectedArea(null);
     setSelectedTemplate(null);
     setForm({ titulo: '', serie: '', turno: '', bimestre: 1, ano: ANO_CORRENTE, instrucoes: '' });
+    setCustomImage(null);
+    setImageZoom(1);
+    setImageOffsetX(0);
+    setImageOffsetY(0);
   }
 
   // ── Area badge color helper ─────────────────────────────────────────────
@@ -404,11 +438,115 @@ export default function Provas() {
 
                 <label style={s.label}>Instruções (editável)</label>
                 <textarea
-                  style={{ ...s.input, height:240, resize:'vertical', fontFamily:'inherit', lineHeight:1.5 }}
+                  style={{ ...s.input, height:180, resize:'vertical', fontFamily:'inherit', lineHeight:1.5 }}
                   value={form.instrucoes}
                   onChange={e => setForm(f => ({ ...f, instrucoes: e.target.value }))}
                   placeholder="Instruções que aparecerão na capa..."
                 />
+
+                {/* ── Inserir Imagem ──────────────────────────────────── */}
+                <div style={s.imageSection}>
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: 10 }}>
+                    <span style={{ fontSize:12, fontWeight:700, color:'#374151' }}>🖼️ Imagem da Capa</span>
+                    {!customImage && (
+                      <button
+                        id="btn-inserir-imagem"
+                        style={s.btnInsertImage}
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        + Inserir Imagem
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Hidden file input */}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    style={{ display:'none' }}
+                    onChange={handleImageUpload}
+                  />
+
+                  {customImage ? (
+                    <div>
+                      {/* Thumbnail + remove */}
+                      <div style={s.imageThumbnailRow}>
+                        <div style={s.imageThumbnailWrap}>
+                          <img src={customImage} alt="Imagem selecionada" style={s.imageThumbnail} />
+                        </div>
+                        <div style={{ flex:1 }}>
+                          <p style={{ fontSize:11, color:'#475569', margin:'0 0 8px' }}>Imagem carregada. Ajuste o zoom e a posição no preview ao lado.</p>
+                          <div style={{ display:'flex', gap:6 }}>
+                            <button style={s.btnChangeImage} onClick={() => fileInputRef.current?.click()}>🔄 Trocar</button>
+                            <button style={s.btnRemoveImage} onClick={removeCustomImage}>✕ Remover</button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Zoom control */}
+                      <div style={s.zoomRow}>
+                        <span style={s.zoomLabel}>🔍 Zoom</span>
+                        <button
+                          style={s.zoomBtn}
+                          onClick={() => setImageZoom(z => Math.max(0.5, parseFloat((z - 0.1).toFixed(1))))}
+                          title="Diminuir zoom"
+                        >−</button>
+                        <input
+                          type="range" min="0.5" max="2.5" step="0.05"
+                          value={imageZoom}
+                          onChange={e => setImageZoom(parseFloat(e.target.value))}
+                          style={s.zoomSlider}
+                        />
+                        <button
+                          style={s.zoomBtn}
+                          onClick={() => setImageZoom(z => Math.min(2.5, parseFloat((z + 0.1).toFixed(1))))}
+                          title="Aumentar zoom"
+                        >+</button>
+                        <span style={s.zoomValue}>{imageZoom.toFixed(1)}×</span>
+                      </div>
+
+                      {/* Offset X */}
+                      <div style={s.zoomRow}>
+                        <span style={s.zoomLabel}>↔ Pos. X</span>
+                        <button style={s.zoomBtn} onClick={() => setImageOffsetX(x => Math.max(-50, x - 5))}>−</button>
+                        <input
+                          type="range" min="-50" max="50" step="1"
+                          value={imageOffsetX}
+                          onChange={e => setImageOffsetX(Number(e.target.value))}
+                          style={s.zoomSlider}
+                        />
+                        <button style={s.zoomBtn} onClick={() => setImageOffsetX(x => Math.min(50, x + 5))}>+</button>
+                        <span style={s.zoomValue}>{imageOffsetX > 0 ? '+' : ''}{imageOffsetX}%</span>
+                      </div>
+
+                      {/* Offset Y */}
+                      <div style={s.zoomRow}>
+                        <span style={s.zoomLabel}>↕ Pos. Y</span>
+                        <button style={s.zoomBtn} onClick={() => setImageOffsetY(y => Math.max(-50, y - 5))}>−</button>
+                        <input
+                          type="range" min="-50" max="50" step="1"
+                          value={imageOffsetY}
+                          onChange={e => setImageOffsetY(Number(e.target.value))}
+                          style={s.zoomSlider}
+                        />
+                        <button style={s.zoomBtn} onClick={() => setImageOffsetY(y => Math.min(50, y + 5))}>+</button>
+                        <span style={s.zoomValue}>{imageOffsetY > 0 ? '+' : ''}{imageOffsetY}%</span>
+                      </div>
+
+                      {/* Reset position */}
+                      <button
+                        style={{ ...s.btnChangeImage, marginTop:4, fontSize:11 }}
+                        onClick={() => { setImageZoom(1); setImageOffsetX(0); setImageOffsetY(0); }}
+                      >↺ Resetar posição</button>
+                    </div>
+                  ) : (
+                    <div style={s.imageEmptyHint}>
+                      <span style={{ fontSize:28, opacity:0.4 }}>🖼️</span>
+                      <p style={{ fontSize:11, color:'#94a3b8', margin:'6px 0 0' }}>Nenhuma imagem selecionada.<br/>A capa usará o design padrão do modelo.</p>
+                    </div>
+                  )}
+                </div>
 
                 <div style={{ display:'flex', gap:10, marginTop:16 }}>
                   <button style={s.secondaryBtn} onClick={() => setStep(2)}>← Voltar</button>
@@ -437,6 +575,10 @@ export default function Provas() {
                     escolaNome={escolaNome}
                     logoEsq={logoEsquerda}
                     logoDir={logoDireita}
+                    customImage={customImage}
+                    imageZoom={imageZoom}
+                    imageOffsetX={imageOffsetX}
+                    imageOffsetY={imageOffsetY}
                   />
                 </div>
                 <p style={{ fontSize:11, color:'#94a3b8', marginTop:8, textAlign:'center' }}>Preview aproximado · PDF gerado em A4</p>
@@ -500,4 +642,117 @@ const s = {
 
   emptyBox: { textAlign:'center', padding:'60px 24px', background:'#fff', borderRadius:14, border:'1px dashed #e2e8f0' },
   spinner: { width:36, height:36, border:'3px solid #e2e8f0', borderTop:'3px solid #6366f1', borderRadius:'50%', animation:'spin 0.7s linear infinite', margin:'0 auto' },
+
+  // ── Image section styles ────────────────────────────────────────────────
+  imageSection: {
+    marginTop: 16,
+    background: 'linear-gradient(135deg,#f8fafc,#f1f5f9)',
+    border: '1.5px solid #e2e8f0',
+    borderRadius: 10,
+    padding: '14px',
+  },
+  btnInsertImage: {
+    padding: '6px 14px',
+    borderRadius: 7,
+    border: '1.5px dashed #6366f1',
+    background: '#eef2ff',
+    color: '#4f46e5',
+    fontWeight: 700,
+    fontSize: 12,
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 4,
+    transition: 'all .2s',
+  },
+  imageThumbnailRow: {
+    display: 'flex',
+    gap: 12,
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  imageThumbnailWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: 8,
+    overflow: 'hidden',
+    border: '2px solid #e2e8f0',
+    flexShrink: 0,
+    background: '#f1f5f9',
+  },
+  imageThumbnail: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover',
+    display: 'block',
+  },
+  btnChangeImage: {
+    padding: '5px 10px',
+    borderRadius: 6,
+    border: '1px solid #e2e8f0',
+    background: '#fff',
+    color: '#475569',
+    fontSize: 11,
+    fontWeight: 700,
+    cursor: 'pointer',
+  },
+  btnRemoveImage: {
+    padding: '5px 10px',
+    borderRadius: 6,
+    border: '1px solid #fecaca',
+    background: '#fff',
+    color: '#ef4444',
+    fontSize: 11,
+    fontWeight: 700,
+    cursor: 'pointer',
+  },
+  zoomRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  zoomLabel: {
+    fontSize: 11,
+    fontWeight: 700,
+    color: '#475569',
+    width: 54,
+    flexShrink: 0,
+  },
+  zoomBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 6,
+    border: '1.5px solid #e2e8f0',
+    background: '#fff',
+    color: '#374151',
+    fontWeight: 900,
+    fontSize: 14,
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    lineHeight: 1,
+  },
+  zoomSlider: {
+    flex: 1,
+    accentColor: '#6366f1',
+    cursor: 'pointer',
+  },
+  zoomValue: {
+    fontSize: 11,
+    fontWeight: 700,
+    color: '#6366f1',
+    width: 38,
+    textAlign: 'right',
+    flexShrink: 0,
+  },
+  imageEmptyHint: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    padding: '16px 0 8px',
+    textAlign: 'center',
+  },
 };

@@ -304,303 +304,103 @@ function ProvaItem({ item, idx, total, onRemove, onChangePontos, onDragStart, on
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════
-   CHECKBOX TOGGLE — reutilizável internamente
+   PAINEL CONFIG DA PROVA
 ══════════════════════════════════════════════════════════════════════════════ */
-function CfgToggle({ checked, onChange, label, desc, color = '#0e7490', disabled = false }) {
-  return (
-    <div
-      onClick={() => !disabled && onChange(!checked)}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 10,
-        padding: '9px 12px', borderRadius: 8, cursor: disabled ? 'default' : 'pointer',
-        background: checked ? `${color}08` : '#f8fafc',
-        border: `1.5px solid ${checked ? `${color}40` : '#e2e8f0'}`,
-        opacity: disabled ? 0.5 : 1,
-        transition: 'all 0.15s',
-      }}
-    >
-      <div style={{
-        width: 18, height: 18, borderRadius: 4, flexShrink: 0,
-        border: `2px solid ${checked ? color : '#cbd5e1'}`,
-        background: checked ? color : '#fff',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        transition: 'all 0.15s',
-      }}>
-        {checked && <span style={{ color: '#fff', fontSize: '0.7rem', fontWeight: 900 }}>✓</span>}
-      </div>
-      <div>
-        <div style={{ fontSize: '0.77rem', fontWeight: 700, color: checked ? color : '#334155' }}>{label}</div>
-        {desc && <div style={{ fontSize: '0.65rem', color: '#94a3b8', marginTop: 1 }}>{desc}</div>}
-      </div>
-    </div>
-  );
-}
-
-/* ══════════════════════════════════════════════════════════════════════════════
-   PAINEL CONFIG DA PROVA — expandido (Passo 1)
-══════════════════════════════════════════════════════════════════════════════ */
-
-// Itens do cabeçalho (em ordem fixa — o usuário ativa/desativa)
-const CABECALHO_ITENS = [
-  { key: 'cab_escola',    label: '🏫 Cabeçalho padrão da escola',  desc: 'Mesmo cabeçalho usado em PDFs, boletins etc.' },
-  { key: 'cab_logo',     label: '🖼️ Logo da escola',               desc: 'Logotipo institucional' },
-  { key: 'cab_titulo',   label: '📝 Título da prova',              desc: 'Nome/título da avaliação' },
-  { key: 'cab_nome',     label: '✏️ Nome do estudante',            desc: 'Linha para o aluno escrever o nome' },
-  { key: 'cab_disc',     label: '📚 Disciplina',                   desc: 'Nome da disciplina' },
-  { key: 'cab_turma',    label: '👥 Turma',                        desc: 'Linha para o aluno escrever a turma' },
-  { key: 'cab_bimestre', label: '📅 Bimestre',                    desc: 'Número do bimestre letivo' },
-  { key: 'cab_ano',      label: '🗓️ Ano letivo',                   desc: `Automático — ${new Date().getFullYear()}` },
-  { key: 'cab_nota',     label: '⭐ Nota',                         desc: 'Campo para o professor registrar a nota' },
-];
-
-// Limite de caracteres do rodapé considerando o espaço fixo de "EDUCA.PROVA · "
-const RODAPE_PREFIXO = 'EDUCA.PROVA · ';
-const RODAPE_MAX = 80; // total da linha; prefixo ocupa ~13 chars
-
 function ProvaConfig({ config, onChange }) {
-  const comCabecalho   = config.com_cabecalho   ?? true;
-  const comMargem      = config.com_margem      ?? true;
-  const comRodape      = config.com_rodape       ?? false;
-  const rodapeTexto    = config.rodape_texto     ?? '';
-  const embarAlt       = config.embaralhar_alternativas ?? 0;
-  const embarQuest     = config.embaralhar_questoes     ?? 0;
-
-  // Itens do cabeçalho selecionados (objeto {key: bool})
-  const cabItens = config.cabecalho_itens ?? {
-    cab_escola: true, cab_logo: true, cab_titulo: true, cab_nome: true,
-    cab_disc: true, cab_turma: true, cab_bimestre: true, cab_ano: true, cab_nota: true,
-  };
-
-  const rodapeRestante = RODAPE_MAX - RODAPE_PREFIXO.length - rodapeTexto.length;
-
-  const labelStyle = {
-    fontSize: '0.68rem', fontWeight: 800, color: '#64748b',
-    textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 5,
-  };
-  const sectionStyle = {
-    gridColumn: '1/-1', background: '#fff', borderRadius: 10,
-    border: '1.5px solid #e2e8f0', padding: '14px 16px',
-  };
-  const inputStyle = {
-    width: '100%', padding: '8px 12px', borderRadius: 8, marginTop: 4,
-    border: '1.5px solid #e2e8f0', fontSize: '0.86rem', fontFamily: 'inherit',
-    boxSizing: 'border-box', outline: 'none',
-  };
-
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
+      {/* Título */}
+      <div style={{ gridColumn: '1/-1' }}>
+        <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          Título da Prova *
+        </label>
+        <input
+          type="text" placeholder="Ex: Avaliação Bimestral de Matemática"
+          value={config.titulo}
+          onChange={e => onChange({ titulo: e.target.value })}
+          style={{
+            width: '100%', padding: '8px 12px', borderRadius: 8, marginTop: 4,
+            border: '1.5px solid #e2e8f0', fontSize: '0.88rem', fontFamily: 'inherit',
+            boxSizing: 'border-box',
+          }}
+        />
+      </div>
 
-      {/* ── Dados da prova ── */}
-      <div style={{ ...sectionStyle }}>
-        <div style={{ ...labelStyle, marginBottom: 10 }}>📋 Dados da Prova</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-          {/* Título — full width */}
-          <div style={{ gridColumn: '1/-1' }}>
-            <label style={labelStyle}>Título *</label>
-            <input type="text" placeholder="Ex: Avaliação Bimestral de Matemática"
-              value={config.titulo} onChange={e => onChange({ titulo: e.target.value })}
-              style={inputStyle} />
+      {/* Disciplina */}
+      <div>
+        <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          Disciplina
+        </label>
+        <input
+          type="text" placeholder="Ex: Matemática"
+          value={config.disciplina}
+          onChange={e => onChange({ disciplina: e.target.value })}
+          style={{ width: '100%', padding: '8px 12px', borderRadius: 8, marginTop: 4, border: '1.5px solid #e2e8f0', fontSize: '0.88rem', fontFamily: 'inherit', boxSizing: 'border-box' }}
+        />
+      </div>
+
+      {/* Turma */}
+      <div>
+        <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          Turma
+        </label>
+        <input
+          type="text" placeholder="Ex: 9º A"
+          value={config.turma}
+          onChange={e => onChange({ turma: e.target.value })}
+          style={{ width: '100%', padding: '8px 12px', borderRadius: 8, marginTop: 4, border: '1.5px solid #e2e8f0', fontSize: '0.88rem', fontFamily: 'inherit', boxSizing: 'border-box' }}
+        />
+      </div>
+
+      {/* Bimestre */}
+      <div>
+        <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          Bimestre
+        </label>
+        <select
+          value={config.bimestre}
+          onChange={e => onChange({ bimestre: e.target.value })}
+          style={{ width: '100%', padding: '8px 12px', borderRadius: 8, marginTop: 4, border: '1.5px solid #e2e8f0', fontSize: '0.88rem', fontFamily: 'inherit', boxSizing: 'border-box', background: '#fff' }}
+        >
+          <option value="">Selecione</option>
+          {[1,2,3,4].map(b => <option key={b} value={b}>{b}º Bimestre</option>)}
+        </select>
+      </div>
+
+      {/* Ano */}
+      <div>
+        <label style={{ fontSize: '0.7rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+          Ano Letivo
+        </label>
+        <input
+          type="number" placeholder={new Date().getFullYear()}
+          value={config.ano_letivo}
+          onChange={e => onChange({ ano_letivo: e.target.value })}
+          style={{ width: '100%', padding: '8px 12px', borderRadius: 8, marginTop: 4, border: '1.5px solid #e2e8f0', fontSize: '0.88rem', fontFamily: 'inherit', boxSizing: 'border-box' }}
+        />
+      </div>
+
+      {/* Embaralhar alternativas — Sprint 5 */}
+      <div style={{ gridColumn: '1/-1' }}>
+        <div
+          style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 8, background: '#f8fafc', border: '1.5px solid #e2e8f0', cursor: 'pointer' }}
+          onClick={() => onChange({ embaralhar_alternativas: config.embaralhar_alternativas ? 0 : 1 })}
+        >
+          <div style={{
+            width: 20, height: 20, borderRadius: 5, flexShrink: 0,
+            border: `2px solid ${config.embaralhar_alternativas ? '#0e7490' : '#cbd5e1'}`,
+            background: config.embaralhar_alternativas ? '#0e7490' : '#fff',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            transition: 'all 0.15s',
+          }}>
+            {config.embaralhar_alternativas ? <span style={{ color: '#fff', fontSize: '0.75rem', fontWeight: 900 }}>✓</span> : null}
           </div>
           <div>
-            <label style={labelStyle}>Disciplina</label>
-            <input type="text" placeholder="Ex: Matemática"
-              value={config.disciplina} onChange={e => onChange({ disciplina: e.target.value })}
-              style={inputStyle} />
-          </div>
-          <div>
-            <label style={labelStyle}>Turma</label>
-            <input type="text" placeholder="Ex: 9º A"
-              value={config.turma} onChange={e => onChange({ turma: e.target.value })}
-              style={inputStyle} />
-          </div>
-          <div>
-            <label style={labelStyle}>Bimestre</label>
-            <select value={config.bimestre} onChange={e => onChange({ bimestre: e.target.value })}
-              style={{ ...inputStyle, background: '#fff' }}>
-              <option value="">Selecione</option>
-              {[1,2,3,4].map(b => <option key={b} value={b}>{b}º Bimestre</option>)}
-            </select>
-          </div>
-          <div>
-            <label style={labelStyle}>Ano Letivo</label>
-            <input type="number" placeholder={new Date().getFullYear()}
-              value={config.ano_letivo} onChange={e => onChange({ ano_letivo: e.target.value })}
-              style={inputStyle} />
+            <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#334155' }}>🔀 Embaralhar alternativas</div>
+            <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>Mistura a ordem das alternativas automaticamente ao gerar o PDF</div>
           </div>
         </div>
       </div>
-
-      {/* ── Coluna direita: cabeçalho + rodapé + opções ── */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-
-        {/* ① COM OU SEM CABEÇALHO */}
-        <div style={{ background: '#fff', borderRadius: 10, border: '1.5px solid #e2e8f0', padding: '14px 16px' }}>
-          <div style={{ ...labelStyle, marginBottom: 10 }}>📄 Cabeçalho da Prova</div>
-
-          {/* Toggle com/sem */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 12 }}>
-            {[
-              { val: true,  icon: '📋', lbl: 'Com cabeçalho' },
-              { val: false, icon: '🚫', lbl: 'Sem cabeçalho' },
-            ].map(opt => (
-              <div key={String(opt.val)}
-                onClick={() => onChange({ com_cabecalho: opt.val })}
-                style={{
-                  padding: '8px 12px', borderRadius: 8, cursor: 'pointer', textAlign: 'center',
-                  border: `2px solid ${comCabecalho === opt.val ? '#0e7490' : '#e2e8f0'}`,
-                  background: comCabecalho === opt.val ? '#f0f9ff' : '#fafafa',
-                  color: comCabecalho === opt.val ? '#0e7490' : '#64748b',
-                  fontWeight: 700, fontSize: '0.78rem',
-                  transition: 'all 0.15s',
-                }}
-              >
-                <div style={{ fontSize: '1.1rem', marginBottom: 2 }}>{opt.icon}</div>
-                {opt.lbl}
-              </div>
-            ))}
-          </div>
-
-          {/* Se COM cabeçalho — checklist de itens */}
-          {comCabecalho && (
-            <div>
-              <div style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 700, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Selecione os itens do cabeçalho (na ordem):
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-                {CABECALHO_ITENS.map(item => (
-                  <CfgToggle
-                    key={item.key}
-                    checked={cabItens[item.key] ?? true}
-                    onChange={v => onChange({ cabecalho_itens: { ...cabItens, [item.key]: v } })}
-                    label={item.label}
-                    desc={item.desc}
-                    color="#0e7490"
-                  />
-                ))}
-              </div>
-              {/* Preview dos itens ativos */}
-              {Object.values(cabItens).some(Boolean) && (
-                <div style={{ marginTop: 10, background: '#f8fafc', borderRadius: 8, padding: '8px 12px', border: '1px dashed #bae6fd' }}>
-                  <div style={{ fontSize: '0.6rem', fontWeight: 800, color: '#0e7490', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>
-                    Preview da ordem:
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                    {CABECALHO_ITENS.filter(i => cabItens[i.key]).map((item, idx) => (
-                      <span key={item.key} style={{ fontSize: '0.62rem', background: '#e0f2fe', color: '#0369a1', borderRadius: 99, padding: '1px 8px', fontWeight: 700 }}>
-                        {idx + 1}. {item.label.split(' ').slice(1).join(' ')}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Se SEM cabeçalho — margem da página */}
-          {!comCabecalho && (
-            <div>
-              <div style={{ fontSize: '0.65rem', color: '#94a3b8', fontWeight: 700, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Margens da página:
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                {[
-                  { val: true,  icon: '📐', lbl: 'Com margem',  desc: 'Padrão A4' },
-                  { val: false, icon: '⬜', lbl: 'Sem margem',  desc: 'Borda a borda' },
-                ].map(opt => (
-                  <div key={String(opt.val)}
-                    onClick={() => onChange({ com_margem: opt.val })}
-                    style={{
-                      padding: '8px 10px', borderRadius: 8, cursor: 'pointer', textAlign: 'center',
-                      border: `2px solid ${comMargem === opt.val ? '#7c3aed' : '#e2e8f0'}`,
-                      background: comMargem === opt.val ? '#faf5ff' : '#fafafa',
-                      color: comMargem === opt.val ? '#7c3aed' : '#64748b',
-                      fontWeight: 700, fontSize: '0.72rem',
-                      transition: 'all 0.15s',
-                    }}
-                  >
-                    <div style={{ fontSize: '1rem', marginBottom: 2 }}>{opt.icon}</div>
-                    <div>{opt.lbl}</div>
-                    <div style={{ fontSize: '0.6rem', color: '#94a3b8', fontWeight: 500, marginTop: 1 }}>{opt.desc}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* ② RODAPÉ */}
-        <div style={{ background: '#fff', borderRadius: 10, border: '1.5px solid #e2e8f0', padding: '14px 16px' }}>
-          <div style={{ ...labelStyle, marginBottom: 8 }}>📄 Rodapé</div>
-          <div style={{ fontSize: '0.66rem', color: '#94a3b8', marginBottom: 10 }}>
-            <strong style={{ color: '#0e7490' }}>EDUCA.PROVA</strong> sempre aparece. Você pode adicionar texto complementar.
-          </div>
-          <CfgToggle
-            checked={comRodape}
-            onChange={v => onChange({ com_rodape: v })}
-            label="✍️ Adicionar texto ao rodapé"
-            desc="Inserir informação complementar além do EDUCA.PROVA"
-            color="#059669"
-          />
-          {comRodape && (
-            <div style={{ marginTop: 8 }}>
-              <div style={{
-                background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: 8,
-                padding: '8px 10px', fontSize: '0.75rem', color: '#166534', marginBottom: 6,
-                fontFamily: 'monospace', letterSpacing: '0.01em',
-              }}>
-                <span style={{ opacity: 0.5 }}>{RODAPE_PREFIXO}</span>
-                <span style={{ fontWeight: 700 }}>{rodapeTexto || '…'}</span>
-              </div>
-              <div style={{ position: 'relative' }}>
-                <input
-                  type="text"
-                  placeholder="Ex: Boa prova! Leia com atenção."
-                  maxLength={RODAPE_MAX - RODAPE_PREFIXO.length}
-                  value={rodapeTexto}
-                  onChange={e => onChange({ rodape_texto: e.target.value })}
-                  style={{
-                    ...inputStyle, marginTop: 0,
-                    border: `1.5px solid ${rodapeRestante <= 10 ? '#fca5a5' : '#e2e8f0'}`,
-                    paddingRight: 44,
-                  }}
-                />
-                <span style={{
-                  position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)',
-                  fontSize: '0.65rem', fontWeight: 700,
-                  color: rodapeRestante <= 10 ? '#dc2626' : '#94a3b8',
-                }}>
-                  {rodapeRestante}
-                </span>
-              </div>
-              <div style={{ fontSize: '0.62rem', color: '#94a3b8', marginTop: 3 }}>
-                Limite: {RODAPE_MAX - RODAPE_PREFIXO.length} caracteres para não quebrar linha no PDF.
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* ③ OPÇÕES DE EMBARALHAMENTO */}
-        <div style={{ background: '#fff', borderRadius: 10, border: '1.5px solid #e2e8f0', padding: '14px 16px' }}>
-          <div style={{ ...labelStyle, marginBottom: 8 }}>🔀 Embaralhamento</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <CfgToggle
-              checked={!!embarAlt}
-              onChange={v => onChange({ embaralhar_alternativas: v ? 1 : 0 })}
-              label="🔀 Embaralhar alternativas"
-              desc="Mistura a ordem das alternativas A–E ao gerar o PDF"
-              color="#d97706"
-            />
-            <CfgToggle
-              checked={!!embarQuest}
-              onChange={v => onChange({ embaralhar_questoes: v ? 1 : 0 })}
-              label="🎲 Embaralhar questões"
-              desc="Muda a ordem das questões ao gerar o PDF (cria variantes)"
-              color="#7c3aed"
-            />
-          </div>
-        </div>
-
-      </div>{/* fim coluna direita */}
     </div>
   );
 }

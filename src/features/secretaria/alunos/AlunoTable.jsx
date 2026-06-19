@@ -47,7 +47,6 @@ export default function AlunoTable({
   onBoletim,
   onTACE,
   onRelatorioDisciplinar,
-  onVerFicha,          // ← novo: se fornecido, delega o modal ao componente pai
   mostrarFicha = true,
   mostrarBoletim = true,
 }) {
@@ -112,11 +111,7 @@ export default function AlunoTable({
                     <button
                       className="text-blue-600 hover:text-blue-800"
                       title="Ficha do Estudante"
-                      onClick={() =>
-                        onVerFicha
-                          ? onVerFicha(aluno.codigo)
-                          : abrirFicha(aluno.codigo)
-                      }
+                      onClick={() => abrirFicha(aluno.codigo)}
                     >
                       <IdentificationIcon className="w-5 h-5" />
                     </button>

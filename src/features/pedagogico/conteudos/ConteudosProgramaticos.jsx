@@ -46,7 +46,6 @@ const IcoBook  = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor
 const IcoFilter = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="cp-icon"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>;
 const IcoStats  = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="cp-icon"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>;
 const IcoPDF    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="cp-icon"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/><polyline points="9 9 10 9"/></svg>;
-const IcoTrash  = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="cp-icon"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>;
 
 // ── Error Boundary — diagnóstico de tela branca ────────────────────────────
 class CPErrorBoundary extends React.Component {
@@ -606,25 +605,6 @@ function ConteudosProgramaticosPage() {
   // Evita que os useEffects de carregamento cascata apaguem os IDs originais
   const prefillRef = useRef({ unidadeId: null, conteudoId: null });
 
-  // ── Estado de exclusão ─────────────────────────────────────────────────────
-  const [deleteItem, setDeleteItem]       = useState(null);  // item a excluir
-  const [deleteLoading, setDeleteLoading] = useState(false);
-  const [deleteErr, setDeleteErr]         = useState("");
-
-  const confirmarExclusao = async () => {
-    if (!deleteItem) return;
-    try {
-      setDeleteLoading(true); setDeleteErr("");
-      await api.delete(`/conteudos/admin/planejamento/itens/${deleteItem.id}`);
-      setDeleteItem(null);
-      carregarLista();
-    } catch (e) {
-      setDeleteErr(e?.response?.data?.message || "Erro ao excluir. Tente novamente.");
-    } finally {
-      setDeleteLoading(false);
-    }
-  };
-
   // ── Objetivos de Aprendizagem (tópicos + subitens) ──────────────────────
   const escolaApelido = localStorage.getItem("escola_apelido")
                      || localStorage.getItem("nome_escola")
@@ -734,9 +714,9 @@ function ConteudosProgramaticosPage() {
 
   // Salva o conteúdo programatico na API
   const salvarConteudo = async (statusEnvio) => {
-    // Validações mínimas (Conteúdo SEEDF é opcional quando não há itens catalogados)
-    if (!mSerie || !mDisciplina || !mBimestre || !mAno || !mUnidadeId) {
-      setSaveMsg("Preencha todos os campos: Série, Disciplina, Bimestre, Ano e Unidade Temática.");
+    // Validações mínimas
+    if (!mSerie || !mDisciplina || !mBimestre || !mAno || !mUnidadeId || !mConteudoId) {
+      setSaveMsg("Preencha todos os campos: Série, Disciplina, Bimestre, Ano, Unidade Temática e Conteúdo SEEDF.");
       return;
     }
     if (objetivos.length === 0) {
@@ -760,33 +740,18 @@ function ConteudosProgramaticosPage() {
     try {
       setSavingConteudo(true);
       setSaveMsg("");
-      const statusParaEnvio = statusEnvio === "enviar" ? "ENVIADO" : "RASCUNHO";
       const { data } = await api.post("/conteudos/admin/planejamento", {
         disciplina_id:            disciplinaId,
         serie:                    mSerie.toUpperCase(),
         bimestre:                 bimestreNum,
         ano_letivo:               Number(mAno),
         bncc_unidade_tematica_id: Number(mUnidadeId),
-        seedf_conteudo_id:        mConteudoId ? Number(mConteudoId) : null,
+        seedf_conteudo_id:        Number(mConteudoId),
         texto:                    textoObj,
-        status:                   statusParaEnvio,
       });
       if (data?.ok) {
         setSaveMsg(statusEnvio === "enviar" ? "✅ Conteúdo enviado com sucesso!" : "✅ Salvo como rascunho!");
-        // Captura os valores do formulário antes do modal fechar
-        const serieParaFiltro = mSerie;       // ex: "6º Ano"
-        const discParaFiltro  = mDisciplina;  // ex: "Arte"
-        const bimParaFiltro   = mBimestre;    // ex: "1º Bimestre"
-        setTimeout(() => {
-          setModalOpen(false);
-          setSaveMsg("");
-          // Ajusta filtros para garantir que o novo registro apareça na lista
-          setSerieFiltro(serieParaFiltro);
-          setDiscFiltro(discParaFiltro);
-          setBimestreFiltro(bimParaFiltro);
-          setStatusFiltro("Todos");
-          // A mudança nos filtros dispara o useEffect que chama carregarLista automaticamente
-        }, 1200);
+        setTimeout(() => { setModalOpen(false); setSaveMsg(""); carregarLista(); }, 1200);
       } else {
         setSaveMsg(data?.message || "Erro ao salvar.");
       }
@@ -1177,12 +1142,6 @@ function ConteudosProgramaticosPage() {
                     <button className="cp-icon-btn cp-icon-btn-edit" title="Editar" onClick={() => openEditModal(item)}>
                       <IcoEdit />
                     </button>
-                    <button className="cp-icon-btn cp-icon-btn-delete" title="Excluir"
-                      onClick={() => { setDeleteErr(""); setDeleteItem(item); }}
-                      style={{ color: "#ef4444" }}
-                    >
-                      <IcoTrash />
-                    </button>
                     {item.status === "ENVIADO" && (
                       <button className="cp-icon-btn cp-icon-btn-approve" title="Aprovar">
                         <IcoCheck />
@@ -1237,12 +1196,6 @@ function ConteudosProgramaticosPage() {
                       <div className="cp-td-actions">
                         <button className="cp-icon-btn cp-icon-btn-view" title="Visualizar" onClick={() => setDetalheItem(item)}><IcoEye /></button>
                         <button className="cp-icon-btn cp-icon-btn-edit" title="Editar" onClick={() => openEditModal(item)}><IcoEdit /></button>
-                         <button
-                           className="cp-icon-btn"
-                           title="Excluir"
-                           onClick={() => { setDeleteErr(""); setDeleteItem(item); }}
-                           style={{ color: "#ef4444" }}
-                         ><IcoTrash /></button>
                         {item.status === "ENVIADO" && (
                           <button className="cp-icon-btn cp-icon-btn-approve" title="Aprovar"><IcoCheck /></button>
                         )}
@@ -1255,107 +1208,6 @@ function ConteudosProgramaticosPage() {
           </table>
         </div>
       )}
-      {/* ── Modal EXCLUIR (confirmação) ── */}
-      {deleteItem && (
-        <div
-          style={{
-            position: "fixed", inset: 0, zIndex: 10000,
-            background: "rgba(15,23,42,0.78)", backdropFilter: "blur(6px)",
-            display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
-          }}
-          onClick={() => !deleteLoading && setDeleteItem(null)}
-        >
-          <div
-            style={{
-              background: "#fff", borderRadius: 20, width: "100%", maxWidth: 440,
-              boxShadow: "0 32px 80px rgba(0,0,0,.3)", overflow: "hidden",
-              animation: "cp-fadein .2s ease",
-            }}
-            onClick={e => e.stopPropagation()}
-          >
-            {/* Header vermelho */}
-            <div style={{
-              background: "linear-gradient(135deg, #ef4444, #dc2626)",
-              padding: "20px 24px", display: "flex", alignItems: "center", gap: 14,
-            }}>
-              <div style={{
-                width: 44, height: 44, borderRadius: 12,
-                background: "rgba(255,255,255,0.2)",
-                display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.4rem",
-              }}>🗑️</div>
-              <div>
-                <h2 style={{ margin: 0, fontSize: "1.05rem", fontWeight: 800, color: "#fff" }}>Excluir Conteúdo</h2>
-                <p style={{ margin: 0, fontSize: "0.76rem", color: "rgba(255,255,255,0.8)" }}>Esta ação não pode ser desfeita</p>
-              </div>
-            </div>
-
-            {/* Corpo */}
-            <div style={{ padding: "20px 24px" }}>
-              <div style={{
-                background: "#fef2f2", border: "1px solid #fecaca",
-                borderRadius: 12, padding: "14px 16px", marginBottom: 16,
-              }}>
-                <p style={{ margin: "0 0 6px", fontSize: "0.82rem", color: "#991b1b", fontWeight: 700 }}>
-                  Você está prestes a excluir:
-                </p>
-                <p style={{ margin: 0, fontSize: "0.88rem", color: "#1e293b", fontWeight: 600 }}>
-                  {deleteItem.disciplina} — {deleteItem.serie} — {deleteItem.bimestre}
-                </p>
-                {deleteItem.conteudo && (
-                  <p style={{ margin: "4px 0 0", fontSize: "0.78rem", color: "#64748b" }}>
-                    {deleteItem.conteudo}
-                  </p>
-                )}
-              </div>
-              <p style={{ margin: 0, fontSize: "0.82rem", color: "#64748b", lineHeight: 1.5 }}>
-                O registro será <strong>desativado</strong> no sistema. Os dados permanecem no banco mas não serão mais exibidos.
-              </p>
-              {deleteErr && (
-                <div style={{
-                  marginTop: 12, background: "#fef2f2", border: "1px solid #fca5a5",
-                  borderRadius: 8, padding: "8px 12px", fontSize: "0.8rem", color: "#b91c1c",
-                  display: "flex", alignItems: "center", gap: 6,
-                }}>
-                  ⚠️ {deleteErr}
-                </div>
-              )}
-            </div>
-
-            {/* Footer */}
-            <div style={{
-              padding: "14px 24px", borderTop: "1px solid #f1f5f9",
-              display: "flex", justifyContent: "flex-end", gap: 10, background: "#fafbff",
-            }}>
-              <button
-                onClick={() => setDeleteItem(null)}
-                disabled={deleteLoading}
-                style={{
-                  background: "#f1f5f9", border: "none", borderRadius: 10,
-                  padding: "9px 20px", color: "#64748b", fontSize: "0.85rem",
-                  fontWeight: 600, cursor: "pointer",
-                }}
-              >Cancelar</button>
-              <button
-                onClick={confirmarExclusao}
-                disabled={deleteLoading}
-                style={{
-                  background: "linear-gradient(135deg, #ef4444, #dc2626)",
-                  border: "none", borderRadius: 10, padding: "9px 20px",
-                  color: "#fff", fontSize: "0.85rem", fontWeight: 700, cursor: "pointer",
-                  display: "flex", alignItems: "center", gap: 8,
-                  opacity: deleteLoading ? 0.7 : 1,
-                }}
-              >
-                {deleteLoading
-                  ? <><span style={{ width: 14, height: 14, border: "2px solid #fff5", borderTopColor: "#fff", borderRadius: "50%", display: "inline-block", animation: "cp-spin .6s linear infinite" }} /> Excluindo...</>
-                  : <><IcoTrash /> Confirmar Exclusão</>
-                }
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ── Modal VISUALIZAR ── */}
       {detalheItem && (() => {
         try {

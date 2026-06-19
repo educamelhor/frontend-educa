@@ -2,8 +2,7 @@ import React, { useState, useEffect } from "react";
 import api from "../../../services/api";
 import ModalBoletim from "../../boletim/ModalBoletim";
 import ModalFichaAluno from "./ModalFichaAluno";
-import ModalRegistroConselho from "./ModalRegistroConselho";
-import ModalZoomFoto from "./ModalZoomFoto";
+import ModalZoomFoto from "./ModalZoomFoto"; // 👈 Import do modal de zoom
 import {
   EyeIcon,
   DocumentTextIcon,
@@ -47,10 +46,6 @@ export default function ConselhoClasse() {
   // Ficha do Estudante (modal)
   const [modalFichaOpen, setModalFichaOpen] = useState(false);
   const [codigoAlunoFicha, setCodigoAlunoFicha] = useState(null);
-
-  // Registro de Conselho
-  const [modalRegistroOpen, setModalRegistroOpen] = useState(false);
-  const [alunoRegistro, setAlunoRegistro]         = useState(null);
 
   // Cache-buster p/ fotos na lista
   const [fotoStamp, setFotoStamp] = useState(0);
@@ -188,27 +183,22 @@ export default function ConselhoClasse() {
 
       {/* Cards de Turmas */}
       {turnoSelecionado && (
-        <div className="flex flex-wrap justify-center gap-3 mb-8">
+        <div className="flex flex-wrap justify-center gap-4 mb-8">
           {loadingTurmas ? (
             <p className="w-full text-center text-gray-500">
               Turmas sendo carregadas...
             </p>
           ) : turmasFiltradas.length > 0 ? (
             turmasFiltradas.map((turma) => (
-              <button
+              <div
                 key={turma.id}
                 onClick={() => handleClickTurma(turma)}
-                title={`Selecionar turma ${turma.turma}`}
-                aria-label={`Selecionar turma ${turma.turma}`}
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl shadow-sm border font-semibold text-sm
-                  whitespace-nowrap transition-all duration-150 select-none
-                  bg-gradient-to-br from-blue-50 to-indigo-100 border-blue-300 text-blue-900
-                  hover:from-blue-100 hover:to-indigo-200 hover:shadow-md hover:scale-105 active:scale-95
-                  ${turmaSelecionada?.id === turma.id ? "ring-2 ring-green-500 border-green-400 from-green-50 to-emerald-100" : "cursor-pointer"}`}
+                className={`bg-gradient-to-b from-blue-200 to-blue-50 rounded-lg px-6 py-3 shadow-md cursor-pointer hover:shadow-xl transition-transform hover:scale-105 text-center font-bold text-blue-900 text-base flex items-center justify-center whitespace-nowrap min-w-[120px] ${
+                  turmaSelecionada?.id === turma.id ? "ring-2 ring-green-600" : ""
+                }`}
               >
-                <span className="text-base">📋</span>
-                <span>{turma.turma}</span>
-              </button>
+                {turma.turma}
+              </div>
             ))
           ) : (
             <p className="w-full text-center text-gray-500">
@@ -270,10 +260,7 @@ export default function ConselhoClasse() {
                       {/* Ações */}
                       <td className="py-2 px-2 text-center">
                         <div className="flex justify-center gap-3">
-                          <button
-                            title="Registro de Conselho"
-                            onClick={() => { setAlunoRegistro(aluno); setModalRegistroOpen(true); }}
-                          >
+                          <button>
                             <EyeIcon className="h-6 w-6 text-gray-600 hover:text-blue-600" />
                           </button>
 
@@ -313,14 +300,6 @@ export default function ConselhoClasse() {
           open={modalBoletimOpen}
           codigo={codigoAlunoBoletim}
           onClose={() => setModalBoletimOpen(false)}
-        />
-      )}
-
-      {modalRegistroOpen && alunoRegistro && (
-        <ModalRegistroConselho
-          aluno={alunoRegistro}
-          turma={turmaSelecionada}
-          onClose={() => { setModalRegistroOpen(false); setAlunoRegistro(null); }}
         />
       )}
 

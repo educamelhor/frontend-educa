@@ -11,13 +11,12 @@
 //     apenas INATIVOS via query param `status=inativo` (paginação normal).
 // ────────────────────────────────────────────────────────────────
 
-import React, { useState, useEffect, useRef } from "react";
-import { AcademicCapIcon, PlusCircleIcon, FolderOpenIcon, TableCellsIcon } from "@heroicons/react/24/solid";
+import React, { useState, useEffect } from "react";
+import { AcademicCapIcon, PlusCircleIcon, FolderOpenIcon } from "@heroicons/react/24/solid";
 import AlunoTable from "./AlunoTable";
 import AlunoForm from "./AlunoForm";
 import ModalExcluirOuInativar from "./ModalExcluirOuInativar";
 import ImportPDF from "./ImportPDF";
-import ModalFichaAluno from "./ModalFichaAluno";
 import Input from "../../../components/ui/Input";
 import styles from "./styles.module.css";
 import api from "../../../services/api";
@@ -67,38 +66,6 @@ export default function Alunos() {
   const [alunoParaExcluirOuInativar, setAlunoParaExcluirOuInativar] = useState(null);
   const [isImportOpen, setImportOpen] = useState(false);
   const [resultadoImportacao, setResultadoImportacao] = useState(null);
-  const [isXlsxModalOpen, setXlsxModalOpen] = useState(false);
-  const xlsxInputRef = useRef();
-
-  // Handler: Importar via XLSX direto (sem modal)
-  const handleXlsxSelected = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const formData = new FormData();
-    formData.append("file", file);
-    // Nome do arquivo determina a turma: "6º ANO A.xlsx" → "6º ANO A"
-    const turmaNome = file.name.replace(/\.[^.]+$/i, "").trim();
-    formData.append("turmaNome", turmaNome);
-    setResultadoImportacao({ _loading: true });
-    try {
-      const res = await api.post("/alunos/importar-xlsx", formData);
-      await fetchAlunos();
-      setResultadoImportacao({
-        localizados: res.data.localizados ?? 0,
-        inseridos:   res.data.inseridos   ?? 0,
-        reativados:  res.data.reativados  ?? 0,
-        atualizados: res.data.atualizados ?? 0,
-        jaExistiam:  res.data.jaExistiam  ?? 0,
-        inativados:  res.data.inativados  ?? 0,
-      });
-    } catch (err) {
-      const msg = err.response?.data?.message || err.message;
-      setErro(`Erro ao importar XLSX: ${msg}`);
-      setResultadoImportacao(null);
-    } finally {
-      e.target.value = null;
-    }
-  };
 
   // ────────────────────────────────────────────────────────────────
   // Filtro de Ano Letivo
@@ -108,11 +75,6 @@ export default function Alunos() {
 
   const [modalBoletimOpen, setModalBoletimOpen] = useState(false);
   const [codigoAlunoBoletim, setCodigoAlunoBoletim] = useState(null);
-
-  // Ficha do Estudante — modal independente
-  const [fichaOpen, setFichaOpen] = useState(false);
-  const [codigoFicha, setCodigoFicha] = useState(null);
-  const abrirFicha = (codigo) => { setCodigoFicha(codigo); setFichaOpen(true); };
   // Controla qual variante do boletim exibir: "anual" ou "2anos"
   const [boletimVariante, setBoletimVariante] = useState("anual");
   const [boletimConfigLoading, setBoletimConfigLoading] = useState(false);
@@ -319,35 +281,15 @@ export default function Alunos() {
                 Adicionar Estudante
               </button>
 
-              {/* Botão PDF */}
               <button
                 type="button"
                 onClick={() => setImportOpen(true)}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 transition shadow-sm"
-                title="Importar alunos a partir de PDF da Secretaria de Educação"
+                title="Incluir Estudantes"
               >
                 <FolderOpenIcon className="w-5 h-5" />
-                Importar via PDF
+                Incluir Estudantes
               </button>
-
-              {/* Botão XLSX */}
-              <button
-                type="button"
-                onClick={() => setXlsxModalOpen(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white hover:opacity-90 transition shadow-sm"
-                style={{ background: '#0f766e' }}
-                title="Importar alunos a partir de planilha Excel — colunas: RE, estudante, data_nascimento, responsavel, cpf_responsavel, turma"
-              >
-                <TableCellsIcon className="w-5 h-5" />
-                Importar via XLSX
-              </button>
-              <input
-                type="file"
-                accept=".xlsx,.xls"
-                ref={xlsxInputRef}
-                style={{ display: 'none' }}
-                onChange={handleXlsxSelected}
-              />
             </>
           )}
 
@@ -367,14 +309,9 @@ export default function Alunos() {
                 </button>
               </div>
 
-              {resultadoImportacao._loading ? (
-                <div className="text-gray-500 animate-pulse">⏳ Importando planilha...</div>
-              ) : "inseridos" in resultadoImportacao ? (
+              {"inseridos" in resultadoImportacao ? (
                 <>
                   <div className="text-green-600">✅ Inseridos: {resultadoImportacao.inseridos}</div>
-                  {resultadoImportacao.atualizados > 0 && (
-                    <div className="text-blue-500">🔄 Dados completados: {resultadoImportacao.atualizados}</div>
-                  )}
                   <div className="text-yellow-600">🟡 Já existiam: {resultadoImportacao.jaExistiam}</div>
                   <div className="text-blue-600">📘 Reativados: {resultadoImportacao.reativados}</div>
                   <div className="text-red-600">❌ Inativados: {resultadoImportacao.inativados}</div>
@@ -452,16 +389,8 @@ export default function Alunos() {
         onDelete={handleExcluir}
         loading={loading}
         onBoletim={handleBoletim}
-        onVerFicha={abrirFicha}
         // (Se não for modo "inativos", a tabela pode ocultar inativos)
         somenteAtivos={!isBuscaInativos(debouncedFiltro)}
-      />
-
-      {/* Modal Ficha do Estudante — independente do módulo Secretaria */}
-      <ModalFichaAluno
-        open={fichaOpen}
-        codigo={codigoFicha}
-        onClose={() => setFichaOpen(false)}
       />
 
       {/* Paginação */}
@@ -603,81 +532,7 @@ export default function Alunos() {
         </div>
       )}
 
-      {/* ═══════════════════════════════════════════════════════
-          MODAL: Importar via XLSX
-          ═══════════════════════════════════════════════════════ */}
-      {isXlsxModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          aria-modal="true"
-          role="dialog"
-        >
-          <div className="w-full max-w-lg rounded-xl bg-white shadow-xl">
-            {/* Cabeçalho */}
-            <div className="flex items-center justify-between px-5 py-4 border-b">
-              <h2 className="text-lg font-semibold text-gray-800">
-                Importar via XLSX
-              </h2>
-              <button
-                onClick={() => setXlsxModalOpen(false)}
-                className="text-gray-500 hover:text-gray-700"
-                aria-label="Fechar"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Corpo */}
-            <div className="px-5 py-4 space-y-4">
-              <p className="text-sm text-gray-600">
-                Selecione a planilha <strong>Excel (.xlsx)</strong> contendo
-                os dados dos alunos. O nome do arquivo deve corresponder
-                exatamente ao nome da turma cadastrada no sistema.
-              </p>
-
-              <div className="bg-blue-50 border border-blue-200 rounded-lg px-4 py-3 text-xs text-blue-800 space-y-1">
-                <p className="font-semibold">Colunas esperadas na planilha:</p>
-                <p>
-                  <code className="bg-blue-100 px-1 py-0.5 rounded">RE</code>{" "}
-                  <code className="bg-blue-100 px-1 py-0.5 rounded">estudante</code>{" "}
-                  <code className="bg-blue-100 px-1 py-0.5 rounded">data_nascimento</code>{" "}
-                  <code className="bg-blue-100 px-1 py-0.5 rounded">responsavel</code>{" "}
-                  <code className="bg-blue-100 px-1 py-0.5 rounded">cpf_responsavel</code>
-                </p>
-              </div>
-
-              {/* Botões */}
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => { setXlsxModalOpen(false); xlsxInputRef.current?.click(); }}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-white font-medium hover:opacity-90 transition disabled:opacity-60"
-                  style={{ background: '#0f766e' }}
-                >
-                  <TableCellsIcon className="w-5 h-5" />
-                  Escolher arquivo
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setXlsxModalOpen(false)}
-                  className="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300 transition"
-                >
-                  Cancelar
-                </button>
-              </div>
-
-              <p className="text-xs text-gray-500">
-                💡 Cada linha da planilha será processada individualmente.
-                Alunos já existentes na turma terão seus dados complementados
-                (sem sobrescrever registros existentes).
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Importação PDF */}
+      {/* Modal Importação */}
       <ImportPDF
         open={isImportOpen}
         onClose={() => setImportOpen(false)}
@@ -687,16 +542,7 @@ export default function Alunos() {
             if (res.status === "erro") {
               setImportOpen(false);
               setResultadoImportacao({ message: res.message || "Erro na importação." });
-            } else if (res._tipo === "inativacao") {
-              // Confirmação de inativação: apenas acumula o campo inativados no resultado anterior
-              setResultadoImportacao((prev) => ({
-                ...(prev || {}),
-                inativados: (prev?.inativados ?? 0) + (res.inativados ?? 0),
-                message: res.message,
-              }));
-              setImportOpen(false);
             } else {
-              // Resultado principal da importação do PDF/XLSX
               setResultadoImportacao({
                 localizados: res.localizados ?? 0,
                 inseridos: res.inseridos ?? 0,

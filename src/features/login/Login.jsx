@@ -451,12 +451,6 @@ export default function Login() {
         localStorage.setItem("scope", data.scope || "escola");
         localStorage.setItem("perfis", JSON.stringify(Array.isArray(data?.perfis) ? data.perfis : []));
         localStorage.setItem("permissoes", JSON.stringify(Array.isArray(data?.permissoes) ? data.permissoes : []));
-        // ✅ Módulos licenciados da escola
-        if (Array.isArray(data?.modulos_ativos)) {
-          localStorage.setItem("modulos_ativos", JSON.stringify(data.modulos_ativos));
-        } else {
-          localStorage.removeItem("modulos_ativos");
-        }
 
         setTipoMensagem("sucesso");
         setMensagem("Login realizado com sucesso!");
@@ -499,12 +493,6 @@ export default function Login() {
         localStorage.setItem("scope", data.scope || "escola");
         localStorage.setItem("perfis", JSON.stringify(Array.isArray(data?.perfis) ? data.perfis : []));
         localStorage.setItem("permissoes", JSON.stringify(Array.isArray(data?.permissoes) ? data.permissoes : []));
-        // ✅ Módulos licenciados da escola
-        if (Array.isArray(data?.modulos_ativos)) {
-          localStorage.setItem("modulos_ativos", JSON.stringify(data.modulos_ativos));
-        } else {
-          localStorage.removeItem("modulos_ativos");
-        }
 
         await carregarDisciplinasProfessor(data.token);
 
@@ -690,7 +678,6 @@ export default function Login() {
         localStorage.removeItem("foto_url");
         localStorage.removeItem("disciplinas_professor_ctx");
         localStorage.removeItem("disciplinas_professor");
-        localStorage.removeItem("modulos_ativos"); // CEO não usa módulos por escola
 
         setTipoMensagem("sucesso");
         setMensagem("Login da Plataforma realizado com sucesso!");
@@ -739,12 +726,6 @@ export default function Login() {
       localStorage.setItem("scope", data.scope || "escola");
       localStorage.setItem("perfis", JSON.stringify(Array.isArray(data?.perfis) ? data.perfis : []));
       localStorage.setItem("permissoes", JSON.stringify(Array.isArray(data?.permissoes) ? data.permissoes : []));
-      // ✅ Módulos licenciados da escola
-      if (Array.isArray(data?.modulos_ativos)) {
-        localStorage.setItem("modulos_ativos", JSON.stringify(data.modulos_ativos));
-      } else {
-        localStorage.removeItem("modulos_ativos");
-      }
 
       await carregarDisciplinasProfessor(data.token);
 
@@ -816,12 +797,6 @@ export default function Login() {
       // ✅ RBAC (perfis/permissoes)
       localStorage.setItem("perfis", JSON.stringify(Array.isArray(data?.perfis) ? data.perfis : []));
       localStorage.setItem("permissoes", JSON.stringify(Array.isArray(data?.permissoes) ? data.permissoes : []));
-      // ✅ Módulos licenciados da escola
-      if (Array.isArray(data?.modulos_ativos)) {
-        localStorage.setItem("modulos_ativos", JSON.stringify(data.modulos_ativos));
-      } else {
-        localStorage.removeItem("modulos_ativos");
-      }
 
       // ✅ DISCIPLINAS do professor (para Conteúdos)
       await carregarDisciplinasProfessor(data.token);

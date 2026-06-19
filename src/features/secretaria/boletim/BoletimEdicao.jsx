@@ -126,41 +126,27 @@ export default function BoletimEdicao() {
   const [notasEdicaoMock, setNotasEdicaoMock] = useState({});
 
   // ---------------------------------------------------------------------------
-  // Carregamento de filtros no boot (disciplinas + anos letivos)
+  // Carregamento de filtros no boot
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    async function carregarFiltrosEstaticos() {
+    async function carregarFiltros() {
       try {
-        const [resDiscs, resAnos] = await Promise.all([
+        const [resTurmas, resDiscs, resAnos] = await Promise.all([
+          api.get("/api/turmas"),
           api.get("/api/disciplinas"),
           api.get("/api/secretaria/relatorios/anos-letivos").catch(() => ({ data: [anoLetivoPadrao()] }))
         ]);
+        setTurmas(resTurmas.data || []);
         setDisciplinas(resDiscs.data || []);
         if (Array.isArray(resAnos.data) && resAnos.data.length > 0) {
           setAnosLetivos(resAnos.data);
         }
       } catch (err) {
-        console.error("Erro ao carregar disciplinas/anos:", err);
+        console.error("Erro ao carregar dados dos filtros:", err);
       }
     }
-    carregarFiltrosEstaticos();
+    carregarFiltros();
   }, []);
-
-  // ---------------------------------------------------------------------------
-  // Recarrega turmas sempre que o ano letivo selecionado mudar
-  // ---------------------------------------------------------------------------
-  useEffect(() => {
-    async function carregarTurmas() {
-      try {
-        const res = await api.get("/api/turmas", { params: { ano: filtroAnoLetivo } });
-        setTurmas(res.data || []);
-        setFiltroTurma("todas"); // reseta seleção ao trocar de ano
-      } catch (err) {
-        console.error("Erro ao carregar turmas:", err);
-      }
-    }
-    carregarTurmas();
-  }, [filtroAnoLetivo]);
 
   // ---------------------------------------------------------------------------
   // Carregar dados de Acompanhamento
@@ -496,7 +482,7 @@ export default function BoletimEdicao() {
                 </label>
                 <select
                   value={filtroTurno}
-                  onChange={(e) => { setFiltroTurno(e.target.value); setFiltroTurma("todas"); }}
+                  onChange={(e) => setFiltroTurno(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition"
                 >
                   <option value="todos">Todos</option>
@@ -516,14 +502,9 @@ export default function BoletimEdicao() {
                   className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition"
                 >
                   <option value="todas">Todas</option>
-                  {turmas
-                    .filter((t) =>
-                      filtroTurno === "todos" ||
-                      (t.turno || "").toLowerCase() === filtroTurno.toLowerCase()
-                    )
-                    .map((t) => (
-                      <option key={t.id} value={t.id}>{t.turma} ({t.turno})</option>
-                    ))}
+                  {turmas.map((t) => (
+                    <option key={t.id} value={t.id}>{t.nome} ({t.turno})</option>
+                  ))}
                 </select>
               </div>
 

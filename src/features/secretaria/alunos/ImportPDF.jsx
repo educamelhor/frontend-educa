@@ -146,13 +146,10 @@ export default function ImportPDF({ open, onClose, onFinish }) {
     setInativando(true);
     try {
       const { data } = await api.post("/api/alunos/inativar-lote", { alunoIds: ids });
-      const qtdInativados = data?.inativados ?? ids.length;
-      const msg = data?.message || `${qtdInativados} aluno(s) inativado(s).`;
+      const msg = data?.message || `${ids.length} aluno(s) inativado(s).`;
       setPendentesModal(null);
       onFinish && onFinish({
-        _tipo: "inativacao",       // sinaliza ao pai que é o resultado da inativação
         status: "sucesso",
-        inativados: qtdInativados, // quantidade real retornada pelo backend
         message: msg,
       });
       onClose && onClose();
@@ -163,7 +160,6 @@ export default function ImportPDF({ open, onClose, onFinish }) {
       setInativando(false);
     }
   }
-
 
   // ─────────────────────────────────────────────
   // Toggle de seleção individual
@@ -310,7 +306,7 @@ export default function ImportPDF({ open, onClose, onFinish }) {
         {/* Cabeçalho */}
         <div className="flex items-center justify-between px-5 py-4 border-b">
           <h2 className="text-lg font-semibold text-gray-800">
-            Importar via PDF
+            Incluir Estudantes (PDF/XLSX)
           </h2>
           <button
             onClick={onClose}
@@ -324,16 +320,16 @@ export default function ImportPDF({ open, onClose, onFinish }) {
         {/* Corpo */}
         <div className="px-5 py-4 space-y-4">
           <p className="text-sm text-gray-600">
-            Selecione o arquivo <strong>PDF</strong> da Secretaria de Educação
-            contendo a lista da turma. O nome do arquivo deve corresponder
-            exatamente ao nome da turma cadastrada no sistema.
+            Selecione um arquivo <strong>PDF</strong> (padrão do sistema) ou{" "}
+            <strong>XLSX</strong> contendo os alunos. O nome do arquivo será usado
+            como rótulo da turma para o relatório de feedback.
           </p>
 
           {/* Input escondido */}
           <input
             ref={fileRef}
             type="file"
-            accept=".pdf"
+            accept=".pdf,.xlsx"
             hidden
             onChange={handleFileSelected}
           />
@@ -370,8 +366,9 @@ export default function ImportPDF({ open, onClose, onFinish }) {
           )}
 
           <p className="text-xs text-gray-500">
-            💡 Após a importação, uma planilha <em>.xlsx</em> será
-            baixada automaticamente com os alunos identificados.
+            Dica: ao importar <strong>PDF</strong>, a planilha <em>.xlsx</em> será
+            baixada automaticamente com os alunos identificados, incluindo a coluna{" "}
+            <code>turma</code>.
           </p>
         </div>
       </div>

@@ -10,21 +10,10 @@ function normalizaTexto(str) {
     .trim();
 }
 
-// Retorna o ano letivo padrão (ano atual; se janeiro, usa ano anterior)
-function anoLetivoPadrao() {
-  const hoje = new Date();
-  const mes = hoje.getMonth() + 1;
-  return mes <= 1 ? hoje.getFullYear() - 1 : hoje.getFullYear();
-}
-
 export default function BoletimTurmas() {
   const [turnoSelecionado, setTurnoSelecionado] = useState(null);
   const [turmas, setTurmas] = useState([]);
   const [loadingTurmas, setLoadingTurmas] = useState(false);
-
-  // Ano letivo
-  const [anosLetivos, setAnosLetivos] = useState([]);
-  const [anoLetivo, setAnoLetivo] = useState(anoLetivoPadrao());
 
   // Para barra de progresso
   const [progress, setProgress] = useState(0);
@@ -34,16 +23,6 @@ export default function BoletimTurmas() {
   const turnos = ["Matutino", "Vespertino", "Noturno"];
 
   useEffect(() => {
-    // Busca anos letivos disponíveis
-    async function carregarAnos() {
-      try {
-        const res = await api.get("/api/matriculas/anos");
-        setAnosLetivos(Array.isArray(res.data) ? res.data : []);
-      } catch {
-        setAnosLetivos([anoLetivoPadrao()]);
-      }
-    }
-    carregarAnos();
     fetchTurmas();
   }, []);
 
@@ -65,8 +44,7 @@ export default function BoletimTurmas() {
   const turmasFiltradas = turmas.filter(
     (t) =>
       turnoSelecionado &&
-      normalizaTexto(t.turno) === normalizaTexto(turnoSelecionado) &&
-      Number(t.ano) === anoLetivo
+      normalizaTexto(t.turno) === normalizaTexto(turnoSelecionado)
   );
 
   const handleGerarBoletins = async (turma) => {
@@ -126,27 +104,6 @@ export default function BoletimTurmas() {
         Impressão de Boletins
       </h1>
 
-      {/* Seletor de Ano Letivo */}
-      <div className="flex justify-center mb-8">
-        <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-lg shadow-sm border border-blue-200">
-          <label htmlFor="filtro-ano-boletim" className="text-sm font-semibold text-gray-700">Ano Letivo:</label>
-          <select
-            id="filtro-ano-boletim"
-            value={anoLetivo}
-            onChange={(e) => {
-              setAnoLetivo(Number(e.target.value));
-              setTurnoSelecionado(null);
-              setSucesso(false);
-            }}
-            className="border rounded px-2 py-1 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            {anosLetivos.map((a) => (
-              <option key={a} value={a}>{a}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-
       {/* Botões de Turnos */}
       <div className="flex justify-center gap-4 mb-10">
         {turnos.map((turno) => (
@@ -166,31 +123,35 @@ export default function BoletimTurmas() {
         ))}
       </div>
 
-      {/* Cards de turmas */}
+      {/* Mini cards de turmas */}
       {turnoSelecionado && (
-        <div className="flex flex-wrap gap-3 justify-center mb-8">
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2 mb-8">
           {loadingTurmas ? (
-            <p className="text-center text-gray-500 w-full">Turmas sendo carregadas...</p>
+            <p className="col-span-full text-center text-gray-500">
+              Turmas sendo carregadas...
+            </p>
           ) : turmasFiltradas.length > 0 ? (
             turmasFiltradas.map((turma) => (
-              <button
+              <div
                 key={turma.id}
                 onClick={() => !gerando && handleGerarBoletins(turma)}
-                disabled={gerando}
+                className={`bg-gradient-to-b from-blue-200 to-blue-50 rounded-md px-9 py-2 shadow-md cursor-pointer hover:shadow-xl transition-transform hover:scale-105 text-center font-bold text-blue-900 text-base ${
+                  gerando ? "opacity-70 pointer-events-none" : ""
+                }`}
+                style={{
+                  minWidth: "80px",
+                  maxWidth: "100px",
+                  margin: "0 auto",
+                }}
                 title={`Gerar boletins da turma ${turma.turma}`}
                 aria-label={`Gerar boletins da turma ${turma.turma}`}
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl shadow-sm border font-semibold text-sm
-                  whitespace-nowrap transition-all duration-150 select-none
-                  bg-gradient-to-br from-blue-50 to-indigo-100 border-blue-300 text-blue-900
-                  hover:from-blue-100 hover:to-indigo-200 hover:shadow-md hover:scale-105 active:scale-95
-                  ${gerando ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}`}
+                tabIndex={0}
               >
-                <span className="text-base">📋</span>
-                <span>{turma.turma}</span>
-              </button>
+                {turma.turma}
+              </div>
             ))
           ) : (
-            <p className="text-center text-gray-500 w-full">
+            <p className="col-span-full text-center text-gray-500">
               Nenhuma turma encontrada para {turnoSelecionado}.
             </p>
           )}

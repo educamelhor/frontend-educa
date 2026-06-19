@@ -26,12 +26,15 @@ const normalizeName = (name) => {
     .replace(/\s+/g, " ");
   if (n === "ED. FISICA" || n === "EDUCACAO FISICA") return "EDUCACAO FISICA";
   if (n === "PORTUGUES" || n === "LINGUA PORTUGUESA") return "PORTUGUES";
-  // ATENÇÃO: PD1 e PD2 são disciplinas DISTINTAS no POMPS (Parte Diversificada 1 e 2).
-  // "Prática Estudantil" é uma disciplina separada, exclusiva do CEF04-CCMDF.
-  // NÃO colapsar PD1/PD2 com PRATICA ESTUDANTIL — cada uma deve manter seu próprio nome.
-  if (n === "PRATICA ESTUDANTIL") return "PRATICA ESTUDANTIL";
-  if (n === "PD1" || n === "PARTE DIVERSIFICADA I")   return "PD1";
-  if (n === "PD2" || n === "PARTE DIVERSIFICADA II")  return "PD2";
+  if (
+    n === "PRATICA ESTUDANTIL" ||
+    n === "PD1" ||
+    n === "PD2" ||
+    n === "PARTE DIVERSIFICADA I" ||
+    n === "PARTE DIVERSIFICADA II"
+  ) {
+    return "PRATICA ESTUDANTIL";
+  }
   return n;
 };
 
@@ -81,7 +84,6 @@ export default function BoletimAnual({
   const [erro, setErro] = useState("");
   const [showSemNotas, setShowSemNotas] = useState(true);
   const [disciplinasList, setDisciplinasList] = useState([]);
-
 
   // Governança: config flags do boletim
   const [govConfig, setGovConfig] = useState({
@@ -136,15 +138,6 @@ export default function BoletimAnual({
           currentEscolaId = studentObj.escola_id;
           currentEtapa = studentObj.etapa;
           currentTurno = studentObj.turno;
-
-          // Aplicar config de governança pre-carregada (evita re-fetch no modo batch)
-          if (boletimConfigProp) {
-            setGovConfig({
-              exibirFaltas: boletimConfigProp["boletim.exibir_faltas"] !== "0",
-              exibirRanking: boletimConfigProp["boletim.exibir_ranking"] !== "0",
-              exibirMediaRodape: boletimConfigProp["boletim.exibir_media_rodape"] !== "0",
-            });
-          }
         }
       } else {
         // Fluxo individual
@@ -212,7 +205,7 @@ export default function BoletimAnual({
         }
       }
 
-      // Buscar disciplinas da escola (etapa + turno do aluno)
+      // Buscar disciplinas correspondentes de forma dinâmica
       if (currentEscolaId) {
         try {
           const resDisc = await api.get("/api/disciplinas", {
@@ -233,7 +226,6 @@ export default function BoletimAnual({
           console.error("Erro ao carregar disciplinas do aluno:", err);
         }
       }
-
 
       if (typeof onLoaded === "function") onLoaded();
     }
@@ -287,37 +279,20 @@ export default function BoletimAnual({
     if (!targetDisc) return {};
     const targetNameNorm = normalizeName(targetDisc.nome);
 
-    const anoOk = (n) => Number(n.ano) === ANO_CORRENTE;
-    const bimOk = (n) => Number(n.bimestre) === Number(bim);
-
-    // ── 1ª PASSAGEM: match por disciplina_id exato ──────────────────
-    // Garante que PD1 (59) e PD2 (60) nunca se confundam, mesmo
-    // que compartilhassem nome normalizado.
-    const porId = notas.find(
-      (n) =>
-        anoOk(n) &&
-        bimOk(n) &&
-        n.disciplina_id != null &&
-        Number(n.disciplina_id) === Number(discId)
-    );
-    if (porId) return porId;
-
-    // ── 2ª PASSAGEM: fallback por nome normalizado ───────────────────
-    // Cobre casos onde o disciplina_id da nota diverge do ID atual no
-    // cadastro (ex: GEOGRAFIA foi deletada e recriada, gerando novo ID,
-    // mas as notas antigas ainda referenciam o ID anterior).
-    // Seguro porque normalizeName agora distingue corretamente PD1, PD2
-    // e Prática Estudantil — sem risco de colisão entre disciplinas distintas.
     return (
-      notas.find(
-        (n) =>
-          anoOk(n) &&
-          bimOk(n) &&
-          normalizeName(n.disciplina) === targetNameNorm
-      ) || {}
+      notas.find((n) => {
+        const noteNameNorm = normalizeName(n.disciplina);
+        const matchName = noteNameNorm === targetNameNorm;
+        const matchId = n.disciplina_id !== undefined && Number(n.disciplina_id) === Number(discId);
+
+        return (
+          (matchId || matchName) &&
+          Number(n.ano) === ANO_CORRENTE &&
+          Number(n.bimestre) === Number(bim)
+        );
+      }) || {}
     );
   };
-
 
   const calcMedia = (arr) => {
     const hasAnyGrade = arr.some((x) => x.nota != null && x.nota !== "");
@@ -491,16 +466,7 @@ export default function BoletimAnual({
             </tr>
           </thead>
           <tbody>
-            {disciplinas
-              .filter((disc) => {
-                const bims = [1, 2, 3, 4].map((b) => findNota(disc.id, b));
-                return bims.some(
-                  (x) =>
-                    (x.nota != null && x.nota !== "") ||
-                    (x.faltas != null && Number(x.faltas) > 0)
-                );
-              })
-              .map((disc) => {
+            {disciplinas.map((disc) => {
               const bims = [1, 2, 3, 4].map((b) => findNota(disc.id, b));
               const media = calcMedia(bims);
               const mediaFin = media;

@@ -604,7 +604,11 @@ export default function PlataformaModulos() {
     setManutSaving(true); setManutError(null);
     try {
       await api.post('/api/plataforma/manutencao', {
-        inicio: manutInicio, fim: manutFim, mensagem: manutMsg,
+        // datetime-local dá horário local (Brasília) — converte para UTC ISO
+        // para alinhar com NOW() do MySQL (servidor em UTC)
+        inicio: new Date(manutInicio).toISOString(),
+        fim: new Date(manutFim).toISOString(),
+        mensagem: manutMsg,
       });
       await fetchManutencao();
       setManutInicio(''); setManutFim('');

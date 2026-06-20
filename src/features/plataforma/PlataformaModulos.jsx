@@ -560,6 +560,7 @@ export default function PlataformaModulos() {
   const [manutMsg, setManutMsg] = useState('O sistema está em manutenção programada.');
   const [manutSaving, setManutSaving] = useState(false);
   const [manutError, setManutError] = useState(null);
+  const [showManutConfirm, setShowManutConfirm] = useState(false);
 
   // Count active modules per school (for the left panel display)
   const [schoolModulosCounts, setSchoolModulosCounts] = useState({});
@@ -589,8 +590,17 @@ export default function PlataformaModulos() {
   }, []);
   useEffect(() => { fetchManutencao(); }, [fetchManutencao]);
 
-  const handleAtivarManutencao = async () => {
+  const handleAtivarManutencao = () => {
     if (!manutInicio || !manutFim) { setManutError('Informe início e fim.'); return; }
+    const dtInicio = new Date(manutInicio);
+    const dtFim = new Date(manutFim);
+    if (dtFim <= dtInicio) { setManutError("'Fim' deve ser posterior a 'Início'."); return; }
+    setManutError(null);
+    setShowManutConfirm(true);
+  };
+
+  const handleConfirmarManutencao = async () => {
+    setShowManutConfirm(false);
     setManutSaving(true); setManutError(null);
     try {
       await api.post('/api/plataforma/manutencao', {
@@ -1049,6 +1059,100 @@ export default function PlataformaModulos() {
           </div>
         )}
       </div>
+
+      {/* ════ MODAL CONFIRMAÇÃO MANUTENÇÃO ════ */}
+      {showManutConfirm && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 9999,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)',
+        }}
+          onClick={() => setShowManutConfirm(false)}
+        >
+          <div
+            style={{
+              background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
+              borderRadius: '20px', padding: '32px 36px',
+              border: '1px solid rgba(245,158,11,0.2)',
+              boxShadow: '0 25px 60px rgba(0,0,0,0.5), 0 0 40px rgba(245,158,11,0.08)',
+              maxWidth: '460px', width: '90%',
+              animation: 'fadeInUp 0.25s ease',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{ textAlign: 'center', marginBottom: '24px' }}>
+              <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>⚠️</div>
+              <h3 style={{
+                fontSize: '1.25rem', fontWeight: 700, color: '#f1f5f9', margin: 0,
+                letterSpacing: '-0.01em',
+              }}>
+                Confirmar Manutenção
+              </h3>
+              <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '6px' }}>
+                {new Date(manutInicio) <= new Date()
+                  ? 'A manutenção será ativada IMEDIATAMENTE.'
+                  : 'A manutenção será ativada no horário agendado.'}
+              </p>
+            </div>
+
+            {/* Info card */}
+            <div style={{
+              background: 'rgba(245,158,11,0.06)',
+              border: '1px solid rgba(245,158,11,0.15)',
+              borderRadius: '12px', padding: '16px', marginBottom: '20px',
+            }}>
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Período</span>
+              </div>
+              <div style={{ fontSize: '0.95rem', color: '#fbbf24', fontWeight: 600, marginBottom: '4px' }}>
+                {new Date(manutInicio).toLocaleString('pt-BR')}
+                <span style={{ color: '#475569', margin: '0 8px' }}>→</span>
+                {new Date(manutFim).toLocaleString('pt-BR')}
+              </div>
+              <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '8px', fontStyle: 'italic' }}>
+                "{manutMsg}"
+              </div>
+            </div>
+
+            {/* Warning */}
+            <div style={{
+              background: 'rgba(239,68,68,0.06)',
+              border: '1px solid rgba(239,68,68,0.12)',
+              borderRadius: '10px', padding: '12px', marginBottom: '24px',
+              fontSize: '0.8rem', color: '#f87171', lineHeight: 1.5,
+            }}>
+              ⚠️ Nenhum usuário escolar poderá acessar o sistema durante este período. Apenas o CEO continua com acesso.
+            </div>
+
+            {/* Buttons */}
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button
+                onClick={() => setShowManutConfirm(false)}
+                style={{
+                  flex: 1, padding: '10px 16px', borderRadius: '10px',
+                  background: 'rgba(255,255,255,0.05)', color: '#94a3b8',
+                  border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer',
+                  fontWeight: 600, fontSize: '0.9rem', transition: 'all 0.2s',
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmarManutencao}
+                style={{
+                  flex: 1, padding: '10px 16px', borderRadius: '10px',
+                  background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: '#fff',
+                  border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem',
+                  boxShadow: '0 4px 12px rgba(245,158,11,0.3)', transition: 'all 0.2s',
+                }}
+              >
+                🔒 Confirmar Ativação
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ════ TWO-PANEL BODY ════ */}
       <div style={S.body}>

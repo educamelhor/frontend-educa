@@ -458,6 +458,13 @@ export default function Login() {
           localStorage.removeItem('modulos_ativos'); // null = irrestrito (CEO/super_admin)
         }
 
+        // ✅ Sincroniza escola_tipo (ex: ['CCMDF']) para regras CCMDF no Sidebar
+        if (Array.isArray(data.escola_tipo)) {
+          localStorage.setItem('escola_tipo', JSON.stringify(data.escola_tipo));
+        } else {
+          localStorage.removeItem('escola_tipo');
+        }
+
         setTipoMensagem("sucesso");
         setMensagem("Login realizado com sucesso!");
         setSuccess(true);
@@ -504,6 +511,13 @@ export default function Login() {
           localStorage.setItem('modulos_ativos', JSON.stringify(data.modulos_ativos));
         } else if (data.modulos_ativos === null) {
           localStorage.removeItem('modulos_ativos');
+        }
+
+        // ✅ Sincroniza escola_tipo (ex: ['CCMDF']) para regras CCMDF no Sidebar
+        if (Array.isArray(data.escola_tipo)) {
+          localStorage.setItem('escola_tipo', JSON.stringify(data.escola_tipo));
+        } else {
+          localStorage.removeItem('escola_tipo');
         }
 
         await carregarDisciplinasProfessor(data.token);
@@ -745,6 +759,13 @@ export default function Login() {
         localStorage.removeItem('modulos_ativos');
       }
 
+      // ✅ Sincroniza escola_tipo (ex: ['CCMDF']) para regras CCMDF no Sidebar
+      if (Array.isArray(data.escola_tipo)) {
+        localStorage.setItem('escola_tipo', JSON.stringify(data.escola_tipo));
+      } else {
+        localStorage.removeItem('escola_tipo');
+      }
+
       await carregarDisciplinasProfessor(data.token);
 
       const cpfLs = data?.cpf || data?.usuario?.cpf || data?.user?.cpf || "";
@@ -820,6 +841,13 @@ export default function Login() {
         localStorage.setItem('modulos_ativos', JSON.stringify(data.modulos_ativos));
       } else if (data.modulos_ativos === null) {
         localStorage.removeItem('modulos_ativos');
+      }
+
+      // ✅ Sincroniza escola_tipo (ex: ['CCMDF']) para regras CCMDF no Sidebar
+      if (Array.isArray(data.escola_tipo)) {
+        localStorage.setItem('escola_tipo', JSON.stringify(data.escola_tipo));
+      } else {
+        localStorage.removeItem('escola_tipo');
       }
 
       // ✅ DISCIPLINAS do professor (para Conteúdos)

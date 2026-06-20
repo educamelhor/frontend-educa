@@ -167,9 +167,15 @@ export default function Sidebar({ isOpen, onClose }) {
   const getPerfil = () =>
     String(localStorage.getItem('perfil') || '').toLowerCase().trim();
   const perfil = getPerfil();
-  const isDisciplinar = perfil === 'disciplinar' || perfil === 'diretor_disciplinar' || perfil === 'militar';
+  const isDisciplinar = perfil === 'disciplinar' || perfil === 'diretor_disciplinar' || perfil === 'militar' || perfil === 'comandante';
   const isProfessor = perfil === 'professor';
   const isSecretario = perfil === 'secretario' || perfil === 'secretaria';
+
+  // ── CCMDF: Diretor Pedagógico NUNCA vê Disciplinar (hardcoded, sem CEO) ──
+  const escolaTipoRaw = localStorage.getItem('escola_tipo');
+  const escolaTipo = (() => { try { const v = JSON.parse(escolaTipoRaw || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } })();
+  const isCCMDF = escolaTipo.includes('CCMDF');
+  const isDiretorPedagogicoCCMDF = isCCMDF && (perfil === 'diretor' || perfil === 'vice_diretor');
 
   // Começando pelos 3 módulos solicitados
   const canConteudos = isScopeEscola && !isDisciplinar && !isProfessor && hasPerm('conteudos:ver');
@@ -450,7 +456,7 @@ export default function Sidebar({ isOpen, onClose }) {
         ) : (
           <>
             {/* LINK: Home */}
-            {!isDisciplinar && !isProfessor && !isCoord && !isSecretario && (
+            {!isProfessor && !isCoord && !isSecretario && (
             <Link to="/home" className={getMainLinkClasses('/home')}>
               <HomeIcon className="h-5 w-5 mr-2" />
               Home
@@ -458,7 +464,7 @@ export default function Sidebar({ isOpen, onClose }) {
             )}
 
             {/* LINK: Estudantes */}
-            {!isDisciplinar && !isProfessor && !isCoord && !isSecretario && hasModulo('secretaria.alunos') && (
+            {!isDisciplinar && !isProfessor && !isCoord && !isSecretario && hasModulo('estudantes') && (
             <Link to="/alunos" className={getMainLinkClasses('/alunos')}>
               <UserGroupIcon className="h-5 w-5 mr-2" />
               Estudantes
@@ -1030,6 +1036,7 @@ export default function Sidebar({ isOpen, onClose }) {
                 </li>
                 )}
 
+                {hasModulo('monitoramento.visitantes_registrar') && (
                 <li>
                   <Link
                     to="/monitoramento/visitantes/registrar"
@@ -1038,6 +1045,8 @@ export default function Sidebar({ isOpen, onClose }) {
                     <PencilSquareIcon className="h-5 w-5 mr-2" /> Visitantes — Registrar
                   </Link>
                 </li>
+                )}
+                {hasModulo('monitoramento.visitantes_historico') && (
                 <li>
                   <Link
                     to="/monitoramento/visitantes/historico"
@@ -1046,6 +1055,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     <ClockIcon className="h-5 w-5 mr-2" /> Visitantes — Histórico
                   </Link>
                 </li>
+                )}
                 {hasModulo('monitoramento.embeddings') && (
                 <li>
                   <Link
@@ -1068,7 +1078,7 @@ export default function Sidebar({ isOpen, onClose }) {
 
 
 
-        {isScopeEscola && !isProfessor && !isCoord && !isSecretario && hasModulo('disciplinar') && (
+        {isScopeEscola && !isProfessor && !isCoord && !isSecretario && !isDiretorPedagogicoCCMDF && hasModulo('disciplinar') && (
           <>
             {/* ───────────────────────────────
                 GRUPO: Disciplinar
@@ -1337,7 +1347,7 @@ export default function Sidebar({ isOpen, onClose }) {
             MENUS INDEPENDENTES: Regimentos, Manual, Suporte
             (Acessíveis a qualquer usuário logado)
         ─────────────────────────────── */}
-        {isScopeEscola && !isSecretario && (
+        {isScopeEscola && !isSecretario && !isDiretorPedagogicoCCMDF && (
           <>
             {hasModulo('disciplinar.regimentos') && (
             <Link

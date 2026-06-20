@@ -95,9 +95,10 @@ const MODULOS_TREE = [
   {
     id: 'monitoramento', label: 'Monitoramento', icon: '📡',
     filhos: [
-      { id: 'monitoramento.painel', label: 'Painel' },
-      { id: 'monitoramento.alertas', label: 'Alertas' },
-      { id: 'monitoramento.embeddings', label: 'Embeddings' },
+      { id: 'monitoramento.painel', label: 'Painel ao Vivo' },
+      { id: 'monitoramento.visitantes_registrar', label: 'Visitantes – Registrar' },
+      { id: 'monitoramento.visitantes_historico', label: 'Visitantes – Histórico' },
+      { id: 'monitoramento.embeddings', label: 'Embeddings – Gerar' },
     ]
   },
   {
@@ -133,6 +134,10 @@ const MODULOS_TREE = [
       { id: 'direcao.cadastro', label: 'Cadastro de Membros' },
       { id: 'direcao.governanca', label: 'Governança' },
     ]
+  },
+  {
+    id: 'estudantes', label: 'Estudantes', icon: '🎒',
+    filhos: []
   },
 ];
 

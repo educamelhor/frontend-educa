@@ -1078,7 +1078,7 @@ export default function Sidebar({ isOpen, onClose }) {
 
 
 
-        {isScopeEscola && !isProfessor && !isCoord && !isSecretario && !isDiretorPedagogicoCCMDF && hasModulo('disciplinar') && (
+        {isScopeEscola && !isProfessor && !isCoord && !isSecretario && !isDiretorPedagogicoCCMDF && (isDisciplinar || hasModulo('disciplinar')) && (
           <>
             {/* ───────────────────────────────
                 GRUPO: Disciplinar
@@ -1095,7 +1095,7 @@ export default function Sidebar({ isOpen, onClose }) {
             </div>
 
             <ul className="ml-4 mb-2">
-                {hasModulo('disciplinar.alunos') && (
+                {(isDisciplinar || hasModulo('disciplinar.alunos')) && (
                 <li>
                   <Link
                     to="/disciplinar/alunos"
@@ -1105,7 +1105,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
                 )}
-                {hasModulo('disciplinar.responsaveis') && (
+                {(isDisciplinar || hasModulo('disciplinar.responsaveis')) && (
                 <li>
                   <Link
                     to="/disciplinar/responsaveis"
@@ -1115,7 +1115,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
                 )}
-                {(perfil === 'diretor' || perfil === 'militar') && hasModulo('disciplinar.equipe') && (
+                {(perfil === 'diretor' || perfil === 'militar') && (isDisciplinar || hasModulo('disciplinar.equipe')) && (
                 <li>
                   <Link
                     to="/disciplinar/equipe"
@@ -1125,7 +1125,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
                 )}
-                {hasModulo('disciplinar.fo_coletivo') && (
+                {(isDisciplinar || hasModulo('disciplinar.fo_coletivo')) && (
                 <li>
                   <Link
                     to="/disciplinar/fo-coletivo"
@@ -1141,7 +1141,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
                 )}
-                {hasModulo('disciplinar.historico') && (
+                {(isDisciplinar || hasModulo('disciplinar.historico')) && (
                 <li>
                   <Link
                     to="/disciplinar/historico"
@@ -1157,7 +1157,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
                 )}
-                {hasModulo('disciplinar.atas') && (
+                {(isDisciplinar || hasModulo('disciplinar.atas')) && (
                 <li>
                   <Link
                     to="/disciplinar/atas"
@@ -1173,7 +1173,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
                 )}
-                {hasModulo('disciplinar.liberacao') && (
+                {(isDisciplinar || hasModulo('disciplinar.liberacao')) && (
                 <li>
                   <Link
                     to="/disciplinar/liberacao"
@@ -1189,7 +1189,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
                 )}
-                {hasModulo('disciplinar.metadados') && (
+                {(isDisciplinar || hasModulo('disciplinar.metadados')) && (
                 <li>
                   <Link
                     to="/disciplinar/metadados"
@@ -1349,7 +1349,7 @@ export default function Sidebar({ isOpen, onClose }) {
         ─────────────────────────────── */}
         {isScopeEscola && !isSecretario && !isDiretorPedagogicoCCMDF && (
           <>
-            {hasModulo('disciplinar.regimentos') && (
+            {(isDisciplinar || hasModulo('disciplinar.regimentos')) && (
             <Link
               to="/disciplinar/regimentos"
               className={getMainLinkClasses('/disciplinar/regimentos')}
@@ -1359,7 +1359,7 @@ export default function Sidebar({ isOpen, onClose }) {
             </Link>
             )}
 
-            {hasModulo('disciplinar.manual') && (
+            {(isDisciplinar || hasModulo('disciplinar.manual')) && (
             <Link
               to="/disciplinar/manual"
               className={getMainLinkClasses('/disciplinar/manual')}
@@ -1367,14 +1367,17 @@ export default function Sidebar({ isOpen, onClose }) {
               <BookOpenIcon className="h-5 w-5 mr-2" /> Manual
             </Link>
             )}
-
-            <Link
-              to="/disciplinar/suporte"
-              className={getMainLinkClasses('/disciplinar/suporte')}
-            >
-              <QuestionMarkCircleIcon className="h-5 w-5 mr-2" /> Suporte
-            </Link>
           </>
+        )}
+
+        {/* SUPORTE: renderiza para TODOS os perfis (sem hasModulo, sem isDiretorPedagogicoCCMDF) */}
+        {isScopeEscola && !isSecretario && (
+          <Link
+            to="/disciplinar/suporte"
+            className={getMainLinkClasses('/disciplinar/suporte')}
+          >
+            <QuestionMarkCircleIcon className="h-5 w-5 mr-2" /> Suporte
+          </Link>
         )}
 
         {canAgenteEduca && hasModulo('agente_educa') && (

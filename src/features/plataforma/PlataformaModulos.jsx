@@ -582,13 +582,32 @@ export default function PlataformaModulos() {
   useEffect(() => { fetchEscolas(); }, [fetchEscolas]);
 
   // ── Fetch manutenção status ───────────────────────────────────────────────────────
+  const [manutEncerrada, setManutEncerrada] = useState(false);
+  const manutAnteriorRef = React.useRef(null);
+
   const fetchManutencao = useCallback(async () => {
     try {
       const { data } = await api.get('/api/plataforma/manutencao');
-      setManutData(data?.manutencao || null);
+      const novo = data?.manutencao || null;
+
+      // Detecta transição: era ativa → agora null (expirou)
+      if (manutAnteriorRef.current && !novo) {
+        setManutEncerrada(true);
+        setTimeout(() => setManutEncerrada(false), 8000);
+      }
+      manutAnteriorRef.current = novo;
+      setManutData(novo);
     } catch { setManutData(null); }
   }, []);
+
   useEffect(() => { fetchManutencao(); }, [fetchManutencao]);
+
+  // Auto-refresh a cada 30s quando manutenção está ativa
+  useEffect(() => {
+    if (!manutData) return;
+    const interval = setInterval(fetchManutencao, 30000);
+    return () => clearInterval(interval);
+  }, [manutData, fetchManutencao]);
 
   const handleAtivarManutencao = () => {
     if (!manutInicio || !manutFim) { setManutError('Informe início e fim.'); return; }
@@ -996,6 +1015,18 @@ export default function PlataformaModulos() {
               border: '1px solid rgba(16,185,129,0.2)',
             }}>
               ○ Inativo
+            </span>
+          )}
+          {manutEncerrada && (
+            <span style={{
+              padding: '4px 12px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 700,
+              background: 'linear-gradient(135deg, rgba(16,185,129,0.15), rgba(52,211,153,0.1))',
+              color: '#34d399',
+              border: '1px solid rgba(16,185,129,0.3)',
+              boxShadow: '0 0 12px rgba(16,185,129,0.2)',
+              animation: 'fadeInUp 0.4s ease',
+            }}>
+              ✅ Manutenção encerrada — usuários com acesso restaurado
             </span>
           )}
         </div>

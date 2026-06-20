@@ -1105,7 +1105,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
                 )}
-                {(perfil === 'diretor' || perfil === 'militar') && (
+                {(perfil === 'diretor' || perfil === 'militar') && hasModulo('disciplinar.equipe') && (
                 <li>
                   <Link
                     to="/disciplinar/equipe"
@@ -1242,7 +1242,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
                 )}
-                {(perfil === 'diretor' || perfil === 'militar') && (
+                {(perfil === 'diretor' || perfil === 'militar') && hasModulo('disciplinar.equipe') && (
                 <li>
                   <Link
                     to="/disciplinar/equipe"

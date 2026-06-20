@@ -46,8 +46,10 @@ const MODULOS_TREE = [
     filhos: [
       { id: 'pedagogico.conselho', label: 'Conselho de Classe' },
       { id: 'pedagogico.conteudos', label: 'Conteúdos' },
-      { id: 'pedagogico.relatorios', label: 'Relatórios' },
+      { id: 'pedagogico.solicitacoes', label: 'Solicitações' },
+      { id: 'pedagogico.provas', label: 'Provas' },
       { id: 'pedagogico.correcoes', label: 'Correções' },
+      { id: 'pedagogico.relatorios', label: 'Relatórios' },
     ]
   },
   {

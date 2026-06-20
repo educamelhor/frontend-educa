@@ -1005,7 +1005,7 @@ export default function PlataformaModulos() {
             <div style={{ flex: 1, minWidth: '200px' }}>
               <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '4px' }}>Período</div>
               <div style={{ fontSize: '0.9rem', color: '#cbd5e1' }}>
-                {new Date(manutData.inicio).toLocaleString('pt-BR')} → {new Date(manutData.fim).toLocaleString('pt-BR')}
+                {new Date(manutData.inicio).toLocaleString('pt-BR', {timeZone:'America/Sao_Paulo'})} → {new Date(manutData.fim).toLocaleString('pt-BR', {timeZone:'America/Sao_Paulo'})}
               </div>
               <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '4px' }}>
                 {manutData.mensagem}
@@ -1110,9 +1110,9 @@ export default function PlataformaModulos() {
                 <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Período</span>
               </div>
               <div style={{ fontSize: '0.95rem', color: '#fbbf24', fontWeight: 600, marginBottom: '4px' }}>
-                {new Date(manutInicio).toLocaleString('pt-BR')}
+                {new Date(manutInicio).toLocaleString('pt-BR', {timeZone:'America/Sao_Paulo'})}
                 <span style={{ color: '#475569', margin: '0 8px' }}>→</span>
-                {new Date(manutFim).toLocaleString('pt-BR')}
+                {new Date(manutFim).toLocaleString('pt-BR', {timeZone:'America/Sao_Paulo'})}
               </div>
               <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '8px', fontStyle: 'italic' }}>
                 "{manutMsg}"

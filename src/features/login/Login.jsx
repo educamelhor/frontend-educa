@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import api from "../../services/api"; // Serviço centralizado para requisições
+import ManutencaoScreen from '../manutencao/ManutencaoScreen';
 
 function isEmailValido(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || "").trim());
@@ -44,7 +45,21 @@ export default function Login() {
   // 📌 Campos do formulário
   const location = useLocation();
 
-  const [tipoAcesso, setTipoAcesso] = useState("escola"); // "escola" | "plataforma"
+  const [tipoAcesso, setTipoAcesso] = useState(() => {
+    // Detecta ?acesso=plataforma (link CEO vindo da ManutencaoScreen)
+    const params = new URLSearchParams(window.location.search);
+    return params.get('acesso') === 'plataforma' ? 'plataforma' : 'escola';
+  });
+
+  // ✅ Manutenção programada — checa antes de renderizar o formulário
+  const [manutencao, setManutencao] = useState(null);
+  useEffect(() => {
+    api.get('/status')
+      .then(res => {
+        if (res.data?.maintenance) setManutencao(res.data);
+      })
+      .catch(() => {}); // silencioso — se falhar, mostra login normalmente
+  }, []);
 
   const [usuario, setUsuario] = useState("");
   const [senha, setSenha] = useState("");
@@ -880,6 +895,11 @@ export default function Login() {
       setLoading(false);
     }
   };
+
+  // ✅ Manutenção ativa + NÃO é acesso CEO → mostra tela de manutenção
+  if (manutencao && tipoAcesso !== 'plataforma') {
+    return <ManutencaoScreen data={manutencao} />;
+  }
 
   return (
     <div className="h-screen w-screen relative flex items-center justify-center">

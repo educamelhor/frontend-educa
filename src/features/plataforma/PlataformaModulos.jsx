@@ -553,6 +553,14 @@ export default function PlataformaModulos() {
   const [error, setError] = useState(null);
   const [copyError, setCopyError] = useState(null);
 
+  // ── Manutenção Programada ──
+  const [manutData, setManutData] = useState(null);
+  const [manutInicio, setManutInicio] = useState('');
+  const [manutFim, setManutFim] = useState('');
+  const [manutMsg, setManutMsg] = useState('O sistema está em manutenção programada.');
+  const [manutSaving, setManutSaving] = useState(false);
+  const [manutError, setManutError] = useState(null);
+
   // Count active modules per school (for the left panel display)
   const [schoolModulosCounts, setSchoolModulosCounts] = useState({});
 
@@ -571,6 +579,39 @@ export default function PlataformaModulos() {
   }, []);
 
   useEffect(() => { fetchEscolas(); }, [fetchEscolas]);
+
+  // ── Fetch manutenção status ───────────────────────────────────────────────────────
+  const fetchManutencao = useCallback(async () => {
+    try {
+      const { data } = await api.get('/api/plataforma/manutencao');
+      setManutData(data?.manutencao || null);
+    } catch { setManutData(null); }
+  }, []);
+  useEffect(() => { fetchManutencao(); }, [fetchManutencao]);
+
+  const handleAtivarManutencao = async () => {
+    if (!manutInicio || !manutFim) { setManutError('Informe início e fim.'); return; }
+    setManutSaving(true); setManutError(null);
+    try {
+      await api.post('/api/plataforma/manutencao', {
+        inicio: manutInicio, fim: manutFim, mensagem: manutMsg,
+      });
+      await fetchManutencao();
+      setManutInicio(''); setManutFim('');
+    } catch (err) {
+      setManutError(err.response?.data?.message || 'Erro ao ativar manutenção.');
+    } finally { setManutSaving(false); }
+  };
+
+  const handleCancelarManutencao = async () => {
+    setManutSaving(true); setManutError(null);
+    try {
+      await api.delete('/api/plataforma/manutencao');
+      setManutData(null);
+    } catch (err) {
+      setManutError(err.response?.data?.message || 'Erro ao cancelar.');
+    } finally { setManutSaving(false); }
+  };
 
   // ── Load modules for a school ───────────────────────────────────────────────
   const fetchModulos = useCallback(async (id) => {
@@ -911,6 +952,102 @@ export default function PlataformaModulos() {
             {schoolLoading ? 'Atualizando...' : 'Atualizar'}
           </button>
         </div>
+      </div>
+
+      {/* ════ MANUTENÇÃO PROGRAMADA ════ */}
+      <div style={{
+        margin: '0 24px 20px', padding: '20px 24px',
+        background: 'rgba(30,41,59,0.5)', borderRadius: '16px',
+        border: `1px solid ${manutData ? 'rgba(245,158,11,0.3)' : 'rgba(255,255,255,0.06)'}`,
+        backdropFilter: 'blur(12px)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+          <span style={{ fontSize: '1.3rem' }}>🛠️</span>
+          <span style={{ fontWeight: 700, fontSize: '1rem', color: '#f1f5f9' }}>Manutenção Programada</span>
+          {manutData && (
+            <span style={{
+              padding: '3px 10px', borderRadius: '12px', fontSize: '0.7rem', fontWeight: 700,
+              textTransform: 'uppercase', letterSpacing: '0.05em',
+              background: manutData.em_andamento ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)',
+              color: manutData.em_andamento ? '#f87171' : '#fbbf24',
+              border: `1px solid ${manutData.em_andamento ? 'rgba(239,68,68,0.3)' : 'rgba(245,158,11,0.3)'}`,
+            }}>
+              {manutData.em_andamento ? '● Em andamento' : '◑ Agendada'}
+            </span>
+          )}
+          {!manutData && (
+            <span style={{
+              padding: '3px 10px', borderRadius: '12px', fontSize: '0.7rem', fontWeight: 700,
+              background: 'rgba(16,185,129,0.1)', color: '#34d399',
+              border: '1px solid rgba(16,185,129,0.2)',
+            }}>
+              ○ Inativo
+            </span>
+          )}
+        </div>
+
+        {manutData ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: '200px' }}>
+              <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '4px' }}>Período</div>
+              <div style={{ fontSize: '0.9rem', color: '#cbd5e1' }}>
+                {new Date(manutData.inicio).toLocaleString('pt-BR')} → {new Date(manutData.fim).toLocaleString('pt-BR')}
+              </div>
+              <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '4px' }}>
+                {manutData.mensagem}
+              </div>
+            </div>
+            <button
+              onClick={handleCancelarManutencao}
+              disabled={manutSaving}
+              style={{
+                padding: '8px 20px', borderRadius: '10px', fontWeight: 600, fontSize: '0.85rem',
+                background: 'rgba(239,68,68,0.12)', color: '#f87171',
+                border: '1px solid rgba(239,68,68,0.25)', cursor: 'pointer',
+                transition: 'all 0.2s', opacity: manutSaving ? 0.6 : 1,
+              }}
+            >
+              {manutSaving ? 'Cancelando...' : '✕ Cancelar Manutenção'}
+            </button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <div style={{ flex: '1 1 180px' }}>
+              <label style={{ fontSize: '0.7rem', color: '#64748b', display: 'block', marginBottom: '4px' }}>Início</label>
+              <input type="datetime-local" value={manutInicio} onChange={e => setManutInicio(e.target.value)}
+                style={{ width: '100%', padding: '7px 10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(15,23,42,0.6)', color: '#e2e8f0', fontSize: '0.85rem' }} />
+            </div>
+            <div style={{ flex: '1 1 180px' }}>
+              <label style={{ fontSize: '0.7rem', color: '#64748b', display: 'block', marginBottom: '4px' }}>Fim</label>
+              <input type="datetime-local" value={manutFim} onChange={e => setManutFim(e.target.value)}
+                style={{ width: '100%', padding: '7px 10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(15,23,42,0.6)', color: '#e2e8f0', fontSize: '0.85rem' }} />
+            </div>
+            <div style={{ flex: '2 1 250px' }}>
+              <label style={{ fontSize: '0.7rem', color: '#64748b', display: 'block', marginBottom: '4px' }}>Mensagem</label>
+              <input type="text" value={manutMsg} onChange={e => setManutMsg(e.target.value)} placeholder="Mensagem para os usuários"
+                style={{ width: '100%', padding: '7px 10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(15,23,42,0.6)', color: '#e2e8f0', fontSize: '0.85rem' }} />
+            </div>
+            <button
+              onClick={handleAtivarManutencao}
+              disabled={manutSaving}
+              style={{
+                padding: '8px 20px', borderRadius: '10px', fontWeight: 600, fontSize: '0.85rem',
+                background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: '#fff',
+                border: 'none', cursor: 'pointer', transition: 'all 0.2s',
+                boxShadow: '0 2px 8px rgba(245,158,11,0.3)', whiteSpace: 'nowrap',
+                opacity: manutSaving ? 0.6 : 1,
+              }}
+            >
+              {manutSaving ? 'Ativando...' : '🚀 Ativar Manutenção'}
+            </button>
+          </div>
+        )}
+
+        {manutError && (
+          <div style={{ marginTop: '8px', fontSize: '0.8rem', color: '#f87171', background: 'rgba(239,68,68,0.08)', padding: '6px 12px', borderRadius: '8px' }}>
+            {manutError}
+          </div>
+        )}
       </div>
 
       {/* ════ TWO-PANEL BODY ════ */}

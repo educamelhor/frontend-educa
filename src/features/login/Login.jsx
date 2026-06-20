@@ -54,7 +54,7 @@ export default function Login() {
   // ✅ Manutenção programada — checa antes de renderizar o formulário
   const [manutencao, setManutencao] = useState(null);
   useEffect(() => {
-    api.get('/status')
+    api.get('/api/sistema/status')
       .then(res => {
         if (res.data?.maintenance) setManutencao(res.data);
       })

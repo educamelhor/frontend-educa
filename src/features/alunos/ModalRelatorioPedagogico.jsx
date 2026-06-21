@@ -210,8 +210,9 @@ export default function ModalRelatorioPedagogico({ open, onClose, aluno, somente
                             </div>
                         </div>
 
-                        {/* Botão Adicionar — oculto para professor */}
-                        {!somenteLeitura && (
+                        {/* Botão Adicionar — professor também pode registrar.
+                            Ao abrir o formulário, professor só vê CATEGORIA + OCORRÊNCIA
+                            (DESCRIÇÃO e REGISTRO INTERNO ocultados via somenteLeitura em ModalNovaOcorrencia). */}
                         <div className="flex-shrink-0">
                             <button
                                 onClick={() => {
@@ -225,7 +226,6 @@ export default function ModalRelatorioPedagogico({ open, onClose, aluno, somente
                                 + Adicionar
                             </button>
                         </div>
-                        )}
                     </div>
 
                     {/* Tabela */}
@@ -360,10 +360,10 @@ export default function ModalRelatorioPedagogico({ open, onClose, aluno, somente
                 aluno={aluno}
                 onOcorrenciaCriada={fetchOcorrencias}
                 ocorrenciaInicial={ocorrenciaSelecionada}
-                readonly={viewMode || somenteLeitura}
+                readonly={viewMode}  {/* só bloqueia quando é modo visualização */}
                 editMode={editMode}
                 perfilUsuario={perfil}
-                somenteLeitura={somenteLeitura}
+                somenteLeitura={somenteLeitura}  {/* oculta DESCRIÇÃO e REGISTRO INTERNO para professor */}
             />
 
             {/* Modal Finalizar */}

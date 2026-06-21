@@ -7,7 +7,7 @@ import { AcademicCapIcon } from "@heroicons/react/24/solid";
 import api from "../../services/api";
 import ModalNovaOcorrenciaPedagogica from "./ModalNovaOcorrenciaPedagogica";
 
-export default function ModalRelatorioPedagogico({ open, onClose, aluno }) {
+export default function ModalRelatorioPedagogico({ open, onClose, aluno, somenteLeitura = false }) {
     const [novaOcorrenciaOpen, setNovaOcorrenciaOpen] = useState(false);
     const [ocorrenciaSelecionada, setOcorrenciaSelecionada] = useState(null);
     const [viewMode, setViewMode] = useState(false);
@@ -210,6 +210,8 @@ export default function ModalRelatorioPedagogico({ open, onClose, aluno }) {
                             </div>
                         </div>
 
+                        {/* Botão Adicionar — oculto para professor */}
+                        {!somenteLeitura && (
                         <div className="flex-shrink-0">
                             <button
                                 onClick={() => {
@@ -223,6 +225,7 @@ export default function ModalRelatorioPedagogico({ open, onClose, aluno }) {
                                 + Adicionar
                             </button>
                         </div>
+                        )}
                     </div>
 
                     {/* Tabela */}
@@ -288,6 +291,8 @@ export default function ModalRelatorioPedagogico({ open, onClose, aluno }) {
                                             </td>
                                             <td className="px-4 py-3 text-center">
                                                 <div className="flex justify-center gap-2">
+                                                    {/* Finalizar — oculto para professor */}
+                                                    {!somenteLeitura && (
                                                     <button
                                                         onClick={() => handleOpenFinalizar(oc)}
                                                         disabled={oc.status === "CANCELADA"}
@@ -302,6 +307,8 @@ export default function ModalRelatorioPedagogico({ open, onClose, aluno }) {
                                                     >
                                                         <ClipboardDocumentCheckIcon className="h-5 w-5" />
                                                     </button>
+                                                    )}
+                                                    {/* Visualizar — disponível para todos */}
                                                     <button
                                                         onClick={() => {
                                                             setOcorrenciaSelecionada(oc);
@@ -314,12 +321,17 @@ export default function ModalRelatorioPedagogico({ open, onClose, aluno }) {
                                                     >
                                                         <EyeIcon className="h-5 w-5" />
                                                     </button>
+                                                    {/* Editar / Excluir — ocultos para professor */}
+                                                    {!somenteLeitura && (
+                                                    <>
                                                     <button onClick={() => handleOpenEdit(oc)} className="text-blue-600 hover:text-blue-800" title="Editar">
                                                         <PencilSquareIcon className="h-5 w-5" />
                                                     </button>
                                                     <button onClick={() => handleOpenDelete(oc)} className="text-red-600 hover:text-red-800" title="Excluir">
                                                         <TrashIcon className="h-5 w-5" />
                                                     </button>
+                                                    </>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
@@ -348,9 +360,10 @@ export default function ModalRelatorioPedagogico({ open, onClose, aluno }) {
                 aluno={aluno}
                 onOcorrenciaCriada={fetchOcorrencias}
                 ocorrenciaInicial={ocorrenciaSelecionada}
-                readonly={viewMode}
+                readonly={viewMode || somenteLeitura}
                 editMode={editMode}
                 perfilUsuario={perfil}
+                somenteLeitura={somenteLeitura}
             />
 
             {/* Modal Finalizar */}

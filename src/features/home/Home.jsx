@@ -444,7 +444,7 @@ export default function Home() {
     const all = [];
 
     if (isGestao) {
-      if (hasModulo('secretaria.alunos'))
+      if (hasModulo('estudantes'))
         all.push({ icon: <Icons.Alunos />, label: 'Estudantes', desc: 'Consultar e gerenciar alunos', to: '/alunos', color: 'blue' });
       if (hasModulo('secretaria'))
         all.push({ icon: <Icons.Secretaria />, label: 'Secretaria', desc: 'Turmas, professores e horários', to: '/secretaria/alunos', color: 'indigo' });

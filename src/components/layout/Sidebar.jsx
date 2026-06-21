@@ -1465,9 +1465,11 @@ export default function Sidebar({ isOpen, onClose }) {
                 )}
               </>
             )}
+          </>
+        )}
 
-            {/* ─── GRUPO: Secretaria (Professor NÃO tem acesso) ─── */}
-            {!isProfessor && hasModulo('secretaria') && (
+        {/* ─── GRUPO: Secretaria (Professor NÃO tem acesso) ─── */}
+        {!isProfessor && !isDisciplinar && hasModulo('secretaria') && (
             <>
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-6 transition"
@@ -1675,12 +1677,10 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
                 )}
-              </ul>
+            </ul>
             )}
             </>
             )}
-          </>
-        )}
 
         {isScopeEscola && !isDisciplinar && !isProfessor && !isSecretario && hasModulo('pedagogico') && (
           <>

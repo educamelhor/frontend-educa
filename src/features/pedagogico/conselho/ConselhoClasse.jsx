@@ -2,7 +2,8 @@ import React, { useState, useEffect } from "react";
 import api from "../../../services/api";
 import ModalBoletim from "../../boletim/ModalBoletim";
 import ModalFichaAluno from "./ModalFichaAluno";
-import ModalZoomFoto from "./ModalZoomFoto"; // 👈 Import do modal de zoom
+import ModalRegistroConselho from "./ModalRegistroConselho";
+import ModalZoomFoto from "./ModalZoomFoto";
 import {
   EyeIcon,
   DocumentTextIcon,
@@ -39,11 +40,15 @@ export default function ConselhoClasse() {
   const [anosLetivos, setAnosLetivos] = useState([]);
   const [anoLetivo, setAnoLetivo] = useState(anoLetivoPadrao());
 
+  // Registro de Conselho de Classe (EyeIcon)
+  const [modalRegistroOpen, setModalRegistroOpen] = useState(false);
+  const [alunoRegistro, setAlunoRegistro]         = useState(null);
+
   // Boletim
   const [modalBoletimOpen, setModalBoletimOpen] = useState(false);
   const [codigoAlunoBoletim, setCodigoAlunoBoletim] = useState(null);
 
-  // Ficha do Estudante (modal)
+  // Ficha do Estudante (IdentificationIcon)
   const [modalFichaOpen, setModalFichaOpen] = useState(false);
   const [codigoAlunoFicha, setCodigoAlunoFicha] = useState(null);
 
@@ -261,13 +266,15 @@ export default function ConselhoClasse() {
                       {/* Ações */}
                       <td className="py-2 px-2 text-center">
                         <div className="flex justify-center gap-3">
-                          {/* Ficha do Estudante — disponível para todas as escolas.
-                              O Relatório Disciplinar dentro da Ficha já é guardado
-                              por isCCMDF em FichaAluno.jsx. */}
-                          <button onClick={() => abrirModalFicha(aluno.codigo)} title="Ficha do estudante">
+                          {/* 👁 EyeIcon = Registro de Conselho de Classe */}
+                          <button
+                            onClick={() => { setAlunoRegistro(aluno); setModalRegistroOpen(true); }}
+                            title="Registro de Conselho de Classe"
+                          >
                             <EyeIcon className="h-6 w-6 text-gray-600 hover:text-blue-600" />
                           </button>
 
+                          {/* DocumentTextIcon = Boletim */}
                           <button
                             onClick={() => abrirModalBoletim(aluno.codigo)}
                             title="Visualizar boletim"
@@ -275,6 +282,7 @@ export default function ConselhoClasse() {
                             <DocumentTextIcon className="h-6 w-6 text-gray-600 hover:text-green-600" />
                           </button>
 
+                          {/* IdentificationIcon = Ficha do Estudante */}
                           <button
                             onClick={() => abrirModalFicha(aluno.codigo)}
                             title="Ficha do estudante"
@@ -282,7 +290,8 @@ export default function ConselhoClasse() {
                             <IdentificationIcon className="h-6 w-6 text-gray-600 hover:text-purple-600" />
                           </button>
 
-                          <button>
+                          {/* Lápis = Edição */}
+                          <button title="Editar">
                             <PencilIcon className="h-6 w-6 text-gray-600 hover:text-yellow-600" />
                           </button>
                         </div>
@@ -298,7 +307,15 @@ export default function ConselhoClasse() {
         </div>
       )}
 
-      {/* Modais */}
+      {/* Modal: Registro de Conselho de Classe (EyeIcon) */}
+      {modalRegistroOpen && alunoRegistro && (
+        <ModalRegistroConselho
+          aluno={alunoRegistro}
+          onClose={() => { setModalRegistroOpen(false); setAlunoRegistro(null); }}
+        />
+      )}
+
+      {/* Modal: Boletim */}
       {modalBoletimOpen && (
         <ModalBoletim
           open={modalBoletimOpen}
@@ -307,6 +324,7 @@ export default function ConselhoClasse() {
         />
       )}
 
+      {/* Modal: Ficha do Estudante (IdentificationIcon) */}
       {modalFichaOpen && (
         <ModalFichaAluno
           open={modalFichaOpen}
@@ -315,6 +333,7 @@ export default function ConselhoClasse() {
         />
       )}
 
+      {/* Modal: Zoom Foto */}
       {zoomOpen && (
         <ModalZoomFoto
           open={zoomOpen}

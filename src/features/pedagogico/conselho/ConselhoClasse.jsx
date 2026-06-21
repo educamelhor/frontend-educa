@@ -55,6 +55,7 @@ export default function ConselhoClasse() {
   const [zoomSrc, setZoomSrc] = useState("");
   const [zoomAlt, setZoomAlt] = useState("");
 
+
   function abrirModalBoletim(codigo) {
     setCodigoAlunoBoletim(codigo);
     setModalBoletimOpen(true);
@@ -260,7 +261,10 @@ export default function ConselhoClasse() {
                       {/* Ações */}
                       <td className="py-2 px-2 text-center">
                         <div className="flex justify-center gap-3">
-                          <button>
+                          {/* Ficha do Estudante — disponível para todas as escolas.
+                              O Relatório Disciplinar dentro da Ficha já é guardado
+                              por isCCMDF em FichaAluno.jsx. */}
+                          <button onClick={() => abrirModalFicha(aluno.codigo)} title="Ficha do estudante">
                             <EyeIcon className="h-6 w-6 text-gray-600 hover:text-blue-600" />
                           </button>
 

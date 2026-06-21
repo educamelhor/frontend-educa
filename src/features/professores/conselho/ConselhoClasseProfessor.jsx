@@ -9,6 +9,11 @@
 //  ❌ Ação de edição (lápis) — exclusiva da direção/coordenação
 //  ❌ Ficha completa do aluno — oculta para professor
 //
+// ── FILTRO DE TURMAS ────────────────────────────────────────────────────────
+// Usa /api/professores/me/turmas (retorna APENAS as turmas do professor logado).
+// NÃO usa /api/turmas (que retorna TODAS as turmas da escola, independente de turno).
+// Isso garante que um professor do matutino não veja turmas do vespertino/noturno.
+//
 // Este arquivo é INDEPENDENTE de ConselhoClasse.jsx (pedagogico/conselho).
 // Alterações aqui NÃO afetam o conselho da direção/coordenação e vice-versa.
 // ============================================================================
@@ -84,20 +89,26 @@ export default function ConselhoClasseProfessor() {
   const fetchTurmas = async () => {
     setLoadingTurmas(true);
     try {
-      const escola_id = localStorage.getItem("escola_id") || 1;
-      const { data } = await api.get("/api/turmas", {
-        params: { escola_id },
-      });
-      setTurmas(data);
+      // ✅ Usa /api/professores/me/turmas para retornar APENAS as turmas
+      // onde o professor logado leciona — sem vazamento de turmas de outros turnos.
+      const { data } = await api.get("/api/professores/me/turmas");
+      // Aceita tanto { turmas: [...] } quanto array direto
+      const lista = Array.isArray(data?.turmas)
+        ? data.turmas
+        : Array.isArray(data)
+        ? data
+        : [];
+      setTurmas(lista);
     } catch (error) {
-      console.error("Erro ao buscar turmas:", error);
+      console.error("Erro ao buscar turmas do professor:", error);
       setTurmas([]);
     } finally {
       setLoadingTurmas(false);
     }
   };
 
-  // Professor vê apenas turmas do ano letivo selecionado
+  // Professor vê apenas suas turmas — filtradas por turno e ano letivo
+  // (o backend já limita ao professor logado via /me/turmas)
   const turmasFiltradas = turmas.filter(
     (t) =>
       turnoSelecionado &&

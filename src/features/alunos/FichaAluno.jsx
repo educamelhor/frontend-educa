@@ -25,6 +25,20 @@ export default function FichaAluno({ codigo: codigoProp }) {
   const isDisciplinar = location.pathname.includes("/disciplinar");
   const isProfessor = String(localStorage.getItem('perfil') || '').toLowerCase().trim() === 'professor';
 
+  // ✅ Guard CCMDF: Relatório Disciplinar é EXCLUSIVO de escolas cívico-militares.
+  // Lemos escola_tipo do localStorage (salvo em todas as rotas de login).
+  // Escolas não-CCMDF (ex: POMPS, demais escolas) jamais exibem o bloco disciplinar,
+  // independentemente do perfil (diretor, coordenador, etc.).
+  const isCCMDF = (() => {
+    try {
+      const raw = localStorage.getItem('escola_tipo');
+      const tipos = JSON.parse(raw || '[]');
+      return Array.isArray(tipos) && tipos.includes('CCMDF');
+    } catch {
+      return false;
+    }
+  })();
+
   const [aluno, setAluno] = useState(null);
   const [erro, setErro] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -354,7 +368,8 @@ export default function FichaAluno({ codigo: codigoProp }) {
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9ca3af', marginBottom: 12 }}>
             RELATÓRIOS
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: isProfessor ? '1fr' : '1fr 1fr', gap: 12 }}>
+          {/* Grade: 2 colunas se escola CCMDF e não-professor; 1 coluna caso contrário */}
+          <div style={{ display: 'grid', gridTemplateColumns: (isCCMDF && !isProfessor) ? '1fr 1fr' : '1fr', gap: 12 }}>
             {/* Relatório Pedagógico */}
             <div
               onClick={() => setModalPedagogicoOpen(true)}
@@ -376,8 +391,8 @@ export default function FichaAluno({ codigo: codigoProp }) {
               <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>Ver histórico →</div>
             </div>
 
-            {/* Relatório Disciplinar */}
-            {!isProfessor && (
+            {/* Relatório Disciplinar — EXCLUSIVO de escolas CCMDF e perfis não-professor */}
+            {isCCMDF && !isProfessor && (
               <div
                 onClick={() => setModalRelatorioOpen(true)}
                 role="button"
@@ -419,11 +434,14 @@ export default function FichaAluno({ codigo: codigoProp }) {
       </div>
 
       {/* Modais */}
-      <ModalRelatorioDisciplinar
-        open={modalRelatorioOpen}
-        onClose={() => setModalRelatorioOpen(false)}
-        aluno={aluno}
-      />
+      {/* ModalRelatorioDisciplinar só é montado em escolas CCMDF */}
+      {isCCMDF && (
+        <ModalRelatorioDisciplinar
+          open={modalRelatorioOpen}
+          onClose={() => setModalRelatorioOpen(false)}
+          aluno={aluno}
+        />
+      )}
 
       <ModalRelatorioPedagogico
         open={modalPedagogicoOpen}

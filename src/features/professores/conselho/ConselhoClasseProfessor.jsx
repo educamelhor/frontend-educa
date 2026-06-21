@@ -27,6 +27,7 @@ import React, { useState, useEffect } from "react";
 import api from "../../../services/api";
 import ModalBoletim from "../../boletim/ModalBoletim";
 import ModalFichaAlunoProfessor from "./ModalFichaAlunoProfessor";
+import ModalRegistroConselho from "../../pedagogico/conselho/ModalRegistroConselho";
 import ModalZoomFoto from "../../pedagogico/conselho/ModalZoomFoto";
 import {
   EyeIcon,
@@ -64,11 +65,15 @@ export default function ConselhoClasseProfessor() {
   const [anosLetivos, setAnosLetivos] = useState([]);
   const [anoLetivo, setAnoLetivo] = useState(anoLetivoPadrao());
 
+  // Registro de Conselho de Classe (EyeIcon)
+  const [modalRegistroOpen, setModalRegistroOpen] = useState(false);
+  const [alunoRegistro, setAlunoRegistro]         = useState(null);
+
   // Boletim
   const [modalBoletimOpen, setModalBoletimOpen] = useState(false);
   const [codigoAlunoBoletim, setCodigoAlunoBoletim] = useState(null);
 
-  // Ficha do Estudante (somente leitura para professor)
+  // Ficha do Estudante / somente leitura (IdentificationIcon)
   const [modalFichaOpen, setModalFichaOpen] = useState(false);
   const [codigoAlunoFicha, setCodigoAlunoFicha] = useState(null);
 
@@ -299,10 +304,10 @@ export default function ConselhoClasseProfessor() {
                           por isCCMDF em FichaAluno.jsx — não aqui. */}
                       <td className="py-2 px-2 text-center">
                         <div className="flex justify-center gap-3">
-                          {/* Ficha do Estudante — somente leitura */}
+                          {/* 👁 EyeIcon = Registro de Conselho de Classe */}
                           <button
-                            onClick={() => abrirModalFicha(aluno.codigo)}
-                            title="Ficha do estudante"
+                            onClick={() => { setAlunoRegistro(aluno); setModalRegistroOpen(true); }}
+                            title="Registro de Conselho de Classe"
                           >
                             <EyeIcon className="h-6 w-6 text-gray-600 hover:text-blue-600" />
                           </button>
@@ -315,7 +320,7 @@ export default function ConselhoClasseProfessor() {
                             <DocumentTextIcon className="h-6 w-6 text-gray-600 hover:text-green-600" />
                           </button>
 
-                          {/* Ficha do Estudante — ícone secundário */}
+                          {/* IdentificationIcon = Ficha do Estudante */}
                           <button
                             onClick={() => abrirModalFicha(aluno.codigo)}
                             title="Ficha do estudante"
@@ -323,7 +328,7 @@ export default function ConselhoClasseProfessor() {
                             <IdentificationIcon className="h-6 w-6 text-gray-600 hover:text-purple-600" />
                           </button>
 
-                          {/* Lápis — edição exclusiva da direção (não funcional para professor) */}
+                          {/* Lápis — edição exclusiva da direção (desabilitado) */}
                           <button title="Edição (somente direção/coordenação)" disabled className="opacity-30 cursor-not-allowed">
                             <PencilIcon className="h-6 w-6 text-gray-400" />
                           </button>
@@ -340,6 +345,14 @@ export default function ConselhoClasseProfessor() {
         </div>
       )}
 
+      {/* Modal: Registro de Conselho de Classe (EyeIcon) */}
+      {modalRegistroOpen && alunoRegistro && (
+        <ModalRegistroConselho
+          aluno={alunoRegistro}
+          onClose={() => { setModalRegistroOpen(false); setAlunoRegistro(null); }}
+        />
+      )}
+
       {/* Modal: Boletim */}
       {modalBoletimOpen && (
         <ModalBoletim
@@ -349,7 +362,7 @@ export default function ConselhoClasseProfessor() {
         />
       )}
 
-      {/* Modal: Ficha do Estudante (somente leitura para professor) */}
+      {/* Modal: Ficha do Estudante - somente leitura (IdentificationIcon) */}
       {modalFichaOpen && (
         <ModalFichaAlunoProfessor
           open={modalFichaOpen}

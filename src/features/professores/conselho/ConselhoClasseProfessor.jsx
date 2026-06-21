@@ -4,10 +4,15 @@
 //
 // Governança aplicada neste arquivo:
 //  ✅ Visualizar boletim do aluno
-//  ❌ Relatório Disciplinar — professor NÃO tem acesso
-//  ❌ Relatório Pedagógico — professor NÃO registra (Descrição / Registro Interno)
+//  ✅ Ficha do Estudante — professor pode visualizar (sem Relatório Disciplinar)
+//  ✅ Relatório Pedagógico — somente leitura (guard somenteLeitura=true)
+//  ❌ Relatório Disciplinar — NUNCA exibido (guard em FichaAluno.jsx via isCCMDF)
 //  ❌ Ação de edição (lápis) — exclusiva da direção/coordenação
-//  ❌ Ficha completa do aluno — oculta para professor
+//
+// ── CAMPO DO NOME DA TURMA ──────────────────────────────────────────────────
+// /api/professores/me/turmas retorna campo `nome` (ex: "8º ANO A")
+// /api/turmas retorna campo `turma` (ex: "8º ANO A")
+// Este componente usa `turma.nome || turma.turma` para compatibilidade com ambos.
 //
 // ── FILTRO DE TURMAS ────────────────────────────────────────────────────────
 // Usa /api/professores/me/turmas (retorna APENAS as turmas do professor logado).
@@ -21,8 +26,14 @@
 import React, { useState, useEffect } from "react";
 import api from "../../../services/api";
 import ModalBoletim from "../../boletim/ModalBoletim";
+import ModalFichaAlunoProfessor from "./ModalFichaAlunoProfessor";
 import ModalZoomFoto from "../../pedagogico/conselho/ModalZoomFoto";
-import { DocumentTextIcon } from "@heroicons/react/24/outline";
+import {
+  EyeIcon,
+  DocumentTextIcon,
+  IdentificationIcon,
+  PencilIcon,
+} from "@heroicons/react/24/outline";
 import { getFotoURL } from "../../../utils/foto";
 
 function normalizaTexto(str) {
@@ -53,9 +64,13 @@ export default function ConselhoClasseProfessor() {
   const [anosLetivos, setAnosLetivos] = useState([]);
   const [anoLetivo, setAnoLetivo] = useState(anoLetivoPadrao());
 
-  // Boletim (única ação disponível para professor)
+  // Boletim
   const [modalBoletimOpen, setModalBoletimOpen] = useState(false);
   const [codigoAlunoBoletim, setCodigoAlunoBoletim] = useState(null);
+
+  // Ficha do Estudante (somente leitura para professor)
+  const [modalFichaOpen, setModalFichaOpen] = useState(false);
+  const [codigoAlunoFicha, setCodigoAlunoFicha] = useState(null);
 
   // Cache-buster para fotos
   const [fotoStamp] = useState(Date.now());
@@ -68,6 +83,11 @@ export default function ConselhoClasseProfessor() {
   function abrirModalBoletim(codigo) {
     setCodigoAlunoBoletim(codigo);
     setModalBoletimOpen(true);
+  }
+
+  function abrirModalFicha(codigo) {
+    setCodigoAlunoFicha(codigo);
+    setModalFichaOpen(true);
   }
 
   const turnos = ["Matutino", "Vespertino", "Noturno"];
@@ -196,22 +216,26 @@ export default function ConselhoClasseProfessor() {
               Turmas sendo carregadas...
             </p>
           ) : turmasFiltradas.length > 0 ? (
-            turmasFiltradas.map((turma) => (
-              <button
-                key={turma.id}
-                onClick={() => handleClickTurma(turma)}
-                title={`Selecionar turma ${turma.turma}`}
-                aria-label={`Selecionar turma ${turma.turma}`}
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl shadow-sm border font-semibold text-sm
-                  whitespace-nowrap transition-all duration-150 select-none
-                  bg-gradient-to-br from-blue-50 to-indigo-100 border-blue-300 text-blue-900
-                  hover:from-blue-100 hover:to-indigo-200 hover:shadow-md hover:scale-105 active:scale-95
-                  ${turmaSelecionada?.id === turma.id ? "ring-2 ring-green-500 border-green-400 from-green-50 to-emerald-100" : "cursor-pointer"}`}
-              >
-                <span className="text-base">📋</span>
-                <span>{turma.turma}</span>
-              </button>
-            ))
+            turmasFiltradas.map((turma) => {
+              // /me/turmas retorna campo `nome`; /api/turmas retorna campo `turma`
+              const nomeTurma = turma.nome || turma.turma || "";
+              return (
+                <button
+                  key={turma.id}
+                  onClick={() => handleClickTurma(turma)}
+                  title={`Selecionar turma ${nomeTurma}`}
+                  aria-label={`Selecionar turma ${nomeTurma}`}
+                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl shadow-sm border font-semibold text-sm
+                    whitespace-nowrap transition-all duration-150 select-none
+                    bg-gradient-to-br from-blue-50 to-indigo-100 border-blue-300 text-blue-900
+                    hover:from-blue-100 hover:to-indigo-200 hover:shadow-md hover:scale-105 active:scale-95
+                    ${turmaSelecionada?.id === turma.id ? "ring-2 ring-green-500 border-green-400 from-green-50 to-emerald-100" : "cursor-pointer"}`}
+                >
+                  <span className="text-base">📋</span>
+                  <span>{nomeTurma}</span>
+                </button>
+              );
+            })
           ) : (
             <p className="w-full text-center text-gray-500">
               Nenhuma turma encontrada para {turnoSelecionado} no ano {anoLetivo}.
@@ -224,13 +248,13 @@ export default function ConselhoClasseProfessor() {
       {turmaSelecionada && (
         <div className="bg-white rounded-lg shadow-md p-4">
           <h2 className="text-2xl font-semibold mb-4 text-blue-800">
-            Alunos da Turma {turmaSelecionada.turma}
+            Alunos da Turma {turmaSelecionada.nome || turmaSelecionada.turma}
           </h2>
 
           {/* Aviso de governança */}
           <div className="mb-4 px-4 py-2 bg-blue-50 border border-blue-200 rounded text-sm text-blue-700">
-            ℹ️ Como professor, você pode visualizar o <strong>boletim</strong> dos alunos.
-            Relatórios disciplinares e registros pedagógicos são gerenciados pela coordenação e direção.
+            ℹ️ Como professor, você pode visualizar o <strong>boletim</strong> e a <strong>ficha</strong> dos alunos.
+            O Relatório Disciplinar é gerenciado pela coordenação e direção.
           </div>
 
           {loadingAlunos ? (
@@ -270,10 +294,20 @@ export default function ConselhoClasseProfessor() {
                         {aluno.estudante}
                       </td>
 
-                      {/* Ações — Professor: apenas Boletim */}
+                      {/* Ações — todos os ícones disponíveis para professor.
+                          O Relatório Disciplinar é bloqueado DENTRO da Ficha
+                          por isCCMDF em FichaAluno.jsx — não aqui. */}
                       <td className="py-2 px-2 text-center">
                         <div className="flex justify-center gap-3">
-                          {/* ✅ Boletim — permitido */}
+                          {/* Ficha do Estudante — somente leitura */}
+                          <button
+                            onClick={() => abrirModalFicha(aluno.codigo)}
+                            title="Ficha do estudante"
+                          >
+                            <EyeIcon className="h-6 w-6 text-gray-600 hover:text-blue-600" />
+                          </button>
+
+                          {/* Boletim */}
                           <button
                             onClick={() => abrirModalBoletim(aluno.codigo)}
                             title="Visualizar boletim"
@@ -281,11 +315,18 @@ export default function ConselhoClasseProfessor() {
                             <DocumentTextIcon className="h-6 w-6 text-gray-600 hover:text-green-600" />
                           </button>
 
-                          {/*
-                            ❌ EyeIcon (Ficha) — oculto para professor
-                            ❌ IdentificationIcon (Relatórios) — oculto para professor
-                            ❌ PencilIcon (Edição) — oculto para professor
-                          */}
+                          {/* Ficha do Estudante — ícone secundário */}
+                          <button
+                            onClick={() => abrirModalFicha(aluno.codigo)}
+                            title="Ficha do estudante"
+                          >
+                            <IdentificationIcon className="h-6 w-6 text-gray-600 hover:text-purple-600" />
+                          </button>
+
+                          {/* Lápis — edição exclusiva da direção (não funcional para professor) */}
+                          <button title="Edição (somente direção/coordenação)" disabled className="opacity-30 cursor-not-allowed">
+                            <PencilIcon className="h-6 w-6 text-gray-400" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -305,6 +346,15 @@ export default function ConselhoClasseProfessor() {
           open={modalBoletimOpen}
           codigo={codigoAlunoBoletim}
           onClose={() => setModalBoletimOpen(false)}
+        />
+      )}
+
+      {/* Modal: Ficha do Estudante (somente leitura para professor) */}
+      {modalFichaOpen && (
+        <ModalFichaAlunoProfessor
+          open={modalFichaOpen}
+          codigo={codigoAlunoFicha}
+          onClose={() => setModalFichaOpen(false)}
         />
       )}
 

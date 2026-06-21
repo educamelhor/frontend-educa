@@ -396,10 +396,10 @@ export default function ModalRelatorioPedagogico({ open, onClose, aluno, somente
                 aluno={aluno}
                 onOcorrenciaCriada={fetchOcorrencias}
                 ocorrenciaInicial={ocorrenciaSelecionada}
-                readonly={viewMode}  {/* só bloqueia quando é modo visualização */}
+                readonly={viewMode}
                 editMode={editMode}
                 perfilUsuario={perfil}
-                somenteLeitura={somenteLeitura}  {/* oculta DESCRIÇÃO e REGISTRO INTERNO para professor */}
+                somenteLeitura={somenteLeitura}
             />
 
             {/* Modal Finalizar */}

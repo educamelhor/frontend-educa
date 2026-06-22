@@ -1,22 +1,74 @@
 // features/pedagogico/conselho/ModalFichaConselhoClasse.jsx
 // ============================================================================
 // Modal de registros do Conselho de Classe — módulo PEDAGÓGICO
-// Cópia isolada de professores/conselho/ModalFichaConselhoClasse.jsx
-// Não compartilhado com outros módulos para evitar vazamento de permissões.
 //
 // Abre via EyeIcon na tabela de alunos do ConselhoClasse (pedagógico).
-// Exibe os registros já lançados para o aluno naquela turma e permite
-// que a direção/coordenação adicione e edite novos registros.
+//
+// Regra LGPD de foto:
+//   O backend já retorna foto=null / foto_url=null quando o responsável
+//   NÃO autorizou o uso de imagem (consentimento_imagem !== 1).
+//   O frontend simplesmente verifica se a URL existe: se não existir,
+//   exibe as iniciais do nome do aluno. Nunca tenta carregar foto
+//   sem consentimento.
 //
 // API:
-//  GET  /api/conselho/registros?aluno_codigo=&turma_id=
-//  POST /api/conselho/registros  { aluno_codigo, turma_id, texto }
-//  PUT  /api/conselho/registros/:id  { texto }
+//   GET  /api/conselho/registros?aluno_codigo=&turma_id=
+//   POST /api/conselho/registros  { aluno_codigo, turma_id, texto }
+//   PUT  /api/conselho/registros/:id  { texto }
+//
+// Este arquivo é EXCLUSIVO do módulo pedagogico/conselho.
+// NÃO impacta nenhum outro módulo.
 // ============================================================================
-import React, { useState, useEffect } from "react";
-import { XMarkIcon, PencilSquareIcon, CheckIcon } from "@heroicons/react/24/outline";
-import { AcademicCapIcon } from "@heroicons/react/24/solid";
+
+import React, { useState, useEffect, useRef } from "react";
+import {
+  XMarkIcon,
+  PencilSquareIcon,
+  CheckIcon,
+  XCircleIcon,
+} from "@heroicons/react/24/outline";
 import api from "../../../services/api";
+import { getFotoURL } from "../../../utils/foto";
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+function getInitials(nome) {
+  if (!nome) return "?";
+  const parts = nome.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 1) return parts[0][0].toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function formatarData(iso) {
+  if (!iso) return "";
+  try {
+    return new Date(iso).toLocaleString("pt-BR", {
+      day: "2-digit", month: "2-digit", year: "numeric",
+      hour: "2-digit", minute: "2-digit",
+    });
+  } catch {
+    return iso;
+  }
+}
+
+// Paleta de cores para o avatar com iniciais (baseada no nome)
+const AVATAR_COLORS = [
+  ["#1e3a5f", "#3b82f6"],
+  ["#064e3b", "#10b981"],
+  ["#581c87", "#a855f7"],
+  ["#7f1d1d", "#ef4444"],
+  ["#92400e", "#f59e0b"],
+  ["#0c4a6e", "#0ea5e9"],
+  ["#1e1b4b", "#6366f1"],
+];
+
+function getAvatarColors(nome) {
+  if (!nome) return AVATAR_COLORS[0];
+  const idx = nome.charCodeAt(0) % AVATAR_COLORS.length;
+  return AVATAR_COLORS[idx];
+}
+
+// ─── Componente ──────────────────────────────────────────────────────────────
 
 export default function ModalFichaConselhoClasse({ open, aluno, turma, onClose }) {
   const [registros, setRegistros] = useState([]);
@@ -25,13 +77,32 @@ export default function ModalFichaConselhoClasse({ open, aluno, turma, onClose }
   const [salvando, setSalvando] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
   const [editandoTexto, setEditandoTexto] = useState("");
+  const [fotoError, setFotoError] = useState(false);
 
+  const dialogRef = useRef(null);
+
+  // ── Busca registros ──────────────────────────────────────────────────────
   useEffect(() => {
     if (open && aluno?.codigo) {
+      setFotoError(false);
       fetchRegistros();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (!open) {
+      setNovoTexto("");
+      setEditandoId(null);
+      setEditandoTexto("");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, aluno]);
+
+  // Fecha com ESC
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => { if (e.key === "Escape") onClose?.(); };
+    window.addEventListener("keydown", onKey);
+    setTimeout(() => dialogRef.current?.focus(), 0);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
 
   const fetchRegistros = async () => {
     setLoading(true);
@@ -41,7 +112,7 @@ export default function ModalFichaConselhoClasse({ open, aluno, turma, onClose }
       const res = await api.get("/api/conselho/registros", { params });
       setRegistros(res.data?.registros || []);
     } catch (err) {
-      console.error("Erro ao carregar registros do conselho:", err);
+      console.error("[ConselhoPedagogico] Erro ao carregar registros:", err);
     } finally {
       setLoading(false);
     }
@@ -59,8 +130,8 @@ export default function ModalFichaConselhoClasse({ open, aluno, turma, onClose }
       setNovoTexto("");
       fetchRegistros();
     } catch (err) {
-      console.error("Erro ao salvar registro:", err);
-      alert("Erro ao salvar registro.");
+      console.error("[ConselhoPedagogico] Erro ao salvar registro:", err);
+      alert("Erro ao salvar o registro.");
     } finally {
       setSalvando(false);
     }
@@ -74,136 +145,442 @@ export default function ModalFichaConselhoClasse({ open, aluno, turma, onClose }
       setEditandoTexto("");
       fetchRegistros();
     } catch (err) {
-      console.error("Erro ao editar registro:", err);
-      alert("Erro ao editar registro.");
-    }
-  };
-
-  const formatarData = (iso) => {
-    if (!iso) return "";
-    try {
-      return new Date(iso).toLocaleString("pt-BR", {
-        day: "2-digit", month: "2-digit", year: "numeric",
-        hour: "2-digit", minute: "2-digit",
-      });
-    } catch {
-      return iso;
+      console.error("[ConselhoPedagogico] Erro ao editar registro:", err);
+      alert("Erro ao editar o registro.");
     }
   };
 
   if (!open || !aluno) return null;
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
+  // ── Foto com LGPD ────────────────────────────────────────────────────────
+  const fotoURL = !fotoError ? getFotoURL(aluno, { stamp: undefined }) : null;
+  const initials = getInitials(aluno.estudante);
+  const [avatarBg, avatarText] = getAvatarColors(aluno.estudante);
+  const mostrarFoto = !!(aluno.foto || aluno.foto_url) && !fotoError;
 
-        {/* Header */}
-        <div className="px-6 py-4 border-b flex justify-between items-center bg-gradient-to-r from-blue-50 to-indigo-50">
-          <div className="flex items-center gap-3">
-            <AcademicCapIcon className="h-6 w-6 text-blue-800" />
-            <div>
-              <h2 className="text-lg font-bold text-blue-900">Ficha do Conselho de Classe</h2>
-              <p className="text-sm text-blue-600">{aluno.estudante} — {turma?.turma || turma?.nome || ""}</p>
+  return (
+    // ── Backdrop ────────────────────────────────────────────────────────────
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(4px)" }}
+    >
+      {/* Fundo clicável para fechar */}
+      <div className="absolute inset-0" onClick={onClose} />
+
+      {/* ── Container do modal ─────────────────────────────────────────────── */}
+      <div
+        ref={dialogRef}
+        tabIndex={-1}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Ficha do Conselho de Classe — ${aluno.estudante}`}
+        className="relative flex flex-col outline-none"
+        style={{
+          width: "min(860px, 96vw)",
+          maxHeight: "92vh",
+          borderRadius: 20,
+          overflow: "hidden",
+          boxShadow: "0 32px 80px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.06)",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+
+        {/* ══ HEADER GRADIENTE PREMIUM ══════════════════════════════════════ */}
+        <div
+          style={{
+            background: "linear-gradient(135deg, #0f2847 0%, #1e3a5f 55%, #1a4a7a 100%)",
+            padding: "28px 32px 24px",
+            position: "relative",
+            flexShrink: 0,
+          }}
+        >
+          {/* Brilho decorativo */}
+          <div style={{
+            position: "absolute", top: -60, right: -40,
+            width: 200, height: 200, borderRadius: "50%",
+            background: "radial-gradient(circle, rgba(99,179,237,0.12) 0%, transparent 70%)",
+            pointerEvents: "none",
+          }} />
+
+          {/* Botão fechar */}
+          <button
+            onClick={onClose}
+            title="Fechar"
+            style={{
+              position: "absolute", top: 16, right: 16,
+              padding: 6, borderRadius: 8, border: "none", cursor: "pointer",
+              background: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.7)",
+              transition: "all 0.15s",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.2)"; e.currentTarget.style.color = "#fff"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.1)"; e.currentTarget.style.color = "rgba(255,255,255,0.7)"; }}
+          >
+            <XMarkIcon style={{ width: 20, height: 20 }} />
+          </button>
+
+          {/* Label topo */}
+          <div style={{
+            fontSize: 10, fontWeight: 700, letterSpacing: "0.14em",
+            textTransform: "uppercase", color: "rgba(255,255,255,0.45)",
+            marginBottom: 16, display: "flex", alignItems: "center", gap: 6,
+          }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+            </svg>
+            CONSELHO DE CLASSE
+          </div>
+
+          {/* Linha do aluno: avatar + info */}
+          <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+
+            {/* Avatar — LGPD: só exibe foto se tiver consentimento */}
+            <div style={{ flexShrink: 0, position: "relative" }}>
+              {mostrarFoto ? (
+                <img
+                  src={fotoURL}
+                  alt={aluno.estudante}
+                  style={{
+                    width: 72, height: 72, borderRadius: "50%",
+                    objectFit: "cover",
+                    border: "3px solid rgba(255,255,255,0.25)",
+                    boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
+                  }}
+                  onError={() => setFotoError(true)}
+                />
+              ) : (
+                <div style={{
+                  width: 72, height: 72, borderRadius: "50%",
+                  background: `linear-gradient(135deg, ${avatarBg}, ${avatarText})`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 24, fontWeight: 800, color: "#fff",
+                  border: "3px solid rgba(255,255,255,0.2)",
+                  boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
+                  letterSpacing: "-1px",
+                  fontFamily: "'Inter', 'Segoe UI', sans-serif",
+                }}>
+                  {initials}
+                </div>
+              )}
+
+              {/* Badge online */}
+              <div style={{
+                position: "absolute", bottom: 3, right: 3,
+                width: 14, height: 14, borderRadius: "50%",
+                background: "#22c55e", border: "2px solid #0f2847",
+              }} />
+            </div>
+
+            {/* Dados do aluno */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <h2 style={{
+                margin: 0, fontSize: 20, fontWeight: 800,
+                color: "#fff", lineHeight: 1.2,
+                fontFamily: "'Inter', 'Montserrat', 'Segoe UI', sans-serif",
+                whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+              }}>
+                {aluno.estudante}
+              </h2>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}>
+                {turma?.turma && (
+                  <span style={{
+                    display: "inline-flex", alignItems: "center", gap: 5,
+                    fontSize: 12, fontWeight: 600,
+                    background: "rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.9)",
+                    borderRadius: 99, padding: "4px 12px",
+                    border: "1px solid rgba(255,255,255,0.15)",
+                  }}>
+                    🎓 {turma.turma}
+                  </span>
+                )}
+                {aluno.turno && (
+                  <span style={{
+                    display: "inline-flex", alignItems: "center", gap: 5,
+                    fontSize: 12, fontWeight: 600,
+                    background: "rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.9)",
+                    borderRadius: 99, padding: "4px 12px",
+                    border: "1px solid rgba(255,255,255,0.15)",
+                  }}>
+                    🕐 {aluno.turno}
+                  </span>
+                )}
+                {aluno.codigo && (
+                  <span style={{
+                    display: "inline-flex", alignItems: "center", gap: 5,
+                    fontSize: 12, fontWeight: 600,
+                    background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.6)",
+                    borderRadius: 99, padding: "4px 12px",
+                    border: "1px solid rgba(255,255,255,0.08)",
+                  }}>
+                    # {aluno.codigo}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Counter de registros */}
+            <div style={{
+              flexShrink: 0, textAlign: "center",
+              background: "rgba(255,255,255,0.08)",
+              border: "1px solid rgba(255,255,255,0.12)",
+              borderRadius: 12, padding: "10px 20px",
+            }}>
+              <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", color: "rgba(255,255,255,0.5)", textTransform: "uppercase" }}>
+                Registros
+              </div>
+              <div style={{ fontSize: 28, fontWeight: 900, color: "#60a5fa", lineHeight: 1.1 }}>
+                {loading ? "…" : registros.length}
+              </div>
             </div>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition" title="Fechar">
-            <XMarkIcon className="h-6 w-6" />
-          </button>
         </div>
 
-        {/* Corpo com scroll */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+        {/* ══ CORPO ══════════════════════════════════════════════════════════ */}
+        <div style={{
+          flex: 1, overflowY: "auto", padding: "24px 32px",
+          background: "#f8fafc",
+          display: "flex", flexDirection: "column", gap: 20,
+        }}>
 
           {/* Novo registro */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <label className="block text-sm font-semibold text-blue-800 mb-2">
+          <div style={{
+            background: "#fff",
+            border: "1px solid #e2e8f0",
+            borderRadius: 14,
+            padding: "20px 24px",
+            boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+          }}>
+            <div style={{
+              fontSize: 11, fontWeight: 700, letterSpacing: "0.1em",
+              textTransform: "uppercase", color: "#64748b", marginBottom: 12,
+              display: "flex", alignItems: "center", gap: 6,
+            }}>
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#3b82f6", display: "inline-block" }} />
               Novo registro do conselho
-            </label>
+            </div>
+
             <textarea
               value={novoTexto}
               onChange={(e) => setNovoTexto(e.target.value)}
               rows={3}
-              placeholder="Descreva as observações sobre o aluno para o conselho de classe..."
-              className="w-full border border-blue-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none bg-white"
+              placeholder="Descreva as observações sobre o aluno para o conselho de classe…"
+              style={{
+                width: "100%", boxSizing: "border-box",
+                border: "1.5px solid #e2e8f0",
+                borderRadius: 10, padding: "12px 14px",
+                fontSize: 14, color: "#1e293b",
+                resize: "vertical", outline: "none",
+                fontFamily: "'Inter', 'Segoe UI', sans-serif",
+                lineHeight: 1.55,
+                transition: "border-color 0.15s, box-shadow 0.15s",
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = "#3b82f6";
+                e.currentTarget.style.boxShadow = "0 0 0 3px rgba(59,130,246,0.12)";
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = "#e2e8f0";
+                e.currentTarget.style.boxShadow = "none";
+              }}
             />
-            <div className="flex justify-end mt-2">
+
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
               <button
                 onClick={handleNovoRegistro}
                 disabled={!novoTexto.trim() || salvando}
-                className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
+                style={{
+                  padding: "9px 20px",
+                  background: novoTexto.trim() && !salvando
+                    ? "linear-gradient(135deg, #1e3a5f, #2563eb)"
+                    : "#e2e8f0",
+                  color: novoTexto.trim() && !salvando ? "#fff" : "#94a3b8",
+                  border: "none", borderRadius: 10,
+                  fontSize: 13, fontWeight: 700, cursor: novoTexto.trim() && !salvando ? "pointer" : "not-allowed",
+                  transition: "all 0.15s",
+                  display: "flex", alignItems: "center", gap: 6,
+                  boxShadow: novoTexto.trim() && !salvando ? "0 4px 12px rgba(37,99,235,0.3)" : "none",
+                }}
+                onMouseEnter={(e) => {
+                  if (novoTexto.trim() && !salvando)
+                    e.currentTarget.style.transform = "translateY(-1px)";
+                }}
+                onMouseLeave={(e) => { e.currentTarget.style.transform = "translateY(0)"; }}
               >
-                {salvando ? "Salvando..." : "+ Adicionar registro"}
+                {salvando ? "Salvando…" : (
+                  <>
+                    <span style={{ fontSize: 16 }}>+</span>
+                    Adicionar registro
+                  </>
+                )}
               </button>
             </div>
           </div>
 
-          {/* Lista de registros */}
+          {/* Histórico */}
           <div>
-            <h3 className="text-sm font-semibold text-gray-700 mb-3 uppercase tracking-wide">
-              Histórico ({registros.length} registro{registros.length !== 1 ? "s" : ""})
-            </h3>
+            <div style={{
+              fontSize: 11, fontWeight: 700, letterSpacing: "0.12em",
+              textTransform: "uppercase", color: "#64748b",
+              marginBottom: 14, display: "flex", alignItems: "center", gap: 8,
+            }}>
+              <span style={{ flex: 1 }}>
+                Histórico
+                <span style={{
+                  marginLeft: 8, fontSize: 10,
+                  background: "#e0e7ff", color: "#3730a3",
+                  borderRadius: 99, padding: "2px 8px", fontWeight: 700,
+                }}>
+                  {registros.length}
+                </span>
+              </span>
+            </div>
 
             {loading ? (
-              <p className="text-center text-gray-500 py-6 italic text-sm">Carregando registros...</p>
+              <div style={{ textAlign: "center", padding: "40px 0", color: "#94a3b8" }}>
+                <div style={{
+                  width: 32, height: 32, borderRadius: "50%",
+                  border: "3px solid #e2e8f0", borderTopColor: "#3b82f6",
+                  animation: "spin 0.7s linear infinite",
+                  margin: "0 auto 12px",
+                }} />
+                <p style={{ fontSize: 13 }}>Carregando registros…</p>
+                <style>{`@keyframes spin { to { transform: rotate(360deg); }}`}</style>
+              </div>
             ) : registros.length === 0 ? (
-              <div className="text-center py-8 text-gray-400">
-                <AcademicCapIcon className="h-10 w-10 mx-auto mb-3 text-gray-300" />
-                <p className="text-sm italic">Nenhum registro lançado para este aluno nesta turma.</p>
+              <div style={{
+                textAlign: "center", padding: "40px 0",
+                background: "#fff", borderRadius: 14,
+                border: "1px dashed #e2e8f0",
+              }}>
+                <div style={{ fontSize: 36, marginBottom: 10 }}>📋</div>
+                <p style={{ fontSize: 13, color: "#94a3b8", margin: 0 }}>
+                  Nenhum registro lançado para este aluno nesta turma.
+                </p>
+                <p style={{ fontSize: 12, color: "#cbd5e1", marginTop: 4 }}>
+                  Seja o primeiro a registrar uma observação.
+                </p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {registros.map((reg) => (
-                  <div key={reg.id} className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                    <div className="flex justify-between items-start gap-3">
-                      <div className="flex-1 min-w-0">
+                  <div
+                    key={reg.id}
+                    style={{
+                      background: "#fff",
+                      border: "1px solid #e9eef5",
+                      borderRadius: 14,
+                      padding: "16px 20px",
+                      boxShadow: "0 1px 3px rgba(0,0,0,0.04)",
+                      transition: "box-shadow 0.15s",
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.08)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.04)"; }}
+                  >
+                    <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                      {/* Conteúdo */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
                         {editandoId === reg.id ? (
                           <textarea
                             value={editandoTexto}
                             onChange={(e) => setEditandoTexto(e.target.value)}
                             rows={3}
-                            className="w-full border border-blue-300 rounded p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
+                            autoFocus
+                            style={{
+                              width: "100%", boxSizing: "border-box",
+                              border: "1.5px solid #3b82f6",
+                              borderRadius: 8, padding: "10px 12px",
+                              fontSize: 14, resize: "vertical", outline: "none",
+                              fontFamily: "'Inter', 'Segoe UI', sans-serif",
+                              boxShadow: "0 0 0 3px rgba(59,130,246,0.12)",
+                            }}
                           />
                         ) : (
-                          <p className="text-sm text-gray-800 whitespace-pre-wrap">{reg.texto}</p>
+                          <p style={{
+                            margin: 0, fontSize: 14, color: "#1e293b",
+                            lineHeight: 1.6, whiteSpace: "pre-wrap",
+                          }}>
+                            {reg.texto}
+                          </p>
                         )}
-                        <div className="flex gap-3 mt-2 text-xs text-gray-500">
-                          <span>
-                            <span className="font-medium text-gray-600">{reg.usuario_nome}</span>
-                            {reg.usuario_perfil && (
-                              <span className="ml-1 px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-medium">
-                                {reg.usuario_perfil}
-                              </span>
-                            )}
+
+                        {/* Meta */}
+                        <div style={{
+                          display: "flex", flexWrap: "wrap", gap: 8,
+                          marginTop: 10, alignItems: "center",
+                        }}>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: "#334155" }}>
+                            {reg.usuario_nome}
                           </span>
-                          <span>{formatarData(reg.criado_em)}</span>
+                          {reg.usuario_perfil && (
+                            <span style={{
+                              fontSize: 10, fontWeight: 700,
+                              background: "#dbeafe", color: "#1d4ed8",
+                              borderRadius: 99, padding: "2px 8px",
+                              textTransform: "capitalize",
+                            }}>
+                              {reg.usuario_perfil}
+                            </span>
+                          )}
+                          <span style={{ fontSize: 11, color: "#94a3b8" }}>
+                            {formatarData(reg.criado_em)}
+                          </span>
                           {reg.editado_em && (
-                            <span className="italic text-gray-400">
-                              (editado por {reg.editado_por_nome})
+                            <span style={{ fontSize: 11, color: "#cbd5e1", fontStyle: "italic" }}>
+                              · editado por {reg.editado_por_nome}
                             </span>
                           )}
                         </div>
                       </div>
 
-                      {/* Ações — só o autor pode editar */}
-                      <div className="flex gap-1 flex-shrink-0">
+                      {/* Ações — apenas o autor pode editar */}
+                      <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
                         {editandoId === reg.id ? (
-                          <button
-                            onClick={() => handleEditar(reg.id)}
-                            className="p-1.5 text-green-600 hover:text-green-800 hover:bg-green-50 rounded"
-                            title="Salvar edição"
-                          >
-                            <CheckIcon className="h-4 w-4" />
-                          </button>
+                          <>
+                            <button
+                              onClick={() => handleEditar(reg.id)}
+                              title="Salvar"
+                              style={{
+                                padding: "6px", borderRadius: 8, border: "none",
+                                cursor: "pointer", background: "#dcfce7", color: "#16a34a",
+                                transition: "all 0.15s",
+                              }}
+                              onMouseEnter={(e) => { e.currentTarget.style.background = "#bbf7d0"; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.background = "#dcfce7"; }}
+                            >
+                              <CheckIcon style={{ width: 16, height: 16 }} />
+                            </button>
+                            <button
+                              onClick={() => { setEditandoId(null); setEditandoTexto(""); }}
+                              title="Cancelar"
+                              style={{
+                                padding: "6px", borderRadius: 8, border: "none",
+                                cursor: "pointer", background: "#fee2e2", color: "#dc2626",
+                                transition: "all 0.15s",
+                              }}
+                              onMouseEnter={(e) => { e.currentTarget.style.background = "#fecaca"; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.background = "#fee2e2"; }}
+                            >
+                              <XCircleIcon style={{ width: 16, height: 16 }} />
+                            </button>
+                          </>
                         ) : (
                           <button
-                            onClick={() => {
-                              setEditandoId(reg.id);
-                              setEditandoTexto(reg.texto);
-                            }}
-                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
+                            onClick={() => { setEditandoId(reg.id); setEditandoTexto(reg.texto); }}
                             title="Editar meu registro"
+                            style={{
+                              padding: "6px", borderRadius: 8, border: "none",
+                              cursor: "pointer", background: "transparent", color: "#94a3b8",
+                              transition: "all 0.15s",
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = "#eff6ff";
+                              e.currentTarget.style.color = "#3b82f6";
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = "transparent";
+                              e.currentTarget.style.color = "#94a3b8";
+                            }}
                           >
-                            <PencilSquareIcon className="h-4 w-4" />
+                            <PencilSquareIcon style={{ width: 16, height: 16 }} />
                           </button>
                         )}
                       </div>
@@ -215,11 +592,25 @@ export default function ModalFichaConselhoClasse({ open, aluno, turma, onClose }
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="px-6 py-3 border-t bg-gray-50 flex justify-end">
+        {/* ══ FOOTER ══════════════════════════════════════════════════════════ */}
+        <div style={{
+          padding: "16px 32px",
+          background: "#fff",
+          borderTop: "1px solid #e9eef5",
+          display: "flex", justifyContent: "flex-end",
+          flexShrink: 0,
+        }}>
           <button
             onClick={onClose}
-            className="px-4 py-2 border rounded text-gray-700 hover:bg-gray-100 transition text-sm"
+            style={{
+              padding: "9px 22px",
+              background: "#f1f5f9", color: "#475569",
+              border: "1px solid #e2e8f0", borderRadius: 10,
+              fontSize: 13, fontWeight: 600, cursor: "pointer",
+              transition: "all 0.15s",
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "#e2e8f0"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "#f1f5f9"; }}
           >
             Fechar
           </button>

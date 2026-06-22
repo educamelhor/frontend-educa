@@ -48,6 +48,8 @@ const MODULOS_TREE = [
       { id: 'pedagogico.conteudos', label: 'Conteúdos' },
       { id: 'pedagogico.relatorios', label: 'Relatórios' },
       { id: 'pedagogico.correcoes', label: 'Correções' },
+      { id: 'pedagogico.solicitacoes', label: 'Solicitações' },
+      { id: 'pedagogico.provas', label: 'Provas' },
     ]
   },
   {
@@ -94,7 +96,8 @@ const MODULOS_TREE = [
     id: 'monitoramento', label: 'Monitoramento', icon: '📡',
     filhos: [
       { id: 'monitoramento.painel', label: 'Painel' },
-      { id: 'monitoramento.alertas', label: 'Alertas' },
+      { id: 'monitoramento.visitantes_registrar', label: 'Visitantes - Registrar' },
+      { id: 'monitoramento.visitantes_historico', label: 'Visitantes - Histórico' },
       { id: 'monitoramento.embeddings', label: 'Embeddings' },
     ]
   },
@@ -131,6 +134,10 @@ const MODULOS_TREE = [
       { id: 'direcao.cadastro', label: 'Cadastro de Membros' },
       { id: 'direcao.governanca', label: 'Governança' },
     ]
+  },
+  {
+    id: 'estudantes', label: 'Estudantes', icon: '🧑‍🎓',
+    filhos: []
   },
 ];
 

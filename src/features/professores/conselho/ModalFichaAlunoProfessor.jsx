@@ -1,24 +1,21 @@
-// src/features/pedagogico/conselho/ModalFichaAluno.jsx
+// features/professores/conselho/ModalFichaAlunoProfessor.jsx
 // ============================================================================
-// Modal da Ficha do Estudante — EXCLUSIVO do módulo PEDAGÓGICO
+// Wrapper modal da Ficha do Estudante — exclusivo do módulo professores/conselho.
 //
-// Usa FichaAlunoPedagogico (isolado nesta pasta), que:
-//  ✅ Exibe Relatório Pedagógico
-//  ❌ NÃO exibe Relatório Disciplinar (exclusivo de militares em CCMDF)
-//  ❌ NÃO exibe banner de upload de foto (foto vem do EDUCA-CAPTURE)
-//
-// Este arquivo NÃO é compartilhado com outros módulos.
+// Usa FichaAlunoProfessor (local) em vez de alunos/FichaAluno (compartilhado),
+// garantindo isolamento completo entre os módulos.
 // ============================================================================
 import React, { useEffect, useRef } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
-import FichaAlunoPedagogico from "./FichaAlunoPedagogico";
+import FichaAlunoProfessor from "./FichaAlunoProfessor";
 
-export default function ModalFichaAluno({ open, codigo, onClose }) {
+export default function ModalFichaAlunoProfessor({ open, codigo, onClose }) {
   const dialogRef = useRef(null);
 
   useEffect(() => {
     if (!open) return;
 
+    // Trava o scroll do body e habilita fechar com ESC
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
@@ -26,6 +23,8 @@ export default function ModalFichaAluno({ open, codigo, onClose }) {
       if (e.key === "Escape") onClose?.();
     };
     window.addEventListener("keydown", onKey);
+
+    // Foca no modal para acessibilidade
     setTimeout(() => dialogRef.current?.focus(), 0);
 
     return () => {
@@ -67,12 +66,9 @@ export default function ModalFichaAluno({ open, codigo, onClose }) {
           </button>
         </div>
 
-        {/*
-          FichaAlunoPedagogico — versão isolada sem upload e sem Disciplinar.
-          Relatório Disciplinar NUNCA renderiza aqui independente da escola.
-        */}
+        {/* Ficha em modo modal — versão professor */}
         <div className="w-full h-full overflow-auto p-4 bg-blue-50">
-          <FichaAlunoPedagogico codigo={codigo} />
+          <FichaAlunoProfessor codigo={codigo} />
         </div>
       </div>
     </div>

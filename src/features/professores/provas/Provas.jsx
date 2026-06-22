@@ -254,38 +254,68 @@ export default function Provas() {
         const ctx = canvas.getContext('2d');
         await page.render({ canvasContext: ctx, viewport }).promise;
 
-        // ── Zona exata da imagem padrão (em PDF pontos → canvas ×2) ──────────
-        // Os headers são enviados pelo backend quando ?noImage=1
+        // ── Zona de imagem por template (canvas pixels, escala 2×) ─────────────
+        // Derivados do backend: instrTextH≈200pt, todos com margem de 10-14px
+        // abaixo do texto de instruções (no gap vazio antes da zona de imagem).
+        // Estes valores NÃO dependem de CORS — são fallbacks seguros e calibrados.
+        //
+        // T1 Clássico:  instrBoxH=228, imageStart≈507pt → x=72,  y=1000, w=1046, maxY=1614
+        // T2 Moderno:   instrTextH=200, imageStart≈477pt → x=124, y=940,  w=1066, maxY=1646
+        // T3 Formal:    instrTextH=200, imageStart≈514pt → x=48,  y=1015, w=1094, maxY=1634
+        // T4 Colorido:  instrBoxH=236, imageStart≈512pt  → x=0,   y=1010, w=1190, maxY=1646
+        // T5 Dark:      instrBoxH=236, imageStart≈479pt  → x=0,   y=940,  w=1190, maxY=1646
+        const TEMPLATE_ZONES = {
+          1: { x: 72,  y: 1000, w: 1046, maxY: 1614 },
+          2: { x: 124, y: 940,  w: 1066, maxY: 1646 },
+          3: { x: 48,  y: 1015, w: 1094, maxY: 1634 },
+          4: { x: 0,   y: 1010, w: 1190, maxY: 1646 },
+          5: { x: 0,   y: 940,  w: 1190, maxY: 1646 },
+        };
         const SCALE = 2;
-        const zoneX  = parseInt(pdfRes.headers.get('X-Image-Zone-X') || '36')  * SCALE;
-        const zoneY  = parseInt(pdfRes.headers.get('X-Image-Zone-Y') || '510') * SCALE;
-        const zoneW  = parseInt(pdfRes.headers.get('X-Image-Zone-W') || '523') * SCALE;
-        const zoneH  = parseInt(pdfRes.headers.get('X-Image-Zone-H') || '260') * SCALE;
+        const tzFallback = TEMPLATE_ZONES[selectedTemplate.id] || TEMPLATE_ZONES[2];
+
+        // Tenta usar headers CORS do backend (mais precisos quando disponíveis)
+        const hX = parseInt(pdfRes.headers.get('X-Image-Zone-X') || '');
+        const hY = parseInt(pdfRes.headers.get('X-Image-Zone-Y') || '');
+        const hW = parseInt(pdfRes.headers.get('X-Image-Zone-W') || '');
+        const hH = parseInt(pdfRes.headers.get('X-Image-Zone-H') || '');
+
+        const zoneX = (hX > 0 ? hX * SCALE : tzFallback.x);
+        const zoneY = (hY > 0 ? hY * SCALE : tzFallback.y);
+        const zoneW = (hW > 0 ? hW * SCALE : tzFallback.w);
+        const zoneH = (hH > 0 ? hH * SCALE : tzFallback.maxY - tzFallback.y);
 
         // Carrega imagem do usuário
         const userImg = new Image();
         userImg.src = customImage;
         await new Promise((res, rej) => { userImg.onload = res; userImg.onerror = rej; });
 
-        // Limpa TODA a zona (remove qualquer resquício da imagem padrão)
+        // Limpa TODA a zona (remove qualquer resquício da imagem padrão do template)
+        // O clearRect apaga pixels do pdfjs — funciona mesmo que ?noImage=1 não tenha efeito
         ctx.clearRect(zoneX, zoneY, zoneW, zoneH);
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(zoneX, zoneY, zoneW, zoneH);
 
         // Desenha a imagem do usuário em modo cover, preenchendo toda a zona
-        // Zoom e offset controlam o crop dentro da zona (como uma câmera)
+        // Zoom e offset permitem reposicionamento/crop dentro da zona
         const iw = userImg.naturalWidth  || userImg.width  || 1;
         const ih = userImg.naturalHeight || userImg.height || 1;
+
+        // Cover: escala pela dimensão que garante cobertura total
         let coverW, coverH;
         if (iw / ih > zoneW / zoneH) {
-          // imagem mais larga que a zona → ajusta pela altura
+          // Imagem mais larga → ajusta pela altura para cobrir verticalmente
           coverH = zoneH * imageZoom;
           coverW = coverH * (iw / ih);
         } else {
-          // imagem mais alta que a zona → ajusta pela largura
+          // Imagem mais alta → ajusta pela largura para cobrir horizontalmente
           coverW = zoneW * imageZoom;
           coverH = coverW / (iw / ih);
         }
+        // Garante que o cover nunca deixa a zona descoberta (zoom mínimo = 1)
+        if (coverW < zoneW) { coverW = zoneW; coverH = zoneW / (iw / ih); }
+        if (coverH < zoneH) { coverH = zoneH; coverW = zoneH * (iw / ih); }
+
         const cx = zoneX + zoneW / 2 + (imageOffsetX / 100) * zoneW;
         const cy = zoneY + zoneH / 2 + (imageOffsetY / 100) * zoneH;
         ctx.save();

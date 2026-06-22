@@ -254,16 +254,15 @@ export default function Provas() {
         const ctx = canvas.getContext('2d');
         await page.render({ canvasContext: ctx, viewport }).promise;
 
-        // ── Zona de imagem por template (canvas pixels, escala 2×) ─────────────
-        // Derivados do backend: instrTextH≈200pt, todos com margem de 10-14px
-        // abaixo do texto de instruções (no gap vazio antes da zona de imagem).
-        // Estes valores NÃO dependem de CORS — são fallbacks seguros e calibrados.
+        // ══ PASSO 1: Limpar zona completa do template (remove coliseu totalmente) ══
+        // Valores calibrados por template (canvas px, escala 2×, instrTextH≈200pt)
+        // A limpeza começa no GAP entre o fim das instruções e o início da imagem padrão.
         //
-        // T1 Clássico:  instrBoxH=228, imageStart≈507pt → x=72,  y=1000, w=1046, maxY=1614
-        // T2 Moderno:   instrTextH=200, imageStart≈477pt → x=124, y=940,  w=1066, maxY=1646
-        // T3 Formal:    instrTextH=200, imageStart≈514pt → x=48,  y=1015, w=1094, maxY=1634
-        // T4 Colorido:  instrBoxH=236, imageStart≈512pt  → x=0,   y=1010, w=1190, maxY=1646
-        // T5 Dark:      instrBoxH=236, imageStart≈479pt  → x=0,   y=940,  w=1190, maxY=1646
+        // T1 Clássico:  x=72,  y=1000, w=1046, maxY=1614
+        // T2 Moderno:   x=124, y=940,  w=1066, maxY=1646  (STRIPE=62*2=124)
+        // T3 Formal:    x=48,  y=1015, w=1094, maxY=1634
+        // T4 Colorido:  x=0,   y=1010, w=1190, maxY=1646
+        // T5 Dark:      x=0,   y=940,  w=1190, maxY=1646
         const TEMPLATE_ZONES = {
           1: { x: 72,  y: 1000, w: 1046, maxY: 1614 },
           2: { x: 124, y: 940,  w: 1066, maxY: 1646 },
@@ -271,56 +270,62 @@ export default function Provas() {
           4: { x: 0,   y: 1010, w: 1190, maxY: 1646 },
           5: { x: 0,   y: 940,  w: 1190, maxY: 1646 },
         };
-        const SCALE = 2;
-        const tzFallback = TEMPLATE_ZONES[selectedTemplate.id] || TEMPLATE_ZONES[2];
+        const cz = TEMPLATE_ZONES[selectedTemplate.id] || TEMPLATE_ZONES[2];
 
-        // Tenta usar headers CORS do backend (mais precisos quando disponíveis)
+        // Tenta refinar com headers CORS do backend quando disponíveis
         const hX = parseInt(pdfRes.headers.get('X-Image-Zone-X') || '');
         const hY = parseInt(pdfRes.headers.get('X-Image-Zone-Y') || '');
-        const hW = parseInt(pdfRes.headers.get('X-Image-Zone-W') || '');
-        const hH = parseInt(pdfRes.headers.get('X-Image-Zone-H') || '');
+        const SCALE = 2;
+        const clearX    = hX > 0 ? hX * SCALE : cz.x;
+        const clearY    = hY > 0 ? hY * SCALE : cz.y;
+        const clearW    = cz.w;
+        const clearMaxY = cz.maxY;
 
-        const zoneX = (hX > 0 ? hX * SCALE : tzFallback.x);
-        const zoneY = (hY > 0 ? hY * SCALE : tzFallback.y);
-        const zoneW = (hW > 0 ? hW * SCALE : tzFallback.w);
-        const zoneH = (hH > 0 ? hH * SCALE : tzFallback.maxY - tzFallback.y);
+        // Apaga TUDO na zona (clearRect remove pixels do pdfjs independente de ?noImage=1)
+        ctx.clearRect(clearX, clearY, clearW, clearMaxY - clearY);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(clearX, clearY, clearW, clearMaxY - clearY);
+
+        // ══ PASSO 2: Desenhar imagem do usuário com os ajustes SALVOS ══════════
+        // Respeita imageHeight, imageWidthPct, imageZoom, imageOffsetX/Y
+        // configurados pelo usuário no wizard — exatamente o que aparece no preview.
+        const zoneW = clearW;
+        const zoneH_max = clearMaxY - clearY; // altura máxima disponível
+
+        // Largura: imageWidthPct% da zona, centrada
+        const drawW  = Math.min((imageWidthPct / 100) * zoneW, zoneW);
+        const drawX  = clearX + (zoneW - drawW) / 2;
+
+        // Altura: imageHeight pts × 2, limitada ao máximo da zona
+        const drawH  = Math.min(imageHeight * 2, zoneH_max);
+        // Âncora: parte inferior da zona (igual ao comportamento das imagens padrão)
+        const drawY  = clearMaxY - drawH;
 
         // Carrega imagem do usuário
         const userImg = new Image();
         userImg.src = customImage;
         await new Promise((res, rej) => { userImg.onload = res; userImg.onerror = rej; });
 
-        // Limpa TODA a zona (remove qualquer resquício da imagem padrão do template)
-        // O clearRect apaga pixels do pdfjs — funciona mesmo que ?noImage=1 não tenha efeito
-        ctx.clearRect(zoneX, zoneY, zoneW, zoneH);
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(zoneX, zoneY, zoneW, zoneH);
-
-        // Desenha a imagem do usuário em modo cover, preenchendo toda a zona
-        // Zoom e offset permitem reposicionamento/crop dentro da zona
         const iw = userImg.naturalWidth  || userImg.width  || 1;
         const ih = userImg.naturalHeight || userImg.height || 1;
 
-        // Cover: escala pela dimensão que garante cobertura total
+        // Mode cover: escala para preencher drawW × drawH sem distorcer
         let coverW, coverH;
-        if (iw / ih > zoneW / zoneH) {
-          // Imagem mais larga → ajusta pela altura para cobrir verticalmente
-          coverH = zoneH * imageZoom;
-          coverW = coverH * (iw / ih);
+        if (iw / ih > drawW / drawH) {
+          coverH = drawH; coverW = coverH * (iw / ih);
         } else {
-          // Imagem mais alta → ajusta pela largura para cobrir horizontalmente
-          coverW = zoneW * imageZoom;
-          coverH = coverW / (iw / ih);
+          coverW = drawW; coverH = coverW / (iw / ih);
         }
-        // Garante que o cover nunca deixa a zona descoberta (zoom mínimo = 1)
-        if (coverW < zoneW) { coverW = zoneW; coverH = zoneW / (iw / ih); }
-        if (coverH < zoneH) { coverH = zoneH; coverW = zoneH * (iw / ih); }
+        // Aplica zoom do usuário (sempre ≥ 1 para não deixar bordas brancas)
+        const z = Math.max(1, imageZoom);
+        coverW *= z;
+        coverH *= z;
 
-        const cx = zoneX + zoneW / 2 + (imageOffsetX / 100) * zoneW;
-        const cy = zoneY + zoneH / 2 + (imageOffsetY / 100) * zoneH;
+        const cx = drawX + drawW / 2 + (imageOffsetX / 100) * drawW;
+        const cy = drawY + drawH / 2 + (imageOffsetY / 100) * drawH;
         ctx.save();
         ctx.beginPath();
-        ctx.rect(zoneX, zoneY, zoneW, zoneH);
+        ctx.rect(drawX, drawY, drawW, drawH);
         ctx.clip();
         ctx.drawImage(userImg, cx - coverW / 2, cy - coverH / 2, coverW, coverH);
         ctx.restore();

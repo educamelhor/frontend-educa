@@ -7,23 +7,7 @@ import { AcademicCapIcon } from "@heroicons/react/24/solid";
 import api from "../../services/api";
 import ModalNovaOcorrenciaPedagogica from "./ModalNovaOcorrenciaPedagogica";
 
-// ── Decodifica JWT para obter usuario_id do usuário logado ─────────────────
-// Mesmo padrão usado em ModalRegistroConselho.jsx
-function getUsuarioIdFromToken() {
-    try {
-        const token = localStorage.getItem("token");
-        if (!token) return null;
-        const parts = token.split(".");
-        if (parts.length !== 3) return null;
-        const payload = JSON.parse(atob(parts[1]));
-        const uid = payload?.usuario_id ?? payload?.usuarioId ?? payload?.id ?? null;
-        return uid ? Number(uid) : null;
-    } catch {
-        return null;
-    }
-}
-
-export default function ModalRelatorioPedagogico({ open, onClose, aluno, somenteLeitura = false }) {
+export default function ModalRelatorioPedagogico({ open, onClose, aluno }) {
     const [novaOcorrenciaOpen, setNovaOcorrenciaOpen] = useState(false);
     const [ocorrenciaSelecionada, setOcorrenciaSelecionada] = useState(null);
     const [viewMode, setViewMode] = useState(false);
@@ -46,26 +30,6 @@ export default function ModalRelatorioPedagogico({ open, onClose, aluno, somente
     const [excluindo, setExcluindo] = useState(false);
 
     const perfil = String(localStorage.getItem("perfil") || "").toLowerCase();
-
-    // ID e nome do usuário logado — usados para verificar autoria dos registros
-    const currentUserId = getUsuarioIdFromToken();
-    const currentUserName = String(localStorage.getItem("userName") || localStorage.getItem("nome") || "").trim().toLowerCase();
-
-    // Professor: pode Editar/Excluir/Finalizar APENAS seus próprios registros
-    // Direção/Coord: acesso completo a todos os registros
-    // Duplo fallback: compara pelo usuario_id_registro (ID numérico) OU
-    //                 pelo nome_usuario_registro (texto) — compatível com a resposta da API.
-    const podeGerenciarOcorrencia = (oc) => {
-        if (!somenteLeitura) return true; // direção/coord: acesso total
-        // professor: verifica autoria
-        if (currentUserId && oc.usuario_id_registro) {
-            return Number(oc.usuario_id_registro) === currentUserId;
-        }
-        if (currentUserName && oc.nome_usuario_registro) {
-            return oc.nome_usuario_registro.trim().toLowerCase() === currentUserName;
-        }
-        return false; // sem informação de autoria → nega acesso
-    };
 
     useEffect(() => {
         if (open && aluno?.id) {
@@ -246,9 +210,6 @@ export default function ModalRelatorioPedagogico({ open, onClose, aluno, somente
                             </div>
                         </div>
 
-                        {/* Botão Adicionar — professor também pode registrar.
-                            Ao abrir o formulário, professor só vê CATEGORIA + OCORRÊNCIA
-                            (DESCRIÇÃO e REGISTRO INTERNO ocultados via somenteLeitura em ModalNovaOcorrencia). */}
                         <div className="flex-shrink-0">
                             <button
                                 onClick={() => {
@@ -327,8 +288,6 @@ export default function ModalRelatorioPedagogico({ open, onClose, aluno, somente
                                             </td>
                                             <td className="px-4 py-3 text-center">
                                                 <div className="flex justify-center gap-2">
-                                                    {/* Finalizar — só autor (professor) ou direção */}
-                                                    {podeGerenciarOcorrencia(oc) && (
                                                     <button
                                                         onClick={() => handleOpenFinalizar(oc)}
                                                         disabled={oc.status === "CANCELADA"}
@@ -343,8 +302,6 @@ export default function ModalRelatorioPedagogico({ open, onClose, aluno, somente
                                                     >
                                                         <ClipboardDocumentCheckIcon className="h-5 w-5" />
                                                     </button>
-                                                    )}
-                                                    {/* Visualizar — disponível para todos */}
                                                     <button
                                                         onClick={() => {
                                                             setOcorrenciaSelecionada(oc);
@@ -357,17 +314,12 @@ export default function ModalRelatorioPedagogico({ open, onClose, aluno, somente
                                                     >
                                                         <EyeIcon className="h-5 w-5" />
                                                     </button>
-                                                    {/* Editar / Excluir — só autor (professor) ou direção */}
-                                                    {podeGerenciarOcorrencia(oc) && (
-                                                    <>
                                                     <button onClick={() => handleOpenEdit(oc)} className="text-blue-600 hover:text-blue-800" title="Editar">
                                                         <PencilSquareIcon className="h-5 w-5" />
                                                     </button>
                                                     <button onClick={() => handleOpenDelete(oc)} className="text-red-600 hover:text-red-800" title="Excluir">
                                                         <TrashIcon className="h-5 w-5" />
                                                     </button>
-                                                    </>
-                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
@@ -399,7 +351,6 @@ export default function ModalRelatorioPedagogico({ open, onClose, aluno, somente
                 readonly={viewMode}
                 editMode={editMode}
                 perfilUsuario={perfil}
-                somenteLeitura={somenteLeitura}
             />
 
             {/* Modal Finalizar */}

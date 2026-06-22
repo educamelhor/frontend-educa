@@ -167,15 +167,9 @@ export default function Sidebar({ isOpen, onClose }) {
   const getPerfil = () =>
     String(localStorage.getItem('perfil') || '').toLowerCase().trim();
   const perfil = getPerfil();
-  const isDisciplinar = perfil === 'disciplinar' || perfil === 'diretor_disciplinar' || perfil === 'militar' || perfil === 'comandante';
+  const isDisciplinar = perfil === 'disciplinar' || perfil === 'diretor_disciplinar' || perfil === 'militar';
   const isProfessor = perfil === 'professor';
   const isSecretario = perfil === 'secretario' || perfil === 'secretaria';
-
-  // ── CCMDF: Diretor Pedagógico NUNCA vê Disciplinar (hardcoded, sem CEO) ──
-  const escolaTipoRaw = localStorage.getItem('escola_tipo');
-  const escolaTipo = (() => { try { const v = JSON.parse(escolaTipoRaw || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } })();
-  const isCCMDF = escolaTipo.includes('CCMDF');
-  const isDiretorPedagogicoCCMDF = isCCMDF && (perfil === 'diretor' || perfil === 'vice_diretor');
 
   // Começando pelos 3 módulos solicitados
   const canConteudos = isScopeEscola && !isDisciplinar && !isProfessor && hasPerm('conteudos:ver');
@@ -455,14 +449,16 @@ export default function Sidebar({ isOpen, onClose }) {
           </>
         ) : (
           <>
-            {/* LINK: Home — renderiza para TODOS os perfis (não passa por hasModulo) */}
+            {/* LINK: Home */}
+            {!isDisciplinar && !isProfessor && !isCoord && !isSecretario && (
             <Link to="/home" className={getMainLinkClasses('/home')}>
               <HomeIcon className="h-5 w-5 mr-2" />
               Home
             </Link>
+            )}
 
             {/* LINK: Estudantes */}
-            {!isDisciplinar && !isProfessor && !isCoord && !isSecretario && hasModulo('estudantes') && (
+            {!isDisciplinar && !isProfessor && !isCoord && !isSecretario && hasModulo('secretaria.alunos') && (
             <Link to="/alunos" className={getMainLinkClasses('/alunos')}>
               <UserGroupIcon className="h-5 w-5 mr-2" />
               Estudantes
@@ -630,8 +626,8 @@ export default function Sidebar({ isOpen, onClose }) {
             </>
             )}
 
-            {/* ─── FREQUÊNCIA (professor): só se hasModulo ativo ─── */}
-            {isProfessor && hasModulo('frequencia') && (
+            {/* ─── FREQUÊNCIA (professor): sempre aberto, só Frequência + Atestados ─── */}
+            {isProfessor && (
               <>
                 <div
                   className="flex items-center w-full py-2 px-3 rounded mt-2"
@@ -641,7 +637,6 @@ export default function Sidebar({ isOpen, onClose }) {
                   <span className="flex-1 text-left font-semibold">Frequência</span>
                 </div>
                 <ul className="ml-4 mb-2">
-                  {hasModulo('frequencia.atestados') && (
                   <li>
                     <Link
                       to="/frequencia/atestados"
@@ -650,7 +645,6 @@ export default function Sidebar({ isOpen, onClose }) {
                       <DocumentTextIcon className="h-5 w-5 mr-2" /> Atestados
                     </Link>
                   </li>
-                  )}
                 </ul>
               </>
             )}
@@ -1005,9 +999,6 @@ export default function Sidebar({ isOpen, onClose }) {
             (Painel + Visitantes: Registrar / Histórico)
         ─────────────────────────────── */}
         {canMonitoramento && hasModulo('monitoramento') && (
-          hasModulo('monitoramento.painel') || hasModulo('monitoramento.visitantes_registrar') ||
-          hasModulo('monitoramento.visitantes_historico') || hasModulo('monitoramento.embeddings')
-        ) && (
           <>
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-2 transition"
@@ -1039,7 +1030,6 @@ export default function Sidebar({ isOpen, onClose }) {
                 </li>
                 )}
 
-                {hasModulo('monitoramento.visitantes_registrar') && (
                 <li>
                   <Link
                     to="/monitoramento/visitantes/registrar"
@@ -1048,8 +1038,6 @@ export default function Sidebar({ isOpen, onClose }) {
                     <PencilSquareIcon className="h-5 w-5 mr-2" /> Visitantes — Registrar
                   </Link>
                 </li>
-                )}
-                {hasModulo('monitoramento.visitantes_historico') && (
                 <li>
                   <Link
                     to="/monitoramento/visitantes/historico"
@@ -1058,7 +1046,6 @@ export default function Sidebar({ isOpen, onClose }) {
                     <ClockIcon className="h-5 w-5 mr-2" /> Visitantes — Histórico
                   </Link>
                 </li>
-                )}
                 {hasModulo('monitoramento.embeddings') && (
                 <li>
                   <Link
@@ -1081,7 +1068,7 @@ export default function Sidebar({ isOpen, onClose }) {
 
 
 
-        {isScopeEscola && !isProfessor && !isCoord && !isSecretario && !isDiretorPedagogicoCCMDF && (isDisciplinar || (isCCMDF && hasModulo('disciplinar'))) && (
+        {isScopeEscola && !isProfessor && !isCoord && !isSecretario && hasModulo('disciplinar') && (
           <>
             {/* ───────────────────────────────
                 GRUPO: Disciplinar
@@ -1098,7 +1085,7 @@ export default function Sidebar({ isOpen, onClose }) {
             </div>
 
             <ul className="ml-4 mb-2">
-                {(isDisciplinar || hasModulo('disciplinar.alunos')) && (
+                {hasModulo('disciplinar.alunos') && (
                 <li>
                   <Link
                     to="/disciplinar/alunos"
@@ -1108,7 +1095,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
                 )}
-                {(isDisciplinar || hasModulo('disciplinar.responsaveis')) && (
+                {hasModulo('disciplinar.responsaveis') && (
                 <li>
                   <Link
                     to="/disciplinar/responsaveis"
@@ -1118,7 +1105,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
                 )}
-                {(perfil === 'diretor' || perfil === 'militar') && (isDisciplinar || hasModulo('disciplinar.equipe')) && (
+                {(perfil === 'diretor' || perfil === 'militar') && (
                 <li>
                   <Link
                     to="/disciplinar/equipe"
@@ -1128,7 +1115,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
                 )}
-                {(isDisciplinar || hasModulo('disciplinar.fo_coletivo')) && (
+                {hasModulo('disciplinar.fo_coletivo') && (
                 <li>
                   <Link
                     to="/disciplinar/fo-coletivo"
@@ -1144,7 +1131,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
                 )}
-                {(isDisciplinar || hasModulo('disciplinar.historico')) && (
+                {hasModulo('disciplinar.historico') && (
                 <li>
                   <Link
                     to="/disciplinar/historico"
@@ -1160,7 +1147,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
                 )}
-                {(isDisciplinar || hasModulo('disciplinar.atas')) && (
+                {hasModulo('disciplinar.atas') && (
                 <li>
                   <Link
                     to="/disciplinar/atas"
@@ -1176,7 +1163,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
                 )}
-                {(isDisciplinar || hasModulo('disciplinar.liberacao')) && (
+                {hasModulo('disciplinar.liberacao') && (
                 <li>
                   <Link
                     to="/disciplinar/liberacao"
@@ -1192,7 +1179,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
                 )}
-                {(isDisciplinar || hasModulo('disciplinar.metadados')) && (
+                {hasModulo('disciplinar.metadados') && (
                 <li>
                   <Link
                     to="/disciplinar/metadados"
@@ -1255,7 +1242,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
                 )}
-                {(perfil === 'diretor' || perfil === 'militar') && hasModulo('disciplinar.equipe') && (
+                {(perfil === 'diretor' || perfil === 'militar') && (
                 <li>
                   <Link
                     to="/disciplinar/equipe"
@@ -1350,9 +1337,9 @@ export default function Sidebar({ isOpen, onClose }) {
             MENUS INDEPENDENTES: Regimentos, Manual, Suporte
             (Acessíveis a qualquer usuário logado)
         ─────────────────────────────── */}
-        {isScopeEscola && !isSecretario && !isDiretorPedagogicoCCMDF && (
+        {isScopeEscola && !isSecretario && (
           <>
-            {(isDisciplinar || hasModulo('disciplinar.regimentos')) && (
+            {hasModulo('disciplinar.regimentos') && (
             <Link
               to="/disciplinar/regimentos"
               className={getMainLinkClasses('/disciplinar/regimentos')}
@@ -1362,7 +1349,7 @@ export default function Sidebar({ isOpen, onClose }) {
             </Link>
             )}
 
-            {(isDisciplinar || hasModulo('disciplinar.manual')) && (
+            {hasModulo('disciplinar.manual') && (
             <Link
               to="/disciplinar/manual"
               className={getMainLinkClasses('/disciplinar/manual')}
@@ -1370,17 +1357,14 @@ export default function Sidebar({ isOpen, onClose }) {
               <BookOpenIcon className="h-5 w-5 mr-2" /> Manual
             </Link>
             )}
-          </>
-        )}
 
-        {/* SUPORTE: renderiza para TODOS os perfis (sem hasModulo, sem isDiretorPedagogicoCCMDF) */}
-        {isScopeEscola && !isSecretario && (
-          <Link
-            to="/disciplinar/suporte"
-            className={getMainLinkClasses('/disciplinar/suporte')}
-          >
-            <QuestionMarkCircleIcon className="h-5 w-5 mr-2" /> Suporte
-          </Link>
+            <Link
+              to="/disciplinar/suporte"
+              className={getMainLinkClasses('/disciplinar/suporte')}
+            >
+              <QuestionMarkCircleIcon className="h-5 w-5 mr-2" /> Suporte
+            </Link>
+          </>
         )}
 
         {canAgenteEduca && hasModulo('agente_educa') && (
@@ -1465,11 +1449,9 @@ export default function Sidebar({ isOpen, onClose }) {
                 )}
               </>
             )}
-          </>
-        )}
 
-        {/* ─── GRUPO: Secretaria (Professor NÃO tem acesso) ─── */}
-        {!isProfessor && !isDisciplinar && hasModulo('secretaria') && (
+            {/* ─── GRUPO: Secretaria (Professor NÃO tem acesso) ─── */}
+            {!isProfessor && hasModulo('secretaria') && (
             <>
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-6 transition"
@@ -1510,7 +1492,6 @@ export default function Sidebar({ isOpen, onClose }) {
                 </li>
                 )}
 
-                {hasModulo('secretaria.responsaveis') && (
                 <li>
                   <Link
                     to="/secretaria/responsaveis"
@@ -1519,9 +1500,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     <UserGroupIcon className="h-5 w-5 mr-2" /> Responsáveis
                   </Link>
                 </li>
-                )}
 
-                {hasModulo('secretaria.cargas_horarias') && (
                 <li>
                   <Link
                     to="/secretaria/cargas-horarias"
@@ -1530,9 +1509,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     <ClockIcon className="h-5 w-5 mr-2" /> Cargas Horárias
                   </Link>
                 </li>
-                )}
 
-                {hasModulo('secretaria.disciplinas') && (
                 <li>
                   <Link
                     to="/secretaria/disciplinas"
@@ -1541,7 +1518,6 @@ export default function Sidebar({ isOpen, onClose }) {
                     <BookOpenIcon className="h-5 w-5 mr-2" /> Disciplinas
                   </Link>
                 </li>
-                )}
 
                 {hasModulo('secretaria.modulacao') && (
                 <li>
@@ -1576,7 +1552,6 @@ export default function Sidebar({ isOpen, onClose }) {
                 </li>
                 )}
 
-                {hasModulo('secretaria.turmas') && (
                 <li>
                   <Link
                     to="/secretaria/turmas"
@@ -1585,7 +1560,6 @@ export default function Sidebar({ isOpen, onClose }) {
                     <AcademicCapIcon className="h-5 w-5 mr-2" /> Turmas
                   </Link>
                 </li>
-                )}
 
                 {/* NOVO SUBMENU: Boletim */}
                 {hasModulo('secretaria.boletim') && (
@@ -1600,7 +1574,6 @@ export default function Sidebar({ isOpen, onClose }) {
                 )}
 
                 {/* NOVO SUBMENU: Agente */}
-                {hasModulo('secretaria.agente') && (
                 <li>
                   <Link
                     to="/secretaria/agente"
@@ -1609,7 +1582,6 @@ export default function Sidebar({ isOpen, onClose }) {
                     <BoltIcon className="h-5 w-5 mr-2" /> Agente
                   </Link>
                 </li>
-                )}
 
                 {hasModulo('secretaria.tabela_codigos') && (
                 <li>
@@ -1650,7 +1622,6 @@ export default function Sidebar({ isOpen, onClose }) {
                 )}
 
                 {/* Sincronizar SEEDF */}
-                {hasModulo('secretaria.sincronizar_seedf') && (
                 <li>
                   <Link
                     to="/secretaria/sincronizar-seedf"
@@ -1676,11 +1647,12 @@ export default function Sidebar({ isOpen, onClose }) {
                     }}>NOVO</span>
                   </Link>
                 </li>
-                )}
-            </ul>
+              </ul>
             )}
             </>
             )}
+          </>
+        )}
 
         {isScopeEscola && !isDisciplinar && !isProfessor && !isSecretario && hasModulo('pedagogico') && (
           <>
@@ -1736,7 +1708,6 @@ export default function Sidebar({ isOpen, onClose }) {
                   </li>
                 )}
 
-                {hasModulo('pedagogico.solicitacoes') && (
                 <li>
                   <Link
                     to="/pedagogico/coordenacao/solicitacoes"
@@ -1745,11 +1716,9 @@ export default function Sidebar({ isOpen, onClose }) {
                     <ClipboardDocumentListIcon className="h-5 w-5 mr-2" /> Solicitações
                   </Link>
                 </li>
-                )}
 
 
 
-                {hasModulo('pedagogico.provas') && (
                 <li>
                   <Link
                     to="/pedagogico/provas"
@@ -1758,10 +1727,8 @@ export default function Sidebar({ isOpen, onClose }) {
                     <DocumentTextIcon className="h-5 w-5 mr-2" /> Provas
                   </Link>
                 </li>
-                )}
 
                 {/* Submenu Correções */}
-                {hasModulo('pedagogico.correcoes') && (
                 <li>
                   <button
                     className="flex items-center w-full py-2 pl-6 pr-3 rounded hover:bg-blue-700 transition"
@@ -1790,7 +1757,6 @@ export default function Sidebar({ isOpen, onClose }) {
                     </ul>
                   )}
                 </li>
-                )}
 
                 {/* Gabarito migrado para menu unificado (/gabarito) */}
 

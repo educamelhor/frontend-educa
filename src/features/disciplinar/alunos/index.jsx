@@ -318,7 +318,7 @@ export default function AlunosDisciplinar() {
                 mostrarBoletim={false}
                 onEditar={null}
                 onDelete={null}
-                onView={handleVerFicha}
+                onVerFicha={handleVerFicha}
                 onRelatorioDisciplinar={handleRelatorioDisciplinar}
             />
 

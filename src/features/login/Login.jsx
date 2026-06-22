@@ -2,7 +2,6 @@
 import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import api from "../../services/api"; // Serviço centralizado para requisições
-import ManutencaoScreen from '../manutencao/ManutencaoScreen';
 
 function isEmailValido(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || "").trim());
@@ -45,21 +44,7 @@ export default function Login() {
   // 📌 Campos do formulário
   const location = useLocation();
 
-  const [tipoAcesso, setTipoAcesso] = useState(() => {
-    // Detecta ?acesso=plataforma (link CEO vindo da ManutencaoScreen)
-    const params = new URLSearchParams(window.location.search);
-    return params.get('acesso') === 'plataforma' ? 'plataforma' : 'escola';
-  });
-
-  // ✅ Manutenção programada — checa antes de renderizar o formulário
-  const [manutencao, setManutencao] = useState(null);
-  useEffect(() => {
-    api.get('/api/sistema/status')
-      .then(res => {
-        if (res.data?.maintenance) setManutencao(res.data);
-      })
-      .catch(() => {}); // silencioso — se falhar, mostra login normalmente
-  }, []);
+  const [tipoAcesso, setTipoAcesso] = useState("escola"); // "escola" | "plataforma"
 
   const [usuario, setUsuario] = useState("");
   const [senha, setSenha] = useState("");
@@ -466,19 +451,6 @@ export default function Login() {
         localStorage.setItem("scope", data.scope || "escola");
         localStorage.setItem("perfis", JSON.stringify(Array.isArray(data?.perfis) ? data.perfis : []));
         localStorage.setItem("permissoes", JSON.stringify(Array.isArray(data?.permissoes) ? data.permissoes : []));
-        // ✅ Sincroniza modulos_ativos no login — evita sidebar com valores obsoletos
-        if (Array.isArray(data.modulos_ativos)) {
-          localStorage.setItem('modulos_ativos', JSON.stringify(data.modulos_ativos));
-        } else if (data.modulos_ativos === null) {
-          localStorage.removeItem('modulos_ativos'); // null = irrestrito (CEO/super_admin)
-        }
-
-        // ✅ Sincroniza escola_tipo (ex: ['CCMDF']) para regras CCMDF no Sidebar
-        if (Array.isArray(data.escola_tipo)) {
-          localStorage.setItem('escola_tipo', JSON.stringify(data.escola_tipo));
-        } else {
-          localStorage.removeItem('escola_tipo');
-        }
 
         setTipoMensagem("sucesso");
         setMensagem("Login realizado com sucesso!");
@@ -521,19 +493,6 @@ export default function Login() {
         localStorage.setItem("scope", data.scope || "escola");
         localStorage.setItem("perfis", JSON.stringify(Array.isArray(data?.perfis) ? data.perfis : []));
         localStorage.setItem("permissoes", JSON.stringify(Array.isArray(data?.permissoes) ? data.permissoes : []));
-        // ✅ Sincroniza modulos_ativos no login (dispositivo confiado)
-        if (Array.isArray(data.modulos_ativos)) {
-          localStorage.setItem('modulos_ativos', JSON.stringify(data.modulos_ativos));
-        } else if (data.modulos_ativos === null) {
-          localStorage.removeItem('modulos_ativos');
-        }
-
-        // ✅ Sincroniza escola_tipo (ex: ['CCMDF']) para regras CCMDF no Sidebar
-        if (Array.isArray(data.escola_tipo)) {
-          localStorage.setItem('escola_tipo', JSON.stringify(data.escola_tipo));
-        } else {
-          localStorage.removeItem('escola_tipo');
-        }
 
         await carregarDisciplinasProfessor(data.token);
 
@@ -767,19 +726,6 @@ export default function Login() {
       localStorage.setItem("scope", data.scope || "escola");
       localStorage.setItem("perfis", JSON.stringify(Array.isArray(data?.perfis) ? data.perfis : []));
       localStorage.setItem("permissoes", JSON.stringify(Array.isArray(data?.permissoes) ? data.permissoes : []));
-      // ✅ Sincroniza modulos_ativos no login (confirmação OTP)
-      if (Array.isArray(data.modulos_ativos)) {
-        localStorage.setItem('modulos_ativos', JSON.stringify(data.modulos_ativos));
-      } else if (data.modulos_ativos === null) {
-        localStorage.removeItem('modulos_ativos');
-      }
-
-      // ✅ Sincroniza escola_tipo (ex: ['CCMDF']) para regras CCMDF no Sidebar
-      if (Array.isArray(data.escola_tipo)) {
-        localStorage.setItem('escola_tipo', JSON.stringify(data.escola_tipo));
-      } else {
-        localStorage.removeItem('escola_tipo');
-      }
 
       await carregarDisciplinasProfessor(data.token);
 
@@ -851,19 +797,6 @@ export default function Login() {
       // ✅ RBAC (perfis/permissoes)
       localStorage.setItem("perfis", JSON.stringify(Array.isArray(data?.perfis) ? data.perfis : []));
       localStorage.setItem("permissoes", JSON.stringify(Array.isArray(data?.permissoes) ? data.permissoes : []));
-      // ✅ Sincroniza modulos_ativos no login (multi-escola)
-      if (Array.isArray(data.modulos_ativos)) {
-        localStorage.setItem('modulos_ativos', JSON.stringify(data.modulos_ativos));
-      } else if (data.modulos_ativos === null) {
-        localStorage.removeItem('modulos_ativos');
-      }
-
-      // ✅ Sincroniza escola_tipo (ex: ['CCMDF']) para regras CCMDF no Sidebar
-      if (Array.isArray(data.escola_tipo)) {
-        localStorage.setItem('escola_tipo', JSON.stringify(data.escola_tipo));
-      } else {
-        localStorage.removeItem('escola_tipo');
-      }
 
       // ✅ DISCIPLINAS do professor (para Conteúdos)
       await carregarDisciplinasProfessor(data.token);
@@ -895,11 +828,6 @@ export default function Login() {
       setLoading(false);
     }
   };
-
-  // ✅ Manutenção ativa + NÃO é acesso CEO → mostra tela de manutenção
-  if (manutencao && tipoAcesso !== 'plataforma') {
-    return <ManutencaoScreen data={manutencao} />;
-  }
 
   return (
     <div className="h-screen w-screen relative flex items-center justify-center">

@@ -220,17 +220,19 @@ export default function Provas() {
 
       const fileName = `capa-${selectedArea.id.toLowerCase()}-${form.bimestre}bim-${form.ano}.pdf`;
 
-      // Baixa o PDF do backend (cabeçaçalho institucional completo, QR, instruções)
-      const pdfRes = await fetch(`${API}/api/capa-provas/${created.id}/pdf`, { headers: authH() });
+      // Baixa o PDF do backend (cabeçalho institucional completo, QR, instruções)
+      // Se houver cor customizada, passa via ?color= para o backend gerar com a cor correta
+      const hasCustomColor = customColor && customColor.toLowerCase() !== selectedArea.cor.toLowerCase();
+      const colorParam = hasCustomColor ? `?color=${encodeURIComponent(customColor)}` : '';
+      const pdfRes = await fetch(`${API}/api/capa-provas/${created.id}/pdf${colorParam}`, { headers: authH() });
       if (!pdfRes.ok) throw new Error('Erro ao gerar PDF.');
       const pdfBytes = new Uint8Array(await pdfRes.arrayBuffer());
 
-      // Verifica se precisa de processamento canvas (cor custom ou imagem custom)
-      const hasCustomColor = customColor && customColor.toLowerCase() !== selectedArea.cor.toLowerCase();
-      const needsCanvas = customImage || hasCustomColor;
+      // Só usa canvas quando há imagem customizada para sobrepor
+      const needsCanvas = !!customImage;
 
       if (needsCanvas) {
-        // ── Canvas pipeline: render PDF do backend + recolorir + overlay de imagem ──
+        // ── Canvas pipeline: render PDF do backend + overlay de imagem ──────
         const pdfjsLib = await import('pdfjs-dist');
         pdfjsLib.GlobalWorkerOptions.workerSrc =
           `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
@@ -245,12 +247,9 @@ export default function Provas() {
         const ctx = canvas.getContext('2d');
         await page.render({ canvasContext: ctx, viewport }).promise;
 
-        // 1) Recolorização — substitui pixels da cor padrão da área pela cor customizada
-        if (hasCustomColor) {
-          recolorCanvas(ctx, canvas.width, canvas.height, selectedArea.cor, customColor);
-        }
+        // (Nenhuma recolorização necessária — cor já está correta no PDF do backend)
 
-        // 2) Overlay de imagem customizada respeitando margens do template
+        // Overlay de imagem customizada respeitando margens do template
         if (customImage) {
           const userImg = new Image();
           userImg.src = customImage;
@@ -716,7 +715,7 @@ export default function Provas() {
                   <button style={{ ...s.stepBtn, ...(active ? s.stepActive : done ? s.stepDone : s.stepIdle) }} onClick={() => goToStep(n)}>
                     <span style={s.stepNum}>{done ? '✓' : n}</span>
                     <span style={s.stepLabel}>{label}</span>
-                  </button>
+                  ></button>
                   {i < 2 && <div style={{ ...s.stepLine, background: done ? '#6366f1' : '#e2e8f0' }} />}
                 </React.Fragment>
               );
@@ -735,7 +734,7 @@ export default function Provas() {
                     <div style={{ fontSize:42, marginBottom:10 }}>{area.emoji}</div>
                     <div style={{ fontSize:18, fontWeight:800, color: area.cor, marginBottom:4 }}>{area.label}</div>
                     <div style={{ fontSize:11, color:'#64748b', lineHeight:1.4 }}>{area.disciplinas}</div>
-                  </button>
+                  ></button>
                 ))}
               </div>
             </div>

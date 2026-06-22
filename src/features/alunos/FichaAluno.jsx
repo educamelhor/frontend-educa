@@ -25,28 +25,6 @@ export default function FichaAluno({ codigo: codigoProp }) {
   const isDisciplinar = location.pathname.includes("/disciplinar");
   const isProfessor = String(localStorage.getItem('perfil') || '').toLowerCase().trim() === 'professor';
 
-  // ✅ Guard CCMDF: Relatório Disciplinar é EXCLUSIVO de escolas cívico-militares.
-  const isCCMDF = (() => {
-    try {
-      const raw = localStorage.getItem('escola_tipo');
-      const tipos = JSON.parse(raw || '[]');
-      return Array.isArray(tipos) && tipos.includes('CCMDF');
-    } catch {
-      return false;
-    }
-  })();
-
-  // ✅ Guard MILITAR: dentro das escolas CCMDF, só perfis militares vêem o Disciplinar.
-  // Perfis militares: 'militar' e 'comandante'
-  // Diretores pedagógicos, coordenadores, etc. NÃO têm acesso ao módulo militar.
-  const isMilitar = (() => {
-    const p = String(localStorage.getItem('perfil') || '').toLowerCase().trim();
-    return p === 'militar' || p === 'comandante';
-  })();
-
-  // Disciplinar só é exibido quando AMBAS as condições forem verdadeiras
-  const showDisciplinar = isCCMDF && isMilitar;
-
   const [aluno, setAluno] = useState(null);
   const [erro, setErro] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -349,16 +327,34 @@ export default function FichaAluno({ codigo: codigoProp }) {
           </div>
         </div>
 
-        {/* Banner upload de foto removido: foto vem do EDUCA-CAPTURE */}
-
+        {/* Upload de foto — oculto no módulo disciplinar */}
+        {!isDisciplinar && (
+          <div style={{ marginBottom: 20, padding: '12px 14px', background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: 10 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 8 }}>📷 Foto do Estudante</div>
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: uploading ? 'not-allowed' : 'pointer' }}>
+              <span style={{ padding: '7px 14px', background: uploading ? '#e5e7eb' : '#1e3a5f', color: '#fff', borderRadius: 8, fontSize: 12, fontWeight: 600, transition: 'background 0.2s' }}>
+                {uploading ? "Enviando…" : "Escolher pasta"}
+              </span>
+              <input
+                type="file"
+                webkitdirectory="true"
+                directory="true"
+                multiple
+                accept=".jpg,.jpeg,.png,.webp,.jfif,image/*"
+                onChange={handleFolderSelect}
+                style={{ display: 'none' }}
+                disabled={uploading}
+              />
+            </label>
+          </div>
+        )}
 
         {/* Relatórios */}
         <div>
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9ca3af', marginBottom: 12 }}>
             RELATÓRIOS
           </div>
-          {/* Grade: 2 colunas se showDisciplinar; 1 coluna caso contrário */}
-          <div style={{ display: 'grid', gridTemplateColumns: showDisciplinar ? '1fr 1fr' : '1fr', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isProfessor ? '1fr' : '1fr 1fr', gap: 12 }}>
             {/* Relatório Pedagógico */}
             <div
               onClick={() => setModalPedagogicoOpen(true)}
@@ -380,8 +376,8 @@ export default function FichaAluno({ codigo: codigoProp }) {
               <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>Ver histórico →</div>
             </div>
 
-            {/* Relatório Disciplinar — EXCLUSIVO de escolas CCMDF + perfil militar/comandante */}
-            {showDisciplinar && (
+            {/* Relatório Disciplinar */}
+            {!isProfessor && (
               <div
                 onClick={() => setModalRelatorioOpen(true)}
                 role="button"
@@ -423,14 +419,11 @@ export default function FichaAluno({ codigo: codigoProp }) {
       </div>
 
       {/* Modais */}
-      {/* ModalRelatorioDisciplinar só é montado para perfis militares em escolas CCMDF */}
-      {showDisciplinar && (
-        <ModalRelatorioDisciplinar
-          open={modalRelatorioOpen}
-          onClose={() => setModalRelatorioOpen(false)}
-          aluno={aluno}
-        />
-      )}
+      <ModalRelatorioDisciplinar
+        open={modalRelatorioOpen}
+        onClose={() => setModalRelatorioOpen(false)}
+        aluno={aluno}
+      />
 
       <ModalRelatorioPedagogico
         open={modalPedagogicoOpen}

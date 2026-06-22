@@ -255,20 +255,20 @@ export default function Provas() {
         await page.render({ canvasContext: ctx, viewport }).promise;
 
         // ══ PASSO 1: Limpar zona completa do template (remove coliseu totalmente) ══
-        // Valores calibrados por template (canvas px, escala 2×, instrTextH≈200pt)
-        // A limpeza começa no GAP entre o fim das instruções e o início da imagem padrão.
+        // Valores medidos com PDFKit real (instrTextH HUMANAS, font 8.8pt, lineGap 0.5, paraGap 2)
+        // clearY DEVE ser >= instrTextEnd para não clipar o item 7:
         //
-        // T1 Clássico:  x=72,  y=1000, w=1046, maxY=1614
-        // T2 Moderno:   x=124, y=940,  w=1066, maxY=1646  (STRIPE=62*2=124)
-        // T3 Formal:    x=48,  y=1015, w=1094, maxY=1634
-        // T4 Colorido:  x=0,   y=1010, w=1190, maxY=1646
-        // T5 Dark:      x=0,   y=940,  w=1190, maxY=1646
+        // T1 Clássico:  instrEnd=969px, imageStart=1057px → clearY=1030px (centro do gap)
+        // T2 Moderno:   instrEnd=979px, imageStart=999px  → clearY=990px  (centro do gap)
+        // T3 Formal:    instrEnd=1035px, imageStart=1051px → clearY=1044px (centro do gap)
+        // T4 Colorido:  instrEnd=1015px, imageStart=1103px → clearY=1060px (centro do gap)
+        // T5 Dark:      instrEnd=949px,  imageStart=1037px → clearY=993px  (centro do gap)
         const TEMPLATE_ZONES = {
-          1: { x: 72,  y: 1000, w: 1046, maxY: 1614 },
-          2: { x: 124, y: 940,  w: 1066, maxY: 1646 },
-          3: { x: 48,  y: 1015, w: 1094, maxY: 1634 },
-          4: { x: 0,   y: 1010, w: 1190, maxY: 1646 },
-          5: { x: 0,   y: 940,  w: 1190, maxY: 1646 },
+          1: { x: 72,  y: 1030, w: 1046, maxY: 1614 },
+          2: { x: 124, y: 990,  w: 1066, maxY: 1646 },
+          3: { x: 48,  y: 1044, w: 1094, maxY: 1634 },
+          4: { x: 0,   y: 1060, w: 1190, maxY: 1646 },
+          5: { x: 0,   y: 993,  w: 1190, maxY: 1646 },
         };
         const cz = TEMPLATE_ZONES[selectedTemplate.id] || TEMPLATE_ZONES[2];
 

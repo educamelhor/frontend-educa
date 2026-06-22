@@ -167,9 +167,15 @@ export default function Sidebar({ isOpen, onClose }) {
   const getPerfil = () =>
     String(localStorage.getItem('perfil') || '').toLowerCase().trim();
   const perfil = getPerfil();
-  const isDisciplinar = perfil === 'disciplinar' || perfil === 'diretor_disciplinar' || perfil === 'militar';
+  const isDisciplinar = perfil === 'disciplinar' || perfil === 'diretor_disciplinar' || perfil === 'militar' || perfil === 'comandante';
   const isProfessor = perfil === 'professor';
   const isSecretario = perfil === 'secretario' || perfil === 'secretaria';
+
+  // ── Escola tipo (CCMDF = cívico-militar) ──
+  const escolaTipoRaw = localStorage.getItem('escola_tipo');
+  const escolaTipo = (() => { try { const v = JSON.parse(escolaTipoRaw || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } })();
+  const isCCMDF = escolaTipo.includes('CCMDF');
+  const isDiretorPedagogicoCCMDF = isCCMDF && (perfil === 'diretor' || perfil === 'vice_diretor');
 
   // Começando pelos 3 módulos solicitados
   const canConteudos = isScopeEscola && !isDisciplinar && !isProfessor && hasPerm('conteudos:ver');
@@ -449,16 +455,14 @@ export default function Sidebar({ isOpen, onClose }) {
           </>
         ) : (
           <>
-            {/* LINK: Home */}
-            {!isDisciplinar && !isProfessor && !isCoord && !isSecretario && (
+            {/* LINK: Home — renderiza para TODOS os perfis (não passa por hasModulo) */}
             <Link to="/home" className={getMainLinkClasses('/home')}>
               <HomeIcon className="h-5 w-5 mr-2" />
               Home
             </Link>
-            )}
 
             {/* LINK: Estudantes */}
-            {!isDisciplinar && !isProfessor && !isCoord && !isSecretario && hasModulo('secretaria.alunos') && (
+            {!isDisciplinar && !isProfessor && !isCoord && !isSecretario && hasModulo('estudantes') && (
             <Link to="/alunos" className={getMainLinkClasses('/alunos')}>
               <UserGroupIcon className="h-5 w-5 mr-2" />
               Estudantes
@@ -626,8 +630,8 @@ export default function Sidebar({ isOpen, onClose }) {
             </>
             )}
 
-            {/* ─── FREQUÊNCIA (professor): sempre aberto, só Frequência + Atestados ─── */}
-            {isProfessor && (
+            {/* ─── FREQUÊNCIA (professor): só se hasModulo ativo ─── */}
+            {isProfessor && hasModulo('frequencia') && (
               <>
                 <div
                   className="flex items-center w-full py-2 px-3 rounded mt-2"
@@ -637,6 +641,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   <span className="flex-1 text-left font-semibold">Frequência</span>
                 </div>
                 <ul className="ml-4 mb-2">
+                  {hasModulo('frequencia.atestados') && (
                   <li>
                     <Link
                       to="/frequencia/atestados"
@@ -645,6 +650,7 @@ export default function Sidebar({ isOpen, onClose }) {
                       <DocumentTextIcon className="h-5 w-5 mr-2" /> Atestados
                     </Link>
                   </li>
+                  )}
                 </ul>
               </>
             )}
@@ -999,6 +1005,9 @@ export default function Sidebar({ isOpen, onClose }) {
             (Painel + Visitantes: Registrar / Histórico)
         ─────────────────────────────── */}
         {canMonitoramento && hasModulo('monitoramento') && (
+          hasModulo('monitoramento.painel') || hasModulo('monitoramento.visitantes_registrar') ||
+          hasModulo('monitoramento.visitantes_historico') || hasModulo('monitoramento.embeddings')
+        ) && (
           <>
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-2 transition"
@@ -1068,7 +1077,7 @@ export default function Sidebar({ isOpen, onClose }) {
 
 
 
-        {isScopeEscola && !isProfessor && !isCoord && !isSecretario && hasModulo('disciplinar') && (
+        {isScopeEscola && !isProfessor && !isCoord && !isSecretario && !isDiretorPedagogicoCCMDF && (isDisciplinar || (isCCMDF && hasModulo('disciplinar'))) && (
           <>
             {/* ───────────────────────────────
                 GRUPO: Disciplinar
@@ -1449,9 +1458,11 @@ export default function Sidebar({ isOpen, onClose }) {
                 )}
               </>
             )}
+          </>
+        )}
 
-            {/* ─── GRUPO: Secretaria (Professor NÃO tem acesso) ─── */}
-            {!isProfessor && hasModulo('secretaria') && (
+        {/* ─── GRUPO: Secretaria (independente do Agente EDUCA) ─── */}
+        {!isProfessor && !isDisciplinar && hasModulo('secretaria') && (
             <>
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-6 transition"
@@ -1651,8 +1662,6 @@ export default function Sidebar({ isOpen, onClose }) {
             )}
             </>
             )}
-          </>
-        )}
 
         {isScopeEscola && !isDisciplinar && !isProfessor && !isSecretario && hasModulo('pedagogico') && (
           <>

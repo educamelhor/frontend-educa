@@ -220,11 +220,15 @@ export default function Provas() {
 
       const fileName = `capa-${selectedArea.id.toLowerCase()}-${form.bimestre}bim-${form.ano}.pdf`;
 
-      // Baixa o PDF do backend (cabeçalho institucional completo, QR, instruções)
-      // Se houver cor customizada, passa via ?color= para o backend gerar com a cor correta
+      // Monta URL do PDF com parâmetros opcionais:
+      // - ?color=  → backend gera com cor correta desde o início (sem recolorCanvas)
+      // - &noImage=1 → backend omite a imagem temática padrão e retorna zona exata em headers
       const hasCustomColor = customColor && customColor.toLowerCase() !== selectedArea.cor.toLowerCase();
-      const colorParam = hasCustomColor ? `?color=${encodeURIComponent(customColor)}` : '';
-      const pdfRes = await fetch(`${API}/api/capa-provas/${created.id}/pdf${colorParam}`, { headers: authH() });
+      const pdfParams = new URLSearchParams();
+      if (hasCustomColor) pdfParams.set('color', customColor);
+      if (customImage)    pdfParams.set('noImage', '1');
+      const pdfParamStr = pdfParams.toString() ? `?${pdfParams.toString()}` : '';
+      const pdfRes = await fetch(`${API}/api/capa-provas/${created.id}/pdf${pdfParamStr}`, { headers: authH() });
       if (!pdfRes.ok) throw new Error('Erro ao gerar PDF.');
       const pdfBytes = new Uint8Array(await pdfRes.arrayBuffer());
 
@@ -232,7 +236,10 @@ export default function Provas() {
       const needsCanvas = !!customImage;
 
       if (needsCanvas) {
-        // ── Canvas pipeline: render PDF do backend + overlay de imagem ──────
+        // ── Canvas pipeline: PDF sem imagem padrão + overlay da imagem do usuário ──
+        // O backend retorna a zona EXATA da imagem padrão via headers X-Image-Zone-*
+        // O frontend limpa essa zona e desenha a imagem do usuário para preenchê-la por completo.
+
         const pdfjsLib = await import('pdfjs-dist');
         pdfjsLib.GlobalWorkerOptions.workerSrc =
           `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
@@ -247,54 +254,46 @@ export default function Provas() {
         const ctx = canvas.getContext('2d');
         await page.render({ canvasContext: ctx, viewport }).promise;
 
-        // (Nenhuma recolorização necessária — cor já está correta no PDF do backend)
+        // ── Zona exata da imagem padrão (em PDF pontos → canvas ×2) ──────────
+        // Os headers são enviados pelo backend quando ?noImage=1
+        const SCALE = 2;
+        const zoneX  = parseInt(pdfRes.headers.get('X-Image-Zone-X') || '36')  * SCALE;
+        const zoneY  = parseInt(pdfRes.headers.get('X-Image-Zone-Y') || '510') * SCALE;
+        const zoneW  = parseInt(pdfRes.headers.get('X-Image-Zone-W') || '523') * SCALE;
+        const zoneH  = parseInt(pdfRes.headers.get('X-Image-Zone-H') || '260') * SCALE;
 
-        // Overlay de imagem customizada respeitando margens do template
-        if (customImage) {
-          const userImg = new Image();
-          userImg.src = customImage;
-          await new Promise((res, rej) => { userImg.onload = res; userImg.onerror = rej; });
+        // Carrega imagem do usuário
+        const userImg = new Image();
+        userImg.src = customImage;
+        await new Promise((res, rej) => { userImg.onload = res; userImg.onerror = rej; });
 
-          // ── Margens do template (pt no PDF 1:1 → ×2 para canvas 2×) ─────────────────────
-          // Template 1 Clássico: border(3)+pad(4)+inner(1)=8 + mx=10 → 18pt
-          // Template 2 Moderno: faixa(55)+mx=14 → faixa fic 0 no rodapé (usa 55 só no conteúdo)
-          // Template 3 Formal: border(4)+pad(4)+inner(1)=9 + mx=16 → 25pt
-          // Template 4 Colorido: mx=0 → 0pt (edge-to-edge)
-          // Template 5 Dark: mx=16 → 16pt
-          const templateMxMap = { 1: 18, 2: 14, 3: 25, 4: 0, 5: 16 };
-          const templateMxPt = templateMxMap[selectedTemplate.id] ?? 16;
-          // Converte pt → px no canvas 2× (1pt = 2px)
-          const baseMx = templateMxPt * 2;
+        // Limpa TODA a zona (remove qualquer resquício da imagem padrão)
+        ctx.clearRect(zoneX, zoneY, zoneW, zoneH);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(zoneX, zoneY, zoneW, zoneH);
 
-          // Largura e altura da imagem customizada (aplicando imageWidthPct e imageHeight)
-          const extraMx = baseMx + ((100 - imageWidthPct) / 100) * (canvas.width - baseMx * 2) / 2;
-          const areaX = extraMx;
-          const areaW = canvas.width - extraMx * 2;
-
-          // Altura: imageHeight em pt ×2 para canvas 2×
-          const areaH = imageHeight * 2;
-          const areaStartY = canvas.height - areaH - baseMx; // margem inferior = baseMx
-
-          const iw = userImg.naturalWidth || userImg.width || 1;
-          const ih = userImg.naturalHeight || userImg.height || 1;
-          let coverW, coverH;
-          if (iw / ih > areaW / areaH) {
-            coverH = areaH; coverW = coverH * (iw / ih);
-          } else {
-            coverW = areaW; coverH = coverW / (iw / ih);
-          }
-          const finalW = coverW * imageZoom;
-          const finalH = coverH * imageZoom;
-          const cx = areaX + areaW / 2 + (imageOffsetX / 100) * areaW;
-          const cy = areaStartY + areaH / 2 + (imageOffsetY / 100) * areaH;
-          ctx.save();
-          ctx.beginPath();
-          ctx.rect(areaX, areaStartY, areaW, areaH);
-          ctx.clip();
-          ctx.clearRect(areaX, areaStartY, areaW, areaH);
-          ctx.drawImage(userImg, cx - finalW / 2, cy - finalH / 2, finalW, finalH);
-          ctx.restore();
+        // Desenha a imagem do usuário em modo cover, preenchendo toda a zona
+        // Zoom e offset controlam o crop dentro da zona (como uma câmera)
+        const iw = userImg.naturalWidth  || userImg.width  || 1;
+        const ih = userImg.naturalHeight || userImg.height || 1;
+        let coverW, coverH;
+        if (iw / ih > zoneW / zoneH) {
+          // imagem mais larga que a zona → ajusta pela altura
+          coverH = zoneH * imageZoom;
+          coverW = coverH * (iw / ih);
+        } else {
+          // imagem mais alta que a zona → ajusta pela largura
+          coverW = zoneW * imageZoom;
+          coverH = coverW / (iw / ih);
         }
+        const cx = zoneX + zoneW / 2 + (imageOffsetX / 100) * zoneW;
+        const cy = zoneY + zoneH / 2 + (imageOffsetY / 100) * zoneH;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(zoneX, zoneY, zoneW, zoneH);
+        ctx.clip();
+        ctx.drawImage(userImg, cx - coverW / 2, cy - coverH / 2, coverW, coverH);
+        ctx.restore();
 
         // Exporta para PDF A4
         const imgData = canvas.toDataURL('image/jpeg', 0.92);

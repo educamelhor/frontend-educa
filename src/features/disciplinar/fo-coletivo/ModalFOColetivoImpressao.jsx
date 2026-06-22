@@ -112,7 +112,9 @@ export default function ModalFOColetivoImpressao({ onClose }) {
   const [loading, setLoading]     = useState(false);
   const [error, setError]         = useState('');
   const [selectedIds, setSelected]= useState(new Set()); // Set<ocorrencia_id>
-  const [printing, setPrinting]       = useState(false);
+  const [printing, setPrinting]   = useState(false);
+  const [printQueue, setPrintQueue] = useState([]); // [{aluno_id, ocorrencia_id, estudante}]
+  const [printProgress, setPrintProgress] = useState(0); // quantos foram impressos
   const [showDatePicker, setShowDatePicker] = useState(false);
   const dateRef = useRef(null);
 
@@ -167,51 +169,37 @@ export default function ModalFOColetivoImpressao({ onClose }) {
   function deselectAll() { setSelected(new Set()); }
 
   // ── Impressão ──────────────────────────────────────────────────────────────
-  async function handleImprimir() {
+  function handleImprimir() {
     // Coletar selecionados na ordem: lote → aluno
     const queue = [];
     lotes.forEach(lote => {
       lote.alunos.forEach(a => {
         if (selectedIds.has(a.ocorrencia_id)) {
-          queue.push({ aluno_id: a.aluno_id, ocorrencia_id: a.ocorrencia_id });
+          queue.push({ aluno_id: a.aluno_id, ocorrencia_id: a.ocorrencia_id, estudante: a.estudante });
         }
       });
     });
     if (queue.length === 0) return;
-
+    setPrintQueue(queue);
+    setPrintProgress(0);
     setPrinting(true);
-    try {
-      const token    = getToken();
-      const escolaId = getEscolaId();
-      const apiBase  = getApiBase();
-
-      const res = await fetch(`${apiBase}/api/relatorio-disciplinar/lote-registros`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-          'x-escola-id': escolaId,
-        },
-        body: JSON.stringify({ registros: queue }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || `Erro HTTP ${res.status}`);
-      }
-
-      // Baixar e abrir o PDF combinado em nova aba
-      const blob = await res.blob();
-      const url  = URL.createObjectURL(blob);
-      window.open(url, '_blank', 'noopener');
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
-    } catch (err) {
-      console.error('[FO Coletivo] Erro ao gerar PDF em lote:', err);
-      alert(`Erro ao gerar PDF: ${err.message}`);
-    } finally {
-      setPrinting(false);
-    }
   }
+
+  // Efeito de impressão sequencial com delay
+  useEffect(() => {
+    if (!printing || printQueue.length === 0) return;
+    if (printProgress >= printQueue.length) {
+      setPrinting(false);
+      return;
+    }
+    const item = printQueue[printProgress];
+    const token   = getToken();
+    const escolaId = getEscolaId();
+    const url = `${getApiBase()}/api/relatorio-disciplinar/${item.aluno_id}/registro/${item.ocorrencia_id}?token=${encodeURIComponent(token)}&escola_id=${escolaId}`;
+    window.open(url, '_blank', 'noopener');
+    const timer = setTimeout(() => setPrintProgress(p => p + 1), 900);
+    return () => clearTimeout(timer);
+  }, [printing, printProgress, printQueue]);
 
   // ── Navegação de data (dia anterior / próximo) ────────────────────────────
   function changeDay(delta) {
@@ -221,7 +209,7 @@ export default function ModalFOColetivoImpressao({ onClose }) {
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
-  const isPrinting = printing;
+  const isPrinting = printing && printProgress < printQueue.length;
 
   return (
     <div
@@ -480,7 +468,7 @@ export default function ModalFOColetivoImpressao({ onClose }) {
                       {lote.alunos.map((aluno, idx) => {
                         const sel = selectedIds.has(aluno.ocorrencia_id);
                         const sb = statusBadge(aluno.status);
-                        const isPrintingThis = false;
+                        const isPrintingThis = isPrinting && printQueue[printProgress]?.ocorrencia_id === aluno.ocorrencia_id;
 
                         return (
                           <div
@@ -597,7 +585,7 @@ export default function ModalFOColetivoImpressao({ onClose }) {
               <div style={{ display:'flex', alignItems:'center', gap:10 }}>
                 <div style={{ width:18, height:18, border:'2.5px solid #fecaca', borderTop:'2.5px solid #ef4444', borderRadius:'50%', animation:'fciSpin 0.7s linear infinite', flexShrink:0 }} />
                 <span style={{ fontSize:13, color:'#ef4444', fontWeight:700 }}>
-                  Gerando PDF… Aguarde.
+                  Imprimindo {printProgress + 1} de {printQueue.length}: {printQueue[printProgress]?.estudante}…
                 </span>
               </div>
             ) : (
@@ -644,7 +632,7 @@ export default function ModalFOColetivoImpressao({ onClose }) {
               onMouseLeave={e => { e.currentTarget.style.transform='translateY(0)'; e.currentTarget.style.boxShadow = totalSelecionados > 0 && !isPrinting ? '0 6px 20px rgba(239,68,68,0.35)' : 'none'; }}
             >
               <PrinterIcon style={{ width:17, height:17 }} />
-              {isPrinting ? `Gerando PDF… (${totalSelecionados} F.O.)` : `Imprimir${totalSelecionados > 0 ? ` (${totalSelecionados})` : ''}`}
+              {isPrinting ? `Imprimindo… (${printProgress}/${printQueue.length})` : `Imprimir${totalSelecionados > 0 ? ` (${totalSelecionados})` : ''}`}
             </button>
           </div>
         </div>

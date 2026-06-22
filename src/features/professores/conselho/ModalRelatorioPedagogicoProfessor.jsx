@@ -3,13 +3,13 @@
 // Versão PROFESSOR do Relatório Pedagógico.
 //
 // Governança aplicada:
-//  ✅ Professor visualiza o histórico de registros pedagógicos
-//  ❌ Botão "+ Adicionar"   — OCULTO
+//  ✅ Professor PODE visualizar o histórico de registros pedagógicos
+//  ✅ Professor PODE registrar novas ocorrências (sem Descrição/Reg.Interno)
 //  ❌ Ação Finalizar        — OCULTA
 //  ❌ Ação Editar           — OCULTA
 //  ❌ Ação Excluir          — OCULTA
-//  ❌ Campo Descrição       — OCULTO (no modal de detalhe)
-//  ❌ Campo Registro Interno— OCULTO (no modal de detalhe)
+//  ❌ Campo Descrição       — OCULTO (no modal de detalhe/criação)
+//  ❌ Campo Registro Interno— OCULTO (no modal de detalhe/criação)
 //
 // Este arquivo é INDEPENDENTE de alunos/ModalRelatorioPedagogico.jsx.
 // NÃO altere o arquivo compartilhado para ajustar regras do professor.
@@ -26,6 +26,7 @@ import ModalNovaOcorrenciaPedagogicaProfessor from "./ModalNovaOcorrenciaPedagog
 export default function ModalRelatorioPedagogicoProfessor({ open, onClose, aluno }) {
   const [novaOcorrenciaOpen, setNovaOcorrenciaOpen] = useState(false);
   const [ocorrenciaSelecionada, setOcorrenciaSelecionada] = useState(null);
+  const [modoVisualizacao, setModoVisualizacao] = useState(false);
   const [ocorrencias, setOcorrencias] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -100,10 +101,10 @@ export default function ModalRelatorioPedagogicoProfessor({ open, onClose, aluno
 
         <div className="p-6 overflow-y-auto">
 
-          {/* Aviso de perfil */}
+          {/* Aviso de governança */}
           <div className="mb-4 px-4 py-2 bg-blue-50 border border-blue-200 rounded text-sm text-blue-700">
-            ℹ️ Como professor, você visualiza os registros em modo <strong>somente leitura</strong>.
-            Adição, edição e exclusão são exclusivas da coordenação e direção.
+            ℹ️ Como professor, você pode <strong>registrar</strong> novas ocorrências e visualizar o histórico.
+            Edição, exclusão, finalização e os campos <strong>Descrição</strong> e <strong>Registro Interno</strong> são exclusivos da coordenação e direção.
           </div>
 
           {/* Cabeçalho do Estudante */}
@@ -140,7 +141,19 @@ export default function ModalRelatorioPedagogicoProfessor({ open, onClose, aluno
               </div>
             </div>
 
-            {/* ❌ Botão "+ Adicionar" — OCULTO para professor */}
+            {/* ✅ Botão + Adicionar — professor PODE registrar novas ocorrências */}
+            <div className="flex-shrink-0">
+              <button
+                onClick={() => {
+                  setOcorrenciaSelecionada(null);
+                  setModoVisualizacao(false);
+                  setNovaOcorrenciaOpen(true);
+                }}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition shadow-sm"
+              >
+                + Adicionar
+              </button>
+            </div>
           </div>
 
           {/* Tabela */}
@@ -189,11 +202,12 @@ export default function ModalRelatorioPedagogicoProfessor({ open, onClose, aluno
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center">
-                        {/* ✅ Apenas visualização — sem Finalizar, Editar ou Excluir */}
+                        {/* ✅ Visualizar — sem Finalizar, Editar ou Excluir */}
                         <div className="flex justify-center gap-2">
                           <button
                             onClick={() => {
                               setOcorrenciaSelecionada(oc);
+                              setModoVisualizacao(true);
                               setNovaOcorrenciaOpen(true);
                             }}
                             className="text-gray-600 hover:text-gray-800"
@@ -212,14 +226,18 @@ export default function ModalRelatorioPedagogicoProfessor({ open, onClose, aluno
         </div>
       </div>
 
-      {/* Modal de detalhe — versão professor (sem Descrição e Registro Interno) */}
+      {/* Modal de criação/visualização — versão professor (sem Descrição e Registro Interno) */}
       <ModalNovaOcorrenciaPedagogicaProfessor
         open={novaOcorrenciaOpen}
         onClose={() => {
           setNovaOcorrenciaOpen(false);
           setOcorrenciaSelecionada(null);
+          setModoVisualizacao(false);
         }}
+        aluno={aluno}
+        onOcorrenciaCriada={fetchOcorrencias}
         ocorrenciaInicial={ocorrenciaSelecionada}
+        readonly={modoVisualizacao}
       />
     </div>
   );

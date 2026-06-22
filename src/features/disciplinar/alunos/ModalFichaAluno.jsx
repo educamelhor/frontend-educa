@@ -69,8 +69,9 @@ export default function ModalFichaAluno({ open, codigo, onClose }) {
 
   return (
     <>
-      {/* Backdrop */}
-      <div
+      {/* Backdrop da ficha — oculto enquanto o relatório disciplinar estiver aberto */}
+      {!modalRelatorioOpen && (
+        <div
         style={{
           position: 'fixed', inset: 0, zIndex: 9999,
           background: 'rgba(0,0,0,0.55)',
@@ -233,13 +234,16 @@ export default function ModalFichaAluno({ open, codigo, onClose }) {
             )}
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Modal do Relatório Disciplinar */}
+      {/* Modal do Relatório Disciplinar — abre por cima, sem sobreposição com a ficha */}
       {aluno && (
         <ModalRelatorioDisciplinar
           open={modalRelatorioOpen}
-          onClose={() => setModalRelatorioOpen(false)}
+          onClose={() => {
+            setModalRelatorioOpen(false);
+            onClose(); // fecha a ficha ao sair do relatório
+          }}
           aluno={aluno}
         />
       )}

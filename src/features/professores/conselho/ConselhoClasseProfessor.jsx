@@ -21,6 +21,7 @@ import React, { useState, useEffect } from "react";
 import api from "../../../services/api";
 import ModalBoletim from "../../boletim/ModalBoletim";
 import ModalFichaAlunoProfessor from "./ModalFichaAlunoProfessor";
+import ModalFichaConselhoClasse from "./ModalFichaConselhoClasse";
 import ModalZoomFotoProfessor from "./ModalZoomFotoProfessor";
 import {
   EyeIcon,
@@ -61,9 +62,13 @@ export default function ConselhoClasseProfessor() {
   const [modalBoletimOpen, setModalBoletimOpen] = useState(false);
   const [codigoAlunoBoletim, setCodigoAlunoBoletim] = useState(null);
 
-  // Ficha do Estudante (EyeIcon)
+  // Ficha do Estudante (IdentificationIcon)
   const [modalFichaOpen, setModalFichaOpen] = useState(false);
   const [codigoAlunoFicha, setCodigoAlunoFicha] = useState(null);
+
+  // Ficha do Conselho de Classe (EyeIcon)
+  const [modalConselhoOpen, setModalConselhoOpen] = useState(false);
+  const [alunoConselho, setAlunoConselho] = useState(null);
 
   // Cache-buster para fotos
   const [fotoStamp, setFotoStamp] = useState(Date.now());
@@ -81,6 +86,11 @@ export default function ConselhoClasseProfessor() {
   function abrirModalFicha(codigo) {
     setCodigoAlunoFicha(codigo);
     setModalFichaOpen(true);
+  }
+
+  function abrirModalConselho(aluno) {
+    setAlunoConselho(aluno);
+    setModalConselhoOpen(true);
   }
 
   // Ao fechar a ficha, atualiza o stamp das fotos (caso tenha sido alterada)
@@ -304,15 +314,15 @@ export default function ConselhoClasseProfessor() {
                       <td className="py-2 px-2 text-center">
                         <div className="flex justify-center gap-3">
 
-                          {/* ✅ BUG 2 CORRIGIDO: EyeIcon abre ModalFichaAlunoProfessor */}
+                          {/* ✅ EyeIcon → Ficha do Conselho de Classe (registros do conselho) */}
                           <button
-                            onClick={() => abrirModalFicha(aluno.codigo)}
-                            title="Ficha do estudante"
+                            onClick={() => abrirModalConselho(aluno)}
+                            title="Ficha do conselho de classe"
                           >
                             <EyeIcon className="h-6 w-6 text-gray-600 hover:text-blue-600" />
                           </button>
 
-                          {/* ✅ Boletim — permitido */}
+                          {/* ✅ Boletim */}
                           <button
                             onClick={() => abrirModalBoletim(aluno.codigo)}
                             title="Visualizar boletim"
@@ -320,10 +330,10 @@ export default function ConselhoClasseProfessor() {
                             <DocumentTextIcon className="h-6 w-6 text-gray-600 hover:text-green-600" />
                           </button>
 
-                          {/* ✅ Relatório Pedagógico — somente leitura via Ficha */}
+                          {/* ✅ IdentificationIcon → Ficha do Estudante */}
                           <button
                             onClick={() => abrirModalFicha(aluno.codigo)}
-                            title="Relatório pedagógico (somente leitura)"
+                            title="Ficha do estudante"
                           >
                             <IdentificationIcon className="h-6 w-6 text-gray-600 hover:text-purple-600" />
                           </button>
@@ -353,12 +363,25 @@ export default function ConselhoClasseProfessor() {
         />
       )}
 
-      {/* Modal: Ficha do Estudante — versão professor (governança aplicada) */}
+      {/* Modal: Ficha do Estudante — versão professor */}
       {modalFichaOpen && (
         <ModalFichaAlunoProfessor
           open={modalFichaOpen}
           codigo={codigoAlunoFicha}
           onClose={handleCloseFicha}
+        />
+      )}
+
+      {/* Modal: Ficha do Conselho de Classe (EyeIcon) */}
+      {modalConselhoOpen && (
+        <ModalFichaConselhoClasse
+          open={modalConselhoOpen}
+          aluno={alunoConselho}
+          turma={turmaSelecionada}
+          onClose={() => {
+            setModalConselhoOpen(false);
+            setAlunoConselho(null);
+          }}
         />
       )}
 

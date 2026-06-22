@@ -91,6 +91,7 @@ export default function ConselhoClasseProfessor() {
 
   const turnos = ["Matutino", "Vespertino", "Noturno"];
 
+  // Carrega anos letivos apenas uma vez
   useEffect(() => {
     async function carregarAnos() {
       try {
@@ -101,19 +102,29 @@ export default function ConselhoClasseProfessor() {
       }
     }
     carregarAnos();
-    fetchTurmas();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Re-busca turmas sempre que o ano letivo mudar (a API filtra por ano)
+  useEffect(() => {
+    fetchTurmas();
+    setTurnoSelecionado(null);
+    setTurmaSelecionada(null);
+    setAlunosTurma([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [anoLetivo]);
+
   // ── CORREÇÃO BUG 1: usa /professores/me/turmas em vez de /api/turmas ──────
-  // Esse endpoint já filtra automaticamente as turmas vinculadas ao professor
-  // logado, sem expor turmas de outros professores ou de toda a escola.
+  // A API retorna { ok: true, turmas: [...] } com campo `nome` para o nome
+  // da turma. Passamos o ano letivo como param para pré-filtrar no servidor.
   const fetchTurmas = async () => {
     setLoadingTurmas(true);
     try {
-      const { data } = await api.get("/professores/me/turmas");
-      // Normaliza o campo de nome: a API retorna `nome` ou `turma`
-      const normalizadas = (Array.isArray(data) ? data : []).map((t) => ({
+      const { data } = await api.get(`/professores/me/turmas?ano=${anoLetivo}`);
+      // A resposta é { ok: true, turmas: [...] }  — extrai o array
+      const lista = data?.turmas || (Array.isArray(data) ? data : []);
+      // Normaliza o campo de nome: a API usa `nome`, o restante do código usa `turma`
+      const normalizadas = lista.map((t) => ({
         ...t,
         turma: t.turma ?? t.nome ?? "",
       }));
@@ -126,12 +137,12 @@ export default function ConselhoClasseProfessor() {
     }
   };
 
-  // Filtra por turno e ano letivo (a API já filtrou por professor)
+  // Filtra apenas por turno na UI — a API já retorna só as turmas do professor
+  // para o ano letivo solicitado via param, sem necessidade de filtrar aqui.
   const turmasFiltradas = turmas.filter(
     (t) =>
       turnoSelecionado &&
-      normalizaTexto(t.turno) === normalizaTexto(turnoSelecionado) &&
-      Number(t.ano) === anoLetivo
+      normalizaTexto(t.turno) === normalizaTexto(turnoSelecionado)
   );
 
   const handleClickTurno = (turno) => {

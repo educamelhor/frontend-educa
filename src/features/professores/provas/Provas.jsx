@@ -231,14 +231,15 @@ export default function Provas() {
       if (!pdfRes.ok) throw new Error('Erro ao gerar PDF.');
       const pdfBytes = new Uint8Array(await pdfRes.arrayBuffer());
 
-      // Usa canvas apenas quando há imagem customizada para sobrepor
-      // (noCustomImage = sem imagem alguma → download direto do PDF já sem imagem)
-      const needsCanvas = !!customImage;
+      // Usa canvas quando há imagem customizada para sobrepor OU quando o usuário
+      // optou por "sem imagem" — neste caso, o canvas garante a limpeza da zona
+      // mesmo que o backend não tenha removido a imagem padrão via ?noImage=1.
+      const needsCanvas = !!customImage || noCustomImage;
 
       if (needsCanvas) {
-        // ── Canvas pipeline: PDF sem imagem padrão + overlay da imagem do usuário ──
-        // O backend retorna a zona EXATA da imagem padrão via headers X-Image-Zone-*
-        // O frontend limpa essa zona e desenha a imagem do usuário para preenchê-la por completo.
+        // ── Canvas pipeline: renderiza PDF → limpa zona de imagem → [overlay] ──
+        // noCustomImage: apenas limpa (zona fica branca)
+        // customImage: limpa e desenha imagem do usuário por cima
 
         const pdfjsLib = await import('pdfjs-dist');
         pdfjsLib.GlobalWorkerOptions.workerSrc =
@@ -286,49 +287,50 @@ export default function Provas() {
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(clearX, clearY, clearW, clearMaxY - clearY);
 
-        // ══ PASSO 2: Desenhar imagem do usuário com os ajustes SALVOS ══════════
-        // Respeita imageHeight, imageWidthPct, imageZoom, imageOffsetX/Y
-        // configurados pelo usuário no wizard — exatamente o que aparece no preview.
-        const zoneW = clearW;
-        const zoneH_max = clearMaxY - clearY; // altura máxima disponível
+        // ══ PASSO 2: Desenhar imagem do usuário (somente se não for "Sem imagem") ════
+        if (customImage) {
+          const zoneW = clearW;
+          const zoneH_max = clearMaxY - clearY; // altura máxima disponível
 
-        // Largura: imageWidthPct% da zona, centrada
-        const drawW  = Math.min((imageWidthPct / 100) * zoneW, zoneW);
-        const drawX  = clearX + (zoneW - drawW) / 2;
+          // Largura: imageWidthPct% da zona, centrada
+          const drawW  = Math.min((imageWidthPct / 100) * zoneW, zoneW);
+          const drawX  = clearX + (zoneW - drawW) / 2;
 
-        // Altura: imageHeight pts × 2, limitada ao máximo da zona
-        const drawH  = Math.min(imageHeight * 2, zoneH_max);
-        // Âncora: parte inferior da zona (igual ao comportamento das imagens padrão)
-        const drawY  = clearMaxY - drawH;
+          // Altura: imageHeight pts × 2, limitada ao máximo da zona
+          const drawH  = Math.min(imageHeight * 2, zoneH_max);
+          // Âncora: parte inferior da zona (igual ao comportamento das imagens padrão)
+          const drawY  = clearMaxY - drawH;
 
-        // Carrega imagem do usuário
-        const userImg = new Image();
-        userImg.src = customImage;
-        await new Promise((res, rej) => { userImg.onload = res; userImg.onerror = rej; });
+          // Carrega imagem do usuário
+          const userImg = new Image();
+          userImg.src = customImage;
+          await new Promise((res, rej) => { userImg.onload = res; userImg.onerror = rej; });
 
-        const iw = userImg.naturalWidth  || userImg.width  || 1;
-        const ih = userImg.naturalHeight || userImg.height || 1;
+          const iw = userImg.naturalWidth  || userImg.width  || 1;
+          const ih = userImg.naturalHeight || userImg.height || 1;
 
-        // Mode cover: escala para preencher drawW × drawH sem distorcer
-        let coverW, coverH;
-        if (iw / ih > drawW / drawH) {
-          coverH = drawH; coverW = coverH * (iw / ih);
-        } else {
-          coverW = drawW; coverH = coverW / (iw / ih);
+          // Mode cover: escala para preencher drawW × drawH sem distorcer
+          let coverW, coverH;
+          if (iw / ih > drawW / drawH) {
+            coverH = drawH; coverW = coverH * (iw / ih);
+          } else {
+            coverW = drawW; coverH = coverW / (iw / ih);
+          }
+          // Aplica zoom do usuário (sempre ≥ 1 para não deixar bordas brancas)
+          const z = Math.max(1, imageZoom);
+          coverW *= z;
+          coverH *= z;
+
+          const cx = drawX + drawW / 2 + (imageOffsetX / 100) * drawW;
+          const cy = drawY + drawH / 2 + (imageOffsetY / 100) * drawH;
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(drawX, drawY, drawW, drawH);
+          ctx.clip();
+          ctx.drawImage(userImg, cx - coverW / 2, cy - coverH / 2, coverW, coverH);
+          ctx.restore();
         }
-        // Aplica zoom do usuário (sempre ≥ 1 para não deixar bordas brancas)
-        const z = Math.max(1, imageZoom);
-        coverW *= z;
-        coverH *= z;
-
-        const cx = drawX + drawW / 2 + (imageOffsetX / 100) * drawW;
-        const cy = drawY + drawH / 2 + (imageOffsetY / 100) * drawH;
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(drawX, drawY, drawW, drawH);
-        ctx.clip();
-        ctx.drawImage(userImg, cx - coverW / 2, cy - coverH / 2, coverW, coverH);
-        ctx.restore();
+        // noCustomImage: zona já foi limpa acima com branco — nenhuma imagem é desenhada
 
         // Exporta para PDF A4
         const imgData = canvas.toDataURL('image/jpeg', 0.92);

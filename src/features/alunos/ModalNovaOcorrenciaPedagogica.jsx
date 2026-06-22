@@ -75,9 +75,6 @@ export default function ModalNovaOcorrenciaPedagogica({
     readonly = false,
     editMode = false,
     perfilUsuario = "",
-    // somenteLeitura=true → professor: visu visualiza apenas CATEGORIA + OCORRÊNCIA
-    // somenteLeitura=false → direção/coordenação: vê todos os campos (DESCRIÇÃO + REGISTRO INTERNO)
-    somenteLeitura = false,
 }) {
     const [data, setData] = useState("");
     const [categoriaSelecionada, setCategoriaSelecionada] = useState("");
@@ -252,8 +249,7 @@ export default function ModalNovaOcorrenciaPedagogica({
                         )}
                     </div>
 
-                    {/* Descrição — EXCLUSIVO de direção/coordenação */}
-                    {!somenteLeitura && (
+                    {/* Descrição */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Descrição</label>
                         <textarea
@@ -265,10 +261,8 @@ export default function ModalNovaOcorrenciaPedagogica({
                             className={`w-full border rounded p-2 focus:ring focus:border-emerald-300 outline-none resize-none ${readonly ? "bg-gray-100 text-gray-600 cursor-not-allowed" : ""}`}
                         />
                     </div>
-                    )}
 
-                    {/* Registro Interno — EXCLUSIVO de direção/coordenação */}
-                    {!somenteLeitura && (
+                    {/* Registro Interno */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                             Registro Interno
@@ -283,7 +277,6 @@ export default function ModalNovaOcorrenciaPedagogica({
                             className={`w-full border rounded p-2 focus:ring focus:border-emerald-300 outline-none resize-none ${readonly ? "bg-gray-100 text-gray-600 cursor-not-allowed" : ""}`}
                         />
                     </div>
-                    )}
 
                     {/* Convocar Responsável — só coord/supervisor/direção */}
                     {isPerfConvocacao && (

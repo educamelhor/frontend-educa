@@ -93,8 +93,9 @@ export default function Provas() {
   const [editingCapaId, setEditingCapaId] = useState(null); // null = nova | id = editando
   const [confirmDelete, setConfirmDelete] = useState(null); // null | { id, titulo }
 
-  // ── Custom image state ─────────────────────────────────────────────────
+  // ── Custom image state ─────────────────────────────────────────────
   const [customImage, setCustomImage] = useState(null); // dataURL
+  const [noCustomImage, setNoCustomImage] = useState(false); // usuário optou por nenhuma imagem
   const [imageZoom, setImageZoom] = useState(1);
   const [imageOffsetX, setImageOffsetX] = useState(0);
   const [imageOffsetY, setImageOffsetY] = useState(0);
@@ -132,11 +133,10 @@ export default function Provas() {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => {
+    reader.onload = ev => {
       setCustomImage(ev.target.result);
-      setImageZoom(1);
-      setImageOffsetX(0);
-      setImageOffsetY(0);
+      setNoCustomImage(false); // inserir imagem cancela o "sem imagem"
+      setImageZoom(1); setImageOffsetX(0); setImageOffsetY(0);
       setImageHeight(200);
       setImageWidthPct(100);
     };
@@ -146,9 +146,8 @@ export default function Provas() {
 
   function removeCustomImage() {
     setCustomImage(null);
-    setImageZoom(1);
-    setImageOffsetX(0);
-    setImageOffsetY(0);
+    setNoCustomImage(false);
+    setImageZoom(1); setImageOffsetX(0); setImageOffsetY(0);
     setImageHeight(200);
     setImageWidthPct(100);
   }
@@ -220,17 +219,28 @@ export default function Provas() {
 
       const fileName = `capa-${selectedArea.id.toLowerCase()}-${form.bimestre}bim-${form.ano}.pdf`;
 
-      // Baixa o PDF do backend (cabeçaçalho institucional completo, QR, instruções)
-      const pdfRes = await fetch(`${API}/api/capa-provas/${created.id}/pdf`, { headers: authH() });
+      // Monta URL do PDF com parâmetros opcionais:
+      // - ?color=   → backend gera com cor correta desde o início
+      // - &noImage=1 → backend omite a imagem temática padrão
+      const hasCustomColor = customColor && customColor.toLowerCase() !== selectedArea.cor.toLowerCase();
+      const pdfParams = new URLSearchParams();
+      if (hasCustomColor)  pdfParams.set('color', customColor);
+      if (customImage || noCustomImage) pdfParams.set('noImage', '1');
+      const pdfParamStr = pdfParams.toString() ? `?${pdfParams.toString()}` : '';
+      const pdfRes = await fetch(`${API}/api/capa-provas/${created.id}/pdf${pdfParamStr}`, { headers: authH() });
       if (!pdfRes.ok) throw new Error('Erro ao gerar PDF.');
       const pdfBytes = new Uint8Array(await pdfRes.arrayBuffer());
 
-      // Verifica se precisa de processamento canvas (cor custom ou imagem custom)
-      const hasCustomColor = customColor && customColor.toLowerCase() !== selectedArea.cor.toLowerCase();
-      const needsCanvas = customImage || hasCustomColor;
+      // Usa canvas quando há imagem customizada para sobrepor OU quando o usuário
+      // optou por "sem imagem" — neste caso, o canvas garante a limpeza da zona
+      // mesmo que o backend não tenha removido a imagem padrão via ?noImage=1.
+      const needsCanvas = !!customImage || noCustomImage;
 
       if (needsCanvas) {
-        // ── Canvas pipeline: render PDF do backend + recolorir + overlay de imagem ──
+        // ── Canvas pipeline: renderiza PDF → limpa zona de imagem → [overlay] ──
+        // noCustomImage: apenas limpa (zona fica branca)
+        // customImage: limpa e desenha imagem do usuário por cima
+
         const pdfjsLib = await import('pdfjs-dist');
         pdfjsLib.GlobalWorkerOptions.workerSrc =
           `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
@@ -245,57 +255,82 @@ export default function Provas() {
         const ctx = canvas.getContext('2d');
         await page.render({ canvasContext: ctx, viewport }).promise;
 
-        // 1) Recolorização — substitui pixels da cor padrão da área pela cor customizada
-        if (hasCustomColor) {
-          recolorCanvas(ctx, canvas.width, canvas.height, selectedArea.cor, customColor);
-        }
+        // ══ PASSO 1: Limpar zona completa do template (remove coliseu totalmente) ══
+        // Valores medidos com PDFKit real (instrTextH HUMANAS, font 8.8pt, lineGap 0.5, paraGap 2)
+        // clearY DEVE ser >= instrTextEnd para não clipar o item 7:
+        //
+        // T1 Clássico:  instrEnd=969px, imageStart=1057px → clearY=1030px (centro do gap)
+        // T2 Moderno:   instrEnd=979px, imageStart=999px  → clearY=990px  (centro do gap)
+        // T3 Formal:    instrEnd=1035px, imageStart=1051px → clearY=1044px (centro do gap)
+        // T4 Colorido:  instrEnd=1015px, imageStart=1103px → clearY=1060px (centro do gap)
+        // T5 Dark:      instrEnd=949px,  imageStart=1037px → clearY=993px  (centro do gap)
+        const TEMPLATE_ZONES = {
+          1: { x: 72,  y: 1030, w: 1046, maxY: 1614 },
+          2: { x: 124, y: 990,  w: 1066, maxY: 1646 },
+          3: { x: 48,  y: 1044, w: 1094, maxY: 1634 },
+          4: { x: 0,   y: 1060, w: 1190, maxY: 1646 },
+          5: { x: 0,   y: 993,  w: 1190, maxY: 1646 },
+        };
+        const cz = TEMPLATE_ZONES[selectedTemplate.id] || TEMPLATE_ZONES[2];
 
-        // 2) Overlay de imagem customizada respeitando margens do template
+        // Tenta refinar com headers CORS do backend quando disponíveis
+        const hX = parseInt(pdfRes.headers.get('X-Image-Zone-X') || '');
+        const hY = parseInt(pdfRes.headers.get('X-Image-Zone-Y') || '');
+        const SCALE = 2;
+        const clearX    = hX > 0 ? hX * SCALE : cz.x;
+        const clearY    = hY > 0 ? hY * SCALE : cz.y;
+        const clearW    = cz.w;
+        const clearMaxY = cz.maxY;
+
+        // Apaga TUDO na zona (clearRect remove pixels do pdfjs independente de ?noImage=1)
+        ctx.clearRect(clearX, clearY, clearW, clearMaxY - clearY);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(clearX, clearY, clearW, clearMaxY - clearY);
+
+        // ══ PASSO 2: Desenhar imagem do usuário (somente se não for "Sem imagem") ════
         if (customImage) {
+          const zoneW = clearW;
+          const zoneH_max = clearMaxY - clearY; // altura máxima disponível
+
+          // Largura: imageWidthPct% da zona, centrada
+          const drawW  = Math.min((imageWidthPct / 100) * zoneW, zoneW);
+          const drawX  = clearX + (zoneW - drawW) / 2;
+
+          // Altura: imageHeight pts × 2, limitada ao máximo da zona
+          const drawH  = Math.min(imageHeight * 2, zoneH_max);
+          // Âncora: parte inferior da zona (igual ao comportamento das imagens padrão)
+          const drawY  = clearMaxY - drawH;
+
+          // Carrega imagem do usuário
           const userImg = new Image();
           userImg.src = customImage;
           await new Promise((res, rej) => { userImg.onload = res; userImg.onerror = rej; });
 
-          // ── Margens do template (pt no PDF 1:1 → ×2 para canvas 2×) ─────────────────────
-          // Template 1 Clássico: border(3)+pad(4)+inner(1)=8 + mx=10 → 18pt
-          // Template 2 Moderno: faixa(55)+mx=14 → faixa fic 0 no rodapé (usa 55 só no conteúdo)
-          // Template 3 Formal: border(4)+pad(4)+inner(1)=9 + mx=16 → 25pt
-          // Template 4 Colorido: mx=0 → 0pt (edge-to-edge)
-          // Template 5 Dark: mx=16 → 16pt
-          const templateMxMap = { 1: 18, 2: 14, 3: 25, 4: 0, 5: 16 };
-          const templateMxPt = templateMxMap[selectedTemplate.id] ?? 16;
-          // Converte pt → px no canvas 2× (1pt = 2px)
-          const baseMx = templateMxPt * 2;
-
-          // Largura e altura da imagem customizada (aplicando imageWidthPct e imageHeight)
-          const extraMx = baseMx + ((100 - imageWidthPct) / 100) * (canvas.width - baseMx * 2) / 2;
-          const areaX = extraMx;
-          const areaW = canvas.width - extraMx * 2;
-
-          // Altura: imageHeight em pt ×2 para canvas 2×
-          const areaH = imageHeight * 2;
-          const areaStartY = canvas.height - areaH - baseMx; // margem inferior = baseMx
-
-          const iw = userImg.naturalWidth || userImg.width || 1;
+          const iw = userImg.naturalWidth  || userImg.width  || 1;
           const ih = userImg.naturalHeight || userImg.height || 1;
+
+          // Mode cover: escala para preencher drawW × drawH sem distorcer
           let coverW, coverH;
-          if (iw / ih > areaW / areaH) {
-            coverH = areaH; coverW = coverH * (iw / ih);
+          if (iw / ih > drawW / drawH) {
+            coverH = drawH; coverW = coverH * (iw / ih);
           } else {
-            coverW = areaW; coverH = coverW / (iw / ih);
+            coverW = drawW; coverH = coverW / (iw / ih);
           }
-          const finalW = coverW * imageZoom;
-          const finalH = coverH * imageZoom;
-          const cx = areaX + areaW / 2 + (imageOffsetX / 100) * areaW;
-          const cy = areaStartY + areaH / 2 + (imageOffsetY / 100) * areaH;
+          // Aplica zoom do usuário (sempre ≥ 1 para não deixar bordas brancas)
+          const z = Math.max(1, imageZoom);
+          coverW *= z;
+          coverH *= z;
+
+          const cx = drawX + drawW / 2 + (imageOffsetX / 100) * drawW;
+          const cy = drawY + drawH / 2 + (imageOffsetY / 100) * drawH;
           ctx.save();
           ctx.beginPath();
-          ctx.rect(areaX, areaStartY, areaW, areaH);
+          ctx.rect(drawX, drawY, drawW, drawH);
           ctx.clip();
-          ctx.clearRect(areaX, areaStartY, areaW, areaH);
-          ctx.drawImage(userImg, cx - finalW / 2, cy - finalH / 2, finalW, finalH);
+          ctx.drawImage(userImg, cx - coverW / 2, cy - coverH / 2, coverW, coverH);
           ctx.restore();
         }
+        // noCustomImage: zona já foi limpa acima com branco — nenhuma imagem é desenhada
 
         // Exporta para PDF A4
         const imgData = canvas.toDataURL('image/jpeg', 0.92);
@@ -369,6 +404,7 @@ export default function Provas() {
     setSelectedTemplate(null);
     setForm({ titulo: '', serie: '', turno: '', bimestre: 1, ano: ANO_CORRENTE, instrucoes: '' });
     setCustomImage(null);
+    setNoCustomImage(false);
     setImageZoom(1);
     setImageOffsetX(0);
     setImageOffsetY(0);
@@ -395,6 +431,7 @@ export default function Provas() {
     setEditingCapaId(capa.id);
     setCustomColor(null);
     setCustomImage(null);
+    setNoCustomImage(false);
     setImageZoom(1);
     setImageOffsetX(0);
     setImageOffsetY(0);
@@ -716,7 +753,7 @@ export default function Provas() {
                   <button style={{ ...s.stepBtn, ...(active ? s.stepActive : done ? s.stepDone : s.stepIdle) }} onClick={() => goToStep(n)}>
                     <span style={s.stepNum}>{done ? '✓' : n}</span>
                     <span style={s.stepLabel}>{label}</span>
-                  </button>
+                  ></button>
                   {i < 2 && <div style={{ ...s.stepLine, background: done ? '#6366f1' : '#e2e8f0' }} />}
                 </React.Fragment>
               );
@@ -735,7 +772,7 @@ export default function Provas() {
                     <div style={{ fontSize:42, marginBottom:10 }}>{area.emoji}</div>
                     <div style={{ fontSize:18, fontWeight:800, color: area.cor, marginBottom:4 }}>{area.label}</div>
                     <div style={{ fontSize:11, color:'#64748b', lineHeight:1.4 }}>{area.disciplinas}</div>
-                  </button>
+                  ></button>
                 ))}
               </div>
             </div>
@@ -916,14 +953,33 @@ export default function Provas() {
                 <div style={s.imageSection}>
                   <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: 10 }}>
                     <span style={{ fontSize:12, fontWeight:700, color:'#374151' }}>🖼️ Imagem da Capa</span>
-                    {!customImage && (
+                    <div style={{ display:'flex', gap:6 }}>
+                      {/* Botão Sem imagem — toggle */}
                       <button
-                        id="btn-inserir-imagem"
-                        style={s.btnInsertImage}
-                        onClick={() => fileInputRef.current?.click()}
+                        id="btn-sem-imagem"
+                        title="Gerar capa sem nenhuma imagem"
+                        style={{
+                          ...s.btnNoImage,
+                          ...(noCustomImage ? s.btnNoImageActive : {}),
+                        }}
+                        onClick={() => {
+                          const next = !noCustomImage;
+                          setNoCustomImage(next);
+                          if (next) { setCustomImage(null); }
+                        }}
                       >
-                        + Inserir Imagem</button>
-                    )}
+                        {noCustomImage ? '✓ Sem imagem' : '🚫 Sem imagem'}
+                      </button>
+                      {/* Botão Inserir Imagem — só aparece quando não há imagem e não está em "sem imagem" */}
+                      {!customImage && !noCustomImage && (
+                        <button
+                          id="btn-inserir-imagem"
+                          style={s.btnInsertImage}
+                          onClick={() => fileInputRef.current?.click()}
+                        >
+                          + Inserir Imagem</button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Hidden file input */}
@@ -1035,6 +1091,17 @@ export default function Provas() {
                         style={{ ...s.btnChangeImage, marginTop:4, fontSize:11 }}
                         onClick={() => { setImageZoom(1); setImageOffsetX(0); setImageOffsetY(0); setImageHeight(200); setImageWidthPct(100); }}
                       >↺ Resetar tudo</button>
+                    </div>
+                  ) : noCustomImage ? (
+                    /* Estado: usuário optou por nenhuma imagem */
+                    <div style={{ ...s.imageEmptyHint, background:'#fef2f2', border:'1px dashed #fca5a5', borderRadius:8 }}>
+                      <span style={{ fontSize:28 }}>🚫</span>
+                      <p style={{ fontSize:11, color:'#dc2626', margin:'6px 0 6px', fontWeight:600 }}>Capa sem imagem</p>
+                      <p style={{ fontSize:10, color:'#ef4444', margin:0 }}>A área de imagem ficará em branco no PDF.</p>
+                      <button
+                        style={{ marginTop:8, fontSize:10, padding:'4px 10px', borderRadius:5, border:'1px solid #fca5a5', background:'#fff', color:'#dc2626', cursor:'pointer' }}
+                        onClick={() => setNoCustomImage(false)}
+                      >↩ Cancelar</button>
                     </div>
                   ) : (
                     <div style={s.imageEmptyHint}>
@@ -1163,6 +1230,23 @@ const s = {
     alignItems: 'center',
     gap: 4,
     transition: 'all .2s',
+  },
+  btnNoImage: {
+    padding: '6px 12px',
+    borderRadius: 7,
+    border: '1.5px solid #e2e8f0',
+    background: '#f8fafc',
+    color: '#64748b',
+    fontWeight: 700,
+    fontSize: 11,
+    cursor: 'pointer',
+    transition: 'all .2s',
+    whiteSpace: 'nowrap',
+  },
+  btnNoImageActive: {
+    border: '1.5px solid #ef4444',
+    background: '#fef2f2',
+    color: '#dc2626',
   },
   imageThumbnailRow: {
     display: 'flex',

@@ -287,10 +287,7 @@ export default function Home() {
             : Promise.resolve(null),
 
           // [4] Visitantes hoje (gestão + monitoramento)
-          (isGestao && hasModulo('monitoramento') && (
-          hasModulo('monitoramento.painel') || hasModulo('monitoramento.visitantes_registrar') ||
-          hasModulo('monitoramento.visitantes_historico') || hasModulo('monitoramento.embeddings')
-        ))
+          (isGestao && hasModulo('monitoramento'))
             ? api.get(`/api/monitoramento/visitantes/historico?de=${hoje}&ate=${hoje}&pageSize=1`)
             : Promise.resolve(null),
 
@@ -395,10 +392,7 @@ export default function Home() {
       });
     }
 
-    if (isGestao && hasModulo('monitoramento') && (
-      hasModulo('monitoramento.painel') || hasModulo('monitoramento.visitantes_registrar') ||
-      hasModulo('monitoramento.visitantes_historico') || hasModulo('monitoramento.embeddings')
-    ) && stats.visitantes !== undefined) {
+    if (isGestao && hasModulo('monitoramento') && stats.visitantes !== undefined) {
       cards.push({
         icon: <Icons.Visitantes />,
         label: 'Visitantes Hoje',
@@ -444,7 +438,7 @@ export default function Home() {
     const all = [];
 
     if (isGestao) {
-      if (hasModulo('estudantes'))
+      if (hasModulo('secretaria.alunos'))
         all.push({ icon: <Icons.Alunos />, label: 'Estudantes', desc: 'Consultar e gerenciar alunos', to: '/alunos', color: 'blue' });
       if (hasModulo('secretaria'))
         all.push({ icon: <Icons.Secretaria />, label: 'Secretaria', desc: 'Turmas, professores e horários', to: '/secretaria/alunos', color: 'indigo' });
@@ -456,10 +450,7 @@ export default function Home() {
         all.push({ icon: <Icons.Frequencia />, label: 'Frequência', desc: 'Atestados, busca ativa e conselho tutelar', to: '/frequencia/atestados', color: 'teal' });
       if (hasModulo('biblioteca'))
         all.push({ icon: <Icons.Livro />, label: 'Biblioteca', desc: 'Acervo, empréstimos e ranking', to: '/biblioteca/acervo', color: 'amber', badge: 'NOVO' });
-      if (hasModulo('monitoramento') && (
-        hasModulo('monitoramento.painel') || hasModulo('monitoramento.visitantes_registrar') ||
-        hasModulo('monitoramento.visitantes_historico') || hasModulo('monitoramento.embeddings')
-      ))
+      if (hasModulo('monitoramento'))
         all.push({ icon: <Icons.Camera />, label: 'Monitoramento', desc: 'Painel ao vivo e controle de visitantes', to: '/monitoramento', color: 'violet' });
       if (hasModulo('impressao'))
         all.push({ icon: <Icons.Impressao />, label: 'Impressão', desc: 'Boletins, gabaritos e listas', to: '/impressao/boletins', color: 'slate' });

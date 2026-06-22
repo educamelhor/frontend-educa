@@ -157,8 +157,6 @@ export default function HeaderGlobal({ onToggleSidebar, sidebarOpen }) {
     localStorage.removeItem("last_escola_id");
     localStorage.removeItem("disciplinas_professor_ctx");
     localStorage.removeItem("disciplinas_professor");
-    localStorage.removeItem("modulos_ativos"); // ✅ limpa módulos para não contaminar próximo login
-    localStorage.removeItem("escola_tipo");     // ✅ limpa tipo da escola (CCMDF) para não contaminar próximo login
 
     // ✅ novos campos do cabeçalho
     localStorage.removeItem("cpf");

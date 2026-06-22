@@ -46,10 +46,8 @@ const MODULOS_TREE = [
     filhos: [
       { id: 'pedagogico.conselho', label: 'Conselho de Classe' },
       { id: 'pedagogico.conteudos', label: 'Conteúdos' },
-      { id: 'pedagogico.solicitacoes', label: 'Solicitações' },
-      { id: 'pedagogico.provas', label: 'Provas' },
-      { id: 'pedagogico.correcoes', label: 'Correções' },
       { id: 'pedagogico.relatorios', label: 'Relatórios' },
+      { id: 'pedagogico.correcoes', label: 'Correções' },
     ]
   },
   {
@@ -95,10 +93,9 @@ const MODULOS_TREE = [
   {
     id: 'monitoramento', label: 'Monitoramento', icon: '📡',
     filhos: [
-      { id: 'monitoramento.painel', label: 'Painel ao Vivo' },
-      { id: 'monitoramento.visitantes_registrar', label: 'Visitantes – Registrar' },
-      { id: 'monitoramento.visitantes_historico', label: 'Visitantes – Histórico' },
-      { id: 'monitoramento.embeddings', label: 'Embeddings – Gerar' },
+      { id: 'monitoramento.painel', label: 'Painel' },
+      { id: 'monitoramento.alertas', label: 'Alertas' },
+      { id: 'monitoramento.embeddings', label: 'Embeddings' },
     ]
   },
   {
@@ -134,10 +131,6 @@ const MODULOS_TREE = [
       { id: 'direcao.cadastro', label: 'Cadastro de Membros' },
       { id: 'direcao.governanca', label: 'Governança' },
     ]
-  },
-  {
-    id: 'estudantes', label: 'Estudantes', icon: '🎒',
-    filhos: []
   },
 ];
 
@@ -553,15 +546,6 @@ export default function PlataformaModulos() {
   const [error, setError] = useState(null);
   const [copyError, setCopyError] = useState(null);
 
-  // ── Manutenção Programada ──
-  const [manutData, setManutData] = useState(null);
-  const [manutInicio, setManutInicio] = useState('');
-  const [manutFim, setManutFim] = useState('');
-  const [manutMsg, setManutMsg] = useState('O sistema está em manutenção programada.');
-  const [manutSaving, setManutSaving] = useState(false);
-  const [manutError, setManutError] = useState(null);
-  const [showManutConfirm, setShowManutConfirm] = useState(false);
-
   // Count active modules per school (for the left panel display)
   const [schoolModulosCounts, setSchoolModulosCounts] = useState({});
 
@@ -580,71 +564,6 @@ export default function PlataformaModulos() {
   }, []);
 
   useEffect(() => { fetchEscolas(); }, [fetchEscolas]);
-
-  // ── Fetch manutenção status ───────────────────────────────────────────────────────
-  const [manutEncerrada, setManutEncerrada] = useState(false);
-  const manutAnteriorRef = React.useRef(null);
-
-  const fetchManutencao = useCallback(async () => {
-    try {
-      const { data } = await api.get('/api/plataforma/manutencao');
-      const novo = data?.manutencao || null;
-
-      // Detecta transição: era ativa → agora null (expirou)
-      if (manutAnteriorRef.current && !novo) {
-        setManutEncerrada(true);
-        setTimeout(() => setManutEncerrada(false), 8000);
-      }
-      manutAnteriorRef.current = novo;
-      setManutData(novo);
-    } catch { setManutData(null); }
-  }, []);
-
-  useEffect(() => { fetchManutencao(); }, [fetchManutencao]);
-
-  // Auto-refresh a cada 30s quando manutenção está ativa
-  useEffect(() => {
-    if (!manutData) return;
-    const interval = setInterval(fetchManutencao, 30000);
-    return () => clearInterval(interval);
-  }, [manutData, fetchManutencao]);
-
-  const handleAtivarManutencao = () => {
-    if (!manutInicio || !manutFim) { setManutError('Informe início e fim.'); return; }
-    const dtInicio = new Date(manutInicio);
-    const dtFim = new Date(manutFim);
-    if (dtFim <= dtInicio) { setManutError("'Fim' deve ser posterior a 'Início'."); return; }
-    setManutError(null);
-    setShowManutConfirm(true);
-  };
-
-  const handleConfirmarManutencao = async () => {
-    setShowManutConfirm(false);
-    setManutSaving(true); setManutError(null);
-    try {
-      await api.post('/api/plataforma/manutencao', {
-        // datetime-local dá horário local (Brasília) — converte para UTC ISO
-        // para alinhar com NOW() do MySQL (servidor em UTC)
-        inicio: new Date(manutInicio).toISOString(),
-        fim: new Date(manutFim).toISOString(),
-        mensagem: manutMsg,
-      });
-      await fetchManutencao();
-      setManutInicio(''); setManutFim('');
-    } catch (err) {
-      setManutError(err.response?.data?.message || 'Erro ao ativar manutenção.');
-    } finally { setManutSaving(false); }
-  };
-
-  const handleCancelarManutencao = async () => {
-    setManutSaving(true); setManutError(null);
-    try {
-      await api.delete('/api/plataforma/manutencao');
-      setManutData(null);
-    } catch (err) {
-      setManutError(err.response?.data?.message || 'Erro ao cancelar.');
-    } finally { setManutSaving(false); }
-  };
 
   // ── Load modules for a school ───────────────────────────────────────────────
   const fetchModulos = useCallback(async (id) => {
@@ -986,208 +905,6 @@ export default function PlataformaModulos() {
           </button>
         </div>
       </div>
-
-      {/* ════ MANUTENÇÃO PROGRAMADA ════ */}
-      <div style={{
-        margin: '0 24px 20px', padding: '20px 24px',
-        background: 'rgba(30,41,59,0.5)', borderRadius: '16px',
-        border: `1px solid ${manutData ? 'rgba(245,158,11,0.3)' : 'rgba(255,255,255,0.06)'}`,
-        backdropFilter: 'blur(12px)',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
-          <span style={{ fontSize: '1.3rem' }}>🛠️</span>
-          <span style={{ fontWeight: 700, fontSize: '1rem', color: '#f1f5f9' }}>Manutenção Programada</span>
-          {manutData && (
-            <span style={{
-              padding: '3px 10px', borderRadius: '12px', fontSize: '0.7rem', fontWeight: 700,
-              textTransform: 'uppercase', letterSpacing: '0.05em',
-              background: manutData.em_andamento ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)',
-              color: manutData.em_andamento ? '#f87171' : '#fbbf24',
-              border: `1px solid ${manutData.em_andamento ? 'rgba(239,68,68,0.3)' : 'rgba(245,158,11,0.3)'}`,
-            }}>
-              {manutData.em_andamento ? '● Em andamento' : '◑ Agendada'}
-            </span>
-          )}
-          {!manutData && (
-            <span style={{
-              padding: '3px 10px', borderRadius: '12px', fontSize: '0.7rem', fontWeight: 700,
-              background: 'rgba(16,185,129,0.1)', color: '#34d399',
-              border: '1px solid rgba(16,185,129,0.2)',
-            }}>
-              ○ Inativo
-            </span>
-          )}
-          {manutEncerrada && (
-            <span style={{
-              padding: '4px 12px', borderRadius: '12px', fontSize: '0.75rem', fontWeight: 700,
-              background: 'linear-gradient(135deg, rgba(16,185,129,0.15), rgba(52,211,153,0.1))',
-              color: '#34d399',
-              border: '1px solid rgba(16,185,129,0.3)',
-              boxShadow: '0 0 12px rgba(16,185,129,0.2)',
-              animation: 'fadeInUp 0.4s ease',
-            }}>
-              ✅ Manutenção encerrada — usuários com acesso restaurado
-            </span>
-          )}
-        </div>
-
-        {manutData ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-            <div style={{ flex: 1, minWidth: '200px' }}>
-              <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '4px' }}>Período</div>
-              <div style={{ fontSize: '0.9rem', color: '#cbd5e1' }}>
-                {new Date(manutData.inicio).toLocaleString('pt-BR', {timeZone:'America/Sao_Paulo'})} → {new Date(manutData.fim).toLocaleString('pt-BR', {timeZone:'America/Sao_Paulo'})}
-              </div>
-              <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '4px' }}>
-                {manutData.mensagem}
-              </div>
-            </div>
-            <button
-              onClick={handleCancelarManutencao}
-              disabled={manutSaving}
-              style={{
-                padding: '8px 20px', borderRadius: '10px', fontWeight: 600, fontSize: '0.85rem',
-                background: 'rgba(239,68,68,0.12)', color: '#f87171',
-                border: '1px solid rgba(239,68,68,0.25)', cursor: 'pointer',
-                transition: 'all 0.2s', opacity: manutSaving ? 0.6 : 1,
-              }}
-            >
-              {manutSaving ? 'Cancelando...' : '✕ Cancelar Manutenção'}
-            </button>
-          </div>
-        ) : (
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-            <div style={{ flex: '1 1 180px' }}>
-              <label style={{ fontSize: '0.7rem', color: '#64748b', display: 'block', marginBottom: '4px' }}>Início</label>
-              <input type="datetime-local" value={manutInicio} onChange={e => setManutInicio(e.target.value)}
-                style={{ width: '100%', padding: '7px 10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(15,23,42,0.6)', color: '#e2e8f0', fontSize: '0.85rem' }} />
-            </div>
-            <div style={{ flex: '1 1 180px' }}>
-              <label style={{ fontSize: '0.7rem', color: '#64748b', display: 'block', marginBottom: '4px' }}>Fim</label>
-              <input type="datetime-local" value={manutFim} onChange={e => setManutFim(e.target.value)}
-                style={{ width: '100%', padding: '7px 10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(15,23,42,0.6)', color: '#e2e8f0', fontSize: '0.85rem' }} />
-            </div>
-            <div style={{ flex: '2 1 250px' }}>
-              <label style={{ fontSize: '0.7rem', color: '#64748b', display: 'block', marginBottom: '4px' }}>Mensagem</label>
-              <input type="text" value={manutMsg} onChange={e => setManutMsg(e.target.value)} placeholder="Mensagem para os usuários"
-                style={{ width: '100%', padding: '7px 10px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(15,23,42,0.6)', color: '#e2e8f0', fontSize: '0.85rem' }} />
-            </div>
-            <button
-              onClick={handleAtivarManutencao}
-              disabled={manutSaving}
-              style={{
-                padding: '8px 20px', borderRadius: '10px', fontWeight: 600, fontSize: '0.85rem',
-                background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: '#fff',
-                border: 'none', cursor: 'pointer', transition: 'all 0.2s',
-                boxShadow: '0 2px 8px rgba(245,158,11,0.3)', whiteSpace: 'nowrap',
-                opacity: manutSaving ? 0.6 : 1,
-              }}
-            >
-              {manutSaving ? 'Ativando...' : '🚀 Ativar Manutenção'}
-            </button>
-          </div>
-        )}
-
-        {manutError && (
-          <div style={{ marginTop: '8px', fontSize: '0.8rem', color: '#f87171', background: 'rgba(239,68,68,0.08)', padding: '6px 12px', borderRadius: '8px' }}>
-            {manutError}
-          </div>
-        )}
-      </div>
-
-      {/* ════ MODAL CONFIRMAÇÃO MANUTENÇÃO ════ */}
-      {showManutConfirm && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 9999,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)',
-        }}
-          onClick={() => setShowManutConfirm(false)}
-        >
-          <div
-            style={{
-              background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
-              borderRadius: '20px', padding: '32px 36px',
-              border: '1px solid rgba(245,158,11,0.2)',
-              boxShadow: '0 25px 60px rgba(0,0,0,0.5), 0 0 40px rgba(245,158,11,0.08)',
-              maxWidth: '460px', width: '90%',
-              animation: 'fadeInUp 0.25s ease',
-            }}
-            onClick={e => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div style={{ textAlign: 'center', marginBottom: '24px' }}>
-              <div style={{ fontSize: '2.5rem', marginBottom: '8px' }}>⚠️</div>
-              <h3 style={{
-                fontSize: '1.25rem', fontWeight: 700, color: '#f1f5f9', margin: 0,
-                letterSpacing: '-0.01em',
-              }}>
-                Confirmar Manutenção
-              </h3>
-              <p style={{ fontSize: '0.85rem', color: '#94a3b8', marginTop: '6px' }}>
-                {new Date(manutInicio) <= new Date()
-                  ? 'A manutenção será ativada IMEDIATAMENTE.'
-                  : 'A manutenção será ativada no horário agendado.'}
-              </p>
-            </div>
-
-            {/* Info card */}
-            <div style={{
-              background: 'rgba(245,158,11,0.06)',
-              border: '1px solid rgba(245,158,11,0.15)',
-              borderRadius: '12px', padding: '16px', marginBottom: '20px',
-            }}>
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.7rem', color: '#64748b', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Período</span>
-              </div>
-              <div style={{ fontSize: '0.95rem', color: '#fbbf24', fontWeight: 600, marginBottom: '4px' }}>
-                {new Date(manutInicio).toLocaleString('pt-BR', {timeZone:'America/Sao_Paulo'})}
-                <span style={{ color: '#475569', margin: '0 8px' }}>→</span>
-                {new Date(manutFim).toLocaleString('pt-BR', {timeZone:'America/Sao_Paulo'})}
-              </div>
-              <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '8px', fontStyle: 'italic' }}>
-                "{manutMsg}"
-              </div>
-            </div>
-
-            {/* Warning */}
-            <div style={{
-              background: 'rgba(239,68,68,0.06)',
-              border: '1px solid rgba(239,68,68,0.12)',
-              borderRadius: '10px', padding: '12px', marginBottom: '24px',
-              fontSize: '0.8rem', color: '#f87171', lineHeight: 1.5,
-            }}>
-              ⚠️ Nenhum usuário escolar poderá acessar o sistema durante este período. Apenas o CEO continua com acesso.
-            </div>
-
-            {/* Buttons */}
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button
-                onClick={() => setShowManutConfirm(false)}
-                style={{
-                  flex: 1, padding: '10px 16px', borderRadius: '10px',
-                  background: 'rgba(255,255,255,0.05)', color: '#94a3b8',
-                  border: '1px solid rgba(255,255,255,0.1)', cursor: 'pointer',
-                  fontWeight: 600, fontSize: '0.9rem', transition: 'all 0.2s',
-                }}
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleConfirmarManutencao}
-                style={{
-                  flex: 1, padding: '10px 16px', borderRadius: '10px',
-                  background: 'linear-gradient(135deg, #f59e0b, #d97706)', color: '#fff',
-                  border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '0.9rem',
-                  boxShadow: '0 4px 12px rgba(245,158,11,0.3)', transition: 'all 0.2s',
-                }}
-              >
-                🔒 Confirmar Ativação
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ════ TWO-PANEL BODY ════ */}
       <div style={S.body}>

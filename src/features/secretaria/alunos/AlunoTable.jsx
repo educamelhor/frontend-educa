@@ -46,6 +46,7 @@ export default function AlunoTable({
   onEditar,
   onBoletim,
   onTACE,
+  onView,               // ← callback externo para abrir ficha (substitui o modal interno)
   onRelatorioDisciplinar,
   mostrarFicha = true,
   mostrarBoletim = true,
@@ -111,7 +112,7 @@ export default function AlunoTable({
                     <button
                       className="text-blue-600 hover:text-blue-800"
                       title="Ficha do Estudante"
-                      onClick={() => abrirFicha(aluno.codigo)}
+                      onClick={() => onView ? onView(aluno.codigo) : abrirFicha(aluno.codigo)}
                     >
                       <IdentificationIcon className="w-5 h-5" />
                     </button>
@@ -173,8 +174,8 @@ export default function AlunoTable({
         </tbody>
       </table>
 
-      {/* ✅ Modal inline para ficha */}
-      {openFicha && (
+      {/* ✅ Modal inline para ficha — apenas quando não há callback externo (onView) */}
+      {!onView && openFicha && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
           <div className="bg-white rounded-lg shadow-xl w-[90vw] max-w-5xl h-[90vh] overflow-y-auto relative">
             <button

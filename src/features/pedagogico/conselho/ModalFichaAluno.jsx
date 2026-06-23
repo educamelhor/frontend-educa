@@ -1,17 +1,7 @@
 // src/features/pedagogico/conselho/ModalFichaAluno.jsx
-// ============================================================================
-// Modal da Ficha do Estudante — EXCLUSIVO do módulo PEDAGÓGICO
-//
-// Usa FichaAlunoPedagogico (isolado nesta pasta), que:
-//  ✅ Exibe Relatório Pedagógico
-//  ❌ NÃO exibe Relatório Disciplinar (exclusivo de militares em CCMDF)
-//  ❌ NÃO exibe banner de upload de foto (foto vem do EDUCA-CAPTURE)
-//
-// Este arquivo NÃO é compartilhado com outros módulos.
-// ============================================================================
 import React, { useEffect, useRef } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
-import FichaAlunoPedagogico from "./FichaAlunoPedagogico";
+import FichaAluno from "../../alunos/FichaAluno";
 
 export default function ModalFichaAluno({ open, codigo, onClose }) {
   const dialogRef = useRef(null);
@@ -19,6 +9,7 @@ export default function ModalFichaAluno({ open, codigo, onClose }) {
   useEffect(() => {
     if (!open) return;
 
+    // trava o scroll do body e habilita fechar com ESC
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
@@ -26,6 +17,8 @@ export default function ModalFichaAluno({ open, codigo, onClose }) {
       if (e.key === "Escape") onClose?.();
     };
     window.addEventListener("keydown", onKey);
+
+    // foca no modal para acessibilidade
     setTimeout(() => dialogRef.current?.focus(), 0);
 
     return () => {
@@ -67,12 +60,9 @@ export default function ModalFichaAluno({ open, codigo, onClose }) {
           </button>
         </div>
 
-        {/*
-          FichaAlunoPedagogico — versão isolada sem upload e sem Disciplinar.
-          Relatório Disciplinar NUNCA renderiza aqui independente da escola.
-        */}
+        {/* A ficha funciona em modo "modal" quando recebe o código por prop */}
         <div className="w-full h-full overflow-auto p-4 bg-blue-50">
-          <FichaAlunoPedagogico codigo={codigo} />
+          <FichaAluno codigo={codigo} />
         </div>
       </div>
     </div>

@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from "react";
 import api from "../../../services/api";
 import ModalBoletim from "../../boletim/ModalBoletim";
-import ModalFichaAluno from "./ModalFichaAluno";           // isolado: sem Disciplinar, sem upload
-import ModalFichaConselhoClasse from "./ModalFichaConselhoClasse"; // isolado: registro de conselho
-import ModalZoomFoto from "./ModalZoomFoto";
+import ModalFichaAluno from "./ModalFichaAluno";
+import ModalZoomFoto from "./ModalZoomFoto"; // 👈 Import do modal de zoom
 import {
   EyeIcon,
   DocumentTextIcon,
@@ -40,15 +39,11 @@ export default function ConselhoClasse() {
   const [anosLetivos, setAnosLetivos] = useState([]);
   const [anoLetivo, setAnoLetivo] = useState(anoLetivoPadrao());
 
-  // 📄 Ficha do Conselho de Classe (EyeIcon)
-  const [modalConselhoOpen, setModalConselhoOpen] = useState(false);
-  const [alunoConselho, setAlunoConselho]         = useState(null);
-
   // Boletim
   const [modalBoletimOpen, setModalBoletimOpen] = useState(false);
   const [codigoAlunoBoletim, setCodigoAlunoBoletim] = useState(null);
 
-  // Ficha do Estudante (IdentificationIcon)
+  // Ficha do Estudante (modal)
   const [modalFichaOpen, setModalFichaOpen] = useState(false);
   const [codigoAlunoFicha, setCodigoAlunoFicha] = useState(null);
 
@@ -265,15 +260,10 @@ export default function ConselhoClasse() {
                       {/* Ações */}
                       <td className="py-2 px-2 text-center">
                         <div className="flex justify-center gap-3">
-                          {/* 👁 EyeIcon = Ficha do Conselho de Classe (registros de texto) */}
-                          <button
-                            onClick={() => { setAlunoConselho(aluno); setModalConselhoOpen(true); }}
-                            title="Ficha do Conselho de Classe"
-                          >
+                          <button>
                             <EyeIcon className="h-6 w-6 text-gray-600 hover:text-blue-600" />
                           </button>
 
-                          {/* DocumentTextIcon = Boletim */}
                           <button
                             onClick={() => abrirModalBoletim(aluno.codigo)}
                             title="Visualizar boletim"
@@ -281,7 +271,6 @@ export default function ConselhoClasse() {
                             <DocumentTextIcon className="h-6 w-6 text-gray-600 hover:text-green-600" />
                           </button>
 
-                          {/* IdentificationIcon = Ficha do Estudante (isolada, sem Disciplinar) */}
                           <button
                             onClick={() => abrirModalFicha(aluno.codigo)}
                             title="Ficha do estudante"
@@ -289,8 +278,7 @@ export default function ConselhoClasse() {
                             <IdentificationIcon className="h-6 w-6 text-gray-600 hover:text-purple-600" />
                           </button>
 
-                          {/* Lápis = Edição */}
-                          <button title="Editar">
+                          <button>
                             <PencilIcon className="h-6 w-6 text-gray-600 hover:text-yellow-600" />
                           </button>
                         </div>
@@ -306,17 +294,7 @@ export default function ConselhoClasse() {
         </div>
       )}
 
-      {/* Modal: Ficha do Conselho de Classe (EyeIcon) */}
-      {modalConselhoOpen && alunoConselho && (
-        <ModalFichaConselhoClasse
-          open={modalConselhoOpen}
-          aluno={alunoConselho}
-          turma={turmaSelecionada}
-          onClose={() => { setModalConselhoOpen(false); setAlunoConselho(null); }}
-        />
-      )}
-
-      {/* Modal: Boletim */}
+      {/* Modais */}
       {modalBoletimOpen && (
         <ModalBoletim
           open={modalBoletimOpen}
@@ -325,7 +303,6 @@ export default function ConselhoClasse() {
         />
       )}
 
-      {/* Modal: Ficha do Estudante (IdentificationIcon) — sem Disciplinar, sem upload */}
       {modalFichaOpen && (
         <ModalFichaAluno
           open={modalFichaOpen}
@@ -334,7 +311,6 @@ export default function ConselhoClasse() {
         />
       )}
 
-      {/* Modal: Zoom Foto */}
       {zoomOpen && (
         <ModalZoomFoto
           open={zoomOpen}

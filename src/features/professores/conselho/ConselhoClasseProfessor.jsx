@@ -1,33 +1,23 @@
 // features/professores/conselho/ConselhoClasseProfessor.jsx
 // ============================================================================
-// Conselho de Classe — Perfil PROFESSOR (componente INDEPENDENTE)
+// Conselho de Classe — Perfil PROFESSOR (componente independente)
 //
 // Governança aplicada neste arquivo:
-//  ✅ Professor vê APENAS suas turmas        → GET /professores/me/turmas
-//  ✅ Ícone olhinho → abre Ficha do Estudante (ModalFichaAlunoProfessor)
-//  ✅ Ícone boletim → abre ModalBoletim
-//  ✅ Ícone ficha   → abre Relatório Pedagógico (somente leitura, sem
-//                     Descrição e sem Registro Interno)
-//  ❌ Ícone lápis (edição)         — OCULTO para professor
-//  ❌ Upload de foto               — OCULTO para professor
-//  ❌ Relatório Disciplinar        — OCULTO para professor
-//  ❌ Campos Descrição / Reg. Int. — OCULTOS para professor
+//  ✅ Visualizar boletim do aluno
+//  ❌ Relatório Disciplinar — professor NÃO tem acesso
+//  ❌ Relatório Pedagógico — professor NÃO registra (Descrição / Registro Interno)
+//  ❌ Ação de edição (lápis) — exclusiva da direção/coordenação
+//  ❌ Ficha completa do aluno — oculta para professor
 //
-// Este arquivo é INDEPENDENTE de pedagogico/conselho/ConselhoClasse.jsx.
+// Este arquivo é INDEPENDENTE de ConselhoClasse.jsx (pedagogico/conselho).
 // Alterações aqui NÃO afetam o conselho da direção/coordenação e vice-versa.
 // ============================================================================
 
 import React, { useState, useEffect } from "react";
 import api from "../../../services/api";
 import ModalBoletim from "../../boletim/ModalBoletim";
-import ModalFichaAlunoProfessor from "./ModalFichaAlunoProfessor";
-import ModalFichaConselhoClasse from "./ModalFichaConselhoClasse";
-import ModalZoomFotoProfessor from "./ModalZoomFotoProfessor";
-import {
-  EyeIcon,
-  DocumentTextIcon,
-  IdentificationIcon,
-} from "@heroicons/react/24/outline";
+import ModalZoomFoto from "../../pedagogico/conselho/ModalZoomFoto";
+import { DocumentTextIcon } from "@heroicons/react/24/outline";
 import { getFotoURL } from "../../../utils/foto";
 
 function normalizaTexto(str) {
@@ -58,20 +48,12 @@ export default function ConselhoClasseProfessor() {
   const [anosLetivos, setAnosLetivos] = useState([]);
   const [anoLetivo, setAnoLetivo] = useState(anoLetivoPadrao());
 
-  // Boletim
+  // Boletim (única ação disponível para professor)
   const [modalBoletimOpen, setModalBoletimOpen] = useState(false);
   const [codigoAlunoBoletim, setCodigoAlunoBoletim] = useState(null);
 
-  // Ficha do Estudante (IdentificationIcon)
-  const [modalFichaOpen, setModalFichaOpen] = useState(false);
-  const [codigoAlunoFicha, setCodigoAlunoFicha] = useState(null);
-
-  // Ficha do Conselho de Classe (EyeIcon)
-  const [modalConselhoOpen, setModalConselhoOpen] = useState(false);
-  const [alunoConselho, setAlunoConselho] = useState(null);
-
   // Cache-buster para fotos
-  const [fotoStamp, setFotoStamp] = useState(Date.now());
+  const [fotoStamp] = useState(Date.now());
 
   // Zoom da Foto
   const [zoomOpen, setZoomOpen] = useState(false);
@@ -83,25 +65,8 @@ export default function ConselhoClasseProfessor() {
     setModalBoletimOpen(true);
   }
 
-  function abrirModalFicha(codigo) {
-    setCodigoAlunoFicha(codigo);
-    setModalFichaOpen(true);
-  }
-
-  function abrirModalConselho(aluno) {
-    setAlunoConselho(aluno);
-    setModalConselhoOpen(true);
-  }
-
-  // Ao fechar a ficha, atualiza o stamp das fotos (caso tenha sido alterada)
-  function handleCloseFicha() {
-    setModalFichaOpen(false);
-    setFotoStamp(Date.now());
-  }
-
   const turnos = ["Matutino", "Vespertino", "Noturno"];
 
-  // Carrega anos letivos apenas uma vez
   useEffect(() => {
     async function carregarAnos() {
       try {
@@ -112,47 +77,32 @@ export default function ConselhoClasseProfessor() {
       }
     }
     carregarAnos();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    fetchTurmas();
+    // eslint-disable-next-line
   }, []);
 
-  // Re-busca turmas sempre que o ano letivo mudar (a API filtra por ano)
-  useEffect(() => {
-    fetchTurmas();
-    setTurnoSelecionado(null);
-    setTurmaSelecionada(null);
-    setAlunosTurma([]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [anoLetivo]);
-
-  // ── CORREÇÃO BUG 1: usa /professores/me/turmas em vez de /api/turmas ──────
-  // A API retorna { ok: true, turmas: [...] } com campo `nome` para o nome
-  // da turma. Passamos o ano letivo como param para pré-filtrar no servidor.
   const fetchTurmas = async () => {
     setLoadingTurmas(true);
     try {
-      const { data } = await api.get(`/professores/me/turmas?ano=${anoLetivo}`);
-      // A resposta é { ok: true, turmas: [...] }  — extrai o array
-      const lista = data?.turmas || (Array.isArray(data) ? data : []);
-      // Normaliza o campo de nome: a API usa `nome`, o restante do código usa `turma`
-      const normalizadas = lista.map((t) => ({
-        ...t,
-        turma: t.turma ?? t.nome ?? "",
-      }));
-      setTurmas(normalizadas);
+      const escola_id = localStorage.getItem("escola_id") || 1;
+      const { data } = await api.get("/api/turmas", {
+        params: { escola_id },
+      });
+      setTurmas(data);
     } catch (error) {
-      console.error("Erro ao buscar turmas do professor:", error);
+      console.error("Erro ao buscar turmas:", error);
       setTurmas([]);
     } finally {
       setLoadingTurmas(false);
     }
   };
 
-  // Filtra apenas por turno na UI — a API já retorna só as turmas do professor
-  // para o ano letivo solicitado via param, sem necessidade de filtrar aqui.
+  // Professor vê apenas turmas do ano letivo selecionado
   const turmasFiltradas = turmas.filter(
     (t) =>
       turnoSelecionado &&
-      normalizaTexto(t.turno) === normalizaTexto(turnoSelecionado)
+      normalizaTexto(t.turno) === normalizaTexto(turnoSelecionado) &&
+      Number(t.ano) === anoLetivo
   );
 
   const handleClickTurno = (turno) => {
@@ -268,8 +218,8 @@ export default function ConselhoClasseProfessor() {
 
           {/* Aviso de governança */}
           <div className="mb-4 px-4 py-2 bg-blue-50 border border-blue-200 rounded text-sm text-blue-700">
-            ℹ️ Como professor, você pode visualizar a <strong>ficha</strong> e o <strong>boletim</strong> dos
-            alunos. Relatórios disciplinares e edição de registros são gerenciados pela coordenação e direção.
+            ℹ️ Como professor, você pode visualizar o <strong>boletim</strong> dos alunos.
+            Relatórios disciplinares e registros pedagógicos são gerenciados pela coordenação e direção.
           </div>
 
           {loadingAlunos ? (
@@ -288,7 +238,6 @@ export default function ConselhoClasseProfessor() {
                       {/* Foto */}
                       <td className="py-2 px-2 text-center">
                         <img
-                          key={`${aluno.codigo}-${fotoStamp}`}
                           src={fotoSrc}
                           alt={`Foto de ${aluno.estudante}`}
                           className="w-12 h-12 rounded-full object-cover mx-auto cursor-pointer"
@@ -310,19 +259,10 @@ export default function ConselhoClasseProfessor() {
                         {aluno.estudante}
                       </td>
 
-                      {/* Ações */}
+                      {/* Ações — Professor: apenas Boletim */}
                       <td className="py-2 px-2 text-center">
                         <div className="flex justify-center gap-3">
-
-                          {/* ✅ EyeIcon → Ficha do Conselho de Classe (registros do conselho) */}
-                          <button
-                            onClick={() => abrirModalConselho(aluno)}
-                            title="Ficha do conselho de classe"
-                          >
-                            <EyeIcon className="h-6 w-6 text-gray-600 hover:text-blue-600" />
-                          </button>
-
-                          {/* ✅ Boletim */}
+                          {/* ✅ Boletim — permitido */}
                           <button
                             onClick={() => abrirModalBoletim(aluno.codigo)}
                             title="Visualizar boletim"
@@ -330,16 +270,10 @@ export default function ConselhoClasseProfessor() {
                             <DocumentTextIcon className="h-6 w-6 text-gray-600 hover:text-green-600" />
                           </button>
 
-                          {/* ✅ IdentificationIcon → Ficha do Estudante */}
-                          <button
-                            onClick={() => abrirModalFicha(aluno.codigo)}
-                            title="Ficha do estudante"
-                          >
-                            <IdentificationIcon className="h-6 w-6 text-gray-600 hover:text-purple-600" />
-                          </button>
-
                           {/*
-                            ❌ PencilIcon (Edição) — OCULTO para professor
+                            ❌ EyeIcon (Ficha) — oculto para professor
+                            ❌ IdentificationIcon (Relatórios) — oculto para professor
+                            ❌ PencilIcon (Edição) — oculto para professor
                           */}
                         </div>
                       </td>
@@ -363,31 +297,9 @@ export default function ConselhoClasseProfessor() {
         />
       )}
 
-      {/* Modal: Ficha do Estudante — versão professor */}
-      {modalFichaOpen && (
-        <ModalFichaAlunoProfessor
-          open={modalFichaOpen}
-          codigo={codigoAlunoFicha}
-          onClose={handleCloseFicha}
-        />
-      )}
-
-      {/* Modal: Ficha do Conselho de Classe (EyeIcon) */}
-      {modalConselhoOpen && (
-        <ModalFichaConselhoClasse
-          open={modalConselhoOpen}
-          aluno={alunoConselho}
-          turma={turmaSelecionada}
-          onClose={() => {
-            setModalConselhoOpen(false);
-            setAlunoConselho(null);
-          }}
-        />
-      )}
-
       {/* Modal: Zoom Foto */}
       {zoomOpen && (
-        <ModalZoomFotoProfessor
+        <ModalZoomFoto
           open={zoomOpen}
           src={zoomSrc}
           alt={zoomAlt}

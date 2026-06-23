@@ -16,7 +16,7 @@ import { AcademicCapIcon, PlusCircleIcon, FolderOpenIcon } from "@heroicons/reac
 import AlunoTable from "./AlunoTable";
 import AlunoForm from "./AlunoForm";
 import ModalExcluirOuInativar from "./ModalExcluirOuInativar";
-import ImportPDF from "./ImportPDF";
+import ImportCSV from "./ImportCSV";
 import Input from "../../../components/ui/Input";
 import styles from "./styles.module.css";
 import api from "../../../services/api";
@@ -533,7 +533,7 @@ export default function Alunos() {
       )}
 
       {/* Modal Importação */}
-      <ImportPDF
+      <ImportCSV
         open={isImportOpen}
         onClose={() => setImportOpen(false)}
         onFinish={async (res) => {
@@ -552,8 +552,8 @@ export default function Alunos() {
                 turma: res.turma || res.turmaNome || res.nomeTurma || undefined,
                 message: res.message,
               });
-              // NÃO fechar o ImportPDF aqui — ele pode ter o modal de pendentes aberto.
-              // O ImportPDF se auto-gerencia: se não houver pendentes, o usuário fechará manualmente.
+              // NÃO fechar o ImportCSV aqui — ele pode ter o modal de pendentes aberto.
+              // O ImportCSV se auto-gerencia: se não houver pendentes, o usuário fechará manualmente.
             }
           } else {
             setImportOpen(false);

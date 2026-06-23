@@ -2,7 +2,8 @@ import React, { useState, useEffect } from "react";
 import api from "../../../services/api";
 import ModalBoletim from "../../boletim/ModalBoletim";
 import ModalFichaAluno from "./ModalFichaAluno";
-import ModalZoomFoto from "./ModalZoomFoto"; // 👈 Import do modal de zoom
+import ModalFichaConselhoClasse from "./ModalFichaConselhoClasse";
+import ModalZoomFoto from "./ModalZoomFoto";
 import {
   EyeIcon,
   DocumentTextIcon,
@@ -43,9 +44,13 @@ export default function ConselhoClasse() {
   const [modalBoletimOpen, setModalBoletimOpen] = useState(false);
   const [codigoAlunoBoletim, setCodigoAlunoBoletim] = useState(null);
 
-  // Ficha do Estudante (modal)
+  // Ficha do Estudante (IdentificationIcon)
   const [modalFichaOpen, setModalFichaOpen] = useState(false);
   const [codigoAlunoFicha, setCodigoAlunoFicha] = useState(null);
+
+  // Ficha do Conselho de Classe (EyeIcon)
+  const [modalConselhoOpen, setModalConselhoOpen] = useState(false);
+  const [alunoConselho, setAlunoConselho] = useState(null);
 
   // Cache-buster p/ fotos na lista
   const [fotoStamp, setFotoStamp] = useState(0);
@@ -63,6 +68,11 @@ export default function ConselhoClasse() {
   function abrirModalFicha(codigo) {
     setCodigoAlunoFicha(codigo);
     setModalFichaOpen(true);
+  }
+
+  function abrirModalConselho(aluno) {
+    setAlunoConselho(aluno);
+    setModalConselhoOpen(true);
   }
 
   const turnos = ["Matutino", "Vespertino", "Noturno"];
@@ -260,7 +270,11 @@ export default function ConselhoClasse() {
                       {/* Ações */}
                       <td className="py-2 px-2 text-center">
                         <div className="flex justify-center gap-3">
-                          <button>
+                          {/* 👁️ EyeIcon → Ficha do Conselho de Classe */}
+                          <button
+                            onClick={() => abrirModalConselho(aluno)}
+                            title="Ficha do conselho de classe"
+                          >
                             <EyeIcon className="h-6 w-6 text-gray-600 hover:text-blue-600" />
                           </button>
 
@@ -278,7 +292,11 @@ export default function ConselhoClasse() {
                             <IdentificationIcon className="h-6 w-6 text-gray-600 hover:text-purple-600" />
                           </button>
 
-                          <button>
+                          {/* ✏️ PencilIcon → Ficha completa do estudante */}
+                          <button
+                            onClick={() => abrirModalFicha(aluno.codigo)}
+                            title="Ficha do estudante"
+                          >
                             <PencilIcon className="h-6 w-6 text-gray-600 hover:text-yellow-600" />
                           </button>
                         </div>
@@ -300,6 +318,19 @@ export default function ConselhoClasse() {
           open={modalBoletimOpen}
           codigo={codigoAlunoBoletim}
           onClose={() => setModalBoletimOpen(false)}
+        />
+      )}
+
+      {/* Modal: Ficha do Conselho de Classe (EyeIcon) */}
+      {modalConselhoOpen && (
+        <ModalFichaConselhoClasse
+          open={modalConselhoOpen}
+          aluno={alunoConselho}
+          turma={turmaSelecionada}
+          onClose={() => {
+            setModalConselhoOpen(false);
+            setAlunoConselho(null);
+          }}
         />
       )}
 

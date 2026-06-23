@@ -1075,6 +1075,20 @@ export default function Sidebar({ isOpen, onClose }) {
 
 
 
+        {/* ⚠️ ─────────────────────────────────────────────────────────────────
+            GRUPO: DISCIPLINAR — REGRAS CRÍTICAS (NÃO REVERTER)
+            ─────────────────────────────────────────────────────────────────
+            ESTE GUARD DEPENDE de isCCMDF e isDiretorPedagogicoCCMDF
+            definidos no bloco de perfil acima (~L177-178).
+            
+            REGRAS:
+            1. Escolas NÃO-CCMDF (ex: POMPS) → NUNCA renderiza Disciplinar
+            2. Diretor/Vice Pedagógico de escola CCMDF → NUNCA renderiza
+            3. Perfis militares (isDisciplinar) → SEMPRE renderiza
+            
+            Se você fez merge e este guard virou hasModulo('disciplinar') simples,
+            VOCÊ REVERTEU uma correção crítica. Restaure o guard completo abaixo.
+        ───────────────────────────────────────────────────────────────────── */}
         {isScopeEscola && !isProfessor && !isCoord && !isSecretario && !isDiretorPedagogicoCCMDF && (isDisciplinar || (isCCMDF && hasModulo('disciplinar'))) && (
           <>
             {/* ───────────────────────────────

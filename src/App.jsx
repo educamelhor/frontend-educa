@@ -33,6 +33,7 @@ import Login from "./features/login/Login.jsx";
 import AtivarDiretor from "./features/login/AtivarDiretor.jsx";
 import GerarGabaritos from "./features/impressao/GerarGabaritos";
 import ConselhoClasse from "./features/pedagogico/conselho/ConselhoClasse";
+// ⚠️  MÓDULO ISOLADO: importa do barrel — se qualquer modal sumir, o build quebra
 import ConselhoClasseProfessor from "./features/professores/conselho/ConselhoClasseProfessor";
 import ConteudosAdmin from "./features/pedagogico/conteudos/ConteudosAdmin.jsx";
 import ConteudosProgramaticos from "./features/pedagogico/conteudos/ConteudosProgramaticos.jsx";
@@ -352,6 +353,7 @@ export default function App() {
           <Route path="/gabarito/corrigir"     element={<RequireModulo modulo="gabarito"><GabaritoModule /></RequireModulo>} />
           <Route path="/gabarito/resultados"   element={<RequireModulo modulo="gabarito"><GabaritoModule /></RequireModulo>} />
           <Route path="/pedagogico/conselho" element={<RequireModulo modulo="pedagogico"><ConselhoClasse /></RequireModulo>} />
+          {/* ⚠️  ROTA PROFESSOR — DEVE usar ConselhoClasseProfessor, NUNCA ConselhoClasse */}
           <Route path="/professores/conselho" element={<RequireModulo modulo="professores"><ConselhoClasseProfessor /></RequireModulo>} />
           <Route path="/pedagogico/conteudos" element={
             <RequireModulo modulo="pedagogico"><RequirePerm perm="conteudos:ver"><ConteudosAdmin /></RequirePerm></RequireModulo>

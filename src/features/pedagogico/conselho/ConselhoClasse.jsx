@@ -292,12 +292,12 @@ export default function ConselhoClasse() {
                             <IdentificationIcon className="h-6 w-6 text-gray-600 hover:text-purple-600" />
                           </button>
 
-                          {/* ✏️ PencilIcon → Ficha completa do estudante */}
+                          {/* ✏️ PencilIcon — sem ação por enquanto */}
                           <button
-                            onClick={() => abrirModalFicha(aluno.codigo)}
-                            title="Ficha do estudante"
+                            title="Em breve"
+                            style={{ cursor: "default", opacity: 0.4 }}
                           >
-                            <PencilIcon className="h-6 w-6 text-gray-600 hover:text-yellow-600" />
+                            <PencilIcon className="h-6 w-6 text-gray-400" />
                           </button>
                         </div>
                       </td>

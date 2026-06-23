@@ -64,8 +64,9 @@ export default function ModalFichaAluno({ open, codigo, onClose }) {
 
         {/* A ficha funciona em modo "modal" quando recebe o código por prop */}
         <div className="w-full h-full overflow-auto p-4 bg-blue-50">
-          {/* hideDisciplinar=true: Rel. Disciplinar é exclusivo do módulo militar (CCMDF) */}
-          <FichaAluno codigo={codigo} hideDisciplinar={true} />
+          {/* hideDisciplinar: Rel. Disciplinar é exclusivo do módulo militar (CCMDF) */}
+          {/* hideUploadFoto: fotos vêm do EDUCA-CAPTURE, não de upload manual */}
+          <FichaAluno codigo={codigo} hideDisciplinar={true} hideUploadFoto={true} />
         </div>
       </div>
     </div>

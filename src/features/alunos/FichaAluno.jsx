@@ -16,7 +16,7 @@ import ModalRelatorioPedagogico from "./ModalRelatorioPedagogico";
      leitura → detecção facial → recorte → upload → refresh
    ========================================================= */
 
-export default function FichaAluno({ codigo: codigoProp, hideDisciplinar = false }) {
+export default function FichaAluno({ codigo: codigoProp, hideDisciplinar = false, hideUploadFoto = false }) {
   const { codigo: codigoParam } = useParams();
   const codigo = codigoProp || codigoParam;
   const isModal = Boolean(codigoProp);
@@ -327,8 +327,8 @@ export default function FichaAluno({ codigo: codigoProp, hideDisciplinar = false
           </div>
         </div>
 
-        {/* Upload de foto — oculto no módulo disciplinar */}
-        {!isDisciplinar && (
+        {/* Upload de foto — oculto no módulo disciplinar e no pedagógico (fotos vem do EDUCA-CAPTURE) */}
+        {!isDisciplinar && !hideUploadFoto && (
           <div style={{ marginBottom: 20, padding: '12px 14px', background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: 10 }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 8 }}>📷 Foto do Estudante</div>
             <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: uploading ? 'not-allowed' : 'pointer' }}>

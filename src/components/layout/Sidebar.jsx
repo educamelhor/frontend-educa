@@ -167,9 +167,16 @@ export default function Sidebar({ isOpen, onClose }) {
   const getPerfil = () =>
     String(localStorage.getItem('perfil') || '').toLowerCase().trim();
   const perfil = getPerfil();
-  const isDisciplinar = perfil === 'disciplinar' || perfil === 'diretor_disciplinar' || perfil === 'militar';
+  const isDisciplinar = perfil === 'disciplinar' || perfil === 'diretor_disciplinar' || perfil === 'militar' || perfil === 'comandante';
   const isProfessor = perfil === 'professor';
   const isSecretario = perfil === 'secretario' || perfil === 'secretaria';
+
+  // ── Escola tipo: CCMDF = cívico-militar ──
+  const escolaTipoRaw = localStorage.getItem('escola_tipo');
+  const escolaTipo = (() => { try { const v = JSON.parse(escolaTipoRaw || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } })();
+  const isCCMDF = escolaTipo.includes('CCMDF');
+  // Diretor Pedagógico de escola CCMDF NÃO acessa Disciplinar
+  const isDiretorPedagogicoCCMDF = isCCMDF && (perfil === 'diretor' || perfil === 'vice_diretor');
 
   // Começando pelos 3 módulos solicitados
   const canConteudos = isScopeEscola && !isDisciplinar && !isProfessor && hasPerm('conteudos:ver');
@@ -1068,7 +1075,7 @@ export default function Sidebar({ isOpen, onClose }) {
 
 
 
-        {isScopeEscola && !isProfessor && !isCoord && !isSecretario && hasModulo('disciplinar') && (
+        {isScopeEscola && !isProfessor && !isCoord && !isSecretario && !isDiretorPedagogicoCCMDF && (isDisciplinar || (isCCMDF && hasModulo('disciplinar'))) && (
           <>
             {/* ───────────────────────────────
                 GRUPO: Disciplinar

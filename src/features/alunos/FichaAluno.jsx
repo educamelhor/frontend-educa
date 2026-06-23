@@ -16,7 +16,7 @@ import ModalRelatorioPedagogico from "./ModalRelatorioPedagogico";
      leitura → detecção facial → recorte → upload → refresh
    ========================================================= */
 
-export default function FichaAluno({ codigo: codigoProp }) {
+export default function FichaAluno({ codigo: codigoProp, hideDisciplinar = false }) {
   const { codigo: codigoParam } = useParams();
   const codigo = codigoProp || codigoParam;
   const isModal = Boolean(codigoProp);
@@ -376,8 +376,8 @@ export default function FichaAluno({ codigo: codigoProp }) {
               <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>Ver histórico →</div>
             </div>
 
-            {/* Relatório Disciplinar */}
-            {!isProfessor && (
+            {/* Relatório Disciplinar — exclusivo do módulo militar (CCMDF) */}
+            {!isProfessor && !hideDisciplinar && (
               <div
                 onClick={() => setModalRelatorioOpen(true)}
                 role="button"

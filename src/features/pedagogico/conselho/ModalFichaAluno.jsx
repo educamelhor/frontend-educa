@@ -1,4 +1,6 @@
 // src/features/pedagogico/conselho/ModalFichaAluno.jsx
+// Relatório Disciplinar OCULTO neste módulo (exclusivo do módulo militar/CCMDF).
+// A prop hideDisciplinar={true} em FichaAluno é a única mudança necessária.
 import React, { useEffect, useRef } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import FichaAluno from "../../alunos/FichaAluno";
@@ -62,7 +64,8 @@ export default function ModalFichaAluno({ open, codigo, onClose }) {
 
         {/* A ficha funciona em modo "modal" quando recebe o código por prop */}
         <div className="w-full h-full overflow-auto p-4 bg-blue-50">
-          <FichaAluno codigo={codigo} />
+          {/* hideDisciplinar=true: Rel. Disciplinar é exclusivo do módulo militar (CCMDF) */}
+          <FichaAluno codigo={codigo} hideDisciplinar={true} />
         </div>
       </div>
     </div>

@@ -451,13 +451,18 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
                                                     )}
                                                 </div>
                                                 {Boolean(oc.convocar_responsavel) && (
-                                                    <div className="mt-2">
+                                                    <div className="mt-2 flex flex-wrap gap-1 items-center">
                                                         <span className="inline-block px-2 py-1 text-xs font-medium text-red-700 bg-red-100 rounded-full border border-red-200">
                                                             Responsável convocado
                                                         </span>
+                                                        {oc.data_convocacao && (
+                                                            <span className="inline-block px-2 py-1 text-xs font-medium text-blue-700 bg-blue-50 rounded-full border border-blue-200" title="Data agendada para comparecimento">
+                                                                📅 Comparec. agendado: {oc.data_convocacao}
+                                                            </span>
+                                                        )}
                                                         {oc.data_comparecimento_responsavel && (
-                                                            <span className="inline-block ml-2 px-2 py-1 text-xs font-medium text-green-700 bg-green-100 rounded-full border border-green-200">
-                                                                Compareceu: {oc.data_comparecimento_responsavel}
+                                                            <span className="inline-block px-2 py-1 text-xs font-medium text-green-700 bg-green-100 rounded-full border border-green-200">
+                                                                ✅ Compareceu: {oc.data_comparecimento_responsavel}
                                                             </span>
                                                         )}
                                                     </div>

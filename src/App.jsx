@@ -17,8 +17,8 @@ import AtasDisciplinar from "./features/disciplinar/atas/AtasPage.jsx";
 import LiberacaoDisciplinar from "./features/disciplinar/liberacao/LiberacaoPage.jsx";
 import Boletim from "./features/boletim/Boletim";
 import BoletimAnual from "./features/boletim/BoletimAnual";
-import FichaAluno from "./features/alunos/FichaAluno";
-import FotoAluno from "./features/alunos/FotoAluno";
+import FichaAluno from "./features/secretaria/alunos/FichaAluno"; // ✅ isolado: usa cópia do módulo Secretaria
+import FotoAluno from "./features/secretaria/alunos/FotoAluno";   // ✅ isolado: usa cópia do módulo Secretaria
 import Professores from "./features/secretaria/professores";
 import FichaProfessor from "./features/secretaria/professores/FichaProfessor";
 import BancoQuestoes from "./features/questoes/BancoQuestoes";
@@ -33,6 +33,7 @@ import Login from "./features/login/Login.jsx";
 import AtivarDiretor from "./features/login/AtivarDiretor.jsx";
 import GerarGabaritos from "./features/impressao/GerarGabaritos";
 import ConselhoClasse from "./features/pedagogico/conselho/ConselhoClasse";
+// ⚠️  MÓDULO ISOLADO: importa do barrel — se qualquer modal sumir, o build quebra
 import ConselhoClasseProfessor from "./features/professores/conselho/ConselhoClasseProfessor";
 import ConteudosAdmin from "./features/pedagogico/conteudos/ConteudosAdmin.jsx";
 import ConteudosProgramaticos from "./features/pedagogico/conteudos/ConteudosProgramaticos.jsx";
@@ -319,8 +320,8 @@ export default function App() {
           {/* ── Alunos individuais ───────────────────────────────────────── */}
           <Route path="/alunos/:codigo/boletim"       element={<Boletim />} />
           <Route path="/alunos/:codigo/boletim-anual" element={<BoletimAnual />} />
-          <Route path="/alunos/:codigo/ficha"         element={<FichaAluno />} />
-          <Route path="/alunos/:codigo/foto-lote"     element={<FotoAluno />} />
+          <Route path="/alunos/:codigo/ficha"         element={<FichaAluno />} />{/* componente isolado em secretaria/alunos */}
+          <Route path="/alunos/:codigo/foto-lote"     element={<FotoAluno />} />{/* componente isolado em secretaria/alunos */}
           <Route path="/questoes" element={<RequireModulo modulo="questoes"><RequireBancoQuestoes><BancoQuestoes /></RequireBancoQuestoes></RequireModulo>} />
 
           {/* ── Secretaria ───────────────────────────────────────────────── */}
@@ -352,6 +353,7 @@ export default function App() {
           <Route path="/gabarito/corrigir"     element={<RequireModulo modulo="gabarito"><GabaritoModule /></RequireModulo>} />
           <Route path="/gabarito/resultados"   element={<RequireModulo modulo="gabarito"><GabaritoModule /></RequireModulo>} />
           <Route path="/pedagogico/conselho" element={<RequireModulo modulo="pedagogico"><ConselhoClasse /></RequireModulo>} />
+          {/* ⚠️  ROTA PROFESSOR — DEVE usar ConselhoClasseProfessor, NUNCA ConselhoClasse */}
           <Route path="/professores/conselho" element={<RequireModulo modulo="professores"><ConselhoClasseProfessor /></RequireModulo>} />
           <Route path="/pedagogico/conteudos" element={
             <RequireModulo modulo="pedagogico"><RequirePerm perm="conteudos:ver"><ConteudosAdmin /></RequirePerm></RequireModulo>

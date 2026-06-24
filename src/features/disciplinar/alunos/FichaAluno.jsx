@@ -2,8 +2,8 @@
 // Design premium — mesma aparência em todos os módulos (Disciplinar, Secretaria, etc.)
 import React, { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import api from "../../services/api";
-import { Button } from "../../components/ui/Button";
+import api from "../../../services/api";
+import { Button } from "../../../components/ui/Button";
 import * as faceapi from "face-api.js";
 import { AcademicCapIcon } from "@heroicons/react/24/solid";
 import ModalRelatorioDisciplinar from "./ModalRelatorioDisciplinar";

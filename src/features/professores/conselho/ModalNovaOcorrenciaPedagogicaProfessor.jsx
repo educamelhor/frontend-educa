@@ -1,22 +1,20 @@
 // features/professores/conselho/ModalNovaOcorrenciaPedagogicaProfessor.jsx
 // ============================================================================
-// Versão PROFESSOR do modal de ocorrência pedagógica.
+// Modal de ocorrência pedagógica — perfil PROFESSOR (isolado)
 //
-// Governança aplicada:
-//  ✅ Professor PODE registrar e visualizar ocorrências pedagógicas
-//  ✅ Professor PODE selecionar categoria e ocorrência
-//  ❌ Campo Descrição          — OCULTO para professor
-//  ❌ Campo Registro Interno   — OCULTO para professor
-//  ❌ Convocar responsável     — OCULTO (exclusivo coordenação/direção)
+// Governança:
+//  ✅ Professor PODE registrar ocorrências (categoria + ocorrência)
+//  ❌ Campo Descrição         — OCULTO
+//  ❌ Campo Registro Interno  — OCULTO
+//  ❌ Convocar responsável    — OCULTO
 //
-// Este arquivo é INDEPENDENTE de alunos/ModalNovaOcorrenciaPedagogica.jsx.
-// NÃO altere o arquivo compartilhado para ajustar regras do professor.
+// EXCLUSIVO: professores/conselho. Não afeta outros módulos.
 // ============================================================================
+
 import React, { useState, useEffect } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import api from "../../../services/api";
 
-// ─── Categorias e ocorrências pedagógicas ────────────────────────────────────
 const CATEGORIAS_PEDAGOGICAS = [
   {
     categoria: "Desempenho Acadêmico",
@@ -81,20 +79,14 @@ const CATEGORIAS_PEDAGOGICAS = [
 ];
 
 export default function ModalNovaOcorrenciaPedagogicaProfessor({
-  open,
-  onClose,
-  aluno,
-  onOcorrenciaCriada,
-  ocorrenciaInicial = null,
-  readonly = false,
+  open, onClose, aluno, onOcorrenciaCriada,
+  ocorrenciaInicial = null, readonly = false,
 }) {
   const [data, setData] = useState("");
   const [categoriaSelecionada, setCategoriaSelecionada] = useState("");
   const [motivo, setMotivo] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [nextRegistro, setNextRegistro] = useState("...");
-
-  // ❌ descricao e registroInterno — NÃO existem neste componente professor
 
   const itensFiltrados = React.useMemo(() => {
     if (!categoriaSelecionada) return [];
@@ -104,9 +96,7 @@ export default function ModalNovaOcorrenciaPedagogicaProfessor({
 
   useEffect(() => {
     if (!open) return;
-
     if (ocorrenciaInicial) {
-      // Modo visualização — preenche com dados existentes
       let dt = ocorrenciaInicial.data_ocorrencia || "";
       if (dt.includes("/")) {
         const [dd, mm, yyyy] = dt.split("/");
@@ -116,7 +106,6 @@ export default function ModalNovaOcorrenciaPedagogicaProfessor({
       setCategoriaSelecionada(ocorrenciaInicial.categoria || "");
       setMotivo(ocorrenciaInicial.motivo || "");
     } else {
-      // Modo criação — limpa tudo
       setData(new Date().toISOString().split("T")[0]);
       setCategoriaSelecionada("");
       setMotivo("");
@@ -134,21 +123,14 @@ export default function ModalNovaOcorrenciaPedagogicaProfessor({
 
   const isVisualizacao = Boolean(ocorrenciaInicial) || readonly;
 
-  const handleCategoriaChange = (cat) => {
-    setCategoriaSelecionada(cat);
-    setMotivo("");
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSalvando(true);
     try {
       await api.post(`/api/alunos/${aluno.id}/ocorrencias-pedagogicas`, {
-        data,
-        categoria: categoriaSelecionada,
-        motivo,
+        data, categoria: categoriaSelecionada, motivo,
         // ❌ descricao — não enviado (professor não tem acesso)
-        // ❌ registroInterno — não enviado (professor não tem acesso)
+        // ❌ registroInterno — não enviado
       });
       if (onOcorrenciaCriada) onOcorrenciaCriada();
       onClose();
@@ -160,7 +142,6 @@ export default function ModalNovaOcorrenciaPedagogicaProfessor({
     }
   };
 
-  // ── Badge de status ──────────────────────────────────────────────────────
   const statusBadge = (status) => {
     if (status === "FINALIZADA") return "text-green-700 bg-green-100 border-green-200";
     if (status === "CANCELADA")  return "text-red-700 bg-red-100 border-red-200";
@@ -171,17 +152,15 @@ export default function ModalNovaOcorrenciaPedagogicaProfessor({
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
 
-        {/* Header */}
         <div className="px-5 py-3 border-b flex justify-between items-center bg-gradient-to-r from-emerald-50 to-teal-50 flex-shrink-0">
           <h2 className="text-lg font-bold text-emerald-900">
             {isVisualizacao ? "Detalhes do Registro Pedagógico" : "Novo Registro Pedagógico"}
           </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition" title="Fechar">
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition">
             <XMarkIcon className="h-6 w-6" />
           </button>
         </div>
 
-        {/* Body */}
         <form id="formPedagogicaProf" onSubmit={handleSubmit} className="px-5 py-4 overflow-y-auto space-y-3 flex-1 min-h-0">
 
           {isVisualizacao && (
@@ -190,13 +169,11 @@ export default function ModalNovaOcorrenciaPedagogicaProfessor({
             </div>
           )}
 
-          {/* Registro + Data */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Registro</label>
               <input
-                type="text"
-                disabled
+                type="text" disabled
                 value={ocorrenciaInicial ? (ocorrenciaInicial.registro || ocorrenciaInicial.id) : nextRegistro}
                 className="w-full border rounded p-2 bg-gray-100 text-gray-500 cursor-not-allowed"
               />
@@ -214,7 +191,6 @@ export default function ModalNovaOcorrenciaPedagogicaProfessor({
             </div>
           </div>
 
-          {/* Categoria */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
             {isVisualizacao ? (
@@ -223,7 +199,7 @@ export default function ModalNovaOcorrenciaPedagogicaProfessor({
               <select
                 required
                 value={categoriaSelecionada}
-                onChange={(e) => handleCategoriaChange(e.target.value)}
+                onChange={(e) => { setCategoriaSelecionada(e.target.value); setMotivo(""); }}
                 className="w-full border rounded p-2 focus:ring focus:border-emerald-300 outline-none"
               >
                 <option value="">-- Selecione a categoria --</option>
@@ -234,7 +210,6 @@ export default function ModalNovaOcorrenciaPedagogicaProfessor({
             )}
           </div>
 
-          {/* Ocorrência */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Ocorrência</label>
             {isVisualizacao ? (
@@ -255,11 +230,9 @@ export default function ModalNovaOcorrenciaPedagogicaProfessor({
             )}
           </div>
 
-          {/* ❌ Campo Descrição — OCULTO para professor (governança) */}
-          {/* ❌ Campo Registro Interno — OCULTO para professor (governança) */}
-          {/* ❌ Convocar Responsável — OCULTO para professor */}
+          {/* ❌ Descrição — OCULTO para professor */}
+          {/* ❌ Registro Interno — OCULTO para professor */}
 
-          {/* Status (somente visualização) */}
           {isVisualizacao && ocorrenciaInicial?.status && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
@@ -269,7 +242,6 @@ export default function ModalNovaOcorrenciaPedagogicaProfessor({
             </div>
           )}
 
-          {/* Registrado por */}
           {isVisualizacao && ocorrenciaInicial?.nome_usuario_registro && (
             <div className="p-3 bg-gray-50 border border-gray-100 rounded-md">
               <p className="text-sm text-gray-700">
@@ -286,7 +258,6 @@ export default function ModalNovaOcorrenciaPedagogicaProfessor({
           )}
         </form>
 
-        {/* Footer */}
         <div className="px-5 py-3 border-t bg-gray-50 flex items-center justify-end gap-3 flex-shrink-0">
           {isVisualizacao ? (
             <button type="button" onClick={onClose} className="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 transition">
@@ -298,8 +269,7 @@ export default function ModalNovaOcorrenciaPedagogicaProfessor({
                 Cancelar
               </button>
               <button
-                type="submit"
-                form="formPedagogicaProf"
+                type="submit" form="formPedagogicaProf"
                 disabled={salvando}
                 className="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 transition disabled:opacity-50"
               >

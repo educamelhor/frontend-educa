@@ -9,7 +9,7 @@ import {
   ClipboardDocumentListIcon,
 } from "@heroicons/react/24/solid";
 import { DocumentTextIcon as DocumentTextOutline } from "@heroicons/react/24/outline";
-import FichaAluno from "../../alunos/FichaAluno"; // ✅ usa o componente existente
+import FichaAluno from "./FichaAluno"; // ✅ isolado: cópia local no módulo Secretaria
 
 // ────────────────────────────────────────────────────────────────
 // Função utilitária para formatar datas no padrão brasileiro
@@ -49,6 +49,8 @@ export default function AlunoTable({
   onRelatorioDisciplinar,
   mostrarFicha = true,
   mostrarBoletim = true,
+  hideDisciplinar = false, // true para escolas não-militares: oculta Relatório Disciplinar na ficha
+  hideUploadFoto = true,   // fotos vêm do EDUCA-CAPTURE, não de upload manual
 }) {
   // ✅ Controle do modal da ficha
   const [openFicha, setOpenFicha] = useState(false);
@@ -183,7 +185,7 @@ export default function AlunoTable({
             >
               ✕
             </button>
-            <FichaAluno codigo={codigoSelecionado} />
+            <FichaAluno codigo={codigoSelecionado} hideDisciplinar={hideDisciplinar} hideUploadFoto={hideUploadFoto} />
           </div>
         </div>
       )}

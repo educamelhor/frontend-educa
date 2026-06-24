@@ -12,9 +12,9 @@ import {
 import { ShieldExclamationIcon } from "@heroicons/react/24/outline";
 import { AcademicCapIcon } from "@heroicons/react/24/solid";
 import api from "../../../services/api";
-import AlunoTable from "./AlunoTable"; // copia local isolada do modulo Disciplinar
+import AlunoTable from "../../secretaria/alunos/AlunoTable";
 import Input from "../../../components/ui/Input";
-import ModalTACE from "../../alunos/ModalTACE";
+import ModalTACE from "./ModalTACE";
 import ModalConfirmTACE from "./ModalConfirmTACE";
 import ModalFichaAluno from "./ModalFichaAluno"; // ⭐ Modal premium independente do módulo Disciplinar
 

@@ -167,9 +167,16 @@ export default function Sidebar({ isOpen, onClose }) {
   const getPerfil = () =>
     String(localStorage.getItem('perfil') || '').toLowerCase().trim();
   const perfil = getPerfil();
-  const isDisciplinar = perfil === 'disciplinar' || perfil === 'diretor_disciplinar' || perfil === 'militar';
+  const isDisciplinar = perfil === 'disciplinar' || perfil === 'diretor_disciplinar' || perfil === 'militar' || perfil === 'comandante';
   const isProfessor = perfil === 'professor';
   const isSecretario = perfil === 'secretario' || perfil === 'secretaria';
+
+  // ── Escola tipo: CCMDF = cívico-militar ──
+  const escolaTipoRaw = localStorage.getItem('escola_tipo');
+  const escolaTipo = (() => { try { const v = JSON.parse(escolaTipoRaw || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } })();
+  const isCCMDF = escolaTipo.includes('CCMDF');
+  // Diretor Pedagógico de escola CCMDF NÃO acessa Disciplinar
+  const isDiretorPedagogicoCCMDF = isCCMDF && (perfil === 'diretor' || perfil === 'vice_diretor');
 
   // Começando pelos 3 módulos solicitados
   const canConteudos = isScopeEscola && !isDisciplinar && !isProfessor && hasPerm('conteudos:ver');
@@ -457,13 +464,6 @@ export default function Sidebar({ isOpen, onClose }) {
             </Link>
             )}
 
-            {/* LINK: Estudantes */}
-            {!isDisciplinar && !isProfessor && !isCoord && !isSecretario && hasModulo('secretaria.alunos') && (
-            <Link to="/alunos" className={getMainLinkClasses('/alunos')}>
-              <UserGroupIcon className="h-5 w-5 mr-2" />
-              Estudantes
-            </Link>
-            )}
 
             {/* GRUPO: Professores (fora de Secretaria) */}
             {isProfessor && hasModulo('professores') ? (
@@ -1068,7 +1068,21 @@ export default function Sidebar({ isOpen, onClose }) {
 
 
 
-        {isScopeEscola && !isProfessor && !isCoord && !isSecretario && hasModulo('disciplinar') && (
+        {/* ⚠️ ─────────────────────────────────────────────────────────────────
+            GRUPO: DISCIPLINAR — REGRAS CRÍTICAS (NÃO REVERTER)
+            ─────────────────────────────────────────────────────────────────
+            ESTE GUARD DEPENDE de isCCMDF e isDiretorPedagogicoCCMDF
+            definidos no bloco de perfil acima (~L177-178).
+            
+            REGRAS:
+            1. Escolas NÃO-CCMDF (ex: POMPS) → NUNCA renderiza Disciplinar
+            2. Diretor/Vice Pedagógico de escola CCMDF → NUNCA renderiza
+            3. Perfis militares (isDisciplinar) → SEMPRE renderiza
+            
+            Se você fez merge e este guard virou hasModulo('disciplinar') simples,
+            VOCÊ REVERTEU uma correção crítica. Restaure o guard completo abaixo.
+        ───────────────────────────────────────────────────────────────────── */}
+        {isScopeEscola && !isProfessor && !isCoord && !isSecretario && !isDiretorPedagogicoCCMDF && (isDisciplinar || (isCCMDF && hasModulo('disciplinar'))) && (
           <>
             {/* ───────────────────────────────
                 GRUPO: Disciplinar
@@ -1450,8 +1464,8 @@ export default function Sidebar({ isOpen, onClose }) {
               </>
             )}
 
-            {/* ─── GRUPO: Secretaria (Professor NÃO tem acesso) ─── */}
-            {!isProfessor && hasModulo('secretaria') && (
+            {/* ─── GRUPO: Secretaria (Professor e Militar NÃO têm acesso) ─── */}
+            {!isProfessor && !isDisciplinar && hasModulo('secretaria') && (
             <>
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-6 transition"

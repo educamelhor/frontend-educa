@@ -1,13 +1,13 @@
-// src/features/disciplinar/alunos/FichaAlunoDisciplinar.jsx
-// Versao da Ficha do Estudante para o modulo DISCIPLINAR
-// Diferenca: SEM o banner de Relatorio Pedagogico (militares nao acessam)
+// src/features/alunos/FichaAluno.jsx
+// Design premium — mesma aparência em todos os módulos (Disciplinar, Secretaria, etc.)
 import React, { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import api from "../../../services/api";
 import { Button } from "../../../components/ui/Button";
 import * as faceapi from "face-api.js";
 import { AcademicCapIcon } from "@heroicons/react/24/solid";
-import ModalRelatorioDisciplinar from "../../alunos/ModalRelatorioDisciplinar";
+import ModalRelatorioDisciplinar from "./ModalRelatorioDisciplinar";
+import ModalRelatorioPedagogico from "./ModalRelatorioPedagogico";
 
 /* =========================================================
    FICHA DO ESTUDANTE — Design Premium
@@ -16,7 +16,7 @@ import ModalRelatorioDisciplinar from "../../alunos/ModalRelatorioDisciplinar";
      leitura → detecção facial → recorte → upload → refresh
    ========================================================= */
 
-export default function FichaAluno({ codigo: codigoProp }) {
+export default function FichaAluno({ codigo: codigoProp, hideDisciplinar = false, hideUploadFoto = false }) {
   const { codigo: codigoParam } = useParams();
   const codigo = codigoProp || codigoParam;
   const isModal = Boolean(codigoProp);
@@ -30,6 +30,7 @@ export default function FichaAluno({ codigo: codigoProp }) {
   const [uploading, setUploading] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const [modalRelatorioOpen, setModalRelatorioOpen] = useState(false);
+  const [modalPedagogicoOpen, setModalPedagogicoOpen] = useState(false);
   const [ocorrenciasCount, setOcorrenciasCount] = useState(null);
 
   const isUploadingRef = useRef(false);
@@ -326,8 +327,8 @@ export default function FichaAluno({ codigo: codigoProp }) {
           </div>
         </div>
 
-        {/* Upload de foto — oculto no módulo disciplinar */}
-        {!isDisciplinar && (
+        {/* Upload de foto — oculto no módulo disciplinar e quando fotos vem do EDUCA-CAPTURE */}
+        {!isDisciplinar && !hideUploadFoto && (
           <div style={{ marginBottom: 20, padding: '12px 14px', background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: 10 }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 8 }}>📷 Foto do Estudante</div>
             <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: uploading ? 'not-allowed' : 'pointer' }}>
@@ -353,38 +354,58 @@ export default function FichaAluno({ codigo: codigoProp }) {
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9ca3af', marginBottom: 12 }}>
             RELATÓRIOS
           </div>
-            {/* Apenas Relatório Disciplinar — sem Pedagógico neste módulo */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
-              {/* Relatório Disciplinar */}
-              {!isProfessor && (
-                <div
-                  onClick={() => setModalRelatorioOpen(true)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={e => e.key === 'Enter' && setModalRelatorioOpen(true)}
-                  style={{
-                    background: 'linear-gradient(135deg, #1e3a5f 0%, #0f2847 100%)',
-                    borderRadius: 14, padding: '18px 20px', cursor: 'pointer',
-                    transition: 'transform 0.15s, box-shadow 0.15s',
-                    boxShadow: '0 2px 8px rgba(15,40,71,0.15)',
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 20px rgba(15,40,71,0.25)'; }}
-                  onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(15,40,71,0.15)'; }}
-                >
-                  <div style={{ fontSize: 22, marginBottom: 8 }}>🛡️</div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 4 }}>Relatório Disciplinar</div>
-                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', marginBottom: 10 }}>
-                    {ocorrenciasCount === null
-                      ? 'Carregando…'
-                      : ocorrenciasCount === 0
-                        ? 'Sem ocorrências'
-                        : `${ocorrenciasCount} ocorrência${ocorrenciasCount > 1 ? 's' : ''} registrada${ocorrenciasCount > 1 ? 's' : ''}`
-                    }
-                  </div>
-                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>Abrir relatório →</div>
-                </div>
-              )}
+          <div style={{ display: 'grid', gridTemplateColumns: (isProfessor || hideDisciplinar) ? '1fr' : '1fr 1fr', gap: 12 }}>
+            {/* Relatório Pedagógico */}
+            <div
+              onClick={() => setModalPedagogicoOpen(true)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={e => e.key === 'Enter' && setModalPedagogicoOpen(true)}
+              style={{
+                background: 'linear-gradient(135deg, #064e3b 0%, #065f46 100%)',
+                borderRadius: 14, padding: '18px 20px', cursor: 'pointer',
+                transition: 'transform 0.15s, box-shadow 0.15s',
+                boxShadow: '0 2px 8px rgba(6,78,59,0.15)',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 20px rgba(6,78,59,0.25)'; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(6,78,59,0.15)'; }}
+            >
+              <div style={{ fontSize: 22, marginBottom: 8 }}>📋</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 4 }}>Relatório Pedagógico</div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', marginBottom: 10 }}>Histórico completo de registros pedagógicos do estudante.</div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>Ver histórico →</div>
             </div>
+
+            {/* Relatório Disciplinar — apenas CCMDF (hideDisciplinar=false) e não-professor */}
+            {!isProfessor && !hideDisciplinar && (
+              <div
+                onClick={() => setModalRelatorioOpen(true)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={e => e.key === 'Enter' && setModalRelatorioOpen(true)}
+                style={{
+                  background: 'linear-gradient(135deg, #1e3a5f 0%, #0f2847 100%)',
+                  borderRadius: 14, padding: '18px 20px', cursor: 'pointer',
+                  transition: 'transform 0.15s, box-shadow 0.15s',
+                  boxShadow: '0 2px 8px rgba(15,40,71,0.15)',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 20px rgba(15,40,71,0.25)'; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(15,40,71,0.15)'; }}
+              >
+                <div style={{ fontSize: 22, marginBottom: 8 }}>🛡️</div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 4 }}>Relatório Disciplinar</div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', marginBottom: 10 }}>
+                  {ocorrenciasCount === null
+                    ? 'Carregando…'
+                    : ocorrenciasCount === 0
+                      ? 'Sem ocorrências'
+                      : `${ocorrenciasCount} ocorrência${ocorrenciasCount > 1 ? 's' : ''} registrada${ocorrenciasCount > 1 ? 's' : ''}`
+                  }
+                </div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>Abrir relatório →</div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Botão voltar (só fora do modal) */}
@@ -402,6 +423,13 @@ export default function FichaAluno({ codigo: codigoProp }) {
         open={modalRelatorioOpen}
         onClose={() => setModalRelatorioOpen(false)}
         aluno={aluno}
+      />
+
+      <ModalRelatorioPedagogico
+        open={modalPedagogicoOpen}
+        onClose={() => setModalPedagogicoOpen(false)}
+        aluno={aluno}
+        somenteLeitura={isProfessor}
       />
     </div>
   );

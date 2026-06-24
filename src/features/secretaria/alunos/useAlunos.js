@@ -1,7 +1,7 @@
 // src/features/secretaria/alunos/useAlunos.js
 
 import { useState, useEffect, useCallback } from "react";
-import api from "../../services/api";
+import api from "../../../services/api";
 
 /**
  * Hook para buscar alunos com suporte a filtros.

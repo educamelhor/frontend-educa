@@ -49,6 +49,7 @@ export default function AlunoTable({
   onRelatorioDisciplinar,
   mostrarFicha = true,
   mostrarBoletim = true,
+  hideDisciplinar = false, // true para escolas não-militares: oculta Relatório Disciplinar na ficha
 }) {
   // ✅ Controle do modal da ficha
   const [openFicha, setOpenFicha] = useState(false);
@@ -183,7 +184,7 @@ export default function AlunoTable({
             >
               ✕
             </button>
-            <FichaAluno codigo={codigoSelecionado} />
+            <FichaAluno codigo={codigoSelecionado} hideDisciplinar={hideDisciplinar} />
           </div>
         </div>
       )}

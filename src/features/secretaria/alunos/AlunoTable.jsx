@@ -9,7 +9,7 @@ import {
   ClipboardDocumentListIcon,
 } from "@heroicons/react/24/solid";
 import { DocumentTextIcon as DocumentTextOutline } from "@heroicons/react/24/outline";
-import FichaAluno from "../../alunos/FichaAluno"; // ✅ usa o componente existente
+import FichaAluno from "./FichaAluno"; // ✅ isolado: cópia local no módulo Secretaria
 
 // ────────────────────────────────────────────────────────────────
 // Função utilitária para formatar datas no padrão brasileiro

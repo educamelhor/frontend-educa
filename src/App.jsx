@@ -17,8 +17,8 @@ import AtasDisciplinar from "./features/disciplinar/atas/AtasPage.jsx";
 import LiberacaoDisciplinar from "./features/disciplinar/liberacao/LiberacaoPage.jsx";
 import Boletim from "./features/boletim/Boletim";
 import BoletimAnual from "./features/boletim/BoletimAnual";
-import FichaAluno from "./features/alunos/FichaAluno";
-import FotoAluno from "./features/alunos/FotoAluno";
+import FichaAluno from "./features/secretaria/alunos/FichaAluno"; // ✅ isolado: usa cópia do módulo Secretaria
+import FotoAluno from "./features/secretaria/alunos/FotoAluno";   // ✅ isolado: usa cópia do módulo Secretaria
 import Professores from "./features/secretaria/professores";
 import FichaProfessor from "./features/secretaria/professores/FichaProfessor";
 import BancoQuestoes from "./features/questoes/BancoQuestoes";
@@ -320,8 +320,8 @@ export default function App() {
           {/* ── Alunos individuais ───────────────────────────────────────── */}
           <Route path="/alunos/:codigo/boletim"       element={<Boletim />} />
           <Route path="/alunos/:codigo/boletim-anual" element={<BoletimAnual />} />
-          <Route path="/alunos/:codigo/ficha"         element={<FichaAluno />} />
-          <Route path="/alunos/:codigo/foto-lote"     element={<FotoAluno />} />
+          <Route path="/alunos/:codigo/ficha"         element={<FichaAluno />} />{/* componente isolado em secretaria/alunos */}
+          <Route path="/alunos/:codigo/foto-lote"     element={<FotoAluno />} />{/* componente isolado em secretaria/alunos */}
           <Route path="/questoes" element={<RequireModulo modulo="questoes"><RequireBancoQuestoes><BancoQuestoes /></RequireBancoQuestoes></RequireModulo>} />
 
           {/* ── Secretaria ───────────────────────────────────────────────── */}

@@ -4,7 +4,7 @@
 // KPI Cards + Filtros + Lista paginada + Redirecionamento para Relatório
 // ============================================================================
 import React, { useState, useEffect, useCallback } from "react";
-import ModalRelatorioDisciplinar from "../../alunos/ModalRelatorioDisciplinar";
+import ModalRelatorioDisciplinar from "./ModalRelatorioDisciplinar";
 import ModalRelatorioSemestral from "./ModalRelatorioSemestral";
 import api from "../../../services/api";
 

@@ -464,13 +464,6 @@ export default function Sidebar({ isOpen, onClose }) {
             </Link>
             )}
 
-            {/* LINK: Estudantes */}
-            {!isDisciplinar && !isProfessor && !isCoord && !isSecretario && hasModulo('secretaria.alunos') && (
-            <Link to="/alunos" className={getMainLinkClasses('/alunos')}>
-              <UserGroupIcon className="h-5 w-5 mr-2" />
-              Estudantes
-            </Link>
-            )}
 
             {/* GRUPO: Professores (fora de Secretaria) */}
             {isProfessor && hasModulo('professores') ? (

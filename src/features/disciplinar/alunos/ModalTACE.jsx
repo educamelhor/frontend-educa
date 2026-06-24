@@ -11,7 +11,7 @@ import {
   ShieldExclamationIcon,
 } from "@heroicons/react/24/outline";
 import { AcademicCapIcon } from "@heroicons/react/24/solid";
-import api from "../../services/api";
+import api from "../../../services/api";
 
 // ── Helpers ──
 function formatarDataBR(data) {

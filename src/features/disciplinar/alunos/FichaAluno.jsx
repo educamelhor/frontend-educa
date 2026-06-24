@@ -2,8 +2,8 @@
 // Design premium — mesma aparência em todos os módulos (Disciplinar, Secretaria, etc.)
 import React, { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import api from "../../services/api";
-import { Button } from "../../components/ui/Button";
+import api from "../../../services/api";
+import { Button } from "../../../components/ui/Button";
 import * as faceapi from "face-api.js";
 import { AcademicCapIcon } from "@heroicons/react/24/solid";
 import ModalRelatorioDisciplinar from "./ModalRelatorioDisciplinar";
@@ -16,7 +16,7 @@ import ModalRelatorioPedagogico from "./ModalRelatorioPedagogico";
      leitura → detecção facial → recorte → upload → refresh
    ========================================================= */
 
-export default function FichaAluno({ codigo: codigoProp, hideDisciplinar = false, hideUploadFoto = false }) {
+export default function FichaAluno({ codigo: codigoProp }) {
   const { codigo: codigoParam } = useParams();
   const codigo = codigoProp || codigoParam;
   const isModal = Boolean(codigoProp);
@@ -327,8 +327,8 @@ export default function FichaAluno({ codigo: codigoProp, hideDisciplinar = false
           </div>
         </div>
 
-        {/* Upload de foto — oculto no módulo disciplinar e no pedagógico (fotos vem do EDUCA-CAPTURE) */}
-        {!isDisciplinar && !hideUploadFoto && (
+        {/* Upload de foto — oculto no módulo disciplinar */}
+        {!isDisciplinar && (
           <div style={{ marginBottom: 20, padding: '12px 14px', background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: 10 }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 8 }}>📷 Foto do Estudante</div>
             <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: uploading ? 'not-allowed' : 'pointer' }}>
@@ -376,8 +376,8 @@ export default function FichaAluno({ codigo: codigoProp, hideDisciplinar = false
               <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>Ver histórico →</div>
             </div>
 
-            {/* Relatório Disciplinar — exclusivo do módulo militar (CCMDF) */}
-            {!isProfessor && !hideDisciplinar && (
+            {/* Relatório Disciplinar */}
+            {!isProfessor && (
               <div
                 onClick={() => setModalRelatorioOpen(true)}
                 role="button"

@@ -1,0 +1,182 @@
+/* src/features/alunos/Boletim.module.css */
+
+/* Faz a tabela usar bordas colapsadas */
+:global(table) {
+  border-collapse: collapse;
+}
+
+/* Aplica borda a todas as células (cabeçalho e corpo) */
+:global(th),
+:global(td) {
+  border: 1px solid #ddd;
+}
+
+/* --- Seus estilos específicos continuam abaixo --- */
+
+.cabDisc {
+  width: 20%;
+  padding: 0.75rem;
+  background: #f0f4f8;
+  font-weight: bold;
+  text-align: center;
+}
+
+.ano2024 {
+  background: #ffeaa7;
+  text-align: center;
+  padding: 8px;
+}
+
+.ano2025 {
+  background: #b2fab4;
+  text-align: center;
+  padding: 8px;
+}
+
+.final {
+  width: 8%;
+  padding: 0.75rem;
+  background: #ffcc99;
+  text-align: center;
+  font-weight: bold;
+  padding: 8px;
+}
+
+.situacao {
+  width: 10%;
+  padding: 0.75rem;
+  background: #0984e3;
+  color: white;
+  text-align: center;
+  font-weight: bold;
+  padding: 8px;
+}
+
+.rotated {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  white-space: nowrap;
+  padding: 4px 2px;
+  font-size: 12px;
+  width: 20px;
+  min-width: 20px;
+}
+
+.disc {
+  padding: 8px;
+}
+
+.finalCell {
+  background: #ffe5cc;
+  text-align: center;
+  padding: 4px;
+}
+
+.faltasCell {
+  background: #ffe5cc;
+  text-align: center;
+  padding: 4px;
+}
+
+.situacaoCell {
+  background: #fff3bf;
+  text-align: center;
+  font-weight: bold;
+  padding: 4px;
+}
+
+/* impressão em paisagem e ajustes para caber em uma página */
+@media print {
+  @page {
+    size: landscape;
+    margin: 0;
+  }
+
+  /* zera margens/paddings do html/body e impede quebra */
+  :global(html), :global(body), :global(#root) {
+    margin: 0;
+    padding: 0;
+    height: auto;
+    overflow: visible;
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  /* impede quebra após o container principal e remove altura fixa */
+  :global(.min-h-screen) {
+    page-break-after: avoid;
+    page-break-inside: avoid;
+    background: #fff !important;
+    height: auto !important;      /* <- forçamos auto para não gerar página extra */
+  }
+
+  /* garante que a tabela não seja dividida */
+  table, thead, tbody, tr, td, th {
+    page-break-inside: avoid !important;
+    page-break-after: avoid !important;
+  }
+
+  /* remove qualquer fundo colorido */
+  :global(.bg-blue-50), :global(.bg-slate-50) {
+    background-color: transparent !important;
+  }
+
+  /* reduz fonte geral e espaçamentos */
+  body {
+    font-size: 8pt;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  thead th, tbody td {
+    padding: 2px !important;
+  }
+
+  /* linha de disciplina bem mais enxuta */
+  tbody tr {
+    height: 1.2rem !important;
+  }
+
+  /* caso queira ainda mais compactação */
+  thead th {
+    font-size: 7pt;
+    padding: 1px !important;
+  }
+
+  /* evita quebra de página dentro da tabela */
+  tbody, tbody tr, tbody td {
+    page-break-inside: avoid;
+  }
+}
+
+@media print {
+  /* Garante layout em paisagem e margens mínimas */
+  @page {
+    size: landscape;
+    margin: 5mm;
+  }
+
+  /* Remove qualquer fundo colorido que possa causar “extensão” do conteúdo */
+  body, .boletimWrapper {
+    background: white !important;
+  }
+
+  /* Força o conteúdo a permanecer numa única página */
+  .boletimWrapper {
+    page-break-after: avoid;
+    page-break-inside: avoid;
+    /* Se o seu container principal tiver outro nome,
+       troque .boletimWrapper pelo seletor correto */
+  }
+
+  /* Ajusta margens do body para “encaixar” tudo */
+  body {
+    margin: 0;
+  }
+
+  /* Esconde eventuais elementos que quebrem a página (se houver) */
+  .no-print, .naoImprimir {
+    display: none !important;
+  }
+}

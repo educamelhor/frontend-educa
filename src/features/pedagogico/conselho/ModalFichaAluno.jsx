@@ -3,7 +3,7 @@
 // A prop hideDisciplinar={true} em FichaAluno é a única mudança necessária.
 import React, { useEffect, useRef } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
-import FichaAluno from "../../alunos/FichaAluno";
+import FichaAluno from "./FichaAluno";
 
 export default function ModalFichaAluno({ open, codigo, onClose }) {
   const dialogRef = useRef(null);

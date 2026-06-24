@@ -16,7 +16,7 @@ import ModalRelatorioPedagogico from "./ModalRelatorioPedagogico";
      leitura → detecção facial → recorte → upload → refresh
    ========================================================= */
 
-export default function FichaAluno({ codigo: codigoProp }) {
+export default function FichaAluno({ codigo: codigoProp, hideDisciplinar = false, hideUploadFoto = false }) {
   const { codigo: codigoParam } = useParams();
   const codigo = codigoProp || codigoParam;
   const isModal = Boolean(codigoProp);
@@ -327,8 +327,8 @@ export default function FichaAluno({ codigo: codigoProp }) {
           </div>
         </div>
 
-        {/* Upload de foto — oculto no módulo disciplinar */}
-        {!isDisciplinar && (
+        {/* Upload de foto — oculto no módulo disciplinar e quando fotos vem do EDUCA-CAPTURE */}
+        {!isDisciplinar && !hideUploadFoto && (
           <div style={{ marginBottom: 20, padding: '12px 14px', background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: 10 }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 8 }}>📷 Foto do Estudante</div>
             <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: uploading ? 'not-allowed' : 'pointer' }}>
@@ -354,7 +354,7 @@ export default function FichaAluno({ codigo: codigoProp }) {
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9ca3af', marginBottom: 12 }}>
             RELATÓRIOS
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: isProfessor ? '1fr' : '1fr 1fr', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: (isProfessor || hideDisciplinar) ? '1fr' : '1fr 1fr', gap: 12 }}>
             {/* Relatório Pedagógico */}
             <div
               onClick={() => setModalPedagogicoOpen(true)}
@@ -376,8 +376,8 @@ export default function FichaAluno({ codigo: codigoProp }) {
               <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>Ver histórico →</div>
             </div>
 
-            {/* Relatório Disciplinar */}
-            {!isProfessor && (
+            {/* Relatório Disciplinar — apenas CCMDF (hideDisciplinar=false) e não-professor */}
+            {!isProfessor && !hideDisciplinar && (
               <div
                 onClick={() => setModalRelatorioOpen(true)}
                 role="button"

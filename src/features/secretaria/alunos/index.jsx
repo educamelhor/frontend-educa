@@ -31,10 +31,11 @@ function anoLetivoPadrao() {
 }
 
 export default function Alunos() {
-  // ── Escola tipo: apenas CCMDF (cívico-militar) exibe Relatório Disciplinar ──
-  const escolaTipoRaw = localStorage.getItem('escola_tipo');
-  const escolaTipo = (() => { try { const v = JSON.parse(escolaTipoRaw || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } })();
-  const isCCMDF = escolaTipo.includes('CCMDF');
+  // ── Apenas perfis militares/disciplinares exibem Relatório Disciplinar na FichaAluno ──
+  // Diretor, Coordenador, Secretário NAO devem ver esse banner
+  const perfilAtual = String(localStorage.getItem('perfil') || '').toLowerCase().trim();
+  const perfisDisciplinar = ['disciplinar', 'diretor_disciplinar', 'militar', 'comandante'];
+  const isPerfilDisciplinar = perfisDisciplinar.includes(perfilAtual);
 
   // ────────────────────────────────────────────────────────────────
   // Preferências de filtro
@@ -396,8 +397,8 @@ export default function Alunos() {
         onBoletim={handleBoletim}
         // (Se não for modo "inativos", a tabela pode ocultar inativos)
         somenteAtivos={!isBuscaInativos(debouncedFiltro)}
-        // só CCMDF (cívico-militar) exibe Relatório Disciplinar na FichaAluno
-        hideDisciplinar={!isCCMDF}
+        // só perfis disciplinar/militar vêem Relatório Disciplinar na FichaAluno
+        hideDisciplinar={!isPerfilDisciplinar}
       />
 
       {/* Paginação */}

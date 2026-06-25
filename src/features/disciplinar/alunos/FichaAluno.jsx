@@ -349,14 +349,17 @@ export default function FichaAluno({ codigo: codigoProp }) {
           </div>
         )}
 
-        {/* Relatórios */}
+        {/* Relatórios — Regra de ouro:
+            • isDisciplinar (perfil militar) → APENAS Relatório Disciplinar
+            • demais perfis                  → APENAS Relatório Pedagógico
+            Nunca dois banners ao mesmo tempo. Grid sempre 1 coluna. */}
         <div>
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9ca3af', marginBottom: 12 }}>
             RELATÓRIOS
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: (isProfessor || isDisciplinar) ? '1fr' : '1fr 1fr', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
 
-            {/* Relatório Pedagógico — oculto no módulo Disciplinar (perfil militar só vê DISCIPLINAR) */}
+            {/* Relatório Pedagógico — apenas perfis NÃO militares */}
             {!isDisciplinar && (
               <div
                 onClick={() => setModalPedagogicoOpen(true)}
@@ -379,8 +382,8 @@ export default function FichaAluno({ codigo: codigoProp }) {
               </div>
             )}
 
-            {/* Relatório Disciplinar */}
-            {!isProfessor && (
+            {/* Relatório Disciplinar — apenas perfil militar (isDisciplinar) */}
+            {isDisciplinar && (
               <div
                 onClick={() => setModalRelatorioOpen(true)}
                 role="button"
@@ -410,6 +413,7 @@ export default function FichaAluno({ codigo: codigoProp }) {
             )}
           </div>
         </div>
+
 
         {/* Botão voltar (só fora do modal) */}
         {!isModal && (

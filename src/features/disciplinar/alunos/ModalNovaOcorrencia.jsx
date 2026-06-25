@@ -548,39 +548,6 @@ export default function ModalNovaOcorrencia({ open, onClose, aluno, onOcorrencia
                             )}
                         </div>
 
-                        {/* Calendário — aparece ao marcar o checkbox de convocação */}
-                        {convocarResponsavel && (
-                            <div style={{ marginLeft: 22, marginTop: 6, background: '#eff6ff', border: '2px solid #3b82f6', borderRadius: 10, padding: '10px 14px' }}>
-                                <label style={{ fontSize: 11, fontWeight: 700, color: '#1d4ed8', letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>
-                                    📅 Data para comparecimento (opcional)
-                                </label>
-                                <input
-                                    type="date"
-                                    value={dataConvocacao}
-                                    disabled={readonly}
-                                    min={new Date().toISOString().split('T')[0]}
-                                    onChange={(e) => setDataConvocacao(e.target.value)}
-                                    style={{
-                                        border: '1.5px solid #93c5fd',
-                                        borderRadius: 8,
-                                        padding: '6px 10px',
-                                        fontSize: 13,
-                                        color: '#1e3a5f',
-                                        background: readonly ? '#f1f5f9' : '#ffffff',
-                                        outline: 'none',
-                                        cursor: readonly ? 'not-allowed' : 'pointer',
-                                        width: 'auto',
-                                    }}
-                                />
-                                {dataConvocacao && !readonly && (
-                                    <button
-                                        type="button"
-                                        onClick={() => setDataConvocacao('')}
-                                        style={{ marginLeft: 8, fontSize: 11, color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
-                                    >Limpar data</button>
-                                )}
-                            </div>
-                        )}
 
                         {convocacaoObrigatoria && !readonly && (
                             <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 ml-6">
@@ -625,6 +592,44 @@ export default function ModalNovaOcorrencia({ open, onClose, aluno, onOcorrencia
 
                 {/* ═══ FOOTER PREMIUM ═══ */}
                 <div style={{ padding: "16px 24px 20px", borderTop: "1px solid #f1f5f9", background: "#fafbfc", flexShrink: 0 }}>
+                    {/* Campo Data de Convocação — aparece aqui no footer quando checkbox marcado */}
+                    {convocarResponsavel && (
+                        <div style={{ marginBottom: 12, background: '#eff6ff', border: '2px solid #3b82f6', borderRadius: 10, padding: '10px 14px' }}>
+                            <label style={{ fontSize: 11, fontWeight: 700, color: '#1d4ed8', letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>
+                                📅 Data para comparecimento (opcional)
+                            </label>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                <input
+                                    type="date"
+                                    value={dataConvocacao}
+                                    disabled={readonly}
+                                    min={new Date().toISOString().split('T')[0]}
+                                    onChange={(e) => setDataConvocacao(e.target.value)}
+                                    style={{
+                                        border: '1.5px solid #93c5fd',
+                                        borderRadius: 8,
+                                        padding: '6px 10px',
+                                        fontSize: 13,
+                                        color: '#1e3a5f',
+                                        background: readonly ? '#f1f5f9' : '#ffffff',
+                                        outline: 'none',
+                                        cursor: readonly ? 'not-allowed' : 'pointer',
+                                    }}
+                                />
+                                {dataConvocacao && !readonly && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setDataConvocacao('')}
+                                        style={{ fontSize: 11, color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+                                    >Limpar data</button>
+                                )}
+                                {!dataConvocacao && !readonly && (
+                                    <span style={{ fontSize: 11, color: '#6b7280' }}>Nenhuma data selecionada — responsável vem quando puder</span>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Info EDUCA-MOBILE se não for readonly */}
                     {!readonly && (
                         <div style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "9px 13px", borderRadius: 10, background: "linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%)", border: "1px solid #bfdbfe", marginBottom: 14, fontSize: 11, color: "#1e40af", lineHeight: 1.5 }}>

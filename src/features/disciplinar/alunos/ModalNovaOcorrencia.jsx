@@ -592,9 +592,9 @@ export default function ModalNovaOcorrencia({ open, onClose, aluno, onOcorrencia
 
                 {/* ═══ FOOTER PREMIUM ═══ */}
                 <div style={{ padding: "16px 24px 20px", borderTop: "1px solid #f1f5f9", background: "#fafbfc", flexShrink: 0 }}>
-                    {/* CAMPO DATA - SEMPRE VISÍVEL PARA DIAGNÓSTICO */}
+                    {/* Campo Data de Convocação — exibido/oculto via CSS baseado no estado convocarResponsavel */}
                     <div style={{
-                        display: 'block',
+                        display: convocarResponsavel ? 'block' : 'none',
                         marginBottom: 12,
                         background: '#eff6ff',
                         border: '2px solid #3b82f6',

@@ -49,6 +49,7 @@ export default function ModalNovaOcorrencia({ open, onClose, aluno, onOcorrencia
     const [buscaConsulta, setBuscaConsulta] = useState("");
     const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
     const [cancelando, setCancelando] = useState(false);
+    const [dataConvocacao, setDataConvocacao] = useState('');  // YYYY-MM-DD ou ''
 
     // Obter a definição do dropdown a partir da label selecionada
     const getDefinicao = (label) => MEDIDAS_DROPDOWN.find(m => m.label === label);
@@ -106,6 +107,18 @@ export default function ModalNovaOcorrencia({ open, onClose, aluno, onOcorrencia
                 setDescricao(ocorrenciaInicial.descricao || "");
                 setRegistroInterno(ocorrenciaInicial.registro_interno || "");
                 setConvocarResponsavel(Boolean(ocorrenciaInicial.convocar_responsavel));
+                // Carregar data de convocação salva (formato dd/mm/yyyy → yyyy-mm-dd)
+                if (ocorrenciaInicial.data_convocacao) {
+                    const dc = ocorrenciaInicial.data_convocacao;
+                    if (dc.includes('/')) {
+                        const [dd, mm, yyyy] = dc.split('/');
+                        setDataConvocacao(`${yyyy}-${mm}-${dd}`);
+                    } else {
+                        setDataConvocacao(dc);
+                    }
+                } else {
+                    setDataConvocacao('');
+                }
                 setDiasSuspensao(ocorrenciaInicial.dias_suspensao != null ? String(ocorrenciaInicial.dias_suspensao) : "");
                 // Carregar atenuantes/agravantes salvos
                 try { setAtenuantes(JSON.parse(ocorrenciaInicial.atenuantes || '[]')); } catch { setAtenuantes([]); }
@@ -122,6 +135,7 @@ export default function ModalNovaOcorrencia({ open, onClose, aluno, onOcorrencia
                 setDescricao("");
                 setRegistroInterno("");
                 setConvocarResponsavel(false);
+                setDataConvocacao('');
                 setDiasSuspensao("");
                 setAtenuantes([]);
                 setAgravantes([]);
@@ -211,6 +225,7 @@ export default function ModalNovaOcorrencia({ open, onClose, aluno, onOcorrencia
                     descricao,
                     registroInterno,
                     convocarResponsavel,
+                    dataConvocacao: dataConvocacao || null,
                     atenuantes,
                     agravantes
                 });
@@ -223,6 +238,7 @@ export default function ModalNovaOcorrencia({ open, onClose, aluno, onOcorrencia
                     registroInterno,
                     descricao,
                     convocarResponsavel,
+                    dataConvocacao: dataConvocacao || null,
                     atenuantes,
                     agravantes
                 };
@@ -493,21 +509,46 @@ export default function ModalNovaOcorrencia({ open, onClose, aluno, onOcorrencia
                         ></textarea>
                     </div>
 
-                    {/* Checkbox Convocar Responsável */}
+                    {/* Checkbox Convocar Responsável + Data de Convocação */}
                     <div className="flex flex-col gap-2">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                             <input
                                 type="checkbox"
                                 id="convocarResp"
                                 disabled={readonly || convocacaoObrigatoria}
                                 checked={convocarResponsavel}
-                                onChange={(e) => setConvocarResponsavel(e.target.checked)}
+                                onChange={(e) => {
+                                    const checked = e.target.checked;
+                                    setConvocarResponsavel(checked);
+                                    if (!checked) setDataConvocacao('');
+                                }}
                                 className={`w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded ${readonly || convocacaoObrigatoria ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
                             />
                             <label htmlFor="convocarResp" className={`text-sm font-medium text-gray-700 select-none ${readonly || convocacaoObrigatoria ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}>
                                 Convocar Responsável
                             </label>
+                            {/* Chip de data se selecionada */}
+                            {convocarResponsavel && dataConvocacao && (
+                                <span style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                                    background: '#eff6ff', border: '1px solid #bfdbfe',
+                                    borderRadius: 20, padding: '2px 10px',
+                                    fontSize: 12, fontWeight: 600, color: '#1d4ed8'
+                                }}>
+                                    📅 {dataConvocacao.split('-').reverse().join('/')}
+                                    {!readonly && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setDataConvocacao('')}
+                                            style={{ marginLeft: 4, color: '#93c5fd', fontWeight: 700, fontSize: 14, lineHeight: 1, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                                            title="Remover data"
+                                        >×</button>
+                                    )}
+                                </span>
+                            )}
                         </div>
+
+
                         {convocacaoObrigatoria && !readonly && (
                             <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1 ml-6">
                                 Convocação obrigatória conforme <strong>Art. 16, § 1º</strong>
@@ -551,6 +592,50 @@ export default function ModalNovaOcorrencia({ open, onClose, aluno, onOcorrencia
 
                 {/* ═══ FOOTER PREMIUM ═══ */}
                 <div style={{ padding: "16px 24px 20px", borderTop: "1px solid #f1f5f9", background: "#fafbfc", flexShrink: 0 }}>
+                    {/* Campo Data de Convocação — exibido/oculto via CSS baseado no estado convocarResponsavel */}
+                    <div style={{
+                        display: convocarResponsavel ? 'block' : 'none',
+                        marginBottom: 12,
+                        background: '#eff6ff',
+                        border: '2px solid #3b82f6',
+                        borderRadius: 10,
+                        padding: '10px 14px'
+                    }}>
+                        <label style={{ fontSize: 11, fontWeight: 700, color: '#1d4ed8', letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>
+                            📅 Data para comparecimento (opcional)
+                        </label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            <input
+                                type="date"
+                                value={dataConvocacao}
+                                disabled={readonly}
+                                min={new Date().toISOString().split('T')[0]}
+                                onChange={(e) => setDataConvocacao(e.target.value)}
+                                style={{
+                                    border: '1.5px solid #93c5fd',
+                                    borderRadius: 8,
+                                    padding: '6px 10px',
+                                    fontSize: 13,
+                                    color: '#1e3a5f',
+                                    background: readonly ? '#f1f5f9' : '#ffffff',
+                                    outline: 'none',
+                                    cursor: readonly ? 'not-allowed' : 'pointer',
+                                }}
+                            />
+                            {dataConvocacao && !readonly && (
+                                <button
+                                    type="button"
+                                    onClick={() => setDataConvocacao('')}
+                                    style={{ fontSize: 11, color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+                                >Limpar data</button>
+                            )}
+                            {!dataConvocacao && !readonly && (
+                                <span style={{ fontSize: 11, color: '#6b7280' }}>Nenhuma data — responsável vem quando puder</span>
+                            )}
+                        </div>
+                    </div>
+
+
                     {/* Info EDUCA-MOBILE se não for readonly */}
                     {!readonly && (
                         <div style={{ display: "flex", alignItems: "flex-start", gap: 8, padding: "9px 13px", borderRadius: 10, background: "linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%)", border: "1px solid #bfdbfe", marginBottom: 14, fontSize: 11, color: "#1e40af", lineHeight: 1.5 }}>

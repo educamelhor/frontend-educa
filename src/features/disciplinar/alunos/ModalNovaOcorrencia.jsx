@@ -549,29 +549,30 @@ export default function ModalNovaOcorrencia({ open, onClose, aluno, onOcorrencia
                         </div>
 
                         {/* Calendário — aparece ao marcar o checkbox de convocação */}
-                        {convocarResponsavel && !readonly && (
-                            <div style={{ marginLeft: 22, marginTop: 6 }}>
-                                <label style={{ fontSize: 11, fontWeight: 600, color: '#1d4ed8', letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>
+                        {convocarResponsavel && (
+                            <div style={{ marginLeft: 22, marginTop: 6, background: '#eff6ff', border: '2px solid #3b82f6', borderRadius: 10, padding: '10px 14px' }}>
+                                <label style={{ fontSize: 11, fontWeight: 700, color: '#1d4ed8', letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>
                                     📅 Data para comparecimento (opcional)
                                 </label>
                                 <input
                                     type="date"
                                     value={dataConvocacao}
+                                    disabled={readonly}
                                     min={new Date().toISOString().split('T')[0]}
                                     onChange={(e) => setDataConvocacao(e.target.value)}
                                     style={{
-                                        border: '1.5px solid #bfdbfe',
+                                        border: '1.5px solid #93c5fd',
                                         borderRadius: 8,
                                         padding: '6px 10px',
                                         fontSize: 13,
                                         color: '#1e3a5f',
-                                        background: '#f0f7ff',
+                                        background: readonly ? '#f1f5f9' : '#ffffff',
                                         outline: 'none',
-                                        cursor: 'pointer',
+                                        cursor: readonly ? 'not-allowed' : 'pointer',
                                         width: 'auto',
                                     }}
                                 />
-                                {dataConvocacao && (
+                                {dataConvocacao && !readonly && (
                                     <button
                                         type="button"
                                         onClick={() => setDataConvocacao('')}

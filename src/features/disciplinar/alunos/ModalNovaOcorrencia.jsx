@@ -592,43 +592,49 @@ export default function ModalNovaOcorrencia({ open, onClose, aluno, onOcorrencia
 
                 {/* ═══ FOOTER PREMIUM ═══ */}
                 <div style={{ padding: "16px 24px 20px", borderTop: "1px solid #f1f5f9", background: "#fafbfc", flexShrink: 0 }}>
-                    {/* Campo Data de Convocação — aparece aqui no footer quando checkbox marcado */}
-                    {convocarResponsavel && (
-                        <div style={{ marginBottom: 12, background: '#eff6ff', border: '2px solid #3b82f6', borderRadius: 10, padding: '10px 14px' }}>
-                            <label style={{ fontSize: 11, fontWeight: 700, color: '#1d4ed8', letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>
-                                📅 Data para comparecimento (opcional)
-                            </label>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                                <input
-                                    type="date"
-                                    value={dataConvocacao}
-                                    disabled={readonly}
-                                    min={new Date().toISOString().split('T')[0]}
-                                    onChange={(e) => setDataConvocacao(e.target.value)}
-                                    style={{
-                                        border: '1.5px solid #93c5fd',
-                                        borderRadius: 8,
-                                        padding: '6px 10px',
-                                        fontSize: 13,
-                                        color: '#1e3a5f',
-                                        background: readonly ? '#f1f5f9' : '#ffffff',
-                                        outline: 'none',
-                                        cursor: readonly ? 'not-allowed' : 'pointer',
-                                    }}
-                                />
-                                {dataConvocacao && !readonly && (
-                                    <button
-                                        type="button"
-                                        onClick={() => setDataConvocacao('')}
-                                        style={{ fontSize: 11, color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
-                                    >Limpar data</button>
-                                )}
-                                {!dataConvocacao && !readonly && (
-                                    <span style={{ fontSize: 11, color: '#6b7280' }}>Nenhuma data selecionada — responsável vem quando puder</span>
-                                )}
-                            </div>
+                    {/* Campo Data de Convocação — usa display CSS para evitar problemas de renderização condicional */}
+                    <div style={{
+                        display: convocarResponsavel ? 'block' : 'none',
+                        marginBottom: 12,
+                        background: '#eff6ff',
+                        border: '2px solid #3b82f6',
+                        borderRadius: 10,
+                        padding: '10px 14px'
+                    }}>
+                        <label style={{ fontSize: 11, fontWeight: 700, color: '#1d4ed8', letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block', marginBottom: 8 }}>
+                            📅 Data para comparecimento (opcional)
+                        </label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                            <input
+                                type="date"
+                                value={dataConvocacao}
+                                disabled={readonly}
+                                min={new Date().toISOString().split('T')[0]}
+                                onChange={(e) => setDataConvocacao(e.target.value)}
+                                style={{
+                                    border: '1.5px solid #93c5fd',
+                                    borderRadius: 8,
+                                    padding: '6px 10px',
+                                    fontSize: 13,
+                                    color: '#1e3a5f',
+                                    background: readonly ? '#f1f5f9' : '#ffffff',
+                                    outline: 'none',
+                                    cursor: readonly ? 'not-allowed' : 'pointer',
+                                }}
+                            />
+                            {dataConvocacao && !readonly && (
+                                <button
+                                    type="button"
+                                    onClick={() => setDataConvocacao('')}
+                                    style={{ fontSize: 11, color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+                                >Limpar data</button>
+                            )}
+                            {!dataConvocacao && !readonly && (
+                                <span style={{ fontSize: 11, color: '#6b7280' }}>Nenhuma data — responsável vem quando puder</span>
+                            )}
                         </div>
-                    )}
+                    </div>
+
 
                     {/* Info EDUCA-MOBILE se não for readonly */}
                     {!readonly && (

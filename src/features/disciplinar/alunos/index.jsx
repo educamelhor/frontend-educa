@@ -12,7 +12,8 @@ import {
 import { ShieldExclamationIcon } from "@heroicons/react/24/outline";
 import { AcademicCapIcon } from "@heroicons/react/24/solid";
 import api from "../../../services/api";
-import AlunoTable from "../../secretaria/alunos/AlunoTable";
+import AlunoTable from "./AlunoTable"; // ✅ isolado: cópia local no módulo Disciplinar (não importa de secretaria)
+
 import Input from "../../../components/ui/Input";
 import ModalTACE from "./ModalTACE";
 import ModalConfirmTACE from "./ModalConfirmTACE";

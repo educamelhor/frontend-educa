@@ -548,11 +548,11 @@ export default function ModalNovaOcorrencia({ open, onClose, aluno, onOcorrencia
                             )}
                         </div>
 
-                        {/* Calendário — aparece ao marcar, fecha ao selecionar */}
+                        {/* Calendário — aparece ao marcar o checkbox de convocação */}
                         {convocarResponsavel && !readonly && (
-                            <div style={{ marginLeft: 22 }}>
-                                <label style={{ fontSize: 11, fontWeight: 600, color: '#6b7280', letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>
-                                    Data para comparecimento (opcional)
+                            <div style={{ marginLeft: 22, marginTop: 6 }}>
+                                <label style={{ fontSize: 11, fontWeight: 600, color: '#1d4ed8', letterSpacing: '0.06em', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>
+                                    📅 Data para comparecimento (opcional)
                                 </label>
                                 <input
                                     type="date"

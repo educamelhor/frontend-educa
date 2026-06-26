@@ -4,7 +4,7 @@ import {
     ClipboardDocumentCheckIcon, CheckCircleIcon,
 } from "@heroicons/react/24/outline";
 import { AcademicCapIcon } from "@heroicons/react/24/solid";
-import api from "../../../services/api";
+import api from "../../services/api";
 import ModalNovaOcorrenciaPedagogica from "./ModalNovaOcorrenciaPedagogica";
 
 export default function ModalRelatorioPedagogico({ open, onClose, aluno }) {

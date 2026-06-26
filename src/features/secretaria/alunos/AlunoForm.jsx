@@ -1,4 +1,4 @@
-// src/features/secretaria/alunos/AlunoForm.jsx
+// src/features/alunos/AlunoForm.jsx
 // ────────────────────────────────────────────────────────────────
 // Componente: AlunoForm
 // Finalidade: Modal de cadastro/edição de aluno (individual)

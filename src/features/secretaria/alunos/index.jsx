@@ -31,12 +31,6 @@ function anoLetivoPadrao() {
 }
 
 export default function Alunos() {
-  // ── Apenas perfis militares/disciplinares exibem Relatório Disciplinar na FichaAluno ──
-  // Diretor, Coordenador, Secretário NAO devem ver esse banner
-  const perfilAtual = String(localStorage.getItem('perfil') || '').toLowerCase().trim();
-  const perfisDisciplinar = ['disciplinar', 'diretor_disciplinar', 'militar', 'comandante'];
-  const isPerfilDisciplinar = perfisDisciplinar.includes(perfilAtual);
-
   // ────────────────────────────────────────────────────────────────
   // Preferências de filtro
   // ────────────────────────────────────────────────────────────────
@@ -397,8 +391,6 @@ export default function Alunos() {
         onBoletim={handleBoletim}
         // (Se não for modo "inativos", a tabela pode ocultar inativos)
         somenteAtivos={!isBuscaInativos(debouncedFiltro)}
-        // só perfis disciplinar/militar vêem Relatório Disciplinar na FichaAluno
-        hideDisciplinar={!isPerfilDisciplinar}
       />
 
       {/* Paginação */}

@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import api from "../../../services/api"; // ajuste conforme sua configuração do axios
-import { Button } from "../../../components/ui/Button"; // ajuste conforme seu componente de botão
+import api from "../../services/api"; // ajuste conforme sua configuração do axios
+import { Button } from "../../components/ui/Button"; // ajuste conforme seu componente de botão
 
 // ──────────────────────────────────────────────────────────────────
 // FACE-API.JS (para rodar detecção no navegador)

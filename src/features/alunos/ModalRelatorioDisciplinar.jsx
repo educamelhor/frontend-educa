@@ -6,10 +6,10 @@ import {
     NoSymbolIcon, PhoneIcon, UserGroupIcon, DevicePhoneMobileIcon,
 } from "@heroicons/react/24/outline";
 import { AcademicCapIcon, ShieldExclamationIcon } from "@heroicons/react/24/solid";
-import api from "../../../services/api";
+import api from "../../services/api";
 import ModalNovaOcorrencia from "./ModalNovaOcorrencia";
 import ModalTACE from "./ModalTACE";
-import ModalConfirmTACE from "./ModalConfirmTACE";
+import ModalConfirmTACE from "../disciplinar/alunos/ModalConfirmTACE";
 
 export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
     const [novaOcorrenciaOpen, setNovaOcorrenciaOpen] = useState(false);

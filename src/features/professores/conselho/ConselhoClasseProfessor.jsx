@@ -1,29 +1,23 @@
 // features/professores/conselho/ConselhoClasseProfessor.jsx
 // ============================================================================
-// Conselho de Classe — Perfil PROFESSOR (componente 100% independente)
+// Conselho de Classe — Perfil PROFESSOR (componente independente)
 //
-// Governança:
-//  ✅ Professor vê APENAS as suas turmas via /professores/me/turmas
-//  ✅ EyeIcon → ModalFichaConselhoClasse (registros do conselho)
-//  ✅ DocumentTextIcon → ModalBoletim
-//  ✅ IdentificationIcon → ModalRelatorioPedagogicoProfessor (sem Desc./Reg.Interno)
-//  ❌ PencilIcon — oculto para professor
+// Governança aplicada neste arquivo:
+//  ✅ Visualizar boletim do aluno
+//  ❌ Relatório Disciplinar — professor NÃO tem acesso
+//  ❌ Relatório Pedagógico — professor NÃO registra (Descrição / Registro Interno)
+//  ❌ Ação de edição (lápis) — exclusiva da direção/coordenação
+//  ❌ Ficha completa do aluno — oculta para professor
 //
-// NÃO usa /api/turmas (retorna todas as turmas da escola).
-// NÃO compartilha arquivos com pedagogico/conselho ou outros módulos.
+// Este arquivo é INDEPENDENTE de ConselhoClasse.jsx (pedagogico/conselho).
+// Alterações aqui NÃO afetam o conselho da direção/coordenação e vice-versa.
 // ============================================================================
 
 import React, { useState, useEffect } from "react";
 import api from "../../../services/api";
 import ModalBoletim from "../../boletim/ModalBoletim";
-import ModalFichaConselhoClasse from "./ModalFichaConselhoClasse";
-import ModalRelatorioPedagogicoProfessor from "./ModalRelatorioPedagogicoProfessor";
-import ModalZoomFotoProfessor from "./ModalZoomFotoProfessor";
-import {
-  EyeIcon,
-  DocumentTextIcon,
-  IdentificationIcon,
-} from "@heroicons/react/24/outline";
+import ModalZoomFoto from "../../pedagogico/conselho/ModalZoomFoto";
+import { DocumentTextIcon } from "@heroicons/react/24/outline";
 import { getFotoURL } from "../../../utils/foto";
 
 function normalizaTexto(str) {
@@ -35,6 +29,7 @@ function normalizaTexto(str) {
     .trim();
 }
 
+// Ano letivo padrão — corte 31/jan
 function anoLetivoPadrao() {
   const hoje = new Date();
   const mes = hoje.getMonth() + 1;
@@ -49,31 +44,29 @@ export default function ConselhoClasseProfessor() {
   const [loadingAlunos, setLoadingAlunos] = useState(false);
   const [loadingTurmas, setLoadingTurmas] = useState(false);
 
-  // Ano letivo
+  // Ano Letivo — professor só vê o ano corrente por padrão
   const [anosLetivos, setAnosLetivos] = useState([]);
   const [anoLetivo, setAnoLetivo] = useState(anoLetivoPadrao());
 
-  // Modal: Boletim
+  // Boletim (única ação disponível para professor)
   const [modalBoletimOpen, setModalBoletimOpen] = useState(false);
   const [codigoAlunoBoletim, setCodigoAlunoBoletim] = useState(null);
 
-  // Modal: Ficha do Conselho de Classe (EyeIcon)
-  const [modalConselhoOpen, setModalConselhoOpen] = useState(false);
-  const [alunoConselho, setAlunoConselho] = useState(null);
+  // Cache-buster para fotos
+  const [fotoStamp] = useState(Date.now());
 
-  // Modal: Relatório Pedagógico Professor (IdentificationIcon)
-  const [modalRelPedOpen, setModalRelPedOpen] = useState(false);
-  const [alunoRelPed, setAlunoRelPed] = useState(null);
-
-  // Zoom foto
+  // Zoom da Foto
   const [zoomOpen, setZoomOpen] = useState(false);
   const [zoomSrc, setZoomSrc] = useState("");
   const [zoomAlt, setZoomAlt] = useState("");
-  const [fotoStamp, setFotoStamp] = useState(Date.now());
+
+  function abrirModalBoletim(codigo) {
+    setCodigoAlunoBoletim(codigo);
+    setModalBoletimOpen(true);
+  }
 
   const turnos = ["Matutino", "Vespertino", "Noturno"];
 
-  // ── Carrega anos letivos (uma vez) ─────────────────────────────────────────
   useEffect(() => {
     async function carregarAnos() {
       try {
@@ -84,47 +77,32 @@ export default function ConselhoClasseProfessor() {
       }
     }
     carregarAnos();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    fetchTurmas();
+    // eslint-disable-next-line
   }, []);
 
-  // ── Re-busca turmas sempre que o ano letivo mudar ──────────────────────────
-  useEffect(() => {
-    fetchTurmas();
-    setTurnoSelecionado(null);
-    setTurmaSelecionada(null);
-    setAlunosTurma([]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [anoLetivo]);
-
-  // ── CRÍTICO: usa /professores/me/turmas (filtrado pelo JWT do professor) ───
-  // NÃO usa /api/turmas — esse endpoint retorna TODAS as turmas da escola.
   const fetchTurmas = async () => {
     setLoadingTurmas(true);
     try {
-      const { data } = await api.get("/api/professores/me/turmas", {
-        params: { ano: anoLetivo },
+      const escola_id = localStorage.getItem("escola_id") || 1;
+      const { data } = await api.get("/api/turmas", {
+        params: { escola_id },
       });
-      // API retorna { ok: true, turmas: [...] }
-      const lista = data?.turmas || (Array.isArray(data) ? data : []);
-      // Normaliza o campo nome→turma para uso interno
-      const normalizadas = lista.map((t) => ({
-        ...t,
-        turma: t.turma || t.nome || "",
-      }));
-      setTurmas(normalizadas);
+      setTurmas(data);
     } catch (error) {
-      console.error("[ConselhoProf] Erro ao buscar turmas do professor:", error);
+      console.error("Erro ao buscar turmas:", error);
       setTurmas([]);
     } finally {
       setLoadingTurmas(false);
     }
   };
 
-  // Filtra por turno na UI (a API já filtra por professor e ano)
+  // Professor vê apenas turmas do ano letivo selecionado
   const turmasFiltradas = turmas.filter(
     (t) =>
       turnoSelecionado &&
-      normalizaTexto(t.turno) === normalizaTexto(turnoSelecionado)
+      normalizaTexto(t.turno) === normalizaTexto(turnoSelecionado) &&
+      Number(t.ano) === anoLetivo
   );
 
   const handleClickTurno = (turno) => {
@@ -138,36 +116,16 @@ export default function ConselhoClasseProfessor() {
     setLoadingAlunos(true);
     setAlunosTurma([]);
     try {
-      const { data } = await api.get("/api/alunos", {
+      const { data } = await api.get(`/api/alunos`, {
         params: { turma_id: turma.id, ano_letivo: anoLetivo },
       });
       setAlunosTurma(data?.alunos || data || []);
     } catch (err) {
-      console.error("[ConselhoProf] Erro ao buscar alunos:", err);
+      console.error("Erro ao buscar alunos da turma:", err);
     } finally {
       setLoadingAlunos(false);
     }
   };
-
-  function abrirModalBoletim(codigo) {
-    setCodigoAlunoBoletim(codigo);
-    setModalBoletimOpen(true);
-  }
-
-  function abrirModalConselho(aluno) {
-    setAlunoConselho(aluno);
-    setModalConselhoOpen(true);
-  }
-
-  function abrirModalRelPed(aluno) {
-    setAlunoRelPed(aluno);
-    setModalRelPedOpen(true);
-  }
-
-  function handleCloseFicha() {
-    setModalRelPedOpen(false);
-    setFotoStamp(Date.now());
-  }
 
   return (
     <div className="p-6">
@@ -187,7 +145,12 @@ export default function ConselhoClasseProfessor() {
           <select
             id="filtro-ano-prof"
             value={anoLetivo}
-            onChange={(e) => setAnoLetivo(Number(e.target.value))}
+            onChange={(e) => {
+              setAnoLetivo(Number(e.target.value));
+              setTurnoSelecionado(null);
+              setTurmaSelecionada(null);
+              setAlunosTurma([]);
+            }}
             className="border rounded px-2 py-1 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             {anosLetivos.map((a) => (
@@ -218,13 +181,16 @@ export default function ConselhoClasseProfessor() {
       {turnoSelecionado && (
         <div className="flex flex-wrap justify-center gap-3 mb-8">
           {loadingTurmas ? (
-            <p className="w-full text-center text-gray-500">Carregando turmas...</p>
+            <p className="w-full text-center text-gray-500">
+              Turmas sendo carregadas...
+            </p>
           ) : turmasFiltradas.length > 0 ? (
             turmasFiltradas.map((turma) => (
               <button
                 key={turma.id}
                 onClick={() => handleClickTurma(turma)}
                 title={`Selecionar turma ${turma.turma}`}
+                aria-label={`Selecionar turma ${turma.turma}`}
                 className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl shadow-sm border font-semibold text-sm
                   whitespace-nowrap transition-all duration-150 select-none
                   bg-gradient-to-br from-blue-50 to-indigo-100 border-blue-300 text-blue-900
@@ -252,8 +218,8 @@ export default function ConselhoClasseProfessor() {
 
           {/* Aviso de governança */}
           <div className="mb-4 px-4 py-2 bg-blue-50 border border-blue-200 rounded text-sm text-blue-700">
-            ℹ️ Como professor, você pode visualizar a <strong>ficha do conselho</strong>,
-            o <strong>relatório pedagógico</strong> e o <strong>boletim</strong> dos alunos.
+            ℹ️ Como professor, você pode visualizar o <strong>boletim</strong> dos alunos.
+            Relatórios disciplinares e registros pedagógicos são gerenciados pela coordenação e direção.
           </div>
 
           {loadingAlunos ? (
@@ -272,7 +238,6 @@ export default function ConselhoClasseProfessor() {
                       {/* Foto */}
                       <td className="py-2 px-2 text-center">
                         <img
-                          key={`${aluno.codigo}-${fotoStamp}`}
                           src={fotoSrc}
                           alt={`Foto de ${aluno.estudante}`}
                           className="w-12 h-12 rounded-full object-cover mx-auto cursor-pointer"
@@ -294,19 +259,10 @@ export default function ConselhoClasseProfessor() {
                         {aluno.estudante}
                       </td>
 
-                      {/* Ações */}
+                      {/* Ações — Professor: apenas Boletim */}
                       <td className="py-2 px-2 text-center">
                         <div className="flex justify-center gap-3">
-
-                          {/* 👁️ EyeIcon → Ficha do Conselho de Classe */}
-                          <button
-                            onClick={() => abrirModalConselho(aluno)}
-                            title="Ficha do conselho de classe"
-                          >
-                            <EyeIcon className="h-6 w-6 text-gray-600 hover:text-blue-600" />
-                          </button>
-
-                          {/* 📄 Boletim */}
+                          {/* ✅ Boletim — permitido */}
                           <button
                             onClick={() => abrirModalBoletim(aluno.codigo)}
                             title="Visualizar boletim"
@@ -314,15 +270,11 @@ export default function ConselhoClasseProfessor() {
                             <DocumentTextIcon className="h-6 w-6 text-gray-600 hover:text-green-600" />
                           </button>
 
-                          {/* 🪪 Relatório Pedagógico (sem Descrição/Reg.Interno) */}
-                          <button
-                            onClick={() => abrirModalRelPed(aluno)}
-                            title="Relatório pedagógico"
-                          >
-                            <IdentificationIcon className="h-6 w-6 text-gray-600 hover:text-purple-600" />
-                          </button>
-
-                          {/* ❌ PencilIcon — oculto para professor */}
+                          {/*
+                            ❌ EyeIcon (Ficha) — oculto para professor
+                            ❌ IdentificationIcon (Relatórios) — oculto para professor
+                            ❌ PencilIcon (Edição) — oculto para professor
+                          */}
                         </div>
                       </td>
                     </tr>
@@ -336,8 +288,6 @@ export default function ConselhoClasseProfessor() {
         </div>
       )}
 
-      {/* ── Modais ────────────────────────────────────────────────────────────── */}
-
       {/* Modal: Boletim */}
       {modalBoletimOpen && (
         <ModalBoletim
@@ -347,31 +297,9 @@ export default function ConselhoClasseProfessor() {
         />
       )}
 
-      {/* Modal: Ficha do Conselho de Classe (EyeIcon) */}
-      {modalConselhoOpen && (
-        <ModalFichaConselhoClasse
-          open={modalConselhoOpen}
-          aluno={alunoConselho}
-          turma={turmaSelecionada}
-          onClose={() => {
-            setModalConselhoOpen(false);
-            setAlunoConselho(null);
-          }}
-        />
-      )}
-
-      {/* Modal: Relatório Pedagógico Professor (IdentificationIcon) */}
-      {modalRelPedOpen && (
-        <ModalRelatorioPedagogicoProfessor
-          open={modalRelPedOpen}
-          aluno={alunoRelPed}
-          onClose={handleCloseFicha}
-        />
-      )}
-
       {/* Modal: Zoom Foto */}
       {zoomOpen && (
-        <ModalZoomFotoProfessor
+        <ModalZoomFoto
           open={zoomOpen}
           src={zoomSrc}
           alt={zoomAlt}

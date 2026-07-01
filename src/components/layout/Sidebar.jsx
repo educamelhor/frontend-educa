@@ -1078,11 +1078,13 @@ export default function Sidebar({ isOpen, onClose }) {
 
         {/* ════ DISCIPLINAR — REGRA DEFINITIVA ════════════════════════════════
              Só renderiza se:  isDisciplinar  (perfil militar/disciplinar)
-                           OU  isCCMDF && hasModulo('disciplinar')  (escola cívico-militar)
+                           OU  isCCMDF && !isDiretorPedagogicoCCMDF && hasModulo('disciplinar')
              Escolas não-CCMDF NUNCA veem este bloco — mesmo com módulo ativo no backend.
+             Diretor/Vice-Diretor de escola CCMDF também NÃO vê (isDiretorPedagogicoCCMDF).
              NÃO ALTERAR esta condição sem revisar o checklist em AGENTS.md
         ═══════════════════════════════════════════════════════════════════════ */}
-        {isScopeEscola && (isDisciplinar || (isCCMDF && hasModulo('disciplinar'))) && (
+        {isScopeEscola && !isDiretorPedagogicoCCMDF && (isDisciplinar || (isCCMDF && hasModulo('disciplinar'))) && (
+
 
           <>
             {/* ───────────────────────────────

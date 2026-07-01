@@ -98,7 +98,7 @@ export default function PrintBoletinsTurma() {
   // Cada aluno ocupa uma página separada (page-break)
   // -------------------------------------------------------------------------
   return (
-  <div id="boletins-pronto" style={{ background: "#fff" }}>
+  <div id="boletins-pronto" style={{ background: "#fff", margin: 0, padding: 0 }}>
     {carregado && alunos.length === 0 ? (
       <div
         style={{
@@ -118,9 +118,14 @@ export default function PrintBoletinsTurma() {
               className="boletim-print-page"
               key={aluno.id || idx}
               style={{
-                pageBreakAfter: idx < alunos.length - 1 ? "always" : "auto",
-                breakAfter: idx < alunos.length - 1 ? "always" : "auto",
+                /* page-break-after faz a quebra APÓS o boletim, antes do próximo */
+                pageBreakAfter: idx < alunos.length - 1 ? "always" : "avoid",
+                breakAfter:     idx < alunos.length - 1 ? "always" : "avoid",
+                /* page-break-inside:avoid impede que um único boletim quebre no meio */
+                pageBreakInside: "avoid",
+                breakInside: "avoid",
                 background: "#fff",
+                overflow: "hidden",   /* garante que conteúdo não vaze além do bloco */
               }}
             >
               <BoletimAnual

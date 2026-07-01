@@ -4,12 +4,14 @@
    Design: Glassmorphism + Gradients + Modern Typography
    ============================================================================ */
 
-/* ─── Wrapper Principal ────────────────────────────────────────────── */
+/* ─── Wrapper Principal ────────────────────────────────────────────────── */
 .boletimAnualWrapper {
   font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
   background: linear-gradient(135deg, #f0f4ff 0%, #e8eef9 50%, #f5f0ff 100%);
   min-height: 100vh;
   padding: 1.5rem;
+  max-width: 900px;
+  margin: 0 auto;
 }
 
 /* ─── Cabeçalho Institucional ──────────────────────────────────────── */
@@ -558,14 +560,22 @@
 /* ─── Print Styles ─────────────────────────────────────────────────── */
 @media print {
   @page {
-    size: landscape;
-    margin: 5mm;
+    size: A4 landscape;
+    margin: 8mm;
   }
 
   .boletimAnualWrapper {
     background: #fff !important;
     padding: 0 !important;
-    min-height: auto !important;
+    /* Remove min-height para evitar página em branco após o conteúdo */
+    min-height: unset !important;
+    height: auto !important;
+    /* Centraliza na página A4 */
+    max-width: 100% !important;
+    margin: 0 !important;
+    /* Evita quebra de página dentro de um boletim */
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
 
   .cabecalho {
@@ -586,6 +596,7 @@
   .rodape {
     box-shadow: none !important;
     border-radius: 0 !important;
+    margin-bottom: 0 !important;  /* elimina espaço vazio que gera página em branco */
   }
 
   .btnImprimir {

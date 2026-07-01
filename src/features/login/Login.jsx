@@ -79,6 +79,10 @@ export default function Login() {
   // ✅ Dispositivo confiado
   const [confirarDispositivo, setConfirarDispositivo] = useState(false);
 
+  // ✅ Manutenção Programada: se o backend retornar 503 + { maintenance: true }
+  // o login escolar exibe uma tela de aviso em vez de "Erro no login."
+  const [manutencao, setManutencao] = useState(null);
+
   // Helpers para device_token (localStorage)
   const getDeviceToken = () => {
     try { return localStorage.getItem("device_token") || ""; } catch { return ""; }
@@ -526,6 +530,11 @@ export default function Login() {
       setCooldown(60);
       setEtapa("codigo");
     } catch (err) {
+      // ✅ Detecta Manutenção Programada (HTTP 503 + maintenance: true)
+      if (err.response?.status === 503 && err.response?.data?.maintenance) {
+        setManutencao(err.response.data);
+        return;
+      }
       setTipoMensagem("erro");
       setMensagem(err.response?.data?.message || "Erro no login.");
     } finally {
@@ -836,6 +845,41 @@ export default function Login() {
       <div className="absolute inset-0 bg-blue-200/20"></div>
 
       {/* 🧾 Card */}
+      {/* ✅ MANUTENÇÃO PROGRAMADA: exibe tela de aviso para usuários do Sistema Escolar */}
+      {manutencao && tipoAcesso !== 'plataforma' ? (
+        <div className="relative z-10 bg-white/95 p-8 rounded-2xl shadow-xl w-[460px] flex flex-col items-center text-center gap-5">
+          <div style={{ fontSize: '4rem' }}>🔧</div>
+          <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>
+            Sistema em Manutenção
+          </h2>
+          <p style={{ fontSize: '0.95rem', color: '#475569', lineHeight: 1.6, margin: 0 }}>
+            {manutencao.mensagem || 'O sistema está em manutenção programada. Tente novamente em instantes.'}
+          </p>
+          {(manutencao.inicio || manutencao.fim) && (
+            <div style={{
+              background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)',
+              borderRadius: 12, padding: '12px 20px', fontSize: '0.82rem', color: '#92400e', width: '100%'
+            }}>
+              {manutencao.inicio && (
+                <div><strong>Início:</strong> {new Date(manutencao.inicio).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</div>
+              )}
+              {manutencao.fim && (
+                <div><strong>Previsão de término:</strong> {new Date(manutencao.fim).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</div>
+              )}
+            </div>
+          )}
+          <button
+            onClick={() => setManutencao(null)}
+            style={{
+              marginTop: 8, padding: '10px 24px', borderRadius: 10, border: 'none',
+              background: '#e2e8f0', color: '#334155', fontWeight: 600,
+              fontSize: '0.875rem', cursor: 'pointer'
+            }}
+          >
+            Tentar novamente
+          </button>
+        </div>
+      ) : (
       <div className="relative z-10 bg-white/90 p-8 rounded-2xl shadow-xl w-96 min-h-[420px] flex flex-col justify-center">
         {success ? (
           <div className="text-center text-green-700 font-semibold text-lg animate-fadeIn">
@@ -1372,7 +1416,7 @@ export default function Login() {
           </form>
         )}
       </div>
+      )} {/* fim ternário manutenção */}
     </div>
   );
 }
-

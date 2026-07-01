@@ -200,9 +200,10 @@ function RequireBancoQuestoes({ children }) {
   return <Navigate to="/home" replace />;
 }
 
-function RequireDiretorMilitar({ children }) {
+// ✅ [GOVERNANÇA v2] RequireDiretorDisciplinar — renomeado de RequireDiretorMilitar
+function RequireDiretorDisciplinar({ children }) {
   const p = String(localStorage.getItem('perfil') || '').toLowerCase().trim();
-  if (p === 'diretor' || p === 'militar') return children;
+  if (p === 'diretor' || p === 'diretor_disciplinar') return children;
   return <Navigate to="/disciplinar/alunos" replace />;
 }
 
@@ -235,18 +236,19 @@ function RequirePerm({ perm, children }) {
   return permissoes.includes(perm) ? children : <Navigate to="/home" replace />;
 }
 
-// ── Módulos: bloqueia rota se módulo não licenciado para esta escola ──
+// ✅ [GOVERNANÇA v2] Módulos: bloqueia rota se módulo não está ativo para este usuário
+// Fallback zero: sem lista de módulos = acesso negado (menu vazio)
 function RequireModulo({ modulo, children }) {
   const getModulos = () => {
     try {
       const raw = localStorage.getItem('modulos_ativos');
-      if (!raw) return null; // null = sem restrição (backward compatible)
+      if (!raw) return []; // ✅ [GOVERNANÇA v2] sem config = acesso zero
       const arr = JSON.parse(raw);
-      return Array.isArray(arr) ? arr : null;
-    } catch { return null; }
+      return Array.isArray(arr) ? arr : [];
+    } catch { return []; }
   };
   const modulos = getModulos();
-  if (modulos !== null && !modulos.includes(modulo)) {
+  if (!modulos.includes(modulo)) {
     return <Navigate to="/home" replace />;
   }
   return children;
@@ -295,9 +297,9 @@ export default function App() {
           <Route path="/disciplinar/responsaveis" element={<RequireModulo modulo="disciplinar"><ResponsaveisDisciplinar /></RequireModulo>} />
           {/* F.O. Coletivo — Registro em Lote */}
           <Route path="/disciplinar/fo-coletivo"  element={<RequireModulo modulo="disciplinar"><FOColetivo /></RequireModulo>} />
-          {/* Gestão de Equipe (apenas Diretor e Militar) */}
+          {/* Gestão de Equipe (apenas Diretor Disciplinar e Diretor Pedagógico) */}
           <Route path="/disciplinar/equipe" element={
-            <RequireDiretorMilitar><GestaoEquipe /></RequireDiretorMilitar>
+            <RequireDiretorDisciplinar><GestaoEquipe /></RequireDiretorDisciplinar>
           } />
           <Route path="/disciplinar/historico"  element={<RequireModulo modulo="disciplinar"><HistoricoDisciplinar /></RequireModulo>} />
           <Route path="/disciplinar/atas"       element={<RequireModulo modulo="disciplinar"><AtasDisciplinar /></RequireModulo>} />

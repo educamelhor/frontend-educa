@@ -1,10 +1,9 @@
 // src/features/boletim/BoletimAnual.jsx
 // ============================================================================
 // BOLETIM ANUAL — Ano Letivo Único (Modelo V2)
-// Renderiza apenas o ano letivo corrente (ex: 2025).
+// Renderiza apenas um único ano letivo (configurável via prop `anoLetivo`).
 // Mantém: cabeçalho institucional, colunas nota/falta, média, resultado final,
 //          situação final, ranking escola/turma/série/turno.
-// O modelo original (dois anos) permanece intacto em Boletim.jsx / BoletimPrint.jsx
 // ============================================================================
 
 import React, { useState, useEffect } from "react";
@@ -13,8 +12,8 @@ import api from "../../services/api";
 import s from "./BoletimAnual.module.css";
 import useEscolaLogos from "../../hooks/useEscolaLogos";
 
-// Ano letivo corrente
-const ANO_CORRENTE = new Date().getFullYear();
+// Ano letivo padrão (pode ser sobrescrito via prop)
+const ANO_DEFAULT = new Date().getFullYear();
 
 const normalizeName = (name) => {
   if (!name) return "";
@@ -73,10 +72,17 @@ export default function BoletimAnual({
   notasPreCarregadas = null,
   // Config de governança pré-carregada (evita segunda chamada API)
   boletimConfig: boletimConfigProp = null,
+  // Ano letivo a exibir (default: ano corrente)
+  anoLetivo: anoLetivoProp = null,
 }) {
   const params = useParams?.() || {};
   const codigo = codigoProp || params.codigo;
   const { logoEsquerda, logoDireita } = useEscolaLogos();
+
+  // Resolve o ano a usar: prop > URL param > default
+  const ANO_CORRENTE = anoLetivoProp
+    ? Number(anoLetivoProp)
+    : ANO_DEFAULT;
 
   const [aluno, setAluno] = useState(null);
   const [notas, setNotas] = useState(notasPreCarregadas);

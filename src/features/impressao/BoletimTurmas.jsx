@@ -33,7 +33,9 @@ const norm = (s) =>
 export default function BoletimTurmas() {
   const [turnoSelecionado, setTurnoSelecionado] = useState(null);
   const [turmas, setTurmas] = useState([]);
-  const [anoLetivo, setAnoLetivo] = useState(null);
+  const [todosOsAnos, setTodosOsAnos] = useState([]); // todos os anos letivos disponíveis
+  const [anoLetivo, setAnoLetivo] = useState(null);   // ano atualmente selecionado
+  const [todasTurmas, setTodasTurmas] = useState([]); // todas as turmas (todos os anos)
   const [loadingTurmas, setLoadingTurmas] = useState(false);
 
   const [progress, setProgress] = useState(0);
@@ -42,7 +44,7 @@ export default function BoletimTurmas() {
   const [sucesso, setSucesso] = useState(false);
   const [turmasSucesso, setTurmasSucesso] = useState(new Set());
 
-  // ─── Buscar turmas e detectar o ano letivo mais recente ───
+  // ── Buscar turmas e detectar todos os anos letivos disponíveis ──
   useEffect(() => {
     (async () => {
       setLoadingTurmas(true);
@@ -51,22 +53,35 @@ export default function BoletimTurmas() {
         const { data } = await api.get("/api/turmas", { params: { escola_id } });
         const todas = data || [];
 
-        // Encontra o maior ano disponível
-        const anos = todas
-          .map((t) => Number(t.ano))
-          .filter((a) => a > 2000);
-        const maiorAno = anos.length > 0 ? Math.max(...anos) : new Date().getFullYear();
+        // Detecta todos os anos presentes
+        const anosUnicos = [...new Set(
+          todas.map((t) => Number(t.ano)).filter((a) => a > 2000)
+        )].sort((a, b) => b - a); // decrescente (mais recente primeiro)
 
+        const maiorAno = anosUnicos.length > 0 ? anosUnicos[0] : new Date().getFullYear();
+
+        setTodosOsAnos(anosUnicos);
+        setTodasTurmas(todas);
         setAnoLetivo(String(maiorAno));
         setTurmas(todas.filter((t) => Number(t.ano) === maiorAno));
       } catch {
         setAnoLetivo(String(new Date().getFullYear()));
+        setTodasTurmas([]);
+        setTodosOsAnos([]);
         setTurmas([]);
       } finally {
         setLoadingTurmas(false);
       }
     })();
   }, []);
+
+  // ── Quando o ano selecionado muda, filtra as turmas correspondentes ──
+  const handleChangeAno = (novoAno) => {
+    setAnoLetivo(novoAno);
+    setTurmas(todasTurmas.filter((t) => Number(t.ano) === Number(novoAno)));
+    setTurnoSelecionado(null); // reseta turno ao trocar o ano
+    setTurmasSucesso(new Set());
+  };
 
   // ─── Turmas filtradas por turno ───
   const turmasFiltradas = useMemo(
@@ -88,7 +103,7 @@ export default function BoletimTurmas() {
     try {
       const { data } = await api.post(
         "/api/boletins/gerar",
-        { turma_id: turma.id },
+        { turma_id: turma.id, ano: anoLetivo ? Number(anoLetivo) : undefined },
         { responseType: "blob", timeout: 180000 }
       );
 
@@ -177,16 +192,39 @@ export default function BoletimTurmas() {
               }}>
                 🖨️ Impressão de Boletins
               </h1>
-              {anoLetivo && (
-                <span style={{
-                  padding: "3px 12px", borderRadius: 99,
-                  background: "rgba(56,189,248,0.15)",
-                  border: "1px solid rgba(56,189,248,0.35)",
-                  color: "#7dd3fc", fontSize: 11, fontWeight: 700,
-                  letterSpacing: "0.08em", textTransform: "uppercase",
-                }}>
-                  Ano Letivo {anoLetivo}
-                </span>
+              {/* Seletor de Ano Letivo */}
+              {todosOsAnos.length > 0 && (
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{
+                    padding: "3px 8px", borderRadius: 99,
+                    background: "rgba(56,189,248,0.15)",
+                    border: "1px solid rgba(56,189,248,0.35)",
+                    color: "#7dd3fc", fontSize: 11, fontWeight: 700,
+                    letterSpacing: "0.08em", textTransform: "uppercase",
+                  }}>Ano Letivo</span>
+                  <select
+                    value={anoLetivo || ""}
+                    onChange={(e) => !gerando && handleChangeAno(e.target.value)}
+                    disabled={gerando}
+                    style={{
+                      background: "rgba(255,255,255,0.1)",
+                      border: "1px solid rgba(56,189,248,0.4)",
+                      color: "#e0f2fe",
+                      borderRadius: 8,
+                      padding: "4px 10px",
+                      fontSize: 14,
+                      fontWeight: 700,
+                      cursor: gerando ? "not-allowed" : "pointer",
+                      outline: "none",
+                    }}
+                  >
+                    {todosOsAnos.map((ano) => (
+                      <option key={ano} value={String(ano)} style={{ background: "#1e3a5f", color: "#fff" }}>
+                        {ano}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               )}
             </div>
             <p style={{ margin: "4px 0 0", color: "#94a3b8", fontSize: 14 }}>

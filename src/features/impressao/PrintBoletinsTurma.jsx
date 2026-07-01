@@ -1,23 +1,25 @@
-// src/features/boletim/PrintBoletinsTurma.jsx
+// src/features/impressao/PrintBoletinsTurma.jsx
 // ============================================================================
 // Componente exclusivo para renderizar boletins em lote (um por página).
 // Utiliza a rota /api/impressao/boletins, que retorna todos os alunos
 // da turma já com suas notas detalhadas, evitando múltiplas requisições.
 // Fluxo de automação real: sem botão manual, apenas container invisível.
+// Usa BoletimAnual (ano único) em vez do modelo de dois anos.
 // ============================================================================
 
 import React, { useEffect, useState, useRef } from "react";
-import BoletimPrint from "../boletim/BoletimPrint"; // ← componente de impressão individual
+import BoletimAnual from "../boletim/BoletimAnual"; // ← layout de um único ano letivo
 import api from "../../services/api";
 
 export default function PrintBoletinsTurma() {
   // -------------------------------------------------------------------------
-  // Captura parâmetros da URL: turma_id e secret
-  // Exemplo: /print/boletins?turma_id=150&secret=123456
+  // Captura parâmetros da URL: turma_id, secret, ano
+  // Exemplo: /print/boletins?turma_id=150&secret=123456&ano=2026
   // -------------------------------------------------------------------------
   const params = new URLSearchParams(window.location.search);
   const turma_id = params.get("turma_id");
   const secret = params.get("secret");
+  const anoParam = params.get("ano");  // ano letivo selecionado (ex: "2026")
 
   // -------------------------------------------------------------------------
   // Estados locais
@@ -121,11 +123,12 @@ export default function PrintBoletinsTurma() {
                 background: "#fff",
               }}
             >
-              <BoletimPrint
+              <BoletimAnual
                 codigo={aluno.codigo}
                 alunoPreCarregado={aluno}
                 notasPreCarregadas={aluno.notas}
                 exibirBotaoImprimir={false}
+                anoLetivo={anoParam ? Number(anoParam) : undefined}
               />
             </div>
           ) : null

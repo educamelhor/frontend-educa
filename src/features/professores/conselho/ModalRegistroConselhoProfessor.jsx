@@ -1,10 +1,11 @@
 // features/professores/conselho/ModalRegistroConselhoProfessor.jsx
 // ============================================================================
-// Modal de VISUALIZAÇÃO do Registro de Conselho de Classe — Perfil PROFESSOR
+// Modal de REGISTRO de Conselho de Classe — Perfil PROFESSOR
 //
 // Governança:
-//  ✅ Professor pode VISUALIZAR os registros do conselho
-//  ❌ Professor NÃO pode criar, editar ou excluir registros
+//  ✅ Professor pode VISUALIZAR todos os registros do conselho
+//  ✅ Professor pode CRIAR seu próprio registro
+//  ❌ Professor NÃO pode editar registros de outros
 //
 // Isolado do módulo pedagógico. Alterações aqui não afetam ConselhoClasse.
 // ============================================================================
@@ -16,6 +17,7 @@ import {
   ClipboardDocumentListIcon,
   UserCircleIcon,
   CalendarDaysIcon,
+  PaperAirplaneIcon,
 } from "@heroicons/react/24/outline";
 
 function formatarData(iso) {
@@ -43,11 +45,16 @@ export default function ModalRegistroConselhoProfessor({
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState(null);
 
-  useEffect(() => {
-    if (!open || !aluno?.codigo) return;
+  // Novo registro
+  const [novoTexto, setNovoTexto] = useState("");
+  const [salvando, setSalvando] = useState(false);
+  const [sucessoMsg, setSucessoMsg] = useState(null);
+  const [erroSalvar, setErroSalvar] = useState(null);
+
+  function carregarRegistros() {
+    if (!aluno?.codigo) return;
     setLoading(true);
     setErro(null);
-    setRegistros([]);
 
     const params = { aluno_codigo: aluno.codigo };
     if (turmaId) params.turma_id = turmaId;
@@ -57,9 +64,42 @@ export default function ModalRegistroConselhoProfessor({
       .then((res) => {
         setRegistros(Array.isArray(res.data?.registros) ? res.data.registros : []);
       })
-      .catch(() => setErro("Não foi possível carregar os registros. Tente novamente."))
+      .catch(() => setErro("Não foi possível carregar os registros."))
       .finally(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    if (!open) return;
+    setNovoTexto("");
+    setSucessoMsg(null);
+    setErroSalvar(null);
+    carregarRegistros();
+    // eslint-disable-next-line
   }, [open, aluno?.codigo, turmaId]);
+
+  async function handleSalvar() {
+    if (!novoTexto.trim()) return;
+    setSalvando(true);
+    setErroSalvar(null);
+    setSucessoMsg(null);
+
+    try {
+      await api.post("/api/conselho/registros", {
+        aluno_codigo: aluno.codigo,
+        turma_id: turmaId,
+        texto: novoTexto.trim(),
+        usuario_perfil: "professor",
+      });
+      setNovoTexto("");
+      setSucessoMsg("Registro salvo com sucesso!");
+      carregarRegistros();
+      setTimeout(() => setSucessoMsg(null), 3000);
+    } catch {
+      setErroSalvar("Erro ao salvar o registro. Tente novamente.");
+    } finally {
+      setSalvando(false);
+    }
+  }
 
   if (!open) return null;
 
@@ -74,14 +114,14 @@ export default function ModalRegistroConselhoProfessor({
         style={{
           background: "linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0f172a 100%)",
           border: "1px solid rgba(99,179,237,0.25)",
-          maxHeight: "88vh",
+          maxHeight: "90vh",
           display: "flex",
           flexDirection: "column",
         }}
       >
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <div
-          className="flex items-center justify-between px-6 py-4"
+          className="flex items-center justify-between px-6 py-4 flex-shrink-0"
           style={{
             background: "linear-gradient(90deg, rgba(59,130,246,0.15) 0%, rgba(99,179,237,0.08) 100%)",
             borderBottom: "1px solid rgba(99,179,237,0.18)",
@@ -104,62 +144,47 @@ export default function ModalRegistroConselhoProfessor({
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            {/* Badge "Somente leitura" */}
-            <span
-              className="px-3 py-1 rounded-full text-xs font-semibold"
-              style={{
-                background: "rgba(251,191,36,0.15)",
-                border: "1px solid rgba(251,191,36,0.35)",
-                color: "#fbbf24",
-              }}
-            >
-              👁 Somente leitura
-            </span>
-            <button
-              onClick={onClose}
-              className="flex items-center justify-center w-8 h-8 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
-            >
-              <XMarkIcon className="h-5 w-5" />
-            </button>
-          </div>
+          <button
+            onClick={onClose}
+            className="flex items-center justify-center w-8 h-8 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+          >
+            <XMarkIcon className="h-5 w-5" />
+          </button>
         </div>
 
-        {/* ── Conteúdo ───────────────────────────────────────────────────── */}
-        <div className="overflow-y-auto flex-1 px-6 py-5">
+        {/* ── Registros existentes ───────────────────────────────────────── */}
+        <div className="overflow-y-auto flex-1 px-6 py-4">
           {loading && (
-            <div className="flex flex-col items-center justify-center py-16 gap-3">
-              <div
-                className="w-10 h-10 rounded-full border-4 border-blue-500 border-t-transparent animate-spin"
-              />
+            <div className="flex flex-col items-center justify-center py-10 gap-3">
+              <div className="w-8 h-8 rounded-full border-4 border-blue-500 border-t-transparent animate-spin" />
               <p className="text-blue-300 text-sm">Carregando registros...</p>
             </div>
           )}
 
           {erro && (
             <div
-              className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm"
+              className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm mb-4"
               style={{
                 background: "rgba(239,68,68,0.12)",
                 border: "1px solid rgba(239,68,68,0.3)",
                 color: "#fca5a5",
               }}
             >
-              <span>⚠️</span> {erro}
+              ⚠️ {erro}
             </div>
           )}
 
           {!loading && !erro && registros.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
-              <ClipboardDocumentListIcon className="h-12 w-12 text-slate-600" />
+            <div className="flex flex-col items-center justify-center py-10 gap-2 text-center">
+              <ClipboardDocumentListIcon className="h-10 w-10 text-slate-600" />
               <p className="text-slate-400 text-sm">
-                Nenhum registro de conselho encontrado para este aluno.
+                Nenhum registro encontrado. Seja o primeiro a registrar!
               </p>
             </div>
           )}
 
           {!loading && registros.length > 0 && (
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3 mb-2">
               {registros.map((reg) => (
                 <div
                   key={reg.id}
@@ -169,42 +194,29 @@ export default function ModalRegistroConselhoProfessor({
                     border: "1px solid rgba(99,179,237,0.15)",
                   }}
                 >
-                  {/* Cabeçalho do registro */}
-                  <div className="flex items-center gap-3 mb-3 pb-3" style={{ borderBottom: "1px solid rgba(99,179,237,0.1)" }}>
+                  <div className="flex items-center gap-3 mb-2 pb-2" style={{ borderBottom: "1px solid rgba(99,179,237,0.1)" }}>
                     <UserCircleIcon className="h-5 w-5 text-blue-400 flex-shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <span className="text-white font-semibold text-sm">
-                        {reg.usuario_nome || "Usuário"}
+                    <span className="text-white font-semibold text-sm flex-1 min-w-0">
+                      {reg.usuario_nome || "Usuário"}
+                    </span>
+                    {reg.usuario_perfil && (
+                      <span
+                        className="px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0"
+                        style={{ background: "rgba(99,179,237,0.15)", color: "#93c5fd" }}
+                      >
+                        {reg.usuario_perfil}
                       </span>
-                      {reg.usuario_perfil && (
-                        <span
-                          className="ml-2 px-2 py-0.5 rounded-full text-xs font-medium"
-                          style={{
-                            background: "rgba(99,179,237,0.15)",
-                            color: "#93c5fd",
-                          }}
-                        >
-                          {reg.usuario_perfil}
-                        </span>
-                      )}
-                    </div>
+                    )}
                     <div className="flex items-center gap-1 text-xs text-slate-400 flex-shrink-0">
                       <CalendarDaysIcon className="h-4 w-4" />
                       <span>{formatarData(reg.criado_em)}</span>
                     </div>
                   </div>
-
-                  {/* Texto do registro */}
-                  <p
-                    className="text-sm leading-relaxed whitespace-pre-wrap"
-                    style={{ color: "#cbd5e1" }}
-                  >
-                    {reg.texto || <em className="text-slate-500">Sem texto registrado.</em>}
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: "#cbd5e1" }}>
+                    {reg.texto || <em className="text-slate-500">Sem texto.</em>}
                   </p>
-
-                  {/* Editado por */}
                   {reg.editado_em && reg.editado_por_nome && (
-                    <p className="mt-3 text-xs text-slate-500 italic">
+                    <p className="mt-2 text-xs text-slate-500 italic">
                       Editado por {reg.editado_por_nome} em {formatarData(reg.editado_em)}
                     </p>
                   )}
@@ -214,17 +226,79 @@ export default function ModalRegistroConselhoProfessor({
           )}
         </div>
 
-        {/* ── Footer ─────────────────────────────────────────────────────── */}
+        {/* ── Formulário: novo registro ──────────────────────────────────── */}
         <div
-          className="flex justify-end px-6 py-4"
-          style={{ borderTop: "1px solid rgba(99,179,237,0.12)" }}
+          className="px-6 py-4 flex-shrink-0"
+          style={{ borderTop: "1px solid rgba(99,179,237,0.15)" }}
         >
-          <button
-            onClick={onClose}
-            className="px-5 py-2 rounded-xl text-sm font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-all"
-          >
-            Fechar
-          </button>
+          <p className="text-xs font-semibold text-blue-300 uppercase tracking-wider mb-2">
+            Novo Registro
+          </p>
+
+          {sucessoMsg && (
+            <div
+              className="mb-3 px-4 py-2 rounded-xl text-sm font-medium"
+              style={{
+                background: "rgba(16,185,129,0.12)",
+                border: "1px solid rgba(16,185,129,0.3)",
+                color: "#6ee7b7",
+              }}
+            >
+              ✅ {sucessoMsg}
+            </div>
+          )}
+
+          {erroSalvar && (
+            <div
+              className="mb-3 px-4 py-2 rounded-xl text-sm"
+              style={{
+                background: "rgba(239,68,68,0.12)",
+                border: "1px solid rgba(239,68,68,0.3)",
+                color: "#fca5a5",
+              }}
+            >
+              ⚠️ {erroSalvar}
+            </div>
+          )}
+
+          <textarea
+            value={novoTexto}
+            onChange={(e) => setNovoTexto(e.target.value)}
+            placeholder="Escreva sua observação sobre o aluno no conselho de classe..."
+            rows={3}
+            className="w-full resize-none rounded-xl px-4 py-3 text-sm outline-none transition-all"
+            style={{
+              background: "rgba(255,255,255,0.06)",
+              border: "1px solid rgba(99,179,237,0.25)",
+              color: "#f1f5f9",
+              caretColor: "#60a5fa",
+            }}
+            onFocus={(e) => (e.target.style.borderColor = "rgba(99,179,237,0.6)")}
+            onBlur={(e) => (e.target.style.borderColor = "rgba(99,179,237,0.25)")}
+          />
+
+          <div className="flex justify-end gap-3 mt-3">
+            <button
+              onClick={onClose}
+              className="px-5 py-2 rounded-xl text-sm font-semibold text-slate-300 hover:text-white hover:bg-white/10 transition-all"
+            >
+              Fechar
+            </button>
+            <button
+              onClick={handleSalvar}
+              disabled={salvando || !novoTexto.trim()}
+              className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{
+                background: salvando || !novoTexto.trim()
+                  ? "rgba(59,130,246,0.3)"
+                  : "linear-gradient(135deg, #2563eb, #0891b2)",
+                boxShadow: novoTexto.trim() ? "0 4px 14px rgba(37,99,235,0.35)" : "none",
+              }}
+            >
+              <PaperAirplaneIcon className="h-4 w-4" />
+              {salvando ? "Salvando..." : "Salvar Registro"}
+            </button>
+          </div>
         </div>
       </div>
     </div>

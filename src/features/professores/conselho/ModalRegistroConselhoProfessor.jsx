@@ -57,6 +57,9 @@ export default function ModalRegistroConselhoProfessor({
   const [editandoId, setEditandoId] = useState(null);
   const [textoEdit, setTextoEdit] = useState("");
   const [salvandoEdicao, setSalvandoEdicao] = useState(false);
+  
+  const [excluindoId, setExcluindoId] = useState(null);
+  const [excluindoLoad, setExcluindoLoad] = useState(false);
 
   const currentUserId = React.useMemo(() => {
     try {
@@ -133,13 +136,21 @@ export default function ModalRegistroConselhoProfessor({
     }
   }
 
-  async function handleExcluir(id) {
-    if (!window.confirm("Deseja realmente excluir este registro? A exclusão ficará registrada no histórico.")) return;
+  function handleExcluirClick(id) {
+    setExcluindoId(id);
+  }
+
+  async function confirmarExclusao() {
+    if (!excluindoId) return;
+    setExcluindoLoad(true);
     try {
-      await api.delete(`/api/conselho/registros/${id}`);
+      await api.delete(`/api/conselho/registros/${excluindoId}`);
+      setExcluindoId(null);
       carregarRegistros();
     } catch {
       alert("Erro ao excluir o registro.");
+    } finally {
+      setExcluindoLoad(false);
     }
   }
 
@@ -268,7 +279,7 @@ export default function ModalRegistroConselhoProfessor({
                           <PencilSquareIcon className="h-4 w-4" />
                         </button>
                         <button
-                          onClick={() => handleExcluir(reg.id)}
+                          onClick={() => handleExcluirClick(reg.id)}
                           className="p-1 text-slate-400 hover:text-red-400 transition"
                           title="Excluir Registro"
                         >
@@ -404,6 +415,36 @@ export default function ModalRegistroConselhoProfessor({
           </div>
         </div>
       </div>
+
+      {excluindoId && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
+          <div className="bg-slate-800 rounded-2xl shadow-2xl w-full max-w-sm border border-slate-700 p-6 flex flex-col items-center text-center">
+            <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mb-4">
+              <TrashIcon className="h-8 w-8 text-red-400" />
+            </div>
+            <h3 className="text-lg font-bold text-white mb-2">Excluir Registro?</h3>
+            <p className="text-slate-400 text-sm mb-6">
+              Esta ação removerá o conteúdo da sua mensagem. A exclusão ficará registrada no histórico.
+            </p>
+            <div className="flex gap-3 w-full">
+              <button
+                onClick={() => setExcluindoId(null)}
+                disabled={excluindoLoad}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-slate-300 bg-slate-700/50 hover:bg-slate-600 transition"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmarExclusao}
+                disabled={excluindoLoad}
+                className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white bg-red-600 hover:bg-red-500 transition disabled:opacity-50"
+              >
+                {excluindoLoad ? "Excluindo..." : "Sim, excluir"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

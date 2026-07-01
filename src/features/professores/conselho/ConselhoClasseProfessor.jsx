@@ -97,18 +97,24 @@ export default function ConselhoClasseProfessor() {
       }
     }
     carregarAnos();
+  }, []);
+
+  // Busca as turmas específicas do professor sempre que o ano letivo mudar
+  useEffect(() => {
     fetchTurmas();
     // eslint-disable-next-line
-  }, []);
+  }, [anoLetivo]);
 
   const fetchTurmas = async () => {
     setLoadingTurmas(true);
     try {
       const escola_id = localStorage.getItem("escola_id") || 1;
-      const { data } = await api.get("/api/turmas", {
-        params: { escola_id },
+      // Busca apenas as turmas deste professor para o ano letivo selecionado
+      const { data } = await api.get("/api/professores/me/turmas", {
+        params: { escola_id, ano: anoLetivo },
       });
-      setTurmas(data);
+      // A rota pode retornar { ok: true, turmas: [...] } ou direto [...]
+      setTurmas(data?.turmas || data || []);
     } catch (error) {
       console.error("Erro ao buscar turmas:", error);
       setTurmas([]);

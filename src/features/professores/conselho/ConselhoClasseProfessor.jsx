@@ -17,7 +17,8 @@ import React, { useState, useEffect } from "react";
 import api from "../../../services/api";
 import ModalBoletim from "../../boletim/ModalBoletim";
 import ModalZoomFoto from "../../pedagogico/conselho/ModalZoomFoto";
-import { DocumentTextIcon } from "@heroicons/react/24/outline";
+import ModalRegistroConselhoProfessor from "./ModalRegistroConselhoProfessor";
+import { EyeIcon, DocumentTextIcon } from "@heroicons/react/24/outline";
 import { getFotoURL } from "../../../utils/foto";
 
 function normalizaTexto(str) {
@@ -52,6 +53,10 @@ export default function ConselhoClasseProfessor() {
   const [modalBoletimOpen, setModalBoletimOpen] = useState(false);
   const [codigoAlunoBoletim, setCodigoAlunoBoletim] = useState(null);
 
+  // Registro de Conselho (visualização somente leitura)
+  const [modalConselhoOpen, setModalConselhoOpen] = useState(false);
+  const [alunoConselho, setAlunoConselho] = useState(null);
+
   // Cache-buster para fotos
   const [fotoStamp] = useState(Date.now());
 
@@ -63,6 +68,11 @@ export default function ConselhoClasseProfessor() {
   function abrirModalBoletim(codigo) {
     setCodigoAlunoBoletim(codigo);
     setModalBoletimOpen(true);
+  }
+
+  function abrirModalConselho(aluno) {
+    setAlunoConselho(aluno);
+    setModalConselhoOpen(true);
   }
 
   const turnos = ["Matutino", "Vespertino", "Noturno"];
@@ -259,10 +269,18 @@ export default function ConselhoClasseProfessor() {
                         {aluno.estudante}
                       </td>
 
-                      {/* Ações — Professor: apenas Boletim */}
+                      {/* Ações */}
                       <td className="py-2 px-2 text-center">
                         <div className="flex justify-center gap-3">
-                          {/* ✅ Boletim — permitido */}
+                          {/* ✅ Registro de Conselho — somente leitura */}
+                          <button
+                            onClick={() => abrirModalConselho({ codigo: aluno.codigo, estudante: aluno.estudante })}
+                            title="Visualizar registro de conselho de classe"
+                          >
+                            <EyeIcon className="h-6 w-6 text-gray-600 hover:text-blue-600" />
+                          </button>
+
+                          {/* ✅ Boletim */}
                           <button
                             onClick={() => abrirModalBoletim(aluno.codigo)}
                             title="Visualizar boletim"
@@ -271,8 +289,7 @@ export default function ConselhoClasseProfessor() {
                           </button>
 
                           {/*
-                            ❌ EyeIcon (Ficha) — oculto para professor
-                            ❌ IdentificationIcon (Relatórios) — oculto para professor
+                            ❌ IdentificationIcon (Ficha Aluno) — oculto para professor
                             ❌ PencilIcon (Edição) — oculto para professor
                           */}
                         </div>
@@ -286,6 +303,16 @@ export default function ConselhoClasseProfessor() {
             <p className="text-center text-gray-500">Nenhum aluno encontrado.</p>
           )}
         </div>
+      )}
+
+      {/* Modal: Registro de Conselho (somente leitura) */}
+      {modalConselhoOpen && (
+        <ModalRegistroConselhoProfessor
+          open={modalConselhoOpen}
+          aluno={alunoConselho}
+          turmaId={turmaSelecionada?.id}
+          onClose={() => setModalConselhoOpen(false)}
+        />
       )}
 
       {/* Modal: Boletim */}

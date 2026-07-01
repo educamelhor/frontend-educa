@@ -58,12 +58,16 @@ export default function ModalRegistroConselhoProfessor({
   const [textoEdit, setTextoEdit] = useState("");
   const [salvandoEdicao, setSalvandoEdicao] = useState(false);
 
-  const currentUserId = Number(
-    localStorage.getItem("usuario_id") || 
-    localStorage.getItem("id") || 
-    localStorage.getItem("usuarioId") || 
-    0
-  );
+  const currentUserId = React.useMemo(() => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) return 0;
+      const payload = JSON.parse(atob(token.split(".")[1]));
+      return Number(payload.usuario_id || payload.usuarioId || payload.id || 0);
+    } catch {
+      return 0;
+    }
+  }, []);
 
   function carregarRegistros() {
     if (!aluno?.codigo) return;

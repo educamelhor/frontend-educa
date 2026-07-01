@@ -83,6 +83,18 @@ export default function Login() {
   // o login escolar exibe uma tela de aviso em vez de "Erro no login."
   const [manutencao, setManutencao] = useState(null);
 
+  // ✅ Checagem proativa: verifica manutenção ao montar a página (antes do login)
+  // Exibe a tela de aviso mesmo sem o usuário ter tentado entrar
+  React.useEffect(() => {
+    if (tipoAcesso === 'plataforma') return; // CEO não vê tela de manutenção
+    api.get('/api/auth/status')
+      .then(res => {
+        if (res.data?.maintenance) setManutencao(res.data);
+      })
+      .catch(() => {}); // endpoint público: falha silenciosa
+  }, [tipoAcesso]);
+
+
   // Helpers para device_token (localStorage)
   const getDeviceToken = () => {
     try { return localStorage.getItem("device_token") || ""; } catch { return ""; }

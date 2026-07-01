@@ -16,8 +16,9 @@ import {
   XMarkIcon,
   ClipboardDocumentListIcon,
   UserCircleIcon,
-  CalendarDaysIcon,
   PaperAirplaneIcon,
+  PencilSquareIcon,
+  TrashIcon,
 } from "@heroicons/react/24/outline";
 
 function formatarData(iso) {
@@ -50,6 +51,18 @@ export default function ModalRegistroConselhoProfessor({
   const [salvando, setSalvando] = useState(false);
   const [sucessoMsg, setSucessoMsg] = useState(null);
   const [erroSalvar, setErroSalvar] = useState(null);
+
+  // Edição e Exclusão
+  const [editandoId, setEditandoId] = useState(null);
+  const [textoEdit, setTextoEdit] = useState("");
+  const [salvandoEdicao, setSalvandoEdicao] = useState(false);
+
+  const currentUserId = Number(
+    localStorage.getItem("usuario_id") || 
+    localStorage.getItem("id") || 
+    localStorage.getItem("usuarioId") || 
+    0
+  );
 
   function carregarRegistros() {
     if (!aluno?.codigo) return;
@@ -98,6 +111,30 @@ export default function ModalRegistroConselhoProfessor({
       setErroSalvar("Erro ao salvar o registro. Tente novamente.");
     } finally {
       setSalvando(false);
+    }
+  }
+
+  async function handleSalvarEdicao(id) {
+    if (!textoEdit.trim()) return;
+    setSalvandoEdicao(true);
+    try {
+      await api.put(`/api/conselho/registros/${id}`, { texto: textoEdit.trim() });
+      setEditandoId(null);
+      carregarRegistros();
+    } catch {
+      alert("Erro ao editar o registro.");
+    } finally {
+      setSalvandoEdicao(false);
+    }
+  }
+
+  async function handleExcluir(id) {
+    if (!window.confirm("Deseja realmente excluir este registro? A exclusão ficará registrada no histórico.")) return;
+    try {
+      await api.delete(`/api/conselho/registros/${id}`);
+      carregarRegistros();
+    } catch {
+      alert("Erro ao excluir o registro.");
     }
   }
 
@@ -188,10 +225,11 @@ export default function ModalRegistroConselhoProfessor({
               {registros.map((reg) => (
                 <div
                   key={reg.id}
-                  className="rounded-xl p-4"
+                  className="rounded-xl p-4 transition-all"
                   style={{
-                    background: "rgba(255,255,255,0.04)",
+                    background: reg.excluido ? "rgba(15,23,42,0.6)" : "rgba(255,255,255,0.04)",
                     border: "1px solid rgba(99,179,237,0.15)",
+                    opacity: reg.excluido ? 0.6 : 1,
                   }}
                 >
                   <div className="flex items-center gap-3 mb-2 pb-2" style={{ borderBottom: "1px solid rgba(99,179,237,0.1)" }}>
@@ -199,7 +237,7 @@ export default function ModalRegistroConselhoProfessor({
                     <span className="text-white font-semibold text-sm flex-1 min-w-0">
                       {reg.usuario_nome || "Usuário"}
                     </span>
-                    {reg.usuario_perfil && (
+                    {!reg.excluido && reg.usuario_perfil && (
                       <span
                         className="px-2 py-0.5 rounded-full text-xs font-medium flex-shrink-0"
                         style={{ background: "rgba(99,179,237,0.15)", color: "#93c5fd" }}
@@ -211,14 +249,74 @@ export default function ModalRegistroConselhoProfessor({
                       <CalendarDaysIcon className="h-4 w-4" />
                       <span>{formatarData(reg.criado_em)}</span>
                     </div>
+
+                    {!reg.excluido && Number(reg.usuario_id) === currentUserId && (
+                      <div className="flex items-center gap-2 ml-2">
+                        <button
+                          onClick={() => {
+                            setEditandoId(reg.id);
+                            setTextoEdit(reg.texto);
+                          }}
+                          className="p-1 text-slate-400 hover:text-blue-400 transition"
+                          title="Editar Registro"
+                        >
+                          <PencilSquareIcon className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleExcluir(reg.id)}
+                          className="p-1 text-slate-400 hover:text-red-400 transition"
+                          title="Excluir Registro"
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: "#cbd5e1" }}>
-                    {reg.texto || <em className="text-slate-500">Sem texto.</em>}
-                  </p>
-                  {reg.editado_em && reg.editado_por_nome && (
-                    <p className="mt-2 text-xs text-slate-500 italic">
-                      Editado por {reg.editado_por_nome} em {formatarData(reg.editado_em)}
+
+                  {reg.excluido ? (
+                    <p className="text-sm italic" style={{ color: "#94a3b8" }}>
+                      Essa mensagem foi excluída por {reg.excluido_por_nome || "um usuário"} no dia {formatarData(reg.excluido_em)}.
                     </p>
+                  ) : editandoId === reg.id ? (
+                    <div className="mt-2">
+                      <textarea
+                        value={textoEdit}
+                        onChange={(e) => setTextoEdit(e.target.value)}
+                        className="w-full resize-none rounded-lg px-3 py-2 text-sm outline-none transition-all mb-2"
+                        rows={3}
+                        style={{
+                          background: "rgba(0,0,0,0.2)",
+                          border: "1px solid rgba(99,179,237,0.3)",
+                          color: "#f1f5f9",
+                        }}
+                      />
+                      <div className="flex justify-end gap-2">
+                        <button
+                          onClick={() => setEditandoId(null)}
+                          className="px-3 py-1 rounded text-xs font-medium text-slate-300 hover:bg-white/10"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          onClick={() => handleSalvarEdicao(reg.id)}
+                          disabled={salvandoEdicao}
+                          className="px-3 py-1 rounded text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-50"
+                        >
+                          {salvandoEdicao ? "Salvando..." : "Salvar"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: "#cbd5e1" }}>
+                        {reg.texto || <em className="text-slate-500">Sem texto.</em>}
+                      </p>
+                      {reg.editado_em && reg.editado_por_nome && (
+                        <p className="mt-2 text-xs italic" style={{ color: "#64748b" }}>
+                          Editado por {reg.editado_por_nome} em {formatarData(reg.editado_em)}
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
               ))}

@@ -215,8 +215,8 @@ export default function ConselhoClasseProfessor() {
               <button
                 key={turma.id}
                 onClick={() => handleClickTurma(turma)}
-                title={`Selecionar turma ${turma.turma}`}
-                aria-label={`Selecionar turma ${turma.turma}`}
+                title={`Selecionar turma ${turma.nome || turma.turma}`}
+                aria-label={`Selecionar turma ${turma.nome || turma.turma}`}
                 className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl shadow-sm border font-semibold text-sm
                   whitespace-nowrap transition-all duration-150 select-none
                   bg-gradient-to-br from-blue-50 to-indigo-100 border-blue-300 text-blue-900
@@ -224,7 +224,7 @@ export default function ConselhoClasseProfessor() {
                   ${turmaSelecionada?.id === turma.id ? "ring-2 ring-green-500 border-green-400 from-green-50 to-emerald-100" : "cursor-pointer"}`}
               >
                 <span className="text-base">📋</span>
-                <span>{turma.turma}</span>
+                <span>{turma.nome || turma.turma}</span>
               </button>
             ))
           ) : (
@@ -239,7 +239,7 @@ export default function ConselhoClasseProfessor() {
       {turmaSelecionada && (
         <div className="bg-white rounded-lg shadow-md p-4">
           <h2 className="text-2xl font-semibold mb-4 text-blue-800">
-            Alunos da Turma {turmaSelecionada.turma}
+            Alunos da Turma {turmaSelecionada.nome || turmaSelecionada.turma}
           </h2>
 
           {/* Aviso de governança */}

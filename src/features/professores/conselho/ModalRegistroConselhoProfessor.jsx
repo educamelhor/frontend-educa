@@ -16,6 +16,7 @@ import {
   XMarkIcon,
   ClipboardDocumentListIcon,
   UserCircleIcon,
+  CalendarDaysIcon,
   PaperAirplaneIcon,
   PencilSquareIcon,
   TrashIcon,

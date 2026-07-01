@@ -306,13 +306,32 @@ export default function BoletimPrint({
     .reduce((a, b) => Number(a) + Number(b), 0)
     .toFixed(2);
 
-  function getSituacaoFinal(b24, b25) {
-    // Para ficar idêntico ao PDF: só decide situação quando 4º bim de 2025 existe
-    const nota4Bim2025 = b25[3]?.nota;
-    if (nota4Bim2025 == null || nota4Bim2025 === "")
+  // ── Detecta dinamicamente os dois anos mais recentes das notas ──
+  // Garante que o boletim sempre exibe as notas corretas, independente
+  // do ano letivo atual (2024/2025, 2025/2026, etc.)
+  const anosPresentes = Array.isArray(notas)
+    ? [...new Set(notas.map((n) => Number(n.ano)).filter((a) => a > 2000))].sort((a, b) => a - b)
+    : [];
+
+  // Sempre mostra exatamente 2 colunas de ano.
+  // Se só há 1 ano, o primeiro é (anoAtual - 1); se nenhum, usa os últimos 2 anos.
+  const anoAtualDefault = new Date().getFullYear();
+  const anoA = anosPresentes.length >= 2
+    ? anosPresentes[anosPresentes.length - 2]          // penúltimo ano
+    : anosPresentes.length === 1
+      ? anosPresentes[0] - 1                           // ano anterior ao único presente
+      : anoAtualDefault - 1;                           // fallback
+  const anoB = anosPresentes.length >= 1
+    ? anosPresentes[anosPresentes.length - 1]          // último ano
+    : anoAtualDefault;                                 // fallback
+
+  function getSituacaoFinal(bA, bB) {
+    // Só decide situação quando o 4º bim do ano mais recente existe
+    const nota4BimB = bB[3]?.nota;
+    if (nota4BimB == null || nota4BimB === "")
       return <span style={{ color: "#888" }}>Cursando...</span>;
 
-    const notasValidas = [...b24, ...b25]
+    const notasValidas = [...bA, ...bB]
       .map((x) => Number(x.nota))
       .filter((n) => !isNaN(n));
 
@@ -431,8 +450,8 @@ export default function BoletimPrint({
               <th rowSpan={3} className={styles.cabDisc}>
                 Componentes<br />Curriculares
               </th>
-              <th colSpan={9} className={styles.ano2024}>2024</th>
-              <th colSpan={9} className={styles.ano2025}>2025</th>
+              <th colSpan={9} className={styles.ano2024}>{anoA}</th>
+              <th colSpan={9} className={styles.ano2025}>{anoB}</th>
               <th rowSpan={2} colSpan={2} className={styles.final}>Resultado Final</th>
               <th rowSpan={3} className={styles.situacao}>Situação Final</th>
             </tr>
@@ -460,37 +479,37 @@ export default function BoletimPrint({
           <tbody>
             {/* Linhas por disciplina */}
             {disciplinas.map((disc) => {
-              const b24 = [1, 2, 3, 4].map((b) => findNota(disc.id, 2024, b));
-              const b25 = [1, 2, 3, 4].map((b) => findNota(disc.id, 2025, b));
+              const bA = [1, 2, 3, 4].map((b) => findNota(disc.id, anoA, b));
+              const bB = [1, 2, 3, 4].map((b) => findNota(disc.id, anoB, b));
 
-              const m24 = calcMedia(b24);
-              const m25 = calcMedia(b25);
+              const mA = calcMedia(bA);
+              const mB = calcMedia(bB);
 
-              const mediaFin = m25;
-              const faltasFin = b25.reduce((a, b) => a + (Number(b.faltas) || 0), 0);
+              const mediaFin = mB;
+              const faltasFin = bB.reduce((a, b) => a + (Number(b.faltas) || 0), 0);
 
               return (
                 <tr key={disc.id}>
                   <td className={styles.disc}>{disc.nome}</td>
-                  {b24.map((x, i) => (
-                    <React.Fragment key={`24-${i}`}>
+                  {bA.map((x, i) => (
+                    <React.Fragment key={`A-${i}`}>
                       <td>{x.nota != null ? Number(x.nota).toFixed(2).replace(".", ",") : ""}</td>
                       <td>{x.faltas != null ? x.faltas : ""}</td>
                     </React.Fragment>
                   ))}
-                  <td>{m24.replace(".", ",")}</td>
+                  <td>{mA.replace(".", ",")}</td>
 
-                  {b25.map((x, i) => (
-                    <React.Fragment key={`25-${i}`}>
+                  {bB.map((x, i) => (
+                    <React.Fragment key={`B-${i}`}>
                       <td>{x.nota != null ? Number(x.nota).toFixed(2).replace(".", ",") : ""}</td>
                       <td>{x.faltas != null ? x.faltas : ""}</td>
                     </React.Fragment>
                   ))}
-                  <td>{m25.replace(".", ",")}</td>
+                  <td>{mB.replace(".", ",")}</td>
 
                   <td className={styles.finalCell}>{mediaFin.replace(".", ",")}</td>
                   <td className={styles.faltasCell}>{faltasFin || ""}</td>
-                  <td className={styles.situacaoCell}>{getSituacaoFinal(b24, b25)}</td>
+                  <td className={styles.situacaoCell}>{getSituacaoFinal(bA, bB)}</td>
                 </tr>
               );
             })}

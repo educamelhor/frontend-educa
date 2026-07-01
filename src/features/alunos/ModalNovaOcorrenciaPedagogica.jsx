@@ -5,65 +5,98 @@ import api from "../../services/api";
 // ─── Lista MOCK provisória de categorias e ocorrências pedagógicas ───
 const CATEGORIAS_PEDAGOGICAS = [
     {
-        categoria: "Desempenho Acadêmico",
+        categoria: "📚 Rendimento e participação pedagógica (positivo)",
         itens: [
-            "Dificuldade de aprendizagem persistente",
-            "Baixo rendimento em avaliações",
-            "Não realiza atividades em sala",
-            "Não entrega tarefas/trabalhos",
-            "Progresso significativo na disciplina",
-            "Destaque em atividade avaliativa",
-        ],
+            "Apresenta boa participação nas discussões em sala.",
+            "Apresenta bom desempenho nas atividades realizadas.",
+            "Apresenta progresso contínuo em seu rendimento escolar.",
+            "Busca aprimorar seu desempenho escolar.",
+            "Compreende com facilidade os conteúdos trabalhados.",
+            "Contribui com ideias durante as atividades.",
+            "Demonstra dedicação às atividades propostas.",
+            "Demonstra evolução significativa na aprendizagem.",
+            "Demonstra interesse pelas atividades propostas.",
+            "Esforça-se para superar suas dificuldades.",
+            "Mostra persistência diante dos desafios.",
+            "Mostra-se envolvido nas propostas pedagógicas.",
+            "Participa ativamente das aulas.",
+            "Realiza as atividades com autonomia.",
+            "Solicita ajuda quando necessário, demonstrando interesse em aprender."
+        ]
     },
     {
-        categoria: "Comportamento em Sala",
+        categoria: "📚 Rendimento e participação pedagógica (negativo)",
         itens: [
-            "Falta de atenção/concentração recorrente",
-            "Uso indevido de celular em aula",
-            "Conversa excessiva durante a aula",
-            "Recusa em participar de atividades",
-            "Participação exemplar na aula",
-            "Colaboração positiva com colegas",
-        ],
+            "Apresenta baixa participação nas atividades propostas.",
+            "Apresenta dificuldade em manter a atenção durante as atividades propostas.",
+            "Apresenta dificuldades em seguir instruções sequenciais.",
+            "Apresenta dificuldades na compreensão das orientações dadas.",
+            "Demonstra baixo rendimento nas atividades avaliativas.",
+            "Demonstra dificuldade em aplicar os conteúdos trabalhados.",
+            "Demonstra falta de organização na realização das atividades.",
+            "Demonstra pouca autonomia na execução das tarefas.",
+            "Demonstra pouco interesse em aprimorar seu desempenho escolar.",
+            "Demostra ter dificuldades por falta de pré-requisitos.",
+            "Estudante dorme em sala de aula.",
+            "Evita envolver-se em atividades que exigem maior esforço cognitivo.",
+            "Não acompanha o ritmo da turma nas propostas pedagógicas.",
+            "Não busca esclarecimento de dúvidas durante as atividades.",
+            "Não revisa ou corrige as atividades quando orientado.",
+            "Necessita de constante mediação para realizar as atividades.",
+            "Necessita de incentivo constante para manter-se engajado.",
+            "Realiza as atividades com pouca dedicação e capricho.",
+            "Realiza outras atividades durante a aula."
+        ]
     },
     {
-        categoria: "Frequência e Pontualidade",
+        categoria: "✏️ Qualidade das atividades (positivo)",
         itens: [
-            "Faltas consecutivas sem justificativa",
-            "Atrasos recorrentes",
-            "Saídas antecipadas frequentes",
-            "Evasão de aula (saiu sem autorização)",
-            "Frequência regular e comprometida",
-        ],
+            "Apresenta capricho na realização das atividades.",
+            "Cumpre os prazos estabelecidos para entrega das atividades.",
+            "Demonstra responsabilidade com as tarefas escolares.",
+            "Mantém o material organizado.",
+            "Registra adequadamente os conteúdos no caderno."
+        ]
     },
     {
-        categoria: "Socioemocional",
+        categoria: "✏️ Qualidade das atividades (negativo)",
         itens: [
-            "Dificuldade de socialização",
-            "Comportamento de isolamento",
-            "Sinais de ansiedade ou estresse",
-            "Conflito recorrente com colegas",
-            "Demonstração de empatia e solidariedade",
-            "Melhora perceptível na convivência",
-        ],
+            "Apresenta dificuldade em gerenciar o tempo durante as atividades.",
+            "Apresenta dificuldade em registrar o conteúdo trabalhado.",
+            "Apresenta registros desorganizados no caderno.",
+            "Depende excessivamente de apoio para concluir tarefas.",
+            "Entrega atividades incompletas ou com baixa qualidade.",
+            "Esquece frequentemente de realizar tarefas de casa.",
+            "Não cumpre prazos para entrega das atividades.",
+            "Não demonstra evolução no desempenho das atividades propostas.",
+            "Não mantém organização dos materiais e atividades escolares.",
+            "Não mantém regularidade nos registros das atividades.",
+            "Realiza as atividades de forma apressada, comprometendo o resultado."
+        ]
     },
     {
-        categoria: "Necessidades Especiais",
+        categoria: "🤝 Convivência e atitudes (positivo)",
         itens: [
-            "Necessidade de atendimento individualizado",
-            "Adequação curricular necessária",
-            "Encaminhamento para equipe multidisciplinar",
-            "Adaptação de atividades/provas",
-            "Evolução no plano educacional individualizado",
-        ],
+            "Contribui para um ambiente harmonioso em sala de aula.",
+            "Demonstra atitudes de respeito e colaboração.",
+            "Demostra ter hábito de estudo.",
+            "É cooperativo nas atividades em grupo",
+            "Mantém bom relacionamento com colegas e professores.",
+            "Respeita as normas e combinados da turma."
+        ]
     },
     {
-        categoria: "Outros",
+        categoria: "🤝 Convivência e atitudes (negativo)",
         itens: [
-            "Ocorrência não categorizada",
-            "Observação geral do professor",
-        ],
-    },
+            "Conversa durante as orientações e explicações.",
+            "Não contribui para um ambiente harmonioso em sala de aula.",
+            "Não demonstra atitudes de respeito e colaboração.",
+            "Não demostra ter hábito de estudo.",
+            "Não é cooperativo nas atividades em grupo.",
+            "Não mantém bom relacionamento com colegas e professores.",
+            "Não respeita as normas e combinados da turma."
+        ]
+    }
 ];
 
 export default function ModalNovaOcorrenciaPedagogica({

@@ -167,16 +167,9 @@ export default function Sidebar({ isOpen, onClose }) {
   const getPerfil = () =>
     String(localStorage.getItem('perfil') || '').toLowerCase().trim();
   const perfil = getPerfil();
-  const isDisciplinar = perfil === 'disciplinar' || perfil === 'diretor_disciplinar' || perfil === 'militar' || perfil === 'comandante';
+  const isDisciplinar = perfil === 'disciplinar' || perfil === 'diretor_disciplinar' || perfil === 'militar';
   const isProfessor = perfil === 'professor';
   const isSecretario = perfil === 'secretario' || perfil === 'secretaria';
-
-  // ── Escola tipo: CCMDF = cívico-militar ──
-  const escolaTipoRaw = localStorage.getItem('escola_tipo');
-  const escolaTipo = (() => { try { const v = JSON.parse(escolaTipoRaw || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } })();
-  const isCCMDF = escolaTipo.includes('CCMDF');
-  // Diretor Pedagógico de escola CCMDF NÃO acessa Disciplinar
-  const isDiretorPedagogicoCCMDF = isCCMDF && (perfil === 'diretor' || perfil === 'vice_diretor');
 
   // Começando pelos 3 módulos solicitados
   const canConteudos = isScopeEscola && !isDisciplinar && !isProfessor && hasPerm('conteudos:ver');
@@ -234,10 +227,9 @@ export default function Sidebar({ isOpen, onClose }) {
   // Governança: perfis com acesso administrativo completo ao Gabarito (Gerar + Corrigir Lote)
   const canGabaritoAdmin = canGabarito && !isProfessor && !isCoord;
 
-  // ── Agente EDUCA: disponível a TODOS exceto perfis militares/disciplinares (CCMDF) ──
-  // isDisciplinar cobre: 'disciplinar', 'diretor_disciplinar', 'militar', 'comandante'
-  const isMilitar = perfil === 'militar' || perfil === 'comandante'; // mantido para compatibilidade
-  const canAgenteEduca = isScopeEscola && !isDisciplinar;
+  // ── Agente EDUCA: disponível a TODOS exceto militar e comandante (CCMDF) ──
+  const isMilitar = perfil === 'militar' || perfil === 'comandante';
+  const canAgenteEduca = isScopeEscola && !isMilitar;
 
 
   // ─────────────────────────────────────────────────────────────
@@ -1076,16 +1068,7 @@ export default function Sidebar({ isOpen, onClose }) {
 
 
 
-        {/* ════ DISCIPLINAR — REGRA ÚNICA ════════════════════════════════════
-             SÓ MILITAR VÊ MÓDULO DISCIPLINAR. SÓ ISSO.
-             isDisciplinar cobre: disciplinar | diretor_disciplinar | militar | comandante
-             Não importa a escola (CCMDF ou não), não importa o módulo habilitado.
-             NÃO adicionar isCCMDF, hasModulo ou qualquer outra condição aqui.
-        ═══════════════════════════════════════════════════════════════════════ */}
-        {isScopeEscola && isDisciplinar && (
-
-
-
+        {isScopeEscola && !isProfessor && !isCoord && !isSecretario && hasModulo('disciplinar') && (
           <>
             {/* ───────────────────────────────
                 GRUPO: Disciplinar
@@ -1468,8 +1451,7 @@ export default function Sidebar({ isOpen, onClose }) {
             )}
 
             {/* ─── GRUPO: Secretaria (Professor NÃO tem acesso) ─── */}
-            {!isProfessor && !isDisciplinar && hasModulo('secretaria') && (
-
+            {!isProfessor && hasModulo('secretaria') && (
             <>
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-6 transition"

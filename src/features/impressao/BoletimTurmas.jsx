@@ -1,73 +1,105 @@
-import React, { useState, useEffect } from "react";
-import api from "../../services/api";
+// src/features/impressao/BoletimTurmas.jsx
+// ============================================================================
+// Módulo IMPRESSÃO DE BOLETINS — Geração em lote por turma.
+// v3 — Design premium, filtro pelo ano letivo mais recente, cards single-line.
+// ============================================================================
 
-function normalizaTexto(str) {
-  if (!str) return "";
-  return str
+import React, { useState, useEffect, useMemo } from "react";
+import api from "../../services/api";
+import {
+  PrinterIcon,
+  CheckCircleIcon,
+  AcademicCapIcon,
+  ArrowDownTrayIcon,
+  SparklesIcon,
+} from "@heroicons/react/24/outline";
+
+// ─── Constantes ───
+const TURNOS = ["Matutino", "Vespertino", "Noturno"];
+
+const TURNO_CONFIG = {
+  Matutino:   { gradientStyle: "linear-gradient(135deg,#f59e0b,#ea580c)", borderColor: "#f59e0b", bgHover: "#fffbeb", emoji: "🌅" },
+  Vespertino: { gradientStyle: "linear-gradient(135deg,#38bdf8,#2563eb)", borderColor: "#38bdf8", bgHover: "#f0f9ff", emoji: "☀️" },
+  Noturno:    { gradientStyle: "linear-gradient(135deg,#818cf8,#7c3aed)", borderColor: "#818cf8", bgHover: "#f5f3ff", emoji: "🌙" },
+};
+
+const norm = (s) =>
+  String(s || "")
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .trim();
-}
 
 export default function BoletimTurmas() {
   const [turnoSelecionado, setTurnoSelecionado] = useState(null);
   const [turmas, setTurmas] = useState([]);
+  const [anoLetivo, setAnoLetivo] = useState(null);
   const [loadingTurmas, setLoadingTurmas] = useState(false);
 
-  // Para barra de progresso
   const [progress, setProgress] = useState(0);
   const [gerando, setGerando] = useState(false);
+  const [turmaSendoGerada, setTurmaSendoGerada] = useState(null);
   const [sucesso, setSucesso] = useState(false);
+  const [turmasSucesso, setTurmasSucesso] = useState(new Set());
 
-  const turnos = ["Matutino", "Vespertino", "Noturno"];
-
+  // ─── Buscar turmas e detectar o ano letivo mais recente ───
   useEffect(() => {
-    fetchTurmas();
+    (async () => {
+      setLoadingTurmas(true);
+      try {
+        const escola_id = localStorage.getItem("escola_id") || 1;
+        const { data } = await api.get("/api/turmas", { params: { escola_id } });
+        const todas = data || [];
+
+        // Encontra o maior ano disponível
+        const anos = todas
+          .map((t) => Number(t.ano))
+          .filter((a) => a > 2000);
+        const maiorAno = anos.length > 0 ? Math.max(...anos) : new Date().getFullYear();
+
+        setAnoLetivo(String(maiorAno));
+        setTurmas(todas.filter((t) => Number(t.ano) === maiorAno));
+      } catch {
+        setAnoLetivo(String(new Date().getFullYear()));
+        setTurmas([]);
+      } finally {
+        setLoadingTurmas(false);
+      }
+    })();
   }, []);
 
-  const fetchTurmas = async () => {
-    setLoadingTurmas(true);
-    try {
-      const escola_id = localStorage.getItem("escola_id") || 1;
-      const { data } = await api.get("/api/turmas", {
-        params: { escola_id },
-      });
-      setTurmas(data);
-    } catch (error) {
-      setTurmas([]);
-    } finally {
-      setLoadingTurmas(false);
-    }
-  };
-
-  const turmasFiltradas = turmas.filter(
-    (t) =>
-      turnoSelecionado &&
-      normalizaTexto(t.turno) === normalizaTexto(turnoSelecionado)
+  // ─── Turmas filtradas por turno ───
+  const turmasFiltradas = useMemo(
+    () =>
+      turmas
+        .filter((t) => turnoSelecionado && norm(t.turno) === norm(turnoSelecionado))
+        .sort((a, b) => (a.turma || "").localeCompare(b.turma || "", "pt-BR")),
+    [turmas, turnoSelecionado]
   );
 
+  // ─── Gerar boletins ───
   const handleGerarBoletins = async (turma) => {
+    if (gerando) return;
     setGerando(true);
-    setProgress(30);
+    setTurmaSendoGerada(turma.id);
+    setProgress(20);
     setSucesso(false);
 
     try {
-      // Garante que está passando o ID numérico da turma!
       const { data } = await api.post(
         "/api/boletins/gerar",
-        { turma_id: turma.id }, // <-- ATENÇÃO: sempre .id
+        { turma_id: turma.id },
         { responseType: "blob", timeout: 180000 }
       );
 
-      setProgress(80);
+      setProgress(85);
 
       const url = window.URL.createObjectURL(new Blob([data]));
       const link = document.createElement("a");
       link.href = url;
       link.setAttribute(
         "download",
-        `Boletins_Turma_${turma.turma.replace(/\s/g, "")}.pdf`
+        `Boletins_${(turma.turma || "turma").replace(/\s/g, "")}_${anoLetivo || ""}.pdf`
       );
       document.body.appendChild(link);
       link.click();
@@ -75,108 +107,420 @@ export default function BoletimTurmas() {
 
       setProgress(100);
       setSucesso(true);
+      setTurmasSucesso((prev) => new Set([...prev, turma.id]));
 
       setTimeout(() => {
         setProgress(0);
         setGerando(false);
-        setSucesso(false); // Limpa mensagem após alguns segundos
-      }, 1800);
-    } catch (err) {
+        setTurmaSendoGerada(null);
+        setSucesso(false);
+      }, 2200);
+    } catch {
       setGerando(false);
+      setTurmaSendoGerada(null);
       setProgress(0);
       setSucesso(false);
-      alert("Erro ao gerar boletins.");
+      alert("Erro ao gerar boletins. Tente novamente.");
     }
   };
 
-  // Limpa mensagem de sucesso ao trocar turno
   const handleClickTurno = (turno) => {
     setTurnoSelecionado(turno);
     setSucesso(false);
   };
 
   return (
-    <div className="p-6">
-      <h1
-        className="text-5xl font-bold text-center text-blue-900 mb-8"
-        style={{ fontFamily: "'Montserrat', sans-serif" }}
-      >
-        Impressão de Boletins
-      </h1>
+    <div style={{ maxWidth: 960, margin: "0 auto", fontFamily: "'Inter', 'Segoe UI', sans-serif" }}>
 
-      {/* Botões de Turnos */}
-      <div className="flex justify-center gap-4 mb-10">
-        {turnos.map((turno) => (
-          <button
-            key={turno}
-            onClick={() => handleClickTurno(turno)}
-            className={`px-8 py-4 text-xl font-semibold rounded-xl shadow-md transition transform hover:scale-105 ${
-              turnoSelecionado === turno
-                ? "bg-green-600 text-white"
-                : "bg-white text-blue-800 border border-blue-400 hover:bg-blue-100"
-            }`}
-            disabled={gerando}
-            aria-label={`Selecionar turno ${turno}`}
-          >
-            {turno}
-          </button>
-        ))}
+      {/* ══════════════════════════════════════════════
+          HERO HEADER
+      ══════════════════════════════════════════════ */}
+      <div
+        style={{
+          background: "linear-gradient(135deg, #0f172a 0%, #1e3a5f 55%, #0c4a6e 100%)",
+          borderRadius: 20,
+          padding: "32px 40px",
+          marginBottom: 32,
+          position: "relative",
+          overflow: "hidden",
+          boxShadow: "0 20px 60px rgba(0,0,0,0.35)",
+        }}
+      >
+        {/* Glow orbs */}
+        <div style={{
+          position: "absolute", top: -60, right: -60, width: 220, height: 220,
+          background: "radial-gradient(circle, rgba(56,189,248,0.25), transparent 70%)",
+          borderRadius: "50%", pointerEvents: "none",
+        }} />
+        <div style={{
+          position: "absolute", bottom: -40, left: "30%", width: 160, height: 160,
+          background: "radial-gradient(circle, rgba(99,102,241,0.2), transparent 70%)",
+          borderRadius: "50%", pointerEvents: "none",
+        }} />
+
+        {/* Título */}
+        <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+          <div style={{
+            width: 56, height: 56, borderRadius: 14,
+            background: "rgba(255,255,255,0.1)",
+            border: "1px solid rgba(255,255,255,0.2)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            flexShrink: 0,
+          }}>
+            <PrinterIcon style={{ width: 28, height: 28, color: "#fff" }} />
+          </div>
+          <div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <h1 style={{
+                margin: 0, color: "#fff", fontSize: 28, fontWeight: 800,
+                fontFamily: "'Montserrat', sans-serif", letterSpacing: "-0.5px",
+              }}>
+                🖨️ Impressão de Boletins
+              </h1>
+              {anoLetivo && (
+                <span style={{
+                  padding: "3px 12px", borderRadius: 99,
+                  background: "rgba(56,189,248,0.15)",
+                  border: "1px solid rgba(56,189,248,0.35)",
+                  color: "#7dd3fc", fontSize: 11, fontWeight: 700,
+                  letterSpacing: "0.08em", textTransform: "uppercase",
+                }}>
+                  Ano Letivo {anoLetivo}
+                </span>
+              )}
+            </div>
+            <p style={{ margin: "4px 0 0", color: "#94a3b8", fontSize: 14 }}>
+              Selecione o turno e clique na turma para gerar e baixar o PDF dos boletins.
+            </p>
+          </div>
+        </div>
+
+        {/* Mini stats dos turnos */}
+        <div style={{
+          position: "relative", marginTop: 24,
+          display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12,
+        }}>
+          {TURNOS.map((turno) => {
+            const cfg = TURNO_CONFIG[turno];
+            const count = loadingTurmas ? "—" : turmas.filter((t) => norm(t.turno) === norm(turno)).length;
+            return (
+              <div key={turno} style={{
+                background: "rgba(255,255,255,0.06)",
+                border: "1px solid rgba(255,255,255,0.1)",
+                borderRadius: 12, padding: "10px 14px", textAlign: "center",
+              }}>
+                <div style={{ fontSize: 20 }}>{cfg.emoji}</div>
+                <div style={{ color: "#e2e8f0", fontWeight: 700, fontSize: 13, marginTop: 2 }}>{turno}</div>
+                <div style={{ color: "#64748b", fontSize: 11, marginTop: 1 }}>
+                  {count} turma{count !== 1 ? "s" : ""}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Mini cards de turmas */}
-      {turnoSelecionado && (
-        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2 mb-8">
-          {loadingTurmas ? (
-            <p className="col-span-full text-center text-gray-500">
-              Turmas sendo carregadas...
-            </p>
-          ) : turmasFiltradas.length > 0 ? (
-            turmasFiltradas.map((turma) => (
-              <div
-                key={turma.id}
-                onClick={() => !gerando && handleGerarBoletins(turma)}
-                className={`bg-gradient-to-b from-blue-200 to-blue-50 rounded-md px-9 py-2 shadow-md cursor-pointer hover:shadow-xl transition-transform hover:scale-105 text-center font-bold text-blue-900 text-base ${
-                  gerando ? "opacity-70 pointer-events-none" : ""
-                }`}
+      {/* ══════════════════════════════════════════════
+          STEP 1 — TURNO
+      ══════════════════════════════════════════════ */}
+      <div style={{ marginBottom: 28 }}>
+        <h2 style={{
+          margin: "0 0 14px", fontSize: 15, fontWeight: 700,
+          color: "#1e293b", display: "flex", alignItems: "center", gap: 8,
+        }}>
+          <span style={{
+            width: 26, height: 26, borderRadius: 8,
+            background: "#e0f2fe", color: "#0369a1",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 12, fontWeight: 800, flexShrink: 0,
+          }}>1</span>
+          Selecione o Turno
+        </h2>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
+          {TURNOS.map((turno) => {
+            const cfg = TURNO_CONFIG[turno];
+            const isActive = turnoSelecionado === turno;
+            const count = loadingTurmas ? "—" : turmas.filter((t) => norm(t.turno) === norm(turno)).length;
+
+            return (
+              <button
+                key={turno}
+                onClick={() => !gerando && handleClickTurno(turno)}
+                disabled={gerando}
+                aria-label={`Selecionar turno ${turno}`}
                 style={{
-                  minWidth: "80px",
-                  maxWidth: "100px",
-                  margin: "0 auto",
+                  position: "relative", overflow: "hidden",
+                  borderRadius: 16, padding: "18px 16px", textAlign: "left",
+                  cursor: gerando ? "not-allowed" : "pointer",
+                  border: isActive ? "2px solid transparent" : "2px solid #e2e8f0",
+                  background: isActive ? cfg.gradientStyle : "#fff",
+                  boxShadow: isActive
+                    ? "0 8px 28px rgba(0,0,0,0.18)"
+                    : "0 1px 4px rgba(0,0,0,0.06)",
+                  transform: isActive ? "scale(1.02)" : "scale(1)",
+                  transition: "all 0.2s ease",
+                  opacity: gerando ? 0.6 : 1,
                 }}
-                title={`Gerar boletins da turma ${turma.turma}`}
-                aria-label={`Gerar boletins da turma ${turma.turma}`}
-                tabIndex={0}
+                onMouseEnter={(e) => {
+                  if (!isActive && !gerando) {
+                    e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.12)";
+                    e.currentTarget.style.transform = "scale(1.01)";
+                    e.currentTarget.style.borderColor = cfg.borderColor;
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.boxShadow = "0 1px 4px rgba(0,0,0,0.06)";
+                    e.currentTarget.style.transform = "scale(1)";
+                    e.currentTarget.style.borderColor = "#e2e8f0";
+                  }
+                }}
               >
-                {turma.turma}
-              </div>
-            ))
+                <div style={{ fontSize: 26, marginBottom: 8 }}>{cfg.emoji}</div>
+                <div style={{
+                  fontWeight: 800, fontSize: 17,
+                  color: isActive ? "#fff" : "#1e293b",
+                }}>
+                  {turno}
+                </div>
+                <div style={{
+                  fontSize: 12, marginTop: 2,
+                  color: isActive ? "rgba(255,255,255,0.75)" : "#64748b",
+                }}>
+                  {count} turma{count !== 1 ? "s" : ""} disponível{count !== 1 ? "s" : ""}
+                </div>
+                {isActive && (
+                  <CheckCircleIcon style={{
+                    position: "absolute", top: 12, right: 12,
+                    width: 20, height: 20, color: "rgba(255,255,255,0.9)",
+                  }} />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ══════════════════════════════════════════════
+          STEP 2 — TURMAS
+      ══════════════════════════════════════════════ */}
+      {turnoSelecionado && (
+        <div style={{ marginBottom: 28 }}>
+          <h2 style={{
+            margin: "0 0 14px", fontSize: 15, fontWeight: 700,
+            color: "#1e293b", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
+          }}>
+            <span style={{
+              width: 26, height: 26, borderRadius: 8,
+              background: "#d1fae5", color: "#065f46",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 12, fontWeight: 800, flexShrink: 0,
+            }}>2</span>
+            Turmas — {turnoSelecionado}
+            <span style={{ fontSize: 12, fontWeight: 400, color: "#94a3b8", marginLeft: 2 }}>
+              (clique para baixar o PDF)
+            </span>
+          </h2>
+
+          {loadingTurmas ? (
+            <div style={{
+              display: "flex", alignItems: "center", gap: 12,
+              padding: "32px", color: "#64748b", justifyContent: "center",
+            }}>
+              <div style={{
+                width: 20, height: 20, borderRadius: "50%",
+                border: "2px solid #e2e8f0", borderTopColor: "#0ea5e9",
+                animation: "spin 0.8s linear infinite",
+              }} />
+              Carregando turmas...
+            </div>
+          ) : turmasFiltradas.length > 0 ? (
+            <div style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))",
+              gap: 10,
+            }}>
+              {turmasFiltradas.map((turma) => {
+                const isThisGerando = gerando && turmaSendoGerada === turma.id;
+                const jaSucesso = turmasSucesso.has(turma.id);
+                const isDisabled = gerando && !isThisGerando;
+
+                return (
+                  <button
+                    key={turma.id}
+                    onClick={() => handleGerarBoletins(turma)}
+                    disabled={gerando}
+                    title={`Gerar boletins — ${turma.turma}`}
+                    aria-label={`Gerar boletins da turma ${turma.turma}`}
+                    style={{
+                      display: "flex", flexDirection: "column",
+                      alignItems: "center", justifyContent: "center",
+                      gap: 6, padding: "12px 8px",
+                      minHeight: 86,
+                      borderRadius: 12,
+                      border: isThisGerando
+                        ? "2px solid #38bdf8"
+                        : jaSucesso
+                        ? "2px solid #34d399"
+                        : "2px solid #e2e8f0",
+                      background: isThisGerando
+                        ? "#f0f9ff"
+                        : jaSucesso
+                        ? "#f0fdf4"
+                        : "#fff",
+                      cursor: gerando ? (isThisGerando ? "wait" : "not-allowed") : "pointer",
+                      opacity: isDisabled ? 0.45 : 1,
+                      boxShadow: (isThisGerando || jaSucesso)
+                        ? "0 4px 14px rgba(0,0,0,0.1)"
+                        : "0 1px 3px rgba(0,0,0,0.06)",
+                      transform: isThisGerando ? "scale(0.96)" : "scale(1)",
+                      transition: "all 0.18s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!gerando && !jaSucesso) {
+                        e.currentTarget.style.borderColor = "#38bdf8";
+                        e.currentTarget.style.boxShadow = "0 6px 20px rgba(14,165,233,0.18)";
+                        e.currentTarget.style.transform = "scale(1.04)";
+                        e.currentTarget.style.background = "#f0f9ff";
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!gerando && !jaSucesso) {
+                        e.currentTarget.style.borderColor = "#e2e8f0";
+                        e.currentTarget.style.boxShadow = "0 1px 3px rgba(0,0,0,0.06)";
+                        e.currentTarget.style.transform = "scale(1)";
+                        e.currentTarget.style.background = "#fff";
+                      }
+                    }}
+                  >
+                    {/* Ícone */}
+                    <div style={{
+                      width: 32, height: 32, borderRadius: 8,
+                      background: isThisGerando ? "#e0f2fe" : jaSucesso ? "#d1fae5" : "#f1f5f9",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      flexShrink: 0,
+                    }}>
+                      {isThisGerando ? (
+                        <div style={{
+                          width: 14, height: 14, borderRadius: "50%",
+                          border: "2px solid #bae6fd", borderTopColor: "#0284c7",
+                          animation: "spin 0.8s linear infinite",
+                        }} />
+                      ) : jaSucesso ? (
+                        <CheckCircleIcon style={{ width: 16, height: 16, color: "#059669" }} />
+                      ) : (
+                        <ArrowDownTrayIcon style={{ width: 16, height: 16, color: "#94a3b8" }} />
+                      )}
+                    </div>
+
+                    {/* Nome da turma — SEMPRE UMA LINHA */}
+                    <span style={{
+                      fontSize: 13, fontWeight: 700,
+                      color: isThisGerando ? "#0284c7" : jaSucesso ? "#059669" : "#1e293b",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      maxWidth: "100%",
+                      lineHeight: 1.2,
+                    }}>
+                      {turma.turma}
+                    </span>
+
+                    {/* Status */}
+                    <span style={{
+                      fontSize: 10, fontWeight: 600,
+                      color: isThisGerando ? "#38bdf8" : jaSucesso ? "#34d399" : "#cbd5e1",
+                      whiteSpace: "nowrap", lineHeight: 1,
+                    }}>
+                      {isThisGerando ? "Gerando..." : jaSucesso ? "✓ Baixado!" : "Gerar PDF"}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           ) : (
-            <p className="col-span-full text-center text-gray-500">
-              Nenhuma turma encontrada para {turnoSelecionado}.
-            </p>
+            <div style={{
+              display: "flex", flexDirection: "column",
+              alignItems: "center", justifyContent: "center",
+              padding: "40px 24px", borderRadius: 16,
+              border: "2px dashed #e2e8f0", background: "#f8fafc",
+              gap: 8, color: "#64748b",
+            }}>
+              <AcademicCapIcon style={{ width: 40, height: 40, color: "#cbd5e1" }} />
+              <p style={{ margin: 0, fontWeight: 600 }}>Nenhuma turma encontrada</p>
+              <p style={{ margin: 0, fontSize: 12, textAlign: "center" }}>
+                Não há turmas do turno {turnoSelecionado} no ano letivo {anoLetivo}.
+              </p>
+            </div>
           )}
         </div>
       )}
 
-      {/* Barra de Progresso e Mensagem */}
+      {/* ══════════════════════════════════════════════
+          BARRA DE PROGRESSO
+      ══════════════════════════════════════════════ */}
       {gerando && (
-        <div className="w-full flex flex-col items-center mt-8">
-          <div className="w-full max-w-md bg-gray-200 rounded-full h-4 mb-2">
-            <div
-              className="bg-blue-600 h-4 rounded-full transition-all"
-              style={{ width: `${progress}%` }}
-            ></div>
+        <div style={{ marginBottom: 20 }}>
+          <div style={{
+            width: "100%", height: 6, borderRadius: 99,
+            background: "#e2e8f0", overflow: "hidden",
+          }}>
+            <div style={{
+              height: "100%", borderRadius: 99,
+              background: "linear-gradient(90deg, #0ea5e9, #2563eb)",
+              boxShadow: "0 0 12px rgba(14,165,233,0.5)",
+              width: `${progress}%`,
+              transition: "width 0.5s ease",
+            }} />
           </div>
-          <span className="text-blue-900 font-semibold">Gerando PDF...</span>
+          <div style={{
+            display: "flex", justifyContent: "space-between",
+            marginTop: 6, fontSize: 12, color: "#64748b",
+          }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <div style={{
+                width: 10, height: 10, borderRadius: "50%",
+                border: "1.5px solid #e2e8f0", borderTopColor: "#0ea5e9",
+                animation: "spin 0.8s linear infinite", flexShrink: 0,
+              }} />
+              Gerando PDF dos boletins...
+            </span>
+            <span style={{ fontWeight: 700, color: "#0ea5e9" }}>{progress}%</span>
+          </div>
         </div>
       )}
+
+      {/* ══════════════════════════════════════════════
+          SUCESSO
+      ══════════════════════════════════════════════ */}
       {sucesso && (
-        <div className="w-full flex justify-center mt-6">
-          <span className="text-green-600 font-semibold text-xl">
-            Boletins gerados com sucesso!
-          </span>
+        <div style={{
+          display: "flex", alignItems: "center", gap: 14,
+          padding: "16px 20px", borderRadius: 14,
+          background: "#f0fdf4", border: "1px solid #bbf7d0",
+          boxShadow: "0 4px 16px rgba(52,211,153,0.15)",
+        }}>
+          <div style={{
+            width: 40, height: 40, borderRadius: "50%",
+            background: "#d1fae5",
+            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+          }}>
+            <SparklesIcon style={{ width: 20, height: 20, color: "#059669" }} />
+          </div>
+          <div>
+            <p style={{ margin: 0, fontWeight: 700, color: "#065f46" }}>
+              Boletins gerados com sucesso!
+            </p>
+            <p style={{ margin: "2px 0 0", fontSize: 12, color: "#059669" }}>
+              O PDF foi baixado automaticamente.
+            </p>
+          </div>
         </div>
       )}
+
+      {/* Keyframe para spinner */}
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

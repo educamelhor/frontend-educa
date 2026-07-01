@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+﻿import React, { useState, useEffect, useCallback } from "react";
 import api from "../../../services/api";
 import {
   CheckCircleIcon,
@@ -241,24 +241,12 @@ export default function Avaliacoes() {
         setPlano(planoCompleto);
 
         // 4) Busca ALUNOS REAIS da turma via tabela matriculas
-        //    ⚠️ Passamos ano_letivo para garantir que alunos inseridos APÓS
-        //    a criação do plano também apareçam na grade de avaliação.
-        //    Sem esse parâmetro, o backend pode usar a data de criação do
-        //    plano como corte, excluindo alunos recém-matriculados.
         try {
-          const resAlunos = await api.get(`/turmas/${turmaSelecionada}/alunos`, {
-            params: { ano_letivo: ano },
-          });
+          const resAlunos = await api.get(`/turmas/${turmaSelecionada}/alunos`);
           if (resAlunos.data?.ok && resAlunos.data.alunos?.length > 0) {
             setAlunos(resAlunos.data.alunos);
           } else {
-            // Fallback: tenta endpoint geral de alunos por turma
-            const resFallback = await api.get("/api/alunos", {
-              params: { turma_id: turmaSelecionada, ano_letivo: ano },
-            });
-            const listaFallback =
-              resFallback.data?.alunos || resFallback.data || [];
-            setAlunos(Array.isArray(listaFallback) ? listaFallback : []);
+            setAlunos([]);
           }
         } catch {
           setAlunos([]);

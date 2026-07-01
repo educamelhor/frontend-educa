@@ -15,15 +15,38 @@
 
 import React, { useEffect, useRef, useState } from "react";
 
+// Deriva slug de diretório da escola (mesma lógica do backend slugDir)
+// Ex: "CEF04-CCMDF" → "cef04-ccmdf" (mantém hífen — frame-binary salva com hífen)
+function slugDir(input) {
+  return String(input || "")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, "-")   // mantém hífen (frame-binary usa apelido com hífen)
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+}
+
+function resolveEscolaDir() {
+  // ✅ Sempre passa pelo slugDir para normalizar hífens corretamente.
+  // localStorage pode ter o valor antigo com underscore (ex: "cef04_ccmdf")
+  // mas o backend salva frames com hífen (ex: "cef04-ccmdf").
+  const raw =
+    localStorage.getItem("escola_dir") ||
+    localStorage.getItem("nome_escola") ||
+    "CEF04-CCMDF";               // fallback com hífen (apelido real da escola)
+  return slugDir(raw);           // normaliza: "CEF04-CCMDF" → "cef04-ccmdf"
+}
+
+
 export default function StreamCamera({ cameraId, titulo, registros }) {
-  // Em DEV (Vite:5173), as rotas /api/* precisam apontar para o backend (3000),
-  // senão o request vai para 5173 e dá 404.
-  // Em PROD, aponta para o backend DigitalOcean (mesma lógica do api.js).
+  // ✅ Usa VITE_BACKEND_ORIGIN (ex: "http://localhost:3000") — SEM /api no final.
+  //    VITE_API_BASE_URL inclui /api ("http://localhost:3000/api") e causaria URL dupla:
+  //    http://localhost:3000/api/api/monitoramento/... → 404 silencioso.
   const _host = window.location.hostname;
   const _isLocal = _host === "localhost" || _host === "127.0.0.1";
   const API_ORIGIN =
-    import.meta.env.VITE_API_ORIGIN ||
-    import.meta.env.VITE_API_BASE_URL ||
+    import.meta.env.VITE_BACKEND_ORIGIN ||   // "http://localhost:3000" (sem /api)
     (_isLocal ? "http://localhost:3000" : "https://educa-backend-docker-659zo.ondigitalocean.app");
 
   const API_BASE_PROTECTED = `${API_ORIGIN}/api/monitoramento`;
@@ -34,12 +57,19 @@ export default function StreamCamera({ cameraId, titulo, registros }) {
   const [imgSrc, setImgSrc] = useState("");
   const [facesData, setFacesData] = useState({ width: 0, height: 0, faces: [] });
   const [modoAoVivo, setModoAoVivo] = useState(false);
+  // drawTick: incrementado toda vez que a <img> carrega uma nova snapshot.
+  // Força o useEffect de canvas a redesenhar após o canvas.width= (que limpa o canvas).
+  const [drawTick, setDrawTick] = useState(0);
 
   const [streamToken, setStreamToken] = useState("");
 
-  // PRÉVIA: controlar o "polling" do snapshot (evita requests cancelled)
+  // PRÉVIA: controlar o "polling" do snapshot
   const snapTimerRef = useRef(null);
   const [snapTick, setSnapTick] = useState(0);
+
+  // Intervalo de atualização do snapshot em ms (worker grava ~1 FPS = 1000ms)
+  // 800ms = mais responsivo que o worker, garante exibição do frame mais recente
+  const SNAP_INTERVAL_MS = 800;
 
   // ----------------------------------------------------------------------------
   // util: sincronizar <canvas> com o tamanho VISÍVEL atual da <img>
@@ -78,37 +108,42 @@ export default function StreamCamera({ cameraId, titulo, registros }) {
 
 
   // ----------------------------------------------------------------------------
-  // ----------------------------------------------------------------------------
   // 1) Atualizar URL da imagem — usa /ingest/snapshot/:id.jpg (sem stream_token)
   // ----------------------------------------------------------------------------
   useEffect(() => {
+    console.log("[StreamCamera] useEffect snap — cameraId:", cameraId, "API_ORIGIN:", API_ORIGIN);
+
     if (cameraId !== 1) {
       setImgSrc("");
       return;
     }
 
-    const escolaDir =
-      localStorage.getItem("escola_dir") ||
-      localStorage.getItem("escola_apelido") ||
-      "cef04_ccmdf";
+    const escolaDir = resolveEscolaDir();
+    console.log("[StreamCamera] escolaDir:", escolaDir);
 
-    // Sempre reseta o src antes de trocar
-    setImgSrc("");
-
-    // Monta URL direta para o frame do worker (sem stream_token, sem ffmpeg-static)
     const buildSnapshotUrl = (tick) =>
       `${API_ORIGIN}/api/monitoramento/ingest/snapshot/${cameraId}.jpg` +
       `?escola_dir=${encodeURIComponent(escolaDir)}&_=${tick}`;
 
-    setImgSrc(buildSnapshotUrl(snapTick));
+    const url = buildSnapshotUrl(Date.now());
+    console.log("[StreamCamera] URL inicial:", url);
+
+    // Carrega imediatamente
+    setImgSrc(url);
+
+    // Polling robusto: atualiza a cada SNAP_INTERVAL_MS independente do onLoad
+    const timer = setInterval(() => {
+      setImgSrc(buildSnapshotUrl(Date.now()));
+    }, SNAP_INTERVAL_MS);
 
     return () => {
+      clearInterval(timer);
       if (snapTimerRef.current) {
         clearTimeout(snapTimerRef.current);
         snapTimerRef.current = null;
       }
     };
-  }, [cameraId, snapTick]);
+  }, [cameraId]);
 
 
   // ----------------------------------------------------------------------------
@@ -128,30 +163,24 @@ export default function StreamCamera({ cameraId, titulo, registros }) {
 
     async function fetchFaces() {
       try {
-        const escolaDir =
-          localStorage.getItem("escola_dir") ||
-          localStorage.getItem("escola_apelido") ||
-          "CEF04_PLAN";
+        const escolaDir = resolveEscolaDir();
 
-        // Evitar 304/ETag do /faces (senão o overlay congela).
-        // Forçamos no-store e um cache-bust na query.
-        const facesUrl = `${API_BASE_PUBLIC}/camera/${cameraId}/faces?escola_dir=${encodeURIComponent(
+        // ✅ Usa o ingest router (/api/monitoramento/ingest/faces/N.json) que já
+        //    funciona com o mesmo case-insensitive matching do snapshot.
+        //    Anterior: /api/monitoramento-public/camera/N/faces (overlay router com problema 404).
+        const facesUrl = `${API_ORIGIN}/api/monitoramento/ingest/faces/${cameraId}.json?escola_dir=${encodeURIComponent(
           escolaDir
         )}&_=${Date.now()}`;
 
-        const resp = await fetch(facesUrl, {
-          cache: "no-store",
-          headers: {
-            "Cache-Control": "no-cache",
-            Pragma: "no-cache",
-          },
-        });
+        const resp = await fetch(facesUrl, { cache: "no-store" });
 
         if (!resp.ok) return;
 
         const json = await resp.json();
 
-        if (!json || !json.ok) return;
+        // ✅ Aceita tanto o formato envelope {ok, faces, width, height}
+        // quanto o formato raw do faces.json {ts, width, height, faces}
+        if (!json || !Array.isArray(json.faces)) return;
 
         // Normalização para manter o desenho original (x,y,w,h; aluno_nome; turma)
         const normFaces = Array.isArray(json.faces)
@@ -305,7 +334,7 @@ export default function StreamCamera({ cameraId, titulo, registros }) {
         ctx.fillText(label, boxX + paddingX, boxY + paddingY + 16);
       }
     });
-  }, [facesData]);
+  }, [facesData, drawTick]);
 
   // ----------------------------------------------------------------------------
   // Logs (DEV) — evitar spam em produção
@@ -360,14 +389,9 @@ export default function StreamCamera({ cameraId, titulo, registros }) {
           className={`w-full h-full transition-all duration-500 cursor-pointer object-contain`}
           onLoad={() => {
             syncCanvasToImageSize();
-
-            // PRÉVIA: só agenda o próximo snapshot depois que este carregou
-            if (!modoAoVivo && cameraId === 1) {
-              if (snapTimerRef.current) clearTimeout(snapTimerRef.current);
-              snapTimerRef.current = setTimeout(() => {
-                setSnapTick((t) => t + 1);
-              }, 500);  // 500ms — rápido porque agora serve do disco (frame.jpg do worker)
-            }
+            // Cada nova snapshot limpa o canvas (canvas.width=... em syncCanvasToImageSize).
+            // drawTick força o useEffect de faces a redesenhar imediatamente após o sync.
+            setDrawTick((t) => t + 1);
           }}
           onClick={() => {
             // ao mudar de modo, limpa timer da prévia imediatamente

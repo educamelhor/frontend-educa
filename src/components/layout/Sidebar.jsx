@@ -32,7 +32,8 @@ import {
 } from '@heroicons/react/24/outline';
 
 export default function Sidebar({ isOpen, onClose }) {
-  // ✅ [GOVERNANÇA v2] Para perfis disciplinares o grupo Disciplinar fica sempre expandido
+  // Para perfis disciplinares o grupo Disciplinar fica sempre expandido
+  // ✅ [GOVERNANÇA v2] 'militar' renomeado para 'diretor_disciplinar'
   const [openGroup, setOpenGroup] = useState(
     () => {
       const p = String(localStorage.getItem('perfil') || '').toLowerCase().trim();
@@ -167,8 +168,13 @@ export default function Sidebar({ isOpen, onClose }) {
   const getPerfil = () =>
     String(localStorage.getItem('perfil') || '').toLowerCase().trim();
   const perfil = getPerfil();
-  // ✅ [GOVERNANÇA v2] 'militar' renomeado para 'diretor_disciplinar'
-  const isDisciplinar = perfil === 'disciplinar' || perfil === 'diretor_disciplinar';
+  // Regra de Ouro: TODOS os perfis militares veem apenas o módulo DISCIPLINAR
+  // Deve ser igual a PERFIS_MILITARES no backend (auth.js)
+  const PERFIS_MILITARES_SET = new Set([
+    'disciplinar', 'diretor_disciplinar', 'comandante',
+    'subcomandante', 'supervisor_disciplinar', 'monitor_disciplinar',
+  ]);
+  const isDisciplinar = PERFIS_MILITARES_SET.has(perfil);
   const isProfessor = perfil === 'professor';
   const isSecretario = perfil === 'secretario' || perfil === 'secretaria';
 
@@ -450,13 +456,11 @@ export default function Sidebar({ isOpen, onClose }) {
           </>
         ) : (
           <>
-            {/* LINK: Home */}
-            {!isDisciplinar && !isProfessor && !isCoord && !isSecretario && (
+            {/* LINK: Home — módulo genérico universal: renderiza para TODOS os usuários sem restrição */}
             <Link to="/home" className={getMainLinkClasses('/home')}>
               <HomeIcon className="h-5 w-5 mr-2" />
               Home
             </Link>
-            )}
 
             {/* LINK: Estudantes — só aparece se CEO configurou módulo 'estudantes' explicitamente */}
             {!isDisciplinar && !isProfessor && !isCoord && !isSecretario && hasModulo('estudantes') && (
@@ -628,7 +632,7 @@ export default function Sidebar({ isOpen, onClose }) {
             )}
 
             {/* ─── FREQUÊNCIA (professor): sempre aberto, só Frequência + Atestados ─── */}
-            {isProfessor && hasModulo('frequencia') && (
+            {isProfessor && (
               <>
                 <div
                   className="flex items-center w-full py-2 px-3 rounded mt-2"
@@ -638,7 +642,6 @@ export default function Sidebar({ isOpen, onClose }) {
                   <span className="flex-1 text-left font-semibold">Frequência</span>
                 </div>
                 <ul className="ml-4 mb-2">
-                  {hasModulo('frequencia.atestados') && (
                   <li>
                     <Link
                       to="/frequencia/atestados"
@@ -647,7 +650,6 @@ export default function Sidebar({ isOpen, onClose }) {
                       <DocumentTextIcon className="h-5 w-5 mr-2" /> Atestados
                     </Link>
                   </li>
-                  )}
                 </ul>
               </>
             )}
@@ -1070,15 +1072,15 @@ export default function Sidebar({ isOpen, onClose }) {
 
 
 
+        {/* DISCIPLINAR — REGRA DE OURO: apenas perfis militares (disciplinar / diretor_disciplinar) */}
+        {isScopeEscola && isDisciplinar && hasModulo('disciplinar') && (
 
-        {isScopeEscola && !isProfessor && !isCoord && !isSecretario && hasModulo('disciplinar') && (
           <>
             {/* ───────────────────────────────
                 GRUPO: Disciplinar
             ─────────────────────────────── */}
-            {isDisciplinar ? (
-            /* ── Disciplinar/Militar: submenus sempre visíveis ── */
-            <>
+          <>
+            {/* ── Disciplinar/Militar: submenus sempre visíveis ── */}
             <div
               className="flex items-center w-full py-2 px-3 rounded mt-6"
               style={{ background: 'rgba(255,255,255,0.05)' }}
@@ -1194,153 +1196,10 @@ export default function Sidebar({ isOpen, onClose }) {
                 )}
               </ul>
             </>
-            ) : (
-            /* ── Outros perfis (diretor, coordenador): toggle colapsável ── */
-            <>
-            <button
-              className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-6 transition"
-              // Militares: submenu sempre fixo, não permite colapsar
-              onClick={() => !isMilitar && setOpenGroup(openGroup === 'disciplinar' ? null : 'disciplinar')}
-              type="button"
-            >
-              <ClipboardDocumentListIcon className="h-5 w-5 mr-2" />
-              <span className="flex-1 text-left">Disciplinar</span>
-              {openGroup === 'disciplinar' ? (
-                <ChevronDownIcon className="h-4 w-4" />
-              ) : (
-                <ChevronRightIcon className="h-4 w-4" />
-              )}
-            </button>
-
-            {openGroup === 'disciplinar' && (
-              <ul className="ml-4 mb-2">
-                {hasModulo('disciplinar.alunos') && (
-                <li>
-                  <Link
-                    to="/disciplinar/alunos"
-                    className={getSubmenuLinkClasses('/disciplinar/alunos')}
-                  >
-                    <UsersIcon className="h-5 w-5 mr-2" /> Alunos
-                  </Link>
-                </li>
-                )}
-                {/* ── DESABILITADO no EDUCA.MELHOR_escola ──
-                    Será recriado futuramente no EDUCA.MELHOR_ceo
-                <li>
-                  <Link
-                    to="/disciplinar/ajustes"
-                    className={getSubmenuLinkClasses('/disciplinar/ajustes')}
-                  >
-                    <WrenchIcon className="h-5 w-5 mr-2" /> Ajustes
-                  </Link>
-                </li>
-                ── FIM DESABILITADO ── */}
-                {hasModulo('disciplinar.responsaveis') && (
-                <li>
-                  <Link
-                    to="/disciplinar/responsaveis"
-                    className={getSubmenuLinkClasses('/disciplinar/responsaveis')}
-                  >
-                    <UserGroupIcon className="h-5 w-5 mr-2" /> Responsáveis
-                  </Link>
-                </li>
-                )}
-                {(perfil === 'diretor' || perfil === 'diretor_disciplinar') && (
-                <li>
-                  <Link
-                    to="/disciplinar/equipe"
-                    className={getSubmenuLinkClasses('/disciplinar/equipe')}
-                  >
-                    <UsersIcon className="h-5 w-5 mr-2" /> Gestão de Equipe
-                  </Link>
-                </li>
-                )}
-                {hasModulo('disciplinar.fo_coletivo') && (
-                <li>
-                  <Link
-                    to="/disciplinar/fo-coletivo"
-                    className={getSubmenuLinkClasses('/disciplinar/fo-coletivo')}
-                    style={{
-                      background: isActive('/disciplinar/fo-coletivo')
-                        ? 'linear-gradient(90deg, rgba(239,68,68,0.15), transparent)'
-                        : undefined,
-                    }}
-                  >
-                    <BoltIcon className="h-5 w-5 mr-2" style={{ color: isActive('/disciplinar/fo-coletivo') ? '#f87171' : undefined }} />
-                    <span className="flex-1">F.O. Coletivo</span>
-                  </Link>
-                </li>
-                )}
-                {hasModulo('disciplinar.historico') && (
-                <li>
-                  <Link
-                    to="/disciplinar/historico"
-                    className={getSubmenuLinkClasses('/disciplinar/historico')}
-                    style={{
-                      background: isActive('/disciplinar/historico')
-                        ? 'linear-gradient(90deg, rgba(245,158,11,0.15), transparent)'
-                        : undefined,
-                    }}
-                  >
-                    <ClockIcon className="h-5 w-5 mr-2" style={{ color: isActive('/disciplinar/historico') ? '#f59e0b' : undefined }} />
-                    <span className="flex-1">Histórico</span>
-                  </Link>
-                </li>
-                )}
-                {hasModulo('disciplinar.atas') && (
-                <li>
-                  <Link
-                    to="/disciplinar/atas"
-                    className={getSubmenuLinkClasses('/disciplinar/atas')}
-                    style={{
-                      background: isActive('/disciplinar/atas')
-                        ? 'linear-gradient(90deg, rgba(30,58,138,0.15), transparent)'
-                        : undefined,
-                    }}
-                  >
-                    <DocumentTextIcon className="h-5 w-5 mr-2" style={{ color: isActive('/disciplinar/atas') ? '#1e3a8a' : undefined }} />
-                    <span className="flex-1">Atas</span>
-                  </Link>
-                </li>
-                )}
-                {hasModulo('disciplinar.liberacao') && (
-                <li>
-                  <Link
-                    to="/disciplinar/liberacao"
-                    className={getSubmenuLinkClasses('/disciplinar/liberacao')}
-                    style={{
-                      background: isActive('/disciplinar/liberacao')
-                        ? 'linear-gradient(90deg, rgba(5,150,105,0.15), transparent)'
-                        : undefined,
-                    }}
-                  >
-                    <CheckCircleIcon className="h-5 w-5 mr-2" style={{ color: isActive('/disciplinar/liberacao') ? '#059669' : undefined }} />
-                    <span className="flex-1">Liberação</span>
-                  </Link>
-                </li>
-                )}
-                {hasModulo('disciplinar.metadados') && (
-                <li>
-                  <Link
-                    to="/disciplinar/metadados"
-                    className={getSubmenuLinkClasses('/disciplinar/metadados')}
-                  >
-                    <TableCellsIcon className="h-5 w-5 mr-2" /> Metadados
-                  </Link>
-                </li>
-                )}
-              </ul>
-            )}
-            </>
-            )}
           </>
         )}
-
-        {/* ───────────────────────────────
-            MENUS INDEPENDENTES: Regimentos, Manual, Suporte
-            (Acessíveis a qualquer usuário logado)
-        ─────────────────────────────── */}
-        {isScopeEscola && !isSecretario && (
+        {/* Regimentos, Manual e Suporte — também exclusivos de perfis militares */}
+        {isScopeEscola && isDisciplinar && (
           <>
             {hasModulo('disciplinar.regimentos') && (
             <Link
@@ -1452,12 +1311,10 @@ export default function Sidebar({ isOpen, onClose }) {
                 )}
               </>
             )}
-          </>
-        )}
 
-        {/* ─── GRUPO: Secretaria — bloco INDEPENDENTE (não aninhado em canAgenteEduca) ─── */}
-        {isScopeEscola && !isProfessor && hasModulo('secretaria') && (
-          <>
+            {/* ─── GRUPO: Secretaria (Professor NÃO tem acesso) ─── */}
+            {!isProfessor && hasModulo('secretaria') && (
+            <>
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-6 transition"
               onClick={() => setOpenGroup(openGroup === 'secretaria' ? null : 'secretaria')}
@@ -1653,6 +1510,8 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
               </ul>
+            )}
+            </>
             )}
           </>
         )}
@@ -1949,10 +1808,24 @@ export default function Sidebar({ isOpen, onClose }) {
           </>
         )}
 
-        {/* ───────────────────────────────
+        {/* ───────────────
             Plataforma (CEO)
             ✅ REMOVIDO do Sistema Escolar: a plataforma é uma SPA separada
-        ─────────────────────────────── */}
+        ─────────────── */}
+
+        {/* LINK: Suporte Genérico — módulo genérico universal: renderiza para TODOS os usuários
+            Independente de perfil (militar, professor, secretário, coordenador, etc.).
+            CEO usa /plataforma/suporte (SPA separada) — não entra neste branch. */}
+        {isScopeEscola && (
+          <Link
+            to="/suporte"
+            className={getMainLinkClasses('/suporte')}
+            style={{ marginTop: 16, borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: 12 }}
+          >
+            <QuestionMarkCircleIcon className="h-5 w-5 mr-2" />
+            Suporte
+          </Link>
+        )}
 
       </nav>
     </aside>

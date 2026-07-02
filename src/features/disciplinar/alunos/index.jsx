@@ -12,7 +12,8 @@ import {
 import { ShieldExclamationIcon } from "@heroicons/react/24/outline";
 import { AcademicCapIcon } from "@heroicons/react/24/solid";
 import api from "../../../services/api";
-import AlunoTable from "../../secretaria/alunos/AlunoTable";
+import AlunoTableDisciplinar from "./AlunoTableDisciplinar";
+
 import Input from "../../../components/ui/Input";
 import ModalTACE from "../../alunos/ModalTACE";
 import ModalConfirmTACE from "./ModalConfirmTACE";
@@ -311,16 +312,16 @@ export default function AlunosDisciplinar() {
 
             {erro && <p className="text-red-600 font-medium mb-4">{erro}</p>}
 
-            <AlunoTable
+            <AlunoTableDisciplinar
                 alunos={alunos}
                 loading={loading}
                 mostrarFicha={true}
                 mostrarBoletim={false}
-                onEditar={null}
-                onDelete={null}
-                onVerFicha={handleVerFicha}
                 onRelatorioDisciplinar={handleRelatorioDisciplinar}
+                onTACE={handleTACEClick}
+
             />
+
 
             {/* Loading overlay enquanto busca pontuação */}
             {loadingPontuacao && (

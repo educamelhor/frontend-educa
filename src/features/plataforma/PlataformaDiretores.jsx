@@ -190,11 +190,12 @@ export default function PlataformaDiretores() {
       // 1) Cancelar diretor atual
       await api.patch(`/api/plataforma/diretores/${subDir.id}/status`, { status: "cancelado" });
       // 2) Vincular novo
-      const papel = subDir.perfil === "militar" ? "diretor_disciplinar" : (subDir.perfil === "diretor" ? "diretor" : "diretor");
+      // ✅ [GOVERNANÇA v2] 'militar' renomeado para 'diretor_disciplinar'
+      const papel = subDir.perfil === "diretor_disciplinar" ? "diretor_disciplinar" : (subDir.perfil === "diretor" ? "diretor" : "diretor");
       // Detecta CCMDF para papel correto
       const escTipos = parseTipo(subDir.escola_tipo);
       const papelFinal = escTipos.includes("CCMDF")
-        ? (subDir.perfil === "militar" ? "diretor_disciplinar" : "diretor_pedagogico")
+        ? (subDir.perfil === "diretor_disciplinar" ? "diretor_disciplinar" : "diretor_pedagogico")
         : "diretor";
       const { data } = await api.post(`/api/plataforma/escolas/${subDir.escola_id}/diretor`, {
         nome: subNome.trim(), cpf: subCpf.replace(/\D/g, ""), email: subEmail.trim() || undefined, papel: papelFinal,

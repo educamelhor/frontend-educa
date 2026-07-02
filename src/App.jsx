@@ -17,7 +17,7 @@ import AtasDisciplinar from "./features/disciplinar/atas/AtasPage.jsx";
 import LiberacaoDisciplinar from "./features/disciplinar/liberacao/LiberacaoPage.jsx";
 import Boletim from "./features/boletim/Boletim";
 import BoletimAnual from "./features/boletim/BoletimAnual";
-import FichaAluno from "./features/alunos/FichaAluno";
+import FichaAlunoDirecao from "./features/direcao/FichaAlunoDirecao";
 import FotoAluno from "./features/alunos/FotoAluno";
 import Professores from "./features/secretaria/professores";
 import FichaProfessor from "./features/secretaria/professores/FichaProfessor";
@@ -33,6 +33,7 @@ import Login from "./features/login/Login.jsx";
 import AtivarDiretor from "./features/login/AtivarDiretor.jsx";
 import GerarGabaritos from "./features/impressao/GerarGabaritos";
 import ConselhoClasse from "./features/pedagogico/conselho/ConselhoClasse";
+import ConselhoClasseProfessor from "./features/professores/conselho/ConselhoClasseProfessor";
 import ConteudosAdmin from "./features/pedagogico/conteudos/ConteudosAdmin.jsx";
 import ConteudosProgramaticos from "./features/pedagogico/conteudos/ConteudosProgramaticos.jsx";
 import Planos from "./features/professores/planos/Planos";
@@ -199,9 +200,10 @@ function RequireBancoQuestoes({ children }) {
   return <Navigate to="/home" replace />;
 }
 
-function RequireDiretorMilitar({ children }) {
+// ✅ [GOVERNANÇA v2] RequireDiretorDisciplinar — renomeado de RequireDiretorMilitar
+function RequireDiretorDisciplinar({ children }) {
   const p = String(localStorage.getItem('perfil') || '').toLowerCase().trim();
-  if (p === 'diretor' || p === 'militar') return children;
+  if (p === 'diretor' || p === 'diretor_disciplinar') return children;
   return <Navigate to="/disciplinar/alunos" replace />;
 }
 
@@ -234,18 +236,19 @@ function RequirePerm({ perm, children }) {
   return permissoes.includes(perm) ? children : <Navigate to="/home" replace />;
 }
 
-// ── Módulos: bloqueia rota se módulo não licenciado para esta escola ──
+// ✅ [GOVERNANÇA v2] Módulos: bloqueia rota se módulo não está ativo para este usuário
+// Fallback zero: sem lista de módulos = acesso negado (menu vazio)
 function RequireModulo({ modulo, children }) {
   const getModulos = () => {
     try {
       const raw = localStorage.getItem('modulos_ativos');
-      if (!raw) return null; // null = sem restrição (backward compatible)
+      if (!raw) return []; // ✅ [GOVERNANÇA v2] sem config = acesso zero
       const arr = JSON.parse(raw);
-      return Array.isArray(arr) ? arr : null;
-    } catch { return null; }
+      return Array.isArray(arr) ? arr : [];
+    } catch { return []; }
   };
   const modulos = getModulos();
-  if (modulos !== null && !modulos.includes(modulo)) {
+  if (!modulos.includes(modulo)) {
     return <Navigate to="/home" replace />;
   }
   return children;
@@ -294,9 +297,9 @@ export default function App() {
           <Route path="/disciplinar/responsaveis" element={<RequireModulo modulo="disciplinar"><ResponsaveisDisciplinar /></RequireModulo>} />
           {/* F.O. Coletivo — Registro em Lote */}
           <Route path="/disciplinar/fo-coletivo"  element={<RequireModulo modulo="disciplinar"><FOColetivo /></RequireModulo>} />
-          {/* Gestão de Equipe (apenas Diretor e Militar) */}
+          {/* Gestão de Equipe (apenas Diretor Disciplinar e Diretor Pedagógico) */}
           <Route path="/disciplinar/equipe" element={
-            <RequireDiretorMilitar><GestaoEquipe /></RequireDiretorMilitar>
+            <RequireDiretorDisciplinar><GestaoEquipe /></RequireDiretorDisciplinar>
           } />
           <Route path="/disciplinar/historico"  element={<RequireModulo modulo="disciplinar"><HistoricoDisciplinar /></RequireModulo>} />
           <Route path="/disciplinar/atas"       element={<RequireModulo modulo="disciplinar"><AtasDisciplinar /></RequireModulo>} />
@@ -304,7 +307,8 @@ export default function App() {
           <Route path="/disciplinar/metadados"  element={<RequireModulo modulo="disciplinar"><MetadadosDisciplinar /></RequireModulo>} />
           <Route path="/disciplinar/regimentos" element={<RequireModulo modulo="disciplinar.regimentos"><RegimentosDisciplinar /></RequireModulo>} />
           <Route path="/disciplinar/manual"     element={<RequireModulo modulo="disciplinar.manual"><ManualDisciplinar /></RequireModulo>} />
-          <Route path="/disciplinar/suporte"    element={<SuporteSAC />} />
+          <Route path="/disciplinar/suporte"    element={<RequireModulo modulo="disciplinar"><SuporteSAC /></RequireModulo>} />
+
 
           {/* ── Monitoramento ────────────────────────────────────────────── */}
           <Route path="/monitoramento" element={<RequireModulo modulo="monitoramento"><RequirePerm perm="monitoramento.visualizar"><Monitoramento /></RequirePerm></RequireModulo>} />
@@ -318,7 +322,7 @@ export default function App() {
           {/* ── Alunos individuais ───────────────────────────────────────── */}
           <Route path="/alunos/:codigo/boletim"       element={<Boletim />} />
           <Route path="/alunos/:codigo/boletim-anual" element={<BoletimAnual />} />
-          <Route path="/alunos/:codigo/ficha"         element={<FichaAluno />} />
+          <Route path="/alunos/:codigo/ficha"         element={<FichaAlunoDirecao />} />
           <Route path="/alunos/:codigo/foto-lote"     element={<FotoAluno />} />
           <Route path="/questoes" element={<RequireModulo modulo="questoes"><RequireBancoQuestoes><BancoQuestoes /></RequireBancoQuestoes></RequireModulo>} />
 
@@ -351,7 +355,7 @@ export default function App() {
           <Route path="/gabarito/corrigir"     element={<RequireModulo modulo="gabarito"><GabaritoModule /></RequireModulo>} />
           <Route path="/gabarito/resultados"   element={<RequireModulo modulo="gabarito"><GabaritoModule /></RequireModulo>} />
           <Route path="/pedagogico/conselho" element={<RequireModulo modulo="pedagogico"><ConselhoClasse /></RequireModulo>} />
-          <Route path="/professores/conselho" element={<RequireModulo modulo="professores"><ConselhoClasse /></RequireModulo>} />
+          <Route path="/professores/conselho" element={<RequireModulo modulo="professores"><ConselhoClasseProfessor /></RequireModulo>} />
           <Route path="/pedagogico/conteudos" element={
             <RequireModulo modulo="pedagogico"><RequirePerm perm="conteudos:ver"><ConteudosAdmin /></RequirePerm></RequireModulo>
           } />

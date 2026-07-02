@@ -515,10 +515,34 @@ function StatusBadge({ status }) {
   );
 }
 
+// ── Lista de perfis gerenciáveis pelo CEO (militares fixos não entram) ────────
+const PERFIS_LISTA = [
+  { key: 'professor',             label: 'Professor' },
+  { key: 'coordenador',           label: 'Coordenador' },
+  { key: 'supervisor',            label: 'Supervisor' },
+  { key: 'pedagogo',              label: 'Pedagogo' },
+  { key: 'secretario',            label: 'Secretário' },
+  { key: 'secretaria',            label: 'Secretaria' },
+  { key: 'orientador',            label: 'Orientador' },
+  { key: 'aluno',                 label: 'Aluno' },
+  { key: 'biblioteca',            label: 'Biblioteca' },
+  { key: 'educador_social',       label: 'Educador Social' },
+  { key: 'merenda',               label: 'Merenda' },
+  { key: 'psicologo',             label: 'Psicólogo' },
+  { key: 'responsavel',           label: 'Responsável' },
+  { key: 'vice_diretor',          label: 'Vice-Diretor' },
+  { key: 'vigilancia',            label: 'Vigilância' },
+  { key: 'visitante',             label: 'Visitante' },
+  { key: 'subcomandante',         label: 'Subcomandante' },
+  { key: 'supervisor_disciplinar',label: 'Supervisor Disciplinar' },
+  { key: 'monitor_disciplinar',   label: 'Monitor Disciplinar' },
+];
+
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function PlataformaModulos() {
   const [escolas, setEscolas] = useState([]);
   const [escolaId, setEscolaId] = useState(null);
+  const [perfilSel, setPerfilSel] = useState(null); // perfil selecionado (Passo 5)
   const [modulosAtivos, setModulosAtivos] = useState(new Set());
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -625,20 +649,22 @@ export default function PlataformaModulos() {
     } finally { setManutSaving(false); }
   };
 
-  // ── Load modules for a school ───────────────────────────────────────────────
-  const fetchModulos = useCallback(async (id) => {
+  // ── Load modules for a school (+ optional perfil) ─────────────────────────
+  const fetchModulos = useCallback(async (id, perfil) => {
     if (!id) return;
     setLoading(true);
     setError(null);
     try {
-      const { data } = await api.get(`/api/plataforma/modulos/${id}`);
+      const url = perfil
+        ? `/api/plataforma/modulos/${id}/perfil/${perfil}`
+        : `/api/plataforma/modulos/${id}`;
+      const { data } = await api.get(url);
       const list = Array.isArray(data?.modulos) ? data.modulos : [];
       const ativos = new Set(
         list.filter(m => m.ativo).map(m => m.modulo)
       );
 
       // ── Normalizar estado: se filho está ativo, pai DEVE estar ativo ──────
-      // Corrige estados inconsistentes que possam ter sido salvos no banco.
       MODULOS_TREE.forEach(grupo => {
         if (grupo.filhos.length > 0) {
           const algumFilhoAtivo = grupo.filhos.some(f => ativos.has(f.id));
@@ -654,11 +680,12 @@ export default function PlataformaModulos() {
       });
 
       setModulosAtivos(ativos);
-      // Update count cache
-      setSchoolModulosCounts(prev => ({ ...prev, [id]: ativos.size }));
+      if (!perfil) {
+        setSchoolModulosCounts(prev => ({ ...prev, [id]: ativos.size }));
+      }
     } catch (err) {
       console.error('[PlataformaModulos] erro ao buscar módulos:', err);
-      setError('Não foi possível carregar os módulos desta escola.');
+      setError('Não foi possível carregar os módulos.');
       setModulosAtivos(new Set());
     } finally {
       setLoading(false);
@@ -668,10 +695,19 @@ export default function PlataformaModulos() {
   const selectEscola = useCallback((id) => {
     if (id === escolaId) return;
     setEscolaId(id);
+    setPerfilSel(null);     // reseta perfil ao trocar de escola
+    setModulosAtivos(new Set());
     setSaved(false);
     setError(null);
-    fetchModulos(id);
-  }, [escolaId, fetchModulos]);
+  }, [escolaId]);
+
+  const selectPerfil = useCallback((perfil) => {
+    if (perfil === perfilSel) return;
+    setPerfilSel(perfil);
+    setSaved(false);
+    setError(null);
+    if (escolaId) fetchModulos(escolaId, perfil);
+  }, [perfilSel, escolaId, fetchModulos]);
 
   // ── Toggle logic ────────────────────────────────────────────────────────────
   const handleToggle = useCallback((id, type, grupo) => {
@@ -746,9 +782,10 @@ export default function PlataformaModulos() {
     });
   }, []);
 
-  // ── Save ────────────────────────────────────────────────────────────────────
+  // ── Save (por perfil quando perfilSel definido) ────────────────────────────
   const salvar = useCallback(async () => {
     if (!escolaId) return;
+    if (!perfilSel) { setError('Selecione um perfil antes de salvar.'); return; }
     setSaving(true);
     setError(null);
     try {
@@ -763,9 +800,8 @@ export default function PlataformaModulos() {
           });
         }
       });
-      await api.put(`/api/plataforma/modulos/${escolaId}`, { modulos });
+      await api.put(`/api/plataforma/modulos/${escolaId}/perfil/${perfilSel}`, { modulos });
       setSaved(true);
-      setSchoolModulosCounts(prev => ({ ...prev, [escolaId]: modulosAtivos.size }));
       setTimeout(() => setSaved(false), 3000);
     } catch (err) {
       console.error('[PlataformaModulos] erro ao salvar:', err);
@@ -773,17 +809,17 @@ export default function PlataformaModulos() {
     } finally {
       setSaving(false);
     }
-  }, [escolaId, modulosAtivos]);
+  }, [escolaId, perfilSel, modulosAtivos]);
 
-  // ── Copy from another school ────────────────────────────────────────────────
+  // ── Copy from another school (por perfil) ──────────────────────────────────
   const copiarDe = useCallback(async (origemId) => {
-    if (!escolaId) return;
+    if (!escolaId || !perfilSel) return;
     setShowCopyModal(false);
     setLoading(true);
     setCopyError(null);
     try {
-      await api.post(`/api/plataforma/modulos/${escolaId}/copiar-de/${origemId}`);
-      await fetchModulos(escolaId);
+      await api.post(`/api/plataforma/modulos/${escolaId}/copiar-de/${origemId}/perfil/${perfilSel}`);
+      await fetchModulos(escolaId, perfilSel);
       setSaved(false);
     } catch (err) {
       console.error('[PlataformaModulos] erro ao copiar:', err);
@@ -791,7 +827,7 @@ export default function PlataformaModulos() {
     } finally {
       setLoading(false);
     }
-  }, [escolaId, fetchModulos]);
+  }, [escolaId, perfilSel, fetchModulos]);
 
   // ── Derived values ──────────────────────────────────────────────────────────
   const escolaSelecionada = escolas.find(e => e.id === escolaId) || null;
@@ -1287,10 +1323,86 @@ export default function PlataformaModulos() {
           </div>
         </div>
 
+        {/* ── CENTER: Profile List ── */}
+        <div style={{
+          width: 210, flexShrink: 0,
+          background: 'rgba(255,255,255,0.02)',
+          borderRight: '1px solid rgba(255,255,255,0.06)',
+          display: 'flex', flexDirection: 'column',
+          position: 'sticky', top: 0,
+          maxHeight: 'calc(100vh - 200px)',
+          overflowY: 'auto',
+        }}>
+          <div style={{
+            padding: '20px 16px 14px',
+            borderBottom: '1px solid rgba(255,255,255,0.05)',
+            position: 'sticky', top: 0, zIndex: 10,
+            background: 'rgba(15,23,42,0.95)',
+            backdropFilter: 'blur(12px)',
+          }}>
+            <div style={{
+              fontSize: '0.65rem', fontWeight: 800,
+              color: 'rgba(148,163,184,0.6)',
+              textTransform: 'uppercase', letterSpacing: '0.06em',
+            }}>
+              Perfis ({PERFIS_LISTA.length})
+            </div>
+          </div>
+          <div style={{ flex: 1, padding: '10px 10px' }}>
+            {!escolaId ? (
+              <div style={{
+                padding: '24px 12px', textAlign: 'center',
+                color: 'rgba(148,163,184,0.35)', fontSize: '0.78rem',
+              }}>
+                Selecione uma escola
+              </div>
+            ) : (
+              PERFIS_LISTA.map(p => {
+                const isSel = p.key === perfilSel;
+                return (
+                  <div
+                    key={p.key}
+                    onClick={() => selectPerfil(p.key)}
+                    style={{
+                      padding: '10px 12px',
+                      borderRadius: 10,
+                      marginBottom: 4,
+                      cursor: 'pointer',
+                      background: isSel
+                        ? 'linear-gradient(135deg, rgba(16,185,129,0.18), rgba(5,150,105,0.1))'
+                        : 'transparent',
+                      border: isSel
+                        ? '1px solid rgba(16,185,129,0.35)'
+                        : '1px solid transparent',
+                      boxShadow: isSel ? '0 4px 12px rgba(16,185,129,0.15)' : 'none',
+                      transition: 'all 0.15s',
+                      display: 'flex', alignItems: 'center', gap: 8,
+                    }}
+                  >
+                    <div style={{
+                      width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+                      background: isSel ? '#10b981' : 'rgba(148,163,184,0.25)',
+                      transition: 'background 0.15s',
+                    }} />
+                    <span style={{
+                      fontSize: '0.82rem',
+                      fontWeight: isSel ? 700 : 500,
+                      color: isSel ? '#34d399' : 'rgba(203,213,225,0.75)',
+                      transition: 'color 0.15s',
+                    }}>
+                      {p.label}
+                    </span>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+
         {/* ── RIGHT: Module tree ── */}
         <div style={S.rightPanel}>
 
-          {/* Empty state */}
+          {/* Empty state — sem escola */}
           {!escolaId && (
             <div style={{
               display: 'flex', flexDirection: 'column',
@@ -1308,7 +1420,7 @@ export default function PlataformaModulos() {
                 fontSize: '0.9rem', color: 'rgba(148,163,184,0.45)',
                 maxWidth: 340, lineHeight: 1.6,
               }}>
-                Escolha uma escola na lista à esquerda para configurar quais módulos ela tem acesso.
+                Escolha uma escola na lista à esquerda e depois um perfil para configurar os módulos.
               </div>
               <div style={{
                 marginTop: 32, display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center',
@@ -1336,8 +1448,31 @@ export default function PlataformaModulos() {
             </div>
           )}
 
-          {/* School selected */}
-          {escolaId && (
+          {/* Empty state — escola selecionada mas sem perfil */}
+          {escolaId && !perfilSel && (
+            <div style={{
+              display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center',
+              minHeight: 480, textAlign: 'center',
+            }}>
+              <div style={{ fontSize: '4rem', marginBottom: 20 }}>👤</div>
+              <div style={{
+                fontSize: '1.2rem', fontWeight: 700, color: 'rgba(226,232,240,0.7)',
+                marginBottom: 12,
+              }}>
+                Selecione um perfil
+              </div>
+              <div style={{
+                fontSize: '0.88rem', color: 'rgba(148,163,184,0.45)',
+                maxWidth: 320, lineHeight: 1.6,
+              }}>
+                Escolha um perfil de usuário na coluna central para configurar quais módulos ele terá acesso nesta escola.
+              </div>
+            </div>
+          )}
+
+          {/* Escola + Perfil selecionados */}
+          {escolaId && perfilSel && (
             <div className="mod-fade">
 
               {/* Top action bar */}
@@ -1347,11 +1482,19 @@ export default function PlataformaModulos() {
               }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{
-                    fontSize: '1.25rem', fontWeight: 800, color: '#f1f5f9',
+                    fontSize: '1.1rem', fontWeight: 800, color: '#f1f5f9',
                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    marginBottom: 4,
+                    marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
                   }}>
                     {escolaSelecionada?.nome || '—'}
+                    <span style={{
+                      background: 'linear-gradient(135deg, rgba(16,185,129,0.2), rgba(5,150,105,0.1))',
+                      border: '1px solid rgba(16,185,129,0.35)',
+                      color: '#34d399', fontSize: '0.75rem', fontWeight: 700,
+                      padding: '3px 10px', borderRadius: 20,
+                    }}>
+                      👤 {PERFIS_LISTA.find(p => p.key === perfilSel)?.label || perfilSel}
+                    </span>
                   </div>
                   <div style={{
                     display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',

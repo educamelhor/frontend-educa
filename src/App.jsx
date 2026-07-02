@@ -248,7 +248,10 @@ function RequireModulo({ modulo, children }) {
     } catch { return []; }
   };
   const modulos = getModulos();
-  if (!modulos.includes(modulo)) {
+  // Aceita: módulo exato ('frequencia') OU qualquer submódulo ('frequencia.atestados')
+  // Isso permite que professor com 'frequencia.atestados' acesse /frequencia/atestados
+  const temAcesso = modulos.some(m => m === modulo || m.startsWith(modulo + '.'));
+  if (!temAcesso) {
     return <Navigate to="/home" replace />;
   }
   return children;

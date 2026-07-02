@@ -86,6 +86,38 @@ const CATEGORY_META = {
 
 // Categorias serão exibidas na ordem retornada pelo backend (definida pelo CEO)
 
+// Mapa de labels com acentuação correta para cada perfil
+const PERFIL_LABELS = {
+  // Pedagógicos
+  professor:        'Professor',
+  coordenador:      'Coordenador',
+  supervisor:       'Supervisor',
+  pedagogo:         'Pedagogo',
+  secretario:       'Secretário',
+  secretaria:       'Secretaria',
+  orientador:       'Orientador',
+  // Novos perfis
+  aluno:            'Aluno',
+  biblioteca:       'Biblioteca',
+  educador_social:  'Educador Social',
+  merenda:          'Merenda',
+  psicologo:        'Psicólogo',
+  responsavel:      'Responsável',
+  vice_diretor:     'Vice-diretor',
+  vigilancia:       'Vigilância',
+  visitante:        'Visitante',
+  // Disciplinares
+  subcomandante:         'Subcomandante',
+  supervisor_disciplinar:'Supervisor Disciplinar',
+  monitor_disciplinar:   'Monitor Disciplinar',
+};
+
+// Helper para obter label com fallback
+const getPerfilLabel = (pfil) =>
+  PERFIL_LABELS[pfil] ||
+  pfil.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+
 export default function Governanca() {
   const [activeTab, setActiveTab] = useState("configs"); // 'configs' | 'logos' | 'acessos'
   const [configsPorCategoria, setConfigsPorCategoria] = useState({});
@@ -485,7 +517,7 @@ export default function Governanca() {
                       transition: "all 0.15s ease",
                     }}
                   >
-                    {pfil.replace(/_/g, " ")}
+                    {getPerfilLabel(pfil)}
                   </button>
                 ))}
               </div>

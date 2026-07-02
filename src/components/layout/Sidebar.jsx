@@ -459,8 +459,8 @@ export default function Sidebar({ isOpen, onClose }) {
             </Link>
             )}
 
-            {/* LINK: Estudantes */}
-            {!isDisciplinar && !isProfessor && !isCoord && !isSecretario && hasModulo('secretaria.alunos') && (
+            {/* LINK: Estudantes — só aparece se CEO configurou módulo 'estudantes' explicitamente */}
+            {!isDisciplinar && !isProfessor && !isCoord && !isSecretario && hasModulo('estudantes') && (
             <Link to="/alunos" className={getMainLinkClasses('/alunos')}>
               <UserGroupIcon className="h-5 w-5 mr-2" />
               Estudantes
@@ -1805,10 +1805,24 @@ export default function Sidebar({ isOpen, onClose }) {
           </>
         )}
 
-        {/* ───────────────────────────────
+        {/* ───────────────
             Plataforma (CEO)
             ✅ REMOVIDO do Sistema Escolar: a plataforma é uma SPA separada
-        ─────────────────────────────── */}
+        ─────────────── */}
+
+        {/* LINK: Suporte Genérico — sempre visível para qualquer usuário de escola
+            Módulo genérico junto com HOME: renderiza independente de configurações CEO/Diretor.
+            Não renderiza para: CEO (usa /plataforma/suporte) nem disciplinar (usa /disciplinar/suporte) */}
+        {isScopeEscola && !isDisciplinar && (
+          <Link
+            to="/suporte"
+            className={getMainLinkClasses('/suporte')}
+            style={{ marginTop: 16, borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: 12 }}
+          >
+            <QuestionMarkCircleIcon className="h-5 w-5 mr-2" />
+            Suporte
+          </Link>
+        )}
 
       </nav>
     </aside>

@@ -260,9 +260,10 @@ export default function Governanca() {
     if (!perfilAcessoSel || savingAcessos) return;
     const modulosPayload = modulosPerfil.map(m => ({
       modulo: m.modulo,
+      // Padrão (não configurado pelo Diretor) = igual ao CEO (ceo_ativo = true)
       ativo: pendingAcessos[m.modulo] !== undefined
         ? pendingAcessos[m.modulo]
-        : (m.diretor_ativo ?? false),
+        : (m.diretor_ativo ?? m.ceo_ativo),
     }));
     setSavingAcessos(true);
     try {
@@ -564,7 +565,8 @@ export default function Governanca() {
                         {modulosPerfil.map(m => {
                           const ativoAtual = pendingAcessos[m.modulo] !== undefined
                             ? pendingAcessos[m.modulo]
-                            : (m.diretor_ativo ?? false);
+                            // Padrão: herda CEO (diretor_ativo=null = igual ao CEO = liberado)
+                            : (m.diretor_ativo ?? m.ceo_ativo);
                           const isPending = pendingAcessos[m.modulo] !== undefined;
                           return (
                             <div
@@ -582,7 +584,7 @@ export default function Governanca() {
                                   {isPending && <span style={{ marginLeft: 8, fontSize: 11, color: "#f59e0b", fontWeight: 700 }}>● alterado</span>}
                                 </div>
                                 <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>
-                                  {m.diretor_ativo === null ? "⚠️ não configurado (padrão: desabilitado)" : ativoAtual ? "✅ acesso liberado" : "❌ sem acesso"}
+                                  {m.diretor_ativo === null ? "✅ padrão CEO (não restringido pelo Diretor)" : ativoAtual ? "✅ acesso liberado pelo Diretor" : "❌ restringido pelo Diretor"}
                                 </div>
                               </div>
                               {/* Toggle switch */}

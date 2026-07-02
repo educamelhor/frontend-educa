@@ -456,13 +456,11 @@ export default function Sidebar({ isOpen, onClose }) {
           </>
         ) : (
           <>
-            {/* LINK: Home — sempre visível para qualquer perfil de escola não-disciplinar */}
-            {!isDisciplinar && !isProfessor && !isSecretario && (
+            {/* LINK: Home — módulo genérico universal: renderiza para TODOS os usuários sem restrição */}
             <Link to="/home" className={getMainLinkClasses('/home')}>
               <HomeIcon className="h-5 w-5 mr-2" />
               Home
             </Link>
-            )}
 
             {/* LINK: Estudantes — só aparece se CEO configurou módulo 'estudantes' explicitamente */}
             {!isDisciplinar && !isProfessor && !isCoord && !isSecretario && hasModulo('estudantes') && (
@@ -1815,10 +1813,10 @@ export default function Sidebar({ isOpen, onClose }) {
             ✅ REMOVIDO do Sistema Escolar: a plataforma é uma SPA separada
         ─────────────── */}
 
-        {/* LINK: Suporte Genérico — sempre visível para qualquer usuário de escola
-            Módulo genérico junto com HOME: renderiza independente de configurações CEO/Diretor.
-            Não renderiza para: CEO (usa /plataforma/suporte) nem disciplinar (usa /disciplinar/suporte) */}
-        {isScopeEscola && !isDisciplinar && (
+        {/* LINK: Suporte Genérico — módulo genérico universal: renderiza para TODOS os usuários
+            Independente de perfil (militar, professor, secretário, coordenador, etc.).
+            CEO usa /plataforma/suporte (SPA separada) — não entra neste branch. */}
+        {isScopeEscola && (
           <Link
             to="/suporte"
             className={getMainLinkClasses('/suporte')}

@@ -15,7 +15,7 @@
 
 import React, { useState, useEffect } from "react";
 import api from "../../../services/api";
-import ModalBoletim from "../../boletim/ModalBoletim";
+import ModalBoletimAnual from "../../boletim/ModalBoletimAnual";
 import ModalZoomFoto from "../../pedagogico/conselho/ModalZoomFoto";
 import ModalRegistroConselhoProfessor from "./ModalRegistroConselhoProfessor";
 import ModalFichaAlunoProfessor from "./ModalFichaAlunoProfessor";
@@ -347,9 +347,9 @@ export default function ConselhoClasseProfessor() {
         />
       )}
 
-      {/* Modal: Boletim */}
+      {/* Modal: Boletim — usa BoletimAnual (apenas ano letivo atual) */}
       {modalBoletimOpen && (
-        <ModalBoletim
+        <ModalBoletimAnual
           open={modalBoletimOpen}
           codigo={codigoAlunoBoletim}
           onClose={() => setModalBoletimOpen(false)}

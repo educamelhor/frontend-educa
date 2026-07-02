@@ -627,7 +627,7 @@ export default function Sidebar({ isOpen, onClose }) {
             )}
 
             {/* ─── FREQUÊNCIA (professor): sempre aberto, só Frequência + Atestados ─── */}
-            {isProfessor && (
+            {isProfessor && hasModulo('frequencia') && (
               <>
                 <div
                   className="flex items-center w-full py-2 px-3 rounded mt-2"

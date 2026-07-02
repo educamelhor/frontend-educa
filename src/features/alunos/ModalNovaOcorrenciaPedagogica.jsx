@@ -120,11 +120,15 @@ export default function ModalNovaOcorrenciaPedagogica({
     const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
     const [cancelando, setCancelando] = useState(false);
 
+    // Normaliza perfil para evitar bugs de casing (BUG 6)
+    const perfilNorm = String(perfilUsuario || "").toLowerCase().trim();
+
     // Perfis que podem convocar responsável
-    const isPerfConvocacao = ["coordenador", "supervisor", "diretor", "vice_diretor", "diretor_disciplinar"].includes(perfilUsuario);
+    const isPerfConvocacao = ["coordenador", "supervisor", "diretor", "vice_diretor", "diretor_disciplinar"].includes(perfilNorm);
 
     // Professor não visualiza Descrição nem Registro Interno
-    const isProfessor = String(perfilUsuario || "").toLowerCase().trim() === "professor";
+    const isProfessor = perfilNorm === "professor";
+
 
     // Itens filtrados pela categoria selecionada
     const itensFiltrados = React.useMemo(() => {

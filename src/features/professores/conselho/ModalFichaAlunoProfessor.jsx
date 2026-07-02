@@ -1,27 +1,22 @@
-// src/features/pedagogico/conselho/ModalFichaAluno.jsx
-// Usa FichaAlunoPedagogico (ISOLADO: apenas Relatório Pedagógico)
+// src/features/professores/conselho/ModalFichaAlunoProfessor.jsx
+// ============================================================
+// Modal wrapper — usa FichaAlunoProfessor (ISOLADO)
+// Professor vê apenas Relatório Pedagógico — edita apenas seus registros
+// ============================================================
 import React, { useEffect, useRef } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
-import FichaAlunoPedagogico from "./FichaAlunoPedagogico";
+import FichaAlunoProfessor from "./FichaAlunoProfessor";
 
-export default function ModalFichaAluno({ open, codigo, onClose }) {
+export default function ModalFichaAlunoProfessor({ open, codigo, onClose }) {
   const dialogRef = useRef(null);
 
   useEffect(() => {
     if (!open) return;
-
-    // trava o scroll do body e habilita fechar com ESC
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
-
-    const onKey = (e) => {
-      if (e.key === "Escape") onClose?.();
-    };
+    const onKey = (e) => { if (e.key === "Escape") onClose?.(); };
     window.addEventListener("keydown", onKey);
-
-    // foca no modal para acessibilidade
     setTimeout(() => dialogRef.current?.focus(), 0);
-
     return () => {
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = prevOverflow;
@@ -44,13 +39,13 @@ export default function ModalFichaAluno({ open, codigo, onClose }) {
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-label="Ficha do Estudante"
+        aria-label="Ficha do Estudante — Professor"
         tabIndex={-1}
         className="relative bg-white rounded-2xl shadow-2xl w-[95vw] max-w-6xl h-[90vh] overflow-hidden outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b">
-          <h2 className="text-lg font-semibold text-blue-900">Ficha do Estudante</h2>
+          <h2 className="text-lg font-semibold text-purple-900">Ficha do Estudante</h2>
           <button
             type="button"
             onClick={onClose}
@@ -61,9 +56,9 @@ export default function ModalFichaAluno({ open, codigo, onClose }) {
           </button>
         </div>
 
-        {/* A ficha funciona em modo "modal" quando recebe o código por prop */}
-        <div className="w-full h-full overflow-auto p-4 bg-blue-50">
-          <FichaAlunoPedagogico codigo={codigo} />
+        {/* FichaAlunoProfessor — sem disciplinar, sem upload */}
+        <div className="w-full h-full overflow-auto p-4 bg-purple-50">
+          <FichaAlunoProfessor codigo={codigo} />
         </div>
       </div>
     </div>

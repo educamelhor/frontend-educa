@@ -1,7 +1,7 @@
 // src/features/disciplinar/alunos/ModalFichaAluno.jsx
-// Wrapper modal que reutiliza o FichaAluno premium já existente no módulo /alunos
+// Wrapper modal — usa FichaAlunoDisciplinar (ISOLADO: apenas Relatório Disciplinar)
 import React from 'react';
-import FichaAluno from '../../alunos/FichaAluno';
+import FichaAlunoDisciplinar from './FichaAlunoDisciplinar';
 
 export default function ModalFichaAluno({ open, codigo, onClose }) {
   if (!open || !codigo) return null;
@@ -41,7 +41,7 @@ export default function ModalFichaAluno({ open, codigo, onClose }) {
 
         {/* Conteúdo — FichaAluno premium */}
         <div style={{ padding: '0 0 16px' }}>
-          <FichaAluno codigo={codigo} />
+          <FichaAlunoDisciplinar codigo={codigo} />
         </div>
       </div>
     </div>

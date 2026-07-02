@@ -18,7 +18,7 @@ import api from "../../../services/api";
 import ModalBoletim from "../../boletim/ModalBoletim";
 import ModalZoomFoto from "../../pedagogico/conselho/ModalZoomFoto";
 import ModalRegistroConselhoProfessor from "./ModalRegistroConselhoProfessor";
-import ModalFichaAluno from "../../pedagogico/conselho/ModalFichaAluno";
+import ModalFichaAlunoProfessor from "./ModalFichaAlunoProfessor";
 import { EyeIcon, DocumentTextIcon, IdentificationIcon } from "@heroicons/react/24/outline";
 import { getFotoURL } from "../../../utils/foto";
 
@@ -338,9 +338,9 @@ export default function ConselhoClasseProfessor() {
         />
       )}
 
-      {/* Modal: Ficha do Aluno (FichaAluno oculta disciplinar e upload p/ professor) */}
+      {/* Modal: Ficha do Aluno — isolado para professor (sem disciplinar, sem upload) */}
       {modalFichaOpen && (
-        <ModalFichaAluno
+        <ModalFichaAlunoProfessor
           open={modalFichaOpen}
           codigo={codigoAlunoFicha}
           onClose={() => setModalFichaOpen(false)}

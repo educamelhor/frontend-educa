@@ -30,16 +30,19 @@ import {
   XMarkIcon,
   BoltIcon,
 } from '@heroicons/react/24/outline';
+import {
+  PERFIS_MILITARES_SET,
+  PERFIS_GESTAO_EQUIPE,
+  PERFIS_GOVERNANCA,
+  PERFIS_SEM_AGENTE_EDUCA,
+  getInitialOpenGroup,
+} from './SidebarGuards';
+// ⚠️  Guards de acesso centralizados em SidebarGuards.js
+//    Edite AQUELE arquivo para alterar regras de visibilidade por perfil.
 
 export default function Sidebar({ isOpen, onClose }) {
-  // Para perfis disciplinares o grupo Disciplinar fica sempre expandido
-  // ✅ [GOVERNANÇA v2] 'militar' renomeado para 'diretor_disciplinar'
-  const [openGroup, setOpenGroup] = useState(
-    () => {
-      const p = String(localStorage.getItem('perfil') || '').toLowerCase().trim();
-      return (p === 'diretor_disciplinar' || p === 'comandante') ? 'disciplinar' : null;
-    }
-  );
+  // Guards de acesso: lidos de SidebarGuards.js (arquivo protegido)
+  const [openGroup, setOpenGroup] = useState(getInitialOpenGroup);
   const [openCorrecoes, setOpenCorrecoes] = useState(false);
   const [openGabaritoPed, setOpenGabaritoPed] = useState(false);
   const location = useLocation();
@@ -168,17 +171,13 @@ export default function Sidebar({ isOpen, onClose }) {
   const getPerfil = () =>
     String(localStorage.getItem('perfil') || '').toLowerCase().trim();
   const perfil = getPerfil();
-  // Regra de Ouro: TODOS os perfis militares veem apenas o módulo DISCIPLINAR
-  // Deve ser igual a PERFIS_MILITARES no backend (auth.js)
-  const PERFIS_MILITARES_SET = new Set([
-    'disciplinar', 'diretor_disciplinar', 'comandante',
-    'subcomandante', 'supervisor_disciplinar', 'monitor_disciplinar',
-  ]);
+  // ⚠️  PERFIS_MILITARES_SET importado de SidebarGuards.js
+  //    Para alterar quem é 'disciplinar', edite SidebarGuards.js
   const isDisciplinar = PERFIS_MILITARES_SET.has(perfil);
   const isProfessor = perfil === 'professor';
   const isSecretario = perfil === 'secretario' || perfil === 'secretaria';
 
-  // Começando pelos 3 módulos solicitados
+  // Iniciando pelos 3 módulos solicitados
   const canConteudos = isScopeEscola && !isDisciplinar && !isProfessor && hasPerm('conteudos:ver');
   const canAvaliacoes = isScopeEscola && !isDisciplinar && !isProfessor && hasPerm('avaliacoes.visualizar');
   const canMonitoramento = isScopeEscola && !isDisciplinar && !isProfessor && hasPerm('monitoramento.visualizar');
@@ -186,10 +185,11 @@ export default function Sidebar({ isOpen, onClose }) {
   // Direção (Diretor) — Devices EDUCA-CAPTURE
   const canDirecaoDevices = isScopeEscola && !isDisciplinar && !isProfessor && hasPerm('capture_devices.gerenciar');
 
-  // Governança — Diretor, Vice-Diretor E Diretor Disciplinar (cada um vê apenas seu domínio)
-  const canGovernanca = isScopeEscola && !isProfessor && (perfil === 'diretor' || perfil === 'vice_diretor' || perfil === 'diretor_disciplinar');
+  // ⚠️  PERFIS_GOVERNANCA importado de SidebarGuards.js
+  //    Inclui diretor_disciplinar (GOVERNANÇA v2) — NÃO remover
+  const canGovernanca = isScopeEscola && !isProfessor && PERFIS_GOVERNANCA.includes(perfil);
 
-  // Banco de Questões — restrito a Direção e Coordenação (em desenvolvimento/aprovação)
+  // Banco de Questões — restrito a Direção e Coordenação
   const canBancoQuestoes = isScopeEscola && !isDisciplinar && (perfil === 'diretor' || perfil === 'vice_diretor' || perfil === 'coordenador');
 
   // ── Governança: controle de acesso ao Gabarito ──
@@ -234,8 +234,9 @@ export default function Sidebar({ isOpen, onClose }) {
   // Governança: perfis com acesso administrativo completo ao Gabarito (Gerar + Corrigir Lote)
   const canGabaritoAdmin = canGabarito && !isProfessor && !isCoord;
 
-  // ✅ [GOVERNANÇA v2] Agente EDUCA: disponível a TODOS exceto disciplinar e comandante (CCMDF)
-  const isMilitar = perfil === 'diretor_disciplinar' || perfil === 'comandante';
+  // ⚠️  PERFIS_SEM_AGENTE_EDUCA importado de SidebarGuards.js
+  //    Usa diretor_disciplinar, NÃO 'militar' (GOVERNANÇA v2)
+  const isMilitar = PERFIS_SEM_AGENTE_EDUCA.has(perfil);
   const canAgenteEduca = isScopeEscola && !isMilitar;
 
 
@@ -1110,7 +1111,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
                 )}
-                {(perfil === 'diretor' || perfil === 'diretor_disciplinar') && (
+                {PERFIS_GESTAO_EQUIPE.has(perfil) && (
                 <li>
                   <Link
                     to="/disciplinar/equipe"

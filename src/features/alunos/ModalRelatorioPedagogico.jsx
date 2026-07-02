@@ -7,7 +7,7 @@ import { AcademicCapIcon } from "@heroicons/react/24/solid";
 import api from "../../services/api";
 import ModalNovaOcorrenciaPedagogica from "./ModalNovaOcorrenciaPedagogica";
 
-export default function ModalRelatorioPedagogico({ open, onClose, aluno, somenteLeitura = false, usuarioLogadoId = 0, perfilUsuario = '' }) {
+export default function ModalRelatorioPedagogico({ open, onClose, aluno }) {
     const [novaOcorrenciaOpen, setNovaOcorrenciaOpen] = useState(false);
     const [ocorrenciaSelecionada, setOcorrenciaSelecionada] = useState(null);
     const [viewMode, setViewMode] = useState(false);
@@ -29,19 +29,7 @@ export default function ModalRelatorioPedagogico({ open, onClose, aluno, somente
     const [ocorrenciaParaExcluir, setOcorrenciaParaExcluir] = useState(null);
     const [excluindo, setExcluindo] = useState(false);
 
-    const perfil = perfilUsuario
-        ? String(perfilUsuario).toLowerCase().trim()
-        : String(localStorage.getItem("perfil") || "").toLowerCase().trim();
-
-    // Para professor: pode editar/excluir apenas seus próprios registros
-    const isProfessor = perfil === 'professor';
-    const podeEditarExcluir = (oc) => {
-        if (somenteLeitura) return false;
-        if (!isProfessor) return true; // coordenador, diretor, etc.
-        const logadoId = Number(usuarioLogadoId || 0);
-        const autorId = Number(oc.usuario_registro_id || 0);
-        return logadoId > 0 && logadoId === autorId;
-    };
+    const perfil = String(localStorage.getItem("perfil") || "").toLowerCase();
 
     useEffect(() => {
         if (open && aluno?.id) {
@@ -222,9 +210,7 @@ export default function ModalRelatorioPedagogico({ open, onClose, aluno, somente
                             </div>
                         </div>
 
-                        {/* Botão Adicionar — oculto em modo somenteLeitura */}
                         <div className="flex-shrink-0">
-                            {!somenteLeitura && (
                             <button
                                 onClick={() => {
                                     setOcorrenciaSelecionada(null);
@@ -236,7 +222,6 @@ export default function ModalRelatorioPedagogico({ open, onClose, aluno, somente
                             >
                                 + Adicionar
                             </button>
-                            )}
                         </div>
                     </div>
 
@@ -249,7 +234,6 @@ export default function ModalRelatorioPedagogico({ open, onClose, aluno, somente
                                     <th className="px-4 py-3 font-semibold text-gray-700">Categoria</th>
                                     <th className="px-4 py-3 font-semibold text-gray-700">Data</th>
                                     <th className="px-4 py-3 font-semibold text-gray-700">Ocorrência</th>
-                                    <th className="px-4 py-3 font-semibold text-gray-700">Registrado por</th>
                                     <th className="px-4 py-3 font-semibold text-gray-700">Status</th>
                                     <th className="px-4 py-3 font-semibold text-gray-700 text-center">Ações</th>
                                 </tr>
@@ -297,10 +281,6 @@ export default function ModalRelatorioPedagogico({ open, onClose, aluno, somente
                                                     </div>
                                                 )}
                                             </td>
-                                            {/* Coluna: Registrado por */}
-                                            <td className="px-4 py-3 text-gray-600 text-xs">
-                                                {oc.nome_usuario_registro || '—'}
-                                            </td>
                                             <td className="px-4 py-3">
                                                 <span className={`px-2 py-1 text-xs font-medium rounded-full border ${statusBadge(oc.status)}`}>
                                                     {oc.status}
@@ -308,8 +288,6 @@ export default function ModalRelatorioPedagogico({ open, onClose, aluno, somente
                                             </td>
                                             <td className="px-4 py-3 text-center">
                                                 <div className="flex justify-center gap-2">
-                                                    {/* Finalizar — oculto para professor */}
-                                                    {!isProfessor && (
                                                     <button
                                                         onClick={() => handleOpenFinalizar(oc)}
                                                         disabled={oc.status === "CANCELADA"}
@@ -324,8 +302,6 @@ export default function ModalRelatorioPedagogico({ open, onClose, aluno, somente
                                                     >
                                                         <ClipboardDocumentCheckIcon className="h-5 w-5" />
                                                     </button>
-                                                    )}
-                                                    {/* Visualizar */}
                                                     <button
                                                         onClick={() => {
                                                             setOcorrenciaSelecionada(oc);
@@ -338,18 +314,12 @@ export default function ModalRelatorioPedagogico({ open, onClose, aluno, somente
                                                     >
                                                         <EyeIcon className="h-5 w-5" />
                                                     </button>
-                                                    {/* Editar — apenas o autor (professor) ou qualquer um (coord/diretor) */}
-                                                    {podeEditarExcluir(oc) && (
                                                     <button onClick={() => handleOpenEdit(oc)} className="text-blue-600 hover:text-blue-800" title="Editar">
                                                         <PencilSquareIcon className="h-5 w-5" />
                                                     </button>
-                                                    )}
-                                                    {/* Excluir — apenas o autor (professor) ou qualquer um (coord/diretor) */}
-                                                    {podeEditarExcluir(oc) && (
                                                     <button onClick={() => handleOpenDelete(oc)} className="text-red-600 hover:text-red-800" title="Excluir">
                                                         <TrashIcon className="h-5 w-5" />
                                                     </button>
-                                                    )}
                                                 </div>
                                             </td>
                                         </tr>

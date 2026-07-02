@@ -26,8 +26,21 @@ const MODULOS_TREE = [
       { id: 'secretaria.modulacao', label: 'Modulação' },
     ]
   },
-  // ── DISCIPLINAR: módulo reservado — sempre ativo para perfis militares.
-  // O CEO não gerencia este módulo. Omitido intencionalmente da lista.
+  {
+    id: 'disciplinar', label: 'Disciplinar', icon: '⚖️',
+    filhos: [
+      { id: 'disciplinar.alunos', label: 'Alunos' },
+      { id: 'disciplinar.historico', label: 'Histórico' },
+      { id: 'disciplinar.atas', label: 'Atas' },
+      { id: 'disciplinar.fo_coletivo', label: 'F.O. Coletivo' },
+      { id: 'disciplinar.responsaveis', label: 'Responsáveis' },
+      { id: 'disciplinar.liberacao', label: 'Liberação' },
+      { id: 'disciplinar.metadados', label: 'Metadados' },
+      { id: 'disciplinar.equipe', label: 'Gestão de Equipe' },
+      { id: 'disciplinar.regimentos', label: 'Regimentos' },
+      { id: 'disciplinar.manual', label: 'Manual' },
+    ]
+  },
   {
     id: 'pedagogico', label: 'Pedagógico', icon: '🎓',
     filhos: [
@@ -37,7 +50,6 @@ const MODULOS_TREE = [
       { id: 'pedagogico.correcoes', label: 'Correções' },
     ]
   },
-
   {
     id: 'gabarito', label: 'Gabarito', icon: '✅',
     filhos: [
@@ -515,34 +527,10 @@ function StatusBadge({ status }) {
   );
 }
 
-// ── Lista de perfis gerenciáveis pelo CEO (militares fixos não entram) ────────
-const PERFIS_LISTA = [
-  { key: 'professor',             label: 'Professor' },
-  { key: 'coordenador',           label: 'Coordenador' },
-  { key: 'supervisor',            label: 'Supervisor' },
-  { key: 'pedagogo',              label: 'Pedagogo' },
-  { key: 'secretario',            label: 'Secretário' },
-  { key: 'secretaria',            label: 'Secretaria' },
-  { key: 'orientador',            label: 'Orientador' },
-  { key: 'aluno',                 label: 'Aluno' },
-  { key: 'biblioteca',            label: 'Biblioteca' },
-  { key: 'educador_social',       label: 'Educador Social' },
-  { key: 'merenda',               label: 'Merenda' },
-  { key: 'psicologo',             label: 'Psicólogo' },
-  { key: 'responsavel',           label: 'Responsável' },
-  { key: 'vice_diretor',          label: 'Vice-Diretor' },
-  { key: 'vigilancia',            label: 'Vigilância' },
-  { key: 'visitante',             label: 'Visitante' },
-  { key: 'subcomandante',         label: 'Subcomandante' },
-  { key: 'supervisor_disciplinar',label: 'Supervisor Disciplinar' },
-  { key: 'monitor_disciplinar',   label: 'Monitor Disciplinar' },
-];
-
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function PlataformaModulos() {
   const [escolas, setEscolas] = useState([]);
   const [escolaId, setEscolaId] = useState(null);
-  const [perfilSel, setPerfilSel] = useState(null); // perfil selecionado (Passo 5)
   const [modulosAtivos, setModulosAtivos] = useState(new Set());
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -557,15 +545,6 @@ export default function PlataformaModulos() {
   const [desativarHover, setDesativarHover] = useState(false);
   const [error, setError] = useState(null);
   const [copyError, setCopyError] = useState(null);
-
-  // ── Manutensão Programada ──
-  const [manutData, setManutData] = useState(null);
-  const [manutInicio, setManutInicio] = useState('');
-  const [manutFim, setManutFim] = useState('');
-  const [manutMsg, setManutMsg] = useState('O sistema está em manutenção programada.');
-  const [manutSaving, setManutSaving] = useState(false);
-  const [manutError, setManutError] = useState(null);
-  const [showManutConfirm, setShowManutConfirm] = useState(false);
 
   // Count active modules per school (for the left panel display)
   const [schoolModulosCounts, setSchoolModulosCounts] = useState({});
@@ -586,85 +565,20 @@ export default function PlataformaModulos() {
 
   useEffect(() => { fetchEscolas(); }, [fetchEscolas]);
 
-  // ── Fetch manutenção status ──
-  const [manutEncerrada, setManutEncerrada] = useState(false);
-  const manutAnteriorRef = React.useRef(null);
-
-  const fetchManutencao = useCallback(async () => {
-    try {
-      const { data } = await api.get('/api/plataforma/manutencao');
-      const novo = data?.manutencao || null;
-      // Detecta transição: era ativa → agora null (expirou)
-      if (manutAnteriorRef.current && !novo) {
-        setManutEncerrada(true);
-        setTimeout(() => setManutEncerrada(false), 8000);
-      }
-      manutAnteriorRef.current = novo;
-      setManutData(novo);
-    } catch { setManutData(null); }
-  }, []);
-
-  useEffect(() => { fetchManutencao(); }, [fetchManutencao]);
-
-  // Auto-refresh a cada 30s quando manutenção está ativa
-  useEffect(() => {
-    if (!manutData) return;
-    const interval = setInterval(fetchManutencao, 30000);
-    return () => clearInterval(interval);
-  }, [manutData, fetchManutencao]);
-
-  const handleAtivarManutencao = () => {
-    if (!manutInicio || !manutFim) { setManutError('Informe início e fim.'); return; }
-    const dtInicio = new Date(manutInicio);
-    const dtFim = new Date(manutFim);
-    if (dtFim <= dtInicio) { setManutError("'Fim' deve ser posterior a 'Início'."); return; }
-    setManutError(null);
-    setShowManutConfirm(true);
-  };
-
-  const handleConfirmarManutencao = async () => {
-    setShowManutConfirm(false);
-    setManutSaving(true); setManutError(null);
-    try {
-      await api.post('/api/plataforma/manutencao', {
-        // datetime-local dá horário local (Brasília) — converte para UTC ISO
-        inicio: new Date(manutInicio).toISOString(),
-        fim: new Date(manutFim).toISOString(),
-        mensagem: manutMsg,
-      });
-      await fetchManutencao();
-      setManutInicio(''); setManutFim('');
-    } catch (err) {
-      setManutError(err.response?.data?.message || 'Erro ao ativar manutenção.');
-    } finally { setManutSaving(false); }
-  };
-
-  const handleCancelarManutencao = async () => {
-    setManutSaving(true); setManutError(null);
-    try {
-      await api.delete('/api/plataforma/manutencao');
-      setManutData(null);
-    } catch (err) {
-      setManutError(err.response?.data?.message || 'Erro ao cancelar.');
-    } finally { setManutSaving(false); }
-  };
-
-  // ── Load modules for a school (+ optional perfil) ─────────────────────────
-  const fetchModulos = useCallback(async (id, perfil) => {
+  // ── Load modules for a school ───────────────────────────────────────────────
+  const fetchModulos = useCallback(async (id) => {
     if (!id) return;
     setLoading(true);
     setError(null);
     try {
-      const url = perfil
-        ? `/api/plataforma/modulos/${id}/perfil/${perfil}`
-        : `/api/plataforma/modulos/${id}`;
-      const { data } = await api.get(url);
+      const { data } = await api.get(`/api/plataforma/modulos/${id}`);
       const list = Array.isArray(data?.modulos) ? data.modulos : [];
       const ativos = new Set(
         list.filter(m => m.ativo).map(m => m.modulo)
       );
 
       // ── Normalizar estado: se filho está ativo, pai DEVE estar ativo ──────
+      // Corrige estados inconsistentes que possam ter sido salvos no banco.
       MODULOS_TREE.forEach(grupo => {
         if (grupo.filhos.length > 0) {
           const algumFilhoAtivo = grupo.filhos.some(f => ativos.has(f.id));
@@ -680,12 +594,11 @@ export default function PlataformaModulos() {
       });
 
       setModulosAtivos(ativos);
-      if (!perfil) {
-        setSchoolModulosCounts(prev => ({ ...prev, [id]: ativos.size }));
-      }
+      // Update count cache
+      setSchoolModulosCounts(prev => ({ ...prev, [id]: ativos.size }));
     } catch (err) {
       console.error('[PlataformaModulos] erro ao buscar módulos:', err);
-      setError('Não foi possível carregar os módulos.');
+      setError('Não foi possível carregar os módulos desta escola.');
       setModulosAtivos(new Set());
     } finally {
       setLoading(false);
@@ -695,19 +608,10 @@ export default function PlataformaModulos() {
   const selectEscola = useCallback((id) => {
     if (id === escolaId) return;
     setEscolaId(id);
-    setPerfilSel(null);     // reseta perfil ao trocar de escola
-    setModulosAtivos(new Set());
     setSaved(false);
     setError(null);
-  }, [escolaId]);
-
-  const selectPerfil = useCallback((perfil) => {
-    if (perfil === perfilSel) return;
-    setPerfilSel(perfil);
-    setSaved(false);
-    setError(null);
-    if (escolaId) fetchModulos(escolaId, perfil);
-  }, [perfilSel, escolaId, fetchModulos]);
+    fetchModulos(id);
+  }, [escolaId, fetchModulos]);
 
   // ── Toggle logic ────────────────────────────────────────────────────────────
   const handleToggle = useCallback((id, type, grupo) => {
@@ -782,10 +686,9 @@ export default function PlataformaModulos() {
     });
   }, []);
 
-  // ── Save (por perfil quando perfilSel definido) ────────────────────────────
+  // ── Save ────────────────────────────────────────────────────────────────────
   const salvar = useCallback(async () => {
     if (!escolaId) return;
-    if (!perfilSel) { setError('Selecione um perfil antes de salvar.'); return; }
     setSaving(true);
     setError(null);
     try {
@@ -800,8 +703,9 @@ export default function PlataformaModulos() {
           });
         }
       });
-      await api.put(`/api/plataforma/modulos/${escolaId}/perfil/${perfilSel}`, { modulos });
+      await api.put(`/api/plataforma/modulos/${escolaId}`, { modulos });
       setSaved(true);
+      setSchoolModulosCounts(prev => ({ ...prev, [escolaId]: modulosAtivos.size }));
       setTimeout(() => setSaved(false), 3000);
     } catch (err) {
       console.error('[PlataformaModulos] erro ao salvar:', err);
@@ -809,17 +713,17 @@ export default function PlataformaModulos() {
     } finally {
       setSaving(false);
     }
-  }, [escolaId, perfilSel, modulosAtivos]);
+  }, [escolaId, modulosAtivos]);
 
-  // ── Copy from another school (por perfil) ──────────────────────────────────
+  // ── Copy from another school ────────────────────────────────────────────────
   const copiarDe = useCallback(async (origemId) => {
-    if (!escolaId || !perfilSel) return;
+    if (!escolaId) return;
     setShowCopyModal(false);
     setLoading(true);
     setCopyError(null);
     try {
-      await api.post(`/api/plataforma/modulos/${escolaId}/copiar-de/${origemId}/perfil/${perfilSel}`);
-      await fetchModulos(escolaId, perfilSel);
+      await api.post(`/api/plataforma/modulos/${escolaId}/copiar-de/${origemId}`);
+      await fetchModulos(escolaId);
       setSaved(false);
     } catch (err) {
       console.error('[PlataformaModulos] erro ao copiar:', err);
@@ -827,7 +731,7 @@ export default function PlataformaModulos() {
     } finally {
       setLoading(false);
     }
-  }, [escolaId, perfilSel, fetchModulos]);
+  }, [escolaId, fetchModulos]);
 
   // ── Derived values ──────────────────────────────────────────────────────────
   const escolaSelecionada = escolas.find(e => e.id === escolaId) || null;
@@ -1002,212 +906,6 @@ export default function PlataformaModulos() {
         </div>
       </div>
 
-      {/* ════ MANUTENÇÃO PROGRAMADA ════ */}
-      <div style={{
-        margin: '0 0 24px 0',
-        padding: '20px 28px',
-        borderRadius: 18,
-        background: manutData ? 'rgba(245,158,11,0.07)' : 'rgba(255,255,255,0.025)',
-        border: `1px solid ${manutData ? 'rgba(245,158,11,0.3)' : 'rgba(255,255,255,0.06)'}`,
-        boxShadow: manutData ? '0 4px 24px rgba(245,158,11,0.1)' : 'none',
-        transition: 'all 0.3s',
-      }}>
-        {/* Header row */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: manutData ? 14 : 0 }}>
-          <span style={{ fontSize: '1.4rem' }}>🔧</span>
-          <span style={{ fontWeight: 700, fontSize: '1rem', color: '#f1f5f9' }}>Manutenção Programada</span>
-          {manutData && (
-            <span style={{
-              padding: '3px 10px', borderRadius: 20, fontSize: '0.6rem', fontWeight: 800,
-              textTransform: 'uppercase', letterSpacing: '0.06em',
-              background: manutData.em_andamento ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)',
-              color: manutData.em_andamento ? '#f87171' : '#fbbf24',
-              border: `1px solid ${manutData.em_andamento ? 'rgba(239,68,68,0.3)' : 'rgba(245,158,11,0.3)'}`,
-            }}>
-              {manutData.em_andamento ? '● Em andamento' : '◑ Agendada'}
-            </span>
-          )}
-          {!manutData && (
-            <span style={{
-              padding: '3px 10px', borderRadius: 20, fontSize: '0.6rem', fontWeight: 800,
-              textTransform: 'uppercase', letterSpacing: '0.06em',
-              background: 'rgba(16,185,129,0.12)', color: '#34d399',
-              border: '1px solid rgba(16,185,129,0.2)',
-            }}>
-              ● Sistema Normal
-            </span>
-          )}
-          {manutEncerrada && (
-            <span style={{
-              padding: '4px 12px', borderRadius: 20, fontSize: '0.65rem', fontWeight: 700,
-              background: 'rgba(16,185,129,0.15)', color: '#34d399',
-              border: '1px solid rgba(16,185,129,0.25)',
-              animation: 'fadeIn 0.4s ease',
-            }}>
-              ✅ Manutenção encerrada — usuários com acesso restaurado
-            </span>
-          )}
-        </div>
-
-        {/* Active maintenance info + cancel */}
-        {manutData ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
-            <div style={{ flex: 1, minWidth: 200 }}>
-              <div style={{ fontSize: '0.8rem', color: 'rgba(148,163,184,0.7)', marginBottom: 4 }}>Período</div>
-              <div style={{ fontSize: '0.9rem', color: '#f1f5f9', fontWeight: 600 }}>
-                {new Date(manutData.inicio).toLocaleString('pt-BR', {timeZone:'America/Sao_Paulo'})} →{' '}
-                {new Date(manutData.fim).toLocaleString('pt-BR', {timeZone:'America/Sao_Paulo'})}
-              </div>
-              {manutData.mensagem && (
-                <div style={{ fontSize: '0.78rem', color: 'rgba(148,163,184,0.6)', marginTop: 4 }}>
-                  {manutData.mensagem}
-                </div>
-              )}
-            </div>
-            <button
-              onClick={handleCancelarManutencao}
-              disabled={manutSaving}
-              style={{
-                padding: '10px 20px', borderRadius: 12, border: 'none',
-                background: 'linear-gradient(135deg, #ef4444, #dc2626)',
-                color: '#fff', fontWeight: 700, fontSize: '0.85rem',
-                cursor: manutSaving ? 'not-allowed' : 'pointer',
-                transition: 'all 0.2s', opacity: manutSaving ? 0.6 : 1,
-                boxShadow: '0 4px 16px rgba(239,68,68,0.3)',
-              }}
-            >
-              {manutSaving ? 'Cancelando...' : '✕ Cancelar Manutenção'}
-            </button>
-          </div>
-        ) : (
-          /* Form to activate */
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end', marginTop: 16 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 180px' }}>
-              <label style={{ fontSize: '0.65rem', fontWeight: 700, color: 'rgba(148,163,184,0.6)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Início</label>
-              <input
-                type="datetime-local"
-                value={manutInicio}
-                onChange={e => setManutInicio(e.target.value)}
-                style={{
-                  padding: '10px 12px', borderRadius: 10, fontSize: '0.85rem',
-                  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-                  color: '#f1f5f9', outline: 'none',
-                }}
-              />
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 180px' }}>
-              <label style={{ fontSize: '0.65rem', fontWeight: 700, color: 'rgba(148,163,184,0.6)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Fim</label>
-              <input
-                type="datetime-local"
-                value={manutFim}
-                onChange={e => setManutFim(e.target.value)}
-                style={{
-                  padding: '10px 12px', borderRadius: 10, fontSize: '0.85rem',
-                  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-                  color: '#f1f5f9', outline: 'none',
-                }}
-              />
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '2 1 220px' }}>
-              <label style={{ fontSize: '0.65rem', fontWeight: 700, color: 'rgba(148,163,184,0.6)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Mensagem</label>
-              <input
-                type="text"
-                value={manutMsg}
-                onChange={e => setManutMsg(e.target.value)}
-                placeholder="Mensagem para os usuários"
-                style={{
-                  padding: '10px 12px', borderRadius: 10, fontSize: '0.85rem',
-                  background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
-                  color: '#f1f5f9', outline: 'none',
-                }}
-              />
-            </div>
-            <button
-              onClick={handleAtivarManutencao}
-              disabled={manutSaving}
-              style={{
-                padding: '10px 20px', borderRadius: 12, border: 'none',
-                background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-                color: '#fff', fontWeight: 700, fontSize: '0.85rem',
-                cursor: manutSaving ? 'not-allowed' : 'pointer',
-                transition: 'all 0.2s', opacity: manutSaving ? 0.6 : 1,
-                boxShadow: '0 4px 16px rgba(245,158,11,0.3)',
-                flexShrink: 0,
-              }}
-            >
-              {manutSaving ? 'Ativando...' : '🚀 Ativar Manutenção'}
-            </button>
-          </div>
-        )}
-
-        {manutError && (
-          <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 10,
-            background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)',
-            fontSize: '0.8rem', color: '#f87171' }}>
-            {manutError}
-          </div>
-        )}
-      </div>
-
-      {/* ════ MODAL CONFIRMAÇÃO MANUTENÇÃO ════ */}
-      {showManutConfirm && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 2000,
-          background: 'rgba(0,0,0,0.75)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          backdropFilter: 'blur(8px)',
-          animation: 'fadeIn 0.2s ease',
-        }}>
-          <div style={{
-            background: 'linear-gradient(135deg, #1e293b, #0f172a)',
-            border: '1px solid rgba(245,158,11,0.3)',
-            borderRadius: 24, padding: '36px 40px',
-            width: '100%', maxWidth: 460,
-            boxShadow: '0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(245,158,11,0.15)',
-            animation: 'slideUp 0.3s cubic-bezier(0.4,0,0.2,1)',
-          }}>
-            <div style={{ fontSize: '2.5rem', textAlign: 'center', marginBottom: 12 }}>🔧</div>
-            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#f1f5f9', textAlign: 'center', marginBottom: 6 }}>
-              Confirmar Manutenção
-            </h3>
-            <p style={{ fontSize: '0.82rem', color: 'rgba(148,163,184,0.8)', textAlign: 'center', marginBottom: 24, lineHeight: 1.6 }}>
-              {new Date(manutInicio) <= new Date()
-                ? 'A manutenção será ativada IMEDIATAMENTE.'
-                : 'A manutenção será ativada no horário agendado.'}
-            </p>
-            <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 12, padding: '14px 18px', marginBottom: 24, fontSize: '0.82rem', color: '#fbbf24', lineHeight: 1.7 }}>
-              <div><strong>Início:</strong> {manutInicio ? new Date(manutInicio).toLocaleString('pt-BR', {timeZone:'America/Sao_Paulo'}) : '—'}</div>
-              <div><strong>Fim:</strong> {manutFim ? new Date(manutFim).toLocaleString('pt-BR', {timeZone:'America/Sao_Paulo'}) : '—'}</div>
-              <div><strong>Mensagem:</strong> "{manutMsg}"</div>
-            </div>
-            <div style={{ display: 'flex', gap: 12 }}>
-              <button
-                onClick={() => setShowManutConfirm(false)}
-                style={{
-                  flex: 1, padding: '12px 20px', borderRadius: 12,
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  background: 'transparent', color: 'rgba(148,163,184,0.9)',
-                  fontWeight: 600, fontSize: '0.9rem', cursor: 'pointer',
-                }}
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleConfirmarManutencao}
-                style={{
-                  flex: 1, padding: '12px 20px', borderRadius: 12, border: 'none',
-                  background: 'linear-gradient(135deg, #f59e0b, #d97706)',
-                  color: '#fff', fontWeight: 700, fontSize: '0.9rem',
-                  cursor: 'pointer', boxShadow: '0 8px 24px rgba(245,158,11,0.3)',
-                }}
-              >
-                🚀 Confirmar e Ativar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ════ TWO-PANEL BODY ════ */}
       <div style={S.body}>
 
@@ -1323,86 +1021,10 @@ export default function PlataformaModulos() {
           </div>
         </div>
 
-        {/* ── CENTER: Profile List ── */}
-        <div style={{
-          width: 210, flexShrink: 0,
-          background: 'rgba(255,255,255,0.02)',
-          borderRight: '1px solid rgba(255,255,255,0.06)',
-          display: 'flex', flexDirection: 'column',
-          position: 'sticky', top: 0,
-          maxHeight: 'calc(100vh - 200px)',
-          overflowY: 'auto',
-        }}>
-          <div style={{
-            padding: '20px 16px 14px',
-            borderBottom: '1px solid rgba(255,255,255,0.05)',
-            position: 'sticky', top: 0, zIndex: 10,
-            background: 'rgba(15,23,42,0.95)',
-            backdropFilter: 'blur(12px)',
-          }}>
-            <div style={{
-              fontSize: '0.65rem', fontWeight: 800,
-              color: 'rgba(148,163,184,0.6)',
-              textTransform: 'uppercase', letterSpacing: '0.06em',
-            }}>
-              Perfis ({PERFIS_LISTA.length})
-            </div>
-          </div>
-          <div style={{ flex: 1, padding: '10px 10px' }}>
-            {!escolaId ? (
-              <div style={{
-                padding: '24px 12px', textAlign: 'center',
-                color: 'rgba(148,163,184,0.35)', fontSize: '0.78rem',
-              }}>
-                Selecione uma escola
-              </div>
-            ) : (
-              PERFIS_LISTA.map(p => {
-                const isSel = p.key === perfilSel;
-                return (
-                  <div
-                    key={p.key}
-                    onClick={() => selectPerfil(p.key)}
-                    style={{
-                      padding: '10px 12px',
-                      borderRadius: 10,
-                      marginBottom: 4,
-                      cursor: 'pointer',
-                      background: isSel
-                        ? 'linear-gradient(135deg, rgba(16,185,129,0.18), rgba(5,150,105,0.1))'
-                        : 'transparent',
-                      border: isSel
-                        ? '1px solid rgba(16,185,129,0.35)'
-                        : '1px solid transparent',
-                      boxShadow: isSel ? '0 4px 12px rgba(16,185,129,0.15)' : 'none',
-                      transition: 'all 0.15s',
-                      display: 'flex', alignItems: 'center', gap: 8,
-                    }}
-                  >
-                    <div style={{
-                      width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
-                      background: isSel ? '#10b981' : 'rgba(148,163,184,0.25)',
-                      transition: 'background 0.15s',
-                    }} />
-                    <span style={{
-                      fontSize: '0.82rem',
-                      fontWeight: isSel ? 700 : 500,
-                      color: isSel ? '#34d399' : 'rgba(203,213,225,0.75)',
-                      transition: 'color 0.15s',
-                    }}>
-                      {p.label}
-                    </span>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-
         {/* ── RIGHT: Module tree ── */}
         <div style={S.rightPanel}>
 
-          {/* Empty state — sem escola */}
+          {/* Empty state */}
           {!escolaId && (
             <div style={{
               display: 'flex', flexDirection: 'column',
@@ -1420,7 +1042,7 @@ export default function PlataformaModulos() {
                 fontSize: '0.9rem', color: 'rgba(148,163,184,0.45)',
                 maxWidth: 340, lineHeight: 1.6,
               }}>
-                Escolha uma escola na lista à esquerda e depois um perfil para configurar os módulos.
+                Escolha uma escola na lista à esquerda para configurar quais módulos ela tem acesso.
               </div>
               <div style={{
                 marginTop: 32, display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center',
@@ -1448,31 +1070,8 @@ export default function PlataformaModulos() {
             </div>
           )}
 
-          {/* Empty state — escola selecionada mas sem perfil */}
-          {escolaId && !perfilSel && (
-            <div style={{
-              display: 'flex', flexDirection: 'column',
-              alignItems: 'center', justifyContent: 'center',
-              minHeight: 480, textAlign: 'center',
-            }}>
-              <div style={{ fontSize: '4rem', marginBottom: 20 }}>👤</div>
-              <div style={{
-                fontSize: '1.2rem', fontWeight: 700, color: 'rgba(226,232,240,0.7)',
-                marginBottom: 12,
-              }}>
-                Selecione um perfil
-              </div>
-              <div style={{
-                fontSize: '0.88rem', color: 'rgba(148,163,184,0.45)',
-                maxWidth: 320, lineHeight: 1.6,
-              }}>
-                Escolha um perfil de usuário na coluna central para configurar quais módulos ele terá acesso nesta escola.
-              </div>
-            </div>
-          )}
-
-          {/* Escola + Perfil selecionados */}
-          {escolaId && perfilSel && (
+          {/* School selected */}
+          {escolaId && (
             <div className="mod-fade">
 
               {/* Top action bar */}
@@ -1482,19 +1081,11 @@ export default function PlataformaModulos() {
               }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{
-                    fontSize: '1.1rem', fontWeight: 800, color: '#f1f5f9',
+                    fontSize: '1.25rem', fontWeight: 800, color: '#f1f5f9',
                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
+                    marginBottom: 4,
                   }}>
                     {escolaSelecionada?.nome || '—'}
-                    <span style={{
-                      background: 'linear-gradient(135deg, rgba(16,185,129,0.2), rgba(5,150,105,0.1))',
-                      border: '1px solid rgba(16,185,129,0.35)',
-                      color: '#34d399', fontSize: '0.75rem', fontWeight: 700,
-                      padding: '3px 10px', borderRadius: 20,
-                    }}>
-                      👤 {PERFIS_LISTA.find(p => p.key === perfilSel)?.label || perfilSel}
-                    </span>
                   </div>
                   <div style={{
                     display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',

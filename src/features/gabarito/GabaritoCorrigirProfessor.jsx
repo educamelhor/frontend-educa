@@ -435,7 +435,7 @@ export default function GabaritoCorrigirProfessor() {
       const notaTotal = data.notaTotal || av.nota_total || 10;
       const acertosPorDisciplina = data.acertosPorDisciplina || null;
 
-      setCorrecao({ resultado, acertos, totalQuestoes, nota, notaTotal, acertosPorDisciplina });
+      setCorrecao({ resultado, acertos, totalQuestoes, nota, notaTotal, acertosPorDisciplina, tem_ajuste_pendente: data.tem_ajuste_pendente || false });
       showToast(`Correção concluída! ${acertos}/${totalQuestoes} acertos`, "success");
 
       // Carregar ajustes manuais existentes para este arquivo
@@ -509,6 +509,7 @@ export default function GabaritoCorrigirProfessor() {
         nota: data.nota,
         notaTotal: data.notaTotal || av.nota_total || 10,
         acertosPorDisciplina: data.acertosPorDisciplina || null,
+        tem_ajuste_pendente: data.tem_ajuste_pendente || false,
       });
 
       // Carregar ajustes manuais existentes
@@ -1068,6 +1069,16 @@ export default function GabaritoCorrigirProfessor() {
                       </div>
                     </div>
                   </div>
+                  {correcao.tem_ajuste_pendente && (
+                    <span style={{
+                      padding: "6px 14px", borderRadius: 8, fontSize: "0.72rem", fontWeight: 700,
+                      background: "rgba(245,158,11,0.12)", color: "#fbbf24",
+                      border: "1px solid rgba(245,158,11,0.3)",
+                      display: "flex", alignItems: "center", gap: 5,
+                    }} title="Este resultado inclui ajustes manuais ainda aguardando aprovação do coordenador">
+                      ⏳ Ajuste pendente
+                    </span>
+                  )}
                   <span style={{
                     padding: "6px 16px", borderRadius: 8, fontSize: "0.72rem", fontWeight: 700,
                     background: "rgba(16,185,129,0.1)", color: "#34d399",

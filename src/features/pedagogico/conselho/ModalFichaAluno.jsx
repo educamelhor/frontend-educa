@@ -1,8 +1,7 @@
 // src/features/pedagogico/conselho/ModalFichaAluno.jsx
-// Usa FichaAlunoPedagogico (ISOLADO: apenas Relatório Pedagógico)
 import React, { useEffect, useRef } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
-import FichaAlunoPedagogico from "./FichaAlunoPedagogico";
+import FichaAluno from "../../alunos/FichaAluno";
 
 export default function ModalFichaAluno({ open, codigo, onClose }) {
   const dialogRef = useRef(null);
@@ -63,7 +62,7 @@ export default function ModalFichaAluno({ open, codigo, onClose }) {
 
         {/* A ficha funciona em modo "modal" quando recebe o código por prop */}
         <div className="w-full h-full overflow-auto p-4 bg-blue-50">
-          <FichaAlunoPedagogico codigo={codigo} />
+          <FichaAluno codigo={codigo} />
         </div>
       </div>
     </div>

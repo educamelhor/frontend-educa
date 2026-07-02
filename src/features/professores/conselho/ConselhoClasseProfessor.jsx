@@ -17,9 +17,7 @@ import React, { useState, useEffect } from "react";
 import api from "../../../services/api";
 import ModalBoletim from "../../boletim/ModalBoletim";
 import ModalZoomFoto from "../../pedagogico/conselho/ModalZoomFoto";
-import ModalRegistroConselhoProfessor from "./ModalRegistroConselhoProfessor";
-import ModalFichaAlunoProfessor from "./ModalFichaAlunoProfessor";
-import { EyeIcon, DocumentTextIcon, IdentificationIcon } from "@heroicons/react/24/outline";
+import { DocumentTextIcon } from "@heroicons/react/24/outline";
 import { getFotoURL } from "../../../utils/foto";
 
 function normalizaTexto(str) {
@@ -54,14 +52,6 @@ export default function ConselhoClasseProfessor() {
   const [modalBoletimOpen, setModalBoletimOpen] = useState(false);
   const [codigoAlunoBoletim, setCodigoAlunoBoletim] = useState(null);
 
-  // Registro de Conselho (professor pode criar + visualizar)
-  const [modalConselhoOpen, setModalConselhoOpen] = useState(false);
-  const [alunoConselho, setAlunoConselho] = useState(null);
-
-  // Ficha do Aluno (somente banner pedagógico)
-  const [modalFichaOpen, setModalFichaOpen] = useState(false);
-  const [codigoAlunoFicha, setCodigoAlunoFicha] = useState(null);
-
   // Cache-buster para fotos
   const [fotoStamp] = useState(Date.now());
 
@@ -73,16 +63,6 @@ export default function ConselhoClasseProfessor() {
   function abrirModalBoletim(codigo) {
     setCodigoAlunoBoletim(codigo);
     setModalBoletimOpen(true);
-  }
-
-  function abrirModalConselho(aluno) {
-    setAlunoConselho(aluno);
-    setModalConselhoOpen(true);
-  }
-
-  function abrirModalFicha(codigo) {
-    setCodigoAlunoFicha(codigo);
-    setModalFichaOpen(true);
   }
 
   const turnos = ["Matutino", "Vespertino", "Noturno"];
@@ -97,24 +77,18 @@ export default function ConselhoClasseProfessor() {
       }
     }
     carregarAnos();
-  }, []);
-
-  // Busca as turmas específicas do professor sempre que o ano letivo mudar
-  useEffect(() => {
     fetchTurmas();
     // eslint-disable-next-line
-  }, [anoLetivo]);
+  }, []);
 
   const fetchTurmas = async () => {
     setLoadingTurmas(true);
     try {
       const escola_id = localStorage.getItem("escola_id") || 1;
-      // Busca apenas as turmas deste professor para o ano letivo selecionado
-      const { data } = await api.get("/api/professores/me/turmas", {
-        params: { escola_id, ano: anoLetivo },
+      const { data } = await api.get("/api/turmas", {
+        params: { escola_id },
       });
-      // A rota pode retornar { ok: true, turmas: [...] } ou direto [...]
-      setTurmas(data?.turmas || data || []);
+      setTurmas(data);
     } catch (error) {
       console.error("Erro ao buscar turmas:", error);
       setTurmas([]);
@@ -215,8 +189,8 @@ export default function ConselhoClasseProfessor() {
               <button
                 key={turma.id}
                 onClick={() => handleClickTurma(turma)}
-                title={`Selecionar turma ${turma.nome || turma.turma}`}
-                aria-label={`Selecionar turma ${turma.nome || turma.turma}`}
+                title={`Selecionar turma ${turma.turma}`}
+                aria-label={`Selecionar turma ${turma.turma}`}
                 className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl shadow-sm border font-semibold text-sm
                   whitespace-nowrap transition-all duration-150 select-none
                   bg-gradient-to-br from-blue-50 to-indigo-100 border-blue-300 text-blue-900
@@ -224,7 +198,7 @@ export default function ConselhoClasseProfessor() {
                   ${turmaSelecionada?.id === turma.id ? "ring-2 ring-green-500 border-green-400 from-green-50 to-emerald-100" : "cursor-pointer"}`}
               >
                 <span className="text-base">📋</span>
-                <span>{turma.nome || turma.turma}</span>
+                <span>{turma.turma}</span>
               </button>
             ))
           ) : (
@@ -239,7 +213,7 @@ export default function ConselhoClasseProfessor() {
       {turmaSelecionada && (
         <div className="bg-white rounded-lg shadow-md p-4">
           <h2 className="text-2xl font-semibold mb-4 text-blue-800">
-            Alunos da Turma {turmaSelecionada.nome || turmaSelecionada.turma}
+            Alunos da Turma {turmaSelecionada.turma}
           </h2>
 
           {/* Aviso de governança */}
@@ -285,18 +259,10 @@ export default function ConselhoClasseProfessor() {
                         {aluno.estudante}
                       </td>
 
-                      {/* Ações */}
+                      {/* Ações — Professor: apenas Boletim */}
                       <td className="py-2 px-2 text-center">
                         <div className="flex justify-center gap-3">
-                          {/* ✅ Registro de Conselho */}
-                          <button
-                            onClick={() => abrirModalConselho({ codigo: aluno.codigo, estudante: aluno.estudante })}
-                            title="Visualizar e registrar conselho de classe"
-                          >
-                            <EyeIcon className="h-6 w-6 text-gray-600 hover:text-blue-600" />
-                          </button>
-
-                          {/* ✅ Boletim */}
+                          {/* ✅ Boletim — permitido */}
                           <button
                             onClick={() => abrirModalBoletim(aluno.codigo)}
                             title="Visualizar boletim"
@@ -304,15 +270,9 @@ export default function ConselhoClasseProfessor() {
                             <DocumentTextIcon className="h-6 w-6 text-gray-600 hover:text-green-600" />
                           </button>
 
-                          {/* ✅ Ficha do Aluno (apenas banner pedagógico) */}
-                          <button
-                            onClick={() => abrirModalFicha(aluno.codigo)}
-                            title="Ficha do estudante"
-                          >
-                            <IdentificationIcon className="h-6 w-6 text-gray-600 hover:text-purple-600" />
-                          </button>
-
                           {/*
+                            ❌ EyeIcon (Ficha) — oculto para professor
+                            ❌ IdentificationIcon (Relatórios) — oculto para professor
                             ❌ PencilIcon (Edição) — oculto para professor
                           */}
                         </div>
@@ -326,25 +286,6 @@ export default function ConselhoClasseProfessor() {
             <p className="text-center text-gray-500">Nenhum aluno encontrado.</p>
           )}
         </div>
-      )}
-
-      {/* Modal: Registro de Conselho (professor pode criar + visualizar) */}
-      {modalConselhoOpen && (
-        <ModalRegistroConselhoProfessor
-          open={modalConselhoOpen}
-          aluno={alunoConselho}
-          turmaId={turmaSelecionada?.id}
-          onClose={() => setModalConselhoOpen(false)}
-        />
-      )}
-
-      {/* Modal: Ficha do Aluno — isolado para professor (sem disciplinar, sem upload) */}
-      {modalFichaOpen && (
-        <ModalFichaAlunoProfessor
-          open={modalFichaOpen}
-          codigo={codigoAlunoFicha}
-          onClose={() => setModalFichaOpen(false)}
-        />
       )}
 
       {/* Modal: Boletim */}

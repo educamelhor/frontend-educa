@@ -9,7 +9,7 @@ import {
   ClipboardDocumentListIcon,
 } from "@heroicons/react/24/solid";
 import { DocumentTextIcon as DocumentTextOutline } from "@heroicons/react/24/outline";
-import FichaAlunoSecretaria from "./FichaAlunoSecretaria"; // ISOLADO: ambos relatórios + upload
+import FichaAluno from "../../alunos/FichaAluno"; // ✅ usa o componente existente
 
 // ────────────────────────────────────────────────────────────────
 // Função utilitária para formatar datas no padrão brasileiro
@@ -183,7 +183,7 @@ export default function AlunoTable({
             >
               ✕
             </button>
-            <FichaAlunoSecretaria codigo={codigoSelecionado} />
+            <FichaAluno codigo={codigoSelecionado} />
           </div>
         </div>
       )}

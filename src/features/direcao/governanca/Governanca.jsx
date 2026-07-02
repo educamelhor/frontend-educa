@@ -86,54 +86,14 @@ const CATEGORY_META = {
 
 // Categorias serão exibidas na ordem retornada pelo backend (definida pelo CEO)
 
-// Mapa de labels com acentuação correta para cada perfil
-const PERFIL_LABELS = {
-  // Pedagógicos
-  professor:        'Professor',
-  coordenador:      'Coordenador',
-  supervisor:       'Supervisor',
-  pedagogo:         'Pedagogo',
-  secretario:       'Secretário',
-  secretaria:       'Secretaria',
-  orientador:       'Orientador',
-  // Novos perfis
-  aluno:            'Aluno',
-  biblioteca:       'Biblioteca',
-  educador_social:  'Educador Social',
-  merenda:          'Merenda',
-  psicologo:        'Psicólogo',
-  responsavel:      'Responsável',
-  vice_diretor:     'Vice-diretor',
-  vigilancia:       'Vigilância',
-  visitante:        'Visitante',
-  // Disciplinares
-  subcomandante:         'Subcomandante',
-  supervisor_disciplinar:'Supervisor Disciplinar',
-  monitor_disciplinar:   'Monitor Disciplinar',
-};
-
-// Helper para obter label com fallback
-const getPerfilLabel = (pfil) =>
-  PERFIL_LABELS[pfil] ||
-  pfil.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-
-
 export default function Governanca() {
-  const [activeTab, setActiveTab] = useState("configs"); // 'configs' | 'logos' | 'acessos'
+  const [activeTab, setActiveTab] = useState("configs"); // 'configs' | 'logos'
   const [configsPorCategoria, setConfigsPorCategoria] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState(null);
   const [expandedCats, setExpandedCats] = useState(new Set());
   const [pendingChanges, setPendingChanges] = useState({}); // { id: valor }
-
-  // ✅ [GOVERNANÇA v2] Estado da aba 'Acesso de Usuários'
-  const [meusPerfisList, setMeusPerfisList] = useState([]); // perfis que o diretor pode gerenciar
-  const [perfilAcessoSel, setPerfilAcessoSel] = useState(null); // perfil selecionado no painel
-  const [modulosPerfil, setModulosPerfil] = useState([]); // módulos do perfil selecionado
-  const [loadingAcessos, setLoadingAcessos] = useState(false);
-  const [savingAcessos, setSavingAcessos] = useState(false);
-  const [pendingAcessos, setPendingAcessos] = useState({}); // { modulo: bool }
 
   // ── Estados adicionais para exceções de disciplinas ──
   const [disciplinas, setDisciplinas] = useState([]);
@@ -197,98 +157,6 @@ export default function Governanca() {
       fetchDisciplinas();
     }
   }, [fetchConfigs, fetchDisciplinas, escolaId, token]);
-
-  // ✅ [GOVERNANÇA v2] Fetch perfis que este diretor pode gerenciar
-  const fetchMeusPerfis = useCallback(async () => {
-    try {
-      const res = await fetch(`${API}/api/direcao/modulos/meus-perfis`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setMeusPerfisList(data.perfis || []);
-        if ((data.perfis || []).length > 0 && !perfilAcessoSel) {
-          setPerfilAcessoSel(data.perfis[0]);
-        }
-      }
-    } catch (err) {
-      console.error('[Governanca] Erro ao buscar perfis:', err);
-    }
-  }, [token, perfilAcessoSel]);
-
-  // ✅ [GOVERNANÇA v2] Fetch módulos do perfil selecionado
-  const fetchModulosPerfil = useCallback(async (pfil) => {
-    if (!pfil || !escolaId) return;
-    setLoadingAcessos(true);
-    setPendingAcessos({});
-    try {
-      const res = await fetch(`${API}/api/direcao/modulos/${pfil}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (data.ok) {
-        setModulosPerfil(data.modulos || []);
-      } else {
-        showToast(data.message || 'Erro ao carregar módulos do perfil', 'error');
-      }
-    } catch (err) {
-      showToast('Erro de conexão ao carregar módulos', 'error');
-    } finally {
-      setLoadingAcessos(false);
-    }
-  }, [escolaId, token]);
-
-  useEffect(() => {
-    if (activeTab === 'acessos' && token) {
-      fetchMeusPerfis();
-    }
-  }, [activeTab, token, fetchMeusPerfis]);
-
-  useEffect(() => {
-    if (perfilAcessoSel && activeTab === 'acessos') {
-      fetchModulosPerfil(perfilAcessoSel);
-    }
-  }, [perfilAcessoSel, activeTab, fetchModulosPerfil]);
-
-  // ✅ [GOVERNANÇA v2] Toggle módulo do perfil
-  const toggleModuloPerfil = (modulo, valorAtual) => {
-    setPendingAcessos(prev => ({ ...prev, [modulo]: !valorAtual }));
-  };
-
-  // ✅ [GOVERNANÇA v2] Salvar configurações de acesso do perfil
-  const salvarAcessosPerfil = async () => {
-    if (!perfilAcessoSel || savingAcessos) return;
-    const modulosPayload = modulosPerfil.map(m => ({
-      modulo: m.modulo,
-      // Padrão (não configurado pelo Diretor) = igual ao CEO (ceo_ativo = true)
-      ativo: pendingAcessos[m.modulo] !== undefined
-        ? pendingAcessos[m.modulo]
-        : (m.diretor_ativo ?? m.ceo_ativo),
-    }));
-    setSavingAcessos(true);
-    try {
-      const res = await fetch(`${API}/api/direcao/modulos/${perfilAcessoSel}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ modulos: modulosPayload }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        showToast(`✅ Acesso do perfil '${perfilAcessoSel}' atualizado.`, 'success');
-        await fetchModulosPerfil(perfilAcessoSel);
-        setPendingAcessos({});
-      } else {
-        showToast(data.message || 'Erro ao salvar', 'error');
-      }
-    } catch {
-      showToast('Erro de conexão ao salvar', 'error');
-    } finally {
-      setSavingAcessos(false);
-    }
-  };
 
   // ── Abrir modal de exceções ──
   const handleOpenExceptionsModal = useCallback(() => {
@@ -451,172 +319,11 @@ export default function Governanca() {
           </svg>
           🏛️ Logos &amp; Identidade Visual
         </button>
-        {/* ✅ [GOVERNANÇA v2] Nova aba — Acesso de Usuários */}
-        <button
-          id="tab-acessos-usuarios"
-          style={activeTab === "acessos" ? styles.tabActive : styles.tabInactive}
-          onClick={() => setActiveTab("acessos")}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" style={{ width: 16, height: 16, marginRight: 6 }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" />
-          </svg>
-          Acesso de Usuários
-        </button>
       </div>
 
       {/* ── ABA LOGOS ── */}
       {activeTab === "logos" && (
         <LogosEscola showToast={(msg, type) => showToast(msg, type)} />
-      )}
-
-      {/* ── ABA ACESSO DE USUÁRIOS ── ✅ [GOVERNANÇA v2] */}
-      {activeTab === "acessos" && (
-        <div style={{ padding: "24px 0" }}>
-          <div style={{ marginBottom: 20, padding: "16px 20px", background: "linear-gradient(135deg, #1e40af 0%, #1d4ed8 100%)", borderRadius: 12, color: "#fff" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <svg xmlns="http://www.w3.org/2000/svg" style={{ width: 22, height: 22 }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" />
-              </svg>
-              <div>
-                <div style={{ fontWeight: 700, fontSize: 16 }}>Acesso de Usuários</div>
-                <div style={{ fontSize: 12, opacity: 0.85, marginTop: 2 }}>
-                  Ative ou desative módulos por perfil. Módulo ativo = acesso 100%. Sem módulo = menu vazio.
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {meusPerfisList.length === 0 && !loadingAcessos && (
-            <div style={{ textAlign: "center", padding: 40, color: "#64748b" }}>
-              <div style={{ fontSize: 40, marginBottom: 8 }}>🔒</div>
-              <div style={{ fontWeight: 600 }}>Nenhum perfil disponível para gerenciar.</div>
-              <div style={{ fontSize: 13, marginTop: 4 }}>Verifique se você tem autoridade de Diretor nesta escola.</div>
-            </div>
-          )}
-
-          {meusPerfisList.length > 0 && (
-            <div style={{ display: "flex", gap: 16 }}>
-              {/* Coluna esquerda — lista de perfis */}
-              <div style={{ width: 200, flexShrink: 0 }}>
-                <div style={{ fontWeight: 600, fontSize: 12, color: "#64748b", textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 }}>
-                  Perfis
-                </div>
-                {meusPerfisList.map(pfil => (
-                  <button
-                    key={pfil}
-                    id={`perfil-btn-${pfil}`}
-                    onClick={() => { setPerfilAcessoSel(pfil); setPendingAcessos({}); }}
-                    style={{
-                      display: "block", width: "100%", textAlign: "left",
-                      padding: "10px 14px", marginBottom: 6, borderRadius: 8,
-                      border: perfilAcessoSel === pfil ? "2px solid #1d4ed8" : "2px solid #e2e8f0",
-                      background: perfilAcessoSel === pfil ? "#eff6ff" : "#fff",
-                      color: perfilAcessoSel === pfil ? "#1d4ed8" : "#334155",
-                      fontWeight: perfilAcessoSel === pfil ? 700 : 400,
-                      fontSize: 13, cursor: "pointer",
-                      textTransform: "capitalize",
-                      transition: "all 0.15s ease",
-                    }}
-                  >
-                    {getPerfilLabel(pfil)}
-                  </button>
-                ))}
-              </div>
-
-              {/* Coluna direita — módulos do perfil selecionado */}
-              <div style={{ flex: 1 }}>
-                {perfilAcessoSel && (
-                  <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0", overflow: "hidden" }}>
-                    <div style={{ padding: "14px 20px", borderBottom: "1px solid #f1f5f9", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: 15, textTransform: "capitalize" }}>
-                          🎯 Perfil: {perfilAcessoSel.replace(/_/g, " ")}
-                        </div>
-                        <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
-                          {modulosPerfil.length} módulo(s) disponível(is) no teto CEO
-                        </div>
-                      </div>
-                      <button
-                        id="btn-salvar-acessos-perfil"
-                        onClick={salvarAcessosPerfil}
-                        disabled={savingAcessos || Object.keys(pendingAcessos).length === 0}
-                        style={{
-                          padding: "8px 20px", borderRadius: 8, border: "none",
-                          background: Object.keys(pendingAcessos).length > 0 ? "linear-gradient(135deg, #1d4ed8, #2563eb)" : "#e2e8f0",
-                          color: Object.keys(pendingAcessos).length > 0 ? "#fff" : "#94a3b8",
-                          fontWeight: 600, fontSize: 13, cursor: Object.keys(pendingAcessos).length > 0 ? "pointer" : "not-allowed",
-                          transition: "all 0.2s ease",
-                        }}
-                      >
-                        {savingAcessos ? "Salvando..." : `Salvar (${Object.keys(pendingAcessos).length} alteração${Object.keys(pendingAcessos).length !== 1 ? "ões" : ""})`}
-                      </button>
-                    </div>
-
-                    {loadingAcessos ? (
-                      <div style={{ padding: 40, textAlign: "center", color: "#64748b" }}>Carregando módulos...</div>
-                    ) : modulosPerfil.length === 0 ? (
-                      <div style={{ padding: 40, textAlign: "center", color: "#64748b" }}>
-                        <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
-                        <div>Nenhum módulo disponível no teto CEO para este domínio.</div>
-                        <div style={{ fontSize: 12, marginTop: 4 }}>Solicite ao CEO que ative módulos para esta escola.</div>
-                      </div>
-                    ) : (
-                      <div style={{ padding: "8px 0" }}>
-                        {modulosPerfil.map(m => {
-                          const ativoAtual = pendingAcessos[m.modulo] !== undefined
-                            ? pendingAcessos[m.modulo]
-                            // Padrão: herda CEO (diretor_ativo=null = igual ao CEO = liberado)
-                            : (m.diretor_ativo ?? m.ceo_ativo);
-                          const isPending = pendingAcessos[m.modulo] !== undefined;
-                          return (
-                            <div
-                              key={m.modulo}
-                              style={{
-                                display: "flex", alignItems: "center", justifyContent: "space-between",
-                                padding: "12px 20px", borderBottom: "1px solid #f8fafc",
-                                background: isPending ? "#fafafa" : "#fff",
-                                transition: "background 0.2s",
-                              }}
-                            >
-                              <div>
-                                <div style={{ fontWeight: 600, fontSize: 14, color: "#1e293b" }}>
-                                  {m.modulo}
-                                  {isPending && <span style={{ marginLeft: 8, fontSize: 11, color: "#f59e0b", fontWeight: 700 }}>● alterado</span>}
-                                </div>
-                                <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>
-                                  {m.diretor_ativo === null ? "✅ padrão CEO (não restringido pelo Diretor)" : ativoAtual ? "✅ acesso liberado pelo Diretor" : "❌ restringido pelo Diretor"}
-                                </div>
-                              </div>
-                              {/* Toggle switch */}
-                              <button
-                                id={`toggle-modulo-${m.modulo}`}
-                                onClick={() => toggleModuloPerfil(m.modulo, ativoAtual)}
-                                style={{
-                                  width: 48, height: 26, borderRadius: 13, border: "none", cursor: "pointer",
-                                  background: ativoAtual ? "linear-gradient(135deg, #10b981, #059669)" : "#e2e8f0",
-                                  position: "relative", transition: "background 0.25s ease", flexShrink: 0,
-                                }}
-                                title={ativoAtual ? "Clique para desativar" : "Clique para ativar"}
-                              >
-                                <span style={{
-                                  position: "absolute", top: 3, left: ativoAtual ? 25 : 3,
-                                  width: 20, height: 20, borderRadius: "50%", background: "#fff",
-                                  boxShadow: "0 1px 4px rgba(0,0,0,0.18)",
-                                  transition: "left 0.2s ease",
-                                  display: "block",
-                                }} />
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
       )}
 
       {/* ── ABA CONFIGURAÇÕES (conteúdo original abaixo) ── */}

@@ -456,8 +456,8 @@ export default function Sidebar({ isOpen, onClose }) {
           </>
         ) : (
           <>
-            {/* LINK: Home */}
-            {!isDisciplinar && !isProfessor && !isCoord && !isSecretario && (
+            {/* LINK: Home — sempre visível para qualquer perfil de escola não-disciplinar */}
+            {!isDisciplinar && !isProfessor && !isSecretario && (
             <Link to="/home" className={getMainLinkClasses('/home')}>
               <HomeIcon className="h-5 w-5 mr-2" />
               Home

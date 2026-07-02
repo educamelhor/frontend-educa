@@ -32,11 +32,11 @@ import {
 } from '@heroicons/react/24/outline';
 
 export default function Sidebar({ isOpen, onClose }) {
-  // Para perfis militares o grupo Disciplinar fica sempre expandido
+  // ✅ [GOVERNANÇA v2] Para perfis disciplinares o grupo Disciplinar fica sempre expandido
   const [openGroup, setOpenGroup] = useState(
     () => {
       const p = String(localStorage.getItem('perfil') || '').toLowerCase().trim();
-      return (p === 'militar' || p === 'comandante') ? 'disciplinar' : null;
+      return (p === 'diretor_disciplinar' || p === 'comandante') ? 'disciplinar' : null;
     }
   );
   const [openCorrecoes, setOpenCorrecoes] = useState(false);
@@ -167,7 +167,8 @@ export default function Sidebar({ isOpen, onClose }) {
   const getPerfil = () =>
     String(localStorage.getItem('perfil') || '').toLowerCase().trim();
   const perfil = getPerfil();
-  const isDisciplinar = perfil === 'disciplinar' || perfil === 'diretor_disciplinar' || perfil === 'militar';
+  // ✅ [GOVERNANÇA v2] 'militar' renomeado para 'diretor_disciplinar'
+  const isDisciplinar = perfil === 'disciplinar' || perfil === 'diretor_disciplinar';
   const isProfessor = perfil === 'professor';
   const isSecretario = perfil === 'secretario' || perfil === 'secretaria';
 
@@ -179,8 +180,8 @@ export default function Sidebar({ isOpen, onClose }) {
   // Direção (Diretor) — Devices EDUCA-CAPTURE
   const canDirecaoDevices = isScopeEscola && !isDisciplinar && !isProfessor && hasPerm('capture_devices.gerenciar');
 
-  // Governança — Diretor e Vice-Diretor
-  const canGovernanca = isScopeEscola && !isDisciplinar && !isProfessor && (perfil === 'diretor' || perfil === 'vice_diretor');
+  // Governança — Diretor, Vice-Diretor E Diretor Disciplinar (cada um vê apenas seu domínio)
+  const canGovernanca = isScopeEscola && !isProfessor && (perfil === 'diretor' || perfil === 'vice_diretor' || perfil === 'diretor_disciplinar');
 
   // Banco de Questões — restrito a Direção e Coordenação (em desenvolvimento/aprovação)
   const canBancoQuestoes = isScopeEscola && !isDisciplinar && (perfil === 'diretor' || perfil === 'vice_diretor' || perfil === 'coordenador');
@@ -227,8 +228,8 @@ export default function Sidebar({ isOpen, onClose }) {
   // Governança: perfis com acesso administrativo completo ao Gabarito (Gerar + Corrigir Lote)
   const canGabaritoAdmin = canGabarito && !isProfessor && !isCoord;
 
-  // ── Agente EDUCA: disponível a TODOS exceto militar e comandante (CCMDF) ──
-  const isMilitar = perfil === 'militar' || perfil === 'comandante';
+  // ✅ [GOVERNANÇA v2] Agente EDUCA: disponível a TODOS exceto disciplinar e comandante (CCMDF)
+  const isMilitar = perfil === 'diretor_disciplinar' || perfil === 'comandante';
   const canAgenteEduca = isScopeEscola && !isMilitar;
 
 
@@ -1107,7 +1108,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
                 )}
-                {(perfil === 'diretor' || perfil === 'militar') && (
+                {(perfil === 'diretor' || perfil === 'diretor_disciplinar') && (
                 <li>
                   <Link
                     to="/disciplinar/equipe"
@@ -1244,7 +1245,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
                 )}
-                {(perfil === 'diretor' || perfil === 'militar') && (
+                {(perfil === 'diretor' || perfil === 'diretor_disciplinar') && (
                 <li>
                   <Link
                     to="/disciplinar/equipe"

@@ -168,8 +168,13 @@ export default function Sidebar({ isOpen, onClose }) {
   const getPerfil = () =>
     String(localStorage.getItem('perfil') || '').toLowerCase().trim();
   const perfil = getPerfil();
-  // ✅ [GOVERNANÇA v2] 'militar' renomeado para 'diretor_disciplinar'
-  const isDisciplinar = perfil === 'disciplinar' || perfil === 'diretor_disciplinar';
+  // Regra de Ouro: TODOS os perfis militares veem apenas o módulo DISCIPLINAR
+  // Deve ser igual a PERFIS_MILITARES no backend (auth.js)
+  const PERFIS_MILITARES_SET = new Set([
+    'disciplinar', 'diretor_disciplinar', 'comandante',
+    'subcomandante', 'supervisor_disciplinar', 'monitor_disciplinar',
+  ]);
+  const isDisciplinar = PERFIS_MILITARES_SET.has(perfil);
   const isProfessor = perfil === 'professor';
   const isSecretario = perfil === 'secretario' || perfil === 'secretaria';
 

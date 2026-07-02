@@ -26,21 +26,8 @@ const MODULOS_TREE = [
       { id: 'secretaria.modulacao', label: 'Modulação' },
     ]
   },
-  {
-    id: 'disciplinar', label: 'Disciplinar', icon: '⚖️',
-    filhos: [
-      { id: 'disciplinar.alunos', label: 'Alunos' },
-      { id: 'disciplinar.historico', label: 'Histórico' },
-      { id: 'disciplinar.atas', label: 'Atas' },
-      { id: 'disciplinar.fo_coletivo', label: 'F.O. Coletivo' },
-      { id: 'disciplinar.responsaveis', label: 'Responsáveis' },
-      { id: 'disciplinar.liberacao', label: 'Liberação' },
-      { id: 'disciplinar.metadados', label: 'Metadados' },
-      { id: 'disciplinar.equipe', label: 'Gestão de Equipe' },
-      { id: 'disciplinar.regimentos', label: 'Regimentos' },
-      { id: 'disciplinar.manual', label: 'Manual' },
-    ]
-  },
+  // ── DISCIPLINAR: módulo reservado — sempre ativo para perfis militares.
+  // O CEO não gerencia este módulo. Omitido intencionalmente da lista.
   {
     id: 'pedagogico', label: 'Pedagógico', icon: '🎓',
     filhos: [
@@ -50,6 +37,7 @@ const MODULOS_TREE = [
       { id: 'pedagogico.correcoes', label: 'Correções' },
     ]
   },
+
   {
     id: 'gabarito', label: 'Gabarito', icon: '✅',
     filhos: [

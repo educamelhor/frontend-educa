@@ -457,8 +457,8 @@ export default function Sidebar({ isOpen, onClose }) {
             </Link>
             )}
 
-            {/* LINK: Estudantes */}
-            {!isDisciplinar && !isProfessor && !isCoord && !isSecretario && hasModulo('secretaria.alunos') && (
+            {/* LINK: Estudantes — só aparece se CEO configurou módulo 'estudantes' explicitamente */}
+            {!isDisciplinar && !isProfessor && !isCoord && !isSecretario && hasModulo('estudantes') && (
             <Link to="/alunos" className={getMainLinkClasses('/alunos')}>
               <UserGroupIcon className="h-5 w-5 mr-2" />
               Estudantes
@@ -637,6 +637,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   <span className="flex-1 text-left font-semibold">Frequência</span>
                 </div>
                 <ul className="ml-4 mb-2">
+                  {hasModulo('frequencia.atestados') && (
                   <li>
                     <Link
                       to="/frequencia/atestados"
@@ -645,6 +646,7 @@ export default function Sidebar({ isOpen, onClose }) {
                       <DocumentTextIcon className="h-5 w-5 mr-2" /> Atestados
                     </Link>
                   </li>
+                  )}
                 </ul>
               </>
             )}
@@ -1449,10 +1451,12 @@ export default function Sidebar({ isOpen, onClose }) {
                 )}
               </>
             )}
+          </>
+        )}
 
-            {/* ─── GRUPO: Secretaria (Professor NÃO tem acesso) ─── */}
-            {!isProfessor && hasModulo('secretaria') && (
-            <>
+        {/* ─── GRUPO: Secretaria — bloco INDEPENDENTE (não aninhado em canAgenteEduca) ─── */}
+        {isScopeEscola && !isProfessor && hasModulo('secretaria') && (
+          <>
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-6 transition"
               onClick={() => setOpenGroup(openGroup === 'secretaria' ? null : 'secretaria')}
@@ -1648,8 +1652,6 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
               </ul>
-            )}
-            </>
             )}
           </>
         )}

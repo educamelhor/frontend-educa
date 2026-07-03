@@ -2,7 +2,8 @@ import React, { useState, useEffect } from "react";
 import api from "../../../services/api";
 import ModalBoletimAnual from "../../boletim/ModalBoletimAnual";
 import ModalFichaAluno from "./ModalFichaAluno";
-import ModalZoomFoto from "./ModalZoomFoto"; // 👈 Import do modal de zoom
+import ModalZoomFoto from "./ModalZoomFoto";
+import ModalRegistroConselhoPedagogico from "./ModalRegistroConselhoPedagogico";
 import {
   EyeIcon,
   DocumentTextIcon,
@@ -55,6 +56,10 @@ export default function ConselhoClasse() {
   const [zoomSrc, setZoomSrc] = useState("");
   const [zoomAlt, setZoomAlt] = useState("");
 
+  // Registro de Conselho de Classe
+  const [modalRegistroOpen, setModalRegistroOpen] = useState(false);
+  const [alunoRegistro, setAlunoRegistro] = useState(null);
+
   function abrirModalBoletim(codigo) {
     setCodigoAlunoBoletim(codigo);
     setModalBoletimOpen(true);
@@ -63,6 +68,11 @@ export default function ConselhoClasse() {
   function abrirModalFicha(codigo) {
     setCodigoAlunoFicha(codigo);
     setModalFichaOpen(true);
+  }
+
+  function abrirModalRegistro(aluno) {
+    setAlunoRegistro(aluno);
+    setModalRegistroOpen(true);
   }
 
   const turnos = ["Matutino", "Vespertino", "Noturno"];
@@ -260,7 +270,10 @@ export default function ConselhoClasse() {
                       {/* Ações */}
                       <td className="py-2 px-2 text-center">
                         <div className="flex justify-center gap-3">
-                          <button>
+                          <button
+                            onClick={() => abrirModalRegistro(aluno)}
+                            title="Registro de Conselho de Classe"
+                          >
                             <EyeIcon className="h-6 w-6 text-gray-600 hover:text-blue-600" />
                           </button>
 
@@ -317,6 +330,15 @@ export default function ConselhoClasse() {
           src={zoomSrc}
           alt={zoomAlt}
           onClose={() => setZoomOpen(false)}
+        />
+      )}
+
+      {modalRegistroOpen && (
+        <ModalRegistroConselhoPedagogico
+          open={modalRegistroOpen}
+          aluno={alunoRegistro}
+          turmaId={turmaSelecionada?.id ?? null}
+          onClose={() => setModalRegistroOpen(false)}
         />
       )}
     </div>

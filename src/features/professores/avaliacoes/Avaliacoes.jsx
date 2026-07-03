@@ -1732,68 +1732,126 @@ export default function Avaliacoes() {
       )}
 
       {/* MODAL LANÇAR AEE */}
-      {modalAEE && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ position: "absolute", inset: 0, backgroundColor: "rgba(0,0,0,0.5)", backdropFilter: "blur(2px)" }} onClick={() => setModalAEE(null)} />
-          <div style={{ position: "relative", backgroundColor: "#fff", borderRadius: "12px", width: "100%", maxWidth: "450px", padding: "20px", boxShadow: "0 10px 25px rgba(0,0,0,0.2)" }}>
-            <h3 style={{ margin: "0 0 10px", color: "#1e293b", fontSize: "1.1rem", fontWeight: 800 }}>
-              Avaliação Adaptada (AEE)
-            </h3>
-            <p style={{ margin: "0 0 15px", fontSize: "0.8rem", color: "#475569" }}>
-              Lançamento manual para alunos com Atendimento Diferencial na atividade <strong>{modalAEE.item.atividade}</strong>.
-            </p>
-            
-            <div style={{ maxHeight: "300px", overflowY: "auto", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "10px" }}>
-              {alunos.filter(a => Number(a.atendimento_diferencial) === 1).length === 0 ? (
-                <div style={{ textAlign: "center", padding: "20px", color: "#64748b", fontSize: "0.85rem" }}>
-                  Nenhum aluno com Atendimento Diferencial (AEE) cadastrado nesta turma.
+      {modalAEE && (() => {
+        const alunosAEE = alunos.filter(a => Number(a.atendimento_diferencial) === 1);
+        const comNotaGabarito = alunosAEE.filter(a => notas[getNotaKey(a.id, modalAEE.itemIdx, 0)] != null);
+        return (
+          <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ position: "absolute", inset: 0, backgroundColor: "rgba(0,0,0,0.5)", backdropFilter: "blur(2px)" }} onClick={() => setModalAEE(null)} />
+            <div style={{ position: "relative", backgroundColor: "#fff", borderRadius: "14px", width: "100%", maxWidth: "480px", padding: "22px", boxShadow: "0 16px 40px rgba(0,0,0,0.22)" }}>
+              
+              {/* Header */}
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "12px" }}>
+                <div>
+                  <h3 style={{ margin: 0, color: "#1e293b", fontSize: "1.1rem", fontWeight: 800 }}>
+                    🧩 Avaliação Adaptada (AEE)
+                  </h3>
+                  <p style={{ margin: "4px 0 0", fontSize: "0.78rem", color: "#64748b" }}>
+                    Atividade: <strong style={{ color: "#334155" }}>{modalAEE.item.atividade}</strong> &nbsp;|&nbsp; Máx: <strong>{modalAEE.item.nota_total} pts</strong>
+                  </p>
                 </div>
-              ) : (
-                alunos.filter(a => Number(a.atendimento_diferencial) === 1).map(aluno => (
-                  <div key={aluno.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #f1f5f9" }}>
-                    <div style={{ fontSize: "0.8rem", fontWeight: 600, color: "#334155" }}>
-                      {aluno.estudante || aluno.nome}
-                    </div>
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      style={{ width: "60px", padding: "4px", textAlign: "center", border: "1px solid #cbd5e1", borderRadius: "4px", fontSize: "0.85rem", outline: "none" }}
-                      placeholder="Nota"
-                      defaultValue={notas[getNotaKey(aluno.id, modalAEE.itemIdx, 0)] ?? ""}
-                      onBlur={(e) => {
-                         let val = e.target.value.replace(",", ".");
-                         setNotas(prev => {
-                           const n = { ...prev };
-                           if (val && !isNaN(val)) {
-                             let num = parseFloat(val);
-                             if (num > Number(modalAEE.item.nota_total)) num = Number(modalAEE.item.nota_total);
-                             if (num < 0) num = 0;
-                             n[getNotaKey(aluno.id, modalAEE.itemIdx, 0)] = num;
-                             e.target.value = num;
-                           } else {
-                             delete n[getNotaKey(aluno.id, modalAEE.itemIdx, 0)];
-                             e.target.value = "";
-                           }
-                           return n;
-                         });
-                      }}
-                    />
+                <button onClick={() => setModalAEE(null)} style={{ background: "none", border: "none", fontSize: "1.2rem", cursor: "pointer", color: "#94a3b8", lineHeight: 1 }}>✕</button>
+              </div>
+
+              {/* Banner de alerta quando algum aluno já tem nota do gabarito */}
+              {comNotaGabarito.length > 0 && (
+                <div style={{ display: "flex", gap: "10px", alignItems: "flex-start", backgroundColor: "#fffbeb", border: "1px solid #f59e0b", borderRadius: "8px", padding: "10px 12px", marginBottom: "14px" }}>
+                  <span style={{ fontSize: "1.1rem", lineHeight: 1 }}>⚠️</span>
+                  <div style={{ fontSize: "0.77rem", color: "#92400e", lineHeight: 1.5 }}>
+                    <strong>{comNotaGabarito.length} aluno{comNotaGabarito.length > 1 ? "s" : ""}</strong> já {comNotaGabarito.length > 1 ? "têm" : "tem"} nota preenchida automaticamente pelo <strong>Gabarito</strong>. Os campos destacados em amarelo indicam essa situação. Altere <strong>apenas se a prova foi realmente adaptada</strong> para esse estudante.
                   </div>
-                ))
+                </div>
               )}
-            </div>
-            
-            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "15px" }}>
-              <button
-                onClick={() => setModalAEE(null)}
-                style={{ padding: "8px 16px", backgroundColor: "#3b82f6", color: "#fff", border: "none", borderRadius: "6px", fontWeight: "bold", cursor: "pointer" }}
-              >
-                Concluir
-              </button>
+
+              {/* Lista de alunos */}
+              <div style={{ maxHeight: "300px", overflowY: "auto", border: "1px solid #e2e8f0", borderRadius: "8px", overflow: "hidden" }}>
+                {alunosAEE.length === 0 ? (
+                  <div style={{ textAlign: "center", padding: "24px", color: "#64748b", fontSize: "0.85rem" }}>
+                    Nenhum aluno com Atendimento Diferencial (AEE) cadastrado nesta turma.
+                  </div>
+                ) : (
+                  alunosAEE.map((aluno, i) => {
+                    const notaKey = getNotaKey(aluno.id, modalAEE.itemIdx, 0);
+                    const temNotaGabarito = notas[notaKey] != null;
+                    return (
+                      <div key={aluno.id} style={{
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        padding: "10px 12px",
+                        borderBottom: i < alunosAEE.length - 1 ? "1px solid #f1f5f9" : "none",
+                        backgroundColor: temNotaGabarito ? "#fffbeb" : "#fff",
+                        transition: "background-color 0.2s"
+                      }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "#1e293b" }}>
+                            {aluno.estudante || aluno.nome}
+                          </div>
+                          {temNotaGabarito && (
+                            <div style={{ fontSize: "0.67rem", color: "#b45309", fontWeight: 600, marginTop: "2px", display: "flex", alignItems: "center", gap: "3px" }}>
+                              🤖 Nota preenchida pelo Gabarito — altere somente se necessário
+                            </div>
+                          )}
+                        </div>
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "3px", marginLeft: "12px" }}>
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            style={{
+                              width: "64px", padding: "5px", textAlign: "center",
+                              border: `1.5px solid ${temNotaGabarito ? "#f59e0b" : "#cbd5e1"}`,
+                              borderRadius: "6px", fontSize: "0.9rem", fontWeight: 700, outline: "none",
+                              backgroundColor: temNotaGabarito ? "#fef3c7" : "#f8fafc",
+                              color: "#1e293b",
+                              transition: "all 0.2s"
+                            }}
+                            placeholder="—"
+                            defaultValue={notas[notaKey] ?? ""}
+                            onFocus={e => { e.target.style.borderColor = "#3b82f6"; e.target.style.backgroundColor = "#eff6ff"; }}
+                            onBlur={(e) => {
+                              e.target.style.borderColor = temNotaGabarito ? "#f59e0b" : "#cbd5e1";
+                              e.target.style.backgroundColor = temNotaGabarito ? "#fef3c7" : "#f8fafc";
+                              let val = e.target.value.replace(",", ".");
+                              setNotas(prev => {
+                                const n = { ...prev };
+                                if (val && !isNaN(val)) {
+                                  let num = parseFloat(val);
+                                  if (num > Number(modalAEE.item.nota_total)) num = Number(modalAEE.item.nota_total);
+                                  if (num < 0) num = 0;
+                                  n[notaKey] = num;
+                                  e.target.value = num;
+                                } else {
+                                  delete n[notaKey];
+                                  e.target.value = "";
+                                }
+                                return n;
+                              });
+                            }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Footer */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "16px" }}>
+                <span style={{ fontSize: "0.72rem", color: "#94a3b8" }}>
+                  {alunosAEE.length} aluno{alunosAEE.length !== 1 ? "s" : ""} AEE nesta turma
+                </span>
+                <button
+                  onClick={() => setModalAEE(null)}
+                  style={{ padding: "9px 22px", backgroundColor: "#3b82f6", color: "#fff", border: "none", borderRadius: "8px", fontWeight: 800, fontSize: "0.9rem", cursor: "pointer", boxShadow: "0 4px 12px rgba(59,130,246,0.35)", transition: "all 0.2s" }}
+                  onMouseEnter={e => e.target.style.backgroundColor = "#2563eb"}
+                  onMouseLeave={e => e.target.style.backgroundColor = "#3b82f6"}
+                >
+                  Concluir ✓
+                </button>
+              </div>
+
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
     </div>
   );

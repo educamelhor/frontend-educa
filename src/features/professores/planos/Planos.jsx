@@ -162,18 +162,7 @@ export default function Planos() {
   const mesAtual = new Date().getMonth() + 1; // 1..12
 
   const statusBimestreMock = (bimLabel) => {
-    const n = Number((bimLabel || "").split("º")[0]);
-    if (!n) return "ATIVO";
-
-    // Regras simples para mock:
-    // Jan–Mar: 1º ATIVO, demais FUTURO
-    // Abr–Jun: 1º ENCERRADO, 2º ATIVO
-    // Jul–Set: 1º/2º ENCERRADOS, 3º ATIVO
-    // Out–Dez: 1º/2º/3º ENCERRADOS, 4º ATIVO
-    if (mesAtual <= 3) return n === 1 ? "ATIVO" : "FUTURO";
-    if (mesAtual <= 6) return n === 1 ? "ENCERRADO" : n === 2 ? "ATIVO" : "FUTURO";
-    if (mesAtual <= 9) return n <= 2 ? "ENCERRADO" : n === 3 ? "ATIVO" : "FUTURO";
-    return n <= 3 ? "ENCERRADO" : "ATIVO";
+    return "ATIVO";
   };
 
   const bimestreEncerrado = (bimLabel) => statusBimestreMock(bimLabel) === "ENCERRADO";

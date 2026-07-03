@@ -266,8 +266,16 @@ export default function GabaritoCorrigirProfessor() {
         justificativa: ajusteJustificativa || null,
       });
       if (resp.data.ok) {
-        showToast(`✏️ Ajuste na questão ${String(ajusteModal.numero).padStart(2, "0")} enviado para aprovação do coordenador.`, "success");
-        // Atualizar lista de ajustes local
+        showToast(`✅ Ajuste na questão ${String(ajusteModal.numero).padStart(2, "0")} salvo com sucesso.`, "success");
+        // Se a API retornar a nota recalculada (recalculado = true), atualizar o estado local
+        if (resp.data.recalculado && resp.data.notasAtualizadas) {
+          setCorrecao(prev => ({
+            ...prev,
+            nota: resp.data.notasAtualizadas.nota,
+            acertos: resp.data.notasAtualizadas.acertos,
+            tem_ajuste_pendente: false // nunca pendente
+          }));
+        }
         setAjustesManuais(prev => {
           const sem = prev.filter(a => a.questao_numero !== ajusteModal.numero);
           return [...sem, resp.data.ajuste];
@@ -1069,16 +1077,6 @@ export default function GabaritoCorrigirProfessor() {
                       </div>
                     </div>
                   </div>
-                  {correcao.tem_ajuste_pendente && (
-                    <span style={{
-                      padding: "6px 14px", borderRadius: 8, fontSize: "0.72rem", fontWeight: 700,
-                      background: "rgba(245,158,11,0.12)", color: "#fbbf24",
-                      border: "1px solid rgba(245,158,11,0.3)",
-                      display: "flex", alignItems: "center", gap: 5,
-                    }} title="Este resultado inclui ajustes manuais ainda aguardando aprovação do coordenador">
-                      ⏳ Ajuste pendente
-                    </span>
-                  )}
                   <span style={{
                     padding: "6px 16px", borderRadius: 8, fontSize: "0.72rem", fontWeight: 700,
                     background: "rgba(16,185,129,0.1)", color: "#34d399",
@@ -1265,7 +1263,7 @@ export default function GabaritoCorrigirProfessor() {
                     Ajuste Manual — Questão {String(ajusteModal.numero).padStart(2, "0")}
                   </div>
                   <div style={{ fontSize: "0.7rem", color: "var(--gab-text-muted)", marginTop: 2 }}>
-                    Sugerido pelo professor · Requer aprovação do coordenador
+                    Ajuste de registro manual 
                   </div>
                 </div>
               </div>

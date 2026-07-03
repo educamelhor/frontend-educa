@@ -782,17 +782,17 @@ export default function Planos() {
 
       {mostrarTabela && (
         <section className="bg-white rounded-xl shadow-lg p-6">
-          {/* Mensagem do sistema */}
+          {/* Mensagem do sistema (Toast Global) */}
           {mensagemSistema && (
             <div
-              className={`mb-4 rounded-lg px-4 py-3 text-sm font-semibold ${
+              className={`fixed top-6 right-6 z-[999999] shadow-2xl rounded-lg px-5 py-4 text-sm font-bold flex items-center gap-3 animate-in fade-in slide-in-from-top-5 duration-300 ${
                 mensagemSistema.type === "success"
-                  ? "bg-green-100 text-green-800"
+                  ? "bg-green-100 text-green-800 border-l-4 border-green-600"
                   : mensagemSistema.type === "warn"
-                    ? "bg-yellow-100 text-yellow-800"
-                    : mensagemSistema.type === "info"
-                      ? "bg-blue-100 text-blue-800"
-                      : "bg-red-100 text-red-800"
+                  ? "bg-yellow-100 text-yellow-800 border-l-4 border-yellow-600"
+                  : mensagemSistema.type === "info"
+                  ? "bg-blue-100 text-blue-800 border-l-4 border-blue-600"
+                  : "bg-red-100 text-red-800 border-l-4 border-red-600"
               }`}
             >
               {mensagemSistema.text}

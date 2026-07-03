@@ -40,6 +40,10 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {}, a
   const [turmaId, setTurmaId] = useState(
     initialData.turma_id ? String(initialData.turma_id) : ""
   );
+  const [cpf, setCpf] = useState(initialData.cpf || "");
+  const [atendimentoDiferencial, setAtendimentoDiferencial] = useState(
+    initialData.atendimento_diferencial === 1 || initialData.atendimento_diferencial === true
+  );
   const [turmas, setTurmas] = useState([]);
   const [modalAtivarOpen, setModalAtivarOpen] = useState(false);
 
@@ -63,6 +67,10 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {}, a
       setEstudante(initialData.estudante || "");
       setDataNascimento(normalizeDate(initialData.data_nascimento));
       setTurmaId(initialData.turma_id ? String(initialData.turma_id) : "");
+      setCpf(initialData.cpf || "");
+      setAtendimentoDiferencial(
+        initialData.atendimento_diferencial === 1 || initialData.atendimento_diferencial === true
+      );
     }
   }, [open, initialData]);
 
@@ -98,6 +106,8 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {}, a
       estudante,
       data_nascimento: dataNascimento,
       turma_id: Number(turmaId),
+      cpf,
+      atendimento_diferencial: atendimentoDiferencial ? 1 : 0,
     };
 
     let sucesso = false;
@@ -126,6 +136,8 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {}, a
       estudante,
       data_nascimento: dataNascimento,
       turma_id: Number(turmaId),
+      cpf,
+      atendimento_diferencial: atendimentoDiferencial ? 1 : 0,
     };
 
     const sucesso = await onSubmit({
@@ -178,6 +190,31 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {}, a
               required
               className="w-full"
             />
+          </div>
+
+          {/* CPF */}
+          <div>
+            <label className="block font-medium mb-1">CPF do Estudante</label>
+            <Input
+              value={cpf}
+              onChange={(e) => setCpf(e.target.value)}
+              placeholder="000.000.000-00"
+              className="w-full"
+            />
+          </div>
+
+          {/* Atendimento Diferencial */}
+          <div className="flex items-center space-x-2 mt-2 bg-slate-50 p-3 rounded border border-slate-200">
+            <input
+              type="checkbox"
+              id="atendimento_diferencial"
+              checked={atendimentoDiferencial}
+              onChange={(e) => setAtendimentoDiferencial(e.target.checked)}
+              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+            />
+            <label htmlFor="atendimento_diferencial" className="font-medium text-slate-700 cursor-pointer">
+              Estudante com Atendimento Diferencial (AEE)
+            </label>
           </div>
 
           {/* Data de Nascimento */}

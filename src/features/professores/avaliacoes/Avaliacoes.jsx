@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import api from "../../../services/api";
 import {
   CheckCircleIcon,
@@ -77,6 +77,7 @@ export default function Avaliacoes() {
 
   // Modal: editar data de um item de avaliação no cabeçalho do diário
   const [modalDataItem, setModalDataItem] = useState(null); // null | { itemId, itemIdx, atividade, dataAtual }
+  const [modalAEE, setModalAEE] = useState(null); // null | { item, itemIdx }
   const [salvandoData, setSalvandoData] = useState(false);
   const [dataEditTemp, setDataEditTemp] = useState("");
 
@@ -1102,7 +1103,7 @@ export default function Avaliacoes() {
                                     <th rowSpan={2} className="px-6 py-4 font-bold border-b border-r border-slate-200 w-10 text-center">Nº</th>
                                     <th rowSpan={2} className="px-6 py-4 font-bold border-b border-r border-slate-200 bg-slate-100 sticky left-0 z-30 min-w-[250px] shadow-sm">Estudante</th>
 
-                                     {/* CABEÇALHO 1 - Títulos das Atividades */}                                      {(Array.isArray(plano.itens) ? plano.itens : JSON.parse(plano.itens || "[]")).map((item, idx) => {                                        const dataExibir = item.data_inicio ? String(item.data_inicio).slice(0, 10) : null;                                        const dataFormatada = dataExibir                                          ? new Date(dataExibir + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })                                          : null;                                        const podeEditar = !item.fixo_direcao && !diarioFechado;                                        return (                                          <th key={idx} colSpan={Number(item.oportunidades) || 1} className="px-4 py-2 text-center text-[11px] font-black uppercase tracking-wider text-indigo-800 border-b border-r border-indigo-100 bg-indigo-50/50">                                            {item.atividade}                                            <div className="text-[10px] text-indigo-500 font-semibold lowercase mt-0.5">                                              (Max: {item.nota_total} pts)                                            </div>                                            {item.fixo_direcao ? (                                              <div title="Data gerenciada pela Direção" style={{ marginTop: 3, fontSize: "0.62rem", color: "#92400e", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", gap: 2 }}>                                                {"\uD83D\uDD12"} {dataFormatada || "a definir"}                                              </div>                                            ) : (                                              <button                                                onClick={() => { if (!podeEditar) return; setDataEditTemp(dataExibir || ""); setModalDataItem({ itemId: item.id, itemIdx: idx, atividade: item.atividade, dataAtual: dataExibir }); }}                                                title={podeEditar ? "Clique para definir a data" : "Diário fechado"}                                                style={{ marginTop: 3, display: "flex", alignItems: "center", justifyContent: "center", gap: 3, fontSize: "0.62rem", fontWeight: 700, color: dataFormatada ? "#1d4ed8" : "#94a3b8", background: dataFormatada ? "rgba(59,130,246,0.1)" : "rgba(148,163,184,0.1)", border: "1px dashed " + (dataFormatada ? "rgba(59,130,246,0.4)" : "rgba(148,163,184,0.4)"), borderRadius: "0.3rem", padding: "1px 5px", cursor: podeEditar ? "pointer" : "default", width: "100%", transition: "all 0.15s" }}                                              >                                                {"\uD83D\uDCC5"} {dataFormatada || "+ data"}                                              </button>                                            )}                                          </th>                                        );                                      })}
+                                     {/* CABEÇALHO 1 - Títulos das Atividades */}                                      {(Array.isArray(plano.itens) ? plano.itens : JSON.parse(plano.itens || "[]")).map((item, idx) => {                                        const dataExibir = item.data_inicio ? String(item.data_inicio).slice(0, 10) : null;                                        const dataFormatada = dataExibir                                          ? new Date(dataExibir + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })                                          : null;                                        const podeEditar = !item.fixo_direcao && !diarioFechado;                                        return (                                          <th key={idx} colSpan={Number(item.oportunidades) || 1} className="px-4 py-2 text-center text-[11px] font-black uppercase tracking-wider text-indigo-800 border-b border-r border-indigo-100 bg-indigo-50/50">                                            {item.atividade}                                            <div className="text-[10px] text-indigo-500 font-semibold lowercase mt-0.5">                                              (Max: {item.nota_total} pts)                                            </div>                                            {item.fixo_direcao ? (                                              <div className="flex flex-col items-center justify-center gap-1 mt-1">                                                <div title="Data gerenciada pela Direção" style={{ fontSize: "0.62rem", color: "#92400e", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", gap: 2 }}>                                                  {"\uD83D\uDD12"} {dataFormatada || "a definir"}                                                </div>                                                {!diarioFechado && (                                                  <button                                                    onClick={() => setModalAEE({ item, itemIdx: idx })}                                                    title="Lançar nota manual para alunos com Atendimento Diferencial (AEE)"                                                    style={{ fontSize: "0.55rem", padding: "2px 6px", borderRadius: "4px", backgroundColor: "#fef3c7", border: "1px solid #f59e0b", color: "#b45309", cursor: "pointer", fontWeight: "bold" }}                                                  >                                                    Lançar AEE                                                  </button>                                                )}                                              </div>                                            ) : (                                              <button                                                onClick={() => { if (!podeEditar) return; setDataEditTemp(dataExibir || ""); setModalDataItem({ itemId: item.id, itemIdx: idx, atividade: item.atividade, dataAtual: dataExibir }); }}                                                title={podeEditar ? "Clique para definir a data" : "Diário fechado"}                                                style={{ marginTop: 3, display: "flex", alignItems: "center", justifyContent: "center", gap: 3, fontSize: "0.62rem", fontWeight: 700, color: dataFormatada ? "#1d4ed8" : "#94a3b8", background: dataFormatada ? "rgba(59,130,246,0.1)" : "rgba(148,163,184,0.1)", border: "1px dashed " + (dataFormatada ? "rgba(59,130,246,0.4)" : "rgba(148,163,184,0.4)"), borderRadius: "0.3rem", padding: "1px 5px", cursor: podeEditar ? "pointer" : "default", width: "100%", transition: "all 0.15s" }}                                              >                                                {"\uD83D\uDCC5"} {dataFormatada || "+ data"}                                              </button>                                            )}                                          </th>                                        );                                      })}
 
                                     <th rowSpan={2} className="px-6 py-4 font-black uppercase tracking-widest text-center border-b border-slate-200 text-slate-800 bg-slate-200 min-w-[120px]">TOTAL</th>
                                 </tr>
@@ -1725,6 +1726,70 @@ export default function Avaliacoes() {
                   {salvandoData ? "Salvando..." : "Salvar Data"}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL LANÇAR AEE */}
+      {modalAEE && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ position: "absolute", inset: 0, backgroundColor: "rgba(0,0,0,0.5)", backdropFilter: "blur(2px)" }} onClick={() => setModalAEE(null)} />
+          <div style={{ position: "relative", backgroundColor: "#fff", borderRadius: "12px", width: "100%", maxWidth: "450px", padding: "20px", boxShadow: "0 10px 25px rgba(0,0,0,0.2)" }}>
+            <h3 style={{ margin: "0 0 10px", color: "#1e293b", fontSize: "1.1rem", fontWeight: 800 }}>
+              Avaliação Adaptada (AEE)
+            </h3>
+            <p style={{ margin: "0 0 15px", fontSize: "0.8rem", color: "#475569" }}>
+              Lançamento manual para alunos com Atendimento Diferencial na atividade <strong>{modalAEE.item.atividade}</strong>.
+            </p>
+            
+            <div style={{ maxHeight: "300px", overflowY: "auto", border: "1px solid #e2e8f0", borderRadius: "8px", padding: "10px" }}>
+              {alunos.filter(a => Number(a.atendimento_diferencial) === 1).length === 0 ? (
+                <div style={{ textAlign: "center", padding: "20px", color: "#64748b", fontSize: "0.85rem" }}>
+                  Nenhum aluno com Atendimento Diferencial (AEE) cadastrado nesta turma.
+                </div>
+              ) : (
+                alunos.filter(a => Number(a.atendimento_diferencial) === 1).map(aluno => (
+                  <div key={aluno.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #f1f5f9" }}>
+                    <div style={{ fontSize: "0.8rem", fontWeight: 600, color: "#334155" }}>
+                      {aluno.estudante || aluno.nome}
+                    </div>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      style={{ width: "60px", padding: "4px", textAlign: "center", border: "1px solid #cbd5e1", borderRadius: "4px", fontSize: "0.85rem", outline: "none" }}
+                      placeholder="Nota"
+                      defaultValue={notas[getNotaKey(aluno.id, modalAEE.itemIdx, 0)] ?? ""}
+                      onBlur={(e) => {
+                         let val = e.target.value.replace(",", ".");
+                         setNotas(prev => {
+                           const n = { ...prev };
+                           if (val && !isNaN(val)) {
+                             let num = parseFloat(val);
+                             if (num > Number(modalAEE.item.nota_total)) num = Number(modalAEE.item.nota_total);
+                             if (num < 0) num = 0;
+                             n[getNotaKey(aluno.id, modalAEE.itemIdx, 0)] = num;
+                             e.target.value = num;
+                           } else {
+                             delete n[getNotaKey(aluno.id, modalAEE.itemIdx, 0)];
+                             e.target.value = "";
+                           }
+                           return n;
+                         });
+                      }}
+                    />
+                  </div>
+                ))
+              )}
+            </div>
+            
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "15px" }}>
+              <button
+                onClick={() => setModalAEE(null)}
+                style={{ padding: "8px 16px", backgroundColor: "#3b82f6", color: "#fff", border: "none", borderRadius: "6px", fontWeight: "bold", cursor: "pointer" }}
+              >
+                Concluir
+              </button>
             </div>
           </div>
         </div>

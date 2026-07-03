@@ -47,6 +47,7 @@ export default function Avaliacoes() {
   const [plano, setPlano] = useState(null);
   const [planoStatus, setPlanoStatus] = useState(null); // null | "PENDENTE" | "RASCUNHO" | "ENVIADO" | "APROVADO"
   const [notas, setNotas] = useState({}); // Formato: { [alunoId_itemIdx_opIdx]: valor }
+  const [alunosComGabarito, setAlunosComGabarito] = useState(new Set()); // aluno_ids com nota via gabarito
   const [coresCelulas, setCoresCelulas] = useState({});
   const [contextMenu, setContextMenu] = useState(null);
   const [salvando, setSalvando] = useState(false);
@@ -261,13 +262,16 @@ export default function Avaliacoes() {
           if (resNotas.data?.ok) {
             setNotas(resNotas.data.notas || {});
             setCoresCelulas(resNotas.data.cores || {});
+            setAlunosComGabarito(new Set(resNotas.data.alunosComGabarito || []));
           } else {
             setNotas({});
             setCoresCelulas({});
+            setAlunosComGabarito(new Set());
           }
         } catch {
           setNotas({});
           setCoresCelulas({});
+          setAlunosComGabarito(new Set());
         }
 
         // 6) Verificar status de fechamento do diário
@@ -1734,7 +1738,7 @@ export default function Avaliacoes() {
       {/* MODAL LANÇAR AEE */}
       {modalAEE && (() => {
         const alunosAEE = alunos.filter(a => Number(a.atendimento_diferencial) === 1);
-        const comNotaGabarito = alunosAEE.filter(a => notas[getNotaKey(a.id, modalAEE.itemIdx, 0)] != null);
+        const comNotaGabarito = alunosAEE.filter(a => alunosComGabarito.has(a.id));
         return (
           <div style={{ position: "fixed", inset: 0, zIndex: 100, display: "flex", alignItems: "center", justifyContent: "center" }}>
             <div style={{ position: "absolute", inset: 0, backgroundColor: "rgba(0,0,0,0.5)", backdropFilter: "blur(2px)" }} onClick={() => setModalAEE(null)} />
@@ -1772,7 +1776,7 @@ export default function Avaliacoes() {
                 ) : (
                   alunosAEE.map((aluno, i) => {
                     const notaKey = getNotaKey(aluno.id, modalAEE.itemIdx, 0);
-                    const temNotaGabarito = notas[notaKey] != null;
+                    const temNotaGabarito = alunosComGabarito.has(aluno.id);
                     return (
                       <div key={aluno.id} style={{
                         display: "flex", alignItems: "center", justifyContent: "space-between",

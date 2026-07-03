@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import api from "../../../services/api";
-import ModalBoletim from "../../boletim/ModalBoletim";
+import ModalBoletimAnual from "../../boletim/ModalBoletimAnual";
 import ModalFichaAluno from "./ModalFichaAluno";
 import ModalZoomFoto from "./ModalZoomFoto"; // 👈 Import do modal de zoom
 import {
@@ -296,7 +296,7 @@ export default function ConselhoClasse() {
 
       {/* Modais */}
       {modalBoletimOpen && (
-        <ModalBoletim
+        <ModalBoletimAnual
           open={modalBoletimOpen}
           codigo={codigoAlunoBoletim}
           onClose={() => setModalBoletimOpen(false)}

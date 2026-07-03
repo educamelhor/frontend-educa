@@ -2,14 +2,14 @@
 // ============================================================
 // FICHA DO ESTUDANTE — Módulo PEDAGÓGICO (isolado)
 // ✅ Apenas: Relatório Pedagógico (acesso total: criar/editar/excluir)
-// ✅ Upload de foto habilitado
+// ❌ Upload de foto: NÃO — fotos vêm exclusivamente do app EDUCA-CAPTURE
 // ❌ Removidos: Relatório Disciplinar, leitura de localStorage para contexto
 // ============================================================
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../../../services/api";
 import { Button } from "../../../components/ui/Button";
-import * as faceapi from "face-api.js";
+// faceapi removido — upload de foto não é mais realizado neste módulo
 import { AcademicCapIcon } from "@heroicons/react/24/solid";
 import ModalRelatorioPedagogico from "../../alunos/ModalRelatorioPedagogico";
 
@@ -21,12 +21,9 @@ export default function FichaAlunoPedagogico({ codigo: codigoProp }) {
 
   const [aluno, setAluno] = useState(null);
   const [erro, setErro] = useState(null);
-  const [uploading, setUploading] = useState(false);
-  const [feedback, setFeedback] = useState(null);
   const [modalPedagogicoOpen, setModalPedagogicoOpen] = useState(false);
 
-  const isUploadingRef = useRef(false);
-  const retryOnceRef = useRef(false);
+  const retryOnceRef = React.useRef(false);
 
   // ID do usuário logado para rastreabilidade
   const usuarioLogadoId = Number(localStorage.getItem('usuario_id') || localStorage.getItem('usuarioId') || 0);
@@ -77,82 +74,7 @@ export default function FichaAlunoPedagogico({ codigo: codigoProp }) {
     return () => { alive = false; };
   }, [codigo]);
 
-  const handleFolderSelect = async (e) => {
-    if (isUploadingRef.current) return;
-    const files = Array.from(e.target.files || []);
-    if (!files.length || !aluno) return;
-    const codigoStr = String(aluno.codigo);
-    const exts = /\.(jpe?g|png|webp|jfif)$/i;
-    const match = files.find(f => {
-      const base = f.name.replace(/\.[^.]+$/, "");
-      return base === codigoStr && exts.test(f.name);
-    });
-    if (!match) {
-      setFeedback({ tipo: "erro", mensagem: `Nenhuma foto com o nome "${codigoStr}" encontrada na pasta.` });
-      return;
-    }
-    isUploadingRef.current = true;
-    setFeedback(null);
-    await processAndUpload(match);
-    isUploadingRef.current = false;
-  };
-
-  const processAndUpload = async (arquivoFonte) => {
-    setUploading(true);
-    try {
-      const objectURL = URL.createObjectURL(arquivoFonte);
-      const imgEl = document.createElement("img");
-      imgEl.src = objectURL;
-      await new Promise((resolve, reject) => {
-        imgEl.onload = resolve;
-        imgEl.onerror = reject;
-      });
-      URL.revokeObjectURL(objectURL);
-
-      try { await faceapi.nets.tinyFaceDetector.loadFromUri("/models"); } catch {}
-
-      let detection;
-      try {
-        const canvasTemp = faceapi.createCanvasFromMedia(imgEl);
-        detection = await faceapi.detectSingleFace(canvasTemp, new faceapi.TinyFaceDetectorOptions());
-      } catch {}
-
-      let fileParaUpload = arquivoFonte;
-      if (detection) {
-        const box = detection.box;
-        const MARGEM = 0.1;
-        const x1 = Math.max(0, box.x - box.width * MARGEM);
-        const y1 = Math.max(0, box.y - box.height * MARGEM);
-        const x2 = Math.min(imgEl.width, box.x + box.width * (1 + MARGEM));
-        const y2 = Math.min(imgEl.height, box.y + box.height * (1 + MARGEM));
-        try {
-          const canvas = document.createElement("canvas");
-          canvas.width = x2 - x1; canvas.height = y2 - y1;
-          canvas.getContext("2d").drawImage(imgEl, x1, y1, x2 - x1, y2 - y1, 0, 0, x2 - x1, y2 - y1);
-          const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", 0.9));
-          if (blob) fileParaUpload = new File([blob], `${aluno.codigo}.jpg`, { type: "image/jpeg" });
-        } catch {}
-      }
-
-      setUploading(true);
-      const formData = new FormData();
-      formData.append("foto", fileParaUpload);
-      const resp = await api.post(`/api/alunos/${codigo}/foto`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      const base = resp?.data?.foto ?? resp?.data?.url ?? resp?.data?.path ?? resp?.data?.caminho ?? "";
-      const baseURL = buildFotoURL(base);
-      const novaPath = baseURL ? `${baseURL}${baseURL.includes("?") ? "&" : "?"}t=${Date.now()}` : "";
-      retryOnceRef.current = false;
-      setAluno(old => ({ ...(old || {}), foto: novaPath }));
-      setFeedback({ tipo: "sucesso", mensagem: "Foto atualizada com sucesso!" });
-    } catch (err) {
-      console.error("Erro ao processar foto:", err);
-      setFeedback({ tipo: "erro", mensagem: "Erro ao processar a imagem." });
-    } finally {
-      setUploading(false);
-    }
-  };
+  // [Upload de foto removido] — fotos vêm exclusivamente do app EDUCA-CAPTURE
 
   const PLACEHOLDER = "data:image/svg+xml;utf8," + encodeURIComponent(
     `<svg xmlns='http://www.w3.org/2000/svg' width='128' height='128'><rect width='100%' height='100%' rx='64' ry='64' fill='#e5e7eb'/></svg>`
@@ -231,32 +153,7 @@ export default function FichaAlunoPedagogico({ codigo: codigoProp }) {
 
       {/* ── CORPO ───────────────────────────────────────────────── */}
       <div style={{ background: '#fff', borderRadius: '0 0 16px 16px', padding: '20px 24px 24px' }}>
-        {feedback?.tipo === "sucesso" && <div style={{ marginBottom: 16, padding: '10px 14px', background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 10, color: '#166534', fontSize: 13 }}>✔️ {feedback.mensagem}</div>}
-        {feedback?.tipo === "erro" && <div style={{ marginBottom: 16, padding: '10px 14px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 10, color: '#991b1b', fontSize: 13 }}>❌ {feedback.mensagem}</div>}
 
-        {/* Informações do estudante */}
-        <div style={{ marginBottom: 20 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9ca3af', marginBottom: 12 }}>INFORMAÇÕES DO ESTUDANTE</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-            {[{ label: 'CÓDIGO', value: aluno.codigo ?? '—' }, { label: 'DATA DE NASCIMENTO', value: formatDate(aluno.data_nascimento) }, { label: 'SEXO', value: aluno.sexo ?? '—' }].map(({ label, value }) => (
-              <div key={label}>
-                <div style={{ fontSize: 10, fontWeight: 600, color: '#9ca3af', letterSpacing: '0.08em', marginBottom: 4 }}>{label}</div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: '#1f2937' }}>{value}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Upload de foto — habilitado no módulo pedagógico */}
-        <div style={{ marginBottom: 20, padding: '12px 14px', background: '#f8fafc', border: '1px solid #e5e7eb', borderRadius: 10 }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 8 }}>📷 Foto do Estudante</div>
-          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: uploading ? 'not-allowed' : 'pointer' }}>
-            <span style={{ padding: '7px 14px', background: uploading ? '#e5e7eb' : '#064e3b', color: '#fff', borderRadius: 8, fontSize: 12, fontWeight: 600, transition: 'background 0.2s' }}>
-              {uploading ? "Enviando…" : "Escolher pasta"}
-            </span>
-            <input type="file" webkitdirectory="true" directory="true" multiple accept=".jpg,.jpeg,.png,.webp,.jfif,image/*" onChange={handleFolderSelect} style={{ display: 'none' }} disabled={uploading} />
-          </label>
-        </div>
 
         {/* Relatório Pedagógico — único relatório deste módulo */}
         <div>

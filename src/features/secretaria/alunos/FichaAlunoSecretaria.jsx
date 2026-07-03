@@ -1,10 +1,10 @@
 // src/features/secretaria/alunos/FichaAlunoSecretaria.jsx
 // ============================================================
 // FICHA DO ESTUDANTE — Módulo SECRETARIA (isolado)
-// ✅ Relatório Disciplinar: sim
+// ❌ Relatório Disciplinar: NÃO — apenas perfil militar (módulo Disciplinar)
 // ✅ Relatório Pedagógico: sim
 // ✅ Upload de Foto: sim
-// Versão completa para uso administrativo da Secretaria.
+// Versão administrativa da Secretaria — sem acesso ao módulo disciplinar.
 // ============================================================
 import React, { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
@@ -12,7 +12,7 @@ import api from "../../../services/api";
 import { Button } from "../../../components/ui/Button";
 import * as faceapi from "face-api.js";
 import { AcademicCapIcon } from "@heroicons/react/24/solid";
-import ModalRelatorioDisciplinar from "../../alunos/ModalRelatorioDisciplinar";
+// ModalRelatorioDisciplinar removido — apenas perfil militar acessa relatório disciplinar
 import ModalRelatorioPedagogico from "../../alunos/ModalRelatorioPedagogico";
 
 export default function FichaAlunoSecretaria({ codigo: codigoProp }) {
@@ -25,9 +25,7 @@ export default function FichaAlunoSecretaria({ codigo: codigoProp }) {
   const [erro, setErro] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [feedback, setFeedback] = useState(null);
-  const [modalRelatorioOpen, setModalRelatorioOpen] = useState(false);
   const [modalPedagogicoOpen, setModalPedagogicoOpen] = useState(false);
-  const [ocorrenciasCount, setOcorrenciasCount] = useState(null);
 
   const isUploadingRef = useRef(false);
   const retryOnceRef = useRef(false);
@@ -78,16 +76,8 @@ export default function FichaAlunoSecretaria({ codigo: codigoProp }) {
     return () => { alive = false; };
   }, [codigo]);
 
-  useEffect(() => {
-    if (!aluno?.id) return;
-    api.get(`/api/alunos/${aluno.id}/ocorrencias`)
-      .then(res => {
-        const lista = Array.isArray(res.data) ? res.data : [];
-        const ativas = lista.filter(o => o.status !== 'CANCELADA');
-        setOcorrenciasCount(ativas.length);
-      })
-      .catch(() => setOcorrenciasCount(0));
-  }, [aluno?.id]);
+  // [Relatório Disciplinar removido] — useEffect de ocorrenciasCount não é mais necessário neste módulo.
+
 
   const handleFolderSelect = async (e) => {
     if (isUploadingRef.current) return;
@@ -240,10 +230,11 @@ export default function FichaAlunoSecretaria({ codigo: codigoProp }) {
           </label>
         </div>
 
-        {/* Ambos os relatórios */}
+        {/* Relatório Pedagógico — único relatório visível na Secretaria
+            Regra de ouro: Relatório Disciplinar é exclusivo do módulo Disciplinar (perfil militar) */}
         <div>
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9ca3af', marginBottom: 12 }}>RELATÓRIOS</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 12 }}>
             <div onClick={() => setModalPedagogicoOpen(true)} role="button" tabIndex={0} onKeyDown={e => e.key === 'Enter' && setModalPedagogicoOpen(true)}
               style={{ background: 'linear-gradient(135deg, #064e3b 0%, #065f46 100%)', borderRadius: 14, padding: '18px 20px', cursor: 'pointer', transition: 'transform 0.15s, box-shadow 0.15s', boxShadow: '0 2px 8px rgba(6,78,59,0.15)' }}
               onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 20px rgba(6,78,59,0.25)'; }}
@@ -252,17 +243,6 @@ export default function FichaAlunoSecretaria({ codigo: codigoProp }) {
               <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 4 }}>Relatório Pedagógico</div>
               <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', marginBottom: 10 }}>Histórico completo de registros pedagógicos.</div>
               <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>Ver histórico →</div>
-            </div>
-            <div onClick={() => setModalRelatorioOpen(true)} role="button" tabIndex={0} onKeyDown={e => e.key === 'Enter' && setModalRelatorioOpen(true)}
-              style={{ background: 'linear-gradient(135deg, #1e3a5f 0%, #0f2847 100%)', borderRadius: 14, padding: '18px 20px', cursor: 'pointer', transition: 'transform 0.15s, box-shadow 0.15s', boxShadow: '0 2px 8px rgba(15,40,71,0.15)' }}
-              onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 20px rgba(15,40,71,0.25)'; }}
-              onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(15,40,71,0.15)'; }}>
-              <div style={{ fontSize: 22, marginBottom: 8 }}>🛡️</div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#fff', marginBottom: 4 }}>Relatório Disciplinar</div>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', marginBottom: 10 }}>
-                {ocorrenciasCount === null ? 'Carregando…' : ocorrenciasCount === 0 ? 'Sem ocorrências' : `${ocorrenciasCount} ocorrência${ocorrenciasCount > 1 ? 's' : ''}`}
-              </div>
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.8)', fontWeight: 600 }}>Abrir relatório →</div>
             </div>
           </div>
         </div>
@@ -274,7 +254,7 @@ export default function FichaAlunoSecretaria({ codigo: codigoProp }) {
         )}
       </div>
 
-      <ModalRelatorioDisciplinar open={modalRelatorioOpen} onClose={() => setModalRelatorioOpen(false)} aluno={aluno} />
+      {/* ModalRelatorioDisciplinar removido — não pertence ao módulo Secretaria */}
       <ModalRelatorioPedagogico open={modalPedagogicoOpen} onClose={() => setModalPedagogicoOpen(false)} aluno={aluno} somenteLeitura={false} usuarioLogadoId={usuarioLogadoId} />
     </div>
   );

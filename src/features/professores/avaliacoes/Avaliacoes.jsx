@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+﻿import React, { useState, useEffect, useCallback, useMemo } from "react";
 import api from "../../../services/api";
 import {
   CheckCircleIcon,
@@ -1225,13 +1225,12 @@ export default function Avaliacoes() {
                              <ArrowDownTrayIcon className="w-5 h-5" />
                              EXPORTAR BOLETIM
                              {!todasNotasLancadas && colunasPendentes.length > 0 && (
-                               <span className="absolute -top-1.5 -right-1.5 bg-amber-400 text-slate-900 text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-md">
+                                <span className="absolute -top-2 -right-2 bg-amber-400 text-slate-900 text-[10px] font-black min-w-[22px] h-[22px] px-1 rounded-full flex items-center justify-center shadow-md">
                                  {colunasPendentes.length}
                                </span>
                              )}
                          </button>
                      )}
-                    )}
                 </div>
             </div>
 

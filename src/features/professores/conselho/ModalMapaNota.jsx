@@ -306,23 +306,11 @@ export default function ModalMapaNota({ turma, anoLetivo, onClose }) {
                       )}
                     </th>
                   ))}
-                  <th style={{
-                    padding: "10px 12px", textAlign: "center", fontWeight: 800,
-                    minWidth: 70, backgroundColor: "rgba(255,255,255,0.1)",
-                    fontSize: "0.7rem",
-                  }}>
-                    MÉDIA
-                  </th>
+
                 </tr>
               </thead>
               <tbody>
                 {alunos.map((aluno, rowIdx) => {
-                  const notasAluno = disciplinas.map(d => notas[`${aluno.id}_${d.id}`]);
-                  const notasValidas = notasAluno.filter(n => n !== undefined && n !== null);
-                  const media = notasValidas.length > 0
-                    ? notasValidas.reduce((s, n) => s + n, 0) / notasValidas.length
-                    : null;
-
                   return (
                     <tr
                       key={aluno.id}
@@ -404,22 +392,6 @@ export default function ModalMapaNota({ turma, anoLetivo, onClose }) {
                         );
                       })}
 
-                      {/* Média */}
-                      <td style={{
-                        padding: "7px 8px",
-                        textAlign: "center",
-                        fontWeight: 800,
-                        fontSize: "0.82rem",
-                        borderBottom: "1px solid #f1f5f9",
-                        backgroundColor: media !== null
-                          ? media >= 7 ? "#dcfce7" : media < 5 ? "#fee2e2" : "#f0f9ff"
-                          : "#f8fafc",
-                        color: media !== null
-                          ? media >= 7 ? "#15803d" : media < 5 ? "#b91c1c" : "#0369a1"
-                          : "#94a3b8",
-                      }}>
-                        {media !== null ? media.toFixed(1) : "—"}
-                      </td>
                     </tr>
                   );
                 })}

@@ -4,6 +4,7 @@ import ModalBoletimAnual from "../../boletim/ModalBoletimAnual";
 import ModalFichaAluno from "./ModalFichaAluno";
 import ModalZoomFoto from "./ModalZoomFoto";
 import ModalRegistroConselhoPedagogico from "./ModalRegistroConselhoPedagogico";
+import ModalMapaNotaPedagogico from "./ModalMapaNota";
 import {
   EyeIcon,
   DocumentTextIcon,
@@ -59,6 +60,9 @@ export default function ConselhoClasse() {
   // Registro de Conselho de Classe
   const [modalRegistroOpen, setModalRegistroOpen] = useState(false);
   const [alunoRegistro, setAlunoRegistro] = useState(null);
+
+  // Mapa de Nota
+  const [modalMapaNotaOpen, setModalMapaNotaOpen] = useState(false);
 
   function abrirModalBoletim(codigo) {
     setCodigoAlunoBoletim(codigo);
@@ -221,9 +225,33 @@ export default function ConselhoClasse() {
       {/* Lista de Alunos */}
       {turmaSelecionada && (
         <div className="bg-white rounded-lg shadow-md p-4">
-          <h2 className="text-2xl font-semibold mb-4 text-blue-800">
-            Alunos da Turma {turmaSelecionada.turma}
-          </h2>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+            <h2 className="text-2xl font-semibold text-blue-800" style={{ margin: 0 }}>
+              Alunos da Turma {turmaSelecionada.turma}
+            </h2>
+            <button
+              onClick={() => setModalMapaNotaOpen(true)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "6px 14px",
+                borderRadius: "8px",
+                fontWeight: 700,
+                fontSize: "0.8rem",
+                cursor: "pointer",
+                border: "2px solid #3b82f6",
+                backgroundColor: "#eff6ff",
+                color: "#1d4ed8",
+                transition: "all 0.15s",
+                boxShadow: "0 2px 6px rgba(59,130,246,0.15)",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.backgroundColor = "#3b82f6"; e.currentTarget.style.color = "#fff"; }}
+              onMouseLeave={e => { e.currentTarget.style.backgroundColor = "#eff6ff"; e.currentTarget.style.color = "#1d4ed8"; }}
+            >
+              📊 MAPA DE NOTA
+            </button>
+          </div>
 
           {loadingAlunos ? (
             <p className="text-center text-gray-500">Carregando alunos...</p>
@@ -339,6 +367,14 @@ export default function ConselhoClasse() {
           aluno={alunoRegistro}
           turmaId={turmaSelecionada?.id ?? null}
           onClose={() => setModalRegistroOpen(false)}
+        />
+      )}
+
+      {modalMapaNotaOpen && turmaSelecionada && (
+        <ModalMapaNotaPedagogico
+          turma={turmaSelecionada}
+          anoLetivo={anoLetivo}
+          onClose={() => setModalMapaNotaOpen(false)}
         />
       )}
     </div>

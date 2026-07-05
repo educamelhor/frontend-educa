@@ -120,11 +120,18 @@ export default function ModalMapaNota({ turma, anoLetivo, onClose }) {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div style={{
-      position: "fixed", inset: 0, zIndex: 200,
-      display: "flex", alignItems: "flex-start", justifyContent: "center",
-      padding: "24px 12px",
-      backgroundColor: "rgba(15,23,42,0.6)",
+    <>
+      <style>{`
+        @keyframes pulse-gold {
+          0%, 100% { filter: drop-shadow(0 0 3px rgba(234,179,8,0.6)); transform: scale(1); }
+          50%       { filter: drop-shadow(0 0 7px rgba(234,179,8,1));   transform: scale(1.15); }
+        }
+      `}</style>
+      <div style={{
+        position: "fixed", inset: 0, zIndex: 200,
+        display: "flex", alignItems: "flex-start", justifyContent: "center",
+        padding: "24px 12px",
+        backgroundColor: "rgba(15,23,42,0.6)",
       backdropFilter: "blur(4px)",
       overflowY: "auto",
     }}>
@@ -342,23 +349,49 @@ export default function ModalMapaNota({ turma, anoLetivo, onClose }) {
               </thead>
               <tbody>
                 {alunos.map((aluno, rowIdx) => {
+                  // ── Destaque: todas as notas existentes >= 7,0 e nenhuma sinalizada amarelo
+                  const notasDoAluno = disciplinas.map(d => ({
+                    nota: notas[`${aluno.id}_${d.id}`],
+                    flagged: flags.has(`${aluno.id}_${d.id}`),
+                  })).filter(x => x.nota !== undefined && x.nota !== null);
+                  const isDestaque = notasDoAluno.length > 0
+                    && notasDoAluno.every(x => x.nota >= 7 && !x.flagged);
+
+                  const rowBg = rowIdx % 2 === 0 ? "#fff" : "#f8fafc";
                   return (
                     <tr
                       key={aluno.id}
-                      style={{ backgroundColor: rowIdx % 2 === 0 ? "#fff" : "#f8fafc" }}
+                      style={{ backgroundColor: isDestaque ? "#f0fdf4" : rowBg }}
                     >
                       {/* Nome — fixo à esquerda */}
                       <td style={{
                         padding: "8px 16px",
                         fontWeight: 600,
-                        color: "#1e293b",
+                        color: isDestaque ? "#15803d" : "#1e293b",
                         position: "sticky",
                         left: 0,
-                        backgroundColor: rowIdx % 2 === 0 ? "#fff" : "#f8fafc",
+                        backgroundColor: isDestaque ? "#f0fdf4" : rowBg,
                         zIndex: 5,
                         borderRight: "2px solid #e2e8f0",
                         borderBottom: "1px solid #f1f5f9",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
                       }}>
+                        {isDestaque && (
+                          <span
+                            title="Aluno destaque: todas as notas ≥ 7,0"
+                            style={{
+                              fontSize: "1rem",
+                              lineHeight: 1,
+                              filter: "drop-shadow(0 0 4px rgba(234,179,8,0.8))",
+                              animation: "pulse-gold 2s infinite",
+                              flexShrink: 0,
+                            }}
+                          >
+                            🏅
+                          </span>
+                        )}
                         {aluno.nome}
                       </td>
 
@@ -466,6 +499,6 @@ export default function ModalMapaNota({ turma, anoLetivo, onClose }) {
           </button>
         </div>
       </div>
-    </div>
+    </>
   );
 }

@@ -19,6 +19,7 @@ import ModalBoletimAnual from "../../boletim/ModalBoletimAnual";
 import ModalZoomFoto from "../../pedagogico/conselho/ModalZoomFoto";
 import ModalRegistroConselhoProfessor from "./ModalRegistroConselhoProfessor";
 import ModalFichaAlunoProfessor from "./ModalFichaAlunoProfessor";
+import ModalMapaNota from "./ModalMapaNota";
 import { EyeIcon, DocumentTextIcon, IdentificationIcon } from "@heroicons/react/24/outline";
 import { getFotoURL } from "../../../utils/foto";
 
@@ -61,6 +62,9 @@ export default function ConselhoClasseProfessor() {
   // Ficha do Aluno (somente banner pedagógico)
   const [modalFichaOpen, setModalFichaOpen] = useState(false);
   const [codigoAlunoFicha, setCodigoAlunoFicha] = useState(null);
+
+  // Mapa de Nota — visão consolidada de toda a turma
+  const [modalMapaNotaOpen, setModalMapaNotaOpen] = useState(false);
 
   // Cache-buster para fotos
   const [fotoStamp] = useState(Date.now());
@@ -238,9 +242,35 @@ export default function ConselhoClasseProfessor() {
       {/* Lista de Alunos */}
       {turmaSelecionada && (
         <div className="bg-white rounded-lg shadow-md p-4">
-          <h2 className="text-2xl font-semibold mb-4 text-blue-800">
-            Alunos da Turma {turmaSelecionada.nome || turmaSelecionada.turma}
-          </h2>
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+            <h2 className="text-2xl font-semibold text-blue-800">
+              Alunos da Turma {turmaSelecionada.nome || turmaSelecionada.turma}
+            </h2>
+            <button
+              onClick={() => setModalMapaNotaOpen(true)}
+              title="Ver mapa consolidado de todas as notas da turma"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "8px 16px",
+                borderRadius: "8px",
+                background: "linear-gradient(135deg, #1e3a8a, #3b82f6)",
+                color: "#fff",
+                border: "none",
+                cursor: "pointer",
+                fontWeight: 800,
+                fontSize: "0.82rem",
+                boxShadow: "0 4px 14px rgba(59,130,246,0.35)",
+                transition: "all 0.2s",
+                letterSpacing: "0.04em",
+              }}
+              onMouseEnter={e => e.currentTarget.style.transform = "translateY(-1px)"}
+              onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
+            >
+              🗺️ MAPA DE NOTA
+            </button>
+          </div>
 
           {/* Aviso de governança */}
           <div className="mb-4 px-4 py-2 bg-blue-50 border border-blue-200 rounded text-sm text-blue-700">
@@ -326,6 +356,15 @@ export default function ConselhoClasseProfessor() {
             <p className="text-center text-gray-500">Nenhum aluno encontrado.</p>
           )}
         </div>
+      )}
+
+      {/* Modal: Mapa de Nota */}
+      {modalMapaNotaOpen && (
+        <ModalMapaNota
+          turma={turmaSelecionada}
+          anoLetivo={anoLetivo}
+          onClose={() => setModalMapaNotaOpen(false)}
+        />
       )}
 
       {/* Modal: Registro de Conselho (professor pode criar + visualizar) */}

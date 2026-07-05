@@ -23,12 +23,14 @@ import api from "../../../services/api";
 // Jan-Mar  → 1 (pré-semestre)  |  Jun → 2 (pós 1º bimestre)
 function bimestreAtual() {
   const m = new Date().getMonth() + 1; // 1-12
+  // Calendario escolar da escola:
+  // Abr-Mai=1 | Jun-Ago=2 | Set-Out=3 | Nov-Dez=4
+  // Jan-Mar e Jun ainda usam bimestre anterior como fallback seguro
   if (m === 4 || m === 5)  return 1;
-  if (m === 7 || m === 8)  return 2;
+  if (m === 6 || m === 7 || m === 8) return 2;
   if (m === 9 || m === 10) return 3;
   if (m === 11 || m === 12) return 4;
-  if (m <= 3) return 1;
-  return 2; // junho
+  return 1; // Jan-Mar: inicio do ano, 1o bimestre ainda
 }
 
 const BIMESTRES = [
@@ -262,8 +264,37 @@ export default function ModalMapaNota({ turma, anoLetivo, onClose }) {
           ) : alunos.length === 0 ? (
             <div style={{ padding: 60, textAlign: "center", color: "#64748b" }}>
               <div style={{ fontSize: "2rem", marginBottom: 12 }}>📋</div>
-              <div style={{ fontWeight: 600 }}>Nenhum aluno ou nota encontrada para este bimestre.</div>
-              <div style={{ fontSize: "0.8rem", marginTop: 6 }}>Verifique se os professores já exportaram os diários para o boletim.</div>
+              <div style={{ fontWeight: 600 }}>Nenhum aluno matriculado encontrado nesta turma.</div>
+            </div>
+          ) : disciplinas.length === 0 ? (
+            <div style={{ padding: 50, textAlign: "center", color: "#64748b" }}>
+              <div style={{ fontSize: "2.5rem", marginBottom: 14 }}>📭</div>
+              <div style={{ fontWeight: 700, fontSize: "1rem", color: "#374151", marginBottom: 8 }}>
+                Nenhuma nota encontrada no {BIMESTRES.find(b => b.valor === bimestre)?.label}
+              </div>
+              <div style={{ fontSize: "0.82rem", color: "#6b7280", marginBottom: 20, maxWidth: 380, margin: "0 auto 20px" }}>
+                As notas só aparecem aqui após os professores <strong>exportarem o diário</strong> (fechar o boletim) para o bimestre selecionado.
+                Tente outro bimestre:
+              </div>
+              <div style={{ display: "flex", justifyContent: "center", gap: 8, flexWrap: "wrap" }}>
+                {BIMESTRES.filter(b => b.valor !== bimestre).map(b => (
+                  <button
+                    key={b.valor}
+                    onClick={() => setBimestre(b.valor)}
+                    style={{
+                      padding: "8px 18px", borderRadius: "8px", fontWeight: 700,
+                      fontSize: "0.82rem", cursor: "pointer",
+                      border: "2px solid #3b82f6",
+                      backgroundColor: "#eff6ff", color: "#1d4ed8",
+                      transition: "all 0.15s",
+                    }}
+                    onMouseEnter={e => { e.target.style.backgroundColor = "#3b82f6"; e.target.style.color = "#fff"; }}
+                    onMouseLeave={e => { e.target.style.backgroundColor = "#eff6ff"; e.target.style.color = "#1d4ed8"; }}
+                  >
+                    {b.label}
+                  </button>
+                ))}
+              </div>
             </div>
           ) : (
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.78rem" }}>

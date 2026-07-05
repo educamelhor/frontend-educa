@@ -499,6 +499,7 @@ export default function ModalMapaNota({ turma, anoLetivo, onClose }) {
           </button>
         </div>
       </div>
+    </div>
     </>
   );
 }

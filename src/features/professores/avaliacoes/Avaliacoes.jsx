@@ -1212,7 +1212,7 @@ export default function Avaliacoes() {
                      {!carregandoDados && plano && !diarioFechado && (
                          <button
                            onClick={handleClickExportarBoletim}
-                           className="flex items-center gap-2 px-5 py-3 rounded-lg font-bold text-white border relative overflow-hidden transition-all duration-200"
+                            className="flex items-center gap-2 px-5 py-3 rounded-lg font-bold text-white border relative transition-all duration-200"
                            style={{
                              background: todasNotasLancadas
                                ? "linear-gradient(135deg, #7c3aed, #4f46e5)"
@@ -1224,11 +1224,11 @@ export default function Avaliacoes() {
                          >
                              <ArrowDownTrayIcon className="w-5 h-5" />
                              EXPORTAR BOLETIM
-                             {!todasNotasLancadas && colunasPendentes.length > 0 && (
-                                <span className="absolute -top-2 -right-2 bg-amber-400 text-slate-900 text-[10px] font-black min-w-[22px] h-[22px] px-1 rounded-full flex items-center justify-center shadow-md">
-                                 {colunasPendentes.length}
-                               </span>
-                             )}
+                              {!todasNotasLancadas && (() => { const total = colunasPendentes.reduce((acc,c)=>acc+c.faltando,0); return total > 0 ? (
+                                <span style={{position:"absolute",top:"-10px",right:"-10px",background:"#f59e0b",color:"#1e293b",fontSize:"11px",fontWeight:900,minWidth:"22px",height:"22px",padding:"0 5px",borderRadius:"999px",display:"flex",alignItems:"center",justifyContent:"center",boxShadow:"0 2px 8px rgba(0,0,0,0.3)",zIndex:10,whiteSpace:"nowrap",lineHeight:1}}>
+                                  {total}
+                                </span>
+                              ) : null; })()}
                          </button>
                      )}
                 </div>

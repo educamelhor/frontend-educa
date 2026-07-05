@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import api from "../../../services/api";
 import {
   CheckCircleIcon,
@@ -69,6 +69,17 @@ export default function Avaliacoes() {
   // Fechar diário (decisão explícita do professor)
   const [modalFechar, setModalFechar] = useState(false);
   const [fechando, setFechando] = useState(false);
+
+  // Novo fluxo: ausência (código 1234) e modal zero
+  const [ausentesSet, setAusentesSet] = useState(new Set()); // keys onde aluno estava ausente
+  const [modalZero, setModalZero] = useState(null); // { key, alunoId, itemIdx, opIdx, maxVal }
+
+  // Novo fluxo: EXPORTAR BOLETIM em etapas
+  const [modalNotasPendentes, setModalNotasPendentes] = useState(false);
+  const [modalConfirmarExportar, setModalConfirmarExportar] = useState(false);
+  const [modalProgressoExportar, setModalProgressoExportar] = useState(false);
+  const [progressoExportar, setProgressoExportar] = useState(0); // 0-100
+  const [modalSucessoExportar, setModalSucessoExportar] = useState(null); // null | { total, inseridas, atualizadas }
 
   // Governança: avaliação padrão bimestral (bloqueia edição manual)
   const [avaliacaoPadrao, setAvaliacaoPadrao] = useState(false);
@@ -260,18 +271,23 @@ export default function Avaliacoes() {
             params: { turma_id: turmaSelecionada }
           });
           if (resNotas.data?.ok) {
+            const coresCarregadas = resNotas.data.cores || {};
             setNotas(resNotas.data.notas || {});
-            setCoresCelulas(resNotas.data.cores || {});
+            setCoresCelulas(coresCarregadas);
             setAlunosComGabarito(new Set(resNotas.data.alunosComGabarito || []));
+            // Popular ausentesSet: células marcadas com cor 'ausente'
+            setAusentesSet(new Set(Object.keys(coresCarregadas).filter(k => coresCarregadas[k] === 'ausente')));
           } else {
             setNotas({});
             setCoresCelulas({});
             setAlunosComGabarito(new Set());
+            setAusentesSet(new Set());
           }
         } catch {
           setNotas({});
           setCoresCelulas({});
           setAlunosComGabarito(new Set());
+          setAusentesSet(new Set());
         }
 
         // 6) Verificar status de fechamento do diário
@@ -316,23 +332,38 @@ export default function Avaliacoes() {
     if (diarioFechado) return; // readonly
     if (isItemBloqueado(itemIdx)) return; // apenas coluna padronizada bloqueada
 
+    const key = getNotaKey(alunoId, itemIdx, opIdx);
+
+    // ── Código especial 1234 = ausência ──
+    // Salva 0 no banco (para cálculos), exibe ✕ vermelho no frontend
+    if (val === "1234") {
+      setNotas(prev => ({ ...prev, [key]: 0 }));
+      setAusentesSet(prev => new Set([...prev, key]));
+      setCoresCelulas(prev => ({ ...prev, [key]: "ausente" }));
+      return;
+    }
+
+    // Ao editar célula que era ausente, remove o status de ausência
+    if (ausentesSet.has(key)) {
+      setAusentesSet(prev => { const s = new Set(prev); s.delete(key); return s; });
+      setCoresCelulas(prev => { const c = { ...prev }; delete c[key]; return c; });
+    }
+
     // Permite digitação livre: aceita vírgula como separador e entrada parcial (ex: ",4" ou "1.")
-    // Guardamos o texto bruto temporariamente no estado de notas como string
-    // A normalização final ocorre no onBlur
     const rawAllowComma = val.replace(",", ".");
 
     if (rawAllowComma === "" || rawAllowComma === ".") {
-      setNotas(prev => { const n = { ...prev }; delete n[getNotaKey(alunoId, itemIdx, opIdx)]; return n; });
+      setNotas(prev => { const n = { ...prev }; delete n[key]; return n; });
       return;
     }
 
     // Durante a digitação, aceita strings como "1." ou ".4" sem forçar parse
     setNotas(prev => ({
       ...prev,
-      [getNotaKey(alunoId, itemIdx, opIdx)]: rawAllowComma
+      [key]: rawAllowComma
     }));
 
-    setCoresCelulas(prev => { const c = { ...prev }; delete c[getNotaKey(alunoId, itemIdx, opIdx)]; return c; });
+    setCoresCelulas(prev => { const c = { ...prev }; delete c[key]; return c; });
   };
 
   // Normaliza a nota ao sair do campo (Tab / click fora) — padrão EDUCADF: 2 casas decimais
@@ -357,6 +388,13 @@ export default function Avaliacoes() {
     // Arredonda para 2 casas decimais e armazena como número (padrão EDUCADF)
     const normalizado = Math.round(numVal * 100) / 100;
     setNotas(prev => ({ ...prev, [key]: normalizado }));
+
+    // ── Aviso nota zero (não é ausência) ──
+    // Se o professor digitar 0,00 manualmente (sem usar código 1234),
+    // exibimos um modal perguntando se é ausência ou zero legítimo.
+    if (normalizado === 0 && !ausentesSet.has(key)) {
+      setModalZero({ key, alunoId, itemIdx, opIdx, maxVal });
+    }
   };
 
   const handleContextMenu = (e, alunoId, itemIdx, opIdx, maxVal) => {
@@ -551,6 +589,104 @@ export default function Avaliacoes() {
 
   const turmaObj = turmas.find(t => String(t.id) === String(turmaSelecionada));
   const selecaoCompleta = disciplinaSelecionada && bimestreSelecionado && turmaSelecionada;
+
+  // ---------------------------
+  // Verifica se TODAS as notas foram lançadas (incluindo coluna bimestral)
+  // Coluna bimestral bloqueada (fixo_direcao + avaliacaoPadrao) SEM nota = bloqueia exportação
+  // Uma célula é considerada preenchida se: tem nota numérica (incl. 0) OU está em ausentesSet
+  // ---------------------------
+  const todasNotasLancadas = useMemo(() => {
+    if (!plano?.itens || alunos.length === 0 || columns.length === 0) return false;
+    for (const aluno of alunos) {
+      for (const col of columns) {
+        const key = getNotaKey(aluno.id, col.itemIdx, col.opIdx);
+        const val = notas[key];
+        const temNota = (val !== undefined && val !== "" && !isNaN(Number(val)));
+        const ausente = ausentesSet.has(key);
+        if (!temNota && !ausente) return false;
+      }
+    }
+    return true;
+  }, [alunos, columns, notas, ausentesSet, plano]);
+
+  // Detalhes de colunas com notas faltando (para o modal de pendências)
+  const colunasPendentes = useMemo(() => {
+    if (!plano?.itens || alunos.length === 0) return [];
+    const resultado = [];
+    for (const col of columns) {
+      const alunosSemNota = alunos.filter(a => {
+        const key = getNotaKey(a.id, col.itemIdx, col.opIdx);
+        const val = notas[key];
+        return (val === undefined || val === "" || isNaN(Number(val))) && !ausentesSet.has(key);
+      });
+      if (alunosSemNota.length > 0) {
+        resultado.push({ col, faltando: alunosSemNota.length, total: alunos.length });
+      }
+    }
+    return resultado;
+  }, [alunos, columns, notas, ausentesSet, plano]);
+
+  // ---------------------------
+  // NOVO FLUXO: EXPORTAR BOLETIM com progresso
+  // ---------------------------
+  const handleClickExportarBoletim = () => {
+    if (!todasNotasLancadas) {
+      setModalNotasPendentes(true);
+    } else {
+      setModalConfirmarExportar(true);
+    }
+  };
+
+  const handleExportarBoletimComProgresso = async () => {
+    if (!plano?.id || !turmaSelecionada) return;
+    setModalConfirmarExportar(false);
+    setProgressoExportar(0);
+    setModalProgressoExportar(true);
+
+    // Progresso simulado: avança até 85% enquanto aguarda API
+    const timer = setInterval(() => {
+      setProgressoExportar(prev => {
+        if (prev >= 85) { clearInterval(timer); return 85; }
+        return prev + (prev < 30 ? 15 : prev < 60 ? 8 : 3);
+      });
+    }, 350);
+
+    try {
+      // 1) Salvar notas primeiro
+      await api.post(`/avaliacoes/${plano.id}/salvar-notas`, {
+        turma_id: turmaSelecionada,
+        notas,
+        cores: coresCelulas,
+      });
+      setProgressoExportar(60);
+
+      // 2) Exportar para o boletim (sem fechar diário)
+      const resp = await api.post(`/avaliacoes/${plano.id}/exportar-boletim`, {
+        turma_id: turmaSelecionada,
+      });
+
+      clearInterval(timer);
+      setProgressoExportar(100);
+
+      await new Promise(r => setTimeout(r, 600)); // pausa para mostrar 100%
+      setModalProgressoExportar(false);
+
+      if (resp.data?.ok) {
+        setModalSucessoExportar({
+          total: resp.data.resumo?.totalAlunos ?? 0,
+          inseridas: resp.data.resumo?.notasInseridas ?? 0,
+          atualizadas: resp.data.resumo?.notasAtualizadas ?? 0,
+        });
+      } else {
+        showMsg("error", resp.data?.error || "Erro ao exportar notas.");
+      }
+    } catch (err) {
+      clearInterval(timer);
+      setModalProgressoExportar(false);
+      const msg = err.response?.data?.error || "Erro ao exportar notas.";
+      showMsg("error", msg);
+    }
+  };
 
   // ---------------------------
   // Mensagem contextual para planos não prontos
@@ -1072,21 +1208,29 @@ export default function Avaliacoes() {
                             {salvando ? "SALVANDO..." : "SALVAR DIÁRIO"}
                         </button>
                     )}
-                    {/* BOTÃO EXPORTAR BOLETIM — desabilitado provisoriamente */}
-                    {!carregandoDados && plano && !diarioFechado && (
-                        <button
-                          disabled
-                          className="flex items-center gap-2 px-5 py-3 rounded-lg font-bold text-white border border-purple-400/15"
-                          style={{
-                            background: "linear-gradient(135deg, rgba(139,92,246,0.25), rgba(99,102,241,0.25))",
-                            opacity: 0.45,
-                            cursor: "not-allowed",
-                          }}
-                          title="Funcionalidade temporariamente desabilitada"
-                        >
-                            <ArrowDownTrayIcon className="w-5 h-5" />
-                            EXPORTAR BOLETIM
-                        </button>
+                     {/* BOTAO EXPORTAR BOLETIM - ativo, redireciona conforme estado */}
+                     {!carregandoDados && plano && !diarioFechado && (
+                         <button
+                           onClick={handleClickExportarBoletim}
+                           className="flex items-center gap-2 px-5 py-3 rounded-lg font-bold text-white border relative overflow-hidden transition-all duration-200"
+                           style={{
+                             background: todasNotasLancadas
+                               ? "linear-gradient(135deg, #7c3aed, #4f46e5)"
+                               : "linear-gradient(135deg, rgba(139,92,246,0.35), rgba(99,102,241,0.35))",
+                             borderColor: todasNotasLancadas ? "rgba(167,139,250,0.5)" : "rgba(139,92,246,0.2)",
+                             boxShadow: todasNotasLancadas ? "0 4px 14px rgba(124,58,237,0.4)" : "none",
+                           }}
+                           title={todasNotasLancadas ? "Todas as notas lancadas" : "Ha notas pendentes - clique para ver"}
+                         >
+                             <ArrowDownTrayIcon className="w-5 h-5" />
+                             EXPORTAR BOLETIM
+                             {!todasNotasLancadas && colunasPendentes.length > 0 && (
+                               <span className="absolute -top-1.5 -right-1.5 bg-amber-400 text-slate-900 text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-md">
+                                 {colunasPendentes.length}
+                               </span>
+                             )}
+                         </button>
+                     )}
                     )}
                 </div>
             </div>
@@ -1150,24 +1294,24 @@ export default function Avaliacoes() {
                                                 const cor = coresCelulas[key];
                                                 const cellBloqueada = diarioFechado || isItemBloqueado(col.itemIdx);
                                                 const isFocused = focusedKey === key;
+                                                const isAusente = ausentesSet.has(key);
 
                                                 // Lógica de exibição:
-                                                // • Campo focado (digitando): mostra o valor bruto com vírgula (não interfere na digitação)
-                                                // • Campo em repouso OU bloqueado: formata com vírgula e 2 casas decimais (padrão EDUCADF)
-                                                // Isso garante que valores carregados do banco também apareçam formatados
+                                                // • Ausente (código 1234): exibe ✕ vermelho, não é input editável
+                                                // • Campo focado (digitando): mostra o valor bruto com vírgula
+                                                // • Campo em repouso: formata com 2 casas decimais e vírgula
                                                 let displayVal = "";
-                                                if (val !== undefined) {
+                                                if (!isAusente && val !== undefined) {
                                                   if (isFocused) {
-                                                    // Durante digitação: mostra o texto bruto (. → ,)
                                                     displayVal = String(val).replace(".", ",");
                                                   } else {
-                                                    // Em repouso: formata com 2 casas decimais e vírgula (padrão EDUCADF)
                                                     const numV = Number(val);
                                                     displayVal = isNaN(numV) ? "" : numV.toFixed(2).replace(".", ",");
-                                                  }
+                                                 }
                                                 }
 
                                                 const bgClass =
+                                                   isAusente ? "bg-red-50" :
                                                    cor === "red" ? "bg-red-200 text-red-900" :
                                                    cor === "yellow" ? "bg-yellow-200 text-yellow-900" :
                                                    cor === "green" ? "bg-green-200 text-green-900" :
@@ -1176,36 +1320,25 @@ export default function Avaliacoes() {
                                                 return (
                                                 <td
                                                    key={`cell_${i}`}
-                                                   onContextMenu={(e) => handleContextMenu(e, aluno.id, col.itemIdx, col.opIdx, col.maxVal)}
-                                                   className={`px-1 py-1 border-r border-slate-100 text-center relative group/cell transition-colors duration-300 ${cor === "red" ? "bg-red-100" : cor === "yellow" ? "bg-yellow-100" : cor === "green" ? "bg-green-100" : ""} ${cellBloqueada ? "bg-amber-50/40" : ""}`}
-                                                >
-                                                    <input
-                                                       type="text"
-                                                       inputMode="decimal"
-                                                       value={displayVal}
-                                                       onChange={(e) => handleNotaChange(aluno.id, col.itemIdx, col.opIdx, col.maxVal, e.target.value)}
-                                                       onFocus={() => setFocusedKey(key)}
-                                                       onBlur={() => handleNotaBlur(aluno.id, col.itemIdx, col.opIdx, col.maxVal)}
-                                                       readOnly={cellBloqueada}
-                                                       tabIndex={cellBloqueada ? -1 : 0}
-                                                       className={`w-full text-center py-2.5 font-bold border border-transparent rounded-lg outline-none transition-all placeholder:text-slate-300 ${bgClass} ${
-                                                         cellBloqueada
-                                                           ? 'cursor-not-allowed bg-slate-50'
-                                                           : 'hover:border-slate-300 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-200'
-                                                       }`}
-                                                       placeholder="-"
-                                                    />
-                                                    {/* Tooltip de suporte no hover */}
-                                                    {!cellBloqueada && (
-                                                       <div className="absolute opacity-0 group-hover/cell:opacity-100 -top-8 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg pointer-events-none transition-opacity whitespace-nowrap z-50">
-                                                           Max: {col.maxVal}
+                                                   onContextMenu={(e) => !isAusente && handleContextMenu(e, aluno.id, col.itemIdx, col.opIdx, col.maxVal)}
+                                                   className={`px-1 py-1 border-r border-slate-100 text-center relative group/cell transition-colors duration-300 ${isAusente ? "bg-red-50" : cor === "red" ? "bg-red-100" : cor === "yellow" ? "bg-yellow-100" : cor === "green" ? "bg-green-100" : ""} ${cellBloqueada && !isAusente ? "bg-amber-50/40" : ""}`}
+                                                 >
+                                                     {isAusente ? (
+                                                       <div className="flex flex-col items-center justify-center py-2 cursor-pointer group/ausente select-none"
+                                                            title="Aluno ausente (codigo 1234)"
+                                                            onClick={() => { if (!cellBloqueada) { setAusentesSet(prev=>{const s=new Set(prev);s.delete(key);return s;}); setCoresCelulas(prev=>{const c={...prev};delete c[key];return c;}); setNotas(prev=>{const n={...prev};delete n[key];return n;}); } }}>
+                                                         <span className="text-red-600 font-black text-lg leading-none">X</span>
+                                                         <span className="text-red-400 text-[9px] font-bold mt-0.5">ausente</span>
                                                        </div>
-                                                     )}
-                                                     {cellBloqueada && !diarioFechado && (
-                                                       <div className="absolute opacity-0 group-hover/cell:opacity-100 -top-8 left-1/2 transform -translate-x-1/2 bg-amber-700 text-white text-[10px] font-bold px-2 py-1 rounded shadow-lg pointer-events-none transition-opacity whitespace-nowrap z-50">
-                                                           🔒 Preenchido via Gabarito
-                                                       </div>
-                                                     )}
+                                                     ) : (<>
+                                                       <input type="text" inputMode="decimal" value={displayVal}
+                                                         onChange={(e)=>handleNotaChange(aluno.id,col.itemIdx,col.opIdx,col.maxVal,e.target.value)}
+                                                         onFocus={()=>setFocusedKey(key)} onBlur={()=>handleNotaBlur(aluno.id,col.itemIdx,col.opIdx,col.maxVal)}
+                                                         readOnly={cellBloqueada} tabIndex={cellBloqueada?-1:0} placeholder="-"
+                                                         className={`w-full text-center py-2.5 font-bold border border-transparent rounded-lg outline-none transition-all ${bgClass} ${cellBloqueada ? (String.fromCharCode(39)+String.fromCharCode(39)+String.fromCharCode(39)+String.fromCharCode(39)) : (String.fromCharCode(39)+String.fromCharCode(39)+String.fromCharCode(39)+String.fromCharCode(39))}`}/>
+                                                       {!cellBloqueada&&(<div className="absolute opacity-0 group-hover/cell:opacity-100 -top-8 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white text-[10px] px-2 py-1 rounded z-50">Max: {col.maxVal}</div>)}
+                                                       {cellBloqueada&&!diarioFechado&&(<div className="absolute opacity-0 group-hover/cell:opacity-100 -top-8 left-1/2 transform -translate-x-1/2 bg-amber-700 text-white text-[10px] px-2 py-1 rounded z-50">Preenchido via Gabarito</div>)}
+                                                     </>)}
                                                  </td>
                                              )})}
 
@@ -1254,6 +1387,197 @@ export default function Avaliacoes() {
                 <span className="flex items-center gap-1.5"><DocumentCheckIcon className="w-4 h-4"/> Os dados são salvos separadamente por bimestre.</span>
             </div>
         </section>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* MODAL: AVISO NOTA ZERO                                         */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {modalZero && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center" style={{background:"rgba(0,0,0,0.7)",backdropFilter:"blur(8px)"}} onClick={()=>setModalZero(null)}>
+          <div onClick={e=>e.stopPropagation()} className="w-full max-w-md mx-4 rounded-2xl overflow-hidden shadow-2xl" style={{background:"linear-gradient(145deg,#1e1b4b,#312e81)"}}>
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl" style={{background:"rgba(251,191,36,0.2)"}}>⚠️</div>
+                <div>
+                  <div className="text-white font-black text-lg">Nota Zero Registrada</div>
+                  <div className="text-indigo-300 text-sm font-medium">Este aluno recebeu 0,00</div>
+                </div>
+              </div>
+              <div className="rounded-xl p-4 mb-5" style={{background:"rgba(255,255,255,0.06)"}}>
+                <p className="text-slate-200 text-sm leading-relaxed">Se o aluno <strong className="text-white">não entregou, faltou ou não teve outra oportunidade</strong>, use o código <strong className="text-amber-300 text-base">1234</strong> para registrar como ausência — isso diferencia quem faltou de quem realizou e errou tudo.</p>
+                <p className="text-slate-400 text-xs mt-2">O código 1234 salva <strong>zero no banco</strong> (sem prejuízo nos cálculos) e exibe um <strong className="text-red-400">✕ vermelho</strong> para sua identificação visual.</p>
+              </div>
+              <div className="flex gap-3">
+                <button onClick={()=>{
+                  if(modalZero){const{key,alunoId,itemIdx,opIdx}=modalZero; setNotas(p=>({...p,[key]:0})); setAusentesSet(p=>new Set([...p,key])); setCoresCelulas(p=>({...p,[key]:"ausente"}));} setModalZero(null);
+                }} className="flex-1 py-3 rounded-xl font-bold text-sm transition-all" style={{background:"rgba(239,68,68,0.15)",color:"#fca5a5",border:"1px solid rgba(239,68,68,0.3)"}}>
+                  ✕ Registrar como Ausência (1234)
+                </button>
+                <button onClick={()=>setModalZero(null)} className="flex-1 py-3 rounded-xl font-bold text-sm transition-all" style={{background:"rgba(99,102,241,0.2)",color:"#a5b4fc",border:"1px solid rgba(99,102,241,0.3)"}}>
+                  Manter Nota 0,00
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* MODAL: NOTAS PENDENTES (clicou exportar sem todas as notas)    */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {modalNotasPendentes && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center" style={{background:"rgba(0,0,0,0.75)",backdropFilter:"blur(8px)"}} onClick={()=>setModalNotasPendentes(false)}>
+          <div onClick={e=>e.stopPropagation()} className="w-full max-w-lg mx-4 rounded-2xl overflow-hidden shadow-2xl" style={{background:"linear-gradient(145deg,#1c1917,#292524)"}}>
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl" style={{background:"rgba(234,179,8,0.15)"}}>📋</div>
+                <div>
+                  <div className="text-white font-black text-lg">Notas Pendentes</div>
+                  <div className="text-amber-400 text-sm font-medium">{colunasPendentes.reduce((acc,c)=>acc+c.faltando,0)} nota(s) não lançada(s) em {colunasPendentes.length} coluna(s)</div>
+                </div>
+              </div>
+              <div className="rounded-xl overflow-hidden mb-5" style={{background:"rgba(255,255,255,0.04)"}}>
+                <div className="px-4 py-2 text-xs font-bold text-stone-400 uppercase tracking-wider border-b" style={{borderColor:"rgba(255,255,255,0.06)"}}>Colunas com pendências</div>
+                <div className="max-h-48 overflow-y-auto">
+                  {colunasPendentes.map((item,idx)=>(
+                    <div key={idx} className="flex items-center justify-between px-4 py-3 border-b" style={{borderColor:"rgba(255,255,255,0.04)"}}>
+                      <div>
+                        <div className="text-white text-sm font-bold">{item.col.title} {item.col.freqTotal>1?`#${item.col.opIdx+1}`:""}</div>
+                        <div className="text-stone-400 text-xs">Coluna {item.col.itemIdx+1}</div>
+                      </div>
+                      <span className="px-3 py-1 rounded-full text-xs font-black" style={{background:"rgba(251,146,60,0.15)",color:"#fb923c"}}>
+                        {item.faltando}/{item.total} alunos
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded-xl p-3 mb-4 flex items-start gap-2" style={{background:"rgba(245,158,11,0.1)"}}>
+                <span className="text-amber-400 text-sm">💡</span>
+                <p className="text-amber-200 text-xs leading-relaxed">Preencha todas as notas antes de exportar. Se um aluno faltou, use o código <strong className="text-amber-300">1234</strong> para registrar ausência.</p>
+              </div>
+              <button onClick={()=>setModalNotasPendentes(false)} className="w-full py-3 rounded-xl font-bold text-white transition-all" style={{background:"linear-gradient(135deg,#7c3aed,#4f46e5)"}}>
+                Entendi, vou preencher
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* MODAL: CONFIRMAR EXPORTAÇÃO (etapa 6)                          */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {modalConfirmarExportar && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center" style={{background:"rgba(0,0,0,0.75)",backdropFilter:"blur(8px)"}} onClick={()=>setModalConfirmarExportar(false)}>
+          <div onClick={e=>e.stopPropagation()} className="w-full max-w-md mx-4 rounded-2xl overflow-hidden shadow-2xl" style={{background:"linear-gradient(145deg,#0f172a,#1e293b)"}}>
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl" style={{background:"rgba(99,102,241,0.15)"}}>📊</div>
+                <div>
+                  <div className="text-white font-black text-lg">Confirmar Exportação</div>
+                  <div className="text-indigo-300 text-sm">Enviar notas para o boletim</div>
+                </div>
+              </div>
+              <div className="rounded-xl p-4 mb-4" style={{background:"rgba(255,255,255,0.05)"}}>
+                <p className="text-slate-200 text-sm leading-relaxed mb-3">Tem certeza que <strong className="text-white">todos os lançamentos de notas estão corretos e atualizados</strong>? As notas serão enviadas para o boletim de cada aluno.</p>
+                <div className="grid grid-cols-3 gap-3 mt-3">
+                  <div className="rounded-lg p-3 text-center" style={{background:"rgba(99,102,241,0.1)"}}>
+                    <div className="text-2xl font-black text-indigo-300">{alunos.length}</div>
+                    <div className="text-xs text-slate-400 mt-1">alunos</div>
+                  </div>
+                  <div className="rounded-lg p-3 text-center" style={{background:"rgba(16,185,129,0.1)"}}>
+                    <div className="text-2xl font-black text-emerald-300">{columns.filter(c=>!isItemBloqueado(c.itemIdx)).length}</div>
+                    <div className="text-xs text-slate-400 mt-1">colunas</div>
+                  </div>
+                  <div className="rounded-lg p-3 text-center" style={{background:"rgba(239,68,68,0.1)"}}>
+                    <div className="text-2xl font-black text-red-300">{ausentesSet.size}</div>
+                    <div className="text-xs text-slate-400 mt-1">ausências</div>
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-xl p-3 mb-5 flex items-start gap-2" style={{background:"rgba(99,102,241,0.08)"}}>
+                <span className="text-indigo-400 text-sm">ℹ️</span>
+                <p className="text-indigo-200 text-xs leading-relaxed">O diário permanecerá <strong>aberto</strong> após a exportação — você poderá atualizar notas e exportar novamente. Use <strong>FECHAR DIÁRIO</strong> somente quando não houver mais edições.</p>
+              </div>
+              <div className="flex gap-3">
+                <button onClick={()=>setModalConfirmarExportar(false)} className="flex-1 py-3 rounded-xl font-bold text-sm" style={{background:"rgba(255,255,255,0.05)",color:"#94a3b8",border:"1px solid rgba(255,255,255,0.1)"}}>
+                  Cancelar
+                </button>
+                <button onClick={handleExportarBoletimComProgresso} className="flex-2 px-6 py-3 rounded-xl font-bold text-white text-sm transition-all" style={{background:"linear-gradient(135deg,#7c3aed,#4f46e5)",flex:2,boxShadow:"0 4px 14px rgba(124,58,237,0.4)"}}>
+                  ✅ Sim, exportar para o boletim
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* MODAL: PROGRESSO DA EXPORTAÇÃO (etapa 7)                       */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {modalProgressoExportar && (
+        <div className="fixed inset-0 z-[350] flex items-center justify-center" style={{background:"rgba(0,0,0,0.85)",backdropFilter:"blur(12px)"}}>
+          <div className="w-full max-w-md mx-4 rounded-2xl overflow-hidden shadow-2xl" style={{background:"linear-gradient(145deg,#0f172a,#1e293b)"}}>
+            <div className="p-8">
+              <div className="flex flex-col items-center text-center mb-6">
+                <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl mb-4" style={{background:"linear-gradient(135deg,rgba(124,58,237,0.3),rgba(79,70,229,0.3))"}}>
+                  {progressoExportar < 60 ? "💾" : progressoExportar < 100 ? "📤" : "✅"}
+                </div>
+                <div className="text-white font-black text-xl mb-1">
+                  {progressoExportar < 60 ? "Salvando notas..." : progressoExportar < 100 ? "Enviando para o boletim..." : "Concluído!"}
+                </div>
+                <div className="text-slate-400 text-sm">
+                  {progressoExportar < 60 ? "Persistindo os dados no servidor" : progressoExportar < 100 ? "Calculando totais e atualizando o boletim" : "Notas exportadas com sucesso"}
+                </div>
+              </div>
+              <div className="rounded-full overflow-hidden mb-3" style={{height:12,background:"rgba(255,255,255,0.08)"}}>
+                <div className="h-full rounded-full transition-all duration-500" style={{width:`${progressoExportar}%`,background:"linear-gradient(90deg,#7c3aed,#4f46e5,#06b6d4)"}}></div>
+              </div>
+              <div className="text-right text-indigo-300 font-black text-sm">{progressoExportar}%</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* MODAL: SUCESSO DA EXPORTAÇÃO (etapa 7 concluído)               */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {modalSucessoExportar && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center" style={{background:"rgba(0,0,0,0.75)",backdropFilter:"blur(8px)"}} onClick={()=>setModalSucessoExportar(null)}>
+          <div onClick={e=>e.stopPropagation()} className="w-full max-w-md mx-4 rounded-2xl overflow-hidden shadow-2xl" style={{background:"linear-gradient(145deg,#052e16,#14532d)"}}>
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-14 h-14 rounded-xl flex items-center justify-center text-3xl" style={{background:"rgba(16,185,129,0.2)"}}>🎉</div>
+                <div>
+                  <div className="text-white font-black text-xl">Notas Exportadas!</div>
+                  <div className="text-emerald-400 text-sm font-medium">{modalSucessoExportar.total} aluno(s) processado(s)</div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3 mb-5">
+                <div className="rounded-xl p-3 text-center" style={{background:"rgba(16,185,129,0.1)"}}>
+                  <div className="text-2xl font-black text-emerald-300">{modalSucessoExportar.inseridas}</div>
+                  <div className="text-xs text-emerald-500 mt-1">notas inseridas</div>
+                </div>
+                <div className="rounded-xl p-3 text-center" style={{background:"rgba(59,130,246,0.1)"}}>
+                  <div className="text-2xl font-black text-blue-300">{modalSucessoExportar.atualizadas}</div>
+                  <div className="text-xs text-blue-500 mt-1">notas atualizadas</div>
+                </div>
+              </div>
+              <div className="rounded-xl p-4 mb-5" style={{background:"rgba(16,185,129,0.08)",border:"1px solid rgba(16,185,129,0.2)"}}>
+                <p className="text-emerald-200 text-sm leading-relaxed">✅ Notas enviadas ao boletim com sucesso. O diário permanece <strong>aberto</strong> caso precise de alguma correção.</p>
+                <p className="text-emerald-300 text-sm font-bold mt-2">🔒 Se você tem certeza que <strong>não haverá mais edições</strong>, clique em <strong>FECHAR DIÁRIO</strong> para que a secretaria tome conhecimento que o lançamento desta turma foi finalizado.</p>
+              </div>
+              <div className="flex gap-3">
+                <button onClick={()=>setModalSucessoExportar(null)} className="flex-1 py-3 rounded-xl font-bold text-sm" style={{background:"rgba(255,255,255,0.05)",color:"#94a3b8",border:"1px solid rgba(255,255,255,0.1)"}}>
+                  Fechar
+                </button>
+                <button onClick={()=>{setModalSucessoExportar(null);setModalFechar(true);}} className="flex-1 py-3 rounded-xl font-bold text-white text-sm transition-all" style={{background:"linear-gradient(135deg,#dc2626,#b91c1c)",boxShadow:"0 4px 14px rgba(220,38,38,0.3)"}}>
+                  🔒 Fechar Diário Agora
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ═══════════════════════════════════════════════════════════════ */}

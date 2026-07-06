@@ -81,6 +81,15 @@ export default function Avaliacoes() {
   const [progressoExportar, setProgressoExportar] = useState(0); // 0-100
   const [modalSucessoExportar, setModalSucessoExportar] = useState(null); // null | { total, inseridas, atualizadas }
 
+
+  // PASSO 2: FECHAR DIARIO - estados
+  const [notasExportadas, setNotasExportadas] = useState(false); // true apos exportacao bem-sucedida
+  const [modalSolicitarReabertura, setModalSolicitarReabertura] = useState(false);
+  const [reaberturaMotivoTipo, setReaberturaMotivoTipo] = useState(""); // tipo do motivo
+  const [reaberturaMotivoTexto, setReaberturaMotivoTexto] = useState(""); // descricao livre
+  const [reaberaturaAlunoId, setReaberturaAlunoId] = useState(""); // aluno selecionado
+  const [enviandoReabertura, setEnviandoReabertura] = useState(false);
+  const [modalSucessoReabertura, setModalSucessoReabertura] = useState(false);
   // Governança: avaliação padrão bimestral (bloqueia edição manual)
   const [avaliacaoPadrao, setAvaliacaoPadrao] = useState(false);
 
@@ -551,6 +560,35 @@ export default function Avaliacoes() {
     setFechando(false);
   };
 
+  // Handler: professor solicita reabertura do diário fechado
+  const handleSolicitarReabertura = async () => {
+    if (!plano?.id || !turmaSelecionada) return;
+    const alunoSelecionado = alunos.find(a => String(a.id) === String(reaberaturaAlunoId));
+    const motivoFinal = [reaberturaMotivoTipo, reaberturaMotivoTexto].filter(Boolean).join(" — ").trim();
+    if (!motivoFinal) return;
+    setEnviandoReabertura(true);
+    try {
+      const resp = await api.post(`/avaliacoes/${plano.id}/solicitar-reabertura-diario`, {
+        turma_id: turmaSelecionada,
+        motivo: motivoFinal,
+        aluno_id: alunoSelecionado?.id || null,
+        aluno_nome: alunoSelecionado?.nome || null,
+      });
+      if (resp.data?.ok) {
+        setModalSolicitarReabertura(false);
+        setReaberturaMotivoTipo("");
+        setReaberturaMotivoTexto("");
+        setReaberturaAlunoId("");
+        setModalSucessoReabertura(true);
+      } else {
+        showMsg("error", resp.data?.error || "Erro ao enviar solicitação.");
+      }
+    } catch (err) {
+      showMsg("error", err.response?.data?.error || "Erro ao enviar solicitação.");
+    }
+    setEnviandoReabertura(false);
+  };
+
   // Conta quantos alunos têm pelo menos 1 nota
   const alunosComNota = alunos.filter(a => {
     if (!plano?.itens) return false;
@@ -672,6 +710,7 @@ export default function Avaliacoes() {
       setModalProgressoExportar(false);
 
       if (resp.data?.ok) {
+        setNotasExportadas(true); // desbloqueia botao FECHAR DIARIO
         setModalSucessoExportar({
           total: resp.data.resumo?.totalAlunos ?? 0,
           inseridas: resp.data.resumo?.notasInseridas ?? 0,
@@ -1180,23 +1219,64 @@ export default function Avaliacoes() {
                    </div>
                 </div>
                 <div className="flex items-center gap-3">
-                    {/* BOTÃO FECHAR DIÁRIO — desabilitado provisoriamente */}
-                    {!carregandoDados && plano && !diarioFechado && (
+                    {/* BOTAO FECHAR DIARIO - dinamico: disabled / ativo / diario ja fechado */}
+                    {!carregandoDados && plano && (
+                      diarioFechado ? (
+                        /* Diario ja fechado: mostrar botao de solicitar reabertura */
+                        <button
+                          onClick={() => setModalSolicitarReabertura(true)}
+                          className="flex items-center gap-2 px-5 py-3 rounded-lg font-bold text-amber-300 border transition-all hover:scale-105 active:scale-95"
+                          style={{background:"linear-gradient(135deg,rgba(245,158,11,0.12),rgba(217,119,6,0.18))",borderColor:"rgba(245,158,11,0.3)",boxShadow:"0 2px 12px rgba(245,158,11,0.15)"}}
+                          title="Solicitar reabertura do diario ao Pedagogico"
+                        >
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 3C9.24 3 7 5.24 7 8v1H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2h-2V8c0-2.76-2.24-5-5-5zm0 12c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3-11V8H9V4h6z" fill="currentColor" opacity="0.4"/>
+                            <circle cx="12" cy="13" r="2" fill="#f59e0b"/>
+                          </svg>
+                          SOLICITAR REABERTURA
+                        </button>
+                      ) : notasExportadas ? (
+                        /* Notas exportadas: FECHAR DIARIO ativo com cadeado aberto colorido */
+                        <button
+                          onClick={() => setModalFechar(true)}
+                          className="flex items-center gap-2 px-5 py-3 rounded-lg font-bold text-white border transition-all hover:scale-105 active:scale-95"
+                          style={{background:"linear-gradient(135deg,#dc2626,#991b1b)",borderColor:"rgba(239,68,68,0.4)",boxShadow:"0 4px 18px rgba(220,38,38,0.4)"}}
+                          title="Fechar o diario - as notas ficarao bloqueadas para edicao"
+                        >
+                          {/* Cadeado aberto colorido - convida ao clique */}
+                          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <defs>
+                              <linearGradient id="lockOpenGrad" x1="0" y1="0" x2="1" y2="1">
+                                <stop offset="0%" stopColor="#fbbf24"/>
+                                <stop offset="100%" stopColor="#f87171"/>
+                              </linearGradient>
+                            </defs>
+                            <path d="M7 13V8C7 5.24 9.24 3 12 3s5 2.24 5 5" stroke="url(#lockOpenGrad)" strokeWidth="2" strokeLinecap="round" fill="none"/>
+                            <rect x="3" y="11" width="18" height="11" rx="2" fill="url(#lockOpenGrad)" opacity="0.9"/>
+                            <circle cx="12" cy="17" r="2" fill="white"/>
+                            <line x1="12" y1="17" x2="12" y2="20" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+                          </svg>
+                          FECHAR DIARIO
+                        </button>
+                      ) : (
+                        /* Default: disabled com cadeado fechado cinza */
                         <button
                           disabled
-                          className="flex items-center gap-2 px-5 py-3 rounded-lg font-bold text-red-300 border"
-                          style={{
-                            background: "rgba(239,68,68,0.06)",
-                            border: "1px solid rgba(239,68,68,0.15)",
-                            opacity: 0.45,
-                            cursor: "not-allowed",
-                          }}
-                          title="Funcionalidade temporariamente desabilitada"
+                          className="flex items-center gap-2 px-5 py-3 rounded-lg font-bold border cursor-not-allowed"
+                          style={{background:"rgba(255,255,255,0.03)",borderColor:"rgba(255,255,255,0.08)",color:"rgba(148,163,184,0.5)",opacity:0.55}}
+                          title="Exporte as notas primeiro para habilitar o fechamento do diario"
                         >
-                            <LockClosedIcon className="w-5 h-5" />
-                            FECHAR DIÁRIO
+                          {/* Cadeado fechado neutro */}
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M7 11V8a5 5 0 0 1 10 0v3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none"/>
+                            <rect x="3" y="11" width="18" height="11" rx="2" fill="currentColor" opacity="0.3"/>
+                            <circle cx="12" cy="17" r="1.5" fill="currentColor" opacity="0.6"/>
+                          </svg>
+                          FECHAR DIARIO
                         </button>
+                      )
                     )}
+
                     {/* BOTÃO SALVAR */}
                     {!carregandoDados && plano && !diarioFechado && (
                         <button
@@ -1705,6 +1785,145 @@ export default function Avaliacoes() {
                   )}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* MODAL: SOLICITAR REABERTURA DE DIARIO                          */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {modalSolicitarReabertura && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center" style={{background:"rgba(0,0,0,0.8)",backdropFilter:"blur(10px)"}} onClick={()=>!enviandoReabertura&&setModalSolicitarReabertura(false)}>
+          <div onClick={e=>e.stopPropagation()} className="w-full max-w-lg mx-4 rounded-2xl overflow-hidden shadow-2xl" style={{background:"linear-gradient(160deg,#1c1917,#292524)"}}>
+            {/* Header */}
+            <div className="p-6 pb-4" style={{background:"linear-gradient(135deg,rgba(245,158,11,0.15),rgba(217,119,6,0.08))"}}>
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{background:"linear-gradient(135deg,rgba(245,158,11,0.2),rgba(217,119,6,0.15))"}}>
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                    <path d="M8 11V7a4 4 0 0 1 8 0" stroke="#f59e0b" strokeWidth="2.5" strokeLinecap="round"/>
+                    <rect x="3" y="11" width="18" height="11" rx="2.5" fill="#f59e0b" opacity="0.85"/>
+                    <circle cx="12" cy="16.5" r="1.8" fill="white"/>
+                    <line x1="12" y1="16.5" x2="12" y2="19.5" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
+                </div>
+                <div>
+                  <div className="text-white font-black text-xl">Solicitar Reabertura</div>
+                  <div className="text-amber-400 text-sm font-medium">O Pedagógico receberá e analisará sua solicitação</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-4">
+              {/* Info contextual */}
+              <div className="rounded-xl p-4 flex items-start gap-3" style={{background:"rgba(245,158,11,0.08)",border:"1px solid rgba(245,158,11,0.2)"}}>
+                <span className="text-amber-400 text-xl">⚠️</span>
+                <p className="text-amber-200 text-sm leading-relaxed">Este diário está <strong className="text-amber-300">fechado e bloqueado</strong>. Para realizar qualquer ajuste nas notas, você precisa solicitar a reabertura ao Pedagógico (Coordenação/Direção). Eles analisarão e poderão aprovar ou negar.</p>
+              </div>
+
+              {/* Motivo - tipo */}
+              <div>
+                <label className="block text-slate-300 text-sm font-bold mb-2">Motivo da Reabertura *</label>
+                <select
+                  value={reaberturaMotivoTipo}
+                  onChange={e=>setReaberturaMotivoTipo(e.target.value)}
+                  className="w-full rounded-xl px-4 py-3 text-sm font-medium outline-none transition-all"
+                  style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",color:"#e2e8f0"}}
+                >
+                  <option value="">Selecione o motivo...</option>
+                  <option value="Erro no lancamento da nota">Erro no lançamento da nota</option>
+                  <option value="Aluno entregou atividade com atraso justificado">Aluno entregou atividade com atraso justificado</option>
+                  <option value="Aluno apresentou atestado medico">Aluno apresentou atestado médico</option>
+                  <option value="Solicitacao da coordenacao">Solicitação da coordenação</option>
+                  <option value="Outro motivo">Outro motivo</option>
+                </select>
+              </div>
+
+              {/* Complemento do motivo */}
+              <div>
+                <label className="block text-slate-300 text-sm font-bold mb-2">Descrição detalhada *</label>
+                <textarea
+                  value={reaberturaMotivoTexto}
+                  onChange={e=>setReaberturaMotivoTexto(e.target.value)}
+                  placeholder="Descreva com detalhes o motivo da reabertura e o que será corrigido..."
+                  rows={3}
+                  maxLength={500}
+                  className="w-full rounded-xl px-4 py-3 text-sm resize-none outline-none transition-all"
+                  style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",color:"#e2e8f0"}}
+                />
+                <div className="text-right text-slate-500 text-xs mt-1">{reaberturaMotivoTexto.length}/500</div>
+              </div>
+
+              {/* Aluno que terá nota alterada */}
+              <div>
+                <label className="block text-slate-300 text-sm font-bold mb-2">Aluno que terá nota alterada</label>
+                <select
+                  value={reaberaturaAlunoId}
+                  onChange={e=>setReaberturaAlunoId(e.target.value)}
+                  className="w-full rounded-xl px-4 py-3 text-sm font-medium outline-none transition-all"
+                  style={{background:"rgba(255,255,255,0.06)",border:"1px solid rgba(255,255,255,0.12)",color:"#e2e8f0"}}
+                >
+                  <option value="">Selecione o aluno (opcional)...</option>
+                  {alunos.map(a=>(
+                    <option key={a.id} value={a.id}>{a.nome} {a.matricula ? `(Mat: ${a.matricula})` : ""}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Botoes */}
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={()=>setModalSolicitarReabertura(false)}
+                  disabled={enviandoReabertura}
+                  className="flex-1 py-3 rounded-xl font-bold text-sm"
+                  style={{background:"rgba(255,255,255,0.05)",color:"#94a3b8",border:"1px solid rgba(255,255,255,0.1)"}}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSolicitarReabertura}
+                  disabled={enviandoReabertura || (!reaberturaMotivoTipo && !reaberturaMotivoTexto.trim())}
+                  className="flex-2 px-6 py-3 rounded-xl font-bold text-white text-sm transition-all"
+                  style={{
+                    flex:2,
+                    background:enviandoReabertura||(!reaberturaMotivoTipo&&!reaberturaMotivoTexto.trim())
+                      ? "rgba(245,158,11,0.2)" : "linear-gradient(135deg,#d97706,#b45309)",
+                    boxShadow:(!enviandoReabertura&&(reaberturaMotivoTipo||reaberturaMotivoTexto.trim()))
+                      ? "0 4px 14px rgba(217,119,6,0.4)" : "none",
+                    cursor:enviandoReabertura||(!reaberturaMotivoTipo&&!reaberturaMotivoTexto.trim()) ? "not-allowed":"pointer",
+                  }}
+                >
+                  {enviandoReabertura ? "Enviando..." : "📨 Enviar Solicitação"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* MODAL: SOLICITACAO DE REABERTURA ENVIADA COM SUCESSO           */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {modalSucessoReabertura && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center" style={{background:"rgba(0,0,0,0.75)",backdropFilter:"blur(8px)"}} onClick={()=>setModalSucessoReabertura(false)}>
+          <div onClick={e=>e.stopPropagation()} className="w-full max-w-md mx-4 rounded-2xl overflow-hidden shadow-2xl" style={{background:"linear-gradient(145deg,#1c1917,#292524)"}}>
+            <div className="p-6">
+              <div className="flex flex-col items-center text-center mb-6">
+                <div className="w-20 h-20 rounded-2xl flex items-center justify-center mb-4" style={{background:"linear-gradient(135deg,rgba(245,158,11,0.2),rgba(217,119,6,0.15))"}}>
+                  <span className="text-4xl">📨</span>
+                </div>
+                <div className="text-white font-black text-xl mb-2">Solicitação Enviada!</div>
+                <div className="text-amber-400 font-medium text-sm">Aguardando análise do Pedagógico</div>
+              </div>
+              <div className="rounded-xl p-4 mb-5 space-y-2" style={{background:"rgba(245,158,11,0.08)",border:"1px solid rgba(245,158,11,0.2)"}}>
+                <p className="text-amber-200 text-sm leading-relaxed">✅ Sua solicitação de reabertura foi registrada com sucesso.</p>
+                <p className="text-stone-400 text-sm leading-relaxed">O <strong className="text-amber-300">Coordenador/Direção</strong> receberá a solicitação no módulo Pedagógico e poderá <strong>aprovar</strong> ou <strong>negar</strong> com uma justificativa.</p>
+                <p className="text-stone-400 text-sm leading-relaxed">Você será informado assim que houver uma resposta.</p>
+              </div>
+              <button onClick={()=>setModalSucessoReabertura(false)} className="w-full py-3 rounded-xl font-bold text-white transition-all" style={{background:"linear-gradient(135deg,#d97706,#b45309)",boxShadow:"0 4px 14px rgba(217,119,6,0.3)"}}>
+                Entendi
+              </button>
             </div>
           </div>
         </div>

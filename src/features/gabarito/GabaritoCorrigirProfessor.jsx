@@ -239,6 +239,10 @@ export default function GabaritoCorrigirProfessor() {
   const [professorIds, setProfessorIds] = useState([]);
   const [currentUserId, setCurrentUserId] = useState(null); // fallback para não-professores
 
+  // ─── Liberação por turma (re-correção após importação) ───
+  // avaliacao_id -> { liberado_correcao, turma_nome }
+  const [lotesLiberados, setLotesLiberados] = useState({});
+
   // ─── Toast ───
   const [toast, setToast] = useState(null);
   function showToast(msg, type = "success") {
@@ -390,6 +394,18 @@ export default function GabaritoCorrigirProfessor() {
         (currentUserId && l.professor_id === currentUserId)
       );
       setLotes(meusLotes);
+
+      // Se a avaliação está com notas importadas, verificar se a turma do professor está liberada
+      if (av.status === "notas_importadas" && meusLotes.length > 0) {
+        try {
+          const turmaNome = meusLotes[0].turma_nome;
+          const respLote = await api.get(`/api/gabarito-lotes/meu-lote?avaliacao_id=${av.id}&turma_nome=${encodeURIComponent(turmaNome)}`);
+          setLotesLiberados(prev => ({
+            ...prev,
+            [av.id]: { liberado_correcao: !!respLote.data.liberado_correcao, turma_nome: turmaNome }
+          }));
+        } catch (_) { /* silencioso */ }
+      }
 
       // Se tem apenas 1 turma, já abrir direto
       if (meusLotes.length === 1) {
@@ -600,28 +616,36 @@ export default function GabaritoCorrigirProfessor() {
               const isOpen = avaliacaoAberta === av.id;
               const temGabarito = av.gabarito_oficial && av.gabarito_oficial.length > 0;
               const notasImportadas = av.status === "notas_importadas";
+              // Verifica se a turma deste professor foi liberada para re-correção
+              const loteInfo = lotesLiberados[av.id];
+              const turmaLiberada = notasImportadas && loteInfo?.liberado_correcao;
+              // Bloqueado apenas se notas importadas E turma NÃO liberada
+              const bloqueado = notasImportadas && !turmaLiberada;
 
               return (
                 <div key={av.id} style={{ display: "flex", flexDirection: "column", gap: 0 }}>
                   {/* ─── Card da Avaliação ─── */}
                   <div
-                    onClick={() => !notasImportadas && toggleAvaliacao(av)}
+                    onClick={() => !bloqueado && toggleAvaliacao(av)}
                     style={{
                       padding: "18px 22px",
                       borderRadius: isOpen ? "14px 14px 0 0" : 14,
-                      cursor: notasImportadas ? "default" : "pointer",
+                      cursor: bloqueado ? "default" : "pointer",
                       transition: "all 0.25s",
-                      background: notasImportadas
+                      background: bloqueado
                         ? "rgba(15,23,42,0.6)"
+                        : turmaLiberada
+                        ? "linear-gradient(135deg, rgba(251,191,36,0.07), rgba(245,158,11,0.04))"
                         : isOpen
                           ? "linear-gradient(135deg, rgba(6,182,212,0.08), rgba(139,92,246,0.05))"
                           : "var(--gab-surface, #1a1f2e)",
                       border: `1px solid ${
-                        notasImportadas ? "rgba(59,130,246,0.2)"
+                        bloqueado ? "rgba(59,130,246,0.2)"
+                        : turmaLiberada ? "rgba(251,191,36,0.25)"
                         : isOpen ? "rgba(6,182,212,0.3)" : "rgba(255,255,255,0.06)"
                       }`,
                       borderBottom: isOpen ? "none" : undefined,
-                      opacity: notasImportadas ? 0.85 : 1,
+                      opacity: 1,
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 6 }}>
@@ -636,7 +660,7 @@ export default function GabaritoCorrigirProfessor() {
                       </div>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: 12 }}>
                         {/* Badge de status */}
-                        {notasImportadas ? (
+                        {bloqueado ? (
                           <div style={{
                             padding: "3px 10px", borderRadius: 8, fontSize: "0.65rem", fontWeight: 700, whiteSpace: "nowrap",
                             background: "rgba(59,130,246,0.12)",
@@ -645,6 +669,17 @@ export default function GabaritoCorrigirProfessor() {
                             display: "flex", alignItems: "center", gap: 4,
                           }}>
                             🔒 NOTAS IMPORTADAS
+                          </div>
+                        ) : turmaLiberada ? (
+                          <div style={{
+                            padding: "3px 10px", borderRadius: 8, fontSize: "0.65rem", fontWeight: 700, whiteSpace: "nowrap",
+                            background: "rgba(251,191,36,0.12)",
+                            color: "#fbbf24",
+                            border: "1px solid rgba(251,191,36,0.3)",
+                            display: "flex", alignItems: "center", gap: 4,
+                            animation: "gab-fade-in 0.3s ease-out",
+                          }}>
+                            ✏️ RE-CORREÇÃO LIBERADA
                           </div>
                         ) : (
                           <div style={{
@@ -656,7 +691,7 @@ export default function GabaritoCorrigirProfessor() {
                             {temGabarito ? "✓ OFICIAL" : "✗ SEM GABARITO"}
                           </div>
                         )}
-                        {!notasImportadas && (
+                        {!bloqueado && (
                           <svg
                             width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}
                             style={{

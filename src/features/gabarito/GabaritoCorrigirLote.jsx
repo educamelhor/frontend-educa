@@ -101,6 +101,11 @@ export default function GabaritoCorrigirLote() {
   const [deleteArquivoModal, setDeleteArquivoModal] = useState(null); // arquivo a excluir
   const [deletingArquivoId, setDeletingArquivoId] = useState(null);
 
+  // ─── Liberar / Bloquear turma para re-correção ───
+  const [liberarModal, setLiberarModal] = useState(null);   // { lote, acao: "liberar"|"bloquear" }
+  const [liberandoLoteId, setLiberandoLoteId] = useState(null);
+
+
   // ─── Cancelamento de Questão em Lote (coordenador/diretor) ───
   const [cancelQuestaoModal, setCancelQuestaoModal] = useState(false);   // modal aberto?
   const [cancelQuestaoNum, setCancelQuestaoNum] = useState("");           // número digitado
@@ -756,7 +761,33 @@ export default function GabaritoCorrigirLote() {
     setDeletingArquivoId(null);
   }
 
+  // ─── Liberar / Bloquear turma para re-correção ───
+  async function alternarLiberacao(lote, acao) {
+    setLiberandoLoteId(lote.id);
+    try {
+      const endpoint = acao === "liberar"
+        ? `/api/gabarito-lotes/${lote.id}/liberar-correcao`
+        : `/api/gabarito-lotes/${lote.id}/bloquear-correcao`;
+      await api.post(endpoint);
+      const novoFlag = acao === "liberar" ? 1 : 0;
+      // Atualizar flag no estado local imediatamente
+      setLotes(prev => prev.map(l => l.id === lote.id ? { ...l, liberado_correcao: novoFlag } : l));
+      setLiberarModal(null);
+      showToast(
+        acao === "liberar"
+          ? `✅ Turma ${lote.turma_nome} liberada para re-correção!`
+          : `🔒 Turma ${lote.turma_nome} bloqueada novamente.`,
+        "success"
+      );
+    } catch (err) {
+      const msg = err.response?.data?.error || "Erro ao alterar status da turma.";
+      showToast(msg, "error");
+    }
+    setLiberandoLoteId(null);
+  }
+
   // ─── Corrigir arquivo individual ───
+
   async function corrigirArquivo(arq) {
     setArquivoSelecionado(arq);
     setCorrecao(null);
@@ -1365,6 +1396,18 @@ export default function GabaritoCorrigirLote() {
                               ✏️ {lote.ajustes_pendentes} ajuste{Number(lote.ajustes_pendentes) > 1 ? "s" : ""}
                             </span>
                           )}
+                          {/* Badge: Re-correção liberada */}
+                          {avaliacaoAtiva?.status === "notas_importadas" && !!lote.liberado_correcao && (
+                            <span style={{
+                              padding: "2px 8px", borderRadius: 10, fontSize: "0.6rem", fontWeight: 700,
+                              background: "rgba(251,191,36,0.12)", color: "#fbbf24",
+                              border: "1px solid rgba(251,191,36,0.3)",
+                              display: "flex", alignItems: "center", gap: 3,
+                              animation: "gab-fade-in 0.3s ease-out",
+                            }}>
+                              ✏️ RE-CORREÇÃO LIBERADA
+                            </span>
+                          )}
                         </div>
                       </div>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
@@ -1398,6 +1441,33 @@ export default function GabaritoCorrigirLote() {
                             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                           </svg>
                         </button>
+                        {/* Botão 🔓/🔒 Liberar/Bloquear turma (apenas quando notas_importadas) */}
+                        {avaliacaoAtiva?.status === "notas_importadas" && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setLiberarModal({ lote, acao: lote.liberado_correcao ? "bloquear" : "liberar" }); }}
+                            title={lote.liberado_correcao ? "Bloquear re-correção desta turma" : "Liberar turma para re-correção"}
+                            disabled={liberandoLoteId === lote.id}
+                            style={{
+                              width: 26, height: 26, borderRadius: 7,
+                              border: `1px solid ${lote.liberado_correcao ? "rgba(251,191,36,0.35)" : "rgba(34,197,94,0.35)"}`,
+                              cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                              background: lote.liberado_correcao ? "rgba(251,191,36,0.1)" : "rgba(34,197,94,0.08)",
+                              transition: "all 0.2s", opacity: liberandoLoteId === lote.id ? 0.5 : 1,
+                            }}
+                          >
+                            {lote.liberado_correcao ? (
+                              // Cadeado fechado = bloquear de volta
+                              <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#fbbf24" strokeWidth={2.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                              </svg>
+                            ) : (
+                              // Cadeado aberto = liberar
+                              <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="#4ade80" strokeWidth={2.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75M3.75 21.75h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                              </svg>
+                            )}
+                          </button>
+                        )}
                         {/* Botão (x) Excluir lote */}
                         <button
                           onClick={(e) => {
@@ -3053,9 +3123,138 @@ export default function GabaritoCorrigirLote() {
           </div>
         </div>
       )}
+      {/* ═══ Modal Premium — Liberar / Bloquear Turma para Re-Correção ═══ */}
+      {liberarModal && (
+        <div
+          style={{
+            position: "fixed", inset: 0, zIndex: 10002,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            background: "rgba(0,0,0,0.75)", backdropFilter: "blur(10px)",
+            animation: "gab-fade-in 0.25s ease-out",
+          }}
+          onClick={() => !liberandoLoteId && setLiberarModal(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "linear-gradient(145deg, #1a1f2e 0%, #111827 100%)",
+              border: `1px solid ${liberarModal.acao === "liberar" ? "rgba(34,197,94,0.25)" : "rgba(251,191,36,0.25)"}`,
+              borderRadius: 22, maxWidth: 460, width: "95%",
+              padding: 0, overflow: "hidden",
+              boxShadow: `0 28px 72px rgba(0,0,0,0.6), 0 0 48px ${liberarModal.acao === "liberar" ? "rgba(34,197,94,0.06)" : "rgba(251,191,36,0.06)"}`,
+              animation: "gab-slide-up 0.35s ease-out",
+            }}
+          >
+            {/* Header */}
+            <div style={{
+              background: liberarModal.acao === "liberar"
+                ? "linear-gradient(135deg, rgba(34,197,94,0.1), rgba(16,185,129,0.05))"
+                : "linear-gradient(135deg, rgba(251,191,36,0.1), rgba(245,158,11,0.05))",
+              borderBottom: `1px solid ${liberarModal.acao === "liberar" ? "rgba(34,197,94,0.15)" : "rgba(251,191,36,0.15)"}`,
+              padding: "24px 28px 20px", textAlign: "center",
+            }}>
+              <div style={{
+                width: 56, height: 56, borderRadius: 16, margin: "0 auto 16px",
+                background: liberarModal.acao === "liberar" ? "rgba(34,197,94,0.1)" : "rgba(251,191,36,0.1)",
+                border: `1px solid ${liberarModal.acao === "liberar" ? "rgba(34,197,94,0.25)" : "rgba(251,191,36,0.25)"}`,
+                display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.6rem",
+              }}>
+                {liberarModal.acao === "liberar" ? "🔓" : "🔒"}
+              </div>
+              <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--gab-text-primary)", marginBottom: 6 }}>
+                {liberarModal.acao === "liberar" ? "Liberar para Re-Correção" : "Bloquear Turma"}
+              </div>
+              <div style={{ fontSize: "0.82rem", color: "var(--gab-text-muted)", lineHeight: 1.5 }}>
+                {liberarModal.acao === "liberar"
+                  ? "O professor desta turma poderá adicionar gabaritos faltantes e realizar novas correções."
+                  : "A turma voltará ao estado bloqueado. O professor não poderá mais fazer correções."}
+              </div>
+            </div>
+
+            {/* Corpo */}
+            <div style={{ padding: "20px 28px 24px" }}>
+              {/* Card da turma */}
+              <div style={{
+                padding: "14px 16px", borderRadius: 12, marginBottom: 16,
+                background: liberarModal.acao === "liberar" ? "rgba(34,197,94,0.05)" : "rgba(251,191,36,0.05)",
+                border: `1px solid ${liberarModal.acao === "liberar" ? "rgba(34,197,94,0.15)" : "rgba(251,191,36,0.15)"}`,
+                display: "flex", alignItems: "center", gap: 12,
+              }}>
+                <div style={{
+                  width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+                  background: liberarModal.acao === "liberar" ? "rgba(34,197,94,0.1)" : "rgba(251,191,36,0.1)",
+                  border: `1px solid ${liberarModal.acao === "liberar" ? "rgba(34,197,94,0.2)" : "rgba(251,191,36,0.2)"}`,
+                  display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.1rem",
+                }}>📁</div>
+                <div>
+                  <div style={{ fontSize: "0.95rem", fontWeight: 700, color: liberarModal.acao === "liberar" ? "#4ade80" : "#fbbf24" }}>
+                    {liberarModal.lote.turma_nome}
+                  </div>
+                  <div style={{ fontSize: "0.72rem", color: "var(--gab-text-muted)", marginTop: 2 }}>
+                    {liberarModal.lote.total_corrigidos_real || liberarModal.lote.total_corrigidos || 0} gabaritos corrigidos
+                    {liberarModal.lote.professor_nome ? ` · Prof. ${liberarModal.lote.professor_nome}` : ""}
+                  </div>
+                </div>
+              </div>
+
+              {/* Aviso contextual */}
+              {liberarModal.acao === "liberar" && (
+                <div style={{
+                  padding: "10px 14px", borderRadius: 10, marginBottom: 22, fontSize: "0.75rem",
+                  background: "rgba(6,182,212,0.05)", border: "1px solid rgba(6,182,212,0.15)",
+                  color: "var(--gab-text-muted)", lineHeight: 1.5,
+                }}>
+                  💡 Após o professor concluir as correções adicionais, clique em <strong style={{ color: "#f59e0b" }}>Exportar Notas Novamente</strong> para atualizar o diário de todas as turmas.
+                </div>
+              )}
+
+              {/* Botões */}
+              <div style={{ display: "flex", gap: 10 }}>
+                <button
+                  onClick={() => setLiberarModal(null)}
+                  disabled={!!liberandoLoteId}
+                  style={{
+                    flex: 1, padding: "11px", borderRadius: 10, fontSize: "0.85rem", fontWeight: 700,
+                    background: "rgba(255,255,255,0.04)", color: "var(--gab-text-primary)",
+                    border: "1px solid rgba(255,255,255,0.1)", cursor: "pointer",
+                    transition: "all 0.2s", fontFamily: "var(--gab-font-body)",
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => alternarLiberacao(liberarModal.lote, liberarModal.acao)}
+                  disabled={!!liberandoLoteId}
+                  style={{
+                    flex: 2, padding: "11px", borderRadius: 10, fontSize: "0.85rem", fontWeight: 700,
+                    background: liberarModal.acao === "liberar"
+                      ? "linear-gradient(135deg, #22c55e 0%, #16a34a 100%)"
+                      : "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+                    color: "#fff", border: "none",
+                    cursor: liberandoLoteId ? "not-allowed" : "pointer",
+                    boxShadow: liberarModal.acao === "liberar" ? "0 4px 16px rgba(34,197,94,0.35)" : "0 4px 16px rgba(245,158,11,0.35)",
+                    transition: "all 0.2s", fontFamily: "var(--gab-font-body)",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                    opacity: liberandoLoteId ? 0.65 : 1,
+                  }}
+                >
+                  {liberandoLoteId === liberarModal.lote.id ? (
+                    <><div className="gab-spinner" /> Aguarde...</>
+                  ) : liberarModal.acao === "liberar" ? (
+                    <>🔓 Sim, Liberar Turma</>
+                  ) : (
+                    <>🔒 Sim, Bloquear Turma</>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ═══ Modal Premium — Excluir Arquivo/Gabarito Individual ═══ */}
       {deleteArquivoModal && (
+
         <div
           style={{
             position: "fixed", inset: 0, zIndex: 10001,

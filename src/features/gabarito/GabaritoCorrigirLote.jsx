@@ -1332,39 +1332,32 @@ export default function GabaritoCorrigirLote() {
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                           {/* Botão vincular professor — bloqueado após importação */}
-                          {avaliacaoAtiva?.status === "notas_importadas" ? (
-                            <div
-                              title="Vinculação bloqueada — notas já importadas"
-                              style={{
-                                width: 32, height: 32, borderRadius: 8,
-                                display: "flex", alignItems: "center", justifyContent: "center",
-                                fontSize: "0.9rem",
-                                background: "rgba(255,255,255,0.05)",
-                                border: "1px solid rgba(255,255,255,0.08)",
-                                opacity: 0.4, cursor: "not-allowed",
-                              }}
-                            >
-                              🔒
-                            </div>
-                          ) : (
-                            <button
-                              onClick={(e) => abrirModalProfessor(lote, e)}
-                              title={lote.professor_id ? `Prof: ${lote.professor_nome}` : "Vincular professor"}
-                              style={{
-                                width: 32, height: 32, borderRadius: 8, border: "none",
-                                cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                                fontSize: "0.9rem", transition: "all 0.2s",
-                                background: lote.professor_id
-                                  ? "linear-gradient(135deg, #10b981, #059669)"
-                                  : "linear-gradient(135deg, #ef4444, #dc2626)",
-                                boxShadow: lote.professor_id
-                                  ? "0 2px 10px rgba(16,185,129,0.4)"
-                                  : "0 2px 10px rgba(239,68,68,0.4)",
-                              }}
-                            >
-                              👨‍🏫
-                            </button>
-                          )}
+                          {/* Botão professor: sempre visível, bloqueado para clique quando notas_importadas */}
+                          <button
+                            onClick={(e) => avaliacaoAtiva?.status !== "notas_importadas" && abrirModalProfessor(lote, e)}
+                            title={
+                              avaliacaoAtiva?.status === "notas_importadas"
+                                ? `Prof: ${lote.professor_nome || "não vinculado"} (vinculação bloqueada após importação)`
+                                : lote.professor_id
+                                  ? `Prof: ${lote.professor_nome}`
+                                  : "Vincular professor"
+                            }
+                            style={{
+                              width: 32, height: 32, borderRadius: 8, border: "none",
+                              cursor: avaliacaoAtiva?.status === "notas_importadas" ? "default" : "pointer",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              fontSize: "0.9rem", transition: "all 0.2s",
+                              background: lote.professor_id
+                                ? "linear-gradient(135deg, #10b981, #059669)"
+                                : "linear-gradient(135deg, #ef4444, #dc2626)",
+                              boxShadow: lote.professor_id
+                                ? "0 2px 10px rgba(16,185,129,0.4)"
+                                : "0 2px 10px rgba(239,68,68,0.4)",
+                              opacity: avaliacaoAtiva?.status === "notas_importadas" ? 0.65 : 1,
+                            }}
+                          >
+                            👨‍🏫
+                          </button>
                           <span style={{
                             padding: "2px 8px", borderRadius: 10, fontSize: "0.65rem", fontWeight: 700,
                             background: isFinalizado

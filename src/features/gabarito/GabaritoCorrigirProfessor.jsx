@@ -350,12 +350,44 @@ export default function GabaritoCorrigirProfessor() {
           return a.status === "publicada" ? -1 : 1;
         });
         setAvaliacoes(todas);
+
+        // ── Pré-carregar status de liberação para todas as avaliações com notas_importadas ──
+        // O professor não pode clicar no card bloqueado, então precisamos saber ANTES
+        // se a sua turma foi liberada para re-correção.
+        const importadas = (respImport.data || []);
+        if (importadas.length > 0) {
+          const liberacoes = {};
+          await Promise.allSettled(
+            importadas.map(async (av) => {
+              try {
+                const respLotes = await api.get(`/api/gabarito-lotes?avaliacao_id=${av.id}`);
+                const lotes = respLotes.data || [];
+                // Filtrar apenas o lote DESTE professor (igual ao filtro do toggleAvaliacao)
+                const meusLotes = lotes.filter(l =>
+                  professorIds.includes(l.professor_id) ||
+                  (currentUserId && l.professor_id === currentUserId)
+                );
+                // Se nenhum lote do professor encontrado ainda (professorIds pode não ter carregado),
+                // verificar se há algum lote liberado na avaliação como fallback
+                const lotesParaVerificar = meusLotes.length > 0 ? meusLotes : lotes;
+                const loteLiberado = lotesParaVerificar.find(l => l.liberado_correcao);
+                if (loteLiberado) {
+                  liberacoes[av.id] = { liberado_correcao: true, turma_nome: loteLiberado.turma_nome };
+                } else {
+                  liberacoes[av.id] = { liberado_correcao: false };
+                }
+              } catch (_) { /* silencioso */ }
+            })
+          );
+          setLotesLiberados(liberacoes);
+        }
       } catch (err) {
         console.error("Erro ao carregar avaliações:", err);
       }
       setLoadingAv(false);
     })();
   }, []);
+
 
   // ─── Abrir/Fechar card de avaliação ───
   async function toggleAvaliacao(av) {

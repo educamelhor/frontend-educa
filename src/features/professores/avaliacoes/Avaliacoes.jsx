@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import api from "../../../services/api";
 import {
   CheckCircleIcon,
@@ -329,19 +329,54 @@ export default function Avaliacoes() {
   // ---------------------------
   const getNotaKey = (alunoId, itemIdx, opIdx) => `${alunoId}_${itemIdx}_${opIdx}`;
 
+  // Verifica se um item específico é do tipo fixo_direcao (Prova Bimestral)
+  const isItemFixoDirecao = (itemIdx) => {
+    if (!avaliacaoPadrao) return false;
+    const arrItens = Array.isArray(plano?.itens) ? plano.itens : JSON.parse(plano?.itens || "[]");
+    return !!arrItens[itemIdx]?.fixo_direcao;
+  };
+
   // Verifica se um item específico é bloqueado (fixo_direcao + avaliacaoPadrao ativo)
+  // Comportamento novo: fixo_direcao com NOTA JÁ IMPORTADA = bloqueado.
+  // fixo_direcao SEM nota (aluno ausente, '-') = desbloqueado só para código 1234.
   const isItemBloqueado = (itemIdx) => {
     if (!avaliacaoPadrao) return false;
     const arrItens = Array.isArray(plano?.itens) ? plano.itens : JSON.parse(plano?.itens || "[]");
-    const item = arrItens[itemIdx];
-    return !!item?.fixo_direcao;
+    return !!arrItens[itemIdx]?.fixo_direcao;
+  };
+
+  // Retorna true quando a célula da Prova Bimestral já tem nota importada do gabarito
+  const isCelulaGabaritoImportada = (alunoId, itemIdx, opIdx) => {
+    if (!isItemFixoDirecao(itemIdx)) return false;
+    const key = getNotaKey(alunoId, itemIdx, opIdx);
+    const val = notas[key];
+    // Considera importada se: tem valor numérico (incluindo 0 apenas se marcado como ausente)
+    if (ausentesSet.has(key)) return true; // ausente já marcado = bloqueado
+    return val !== undefined && val !== null && val !== "";
   };
 
   const handleNotaChange = (alunoId, itemIdx, opIdx, maxVal, val) => {
     if (diarioFechado) return; // readonly
-    if (isItemBloqueado(itemIdx)) return; // apenas coluna padronizada bloqueada
 
     const key = getNotaKey(alunoId, itemIdx, opIdx);
+
+    // Prova Bimestral (fixo_direcao): só permite edição se a célula está vazia
+    // e somente para o código de ausência 1234
+    if (isItemFixoDirecao(itemIdx)) {
+      const notaAtual = notas[key];
+      const jaTemNota = notaAtual !== undefined && notaAtual !== null && notaAtual !== "";
+      if (jaTemNota || ausentesSet.has(key)) return; // bloqueado: nota já importada ou já ausente
+      // Vazia: aceita apenas 1234
+      if (val === "1234") {
+        setNotas(prev => ({ ...prev, [key]: 0 }));
+        setAusentesSet(prev => new Set([...prev, key]));
+        setCoresCelulas(prev => ({ ...prev, [key]: "ausente" }));
+      }
+      // Qualquer outro valor em célula vazia de gabarito é ignorado
+      return;
+    }
+
+    if (isItemBloqueado(itemIdx)) return; // outras colunas bloqueadas
 
     // ── Código especial 1234 = ausência ──
     // Salva 0 no banco (para cálculos), exibe ✕ vermelho no frontend
@@ -379,6 +414,7 @@ export default function Avaliacoes() {
   // Exemplos: "1" → 1.00 | ",4" → 0.40 | "1." → 1.00 | "" → remove
   const handleNotaBlur = (alunoId, itemIdx, opIdx, maxVal) => {
     if (diarioFechado) return;
+    if (isItemFixoDirecao(itemIdx)) return; // Prova Bimestral: blur não faz nada (só aceita 1234 no onChange)
     if (isItemBloqueado(itemIdx)) return;
     const key = getNotaKey(alunoId, itemIdx, opIdx);
     setFocusedKey(null); // sai do modo de edição → exibe formatado
@@ -408,7 +444,8 @@ export default function Avaliacoes() {
 
   const handleContextMenu = (e, alunoId, itemIdx, opIdx, maxVal) => {
     if (diarioFechado) return; // readonly
-    if (isItemBloqueado(itemIdx)) return; // apenas coluna padronizada bloqueada
+    if (isItemFixoDirecao(itemIdx)) return; // Prova Bimestral não tem menu de contexto
+    if (isItemBloqueado(itemIdx)) return; // outras colunas padronizadas bloqueadas
     e.preventDefault();
     setContextMenu({
       alunoId, itemIdx, opIdx, maxVal,
@@ -1371,14 +1408,11 @@ export default function Avaliacoes() {
                                                 const key = getNotaKey(aluno.id, col.itemIdx, col.opIdx);
                                                 const val = notas[key];
                                                 const cor = coresCelulas[key];
-                                                const cellBloqueada = diarioFechado || isItemBloqueado(col.itemIdx);
+                                                const isGabaritoVazio = isItemFixoDirecao(col.itemIdx) && (val === undefined || val === null || val === "") && !ausentesSet.has(key);
+                                                const cellBloqueada = diarioFechado || (isItemBloqueado(col.itemIdx) && !isGabaritoVazio);
                                                 const isFocused = focusedKey === key;
                                                 const isAusente = ausentesSet.has(key);
 
-                                                // Lógica de exibição:
-                                                // • Ausente (código 1234): exibe ✕ vermelho, não é input editável
-                                                // • Campo focado (digitando): mostra o valor bruto com vírgula
-                                                // • Campo em repouso: formata com 2 casas decimais e vírgula
                                                 let displayVal = "";
                                                 if (!isAusente && val !== undefined) {
                                                   if (isFocused) {
@@ -1399,7 +1433,7 @@ export default function Avaliacoes() {
                                                 return (
                                                 <td
                                                    key={`cell_${i}`}
-                                                   onContextMenu={(e) => !isAusente && handleContextMenu(e, aluno.id, col.itemIdx, col.opIdx, col.maxVal)}
+                                                   onContextMenu={(e) => !isAusente && !isItemFixoDirecao(col.itemIdx) && handleContextMenu(e, aluno.id, col.itemIdx, col.opIdx, col.maxVal)}
                                                    className={`px-1 py-1 border-r border-slate-100 text-center relative group/cell transition-colors duration-300 ${isAusente ? "bg-red-50" : cor === "red" ? "bg-red-100" : cor === "yellow" ? "bg-yellow-100" : cor === "green" ? "bg-green-100" : ""} ${cellBloqueada && !isAusente ? "bg-amber-50/40" : ""}`}
                                                  >
                                                      {isAusente ? (
@@ -1414,9 +1448,23 @@ export default function Avaliacoes() {
                                                          onChange={(e)=>handleNotaChange(aluno.id,col.itemIdx,col.opIdx,col.maxVal,e.target.value)}
                                                          onFocus={()=>setFocusedKey(key)} onBlur={()=>handleNotaBlur(aluno.id,col.itemIdx,col.opIdx,col.maxVal)}
                                                          readOnly={cellBloqueada} tabIndex={cellBloqueada?-1:0} placeholder="-"
-                                                         className={`w-full text-center py-2.5 font-bold border border-transparent rounded-lg outline-none transition-all ${bgClass} ${cellBloqueada ? (String.fromCharCode(39)+String.fromCharCode(39)+String.fromCharCode(39)+String.fromCharCode(39)) : (String.fromCharCode(39)+String.fromCharCode(39)+String.fromCharCode(39)+String.fromCharCode(39))}`}/>
-                                                       {!cellBloqueada&&(<div className="absolute opacity-0 group-hover/cell:opacity-100 -top-8 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white text-[10px] px-2 py-1 rounded z-50">Max: {col.maxVal}</div>)}
-                                                       {cellBloqueada&&!diarioFechado&&(<div className="absolute opacity-0 group-hover/cell:opacity-100 -top-8 left-1/2 transform -translate-x-1/2 bg-amber-700 text-white text-[10px] px-2 py-1 rounded z-50">Preenchido via Gabarito</div>)}
+                                                         className={`w-full text-center py-2.5 font-bold border border-transparent rounded-lg outline-none transition-all ${bgClass}`}/>
+                                                       {/* Tooltip: célula bloqueada com nota importada */}
+                                                       {cellBloqueada&&!diarioFechado&&!isGabaritoVazio&&(
+                                                         <div className="absolute opacity-0 group-hover/cell:opacity-100 -top-8 left-1/2 transform -translate-x-1/2 bg-amber-700 text-white text-[10px] px-2 py-1 rounded z-50 whitespace-nowrap">
+                                                           Preenchido via Gabarito
+                                                         </div>
+                                                       )}
+                                                       {/* Hint: célula de gabarito vazia — só aceita 1234 */}
+                                                       {!cellBloqueada&&isItemFixoDirecao(col.itemIdx)&&(
+                                                         <div className="absolute opacity-0 group-hover/cell:opacity-100 -top-8 left-1/2 transform -translate-x-1/2 bg-cyan-700 text-white text-[10px] px-2 py-1 rounded z-50 whitespace-nowrap">
+                                                           Digite 1234 para ausente
+                                                         </div>
+                                                       )}
+                                                       {/* Tooltip: max val em células normais */}
+                                                       {!cellBloqueada&&!isItemFixoDirecao(col.itemIdx)&&(
+                                                         <div className="absolute opacity-0 group-hover/cell:opacity-100 -top-8 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white text-[10px] px-2 py-1 rounded z-50">Max: {col.maxVal}</div>
+                                                       )}
                                                      </>)}
                                                  </td>
                                              )})}

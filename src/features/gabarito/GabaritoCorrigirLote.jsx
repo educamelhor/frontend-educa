@@ -97,6 +97,10 @@ export default function GabaritoCorrigirLote() {
   const [ajustesLoading, setAjustesLoading] = useState(false);
   const [decidindoAjusteId, setDecidindoAjusteId] = useState(null);
 
+  // ─── Excluir arquivo (gabarito individual) ───
+  const [deleteArquivoModal, setDeleteArquivoModal] = useState(null); // arquivo a excluir
+  const [deletingArquivoId, setDeletingArquivoId] = useState(null);
+
   // ─── Cancelamento de Questão em Lote (coordenador/diretor) ───
   const [cancelQuestaoModal, setCancelQuestaoModal] = useState(false);   // modal aberto?
   const [cancelQuestaoNum, setCancelQuestaoNum] = useState("");           // número digitado
@@ -720,6 +724,36 @@ export default function GabaritoCorrigirLote() {
       showToast(msg, "error");
     }
     setDeletingLoteId(null);
+  }
+
+  // ─── Excluir arquivo individual do lote ───
+  async function excluirArquivo(arq) {
+    setDeletingArquivoId(arq.id);
+    try {
+      await api.delete(`/api/gabarito-lotes/arquivos/${arq.id}`);
+      // Remover da lista do modal
+      setModalAlunosData(prev => prev.filter(a => a.id !== arq.id));
+      setDeleteArquivoModal(null);
+      // Fechar preview se estava aberto para este arquivo
+      if (previewArquivo?.id === arq.id) {
+        if (previewImgUrl) URL.revokeObjectURL(previewImgUrl);
+        setPreviewArquivo(null);
+        setPreviewImgUrl(null);
+      }
+      // Fechar painel de vínculo se estava aberto para este arquivo
+      if (vinculoArquivo?.id === arq.id) setVinculoArquivo(null);
+      if (ajustesReviewArquivo?.id === arq.id) { setAjustesReviewArquivo(null); setAjustesList([]); }
+      showToast(`Gabarito excluído com sucesso.`, "success");
+      // Atualizar contadores do lote
+      if (avaliacaoAtiva) {
+        carregarLotes(avaliacaoAtiva.id);
+        verificarStatusImportacao(avaliacaoAtiva.id);
+      }
+    } catch (err) {
+      const msg = err.response?.data?.error || "Erro ao excluir gabarito.";
+      showToast(msg, "error");
+    }
+    setDeletingArquivoId(null);
   }
 
   // ─── Corrigir arquivo individual ───
@@ -2321,7 +2355,8 @@ export default function GabaritoCorrigirLote() {
                   Nenhum gabarito encontrado nesta turma.
                 </div>
               ) : (
-                modalAlunosData.map((arq, idx) => {
+                // Dedup por id antes de renderizar (evita duplicação ao re-abrir lote com arquivos novos)
+                Array.from(new Map(modalAlunosData.map(a => [a.id, a])).values()).map((arq, idx) => {
                   const naoIdentificado = pareceNomeArquivo(arq.nome_aluno);
                   const statusMap = {
                     corrigido: { label: "Corrigido", bg: "rgba(16,185,129,0.12)", color: "#34d399", border: "rgba(16,185,129,0.25)" },
@@ -2455,6 +2490,22 @@ export default function GabaritoCorrigirLote() {
                           {st.label}
                         </span>
                       )}
+
+                      {/* Botão excluir arquivo */}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setDeleteArquivoModal(arq); }}
+                        title="Excluir este gabarito"
+                        style={{
+                          width: 28, height: 28, borderRadius: 7, border: "1px solid rgba(239,68,68,0.2)",
+                          cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                          background: "rgba(239,68,68,0.06)", transition: "all 0.2s", flexShrink: 0,
+                          marginLeft: 2,
+                        }}
+                      >
+                        <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#f87171" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                        </svg>
+                      </button>
                     </div>
                   );
                 })
@@ -2998,6 +3049,147 @@ export default function GabaritoCorrigirLote() {
                   <>🗑️ Sim, Excluir</>
                 )}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ Modal Premium — Excluir Arquivo/Gabarito Individual ═══ */}
+      {deleteArquivoModal && (
+        <div
+          style={{
+            position: "fixed", inset: 0, zIndex: 10001,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            background: "rgba(0,0,0,0.75)", backdropFilter: "blur(10px)",
+            animation: "gab-fade-in 0.25s ease-out",
+          }}
+          onClick={() => !deletingArquivoId && setDeleteArquivoModal(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "linear-gradient(145deg, #1a1f2e 0%, #111827 100%)",
+              border: "1px solid rgba(239,68,68,0.25)",
+              borderRadius: 22, maxWidth: 460, width: "95%",
+              padding: 0, overflow: "hidden",
+              boxShadow: "0 28px 72px rgba(0,0,0,0.6), 0 0 48px rgba(239,68,68,0.08)",
+              animation: "gab-slide-up 0.35s ease-out",
+            }}
+          >
+            {/* Header vermelho */}
+            <div style={{
+              background: "linear-gradient(135deg, rgba(239,68,68,0.12), rgba(220,38,38,0.06))",
+              borderBottom: "1px solid rgba(239,68,68,0.15)",
+              padding: "24px 28px 20px",
+              textAlign: "center",
+            }}>
+              <div style={{
+                width: 56, height: 56, borderRadius: 16, margin: "0 auto 16px",
+                background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.25)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <svg width="26" height="26" fill="none" viewBox="0 0 24 24" stroke="#f87171" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                </svg>
+              </div>
+              <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--gab-text-primary)", marginBottom: 6 }}>
+                Excluir Gabarito
+              </div>
+              <div style={{ fontSize: "0.82rem", color: "var(--gab-text-muted)", lineHeight: 1.5 }}>
+                Esta ação é permanente e não pode ser desfeita.
+              </div>
+            </div>
+
+            {/* Corpo */}
+            <div style={{ padding: "20px 28px 24px" }}>
+              {/* Card com dados do arquivo */}
+              <div style={{
+                padding: "14px 16px", borderRadius: 12, marginBottom: 16,
+                background: "rgba(239,68,68,0.05)", border: "1px solid rgba(239,68,68,0.15)",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{
+                    width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+                    background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)",
+                    display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1rem",
+                  }}>📄</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{
+                      fontSize: "0.9rem", fontWeight: 700, color: "#f87171",
+                      whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                    }}>
+                      {deleteArquivoModal.nome_aluno && !pareceNomeArquivo(deleteArquivoModal.nome_aluno)
+                        ? deleteArquivoModal.nome_aluno
+                        : deleteArquivoModal.arquivo_nome || "Arquivo sem identificação"}
+                    </div>
+                    {deleteArquivoModal.codigo_aluno && (
+                      <div style={{ fontSize: "0.72rem", color: "var(--gab-text-muted)", marginTop: 2 }}>
+                        RE: {deleteArquivoModal.codigo_aluno}
+                      </div>
+                    )}
+                    <div style={{
+                      marginTop: 4, display: "inline-block",
+                      padding: "1px 8px", borderRadius: 6, fontSize: "0.6rem", fontWeight: 700,
+                      background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)",
+                      color: "#f87171", textTransform: "uppercase",
+                    }}>
+                      {deleteArquivoModal.status || "pendente"}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Aviso */}
+              <div style={{
+                padding: "10px 14px", borderRadius: 10, marginBottom: 22, fontSize: "0.75rem",
+                background: "rgba(245,158,11,0.05)", border: "1px solid rgba(245,158,11,0.15)",
+                color: "var(--gab-text-muted)", lineHeight: 1.5,
+              }}>
+                ⚠️ O arquivo escaneado
+                {deleteArquivoModal.status === "corrigido" ? ", a correção e todos os ajustes manuais " : " "}
+                serão removidos permanentemente do sistema.
+              </div>
+
+              {/* Botões */}
+              <div style={{ display: "flex", gap: 10 }}>
+                <button
+                  onClick={() => setDeleteArquivoModal(null)}
+                  disabled={!!deletingArquivoId}
+                  style={{
+                    flex: 1, padding: "11px", borderRadius: 10, fontSize: "0.85rem", fontWeight: 700,
+                    background: "rgba(255,255,255,0.04)", color: "var(--gab-text-primary)",
+                    border: "1px solid rgba(255,255,255,0.1)", cursor: "pointer",
+                    transition: "all 0.2s", fontFamily: "var(--gab-font-body)",
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => excluirArquivo(deleteArquivoModal)}
+                  disabled={!!deletingArquivoId}
+                  style={{
+                    flex: 2, padding: "11px", borderRadius: 10, fontSize: "0.85rem", fontWeight: 700,
+                    background: "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)",
+                    color: "#fff", border: "none",
+                    cursor: deletingArquivoId ? "not-allowed" : "pointer",
+                    boxShadow: "0 4px 16px rgba(239,68,68,0.35)",
+                    transition: "all 0.2s", fontFamily: "var(--gab-font-body)",
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                    opacity: deletingArquivoId ? 0.65 : 1,
+                  }}
+                >
+                  {deletingArquivoId === deleteArquivoModal.id ? (
+                    <><div className="gab-spinner" /> Excluindo...</>
+                  ) : (
+                    <>
+                      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                      </svg>
+                      Sim, Excluir Gabarito
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>

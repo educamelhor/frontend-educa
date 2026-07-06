@@ -73,6 +73,8 @@ export default function Avaliacoes() {
   // Novo fluxo: ausência (código 1234) e modal zero
   const [ausentesSet, setAusentesSet] = useState(new Set()); // keys onde aluno estava ausente
   const [modalZero, setModalZero] = useState(null); // { key, alunoId, itemIdx, opIdx, maxVal }
+  // Buffer de digitação para células de gabarito vazias (Prova Bimestral sem nota)
+  const [tempGabarito, setTempGabarito] = useState({}); // key -> string parcial
 
   // Novo fluxo: EXPORTAR BOLETIM em etapas
   const [modalNotasPendentes, setModalNotasPendentes] = useState(false);
@@ -361,18 +363,23 @@ export default function Avaliacoes() {
     const key = getNotaKey(alunoId, itemIdx, opIdx);
 
     // Prova Bimestral (fixo_direcao): só permite edição se a célula está vazia
-    // e somente para o código de ausência 1234
+    // e somente para o código de ausência 1234 — armazena digitação parcial no buffer
     if (isItemFixoDirecao(itemIdx)) {
       const notaAtual = notas[key];
       const jaTemNota = notaAtual !== undefined && notaAtual !== null && notaAtual !== "";
       if (jaTemNota || ausentesSet.has(key)) return; // bloqueado: nota já importada ou já ausente
-      // Vazia: aceita apenas 1234
+
+      // Armazena o valor parcial para exibição
+      setTempGabarito(prev => ({ ...prev, [key]: val }));
+
+      // Quando completa o código 1234, confirma ausência
       if (val === "1234") {
         setNotas(prev => ({ ...prev, [key]: 0 }));
         setAusentesSet(prev => new Set([...prev, key]));
         setCoresCelulas(prev => ({ ...prev, [key]: "ausente" }));
+        // Limpa o buffer após confirmar
+        setTempGabarito(prev => { const t = { ...prev }; delete t[key]; return t; });
       }
-      // Qualquer outro valor em célula vazia de gabarito é ignorado
       return;
     }
 
@@ -414,7 +421,13 @@ export default function Avaliacoes() {
   // Exemplos: "1" → 1.00 | ",4" → 0.40 | "1." → 1.00 | "" → remove
   const handleNotaBlur = (alunoId, itemIdx, opIdx, maxVal) => {
     if (diarioFechado) return;
-    if (isItemFixoDirecao(itemIdx)) return; // Prova Bimestral: blur não faz nada (só aceita 1234 no onChange)
+    if (isItemFixoDirecao(itemIdx)) {
+      // Limpa buffer se não completou 1234
+      const key = getNotaKey(alunoId, itemIdx, opIdx);
+      setTempGabarito(prev => { const t = { ...prev }; delete t[key]; return t; });
+      setFocusedKey(null);
+      return;
+    }
     if (isItemBloqueado(itemIdx)) return;
     const key = getNotaKey(alunoId, itemIdx, opIdx);
     setFocusedKey(null); // sai do modo de edição → exibe formatado
@@ -1414,13 +1427,16 @@ export default function Avaliacoes() {
                                                 const isAusente = ausentesSet.has(key);
 
                                                 let displayVal = "";
-                                                if (!isAusente && val !== undefined) {
+                                                if (isGabaritoVazio && tempGabarito[key] !== undefined) {
+                                                  // Célula de gabarito vazia: exibe o que o professor está digitando
+                                                  displayVal = tempGabarito[key];
+                                                } else if (!isAusente && val !== undefined) {
                                                   if (isFocused) {
                                                     displayVal = String(val).replace(".", ",");
                                                   } else {
                                                     const numV = Number(val);
                                                     displayVal = isNaN(numV) ? "" : numV.toFixed(2).replace(".", ",");
-                                                 }
+                                                  }
                                                 }
 
                                                 const bgClass =

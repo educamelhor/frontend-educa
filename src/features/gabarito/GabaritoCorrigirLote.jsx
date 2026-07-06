@@ -187,7 +187,7 @@ export default function GabaritoCorrigirLote() {
   async function vincularProfessor(loteId, professorId) {
     setVinculandoProf(true);
     try {
-      const resp = await api.put(`/gabarito-lotes/${loteId}/vincular-professor`, { professor_id: professorId });
+      const resp = await api.put(`/api/gabarito-lotes/${loteId}/vincular-professor`, { professor_id: professorId });
       setLotes(prev => prev.map(l => l.id === loteId ? { ...l, professor_id: professorId, professor_nome: resp.data.professor_nome } : l));
       setProfModalLote(null);
       showToast("Professor vinculado com sucesso!", "success");
@@ -738,6 +738,12 @@ export default function GabaritoCorrigirLote() {
       ));
 
       showToast(`${arq.nome_aluno || arq.codigo_aluno}: ${resp.data.acertos}/${resp.data.totalQuestoes} acertos!`, "success");
+
+      // Bug 2: Atualizar status de importação após cada correção (o último arquivo pode finalizar o lote)
+      if (avaliacaoAtiva) {
+        carregarLotes(avaliacaoAtiva.id);
+        verificarStatusImportacao(avaliacaoAtiva.id);
+      }
     } catch (err) {
       console.error("Erro ao corrigir:", err);
       showToast("Erro ao corrigir gabarito.", "error");
@@ -770,7 +776,11 @@ export default function GabaritoCorrigirLote() {
 
     showToast(`${corrigidos} gabaritos corrigidos automaticamente!`, "success");
     setLoadingCorrecao(false);
-    carregarLotes(avaliacaoAtiva.id); // Atualizar contadores
+    // Bug 2: Atualizar lotes E status de importação após corrigir todos
+    if (avaliacaoAtiva) {
+      carregarLotes(avaliacaoAtiva.id);
+      verificarStatusImportacao(avaliacaoAtiva.id);
+    }
   }
 
   // ─── Helper: ícone de status ───
@@ -1244,7 +1254,10 @@ export default function GabaritoCorrigirLote() {
                   const identificados = lote.total_identificados || 0;
                   const pendentes = total - corrigidos - identificados - (lote.total_erros || 0);
                   const pct = total > 0 ? Math.round((corrigidos / total) * 100) : 0;
+                  const pctIdent = total > 0 ? Math.round((identificados / total) * 100) : 0;
                   const isFinalizado = lote.status === "finalizado";
+                  // PA4: label especial quando todos identificados mas nenhum corrigido
+                  const todosProntos = identificados === total && total > 0 && corrigidos === 0;
 
                   return (
                     <div key={lote.id} className="gab-lote-card" onClick={() => abrirLote(lote)}>
@@ -1289,11 +1302,23 @@ export default function GabaritoCorrigirLote() {
                           )}
                           <span style={{
                             padding: "2px 8px", borderRadius: 10, fontSize: "0.65rem", fontWeight: 700,
-                            background: isFinalizado ? "rgba(16,185,129,0.1)" : "rgba(245,158,11,0.1)",
-                            color: isFinalizado ? "var(--gab-green-light)" : "var(--gab-amber-light, #f59e0b)",
-                            border: `1px solid ${isFinalizado ? "rgba(16,185,129,0.2)" : "rgba(245,158,11,0.2)"}`,
+                            background: isFinalizado
+                              ? "rgba(16,185,129,0.1)"
+                              : todosProntos
+                              ? "rgba(6,182,212,0.1)"
+                              : "rgba(245,158,11,0.1)",
+                            color: isFinalizado
+                              ? "var(--gab-green-light)"
+                              : todosProntos
+                              ? "var(--gab-cyan-light, #22d3ee)"
+                              : "var(--gab-amber-light, #f59e0b)",
+                            border: `1px solid ${
+                              isFinalizado ? "rgba(16,185,129,0.2)"
+                              : todosProntos ? "rgba(6,182,212,0.2)"
+                              : "rgba(245,158,11,0.2)"
+                            }`,
                           }}>
-                            {isFinalizado ? "FINALIZADO" : `${pct}%`}
+                            {isFinalizado ? "FINALIZADO" : todosProntos ? "PRONTO" : `${pct}%`}
                           </span>
                           {Number(lote.ajustes_pendentes) > 0 && (
                             <span style={{
@@ -1357,11 +1382,23 @@ export default function GabaritoCorrigirLote() {
                           </svg>
                         </button>
                       </div>
-                      {/* Barra de progresso */}
-                      <div style={{ height: 4, borderRadius: 2, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
+                      {/* Barra de progresso — PA4: dois segmentos: azul=identificados, verde=corrigidos */}
+                      <div style={{ height: 4, borderRadius: 2, background: "rgba(255,255,255,0.06)", overflow: "hidden", position: "relative" }}>
+                        {/* Segmento azul: identificados (abaixo dos corrigidos) */}
+                        {pctIdent > 0 && !isFinalizado && (
+                          <div style={{
+                            position: "absolute", left: 0, top: 0,
+                            height: "100%", borderRadius: 2,
+                            width: `${Math.min(pct + pctIdent, 100)}%`,
+                            background: "rgba(6,182,212,0.35)",
+                            transition: "width 0.5s ease-out",
+                          }} />
+                        )}
+                        {/* Segmento verde: corrigidos (sobrepõe o azul) */}
                         <div style={{
+                          position: "absolute", left: 0, top: 0,
                           height: "100%", borderRadius: 2, transition: "width 0.5s ease-out",
-                          width: `${pct}%`,
+                          width: isFinalizado ? "100%" : `${pct}%`,
                           background: isFinalizado
                             ? "var(--gab-green-light, #10b981)"
                             : "linear-gradient(90deg, #06b6d4, #8b5cf6)",
@@ -1375,7 +1412,8 @@ export default function GabaritoCorrigirLote() {
           )}
 
           {/* ═══ CARD: IMPORTAR NOTAS PARA DIÁRIO ═══ */}
-          {importStatus && (avaliacaoAtiva?.tipo === "prova_padronizada" || avaliacaoConfig?.["escola.avaliacao_padrao_bimestral"] === "1") && lotes.length > 0 && (
+          {/* Bug 3: mostrar sempre que houver disciplinas configuradas, independente do tipo */}
+          {importStatus && importStatus.temDisciplinas && lotes.length > 0 && (
             <div className="gab-card" style={{
               border: importStatus.jaImportou
                 ? "1px solid rgba(16,185,129,0.25)"
@@ -1712,19 +1750,45 @@ export default function GabaritoCorrigirLote() {
                   <strong style={{ color: "var(--gab-text-primary)" }}>Bimestre:</strong> {importResultado.resumo?.bimestre || "—"}
                 </div>
 
-                {/* Erros (se houver) */}
+                {/* PA5: Alunos não importados (sem QR / ARQ_*) */}
                 {importResultado.resumo?.erros > 0 && (
                   <div style={{
-                    padding: "10px 14px", borderRadius: 10, fontSize: "0.75rem",
-                    background: "rgba(245,158,11,0.04)", border: "1px solid rgba(245,158,11,0.15)",
-                    color: "var(--gab-text-muted)", marginBottom: 16,
+                    padding: "12px 14px", borderRadius: 10, fontSize: "0.75rem",
+                    background: "rgba(239,68,68,0.05)", border: "1px solid rgba(239,68,68,0.2)",
+                    color: "var(--gab-text-muted)", marginBottom: 12,
                   }}>
-                    <div style={{ fontWeight: 700, color: "var(--gab-amber-light, #f59e0b)", marginBottom: 6 }}>
-                      ⚠️ {importResultado.resumo.erros} aluno(s) não importado(s):
+                    <div style={{ fontWeight: 700, color: "#f87171", marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: "1rem" }}>🚫</span>
+                      {importResultado.resumo.erros} aluno(s) NÃO importado(s) — nota perdida
+                    </div>
+                    <div style={{ fontSize: "0.7rem", color: "rgba(148,163,184,0.8)", marginBottom: 6 }}>
+                      Estes alunos não foram identificados pelo QR Code. Vincule-os manualmente antes de reimportar.
                     </div>
                     {importResultado.resumo.detalheErros?.map((e, i) => (
                       <div key={i} style={{ marginBottom: 3 }}>
                         • <strong>{e.codigo}</strong>{e.nome ? ` (${e.nome})` : ""}: {e.motivo}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* PA6: Avisos de PAP ausente */}
+                {importResultado.resumo?.avisos > 0 && (
+                  <div style={{
+                    padding: "12px 14px", borderRadius: 10, fontSize: "0.75rem",
+                    background: "rgba(245,158,11,0.05)", border: "1px solid rgba(245,158,11,0.2)",
+                    color: "var(--gab-text-muted)", marginBottom: 12,
+                  }}>
+                    <div style={{ fontWeight: 700, color: "#f59e0b", marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
+                      <span style={{ fontSize: "1rem" }}>⚠️</span>
+                      {importResultado.resumo.avisos} combinação(ões) sem PAP — notas não lançadas
+                    </div>
+                    <div style={{ fontSize: "0.7rem", color: "rgba(148,163,184,0.8)", marginBottom: 6 }}>
+                      O PAP (Plano de Avaliação Pedagógica) deve estar com status APROVADO ou ENVIADO. Solicite ao professor que envie ou ao coordenador que aprove.
+                    </div>
+                    {importResultado.resumo.detalheAvisos?.map((a, i) => (
+                      <div key={i} style={{ marginBottom: 3 }}>
+                        • <strong>{a.disciplina}</strong> / {a.turma}: {a.motivo}
                       </div>
                     ))}
                   </div>
@@ -2205,7 +2269,11 @@ export default function GabaritoCorrigirLote() {
                         🔍 Identificando alunos automaticamente...
                       </div>
                       <div style={{ fontSize: "0.65rem", color: "var(--gab-text-muted)", marginTop: 1 }}>
-                        Lendo QR Code de {qrAutoProgress.total} gabarito(s) — aguarde, pode levar alguns segundos
+                        {/* PA7: estimativa de tempo baseada na quantidade de arquivos */}
+                        Lendo QR Code de {qrAutoProgress.total} gabarito(s)
+                        {qrAutoProgress.total > 5
+                          ? ` — estimativa: ~${Math.ceil(qrAutoProgress.total * 7 / 60)} min`
+                          : " — aguarde alguns segundos"}
                       </div>
                     </div>
                   </>

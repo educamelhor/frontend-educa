@@ -1,45 +1,45 @@
 // src/features/plataforma/PlataformaModulos.jsx
 // ============================================================================
-// CEO Module Licensing ÔÇö define which menus each school can access
+// CEO Module Licensing — define which menus each school can access
 // Two-panel: left = school list | right = module tree toggles
 // ============================================================================
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../../services/api';
 
-// ÔöÇÔöÇ Full module tree ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+// ── Full module tree ──────────────────────────────────────────────────────────
 const MODULOS_TREE = [
   {
-    id: 'secretaria', label: 'Secretaria', icon: '­ƒôï',
+    id: 'secretaria', label: 'Secretaria', icon: '📋',
     filhos: [
       { id: 'secretaria.alunos', label: 'Alunos' },
-      { id: 'secretaria.responsaveis', label: 'Respons├íveis' },
-      { id: 'secretaria.cargas_horarias', label: 'Cargas Hor├írias' },
+      { id: 'secretaria.responsaveis', label: 'Responsáveis' },
+      { id: 'secretaria.cargas_horarias', label: 'Cargas Horárias' },
       { id: 'secretaria.disciplinas', label: 'Disciplinas' },
       { id: 'secretaria.turmas', label: 'Turmas' },
       { id: 'secretaria.professores', label: 'Professores' },
-      { id: 'secretaria.boletim', label: 'Boletim (Edi├º├úo)' },
-      { id: 'secretaria.relatorios', label: 'Relat├│rios' },
-      { id: 'secretaria.horarios', label: 'Hor├írios' },
+      { id: 'secretaria.boletim', label: 'Boletim (Edição)' },
+      { id: 'secretaria.relatorios', label: 'Relatórios' },
+      { id: 'secretaria.horarios', label: 'Horários' },
       { id: 'secretaria.agente', label: 'Agente' },
-      { id: 'secretaria.tabela_codigos', label: 'Tabela de C├│digos' },
+      { id: 'secretaria.tabela_codigos', label: 'Tabela de Códigos' },
       { id: 'secretaria.sincronizar_seedf', label: 'Sincronizar SEEDF' },
-      { id: 'secretaria.modulacao', label: 'Modula├º├úo' },
+      { id: 'secretaria.modulacao', label: 'Modulação' },
     ]
   },
-  // ÔöÇÔöÇ DISCIPLINAR: m├│dulo reservado ÔÇö sempre ativo para perfis militares.
-  // O CEO n├úo gerencia este m├│dulo. Omitido intencionalmente da lista.
+  // ── DISCIPLINAR: módulo reservado — sempre ativo para perfis militares.
+  // O CEO não gerencia este módulo. Omitido intencionalmente da lista.
   {
-    id: 'pedagogico', label: 'Pedag├│gico', icon: '­ƒÄô',
+    id: 'pedagogico', label: 'Pedagógico', icon: '🎓',
     filhos: [
       { id: 'pedagogico.conselho', label: 'Conselho de Classe' },
-      { id: 'pedagogico.conteudos', label: 'Conte├║dos' },
-      { id: 'pedagogico.relatorios', label: 'Relat├│rios' },
-      { id: 'pedagogico.correcoes', label: 'Corre├º├Áes' },
+      { id: 'pedagogico.conteudos', label: 'Conteúdos' },
+      { id: 'pedagogico.relatorios', label: 'Relatórios' },
+      { id: 'pedagogico.correcoes', label: 'Correções' },
     ]
   },
 
   {
-    id: 'gabarito', label: 'Gabarito', icon: 'Ô£à',
+    id: 'gabarito', label: 'Gabarito', icon: '✅',
     filhos: [
       { id: 'gabarito.gerar', label: 'Gerar / Imprimir' },
       { id: 'gabarito.corrigir_lote', label: 'Corrigir Lote' },
@@ -48,19 +48,19 @@ const MODULOS_TREE = [
     ]
   },
   {
-    id: 'frequencia', label: 'Frequ├¬ncia', icon: '­ƒôà',
+    id: 'frequencia', label: 'Frequência', icon: '📅',
     filhos: [
       { id: 'frequencia.atestados', label: 'Atestados' },
-      { id: 'frequencia.relatorios', label: 'Relat├│rios' },
+      { id: 'frequencia.relatorios', label: 'Relatórios' },
       { id: 'frequencia.busca_ativa', label: 'Busca Ativa' },
       { id: 'frequencia.conselho_tutelar', label: 'Conselho Tutelar' },
     ]
   },
   {
-    id: 'biblioteca', label: 'Biblioteca', icon: '­ƒôÜ',
+    id: 'biblioteca', label: 'Biblioteca', icon: '📚',
     filhos: [
       { id: 'biblioteca.acervo', label: 'Acervo' },
-      { id: 'biblioteca.emprestimos', label: 'Empr├®stimos' },
+      { id: 'biblioteca.emprestimos', label: 'Empréstimos' },
       { id: 'biblioteca.alunos', label: 'Alunos Leitores' },
       { id: 'biblioteca.leitor_destaque', label: 'Leitor Destaque' },
       { id: 'biblioteca.concurso', label: 'Ranking & Concurso' },
@@ -68,18 +68,18 @@ const MODULOS_TREE = [
     ]
   },
   {
-    id: 'professores', label: 'Professores', icon: '­ƒæ®­ƒÅ½',
+    id: 'professores', label: 'Professores', icon: '👩🏫',
     filhos: [
       { id: 'professores.planos', label: 'Planos' },
-      { id: 'professores.avaliacoes', label: 'Avalia├º├Áes' },
-      { id: 'professores.conteudos', label: 'Conte├║dos' },
+      { id: 'professores.avaliacoes', label: 'Avaliações' },
+      { id: 'professores.conteudos', label: 'Conteúdos' },
       { id: 'professores.provas', label: 'Provas' },
       { id: 'professores.conselho', label: 'Conselho de Classe' },
       { id: 'professores.boletim', label: 'Boletim Manual' },
     ]
   },
   {
-    id: 'monitoramento', label: 'Monitoramento', icon: '­ƒôí',
+    id: 'monitoramento', label: 'Monitoramento', icon: '📡',
     filhos: [
       { id: 'monitoramento.painel', label: 'Painel' },
       { id: 'monitoramento.alertas', label: 'Alertas' },
@@ -87,11 +87,11 @@ const MODULOS_TREE = [
     ]
   },
   {
-    id: 'questoes', label: 'Banco de Quest├Áes', icon: 'ÔØô',
+    id: 'questoes', label: 'Banco de Questões', icon: '❓',
     filhos: []
   },
   {
-    id: 'agente_educa', label: 'Agente EDUCA', icon: '­ƒñû',
+    id: 'agente_educa', label: 'Agente EDUCA', icon: '🤖',
     filhos: [
       { id: 'agente_educa.credenciais', label: 'Credenciais' },
       { id: 'agente_educa.planos', label: 'Planos' },
@@ -99,7 +99,7 @@ const MODULOS_TREE = [
     ]
   },
   {
-    id: 'impressao', label: 'Impress├úo', icon: '­ƒû¿´©Å',
+    id: 'impressao', label: 'Impressão', icon: '🖨️',
     filhos: [
       { id: 'impressao.gabaritos', label: 'Gabaritos' },
       { id: 'impressao.boletins', label: 'Boletins' },
@@ -108,21 +108,21 @@ const MODULOS_TREE = [
     ]
   },
   {
-    id: 'ferramentas', label: 'Ferramentas', icon: '­ƒöº',
+    id: 'ferramentas', label: 'Ferramentas', icon: '🔧',
     filhos: []
   },
   {
-    id: 'direcao', label: 'Dire├º├úo', icon: '­ƒÅø´©Å',
+    id: 'direcao', label: 'Direção', icon: '🏛️',
     filhos: [
       { id: 'direcao.educa_capture', label: 'Educa-Capture' },
-      { id: 'direcao.responsaveis', label: 'Respons├íveis' },
+      { id: 'direcao.responsaveis', label: 'Responsáveis' },
       { id: 'direcao.cadastro', label: 'Cadastro de Membros' },
-      { id: 'direcao.governanca', label: 'Governan├ºa' },
+      { id: 'direcao.governanca', label: 'Governança' },
     ]
   },
 ];
 
-// ÔöÇÔöÇ Group accent colors (cycle) ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+// ── Group accent colors (cycle) ───────────────────────────────────────────────
 const GROUP_COLORS = [
   { accent: '#6366f1', bg: 'rgba(99,102,241,0.06)' },
   { accent: '#3b82f6', bg: 'rgba(59,130,246,0.06)' },
@@ -133,12 +133,12 @@ const GROUP_COLORS = [
   { accent: '#14b8a6', bg: 'rgba(20,184,166,0.06)' },
 ];
 
-// ÔöÇÔöÇ Total leaf count ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+// ── Total leaf count ──────────────────────────────────────────────────────────
 const TOTAL_MODULOS = MODULOS_TREE.reduce((acc, g) =>
   acc + (g.filhos.length > 0 ? g.filhos.length : 1), 0
 );
 
-// ÔöÇÔöÇ Helpers ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function getGroupState(grupo, ativos) {
   if (grupo.filhos.length === 0) {
     return ativos.has(grupo.id) ? 'all' : 'none';
@@ -161,7 +161,7 @@ function getGroupBorder(state, accent) {
   return 'rgba(255,255,255,0.06)';
 }
 
-// ÔöÇÔöÇ Toggle switch ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+// ── Toggle switch ─────────────────────────────────────────────────────────────
 function ToggleSwitch({ isActive, onClick, size = 'md' }) {
   const [hover, setHover] = useState(false);
   const w = size === 'sm' ? 38 : 44;
@@ -206,7 +206,7 @@ function ToggleSwitch({ isActive, onClick, size = 'md' }) {
   );
 }
 
-// ÔöÇÔöÇ Copy modal ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+// ── Copy modal ────────────────────────────────────────────────────────────────
 function CopyModal({ escolas, escolaAtual, onConfirm, onClose }) {
   const [origemId, setOrigemId] = useState('');
   const [confirmHover, setConfirmHover] = useState(false);
@@ -233,18 +233,18 @@ function CopyModal({ escolas, escolaAtual, onConfirm, onClose }) {
         boxShadow: '0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(99,102,241,0.15)',
         animation: 'slideUp 0.3s cubic-bezier(0.4,0,0.2,1)',
       }}>
-        <div style={{ fontSize: '2.5rem', textAlign: 'center', marginBottom: 12 }}>­ƒôï</div>
+        <div style={{ fontSize: '2.5rem', textAlign: 'center', marginBottom: 12 }}>📋</div>
         <h3 style={{
           fontSize: '1.2rem', fontWeight: 800, color: '#f1f5f9',
           textAlign: 'center', marginBottom: 8,
         }}>
-          Copiar configura├º├úo
+          Copiar configuração
         </h3>
         <p style={{
           fontSize: '0.85rem', color: 'rgba(148,163,184,0.8)',
           textAlign: 'center', marginBottom: 28, lineHeight: 1.6,
         }}>
-          Selecione a escola de origem. Isso substituir├í a configura├º├úo atual de{' '}
+          Selecione a escola de origem. Isso substituirá a configuração atual de{' '}
           <strong style={{ color: '#f1f5f9' }}>{escolaAtual?.nome}</strong>.
         </p>
 
@@ -268,7 +268,7 @@ function CopyModal({ escolas, escolaAtual, onConfirm, onClose }) {
               cursor: 'pointer',
             }}
           >
-            <option value="">ÔÇö Selecione uma escola ÔÇö</option>
+            <option value="">— Selecione uma escola —</option>
             {origens.map(e => (
               <option key={e.id} value={e.id} style={{ background: '#1e293b' }}>
                 {e.nome} {e.apelido ? `(${e.apelido})` : ''}
@@ -285,7 +285,7 @@ function CopyModal({ escolas, escolaAtual, onConfirm, onClose }) {
             border: '1px solid rgba(245,158,11,0.2)',
             fontSize: '0.82rem', color: '#fbbf24', lineHeight: 1.5,
           }}>
-            ÔÜá´©Å A configura├º├úo atual de <strong>{escolaAtual?.nome}</strong> ser├í <strong>substitu├¡da</strong> pelos m├│dulos de <strong>{origem?.nome}</strong>.
+            ⚠️ A configuração atual de <strong>{escolaAtual?.nome}</strong> será <strong>substituída</strong> pelos módulos de <strong>{origem?.nome}</strong>.
           </div>
         )}
 
@@ -332,7 +332,7 @@ function CopyModal({ escolas, escolaAtual, onConfirm, onClose }) {
   );
 }
 
-// ÔöÇÔöÇ Module Group Card ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+// ── Module Group Card ─────────────────────────────────────────────────────────
 function ModuloGrupo({ grupo, colorDef, ativos, onToggle, expandido, onToggleExpand }) {
   const [hoverGroup, setHoverGroup] = useState(false);
   const groupState = getGroupState(grupo, ativos);
@@ -375,7 +375,7 @@ function ModuloGrupo({ grupo, colorDef, ativos, onToggle, expandido, onToggleExp
             transition: 'transform 0.2s',
             transform: expandido ? 'rotate(90deg)' : 'rotate(0deg)',
             display: 'inline-block',
-          }}>ÔûÂ</span>
+          }}>▶</span>
         ) : (
           <span style={{ width: 12 }} />
         )}
@@ -422,7 +422,7 @@ function ModuloGrupo({ grupo, colorDef, ativos, onToggle, expandido, onToggleExp
           border: `1px solid ${accent}30`,
           whiteSpace: 'nowrap',
         }}>
-          {groupState === 'all' ? 'Ô£ô ATIVO' : groupState === 'some' ? 'ÔùÉ PARCIAL' : 'Ôùï OFF'}
+          {groupState === 'all' ? '✓ ATIVO' : groupState === 'some' ? '◐ PARCIAL' : '○ OFF'}
         </div>
 
         {/* Group toggle */}
@@ -459,7 +459,7 @@ function ModuloGrupo({ grupo, colorDef, ativos, onToggle, expandido, onToggleExp
                   color: isOn ? accent : 'rgba(148,163,184,0.25)',
                   transition: 'color 0.2s',
                 }}>
-                  {isLast ? 'ÔööÔöÇ' : 'Ôö£ÔöÇ'}
+                  {isLast ? '└─' : '├─'}
                 </span>
 
                 <span style={{
@@ -493,7 +493,7 @@ function ModuloGrupo({ grupo, colorDef, ativos, onToggle, expandido, onToggleExp
   );
 }
 
-// ÔöÇÔöÇ School Status Badge ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+// ── School Status Badge ───────────────────────────────────────────────────────
 function StatusBadge({ status }) {
   const cfg = {
     ativa:     { bg: 'rgba(16,185,129,0.15)', color: '#10b981', label: 'Ativa',     dot: '#10b981' },
@@ -516,10 +516,11 @@ function StatusBadge({ status }) {
 }
 
 // ── Lista de perfis gerenciáveis pelo CEO (militares fixos não entram) ────────
-// 'diretor' está aqui para permitir config explicitamente pelo CEO.
-// No backend: Diretor recebe a UNIÃO de todos os perfis configurados em escola_perfil_modulos.
+// 'diretor' incluído para permitir configuração explícita pelo CEO.
+// No backend, o Diretor recebe a UNIÃO de todos os perfis configurados em escola_perfil_modulos.
 const PERFIS_LISTA = [
-  { key: 'diretor',               label: 'Diretor Pedagógico' },
+  { key: 'diretor',               label: 'Diretor Pedagógico' }, // essencial para escolas CCMDF
+  { key: 'vice_diretor',          label: 'Vice-Diretor' },
   { key: 'professor',             label: 'Professor' },
   { key: 'coordenador',           label: 'Coordenador' },
   { key: 'supervisor',            label: 'Supervisor' },
@@ -531,17 +532,16 @@ const PERFIS_LISTA = [
   { key: 'biblioteca',            label: 'Biblioteca' },
   { key: 'educador_social',       label: 'Educador Social' },
   { key: 'merenda',               label: 'Merenda' },
-  { key: 'psicologo',             label: 'Psic├│logo' },
-  { key: 'responsavel',           label: 'Respons├ível' },
-  { key: 'vice_diretor',          label: 'Vice-Diretor' },
-  { key: 'vigilancia',            label: 'Vigil├óncia' },
+  { key: 'psicologo',             label: 'Psicólogo' },
+  { key: 'responsavel',           label: 'Responsável' },
+  { key: 'vigilancia',            label: 'Vigilância' },
   { key: 'visitante',             label: 'Visitante' },
   { key: 'subcomandante',         label: 'Subcomandante' },
   { key: 'supervisor_disciplinar',label: 'Supervisor Disciplinar' },
   { key: 'monitor_disciplinar',   label: 'Monitor Disciplinar' },
 ];
 
-// ÔöÇÔöÇ Main Component ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+// ── Main Component ────────────────────────────────────────────────────────────
 export default function PlataformaModulos() {
   const [escolas, setEscolas] = useState([]);
   const [escolaId, setEscolaId] = useState(null);
@@ -561,11 +561,11 @@ export default function PlataformaModulos() {
   const [error, setError] = useState(null);
   const [copyError, setCopyError] = useState(null);
 
-  // ÔöÇÔöÇ Manutens├úo Programada ÔöÇÔöÇ
+  // ── Manutensão Programada ──
   const [manutData, setManutData] = useState(null);
   const [manutInicio, setManutInicio] = useState('');
   const [manutFim, setManutFim] = useState('');
-  const [manutMsg, setManutMsg] = useState('O sistema est├í em manuten├º├úo programada.');
+  const [manutMsg, setManutMsg] = useState('O sistema está em manutenção programada.');
   const [manutSaving, setManutSaving] = useState(false);
   const [manutError, setManutError] = useState(null);
   const [showManutConfirm, setShowManutConfirm] = useState(false);
@@ -573,7 +573,7 @@ export default function PlataformaModulos() {
   // Count active modules per school (for the left panel display)
   const [schoolModulosCounts, setSchoolModulosCounts] = useState({});
 
-  // ÔöÇÔöÇ Load school list ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+  // ── Load school list ────────────────────────────────────────────────────────
   const fetchEscolas = useCallback(async () => {
     setSchoolLoading(true);
     try {
@@ -589,7 +589,7 @@ export default function PlataformaModulos() {
 
   useEffect(() => { fetchEscolas(); }, [fetchEscolas]);
 
-  // ÔöÇÔöÇ Fetch manuten├º├úo status ÔöÇÔöÇ
+  // ── Fetch manutenção status ──
   const [manutEncerrada, setManutEncerrada] = useState(false);
   const manutAnteriorRef = React.useRef(null);
 
@@ -597,7 +597,7 @@ export default function PlataformaModulos() {
     try {
       const { data } = await api.get('/api/plataforma/manutencao');
       const novo = data?.manutencao || null;
-      // Detecta transi├º├úo: era ativa ÔåÆ agora null (expirou)
+      // Detecta transição: era ativa → agora null (expirou)
       if (manutAnteriorRef.current && !novo) {
         setManutEncerrada(true);
         setTimeout(() => setManutEncerrada(false), 8000);
@@ -609,7 +609,7 @@ export default function PlataformaModulos() {
 
   useEffect(() => { fetchManutencao(); }, [fetchManutencao]);
 
-  // Auto-refresh a cada 30s quando manuten├º├úo est├í ativa
+  // Auto-refresh a cada 30s quando manutenção está ativa
   useEffect(() => {
     if (!manutData) return;
     const interval = setInterval(fetchManutencao, 30000);
@@ -617,10 +617,10 @@ export default function PlataformaModulos() {
   }, [manutData, fetchManutencao]);
 
   const handleAtivarManutencao = () => {
-    if (!manutInicio || !manutFim) { setManutError('Informe in├¡cio e fim.'); return; }
+    if (!manutInicio || !manutFim) { setManutError('Informe início e fim.'); return; }
     const dtInicio = new Date(manutInicio);
     const dtFim = new Date(manutFim);
-    if (dtFim <= dtInicio) { setManutError("'Fim' deve ser posterior a 'In├¡cio'."); return; }
+    if (dtFim <= dtInicio) { setManutError("'Fim' deve ser posterior a 'Início'."); return; }
     setManutError(null);
     setShowManutConfirm(true);
   };
@@ -630,7 +630,7 @@ export default function PlataformaModulos() {
     setManutSaving(true); setManutError(null);
     try {
       await api.post('/api/plataforma/manutencao', {
-        // datetime-local d├í hor├írio local (Bras├¡lia) ÔÇö converte para UTC ISO
+        // datetime-local dá horário local (Brasília) — converte para UTC ISO
         inicio: new Date(manutInicio).toISOString(),
         fim: new Date(manutFim).toISOString(),
         mensagem: manutMsg,
@@ -638,7 +638,7 @@ export default function PlataformaModulos() {
       await fetchManutencao();
       setManutInicio(''); setManutFim('');
     } catch (err) {
-      setManutError(err.response?.data?.message || 'Erro ao ativar manuten├º├úo.');
+      setManutError(err.response?.data?.message || 'Erro ao ativar manutenção.');
     } finally { setManutSaving(false); }
   };
 
@@ -652,7 +652,7 @@ export default function PlataformaModulos() {
     } finally { setManutSaving(false); }
   };
 
-  // ÔöÇÔöÇ Load modules for a school (+ optional perfil) ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+  // ── Load modules for a school (+ optional perfil) ─────────────────────────
   const fetchModulos = useCallback(async (id, perfil) => {
     if (!id) return;
     setLoading(true);
@@ -667,14 +667,14 @@ export default function PlataformaModulos() {
         list.filter(m => m.ativo).map(m => m.modulo)
       );
 
-      // ÔöÇÔöÇ Normalizar estado: se filho est├í ativo, pai DEVE estar ativo ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+      // ── Normalizar estado: se filho está ativo, pai DEVE estar ativo ──────
       MODULOS_TREE.forEach(grupo => {
         if (grupo.filhos.length > 0) {
           const algumFilhoAtivo = grupo.filhos.some(f => ativos.has(f.id));
           if (algumFilhoAtivo) ativos.add(grupo.id);
         }
       });
-      // ÔöÇÔöÇ Dire├º├úo inversa: pai ativo mas nenhum filho ÔåÆ desativa pai ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+      // ── Direção inversa: pai ativo mas nenhum filho → desativa pai ────────
       MODULOS_TREE.forEach(grupo => {
         if (grupo.filhos.length > 0 && ativos.has(grupo.id)) {
           const algumFilhoAtivo = grupo.filhos.some(f => ativos.has(f.id));
@@ -687,8 +687,8 @@ export default function PlataformaModulos() {
         setSchoolModulosCounts(prev => ({ ...prev, [id]: ativos.size }));
       }
     } catch (err) {
-      console.error('[PlataformaModulos] erro ao buscar m├│dulos:', err);
-      setError('N├úo foi poss├¡vel carregar os m├│dulos.');
+      console.error('[PlataformaModulos] erro ao buscar módulos:', err);
+      setError('Não foi possível carregar os módulos.');
       setModulosAtivos(new Set());
     } finally {
       setLoading(false);
@@ -712,7 +712,7 @@ export default function PlataformaModulos() {
     if (escolaId) fetchModulos(escolaId, perfil);
   }, [perfilSel, escolaId, fetchModulos]);
 
-  // ÔöÇÔöÇ Toggle logic ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+  // ── Toggle logic ────────────────────────────────────────────────────────────
   const handleToggle = useCallback((id, type, grupo) => {
     setSaved(false);
     setModulosAtivos(prev => {
@@ -729,13 +729,13 @@ export default function PlataformaModulos() {
           return next;
         }
 
-        // Usa estado REAL do pai no Set (n├úo depende se todos filhos est├úo on)
+        // Usa estado REAL do pai no Set (não depende se todos filhos estão on)
         if (next.has(id)) {
-          // Pai estava ON ÔåÆ desliga tudo
+          // Pai estava ON → desliga tudo
           g.filhos.forEach(f => next.delete(f.id));
           next.delete(id);
         } else {
-          // Pai estava OFF ÔåÆ liga tudo
+          // Pai estava OFF → liga tudo
           g.filhos.forEach(f => next.add(f.id));
           next.add(id);
         }
@@ -745,21 +745,21 @@ export default function PlataformaModulos() {
       // Child toggle
       if (next.has(id)) {
         next.delete(id);
-        // Pai s├│ desativa quando TODOS os filhos estiverem off
+        // Pai só desativa quando TODOS os filhos estiverem off
         if (grupo) {
           const anyOn = grupo.filhos.some(f => f.id !== id && next.has(f.id));
           if (!anyOn) next.delete(grupo.id);
         }
       } else {
         next.add(id);
-        // Filho ativo ÔåÆ pai ativa automaticamente (sem pai renderizado, filho ├® inacess├¡vel)
+        // Filho ativo → pai ativa automaticamente (sem pai renderizado, filho é inacessível)
         if (grupo) next.add(grupo.id);
       }
       return next;
     });
   }, []);
 
-  // ÔöÇÔöÇ Activate / Deactivate All ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+  // ── Activate / Deactivate All ───────────────────────────────────────────────
   const activarTodos = useCallback(() => {
     setSaved(false);
     const all = new Set();
@@ -775,7 +775,7 @@ export default function PlataformaModulos() {
     setModulosAtivos(new Set());
   }, []);
 
-  // ÔöÇÔöÇ Toggle expand group ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+  // ── Toggle expand group ─────────────────────────────────────────────────────
   const toggleExpand = useCallback((id) => {
     setExpandidos(prev => {
       const next = new Set(prev);
@@ -785,7 +785,7 @@ export default function PlataformaModulos() {
     });
   }, []);
 
-  // ÔöÇÔöÇ Save (por perfil quando perfilSel definido) ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+  // ── Save (por perfil quando perfilSel definido) ────────────────────────────
   const salvar = useCallback(async () => {
     if (!escolaId) return;
     if (!perfilSel) { setError('Selecione um perfil antes de salvar.'); return; }
@@ -814,7 +814,7 @@ export default function PlataformaModulos() {
     }
   }, [escolaId, perfilSel, modulosAtivos]);
 
-  // ÔöÇÔöÇ Copy from another school (por perfil) ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+  // ── Copy from another school (por perfil) ──────────────────────────────────
   const copiarDe = useCallback(async (origemId) => {
     if (!escolaId || !perfilSel) return;
     setShowCopyModal(false);
@@ -826,13 +826,13 @@ export default function PlataformaModulos() {
       setSaved(false);
     } catch (err) {
       console.error('[PlataformaModulos] erro ao copiar:', err);
-      setCopyError('Erro ao copiar configura├º├úo. Tente novamente.');
+      setCopyError('Erro ao copiar configuração. Tente novamente.');
     } finally {
       setLoading(false);
     }
   }, [escolaId, perfilSel, fetchModulos]);
 
-  // ÔöÇÔöÇ Derived values ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+  // ── Derived values ──────────────────────────────────────────────────────────
   const escolaSelecionada = escolas.find(e => e.id === escolaId) || null;
   const escolasFiltradas = escolas.filter(e =>
     !search || e.nome?.toLowerCase().includes(search.toLowerCase()) ||
@@ -841,7 +841,7 @@ export default function PlataformaModulos() {
 
   const countAtivos = modulosAtivos.size;
 
-  // ÔöÇÔöÇ Styles ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+  // ── Styles ──────────────────────────────────────────────────────────────────
   const S = {
     page: {
       width: '100%', minHeight: '100vh',
@@ -891,7 +891,7 @@ export default function PlataformaModulos() {
       display: 'flex', gap: 0,
       minHeight: 'calc(100vh - 200px)',
     },
-    // ÔöÇÔöÇ LEFT PANEL ÔöÇÔöÇ
+    // ── LEFT PANEL ──
     leftPanel: {
       width: 320, flexShrink: 0,
       background: 'rgba(255,255,255,0.02)',
@@ -916,7 +916,7 @@ export default function PlataformaModulos() {
       color: '#f1f5f9', outline: 'none',
       boxSizing: 'border-box',
     },
-    // ÔöÇÔöÇ RIGHT PANEL ÔöÇÔöÇ
+    // ── RIGHT PANEL ──
     rightPanel: {
       flex: 1, overflowY: 'auto',
       padding: '28px 36px',
@@ -924,7 +924,7 @@ export default function PlataformaModulos() {
     },
   };
 
-  // ÔöÇÔöÇ Spinner ÔöÇÔöÇ
+  // ── Spinner ──
   const Spinner = ({ size = 32 }) => (
     <div style={{
       width: size, height: size,
@@ -957,27 +957,27 @@ export default function PlataformaModulos() {
         select option { background: #1e293b; color: #f1f5f9; }
       `}</style>
 
-      {/* ÔòÉÔòÉÔòÉÔòÉ HERO ÔòÉÔòÉÔòÉÔòÉ */}
+      {/* ════ HERO ════ */}
       <div style={S.hero}>
         <div style={S.heroBg1} />
         <div style={S.heroBg2} />
         <div style={S.heroInner}>
           <div>
             <div style={S.badge}>
-              <span>­ƒöÉ</span> CEO ┬À Licenciamento de M├│dulos
+              <span>🔐</span> CEO · Licenciamento de Módulos
             </div>
             <div style={S.heroTitle}>
-              M├│dulos por Escola
+              Módulos por Escola
               <br />
               <span style={{
                 backgroundImage: 'linear-gradient(90deg, #34d399, #6366f1)',
                 WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
               }}>
-                Configura├º├úo de Acesso
+                Configuração de Acesso
               </span>
             </div>
             <div style={S.heroSubtitle}>
-              {schoolLoading ? 'Carregando escolas...' : `${escolas.length} escola${escolas.length !== 1 ? 's' : ''} cadastrada${escolas.length !== 1 ? 's' : ''} ┬À ${TOTAL_MODULOS} m├│dulos dispon├¡veis`}
+              {schoolLoading ? 'Carregando escolas...' : `${escolas.length} escola${escolas.length !== 1 ? 's' : ''} cadastrada${escolas.length !== 1 ? 's' : ''} · ${TOTAL_MODULOS} módulos disponíveis`}
             </div>
           </div>
 
@@ -998,14 +998,14 @@ export default function PlataformaModulos() {
             }}
           >
             <span style={{ animation: schoolLoading ? 'spin 0.8s linear infinite' : 'none', display: 'inline-block' }}>
-              ­ƒöä
+              🔄
             </span>
             {schoolLoading ? 'Atualizando...' : 'Atualizar'}
           </button>
         </div>
       </div>
 
-      {/* ÔòÉÔòÉÔòÉÔòÉ MANUTEN├ç├âO PROGRAMADA ÔòÉÔòÉÔòÉÔòÉ */}
+      {/* ════ MANUTENÇÃO PROGRAMADA ════ */}
       <div style={{
         margin: '0 0 24px 0',
         padding: '20px 28px',
@@ -1017,8 +1017,8 @@ export default function PlataformaModulos() {
       }}>
         {/* Header row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: manutData ? 14 : 0 }}>
-          <span style={{ fontSize: '1.4rem' }}>­ƒöº</span>
-          <span style={{ fontWeight: 700, fontSize: '1rem', color: '#f1f5f9' }}>Manuten├º├úo Programada</span>
+          <span style={{ fontSize: '1.4rem' }}>🔧</span>
+          <span style={{ fontWeight: 700, fontSize: '1rem', color: '#f1f5f9' }}>Manutenção Programada</span>
           {manutData && (
             <span style={{
               padding: '3px 10px', borderRadius: 20, fontSize: '0.6rem', fontWeight: 800,
@@ -1027,7 +1027,7 @@ export default function PlataformaModulos() {
               color: manutData.em_andamento ? '#f87171' : '#fbbf24',
               border: `1px solid ${manutData.em_andamento ? 'rgba(239,68,68,0.3)' : 'rgba(245,158,11,0.3)'}`,
             }}>
-              {manutData.em_andamento ? 'ÔùÅ Em andamento' : 'Ôùæ Agendada'}
+              {manutData.em_andamento ? '● Em andamento' : '◑ Agendada'}
             </span>
           )}
           {!manutData && (
@@ -1037,7 +1037,7 @@ export default function PlataformaModulos() {
               background: 'rgba(16,185,129,0.12)', color: '#34d399',
               border: '1px solid rgba(16,185,129,0.2)',
             }}>
-              ÔùÅ Sistema Normal
+              ● Sistema Normal
             </span>
           )}
           {manutEncerrada && (
@@ -1047,7 +1047,7 @@ export default function PlataformaModulos() {
               border: '1px solid rgba(16,185,129,0.25)',
               animation: 'fadeIn 0.4s ease',
             }}>
-              Ô£à Manuten├º├úo encerrada ÔÇö usu├írios com acesso restaurado
+              ✅ Manutenção encerrada — usuários com acesso restaurado
             </span>
           )}
         </div>
@@ -1056,9 +1056,9 @@ export default function PlataformaModulos() {
         {manutData ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap' }}>
             <div style={{ flex: 1, minWidth: 200 }}>
-              <div style={{ fontSize: '0.8rem', color: 'rgba(148,163,184,0.7)', marginBottom: 4 }}>Per├¡odo</div>
+              <div style={{ fontSize: '0.8rem', color: 'rgba(148,163,184,0.7)', marginBottom: 4 }}>Período</div>
               <div style={{ fontSize: '0.9rem', color: '#f1f5f9', fontWeight: 600 }}>
-                {new Date(manutData.inicio).toLocaleString('pt-BR', {timeZone:'America/Sao_Paulo'})} ÔåÆ{' '}
+                {new Date(manutData.inicio).toLocaleString('pt-BR', {timeZone:'America/Sao_Paulo'})} →{' '}
                 {new Date(manutData.fim).toLocaleString('pt-BR', {timeZone:'America/Sao_Paulo'})}
               </div>
               {manutData.mensagem && (
@@ -1079,14 +1079,14 @@ export default function PlataformaModulos() {
                 boxShadow: '0 4px 16px rgba(239,68,68,0.3)',
               }}
             >
-              {manutSaving ? 'Cancelando...' : 'Ô£ò Cancelar Manuten├º├úo'}
+              {manutSaving ? 'Cancelando...' : '✕ Cancelar Manutenção'}
             </button>
           </div>
         ) : (
           /* Form to activate */
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'flex-end', marginTop: 16 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 180px' }}>
-              <label style={{ fontSize: '0.65rem', fontWeight: 700, color: 'rgba(148,163,184,0.6)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>In├¡cio</label>
+              <label style={{ fontSize: '0.65rem', fontWeight: 700, color: 'rgba(148,163,184,0.6)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Início</label>
               <input
                 type="datetime-local"
                 value={manutInicio}
@@ -1117,7 +1117,7 @@ export default function PlataformaModulos() {
                 type="text"
                 value={manutMsg}
                 onChange={e => setManutMsg(e.target.value)}
-                placeholder="Mensagem para os usu├írios"
+                placeholder="Mensagem para os usuários"
                 style={{
                   padding: '10px 12px', borderRadius: 10, fontSize: '0.85rem',
                   background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
@@ -1138,7 +1138,7 @@ export default function PlataformaModulos() {
                 flexShrink: 0,
               }}
             >
-              {manutSaving ? 'Ativando...' : '­ƒÜÇ Ativar Manuten├º├úo'}
+              {manutSaving ? 'Ativando...' : '🚀 Ativar Manutenção'}
             </button>
           </div>
         )}
@@ -1152,7 +1152,7 @@ export default function PlataformaModulos() {
         )}
       </div>
 
-      {/* ÔòÉÔòÉÔòÉÔòÉ MODAL CONFIRMA├ç├âO MANUTEN├ç├âO ÔòÉÔòÉÔòÉÔòÉ */}
+      {/* ════ MODAL CONFIRMAÇÃO MANUTENÇÃO ════ */}
       {showManutConfirm && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 2000,
@@ -1169,18 +1169,18 @@ export default function PlataformaModulos() {
             boxShadow: '0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(245,158,11,0.15)',
             animation: 'slideUp 0.3s cubic-bezier(0.4,0,0.2,1)',
           }}>
-            <div style={{ fontSize: '2.5rem', textAlign: 'center', marginBottom: 12 }}>­ƒöº</div>
+            <div style={{ fontSize: '2.5rem', textAlign: 'center', marginBottom: 12 }}>🔧</div>
             <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#f1f5f9', textAlign: 'center', marginBottom: 6 }}>
-              Confirmar Manuten├º├úo
+              Confirmar Manutenção
             </h3>
             <p style={{ fontSize: '0.82rem', color: 'rgba(148,163,184,0.8)', textAlign: 'center', marginBottom: 24, lineHeight: 1.6 }}>
               {new Date(manutInicio) <= new Date()
-                ? 'A manuten├º├úo ser├í ativada IMEDIATAMENTE.'
-                : 'A manuten├º├úo ser├í ativada no hor├írio agendado.'}
+                ? 'A manutenção será ativada IMEDIATAMENTE.'
+                : 'A manutenção será ativada no horário agendado.'}
             </p>
             <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)', borderRadius: 12, padding: '14px 18px', marginBottom: 24, fontSize: '0.82rem', color: '#fbbf24', lineHeight: 1.7 }}>
-              <div><strong>In├¡cio:</strong> {manutInicio ? new Date(manutInicio).toLocaleString('pt-BR', {timeZone:'America/Sao_Paulo'}) : 'ÔÇö'}</div>
-              <div><strong>Fim:</strong> {manutFim ? new Date(manutFim).toLocaleString('pt-BR', {timeZone:'America/Sao_Paulo'}) : 'ÔÇö'}</div>
+              <div><strong>Início:</strong> {manutInicio ? new Date(manutInicio).toLocaleString('pt-BR', {timeZone:'America/Sao_Paulo'}) : '—'}</div>
+              <div><strong>Fim:</strong> {manutFim ? new Date(manutFim).toLocaleString('pt-BR', {timeZone:'America/Sao_Paulo'}) : '—'}</div>
               <div><strong>Mensagem:</strong> "{manutMsg}"</div>
             </div>
             <div style={{ display: 'flex', gap: 12 }}>
@@ -1204,17 +1204,17 @@ export default function PlataformaModulos() {
                   cursor: 'pointer', boxShadow: '0 8px 24px rgba(245,158,11,0.3)',
                 }}
               >
-                ­ƒÜÇ Confirmar e Ativar
+                🚀 Confirmar e Ativar
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ÔòÉÔòÉÔòÉÔòÉ TWO-PANEL BODY ÔòÉÔòÉÔòÉÔòÉ */}
+      {/* ════ TWO-PANEL BODY ════ */}
       <div style={S.body}>
 
-        {/* ÔöÇÔöÇ LEFT: School List ÔöÇÔöÇ */}
+        {/* ── LEFT: School List ── */}
         <div style={S.leftPanel}>
           <div style={S.leftHeader}>
             <div style={{
@@ -1226,7 +1226,7 @@ export default function PlataformaModulos() {
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="­ƒöì  Buscar escola..."
+              placeholder="🔍  Buscar escola..."
               style={S.searchInput}
             />
           </div>
@@ -1316,7 +1316,7 @@ export default function PlataformaModulos() {
                         padding: '2px 8px', borderRadius: 8,
                         border: isSelected ? '1px solid rgba(99,102,241,0.2)' : '1px solid transparent',
                       }}>
-                        {count !== undefined ? `${count}/${TOTAL_MODULOS}` : 'ÔÇö'} m├│d.
+                        {count !== undefined ? `${count}/${TOTAL_MODULOS}` : '—'} mód.
                       </div>
                     </div>
                   </div>
@@ -1326,7 +1326,7 @@ export default function PlataformaModulos() {
           </div>
         </div>
 
-        {/* ÔöÇÔöÇ CENTER: Profile List ÔöÇÔöÇ */}
+        {/* ── CENTER: Profile List ── */}
         <div style={{
           width: 210, flexShrink: 0,
           background: 'rgba(255,255,255,0.02)',
@@ -1402,17 +1402,17 @@ export default function PlataformaModulos() {
           </div>
         </div>
 
-        {/* ÔöÇÔöÇ RIGHT: Module tree ÔöÇÔöÇ */}
+        {/* ── RIGHT: Module tree ── */}
         <div style={S.rightPanel}>
 
-          {/* Empty state ÔÇö sem escola */}
+          {/* Empty state — sem escola */}
           {!escolaId && (
             <div style={{
               display: 'flex', flexDirection: 'column',
               alignItems: 'center', justifyContent: 'center',
               minHeight: 480, textAlign: 'center',
             }}>
-              <div style={{ fontSize: '5rem', marginBottom: 20, filter: 'grayscale(0.3)' }}>­ƒÅ½</div>
+              <div style={{ fontSize: '5rem', marginBottom: 20, filter: 'grayscale(0.3)' }}>🏫</div>
               <div style={{
                 fontSize: '1.3rem', fontWeight: 700, color: 'rgba(226,232,240,0.7)',
                 marginBottom: 12,
@@ -1423,7 +1423,7 @@ export default function PlataformaModulos() {
                 fontSize: '0.9rem', color: 'rgba(148,163,184,0.45)',
                 maxWidth: 340, lineHeight: 1.6,
               }}>
-                Escolha uma escola na lista ├á esquerda e depois um perfil para configurar os m├│dulos.
+                Escolha uma escola na lista à esquerda e depois um perfil para configurar os módulos.
               </div>
               <div style={{
                 marginTop: 32, display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center',
@@ -1451,14 +1451,14 @@ export default function PlataformaModulos() {
             </div>
           )}
 
-          {/* Empty state ÔÇö escola selecionada mas sem perfil */}
+          {/* Empty state — escola selecionada mas sem perfil */}
           {escolaId && !perfilSel && (
             <div style={{
               display: 'flex', flexDirection: 'column',
               alignItems: 'center', justifyContent: 'center',
               minHeight: 480, textAlign: 'center',
             }}>
-              <div style={{ fontSize: '4rem', marginBottom: 20 }}>­ƒæñ</div>
+              <div style={{ fontSize: '4rem', marginBottom: 20 }}>👤</div>
               <div style={{
                 fontSize: '1.2rem', fontWeight: 700, color: 'rgba(226,232,240,0.7)',
                 marginBottom: 12,
@@ -1469,7 +1469,7 @@ export default function PlataformaModulos() {
                 fontSize: '0.88rem', color: 'rgba(148,163,184,0.45)',
                 maxWidth: 320, lineHeight: 1.6,
               }}>
-                Escolha um perfil de usu├írio na coluna central para configurar quais m├│dulos ele ter├í acesso nesta escola.
+                Escolha um perfil de usuário na coluna central para configurar quais módulos ele terá acesso nesta escola.
               </div>
             </div>
           )}
@@ -1489,14 +1489,14 @@ export default function PlataformaModulos() {
                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                     marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap',
                   }}>
-                    {escolaSelecionada?.nome || 'ÔÇö'}
+                    {escolaSelecionada?.nome || '—'}
                     <span style={{
                       background: 'linear-gradient(135deg, rgba(16,185,129,0.2), rgba(5,150,105,0.1))',
                       border: '1px solid rgba(16,185,129,0.35)',
                       color: '#34d399', fontSize: '0.75rem', fontWeight: 700,
                       padding: '3px 10px', borderRadius: 20,
                     }}>
-                      ­ƒæñ {PERFIS_LISTA.find(p => p.key === perfilSel)?.label || perfilSel}
+                      👤 {PERFIS_LISTA.find(p => p.key === perfilSel)?.label || perfilSel}
                     </span>
                   </div>
                   <div style={{
@@ -1510,7 +1510,7 @@ export default function PlataformaModulos() {
                       fontSize: '0.7rem', fontWeight: 800,
                       color: countAtivos > 0 ? '#818cf8' : 'rgba(148,163,184,0.5)',
                     }}>
-                      {countAtivos} / {TOTAL_MODULOS} m├│dulos ativos
+                      {countAtivos} / {TOTAL_MODULOS} módulos ativos
                     </span>
                   </div>
                 </div>
@@ -1530,7 +1530,7 @@ export default function PlataformaModulos() {
                       display: 'flex', alignItems: 'center', gap: 6,
                     }}
                   >
-                    Ô£ô Ativar Todos
+                    ✓ Ativar Todos
                   </button>
 
                   <button
@@ -1546,7 +1546,7 @@ export default function PlataformaModulos() {
                       cursor: 'pointer', transition: 'all 0.2s',
                     }}
                   >
-                    Ô£ò Desativar Todos
+                    ✕ Desativar Todos
                   </button>
 
                   <button
@@ -1560,7 +1560,7 @@ export default function PlataformaModulos() {
                       display: 'flex', alignItems: 'center', gap: 6,
                     }}
                   >
-                    ­ƒôï Copiar de outra escola
+                    📋 Copiar de outra escola
                   </button>
 
                   {/* Save button */}
@@ -1593,9 +1593,9 @@ export default function PlataformaModulos() {
                     {saving ? (
                       <><Spinner size={16} /> Salvando...</>
                     ) : saved ? (
-                      <>Ô£ô Salvo!</>
+                      <>✓ Salvo!</>
                     ) : (
-                      <>­ƒÆ¥ Salvar Configura├º├úo</>
+                      <>💾 Salvar Configuração</>
                     )}
                   </button>
                 </div>
@@ -1628,7 +1628,7 @@ export default function PlataformaModulos() {
                   color: '#fca5a5', fontSize: '0.85rem', fontWeight: 600,
                   display: 'flex', alignItems: 'center', gap: 8,
                 }}>
-                  <span>ÔÜá´©Å</span>
+                  <span>⚠️</span>
                   {error || copyError}
                   <button
                     onClick={() => { setError(null); setCopyError(null); }}
@@ -1636,7 +1636,7 @@ export default function PlataformaModulos() {
                       marginLeft: 'auto', background: 'none', border: 'none',
                       color: '#fca5a5', cursor: 'pointer', fontSize: '1rem',
                     }}
-                  >Ô£ò</button>
+                  >✕</button>
                 </div>
               )}
 
@@ -1677,11 +1677,11 @@ export default function PlataformaModulos() {
                   }}>
                     <div>
                       <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#f1f5f9', marginBottom: 2 }}>
-                        Configura├º├úo de{' '}
+                        Configuração de{' '}
                         <span style={{ color: '#818cf8' }}>{escolaSelecionada?.nome}</span>
                       </div>
                       <div style={{ fontSize: '0.72rem', color: 'rgba(148,163,184,0.55)' }}>
-                        {countAtivos} m├│dulos ativos de {TOTAL_MODULOS} dispon├¡veis
+                        {countAtivos} módulos ativos de {TOTAL_MODULOS} disponíveis
                       </div>
                     </div>
                     <button
@@ -1704,8 +1704,8 @@ export default function PlataformaModulos() {
                       }}
                     >
                       {saving ? <><Spinner size={16} /> Salvando...</> :
-                       saved ? 'Ô£ô Configura├º├úo salva!' :
-                       '­ƒÆ¥ Salvar Configura├º├úo'}
+                       saved ? '✓ Configuração salva!' :
+                       '💾 Salvar Configuração'}
                     </button>
                   </div>
                 </div>
@@ -1715,7 +1715,7 @@ export default function PlataformaModulos() {
         </div>
       </div>
 
-      {/* ÔöÇÔöÇ Copy Modal ÔöÇÔöÇ */}
+      {/* ── Copy Modal ── */}
       {showCopyModal && (
         <CopyModal
           escolas={escolas}

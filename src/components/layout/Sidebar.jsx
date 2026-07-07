@@ -1075,12 +1075,10 @@ export default function Sidebar({ isOpen, onClose }) {
 
         {/* DISCIPLINAR — REGRA DE OURO: apenas perfis militares (disciplinar / diretor_disciplinar) */}
         {isScopeEscola && isDisciplinar && hasModulo('disciplinar') && (
-
           <>
             {/* ───────────────────────────────
                 GRUPO: Disciplinar
             ─────────────────────────────── */}
-          <>
             {/* ── Disciplinar/Militar: submenus sempre visíveis ── */}
             <div
               className="flex items-center w-full py-2 px-3 rounded mt-6"
@@ -1196,7 +1194,6 @@ export default function Sidebar({ isOpen, onClose }) {
                 </li>
                 )}
               </ul>
-            </>
           </>
         )}
         {/* Regimentos, Manual e Suporte — também exclusivos de perfis militares */}
@@ -1317,7 +1314,7 @@ export default function Sidebar({ isOpen, onClose }) {
 
         {/* ─── GRUPO: Secretaria (Professor NÃO tem acesso) ─── */}
         {!isProfessor && hasModulo('secretaria') && (
-        <>
+          <>
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-6 transition"
               onClick={() => setOpenGroup(openGroup === 'secretaria' ? null : 'secretaria')}

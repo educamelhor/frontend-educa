@@ -467,6 +467,10 @@ export default function Login() {
         localStorage.setItem("scope", data.scope || "escola");
         localStorage.setItem("perfis", JSON.stringify(Array.isArray(data?.perfis) ? data.perfis : []));
         localStorage.setItem("permissoes", JSON.stringify(Array.isArray(data?.permissoes) ? data.permissoes : []));
+        // 🔄 Limpa módulos da sessão anterior — Sidebar reinicia sem dado obsoleto.
+        // applyModulosFromServer atualizará com os módulos corretos ao montar.
+        localStorage.removeItem("modulos_ativos");
+        sessionStorage.removeItem("modulos_last_refresh");
 
         setTipoMensagem("sucesso");
         setMensagem("Login realizado com sucesso!");
@@ -509,6 +513,10 @@ export default function Login() {
         localStorage.setItem("scope", data.scope || "escola");
         localStorage.setItem("perfis", JSON.stringify(Array.isArray(data?.perfis) ? data.perfis : []));
         localStorage.setItem("permissoes", JSON.stringify(Array.isArray(data?.permissoes) ? data.permissoes : []));
+        // 🔄 Limpa módulos da sessão anterior — Sidebar reinicia sem dado obsoleto.
+        // applyModulosFromServer atualizará com os módulos corretos ao montar.
+        localStorage.removeItem("modulos_ativos");
+        sessionStorage.removeItem("modulos_last_refresh");
 
         await carregarDisciplinasProfessor(data.token);
 
@@ -763,6 +771,11 @@ export default function Login() {
       // (usuário pode já ter um token válido de sessão anterior)
       if (!confirarDispositivo && !getDeviceToken()) clearDeviceToken();
 
+      // 🔄 Limpa módulos da sessão anterior — Sidebar reinicia sem dado obsoleto.
+      // applyModulosFromServer atualizará com os módulos corretos ao montar.
+      localStorage.removeItem("modulos_ativos");
+      sessionStorage.removeItem("modulos_last_refresh");
+
       setTipoMensagem("sucesso");
       setMensagem("Login realizado com sucesso!");
       setSuccess(true);
@@ -777,6 +790,7 @@ export default function Login() {
       setLoading(false);
     }
   };
+
 
   const handleConfirmarEscola = async (e) => {
     e.preventDefault();
@@ -833,7 +847,9 @@ export default function Login() {
       // ✅ Memoriza a última escola usada para pré-seleção futura
       localStorage.setItem("last_escola_id", String(data.escola_id || ""));
 
-
+      // 🔄 Limpa módulos da sessão anterior — Sidebar reinicia sem dado obsoleto.
+      localStorage.removeItem("modulos_ativos");
+      sessionStorage.removeItem("modulos_last_refresh");
 
       setTipoMensagem("sucesso");
       setMensagem("Login realizado com sucesso!");

@@ -1,4 +1,4 @@
-﻿// src/features/plataforma/PlataformaModulos.jsx
+// src/features/plataforma/PlataformaModulos.jsx
 // ============================================================================
 // CEO Module Licensing ÔÇö define which menus each school can access
 // Two-panel: left = school list | right = module tree toggles
@@ -515,13 +515,16 @@ function StatusBadge({ status }) {
   );
 }
 
-// ÔöÇÔöÇ Lista de perfis gerenci├íveis pelo CEO (militares fixos n├úo entram) ÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇÔöÇ
+// ── Lista de perfis gerenciáveis pelo CEO (militares fixos não entram) ────────
+// 'diretor' está aqui para permitir config explicitamente pelo CEO.
+// No backend: Diretor recebe a UNIÃO de todos os perfis configurados em escola_perfil_modulos.
 const PERFIS_LISTA = [
+  { key: 'diretor',               label: 'Diretor Pedagógico' },
   { key: 'professor',             label: 'Professor' },
   { key: 'coordenador',           label: 'Coordenador' },
   { key: 'supervisor',            label: 'Supervisor' },
   { key: 'pedagogo',              label: 'Pedagogo' },
-  { key: 'secretario',            label: 'Secret├írio' },
+  { key: 'secretario',            label: 'Secretário' },
   { key: 'secretaria',            label: 'Secretaria' },
   { key: 'orientador',            label: 'Orientador' },
   { key: 'aluno',                 label: 'Aluno' },

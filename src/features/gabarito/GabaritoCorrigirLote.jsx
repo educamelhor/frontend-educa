@@ -219,8 +219,8 @@ export default function GabaritoCorrigirLote() {
   // ─ Verifica se todos os alunos foram identificados antes de permitir vincular ─
   function abrirModalProfessor(lote, e) {
     e.stopPropagation();
-    // Bloquear se a avaliação já teve notas importadas
-    if (avaliacaoAtiva?.status === "notas_importadas") {
+    // Bloquear se a avaliação já teve notas importadas E não está liberado para re-correção
+    if (avaliacaoAtiva?.status === "notas_importadas" && !lote.liberado_correcao) {
       showToast("🔒 Não é possível vincular correto após a importação das notas.", "error");
       return;
     }
@@ -1334,9 +1334,12 @@ export default function GabaritoCorrigirLote() {
                           {/* Botão vincular professor — bloqueado após importação */}
                           {/* Botão professor: sempre visível, bloqueado para clique quando notas_importadas */}
                           <button
-                            onClick={(e) => avaliacaoAtiva?.status !== "notas_importadas" && abrirModalProfessor(lote, e)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              abrirModalProfessor(lote, e);
+                            }}
                             title={
-                              avaliacaoAtiva?.status === "notas_importadas"
+                              avaliacaoAtiva?.status === "notas_importadas" && !lote.liberado_correcao
                                 ? `Prof: ${lote.professor_nome || "não vinculado"} (vinculação bloqueada após importação)`
                                 : lote.professor_id
                                   ? `Prof: ${lote.professor_nome}`
@@ -1344,7 +1347,7 @@ export default function GabaritoCorrigirLote() {
                             }
                             style={{
                               width: 32, height: 32, borderRadius: 8, border: "none",
-                              cursor: avaliacaoAtiva?.status === "notas_importadas" ? "default" : "pointer",
+                              cursor: (avaliacaoAtiva?.status === "notas_importadas" && !lote.liberado_correcao) ? "default" : "pointer",
                               display: "flex", alignItems: "center", justifyContent: "center",
                               fontSize: "0.9rem", transition: "all 0.2s",
                               background: lote.professor_id
@@ -1353,7 +1356,7 @@ export default function GabaritoCorrigirLote() {
                               boxShadow: lote.professor_id
                                 ? "0 2px 10px rgba(16,185,129,0.4)"
                                 : "0 2px 10px rgba(239,68,68,0.4)",
-                              opacity: avaliacaoAtiva?.status === "notas_importadas" ? 0.65 : 1,
+                              opacity: (avaliacaoAtiva?.status === "notas_importadas" && !lote.liberado_correcao) ? 0.65 : 1,
                             }}
                           >
                             👨‍🏫

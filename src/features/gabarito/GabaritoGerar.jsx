@@ -257,6 +257,28 @@ export default function GabaritoGerar() {
     }
     setGerando(false);
   }
+  // ─── Atualizar Disciplinas (para avaliação já salva) ───
+  async function handleAtualizarDisciplinas() {
+    if (!avaliacaoSalva) return;
+    const faixaErr = validarFaixas();
+    if (faixaErr !== true) { showToast(faixaErr, "error"); return; }
+    
+    setGerando(true);
+    try {
+      await api.put(`/gabarito-avaliacoes/${avaliacaoSalva.id}`, {
+        disciplinas_config: discConfig.length > 0 ? discConfig : null
+      });
+      // Atualiza o estado da avaliação salva para refletir a nova config
+      setAvaliacaoSalva((prev) => ({
+        ...prev,
+        disciplinas_config: discConfig.length > 0 ? discConfig : null
+      }));
+      showToast("Disciplinas atualizadas com sucesso!");
+    } catch (err) {
+      showToast(err?.response?.data?.error || "Erro ao atualizar disciplinas.", "error");
+    }
+    setGerando(false);
+  }
 
   // ─── Salvar + Gerar (primeira vez) ───
   async function handleSalvarEGerar() {
@@ -494,13 +516,25 @@ export default function GabaritoGerar() {
                 <p style={{ margin: "0 0 14px", fontSize: "0.75rem" }}>
                   Para provas por área (Exatas, Humanas), adicione as disciplinas e suas faixas de questões.
                 </p>
-                <button
-                  type="button"
-                  className="gab-btn gab-btn-primary gab-btn-sm"
-                  onClick={addDisciplina}
-                >
-                  + Adicionar Disciplina
-                </button>
+                <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+                  <button
+                    type="button"
+                    className="gab-btn gab-btn-primary gab-btn-sm"
+                    onClick={addDisciplina}
+                  >
+                    + Adicionar Disciplina
+                  </button>
+                  {avaliacaoSalva && (
+                    <button
+                      type="button"
+                      className="gab-btn gab-btn-secondary gab-btn-sm"
+                      onClick={handleAtualizarDisciplinas}
+                      disabled={gerando}
+                    >
+                      {gerando ? "Salvando..." : "Salvar Configuração Vazia"}
+                    </button>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="gab-flex gab-flex-col gab-gap-10">
@@ -608,14 +642,27 @@ export default function GabaritoGerar() {
                   </span>
                 </div>
 
-                <button
-                  type="button"
-                  className="gab-btn gab-btn-ghost gab-btn-sm"
-                  onClick={addDisciplina}
-                  style={{ alignSelf: "flex-start" }}
-                >
-                  + Adicionar outra disciplina
-                </button>
+                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  <button
+                    type="button"
+                    className="gab-btn gab-btn-ghost gab-btn-sm"
+                    onClick={addDisciplina}
+                    style={{ alignSelf: "flex-start" }}
+                  >
+                    + Adicionar outra disciplina
+                  </button>
+                  {avaliacaoSalva && (
+                    <button
+                      type="button"
+                      className="gab-btn gab-btn-primary gab-btn-sm"
+                      onClick={handleAtualizarDisciplinas}
+                      disabled={gerando}
+                      style={{ alignSelf: "flex-start" }}
+                    >
+                      {gerando ? "Salvando..." : "Salvar Alterações"}
+                    </button>
+                  )}
+                </div>
               </div>
             )}
           </div>

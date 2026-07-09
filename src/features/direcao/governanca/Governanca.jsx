@@ -126,6 +126,7 @@ export default function Governanca() {
   const [toast, setToast] = useState(null);
   const [expandedCats, setExpandedCats] = useState(new Set());
   const [pendingChanges, setPendingChanges] = useState({}); // { id: valor }
+  const [syncingPaps, setSyncingPaps] = useState(false); // sync manual de planos
 
   // ✅ [GOVERNANÇA v2] Estado da aba 'Acesso de Usuários'
   const [meusPerfisList, setMeusPerfisList] = useState([]); // perfis que o diretor pode gerenciar
@@ -145,6 +146,31 @@ export default function Governanca() {
   const escolaId = localStorage.getItem("escola_id");
   const token = localStorage.getItem("token");
   const perfil = String(localStorage.getItem("perfil") || "").toLowerCase();
+
+  // ── Sincronização manual de planos ──
+  const handleSyncPaps = async () => {
+    setSyncingPaps(true);
+    try {
+      const res = await fetch(`${API}/api/governanca/sync-paps?escola_id=${escolaId}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "x-escola-id": escolaId,
+          "x-perfil": perfil,
+        },
+      });
+      const data = await res.json();
+      if (data.ok) {
+        showToast("🔄 Sincronização iniciada! Aguarde alguns segundos e os planos serão atualizados automaticamente.", "success");
+      } else {
+        showToast(data.message || "Erro ao iniciar sincronização.", "error");
+      }
+    } catch (err) {
+      showToast("Erro ao conectar com o servidor.", "error");
+    } finally {
+      setSyncingPaps(false);
+    }
+  };
 
   // ── Fetch configurações ──
   const fetchConfigs = useCallback(async () => {
@@ -695,6 +721,26 @@ export default function Governanca() {
           </button>
         </div>
       )}
+
+      {/* ── BOTÃO SYNC MANUAL DE PLANOS ── */}
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+        <button
+          onClick={handleSyncPaps}
+          disabled={syncingPaps}
+          title="Ressincroniza todos os planos do ano com as regras atuais de avaliação bimestral e disciplinas de exceção"
+          style={{
+            display: "flex", alignItems: "center", gap: 6,
+            padding: "7px 16px", borderRadius: 8, border: "1px solid #c7d2fe",
+            background: syncingPaps ? "#e0e7ff" : "#eef2ff",
+            color: "#3730a3", fontWeight: 700, fontSize: "0.82rem",
+            cursor: syncingPaps ? "not-allowed" : "pointer",
+            transition: "all 0.2s",
+          }}
+        >
+          <span style={{ fontSize: "1rem" }}>{syncingPaps ? "⏳" : "🔄"}</span>
+          {syncingPaps ? "Sincronizando..." : "Sincronizar Planos com Avaliação Bimestral"}
+        </button>
+      </div>
 
       {/* ── LOADING ── */}
       {loading ? (

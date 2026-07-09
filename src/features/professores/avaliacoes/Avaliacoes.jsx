@@ -92,7 +92,10 @@ export default function Avaliacoes() {
   const [reaberaturaAlunoId, setReaberturaAlunoId] = useState(""); // aluno selecionado
   const [enviandoReabertura, setEnviandoReabertura] = useState(false);
   const [modalSucessoReabertura, setModalSucessoReabertura] = useState(false);
-  // Governança: avaliação padrão bimestral (bloqueia edição manual)
+  // Governança: escola adota avaliação padrão bimestral (config global)
+  const [escolaAdotaBimestral, setEscolaAdotaBimestral] = useState(false);
+  // avaliacaoPadrao = true APENAS quando a escola adota E o plano atual tem item fixo_direcao=1
+  // (derivado dos itens do plano após carregamento — respeita disciplinas de exceção)
   const [avaliacaoPadrao, setAvaliacaoPadrao] = useState(false);
 
   // Modal: plano ainda não aprovado (status ENVIADO) — bloqueia lançamento
@@ -201,7 +204,7 @@ export default function Avaliacoes() {
     const carregarGrid = async () => {
       setCarregandoDados(true);
       try {
-        // 0) Buscar config de governança (avaliação padrão)
+        // 0) Buscar config de governança (avaliação padrão bimestral da escola)
         try {
           const escolaId = localStorage.getItem("escola_id");
           if (escolaId) {
@@ -209,9 +212,12 @@ export default function Avaliacoes() {
               params: { escola_id: escolaId },
             });
             const cfg = cfgRes.data?.config || {};
-            setAvaliacaoPadrao(cfg["escola.avaliacao_padrao_bimestral"] === "1");
+            // Salva a config GLOBAL da escola (não necessariamente verdadeiro para esta disciplina)
+            setEscolaAdotaBimestral(cfg["escola.avaliacao_padrao_bimestral"] === "1");
+            // avaliacaoPadrao será derivado dos itens do plano após carregar (mais abaixo)
           }
         } catch {
+          setEscolaAdotaBimestral(false);
           setAvaliacaoPadrao(false);
         }
 
@@ -263,6 +269,17 @@ export default function Avaliacoes() {
         }
 
         setPlano(planoCompleto);
+
+        // Derivar avaliacaoPadrao dos itens reais do plano:
+        // true SOMENTE se a escola adota bimestral E o plano tem item fixo_direcao=1.
+        // Isso respeita automaticamente disciplinas de exceção — se o backend zerou
+        // o fixo_direcao (exceção com notas) ou deletou (exceção sem notas), este
+        // professor não verá o bloqueio mesmo que a escola adote a avaliação padrão.
+        const itensDoPlano = Array.isArray(planoCompleto.itens)
+          ? planoCompleto.itens
+          : JSON.parse(planoCompleto.itens || "[]");
+        const temItemFixo = itensDoPlano.some(it => it.fixo_direcao === 1 || it.fixo_direcao === true);
+        setAvaliacaoPadrao(temItemFixo);
 
         // 4) Busca ALUNOS REAIS da turma via tabela matriculas
         try {
@@ -1054,7 +1071,8 @@ export default function Avaliacoes() {
       )}
 
       {/* ───────────────── BANNER AVALIAÇÃO PADRONIZADA ───────────────── */}
-      {avaliacaoPadrao && plano && !diarioFechado && (
+      {/* Aparece quando: escola adota avaliação padrão bimestral E este plano tem coluna fixo_direcao */}
+      {escolaAdotaBimestral && avaliacaoPadrao && plano && !diarioFechado && (
         <section className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-2xl shadow-sm border border-amber-200 p-6 flex items-center gap-5">
           <div className="p-3 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl shadow-md flex-shrink-0">
             <LockClosedIcon className="w-7 h-7 text-white" />

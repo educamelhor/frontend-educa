@@ -515,30 +515,28 @@ function StatusBadge({ status }) {
   );
 }
 
-// ── Lista de perfis gerenciáveis pelo CEO (militares fixos não entram) ────────
-// 'diretor' incluído para permitir configuração explícita pelo CEO.
-// No backend, o Diretor recebe a UNIÃO de todos os perfis configurados em escola_perfil_modulos.
+// ── Lista de perfis gerenciáveis pelo CEO ─────────────────────────────────────
+// Regras:
+// - 'secretario' removido: duplicata de 'secretaria'
+// - 'visitante'  removido: duplicata de 'vigilancia'
+// - 'subcomandante', 'supervisor_disciplinar', 'monitor_disciplinar' removidos:
+//   módulo DISCIPLINAR é padrão/fixo para escolas CCMDF — CEO não o gerencia.
 const PERFIS_LISTA = [
-  { key: 'diretor',               label: 'Diretor Pedagógico' }, // essencial para escolas CCMDF
-  { key: 'vice_diretor',          label: 'Vice-Diretor' },
-  { key: 'professor',             label: 'Professor' },
-  { key: 'coordenador',           label: 'Coordenador' },
-  { key: 'supervisor',            label: 'Supervisor' },
-  { key: 'pedagogo',              label: 'Pedagogo' },
-  { key: 'secretario',            label: 'Secretário' },
-  { key: 'secretaria',            label: 'Secretaria' },
-  { key: 'orientador',            label: 'Orientador' },
-  { key: 'aluno',                 label: 'Aluno' },
-  { key: 'biblioteca',            label: 'Biblioteca' },
-  { key: 'educador_social',       label: 'Educador Social' },
-  { key: 'merenda',               label: 'Merenda' },
-  { key: 'psicologo',             label: 'Psicólogo' },
-  { key: 'responsavel',           label: 'Responsável' },
-  { key: 'vigilancia',            label: 'Vigilância' },
-  { key: 'visitante',             label: 'Visitante' },
-  { key: 'subcomandante',         label: 'Subcomandante' },
-  { key: 'supervisor_disciplinar',label: 'Supervisor Disciplinar' },
-  { key: 'monitor_disciplinar',   label: 'Monitor Disciplinar' },
+  { key: 'diretor',         label: 'Diretor Pedagógico' },
+  { key: 'vice_diretor',    label: 'Vice-Diretor' },
+  { key: 'professor',       label: 'Professor' },
+  { key: 'coordenador',     label: 'Coordenador' },
+  { key: 'supervisor',      label: 'Supervisor' },
+  { key: 'pedagogo',        label: 'Pedagogo' },
+  { key: 'secretaria',      label: 'Secretaria' },
+  { key: 'orientador',      label: 'Orientador' },
+  { key: 'aluno',           label: 'Aluno' },
+  { key: 'biblioteca',      label: 'Biblioteca' },
+  { key: 'educador_social', label: 'Educador Social' },
+  { key: 'merenda',         label: 'Merenda' },
+  { key: 'psicologo',       label: 'Psicólogo' },
+  { key: 'responsavel',     label: 'Responsável' },
+  { key: 'vigilancia',      label: 'Vigilância' },
 ];
 
 // ── Main Component ────────────────────────────────────────────────────────────

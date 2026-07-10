@@ -65,20 +65,8 @@ export default function Planos() {
   const totalPontos = (lista) =>
     (lista || []).reduce((acc, it) => acc + Number(it?.nota_total || 0), 0);
 
-  // Tabela (mock inicial) — em passos futuros virá do backend
-
-  const [itens, setItens] = useState([
-    {
-      atividade: "Prova Bimestral",
-      data_inicio: "",
-      data_final: "",
-      nota_total: 5, // ✅ regra mock da direção: 5 pontos fixos
-      oportunidades: 1,
-      nota_invertida: 0,
-      descricao: "",
-      fixo_direcao: true, // ✅ trava edição/remoção
-    },
-  ]);
+  // Itens do PAP — inicia vazio; serão preenchidos após verificar governança da escola
+  const [itens, setItens] = useState([]);
 
   // ✅ Cálculos dependem de "itens" — devem ficar DEPOIS do state
   const totalAtual = totalPontos(itens);
@@ -127,14 +115,34 @@ export default function Planos() {
   const [turmas, setTurmas] = useState([]);
   const [loadingInicial, setLoadingInicial] = useState(true);
 
+  // Governança: escola adota avaliação padrão bimestral + nomes das disciplinas de exceção
+  const [escolaAdotaBimestral, setEscolaAdotaBimestral] = useState(false);
+  const [excecoesNomes, setExcecoesNomes] = useState([]); // nomes em lowercase, ex: ["prática estudantil"]
+
+  // Helper: retorna os itens iniciais de um plano respeitando as exceções de governança.
+  // Se a disciplina for exceção ou a escola não adotar bimestral, começa sem Prova Bimestral.
+  const getItensIniciais = (disciplinaAtual) => {
+    const ehExcecao = excecoesNomes.includes(String(disciplinaAtual || "").trim().toLowerCase());
+    if (escolaAdotaBimestral && !ehExcecao) {
+      return [{ atividade: "Prova Bimestral", nota_total: 5, oportunidades: 1,
+                nota_invertida: 0, descricao: "", data_inicio: "", data_final: "",
+                fixo_direcao: true }];
+    }
+    return []; // exceção ou escola não usa bimestral padronizado
+  };
+
   useEffect(() => {
-    // Carga inicial: turmas + disciplinas do professor
+    // Carga inicial: turmas + disciplinas do professor + config de governança
     const fetchDadosIniciais = async () => {
       setLoadingInicial(true);
       try {
-        const [resDisc, resTurmas] = await Promise.all([
+        const escolaId = localStorage.getItem("escola_id");
+        const [resDisc, resTurmas, resCfg] = await Promise.all([
           api.get("/professores/me/disciplinas"),
           api.get("/professores/me/turmas"),
+          escolaId
+            ? api.get("/api/governanca/avaliacao-config", { params: { escola_id: escolaId } }).catch(() => null)
+            : Promise.resolve(null),
         ]);
 
         if (resDisc.data?.ok) {
@@ -143,6 +151,11 @@ export default function Planos() {
         }
         if (resTurmas.data?.ok) {
           setTurmas(resTurmas.data.turmas || []);
+        }
+        if (resCfg?.data?.ok) {
+          const cfg = resCfg.data.config || {};
+          setEscolaAdotaBimestral(cfg["escola.avaliacao_padrao_bimestral"] === "1");
+          setExcecoesNomes(resCfg.data.excecoes_nomes || []);
         }
       } catch (err) {
         console.error("Erro ao carregar dados do professor", err);
@@ -241,9 +254,9 @@ export default function Planos() {
   const [modoEdicaoPlano, setModoEdicaoPlano] = useState(false);
   const [turmasDoPlanoAberto, setTurmasDoPlanoAberto] = useState([]); // Array p/ suportar lote
   
-  const abrirPlano = async (turmasArray, planoId) => {
+  const abrirPlano = async (turmasArray, planoId, disciplinaParaAbrir) => {
     setTurmasDoPlanoAberto(turmasArray);
-    
+
     // Se for um plano existente
     if (planoId) {
       try {
@@ -251,7 +264,7 @@ export default function Planos() {
         setPapKeyAtiva(planoId);
         setPapStatus(data.status || "RASCUNHO");
         if (data.itens && data.itens.length > 0) {
-           // ✅ Normaliza datas de ISO datetime para YYYY-MM-DD (formato aceito por input[type=date])
+           // Normaliza datas de ISO datetime para YYYY-MM-DD
            const norm = (d) => d ? String(d).slice(0, 10) : '';
            setItens(data.itens.map(it => ({
              ...it,
@@ -260,7 +273,8 @@ export default function Planos() {
              data:        norm(it.data),
            })));
         } else {
-           setItens([{ atividade: "Prova Bimestral", nota_total: 5, oportunidades: 1, nota_invertida: 0, fixo_direcao: true }]);
+           // Plano existe mas sem itens: inicializa respeitando as exceções
+           setItens(getItensIniciais(disciplinaParaAbrir));
         }
       } catch (err) {
         console.error(err);
@@ -268,12 +282,12 @@ export default function Planos() {
         return;
       }
     } else {
-      // Plano NOVO
+      // Plano NOVO: inicializa respeitando as exceções
       setPapKeyAtiva("NOVO");
       setPapStatus("RASCUNHO");
-      setItens([{ atividade: "Prova Bimestral", nota_total: 5, oportunidades: 1, nota_invertida: 0, fixo_direcao: true }]);
+      setItens(getItensIniciais(disciplinaParaAbrir));
     }
-    
+
     setMostrarTabela(true); // Exibe o painel de edição
     setModoEdicaoPlano(true);
   };
@@ -297,8 +311,6 @@ export default function Planos() {
     setSelecaoLote(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
   };
 
-  // Helper para abrir plano de uma disciplina específica
-  // → passa TODAS as turmas selecionadas para o editor (suporta 1 ou N turmas)
   const abrirPlanoDisc = (disc, planoId) => {
     setDisciplinaSelecionada(disc);
     // Se multi-turma ativo: usa o array completo; senão: somente a turma principal
@@ -308,7 +320,8 @@ export default function Planos() {
           return obj?.nome || id;
         })
       : [turmaNomeSelecionada];
-    abrirPlano(turmasParaAbrir, planoId);
+    // Passa a disciplina como terceiro argumento para respeitar exceções de governança
+    abrirPlano(turmasParaAbrir, planoId, disc);
   };
 
   return (
@@ -1753,7 +1766,7 @@ export default function Planos() {
 
                     showMsg("success", "Plano reaberto para edição.");
                     // Abrir o editor
-                    abrirPlano([modalGovernanca.turma], modalGovernanca.planoId);
+                    abrirPlano([modalGovernanca.turma], modalGovernanca.planoId, disciplinaSelecionada);
                   } catch (err) {
                     console.error("Erro ao reabrir plano:", err);
                     showMsg("error", "Erro ao reabrir o plano para edição.");

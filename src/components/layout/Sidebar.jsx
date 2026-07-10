@@ -1193,7 +1193,7 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
                 )}
-                {hasModulo('disciplinar.aph_cbmdf') && (
+                {/* APH-CBMDF — autônomo, sem guard hasModulo (DISCIPLINAR sempre é padrão) */}
                 <li>
                   <Link
                     to="/disciplinar/aph-cbmdf"
@@ -1209,7 +1209,6 @@ export default function Sidebar({ isOpen, onClose }) {
                     <span className="flex-1">APH-CBMDF</span>
                   </Link>
                 </li>
-                )}
               </ul>
           </>
         )}

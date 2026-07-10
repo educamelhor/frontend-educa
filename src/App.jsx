@@ -312,7 +312,7 @@ export default function App() {
           <Route path="/disciplinar/regimentos" element={<RequireModulo modulo="disciplinar.regimentos"><RegimentosDisciplinar /></RequireModulo>} />
           <Route path="/disciplinar/manual"     element={<RequireModulo modulo="disciplinar.manual"><ManualDisciplinar /></RequireModulo>} />
           <Route path="/disciplinar/suporte"    element={<RequireModulo modulo="disciplinar"><SuporteSAC /></RequireModulo>} />
-          <Route path="/disciplinar/aph-cbmdf" element={<RequireModulo modulo="disciplinar.aph_cbmdf"><AphCbmdfPage /></RequireModulo>} />
+          <Route path="/disciplinar/aph-cbmdf" element={<RequireModulo modulo="disciplinar"><AphCbmdfPage /></RequireModulo>} />
 
           {/* ── Monitoramento ────────────────────────────────────────────── */}
           <Route path="/monitoramento" element={<RequireModulo modulo="monitoramento"><RequirePerm perm="monitoramento.visualizar"><Monitoramento /></RequirePerm></RequireModulo>} />

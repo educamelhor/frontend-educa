@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import api from '../../../services/api';
 import { jsPDF } from 'jspdf';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -6,16 +6,18 @@ import * as pdfjsLib from 'pdfjs-dist';
 pdfjsLib.GlobalWorkerOptions.workerSrc =
   `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
-// ─── Coordenadas EXATAS extraídas do template PDF (pdfplumber) ────────────────
-// Template: 296.9 × 210.1mm (A4 landscape)
-// Campo          y_template   x_range         x_center
-// NOME          100.7mm      106→280mm        193mm    (underline após "aluno(a):")
-// TURMA         115.0mm      172→247mm        210mm    (underline após "turma")
-// PERÍODO       137.9mm       16→174mm         95mm    (underline antes de "com carga")
+// ─── Coordenadas do template PDF (pdfplumber) + calibração visual (+Δy) ─────────
+// Template: 296.9 × 210.1mm (A4 landscape)                     Δy medido no print
+// Campo      y_template  y_final  x_range        x_center
+// NOME        100.7mm    108mm    106→280mm       193mm  (underline após "aluno(a):")
+// TURMA       115.0mm    117mm    172→247mm       210mm  (underline após "turma")
+// ESCOLA      126.5mm    131mm     16→138mm        77mm  (blank antes de "Colégio")
+// PERÍODO     137.9mm    140mm     16→174mm        95mm  (underline antes "com carga")
 const CERT = {
-  name:    { x: 193,   y: 101,  fontBase: 15, fontMin: 9,  maxW: 160, align: 'center', color: [10,10,80],   bold: true  },
-  turma:   { x: 210,   y: 115,  font: 10,                             align: 'center', color: [10,10,80],   bold: false },
-  periodo: { x: 95.3,  y: 138,  font: 10,                             align: 'center', color: [40,40,40],   bold: false },
+  name:    { x: 193,   y: 108,  fontBase: 15, fontMin: 9,  maxW: 160, align: 'center', color: [10,10,80],   bold: true  },
+  turma:   { x: 210,   y: 117,  font: 10,                             align: 'center', color: [10,10,80],   bold: false },
+  escola:  { x:  77,   y: 131,  font: 10,     maxW: 118,             align: 'center', color: [40,40,40],   bold: false },
+  periodo: { x:  95.3, y: 140,  font: 10,                             align: 'center', color: [40,40,40],   bold: false },
 };
 
 // ─── Render template PDF como JPEG via pdfjs ─────────────────────────────────
@@ -127,9 +129,10 @@ export default function AphCbmdfPage() {
     setGerando(true); setErro(''); setSucesso('');
 
     try {
-      const bg      = await renderTemplate('/templates/certificado_aph_cbmdf.pdf');
-      const doc     = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-      const periodT = fmtPeriodo(dtInicio, dtFim);
+      const bg         = await renderTemplate('/templates/certificado_aph_cbmdf.pdf');
+      const doc        = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      const periodT    = fmtPeriodo(dtInicio, dtFim);
+      const escolaLabel = nomeEscola; // capturado do localStorage no login
 
       lote.forEach((aluno, i) => {
         if (i > 0) doc.addPage('a4', 'landscape');
@@ -155,6 +158,20 @@ export default function AphCbmdfPage() {
           doc.setFontSize(CERT.turma.font);
           doc.setTextColor(...CERT.turma.color);
           doc.text(turmaLabel, CERT.turma.x, CERT.turma.y, { align: CERT.turma.align });
+        }
+
+        // ── ESCOLA (blank antes de "Colégio Cívico-Militar") ──────────────
+        if (escolaLabel) {
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(CERT.escola.font);
+          doc.setTextColor(...CERT.escola.color);
+          // Reduz fonte se nome da escola for muito longo
+          let fsEscola = CERT.escola.font;
+          while (doc.getTextWidth(escolaLabel) > CERT.escola.maxW && fsEscola > 7) {
+            fsEscola -= 0.5;
+            doc.setFontSize(fsEscola);
+          }
+          doc.text(escolaLabel, CERT.escola.x, CERT.escola.y, { align: CERT.escola.align });
         }
 
         // ── PERÍODO ────────────────────────────────────────────────────────

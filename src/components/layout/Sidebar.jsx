@@ -1193,6 +1193,23 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
                 )}
+                {hasModulo('disciplinar.aph_cbmdf') && (
+                <li>
+                  <Link
+                    to="/disciplinar/aph-cbmdf"
+                    className={getSubmenuLinkClasses('/disciplinar/aph-cbmdf')}
+                    style={{
+                      background: isActive('/disciplinar/aph-cbmdf')
+                        ? 'linear-gradient(90deg, rgba(220,38,38,0.15), transparent)'
+                        : undefined,
+                    }}
+                  >
+                    <DocumentTextIcon className="h-5 w-5 mr-2"
+                      style={{ color: isActive('/disciplinar/aph-cbmdf') ? '#dc2626' : undefined }} />
+                    <span className="flex-1">APH-CBMDF</span>
+                  </Link>
+                </li>
+                )}
               </ul>
           </>
         )}

@@ -502,8 +502,10 @@ export default function BoletimEdicao() {
                   className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition"
                 >
                   <option value="todas">Todas</option>
-                  {turmas.map((t) => (
-                    <option key={t.id} value={t.id}>{t.turma} ({t.turno})</option>
+                  {turmas
+                    .filter((t) => Number(t.ano) === filtroAnoLetivo && (filtroTurno === "todos" || t.turno?.toLowerCase() === filtroTurno))
+                    .map((t) => (
+                      <option key={t.id} value={t.id}>{t.turma} ({t.turno})</option>
                   ))}
                 </select>
               </div>

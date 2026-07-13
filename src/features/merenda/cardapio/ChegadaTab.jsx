@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { PlusIcon, TrashIcon } from "@heroicons/react/24/outline";
+import { PlusIcon, TrashIcon, PencilSquareIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import api from "../../../services/api";
 
@@ -8,6 +8,7 @@ export default function ChegadaTab() {
   const [produtos, setProdutos] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState(null);
 
   // Modal form state
   const [selectedProdutoId, setSelectedProdutoId] = useState("");
@@ -40,9 +41,40 @@ export default function ChegadaTab() {
 
   // Funções de manipulação do modal
   const handleOpenModal = () => {
+    setEditingId(null);
     setSelectedProdutoId("");
     setLotes([{ quantidade_unidades: "", lote: "", validade: "" }]);
     setIsModalOpen(true);
+  };
+
+  const handleEdit = (item) => {
+    setEditingId(item.id);
+    setSelectedProdutoId(item.produto_id.toString());
+    
+    // Formata a data para yyyy-mm-dd
+    let valFormatada = "";
+    if (item.validade) {
+      valFormatada = String(item.validade).split('T')[0];
+    }
+
+    setLotes([{ 
+      quantidade_unidades: item.quantidade_unidades, 
+      lote: item.lote || "", 
+      validade: valFormatada 
+    }]);
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Deseja realmente excluir esta entrada? O saldo do produto será afetado.")) return;
+    try {
+      await api.delete(`/api/merenda/entradas/${id}`);
+      toast.success("Entrada excluída com sucesso.");
+      fetchEntradas();
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao excluir entrada.");
+    }
   };
 
   const handleCloseModal = () => {
@@ -102,11 +134,18 @@ export default function ChegadaTab() {
 
     setSaving(true);
     try {
-      await api.post("/api/merenda/entradas", {
-        produto_id: selectedProdutoId,
-        lotes: payloadLotes
-      });
-      toast.success("Chegada registrada com sucesso!");
+      if (editingId) {
+        // Se está editando, manda PUT para a primeira e única linha
+        const editPayload = payloadLotes[0];
+        await api.put(`/api/merenda/entradas/${editingId}`, editPayload);
+        toast.success("Entrada atualizada com sucesso!");
+      } else {
+        await api.post("/api/merenda/entradas", {
+          produto_id: selectedProdutoId,
+          lotes: payloadLotes
+        });
+        toast.success("Chegada registrada com sucesso!");
+      }
       handleCloseModal();
       fetchEntradas();
     } catch (err) {
@@ -143,12 +182,13 @@ export default function ChegadaTab() {
               <th className="py-4 px-6 font-semibold tracking-wide">PESO TOTAL <span className="text-xs opacity-70 font-normal">(KG)</span></th>
               <th className="py-4 px-6 font-semibold tracking-wide">LOTE</th>
               <th className="py-4 px-6 font-semibold tracking-wide">VALIDADE</th>
+              <th className="py-4 px-6 text-center font-semibold tracking-wide">AÇÕES</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
             {entradas.length === 0 ? (
               <tr>
-                <td colSpan="6" className="py-12 text-center text-gray-500">
+                <td colSpan="7" className="py-12 text-center text-gray-500">
                   Nenhuma entrada registrada até o momento.
                 </td>
               </tr>
@@ -178,6 +218,24 @@ export default function ChegadaTab() {
                       const [yyyy, mm, dd] = String(item.validade).split('T')[0].split('-');
                       return `${dd}/${mm}/${yyyy}`;
                     })() : '-'}
+                  </td>
+                  <td className="py-4 px-6 text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      <button
+                        onClick={() => handleEdit(item)}
+                        className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Editar Entrada"
+                      >
+                        <PencilSquareIcon className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(item.id)}
+                        className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Excluir Entrada"
+                      >
+                        <TrashIcon className="w-5 h-5" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -223,14 +281,16 @@ export default function ChegadaTab() {
                 <div className="space-y-4">
                   <div className="flex justify-between items-center mb-2">
                     <h3 className="text-sm font-semibold text-gray-700">Lotes e Validades recebidos</h3>
-                    <button
-                      type="button"
-                      onClick={addLote}
-                      className="text-amber-600 hover:text-amber-700 text-sm font-medium flex items-center gap-1"
-                    >
-                      <PlusIcon className="w-4 h-4" />
-                      Adicionar lote
-                    </button>
+                    {!editingId && (
+                      <button
+                        type="button"
+                        onClick={addLote}
+                        className="text-amber-600 hover:text-amber-700 text-sm font-medium flex items-center gap-1"
+                      >
+                        <PlusIcon className="w-4 h-4" />
+                        Adicionar lote
+                      </button>
+                    )}
                   </div>
 
                   {lotes.map((loteItem, index) => (
@@ -273,7 +333,7 @@ export default function ChegadaTab() {
                           {calcularPeso(selectedProdutoId, loteItem.quantidade_unidades)}
                         </div>
                       </div>
-                      {lotes.length > 1 && (
+                      {!editingId && lotes.length > 1 && (
                         <button
                           type="button"
                           onClick={() => removeLote(index)}

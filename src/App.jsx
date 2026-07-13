@@ -390,8 +390,7 @@ export default function App() {
           <Route path="/frequencia/conselho-tutelar" element={<RequireModulo modulo="frequencia"><ConselhoTutelar /></RequireModulo>} />
 
           {/* ── Merenda ─────────────────────────────────────────────────── */}
-          {/* TEMP: Sem RequireModulo para testes diretos pela URL */}
-          <Route path="/merenda/cadastro" element={<MerendaCadastroPage />} />
+          <Route path="/merenda/cadastro" element={<RequireModulo modulo="merenda.cadastro"><MerendaCadastroPage /></RequireModulo>} />
 
           {/* ── Impressão ────────────────────────────────────────────────── */}
           <Route path="/impressao/gabaritos"   element={<RequireModulo modulo="impressao"><GerarGabaritos /></RequireModulo>} />

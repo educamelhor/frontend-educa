@@ -12,6 +12,7 @@ export default function ChegadaTab() {
 
   // Modal form state
   const [selectedProdutoId, setSelectedProdutoId] = useState("");
+  const [selectedOrigem, setSelectedOrigem] = useState("Governo (SEEDF)");
   const [lotes, setLotes] = useState([{ quantidade_unidades: "", lote: "", validade: "" }]);
 
   useEffect(() => {
@@ -43,6 +44,7 @@ export default function ChegadaTab() {
   const handleOpenModal = () => {
     setEditingId(null);
     setSelectedProdutoId("");
+    setSelectedOrigem("Governo (SEEDF)");
     setLotes([{ quantidade_unidades: "", lote: "", validade: "" }]);
     setIsModalOpen(true);
   };
@@ -50,6 +52,7 @@ export default function ChegadaTab() {
   const handleEdit = (item) => {
     setEditingId(item.id);
     setSelectedProdutoId(item.produto_id.toString());
+    setSelectedOrigem(item.origem || "Governo (SEEDF)");
     
     // Formata a data para yyyy-mm-dd
     let valFormatada = "";
@@ -136,12 +139,13 @@ export default function ChegadaTab() {
     try {
       if (editingId) {
         // Se está editando, manda PUT para a primeira e única linha
-        const editPayload = payloadLotes[0];
+        const editPayload = { ...payloadLotes[0], origem: selectedOrigem };
         await api.put(`/api/merenda/entradas/${editingId}`, editPayload);
         toast.success("Entrada atualizada com sucesso!");
       } else {
         await api.post("/api/merenda/entradas", {
           produto_id: selectedProdutoId,
+          origem: selectedOrigem,
           lotes: payloadLotes
         });
         toast.success("Chegada registrada com sucesso!");
@@ -178,6 +182,7 @@ export default function ChegadaTab() {
             <tr className="bg-gray-100/90 border-b-2 border-gray-200 text-sm text-gray-600 shadow-sm">
               <th className="py-4 px-6 font-semibold tracking-wide">DATA</th>
               <th className="py-4 px-6 font-semibold tracking-wide">PRODUTO</th>
+              <th className="py-4 px-6 font-semibold tracking-wide">ORIGEM</th>
               <th className="py-4 px-6 font-semibold tracking-wide">UNIDADES</th>
               <th className="py-4 px-6 font-semibold tracking-wide">PESO TOTAL <span className="text-xs opacity-70 font-normal">(KG)</span></th>
               <th className="py-4 px-6 font-semibold tracking-wide">LOTE</th>
@@ -188,7 +193,7 @@ export default function ChegadaTab() {
           <tbody className="divide-y divide-gray-50">
             {entradas.length === 0 ? (
               <tr>
-                <td colSpan="7" className="py-12 text-center text-gray-500">
+                <td colSpan="8" className="py-12 text-center text-gray-500">
                   Nenhuma entrada registrada até o momento.
                 </td>
               </tr>
@@ -201,6 +206,11 @@ export default function ChegadaTab() {
                   <td className="py-4 px-6">
                     <div className="font-medium text-gray-800">{item.produto}</div>
                     <div className="text-xs text-gray-500">{item.marca}</div>
+                  </td>
+                  <td className="py-4 px-6">
+                    <span className="px-2 py-1 bg-blue-50 text-blue-600 text-xs font-semibold rounded-full border border-blue-100">
+                      {item.origem || 'Governo (SEEDF)'}
+                    </span>
                   </td>
                   <td className="py-4 px-6 text-gray-600">{Number(item.quantidade_unidades)}</td>
                   <td className="py-4 px-6 font-semibold text-emerald-600">
@@ -258,23 +268,39 @@ export default function ChegadaTab() {
             </div>
 
             <form onSubmit={handleSubmit} className="p-6">
-              <div className="mb-6">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Gênero Alimentício
-                </label>
-                <select
-                  required
-                  value={selectedProdutoId}
-                  onChange={(e) => setSelectedProdutoId(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-400 outline-none transition-all"
-                >
-                  <option value="">-- Selecione o produto --</option>
-                  {produtos.map(p => (
-                    <option key={p.id} value={p.id}>
-                      {p.produto} - {p.marca} ({p.gramatura} kg)
-                    </option>
-                  ))}
-                </select>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Gênero Alimentício</label>
+                  <select
+                    required
+                    value={selectedProdutoId}
+                    onChange={(e) => setSelectedProdutoId(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20"
+                  >
+                    <option value="">Selecione um produto...</option>
+                    {produtos.map(p => (
+                      <option key={p.id} value={p.id}>
+                        {p.nome} - {p.marca} ({p.gramatura})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Origem</label>
+                  <select
+                    required
+                    value={selectedOrigem}
+                    onChange={(e) => setSelectedOrigem(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20"
+                  >
+                    <option value="Governo (SEEDF)">Governo (SEEDF)</option>
+                    <option value="Transferência">Transferência</option>
+                    <option value="Doação">Doação</option>
+                    <option value="Compra Direta">Compra Direta</option>
+                    <option value="Outros">Outros</option>
+                  </select>
+                </div>
               </div>
 
               {selectedProdutoId && (

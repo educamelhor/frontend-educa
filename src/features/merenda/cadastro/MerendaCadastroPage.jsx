@@ -194,14 +194,14 @@ export default function MerendaCadastroPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-gray-50/80 border-b border-gray-100 text-sm text-gray-500">
+                <tr className="bg-gray-100/90 border-b-2 border-gray-200 text-sm text-gray-600 shadow-sm">
                   <th className="py-4 px-6 font-semibold tracking-wide">PRODUTO</th>
                   <th className="py-4 px-6 font-semibold tracking-wide">CATEGORIA</th>
-                  <th className="py-4 px-6 font-semibold tracking-wide">GRAMATURA</th>
+                  <th className="py-4 px-6 font-semibold tracking-wide">GRAMATURA <span className="text-xs opacity-70 font-normal">(KG)</span></th>
                   <th className="py-4 px-6 font-semibold tracking-wide">MARCA</th>
                   <th className="py-4 px-6 font-semibold tracking-wide">VALIDADE</th>
                   <th className="py-4 px-6 font-semibold tracking-wide">LOTE</th>
-                  <th className="py-4 px-6 font-semibold tracking-wide text-right">AÇÕES</th>
+                  <th className="py-4 px-6 font-semibold tracking-wide text-center">AÇÕES</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -231,8 +231,8 @@ export default function MerendaCadastroPage() {
                         </span>
                       ) : '-'}
                     </td>
-                    <td className="py-4 px-6 text-right">
-                      <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <td className="py-4 px-6 text-center">
+                      <div className="flex items-center justify-center gap-2">
                         <button
                           onClick={() => handleOpenModal(item)}
                           className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"

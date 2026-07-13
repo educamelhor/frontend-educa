@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect } from "react";
+import { Toaster } from "react-hot-toast";
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom";
 import Sidebar from "./components/layout/Sidebar";
 import HeaderGlobal from "./components/layout/HeaderGlobal";
@@ -264,6 +265,7 @@ function RequireModulo({ modulo, children }) {
 export default function App() {
   return (
     <BrowserRouter>
+      <Toaster position="top-right" />
       <Routes>
         {/* Rotas públicas */}
         <Route path="/" element={<LandingPage />} />

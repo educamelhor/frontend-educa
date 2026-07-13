@@ -21,6 +21,7 @@ export default function MerendaCadastroPage() {
   const [isEditing, setIsEditing] = useState(false);
   
   // Form states
+  const [formData, setFormData] = useState({
     id: null,
     produto: "",
     gramatura: "",

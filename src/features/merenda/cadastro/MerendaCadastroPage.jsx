@@ -222,7 +222,10 @@ export default function MerendaCadastroPage() {
                     <td className="py-4 px-6 text-gray-600">{item.gramatura || '-'}</td>
                     <td className="py-4 px-6 text-gray-600">{item.marca || '-'}</td>
                     <td className="py-4 px-6 text-gray-600">
-                      {item.validade ? new Date(item.validade).toLocaleDateString('pt-BR') : '-'}
+                      {item.validade ? (() => {
+                        const [yyyy, mm, dd] = String(item.validade).split('T')[0].split('-');
+                        return `${dd}/${mm}/${yyyy}`;
+                      })() : '-'}
                     </td>
                     <td className="py-4 px-6">
                       {item.lote ? (

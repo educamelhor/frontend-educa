@@ -130,6 +130,7 @@ import PlanoAvaliacaoPage from "./features/pedagogico/relatorios/PlanoAvaliacaoP
 
 // ✅ MÓDULO MERENDA
 import MerendaCadastroPage from "./features/merenda/cadastro";
+import MerendaCardapioPage from "./features/merenda/cardapio/MerendaCardapioPage";
 
 // Layout protegido para rotas autenticadas
 function ProtectedLayout() {
@@ -393,6 +394,7 @@ export default function App() {
 
           {/* ── Merenda ─────────────────────────────────────────────────── */}
           <Route path="/merenda/cadastro" element={<RequireModulo modulo="merenda.cadastro"><MerendaCadastroPage /></RequireModulo>} />
+          <Route path="/merenda/cardapio" element={<RequireModulo modulo="merenda.cardapio"><MerendaCardapioPage /></RequireModulo>} />
 
           {/* ── Impressão ────────────────────────────────────────────────── */}
           <Route path="/impressao/gabaritos"   element={<RequireModulo modulo="impressao"><GerarGabaritos /></RequireModulo>} />

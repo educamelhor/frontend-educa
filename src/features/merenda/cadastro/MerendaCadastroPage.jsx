@@ -60,7 +60,7 @@ export default function MerendaCadastroPage() {
         produto: item.produto || "",
         gramatura: item.gramatura || "",
         marca: item.marca || "",
-        validade: item.validade || "",
+        validade: item.validade ? String(item.validade).split('T')[0] : "",
         lote: item.lote || "",
         categoria: item.categoria || "Perecível"
       });

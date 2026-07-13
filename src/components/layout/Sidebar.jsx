@@ -264,6 +264,7 @@ export default function Sidebar({ isOpen, onClose }) {
     else if (p.startsWith('/gabarito')) setOpenGroup('gabarito');
     else if (p.startsWith('/agente-educa')) setOpenGroup('agente-educa');
     else if (p.startsWith('/biblioteca')) setOpenGroup('biblioteca');
+    else if (p.startsWith('/merenda')) setOpenGroup('merenda');
     else setOpenGroup(null);
   }, [location.pathname]);
 
@@ -1814,6 +1815,107 @@ export default function Sidebar({ isOpen, onClose }) {
                       color: '#fff', padding: '1px 5px', borderRadius: '6px',
                       letterSpacing: '0.5px',
                     }}>NOVO</span>
+                  </Link>
+                </li>
+                )}
+              </ul>
+            )}
+          </>
+        )}
+
+        {/* ───────────────────────────────
+            GRUPO: Merenda
+            Acesso: direção, coordenação — exceto professor, militar/disciplinar, secretário
+        ─────────────── */}
+        {isScopeEscola && !isDisciplinar && !isProfessor && !isSecretario && hasModulo('merenda') && (
+          <>
+            <button
+              className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-2 transition"
+              onClick={() => setOpenGroup(openGroup === 'merenda' ? null : 'merenda')}
+              type="button"
+              style={{
+                background: openGroup === 'merenda'
+                  ? 'linear-gradient(90deg, rgba(234,179,8,0.15), transparent)'
+                  : undefined,
+              }}
+            >
+              {/* Ícone de merenda: prato com talheres usando SVG inline */}
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+                style={{ color: openGroup === 'merenda' ? '#fbbf24' : undefined }}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                <circle cx="12" cy="12" r="9" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span className="flex-1 text-left" style={{ fontWeight: 700 }}>Merenda</span>
+              <span style={{
+                fontSize: '0.55rem',
+                fontWeight: 800,
+                background: 'linear-gradient(135deg, #f59e0b, #d97706)',
+                color: '#fff',
+                padding: '2px 6px',
+                borderRadius: '8px',
+                letterSpacing: '0.5px',
+                marginRight: 4,
+              }}>NOVO</span>
+              {openGroup === 'merenda' ? (
+                <ChevronDownIcon className="h-4 w-4" />
+              ) : (
+                <ChevronRightIcon className="h-4 w-4" />
+              )}
+            </button>
+
+            {openGroup === 'merenda' && (
+              <ul className="ml-4 mb-2">
+                {/* Cadastro */}
+                {hasModulo('merenda.cadastro') && (
+                <li>
+                  <Link
+                    to="/merenda/cadastro"
+                    className={getSubmenuLinkClasses('/merenda/cadastro')}
+                    style={{
+                      background: isActive('/merenda/cadastro')
+                        ? 'linear-gradient(90deg, rgba(245,158,11,0.15), transparent)'
+                        : undefined,
+                    }}
+                  >
+                    <UsersIcon className="h-5 w-5 mr-2" style={{ color: isActive('/merenda/cadastro') ? '#fbbf24' : undefined }} />
+                    <span className="flex-1">Cadastro</span>
+                  </Link>
+                </li>
+                )}
+
+                {/* Cardápio */}
+                {hasModulo('merenda.cardapio') && (
+                <li>
+                  <Link
+                    to="/merenda/cardapio"
+                    className={getSubmenuLinkClasses('/merenda/cardapio')}
+                    style={{
+                      background: isActive('/merenda/cardapio')
+                        ? 'linear-gradient(90deg, rgba(245,158,11,0.15), transparent)'
+                        : undefined,
+                    }}
+                  >
+                    <ClipboardDocumentListIcon className="h-5 w-5 mr-2" style={{ color: isActive('/merenda/cardapio') ? '#fbbf24' : undefined }} />
+                    <span className="flex-1">Cardápio</span>
+                  </Link>
+                </li>
+                )}
+
+                {/* Relatórios */}
+                {hasModulo('merenda.relatorios') && (
+                <li>
+                  <Link
+                    to="/merenda/relatorios"
+                    className={getSubmenuLinkClasses('/merenda/relatorios')}
+                    style={{
+                      background: isActive('/merenda/relatorios')
+                        ? 'linear-gradient(90deg, rgba(245,158,11,0.15), transparent)'
+                        : undefined,
+                    }}
+                  >
+                    <ChartBarIcon className="h-5 w-5 mr-2" style={{ color: isActive('/merenda/relatorios') ? '#fbbf24' : undefined }} />
+                    <span className="flex-1">Relatórios</span>
                   </Link>
                 </li>
                 )}

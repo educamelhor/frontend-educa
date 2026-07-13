@@ -120,6 +120,14 @@ const MODULOS_TREE = [
       { id: 'direcao.governanca', label: 'Governança' },
     ]
   },
+  {
+    id: 'merenda', label: 'Merenda', icon: '🍽️',
+    filhos: [
+      { id: 'merenda.cadastro', label: 'Cadastro' },
+      { id: 'merenda.cardapio', label: 'Cardápio' },
+      { id: 'merenda.relatorios', label: 'Relatórios' },
+    ]
+  },
 ];
 
 // ── Group accent colors (cycle) ───────────────────────────────────────────────

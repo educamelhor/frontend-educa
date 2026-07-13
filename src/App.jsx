@@ -127,6 +127,9 @@ import RelatoriosSecretaria from "./features/secretaria/relatorios/RelatoriosSec
 import RelatoriosPedagogicos from "./features/pedagogico/relatorios/RelatoriosPedagogicos.jsx";
 import PlanoAvaliacaoPage from "./features/pedagogico/relatorios/PlanoAvaliacaoPage.jsx";
 
+// ✅ MÓDULO MERENDA
+import MerendaCadastroPage from "./features/merenda/cadastro";
+
 // Layout protegido para rotas autenticadas
 function ProtectedLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -385,6 +388,10 @@ export default function App() {
           <Route path="/frequencia/relatorios"      element={<RequireModulo modulo="frequencia"><Relatorios /></RequireModulo>} />
           <Route path="/frequencia/busca-ativa"     element={<RequireModulo modulo="frequencia"><BuscaAtiva /></RequireModulo>} />
           <Route path="/frequencia/conselho-tutelar" element={<RequireModulo modulo="frequencia"><ConselhoTutelar /></RequireModulo>} />
+
+          {/* ── Merenda ─────────────────────────────────────────────────── */}
+          {/* TEMP: Sem RequireModulo para testes diretos pela URL */}
+          <Route path="/merenda/cadastro" element={<MerendaCadastroPage />} />
 
           {/* ── Impressão ────────────────────────────────────────────────── */}
           <Route path="/impressao/gabaritos"   element={<RequireModulo modulo="impressao"><GerarGabaritos /></RequireModulo>} />

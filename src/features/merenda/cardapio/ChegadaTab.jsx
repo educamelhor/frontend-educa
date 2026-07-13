@@ -247,9 +247,10 @@ export default function ChegadaTab() {
                         />
                       </div>
                       <div className="flex-1">
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Lote (opcional)</label>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">Lote</label>
                         <input
                           type="text"
+                          required
                           value={loteItem.lote}
                           onChange={(e) => handleLoteChange(index, "lote", e.target.value)}
                           placeholder="Ex: L123"
@@ -257,9 +258,10 @@ export default function ChegadaTab() {
                         />
                       </div>
                       <div className="flex-1">
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Validade (opcional)</label>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">Validade</label>
                         <input
                           type="date"
+                          required
                           value={loteItem.validade}
                           onChange={(e) => handleLoteChange(index, "validade", e.target.value)}
                           className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none focus:border-amber-400"

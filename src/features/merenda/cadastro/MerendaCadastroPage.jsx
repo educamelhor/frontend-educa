@@ -21,13 +21,10 @@ export default function MerendaCadastroPage() {
   const [isEditing, setIsEditing] = useState(false);
   
   // Form states
-  const [formData, setFormData] = useState({
     id: null,
     produto: "",
     gramatura: "",
     marca: "",
-    validade: "",
-    lote: "",
     categoria: "Perecível"
   });
 
@@ -60,8 +57,6 @@ export default function MerendaCadastroPage() {
         produto: item.produto || "",
         gramatura: item.gramatura || "",
         marca: item.marca || "",
-        validade: item.validade ? String(item.validade).split('T')[0] : "",
-        lote: item.lote || "",
         categoria: item.categoria || "Perecível"
       });
     } else {
@@ -71,8 +66,6 @@ export default function MerendaCadastroPage() {
         produto: "",
         gramatura: "",
         marca: "",
-        validade: "",
-        lote: "",
         categoria: "Perecível"
       });
     }
@@ -81,7 +74,7 @@ export default function MerendaCadastroPage() {
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
-    setFormData({ id: null, produto: "", gramatura: "", marca: "", validade: "", lote: "", categoria: "Perecível" });
+    setFormData({ id: null, produto: "", gramatura: "", marca: "", categoria: "Perecível" });
   };
 
   const handleChange = (e) => {
@@ -131,8 +124,7 @@ export default function MerendaCadastroPage() {
   // Filtragem visual
   const produtosFiltrados = produtos.filter(p => 
     (p.produto || "").toLowerCase().includes(busca.toLowerCase()) ||
-    (p.marca || "").toLowerCase().includes(busca.toLowerCase()) ||
-    (p.lote || "").toLowerCase().includes(busca.toLowerCase())
+    (p.marca || "").toLowerCase().includes(busca.toLowerCase())
   );
 
   return (
@@ -157,11 +149,11 @@ export default function MerendaCadastroPage() {
         <div className="relative z-10 flex flex-col sm:flex-row items-center gap-3">
           <div className="relative w-full sm:w-64">
             <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Buscar produto, marca ou lote..."
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
+              <input
+                type="text"
+                placeholder="Buscar produto ou marca..."
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
               className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-400 focus:border-amber-400 outline-none transition-all text-sm"
             />
           </div>
@@ -199,8 +191,6 @@ export default function MerendaCadastroPage() {
                   <th className="py-4 px-6 font-semibold tracking-wide">CATEGORIA</th>
                   <th className="py-4 px-6 font-semibold tracking-wide">GRAMATURA <span className="text-xs opacity-70 font-normal">(KG)</span></th>
                   <th className="py-4 px-6 font-semibold tracking-wide">MARCA</th>
-                  <th className="py-4 px-6 font-semibold tracking-wide">VALIDADE</th>
-                  <th className="py-4 px-6 font-semibold tracking-wide">LOTE</th>
                   <th className="py-4 px-6 font-semibold tracking-wide text-center">AÇÕES</th>
                 </tr>
               </thead>
@@ -221,19 +211,6 @@ export default function MerendaCadastroPage() {
                     </td>
                     <td className="py-4 px-6 text-gray-600">{item.gramatura || '-'}</td>
                     <td className="py-4 px-6 text-gray-600">{item.marca || '-'}</td>
-                    <td className="py-4 px-6 text-gray-600">
-                      {item.validade ? (() => {
-                        const [yyyy, mm, dd] = String(item.validade).split('T')[0].split('-');
-                        return `${dd}/${mm}/${yyyy}`;
-                      })() : '-'}
-                    </td>
-                    <td className="py-4 px-6">
-                      {item.lote ? (
-                        <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs font-mono rounded border border-gray-200">
-                          {item.lote}
-                        </span>
-                      ) : '-'}
-                    </td>
                     <td className="py-4 px-6 text-center">
                       <div className="flex items-center justify-center gap-2">
                         <button
@@ -341,48 +318,18 @@ export default function MerendaCadastroPage() {
                   </div>
                 </div>
 
-                {/* Marca & Lote */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">
-                      Marca
-                    </label>
-                    <input
-                      type="text"
-                      name="marca"
-                      value={formData.marca}
-                      onChange={handleChange}
-                      placeholder="Ex: Tio João"
-                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-400 focus:border-amber-400 outline-none transition-all"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">
-                      Lote
-                    </label>
-                    <input
-                      type="text"
-                      name="lote"
-                      value={formData.lote}
-                      onChange={handleChange}
-                      placeholder="Ex: L123456"
-                      className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-400 focus:border-amber-400 outline-none transition-all font-mono text-sm"
-                    />
-                  </div>
-                </div>
-
-                {/* Validade */}
+                {/* Marca */}
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">
-                    Validade
+                    Marca
                   </label>
                   <input
-                    type="date"
-                    name="validade"
-                    value={formData.validade}
+                    type="text"
+                    name="marca"
+                    value={formData.marca}
                     onChange={handleChange}
-                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-400 focus:border-amber-400 outline-none transition-all text-gray-700"
+                    placeholder="Ex: Tio João"
+                    className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-amber-400 focus:border-amber-400 outline-none transition-all"
                   />
                 </div>
               </div>

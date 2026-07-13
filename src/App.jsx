@@ -394,7 +394,7 @@ export default function App() {
 
           {/* ── Merenda ─────────────────────────────────────────────────── */}
           <Route path="/merenda/cadastro" element={<RequireModulo modulo="merenda.cadastro"><MerendaCadastroPage /></RequireModulo>} />
-          <Route path="/merenda/cardapio" element={<RequireModulo modulo="merenda.cardapio"><MerendaCardapioPage /></RequireModulo>} />
+          <Route path="/merenda/cardapio" element={<MerendaCardapioPage />} />
 
           {/* ── Impressão ────────────────────────────────────────────────── */}
           <Route path="/impressao/gabaritos"   element={<RequireModulo modulo="impressao"><GerarGabaritos /></RequireModulo>} />

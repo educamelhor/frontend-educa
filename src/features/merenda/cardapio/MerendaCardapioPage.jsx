@@ -4,14 +4,18 @@ import {
   TruckIcon,
   ScaleIcon,
   BanknotesIcon,
-  CalendarDaysIcon
+  CalendarDaysIcon,
+  ArrowsRightLeftIcon
 } from "@heroicons/react/24/outline";
+
+import ChegadaTab from "./ChegadaTab";
 
 export default function MerendaCardapioPage() {
   const [activeTab, setActiveTab] = useState("chegada");
 
   const tabs = [
     { id: "chegada", label: "CHEGADA DE GÊNEROS", icon: <TruckIcon className="w-5 h-5" /> },
+    { id: "movimentacao", label: "MOVIMENTAÇÃO DE GÊNEROS", icon: <ArrowsRightLeftIcon className="w-5 h-5" /> },
     { id: "percapita", label: "PERCÁPITA", icon: <ScaleIcon className="w-5 h-5" /> },
     { id: "cardapio", label: "CARDÁPIO", icon: <CalendarDaysIcon className="w-5 h-5" /> },
     { id: "saldo", label: "SALDO", icon: <BanknotesIcon className="w-5 h-5" /> },
@@ -58,9 +62,13 @@ export default function MerendaCardapioPage() {
       {/* TABS CONTENT */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden min-h-[400px] flex flex-col">
         {activeTab === "chegada" && (
+          <ChegadaTab />
+        )}
+
+        {activeTab === "movimentacao" && (
           <div className="p-8 text-center text-gray-500">
-            <TruckIcon className="w-12 h-12 mx-auto text-gray-300 mb-4" />
-            <h3 className="text-lg font-bold text-gray-700">Tabela: Chegada de Gêneros</h3>
+            <ArrowsRightLeftIcon className="w-12 h-12 mx-auto text-gray-300 mb-4" />
+            <h3 className="text-lg font-bold text-gray-700">Tabela: Movimentação de Gêneros</h3>
             <p className="text-sm mt-1">A renderização desta tabela será detalhada no próximo passo.</p>
           </div>
         )}

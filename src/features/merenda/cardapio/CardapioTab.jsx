@@ -20,6 +20,7 @@ export default function CardapioTab() {
   const [editingId, setEditingId] = useState(null);
   const [dataCardapio, setDataCardapio] = useState("");
   const [nomeCardapio, setNomeCardapio] = useState("");
+  const [turnoCardapio, setTurnoCardapio] = useState("Todos");
   const [itensSelecionados, setItensSelecionados] = useState([]);
   const [selectedLoteId, setSelectedLoteId] = useState(""); // para a listbox
 
@@ -76,6 +77,7 @@ export default function CardapioTab() {
       setEditingId(cardapioExistente.id);
       setDataCardapio(String(cardapioExistente.data_cardapio).split('T')[0]);
       setNomeCardapio(cardapioExistente.nome);
+      setTurnoCardapio(cardapioExistente.turno || "Todos");
       const formatItens = cardapioExistente.itens.map(i => ({
         key: `${i.produto_id}||${i.lote || ''}||${i.validade || ''}`,
         produto_id: i.produto_id,
@@ -92,6 +94,7 @@ export default function CardapioTab() {
       const mesFormatado = String(month + 1).padStart(2, '0');
       setDataCardapio(`${year}-${mesFormatado}-${diaFormatado}`);
       setNomeCardapio("");
+      setTurnoCardapio("Todos");
       setItensSelecionados([]);
     }
     setSelectedLoteId("");
@@ -166,6 +169,7 @@ export default function CardapioTab() {
     const payload = {
       data_cardapio: dataCardapio,
       nome: nomeCardapio,
+      turno: turnoCardapio,
       itens: itensSelecionados.map(i => ({
         produto_id: i.produto_id,
         lote: i.lote,
@@ -310,8 +314,8 @@ export default function CardapioTab() {
                       key={c.id} 
                       className="group/badge relative bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-100 rounded-lg p-2 text-xs font-semibold text-emerald-800 shadow-sm transition-all"
                     >
-                      <div className="break-words leading-tight" title={c.nome}>
-                        🍲 {c.nome}
+                      <div className="break-words leading-tight" title={`${c.nome}${c.turno && c.turno !== 'Todos' ? ` (${c.turno})` : ''}`}>
+                        🍲 {c.nome} {c.turno && c.turno !== 'Todos' ? `(${c.turno})` : ''}
                       </div>
                     </div>
                   ))}
@@ -338,8 +342,8 @@ export default function CardapioTab() {
             </div>
 
             <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div className="md:col-span-2">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-6 mb-8">
+                <div className="md:col-span-6">
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Refeição (Nome)</label>
                   <input
                     type="text"
@@ -350,7 +354,20 @@ export default function CardapioTab() {
                     className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20 text-gray-700 font-medium bg-gray-50/50"
                   />
                 </div>
-                <div>
+                <div className="md:col-span-3">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Turno</label>
+                  <select
+                    value={turnoCardapio}
+                    onChange={(e) => setTurnoCardapio(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20 text-gray-700 font-medium bg-gray-50/50"
+                  >
+                    <option value="Todos">Todos os Turnos</option>
+                    <option value="Matutino">Matutino</option>
+                    <option value="Vespertino">Vespertino</option>
+                    <option value="Noturno">Noturno</option>
+                  </select>
+                </div>
+                <div className="md:col-span-3">
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Data (Referência)</label>
                   <input
                     type="date"

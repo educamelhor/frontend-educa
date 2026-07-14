@@ -10,6 +10,7 @@ import {
 
 import ChegadaTab from "./ChegadaTab";
 import MovimentacaoTab from "./MovimentacaoTab";
+import PercapitaTab from "./PercapitaTab";
 
 export default function MerendaCardapioPage() {
   const [activeTab, setActiveTab] = useState("chegada");
@@ -71,11 +72,7 @@ export default function MerendaCardapioPage() {
         )}
 
         {activeTab === "percapita" && (
-          <div className="p-8 text-center text-gray-500">
-            <ScaleIcon className="w-12 h-12 mx-auto text-gray-300 mb-4" />
-            <h3 className="text-lg font-bold text-gray-700">Tabela: Percápita</h3>
-            <p className="text-sm mt-1">A renderização desta tabela será detalhada no próximo passo.</p>
-          </div>
+          <PercapitaTab />
         )}
 
         {activeTab === "cardapio" && (

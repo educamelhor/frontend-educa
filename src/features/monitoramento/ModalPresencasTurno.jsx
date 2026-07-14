@@ -50,7 +50,7 @@ export default function ModalPresencasTurno({ isOpen, onClose, turno, dataFiltro
       else if (dataFiltro) params.set("data", dataFiltro);
 
       const resp = await fetch(
-        `http://localhost:3000/api/monitoramento/presencas-turno?${params.toString()}`,
+        `/api/monitoramento/presencas-turno?${params.toString()}`,
         {
           headers: {
             Authorization: token ? `Bearer ${token}` : "",
@@ -115,7 +115,7 @@ export default function ModalPresencasTurno({ isOpen, onClose, turno, dataFiltro
   // ======================================================================
   // Exportações via BACKEND (mantidas)
   // ======================================================================
-  const API_BASE = "http://localhost:3000/api/monitoramento";
+  const API_BASE = "/api/monitoramento";
 
   function getFilenameFromContentDisposition(disposition, fallback) {
     if (!disposition) return fallback;

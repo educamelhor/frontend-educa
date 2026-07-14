@@ -80,12 +80,9 @@ export default function Monitoramento() {
 
   function handleCliqueHistorico() {
     setFiltroTurno("historico");
-    const data = prompt("Informe a data (AAAA-MM-DD):");
-    if (data) {
-      setDataHistorico(data);
-      setTurnoModal("historico");
-      setModalAberto(true);
-    }
+    setTurnoModal("historico");
+    setModalAberto(true);
+    // ✅ O modal já tem <input type="date"> internamente — sem prompt() nativo
   }
 
   function fecharModal() {

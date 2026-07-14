@@ -289,14 +289,14 @@ export default function CardapioTab() {
             return (
               <div 
                 key={day} 
-                className={`bg-white p-2 min-h-[120px] transition-all group ${isToday ? 'ring-2 ring-inset ring-amber-400 bg-amber-50/10' : 'hover:bg-gray-50'}`}
+                onClick={() => openModal(day)}
+                className={`bg-white p-2 min-h-[120px] transition-all group cursor-pointer ${isToday ? 'ring-2 ring-inset ring-amber-400 bg-amber-50/10' : 'hover:bg-gray-50'}`}
               >
                 <div className="flex justify-between items-start mb-2">
                   <span className={`text-sm font-semibold w-7 h-7 flex items-center justify-center rounded-full ${isToday ? 'bg-amber-500 text-white' : 'text-gray-600'}`}>
                     {day}
                   </span>
                   <button 
-                    onClick={() => openModal(day)}
                     className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-emerald-500 transition-all"
                     title="Adicionar Cardápio neste dia"
                   >
@@ -306,7 +306,11 @@ export default function CardapioTab() {
                 
                 <div className="space-y-2 overflow-y-auto max-h-[80px] no-scrollbar">
                   {cardapiosDoDia.map(c => (
-                    <div key={c.id} className="group/badge relative bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-100 rounded-lg p-2 text-xs font-semibold text-emerald-800 shadow-sm cursor-pointer hover:shadow-md transition-all">
+                    <div 
+                      key={c.id} 
+                      onClick={(e) => { e.stopPropagation(); openModal(day, c); }}
+                      className="group/badge relative bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-100 rounded-lg p-2 text-xs font-semibold text-emerald-800 shadow-sm cursor-pointer hover:shadow-md transition-all"
+                    >
                       <div className="truncate pr-10" title={c.nome}>
                         🍲 {c.nome}
                       </div>

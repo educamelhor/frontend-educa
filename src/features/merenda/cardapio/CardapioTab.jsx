@@ -310,7 +310,7 @@ export default function CardapioTab() {
                       key={c.id} 
                       className="group/badge relative bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-100 rounded-lg p-2 text-xs font-semibold text-emerald-800 shadow-sm transition-all"
                     >
-                      <div className="truncate" title={c.nome}>
+                      <div className="break-words leading-tight" title={c.nome}>
                         🍲 {c.nome}
                       </div>
                     </div>

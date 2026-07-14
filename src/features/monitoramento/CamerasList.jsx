@@ -3,7 +3,7 @@
 
 import React, { useEffect, useState } from "react";
 
-export default function CamerasList() {
+export default function CamerasList({ refreshTrigger }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState(null);
@@ -32,7 +32,7 @@ export default function CamerasList() {
       }
     }
     load();
-  }, []);
+  }, [refreshTrigger]);
 
   if (loading) {
     return <div className="p-3 text-sm text-gray-600">Carregando câmeras…</div>;

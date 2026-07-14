@@ -7,13 +7,16 @@
 // - Mantém estilo leve com Tailwind
 // ============================================================================
 
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import StreamCamera from "./StreamCamera.jsx";
 import CamerasList from "./CamerasList.jsx";
+import ModalGerenciarCameras from "./ModalGerenciarCameras.jsx";
 
 export default function MonitoramentoPainel() {
   const navigate = useNavigate();
+  const [modalCamerasAberto, setModalCamerasAberto] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   return (
     <div className="min-h-screen bg-blue-50 flex flex-col">
@@ -56,16 +59,27 @@ export default function MonitoramentoPainel() {
           <div className="bg-white border border-blue-200 rounded-lg shadow-sm">
             <div className="px-4 py-3 border-b border-blue-100 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-blue-900">Câmeras cadastradas</h2>
-              {/* espaço reservado para futuro: botão “Gerenciar” */}
+              <button 
+                onClick={() => setModalCamerasAberto(true)}
+                className="text-sm px-3 py-1.5 bg-blue-100 text-blue-700 font-semibold rounded hover:bg-blue-200 transition"
+              >
+                Gerenciar Câmeras
+              </button>
             </div>
 
             {/* A lista já faz o fetch em /api/monitoramento/cameras e exibe nome/RTSP/status */}
             <div className="p-4">
-              <CamerasList />
+              <CamerasList refreshTrigger={refreshTrigger} />
             </div>
           </div>
         </section>
       </main>
+
+      <ModalGerenciarCameras 
+        isOpen={modalCamerasAberto} 
+        onClose={() => setModalCamerasAberto(false)} 
+        onRefresh={() => setRefreshTrigger(prev => prev + 1)}
+      />
     </div>
   );
 }

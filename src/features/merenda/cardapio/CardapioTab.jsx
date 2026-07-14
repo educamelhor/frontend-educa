@@ -13,6 +13,9 @@ export default function CardapioTab() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // Custom Confirm Modal State
+  const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, title: "", message: "", onConfirm: null, type: "danger" });
+
   // Form State
   const [editingId, setEditingId] = useState(null);
   const [dataCardapio, setDataCardapio] = useState("");
@@ -49,13 +52,8 @@ export default function CardapioTab() {
   };
 
   // Funções de Calendário
-  const nextMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
-  };
-  const prevMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
-  };
-  
+  const nextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+  const prevMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
   const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
   const getFirstDayOfMonth = (year, month) => new Date(year, month, 1).getDay();
 
@@ -71,7 +69,6 @@ export default function CardapioTab() {
   const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
   const weekDays = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 
-  // Funções de Modal e CRUD
   const getEstoqueKey = (item) => `${item.produto_id}||${item.lote || ''}||${item.validade || ''}`;
 
   const openModal = (day = null, cardapioExistente = null) => {
@@ -79,7 +76,6 @@ export default function CardapioTab() {
       setEditingId(cardapioExistente.id);
       setDataCardapio(String(cardapioExistente.data_cardapio).split('T')[0]);
       setNomeCardapio(cardapioExistente.nome);
-      // Itens que vêm da API
       const formatItens = cardapioExistente.itens.map(i => ({
         key: `${i.produto_id}||${i.lote || ''}||${i.validade || ''}`,
         produto_id: i.produto_id,
@@ -122,34 +118,39 @@ export default function CardapioTab() {
 
     const kgNecessario = Number(itemEstoque.percapita_kg) * totalAlunos;
     const saldoKg = Number(itemEstoque.saldo_kg);
-    let kgUsado = kgNecessario;
+
+    const proceedAddItem = (kgUsado) => {
+      setItensSelecionados(prev => [...prev, {
+        key: selectedLoteId,
+        produto_id: itemEstoque.produto_id,
+        lote: itemEstoque.lote,
+        validade: itemEstoque.validade,
+        produto: itemEstoque.produto,
+        marca: itemEstoque.marca,
+        quantidade_kg: kgUsado,
+        gramaturaStr: itemEstoque.gramatura
+      }]);
+      setSelectedLoteId("");
+    };
 
     if (kgNecessario > saldoKg) {
-      const confirm = window.confirm(`ATENÇÃO! O saldo deste lote é de ${saldoKg.toLocaleString('pt-BR')}kg, mas a percápita exige ${kgNecessario.toLocaleString('pt-BR')}kg para ${totalAlunos} alunos.\n\nDeseja utilizar todo o saldo restante deste lote mesmo assim?`);
-      if (!confirm) {
-        setSelectedLoteId("");
-        return;
-      }
-      kgUsado = saldoKg; // Usa tudo que tem
+      setConfirmConfig({
+        isOpen: true,
+        title: "Atenção: Saldo Insuficiente",
+        message: `O saldo deste lote é de ${saldoKg.toLocaleString('pt-BR')}kg, mas a percápita exige ${kgNecessario.toLocaleString('pt-BR')}kg para ${totalAlunos} alunos.\n\nDeseja utilizar todo o saldo restante deste lote mesmo assim?`,
+        type: "warning",
+        onConfirm: () => {
+          proceedAddItem(saldoKg);
+          setConfirmConfig({ isOpen: false });
+        }
+      });
+      return;
     }
-
-    setItensSelecionados([...itensSelecionados, {
-      key: selectedLoteId,
-      produto_id: itemEstoque.produto_id,
-      lote: itemEstoque.lote,
-      validade: itemEstoque.validade,
-      produto: itemEstoque.produto,
-      marca: itemEstoque.marca,
-      quantidade_kg: kgUsado,
-      // gramatura
-      gramaturaStr: itemEstoque.gramatura
-    }]);
-    setSelectedLoteId("");
+    
+    proceedAddItem(kgNecessario);
   };
 
-  const handleRemoveItem = (key) => {
-    setItensSelecionados(itensSelecionados.filter(i => i.key !== key));
-  };
+  const handleRemoveItem = (key) => setItensSelecionados(itensSelecionados.filter(i => i.key !== key));
 
   const calcularUnidades = (kg, gramaturaStr) => {
     if (!kg) return 0;
@@ -161,18 +162,7 @@ export default function CardapioTab() {
     return (parseFloat(kg) / gramatura).toFixed(4);
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!nomeCardapio || !dataCardapio) {
-      toast.error("Preencha a data e o nome do cardápio.");
-      return;
-    }
-    if (itensSelecionados.length === 0) {
-      if (!window.confirm("Você não incluiu nenhum gênero alimentício. Deseja salvar o cardápio vazio?")) {
-        return;
-      }
-    }
-
+  const executeSubmit = async () => {
     const payload = {
       data_cardapio: dataCardapio,
       nome: nomeCardapio,
@@ -205,17 +195,49 @@ export default function CardapioTab() {
     }
   };
 
-  const handleDelete = async (id, nome) => {
-    if (!window.confirm(`ATENÇÃO! Deseja realmente CANCELAR o cardápio "${nome}"?\nOs itens consumidos serão devolvidos ao estoque automaticamente.`)) return;
-    try {
-      await api.delete(`/api/merenda/cardapio/${id}`);
-      toast.success("Cardápio cancelado e estoque estornado.");
-      fetchCardapios();
-      fetchEstoque();
-    } catch (err) {
-      console.error(err);
-      toast.error("Erro ao cancelar cardápio.");
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!nomeCardapio || !dataCardapio) {
+      toast.error("Preencha a data e o nome do cardápio.");
+      return;
     }
+    
+    if (itensSelecionados.length === 0) {
+      setConfirmConfig({
+        isOpen: true,
+        title: "Cardápio Vazio",
+        message: "Você não incluiu nenhum gênero alimentício. Deseja salvar o cardápio vazio?",
+        type: "warning",
+        onConfirm: () => {
+          setConfirmConfig({ isOpen: false });
+          executeSubmit();
+        }
+      });
+      return;
+    }
+    
+    executeSubmit();
+  };
+
+  const handleDelete = (id, nome) => {
+    setConfirmConfig({
+      isOpen: true,
+      title: "Cancelar Cardápio",
+      message: `ATENÇÃO! Deseja realmente CANCELAR o cardápio "${nome}"?\nOs itens consumidos serão devolvidos ao estoque automaticamente.`,
+      type: "danger",
+      onConfirm: async () => {
+        setConfirmConfig({ isOpen: false });
+        try {
+          await api.delete(`/api/merenda/cardapio/${id}`);
+          toast.success("Cardápio cancelado e estoque estornado.");
+          fetchCardapios();
+          fetchEstoque();
+        } catch (err) {
+          console.error(err);
+          toast.error("Erro ao cancelar cardápio.");
+        }
+      }
+    });
   };
 
   return (
@@ -248,9 +270,7 @@ export default function CardapioTab() {
         </div>
       </div>
 
-      {/* Calendário */}
       <div className="flex-1 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col min-h-[600px]">
-        {/* Cabeçalho dias da semana */}
         <div className="grid grid-cols-7 border-b border-gray-100 bg-gray-50/50">
           {weekDays.map(wd => (
             <div key={wd} className="py-3 text-center text-xs font-bold text-gray-500 tracking-wider uppercase">
@@ -258,7 +278,6 @@ export default function CardapioTab() {
             </div>
           ))}
         </div>
-        {/* Grid de dias */}
         <div className="grid grid-cols-7 flex-1 auto-rows-fr bg-gray-200 gap-[1px]">
           {days.map((day, idx) => {
             if (!day) return <div key={`empty-${idx}`} className="bg-gray-50" />;
@@ -291,7 +310,6 @@ export default function CardapioTab() {
                       <div className="truncate pr-10" title={c.nome}>
                         🍲 {c.nome}
                       </div>
-                      {/* Botões de Ação do Badge */}
                       <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover/badge:opacity-100 transition-opacity bg-gradient-to-l from-teal-50 pl-2">
                         <button onClick={(e) => { e.stopPropagation(); openModal(day, c); }} className="p-1 text-blue-500 hover:bg-blue-100 rounded">
                           <PencilSquareIcon className="w-3.5 h-3.5" />
@@ -309,7 +327,7 @@ export default function CardapioTab() {
         </div>
       </div>
 
-      {/* Modal */}
+      {/* Modal Planejar Cardápio */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
@@ -325,7 +343,6 @@ export default function CardapioTab() {
             </div>
 
             <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6">
-              
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                 <div className="md:col-span-2">
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Refeição (Nome)</label>
@@ -339,13 +356,13 @@ export default function CardapioTab() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Data</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Data (Referência)</label>
                   <input
                     type="date"
-                    required
+                    disabled
                     value={dataCardapio}
-                    onChange={(e) => setDataCardapio(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20 text-gray-700 font-medium bg-gray-50/50"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl bg-gray-100/70 text-gray-500 font-semibold cursor-not-allowed"
+                    title="A data é definida pelo dia selecionado no calendário"
                   />
                 </div>
               </div>
@@ -441,6 +458,45 @@ export default function CardapioTab() {
                 ) : (
                   editingId ? "Salvar Alterações" : "Salvar Cardápio e Baixar Estoque"
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Premium de Confirmação e Avisos */}
+      {confirmConfig.isOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200 border border-white/20">
+            <div className={`px-6 py-5 border-b flex items-center gap-4 ${confirmConfig.type === 'danger' ? 'bg-red-50 border-red-100' : 'bg-amber-50 border-amber-100'}`}>
+              {confirmConfig.type === 'danger' ? (
+                <div className="bg-red-100 p-2.5 rounded-full text-red-600 shadow-sm">
+                  <TrashIcon className="w-6 h-6" />
+                </div>
+              ) : (
+                <div className="bg-amber-100 p-2.5 rounded-full text-amber-600 shadow-sm">
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                </div>
+              )}
+              <h3 className={`text-xl font-bold tracking-tight ${confirmConfig.type === 'danger' ? 'text-red-900' : 'text-amber-900'}`}>
+                {confirmConfig.title}
+              </h3>
+            </div>
+            <div className="p-6 bg-white">
+              <p className="text-gray-700 whitespace-pre-wrap leading-relaxed text-[15px]">{confirmConfig.message}</p>
+            </div>
+            <div className="px-6 py-5 bg-gray-50 border-t border-gray-100 flex justify-end gap-3 rounded-b-3xl">
+              <button
+                onClick={() => setConfirmConfig({ isOpen: false, title: "", message: "", onConfirm: null, type: "danger" })}
+                className="px-6 py-2.5 text-gray-700 font-semibold hover:bg-gray-200 rounded-xl transition-colors"
+              >
+                Voltar
+              </button>
+              <button
+                onClick={confirmConfig.onConfirm}
+                className={`px-6 py-2.5 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all ${confirmConfig.type === 'danger' ? 'bg-red-500 hover:bg-red-600' : 'bg-amber-500 hover:bg-amber-600'}`}
+              >
+                Confirmar
               </button>
             </div>
           </div>

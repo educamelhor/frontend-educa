@@ -289,7 +289,7 @@ export default function CardapioTab() {
             return (
               <div 
                 key={day} 
-                onClick={() => openModal(day)}
+                onClick={() => openModal(day, cardapiosDoDia[0] || null)}
                 className={`bg-white p-2 min-h-[120px] transition-all group cursor-pointer ${isToday ? 'ring-2 ring-inset ring-amber-400 bg-amber-50/10' : 'hover:bg-gray-50'}`}
               >
                 <div className="flex justify-between items-start mb-2">
@@ -308,19 +308,10 @@ export default function CardapioTab() {
                   {cardapiosDoDia.map(c => (
                     <div 
                       key={c.id} 
-                      onClick={(e) => { e.stopPropagation(); openModal(day, c); }}
-                      className="group/badge relative bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-100 rounded-lg p-2 text-xs font-semibold text-emerald-800 shadow-sm cursor-pointer hover:shadow-md transition-all"
+                      className="group/badge relative bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-100 rounded-lg p-2 text-xs font-semibold text-emerald-800 shadow-sm transition-all"
                     >
-                      <div className="truncate pr-10" title={c.nome}>
+                      <div className="truncate" title={c.nome}>
                         🍲 {c.nome}
-                      </div>
-                      <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover/badge:opacity-100 transition-opacity bg-gradient-to-l from-teal-50 pl-2">
-                        <button onClick={(e) => { e.stopPropagation(); openModal(day, c); }} className="p-1 text-blue-500 hover:bg-blue-100 rounded">
-                          <PencilSquareIcon className="w-3.5 h-3.5" />
-                        </button>
-                        <button onClick={(e) => { e.stopPropagation(); handleDelete(c.id, c.nome); }} className="p-1 text-red-500 hover:bg-red-100 rounded">
-                          <TrashIcon className="w-3.5 h-3.5" />
-                        </button>
                       </div>
                     </div>
                   ))}
@@ -444,25 +435,39 @@ export default function CardapioTab() {
               )}
             </form>
 
-            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-3 rounded-b-3xl">
-              <button
-                type="button"
-                onClick={closeModal}
-                className="px-6 py-2.5 text-gray-700 font-semibold hover:bg-gray-200 rounded-xl transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleSubmit}
-                disabled={saving}
-                className="px-8 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl shadow-md transition-colors disabled:opacity-50 flex items-center gap-2"
-              >
-                {saving ? (
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : (
-                  editingId ? "Salvar Alterações" : "Salvar Cardápio e Baixar Estoque"
-                )}
-              </button>
+            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex justify-between items-center rounded-b-3xl">
+              {editingId ? (
+                <button
+                  type="button"
+                  onClick={() => { closeModal(); handleDelete(editingId, nomeCardapio); }}
+                  className="px-5 py-2.5 bg-red-100 hover:bg-red-200 text-red-700 font-bold rounded-xl transition-colors flex items-center gap-2 shadow-sm"
+                >
+                  <TrashIcon className="w-5 h-5" />
+                  Excluir Cardápio
+                </button>
+              ) : (
+                <div></div>
+              )}
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  className="px-6 py-2.5 text-gray-700 font-semibold hover:bg-gray-200 rounded-xl transition-colors"
+                >
+                  Fechar
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={saving}
+                  className="px-8 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl shadow-md transition-colors disabled:opacity-50 flex items-center gap-2"
+                >
+                  {saving ? (
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    editingId ? "Salvar Alterações" : "Salvar Cardápio e Baixar Estoque"
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>

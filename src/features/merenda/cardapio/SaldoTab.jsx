@@ -9,6 +9,7 @@ export default function SaldoTab() {
   
   const [isConferencia, setIsConferencia] = useState(false);
   const [conferenciaData, setConferenciaData] = useState({}); // { key: kg }
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetchSaldoCompleto();
@@ -19,6 +20,14 @@ export default function SaldoTab() {
     try {
       const { data } = await api.get("/api/merenda/saldo-completo");
       setItens(data || []);
+      
+      const confData = {};
+      (data || []).forEach(item => {
+        if (item.quantidade_deposito_kg !== null && item.quantidade_deposito_kg !== undefined) {
+          confData[getEstoqueKey(item)] = item.quantidade_deposito_kg;
+        }
+      });
+      setConferenciaData(confData);
     } catch (err) {
       console.error(err);
       toast.error("Erro ao carregar saldo.");
@@ -31,13 +40,34 @@ export default function SaldoTab() {
 
   const toggleConferencia = () => {
     setIsConferencia(!isConferencia);
-    if (!isConferencia) {
-      setConferenciaData({});
-    }
   };
 
   const handleConferenciaChange = (key, value) => {
     setConferenciaData(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleSaveConferencia = async () => {
+    setSaving(true);
+    const payload = Object.entries(conferenciaData).map(([key, kgStr]) => {
+      const [produto_id, lote, validade] = key.split('||');
+      return {
+        produto_id,
+        lote: lote || null,
+        validade: validade || null,
+        quantidade_deposito_kg: parseFloat(kgStr) || 0
+      };
+    }).filter(i => !isNaN(i.quantidade_deposito_kg));
+
+    try {
+      await api.post("/api/merenda/conferencia", { itens: payload });
+      toast.success("Conferência salva com sucesso!");
+      fetchSaldoCompleto();
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao salvar conferência.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handlePrint = () => {
@@ -66,6 +96,23 @@ export default function SaldoTab() {
         </div>
         
         <div className="flex items-center gap-3">
+          {isConferencia && (
+            <button
+              onClick={handleSaveConferencia}
+              disabled={saving}
+              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition-all flex items-center gap-2 disabled:opacity-50"
+            >
+              {saving ? (
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <>
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>
+                  Salvar Conferência
+                </>
+              )}
+            </button>
+          )}
+
           {!isConferencia && (
             <button
               onClick={handlePrint}
@@ -80,12 +127,21 @@ export default function SaldoTab() {
             onClick={toggleConferencia}
             className={`px-5 py-2.5 font-bold rounded-xl shadow-sm transition-all flex items-center gap-2 ${
               isConferencia 
-                ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' 
+                ? 'bg-gray-200 text-gray-700 hover:bg-gray-300' 
                 : 'bg-emerald-500 text-white hover:bg-emerald-600 shadow-md'
             }`}
           >
-            <ClipboardDocumentCheckIcon className="w-5 h-5" />
-            {isConferencia ? "Sair da Conferência" : "Iniciar Conferência"}
+            {isConferencia ? (
+              <>
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                Sair da Conferência
+              </>
+            ) : (
+              <>
+                <ClipboardDocumentCheckIcon className="w-5 h-5" />
+                Iniciar Conferência
+              </>
+            )}
           </button>
         </div>
       </div>

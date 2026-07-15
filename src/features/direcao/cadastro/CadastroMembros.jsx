@@ -28,6 +28,7 @@ const FUNCOES = [
   { value: "apoio",                   label: "Apoio" },
   { value: "educador_social",         label: "Educador Social" },
   { value: "vigilancia",              label: "Vigilância" },
+  { value: "merenda",                 label: "Merenda" },
 ];
 
 /* ═══════════════════════════════════════════════════════════

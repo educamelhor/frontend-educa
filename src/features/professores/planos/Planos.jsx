@@ -338,11 +338,11 @@ export default function Planos() {
       setEnviandoPAP(true);
       const { data } = await api.delete(`/avaliacoes/${modalExcluirPlano.id}`);
       if (data.success) {
-        setDisciplinasComPlanos(prev => prev.map(d =>
-          d.disciplina === modalExcluirPlano.disciplina
-            ? { ...d, status: "PENDENTE", id: null }
-            : d
-        ));
+        // Força o useEffect a recarregar a tabela para atualizar a exclusão
+        const turmaCache = turmaSelecionada;
+        setTurmaSelecionada(null);
+        setTimeout(() => setTurmaSelecionada(turmaCache), 50);
+
         showMsg("success", data.message || "Plano excluído com sucesso.");
       } else {
         showMsg("error", data.message || "Erro ao excluir plano.");

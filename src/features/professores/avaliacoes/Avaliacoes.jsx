@@ -1647,7 +1647,7 @@ export default function Avaliacoes() {
                     <div className="text-xs text-slate-400 mt-1">alunos</div>
                   </div>
                   <div className="rounded-lg p-3 text-center" style={{background:"rgba(16,185,129,0.1)"}}>
-                    <div className="text-2xl font-black text-emerald-300">{columns.filter(c=>!isItemBloqueado(c.itemIdx)).length}</div>
+                    <div className="text-2xl font-black text-emerald-300">{columns.length}</div>
                     <div className="text-xs text-slate-400 mt-1">colunas</div>
                   </div>
                   <div className="rounded-lg p-3 text-center" style={{background:"rgba(239,68,68,0.1)"}}>

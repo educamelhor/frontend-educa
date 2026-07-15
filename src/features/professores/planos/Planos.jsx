@@ -992,9 +992,22 @@ export default function Planos() {
                       lineHeight: 1.5,
                     }}
                   >
-                    {isLote
-                      ? "Ao salvar, o mesmo plano de avaliação será aplicado a todas as turmas listadas acima."
-                      : "Este plano será salvo exclusivamente para esta turma."}
+                    <button
+                      onClick={() => {
+                        if (planoModo !== "professor_autonomo") {
+                          if (papStatus === "ENVIADO")
+                            return showMsg("info", "PAP enviado: aguardando apreciação da direção.");
+                          if (papStatus === "APROVADO")
+                            return showMsg("info", "PAP aprovado: edição bloqueada.");
+                        }
+                        if (papStatus === "BLOQUEADO_TEMPO")
+                          return showMsg("info", "Bimestre encerrado: apenas consulta.");
+                      }}
+                    >
+                      {isLote
+                        ? "Ao salvar, o mesmo plano de avaliação será aplicado a todas as turmas listadas acima."
+                        : "Este plano será salvo exclusivamente para esta turma."}
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1010,10 +1023,12 @@ export default function Planos() {
               type="button"
               onClick={() => {
                 // bloqueios de governança (mock)
-                if (papStatus === "ENVIADO")
-                  return showMsg("info", "PAP enviado: aguardando apreciação da direção.");
-                if (papStatus === "APROVADO")
-                  return showMsg("info", "PAP aprovado: edição bloqueada.");
+                if (planoModo !== "professor_autonomo") {
+                  if (papStatus === "ENVIADO")
+                    return showMsg("info", "PAP enviado: aguardando apreciação da direção.");
+                  if (papStatus === "APROVADO")
+                    return showMsg("info", "PAP aprovado: edição bloqueada.");
+                }
                 if (papStatus === "BLOQUEADO_TEMPO")
                   return showMsg("info", "Bimestre encerrado: apenas consulta.");
 
@@ -1191,8 +1206,9 @@ export default function Planos() {
                               }
 
                               // 2) Se o PAP está em rascunho ou liberado pela direção (pode editar)
+                              //    OU se o professor tem autonomia total
 
-                              if (papStatus === "RASCUNHO" || papStatus === "LIBERADO") {
+                              if (papStatus === "RASCUNHO" || papStatus === "LIBERADO" || planoModo === "professor_autonomo") {
                                 // ✅ modo edição
                                 setEditIndex(idx);
 
@@ -1227,8 +1243,10 @@ export default function Planos() {
                           <button
                             type="button"
                             onClick={() => {
-                              if (papStatus === "ENVIADO") return showMsg("info", "PAP enviado: edição bloqueada.");
-                              if (papStatus === "APROVADO") return showMsg("info", "PAP aprovado: edição bloqueada.");
+                              if (planoModo !== "professor_autonomo") {
+                                if (papStatus === "ENVIADO") return showMsg("info", "PAP enviado: edição bloqueada.");
+                                if (papStatus === "APROVADO") return showMsg("info", "PAP aprovado: edição bloqueada.");
+                              }
                               if (papStatus === "BLOQUEADO_TEMPO") return showMsg("info", "Bimestre encerrado: apenas consulta.");
 
                               // ✅ abre modal premium de confirmação
@@ -1266,8 +1284,10 @@ export default function Planos() {
                 onClick={async () => {
                   if (!papKeyAtiva) return;
                   if (papStatus === "BLOQUEADO_TEMPO") return showMsg("info", "Bimestre encerrado: apenas consulta.");
-                  if (papStatus === "APROVADO") return showMsg("info", "PAP aprovado: edição bloqueada.");
-                  if (papStatus === "ENVIADO") return showMsg("info", "Este PAP já foi enviado para direção.");
+                  if (planoModo !== "professor_autonomo") {
+                    if (papStatus === "APROVADO") return showMsg("info", "PAP aprovado: edição bloqueada.");
+                    if (papStatus === "ENVIADO") return showMsg("info", "Este PAP já foi enviado para direção.");
+                  }
 
                   try {
                     const nomeCodigo = "Plano-" + Math.floor(Math.random() * 10000); // Gerado via backend depois logicamente
@@ -1312,8 +1332,10 @@ export default function Planos() {
                 onClick={() => {
                   if (!papKeyAtiva) return;
                   if (papStatus === "BLOQUEADO_TEMPO") return showMsg("info", "Bimestre encerrado: apenas consulta.");
-                  if (papStatus === "APROVADO") return showMsg("info", "PAP aprovado: edição bloqueada.");
-                  if (papStatus === "ENVIADO") return showMsg("info", "Este PAP já foi enviado para direção.");
+                  if (planoModo !== "professor_autonomo") {
+                    if (papStatus === "APROVADO") return showMsg("info", "PAP aprovado: edição bloqueada.");
+                    if (papStatus === "ENVIADO") return showMsg("info", "Este PAP já foi enviado para direção.");
+                  }
                   if (!pontosOk) {
                     return showMsg(
                       "warn",
@@ -2039,12 +2061,14 @@ export default function Planos() {
         setDescricao={setDescricao}
 
         onSalvar={() => {
-          // bloqueios de governança (mock)
-          if (papStatus === "ENVIADO")
-            return { ok: false, type: "info", text: "PAP enviado: edição bloqueada." };
+          // bloqueios de governança
+          if (planoModo !== "professor_autonomo") {
+            if (papStatus === "ENVIADO")
+              return { ok: false, type: "info", text: "PAP enviado: edição bloqueada." };
 
-          if (papStatus === "APROVADO")
-            return { ok: false, type: "info", text: "PAP aprovado: edição bloqueada." };
+            if (papStatus === "APROVADO")
+              return { ok: false, type: "info", text: "PAP aprovado: edição bloqueada." };
+          }
 
           if (papStatus === "BLOQUEADO_TEMPO")
             return { ok: false, type: "info", text: "Bimestre encerrado: apenas consulta." };

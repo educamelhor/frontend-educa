@@ -92,16 +92,19 @@ function PlanCard({ plano, onExportar, onReexportar, exportandoId }) {
                 }}>
                   {plano.bimestre}
                 </span>
-                {bimestral && (
+                {bimestral && (() => {
+                  const numColunas = new Set(itens.map(i => (i.atividade || '').trim())).size;
+                  return (
                   <span style={{
                     fontSize: "0.65rem", fontWeight: 700, padding: "3px 10px", borderRadius: 99,
                     background: "rgba(139,92,246,0.12)", color: "#a78bfa",
                     border: "1px solid rgba(139,92,246,0.25)",
                     display: "flex", alignItems: "center", gap: 4,
                   }}>
-                    ✓ Avaliação Bimestral
+                    ✓ {numColunas} {numColunas === 1 ? 'coluna' : 'colunas'}
                   </span>
-                )}
+                  );
+                })()}
               </div>
 
               <div style={{ fontSize: "1.05rem", fontWeight: 800, color: "#e2e8f0", marginBottom: 4 }}>
@@ -236,7 +239,7 @@ function PlanCard({ plano, onExportar, onReexportar, exportandoId }) {
                     </div>
                     <div style={{ fontSize: "0.6rem", color: "#475569", marginTop: 2 }}>
                       {item.nota_total} pts
-                      {!!item.fixo_direcao && <span style={{ color: "#a78bfa", marginLeft: 6 }}>← será exportado</span>}
+                      <span style={{ color: item.fixo_direcao ? "#a78bfa" : "#94a3b8", marginLeft: 6 }}>← será exportado</span>
                     </div>
                   </div>
                 ))}
@@ -481,7 +484,7 @@ export default function AgentePlanos() {
     const bimestral = itens.find(i => i.fixo_direcao);
     setModalReexportar({
       plano,
-      atividade: bimestral?.atividade || 'Prova Bimestral',
+      atividade: 'Plano completo',
       onConfirmar: () => handleExportarEstrutura(plano),
     });
   };
@@ -547,9 +550,9 @@ export default function AgentePlanos() {
               Planos — Exportar para EDUCADF
             </h1>
             <p style={{ color: "#64748b", fontSize: "0.9rem", marginTop: 8, maxWidth: 560, lineHeight: 1.6 }}>
-              O Agente migra a coluna <strong style={{ color: "#a78bfa" }}>Avaliação Bimestral</strong> dos seus
-              Planos de Avaliação Pedagógico (PAP) para o portal EDUCADF.
-              Apenas a <strong style={{ color: "#e2e8f0" }}>estrutura</strong> é exportada nesta etapa — as notas serão em etapa posterior.
+              O Agente migra <strong style={{ color: "#a78bfa" }}>todo o Plano de Avaliação</strong> do
+              seu Diário (PAP) para o portal EDUCADF.
+              Apenas a <strong style={{ color: "#e2e8f0" }}>estrutura (colunas)</strong> é exportada nesta etapa — as notas serão em etapa posterior.
             </p>
           </div>
 
@@ -585,7 +588,7 @@ export default function AgentePlanos() {
         <div style={{ fontSize: "0.82rem", color: "#94a3b8", lineHeight: 1.6 }}>
           <strong style={{ color: "#a78bfa" }}>Etapa 1 de N:</strong>{" "}
           Exportação da <strong style={{ color: "#e2e8f0" }}>estrutura</strong> — o Agente cria no EDUCADF
-          as colunas correspondentes à Avaliação Bimestral de cada plano aprovado. Somente planos com status&nbsp;
+          as colunas correspondentes ao plano de cada turma. Somente planos com status&nbsp;
           <strong style={{ color: "#22c55e" }}>APROVADO</strong> ou <strong style={{ color: "#3b82f6" }}>ENVIADO</strong>{" "}
           podem ser exportados. As notas serão sincronizadas em etapa futura.
         </div>
@@ -955,7 +958,7 @@ export default function AgentePlanos() {
             <div style={{ fontSize: "0.8rem", color: "#334155" }}>
               Para iniciar, crie Planos de Avaliação com a coluna{" "}
               <strong style={{ color: "#a78bfa" }}>Avaliação Bimestral</strong> habilitada
-              e aguarde aprovação da Direção.
+              (obrigatória) e aguarde aprovação da Direção.
             </div>
           </div>
         ) : (
@@ -1008,7 +1011,7 @@ export default function AgentePlanos() {
                 Exportar Estrutura para EDUCADF
               </div>
               <div style={{ fontSize: "0.78rem", color: "rgba(196,181,253,0.85)", marginTop: 6 }}>
-                Apenas a coluna <strong style={{ color: "#c4b5fd" }}>Avaliação Bimestral</strong> será criada
+                <strong style={{ color: "#c4b5fd" }}>Todo o plano</strong> será migrado para o EDUCADF
               </div>
             </div>
 
@@ -1039,7 +1042,7 @@ export default function AgentePlanos() {
                 fontSize: "0.78rem", color: "#a5b4fc", lineHeight: 1.6,
               }}>
                 <strong style={{ color: "#818cf8" }}>🎯 O que será exportado:</strong><br />
-                A coluna <strong style={{ color: "#e2e8f0" }}>Avaliação Bimestral</strong> será criada no portal EDUCADF
+                As colunas do <strong style={{ color: "#e2e8f0" }}>plano de avaliação</strong> serão criadas no portal EDUCADF
                 para <strong style={{ color: "#e2e8f0" }}>{modalConfirm.turmas}</strong> · <strong style={{ color: "#e2e8f0" }}>{modalConfirm.bimestre}</strong>.
                 As notas não serão alteradas nesta etapa.
               </div>
@@ -1085,7 +1088,7 @@ export default function AgentePlanos() {
             <div style={{ background: 'linear-gradient(135deg, #d97706, #b45309)', padding: '28px 28px 22px', textAlign: 'center' }}>
               <div style={{ fontSize: '2.8rem', marginBottom: 10 }}>⚠️</div>
               <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#fff' }}>Reexportar Estrutura?</div>
-              <div style={{ fontSize: '0.78rem', color: 'rgba(253,230,138,0.85)', marginTop: 6 }}>A coluna já foi exportada anteriormente</div>
+              <div style={{ fontSize: '0.78rem', color: 'rgba(253,230,138,0.85)', marginTop: 6 }}>As colunas já foram exportadas anteriormente</div>
             </div>
             <div style={{ padding: '24px 28px' }}>
               <div style={{ padding: '16px 18px', borderRadius: 16, marginBottom: 18, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)' }}>
@@ -1105,7 +1108,7 @@ export default function AgentePlanos() {
                 </div>
               </div>
               <div style={{ padding: '12px 16px', borderRadius: 12, marginBottom: 20, background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.2)', fontSize: '0.82rem', color: '#fde68a', lineHeight: 1.65 }}>
-                O Agente tentará criar o procedimento no EDUCADF.<br />
+                O Agente tentará recriar as colunas no EDUCADF.<br />
                 Se ele já existir, você será informado e <strong style={{ color: '#fbbf24' }}>nenhuma duplicata</strong> será criada.
               </div>
               <div style={{ display: 'flex', gap: 10 }}>

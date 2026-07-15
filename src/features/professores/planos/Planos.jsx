@@ -1140,39 +1140,41 @@ export default function Planos() {
                         <div className="flex items-center justify-center gap-2">
                           {/* Ícone 1 (AZUL) — padrão discreto (igual Alunos) */}
 
-                          <button
-                            type="button"
-                            onClick={() => {
-                              // Ícone 1 (AZUL) — Solicitar edição do item (mock)
+                          {planoModo !== "professor_autonomo" && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                // Ícone 1 (AZUL) — Solicitar edição do item (mock)
 
-                              // 1) Se o bimestre já encerrou (status final)
-                              if (papStatus === "BLOQUEADO_TEMPO") {
+                                // 1) Se o bimestre já encerrou (status final)
+                                if (papStatus === "BLOQUEADO_TEMPO") {
+                                  return showMsg(
+                                    "info",
+                                    "Bimestre encerrado: não é mais possível editar este item."
+                                  );
+                                }
+
+                                // 2) Se o PAP ainda está em rascunho ou liberado (pode editar livremente)
+                                if (papStatus === "RASCUNHO" || papStatus === "LIBERADO") {
+                                  return showMsg(
+                                    "info",
+                                    "Plano em edição. Você pode continuar editando para finalizar."
+                                  );
+                                }
+
+                                // 3) Qualquer outro status (ENVIADO / APROVADO / DEVOLVIDO):
+                                //    Solicitação de edição vai para direção (mock)
                                 return showMsg(
                                   "info",
-                                  "Bimestre encerrado: não é mais possível editar este item."
+                                  "Sua solicitação para editar este item foi enviada para a direção. Em breve você poderá editar."
                                 );
-                              }
-
-                              // 2) Se o PAP ainda está em rascunho ou liberado (pode editar livremente)
-                              if (papStatus === "RASCUNHO" || papStatus === "LIBERADO") {
-                                return showMsg(
-                                  "info",
-                                  "Plano em edição. Você pode continuar editando para finalizar."
-                                );
-                              }
-
-                              // 3) Qualquer outro status (ENVIADO / APROVADO / DEVOLVIDO):
-                              //    Solicitação de edição vai para direção (mock)
-                              return showMsg(
-                                "info",
-                                "Sua solicitação para editar este item foi enviada para a direção. Em breve você poderá editar."
-                              );
-                            }}
-                            className="p-1.5 rounded text-blue-600 hover:bg-blue-50 transition"
-                            title="Solicitar edição do item"
-                          >
-                            <IdentificationIcon className="h-5 w-5" />
-                          </button>
+                              }}
+                              className="p-1.5 rounded text-blue-600 hover:bg-blue-50 transition"
+                              title="Solicitar edição do item"
+                            >
+                              <IdentificationIcon className="h-5 w-5" />
+                            </button>
+                          )}
 
                           {/* Ícone 3 (ROXO) — Editar item (respeitando status do PAP) */}
                           <button

@@ -86,6 +86,7 @@ export default function Planos() {
 
   // ✅ Modal premium de governança (ENVIADO / APROVADO / DEVOLVIDO)
   const [modalGovernanca, setModalGovernanca] = useState(null); // null | { tipo: "ENVIADO" | "APROVADO", turma: "...", planoId }
+  const [modalExcluirPlano, setModalExcluirPlano] = useState(null); // null | { id, disciplina, turma }
   const [solicitacaoEnviada, setSolicitacaoEnviada] = useState(false); // modal de confirmação após solicitar liberação
   const [solicitandoLiberacao, setSolicitandoLiberacao] = useState(false);
 
@@ -329,6 +330,30 @@ export default function Planos() {
       : [turmaNomeSelecionada];
     // Passa a disciplina como terceiro argumento para respeitar exceções de governança
     abrirPlano(turmasParaAbrir, planoId, disc);
+  };
+
+  const handleExcluirPlano = async () => {
+    if (!modalExcluirPlano) return;
+    try {
+      setEnviandoPAP(true);
+      const { data } = await api.delete(`/avaliacoes/${modalExcluirPlano.id}`);
+      if (data.success) {
+        setDisciplinasComPlanos(prev => prev.map(d =>
+          d.disciplina === modalExcluirPlano.disciplina
+            ? { ...d, status: "PENDENTE", id: null }
+            : d
+        ));
+        showMsg("success", data.message || "Plano excluído com sucesso.");
+      } else {
+        showMsg("error", data.message || "Erro ao excluir plano.");
+      }
+    } catch (err) {
+      console.error(err);
+      showMsg("error", err.response?.data?.message || "Erro ao excluir plano.");
+    } finally {
+      setEnviandoPAP(false);
+      setModalExcluirPlano(null);
+    }
   };
 
   return (
@@ -779,23 +804,36 @@ export default function Planos() {
                           )}
                           {isEnviado && (
                             <button onClick={() => setModalGovernanca({ tipo: "ENVIADO", turma: turmaNomeSelecionada })}
-                              style={{ background: "#fef3c7", color: "#92400e", border: "1px solid #fde68a", borderRadius: "0.5rem", padding: "0.45rem 1.1rem", fontWeight: 700, fontSize: "0.8rem", cursor: "pointer" }}
+                              style={{ background: "#fef3c7", color: "#92400e", border: "1px solid #fde68a", borderRadius: "0.5rem", padding: "0.45rem 1.1rem", fontWeight: 700, fontSize: "0.8rem", cursor: "pointer", marginRight: "0.5rem" }}
                             >Editar</button>
                           )}
-                          {isAprovado && (
+                          {isAprovado && planoModo !== "professor_autonomo" && (
                             <button onClick={() => setModalGovernanca({ tipo: "APROVADO", turma: turmaNomeSelecionada, planoId: id, solicitacaoJaFeita: false })}
-                              style={{ background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe", borderRadius: "0.5rem", padding: "0.45rem 1.1rem", fontWeight: 700, fontSize: "0.8rem", cursor: "pointer" }}
+                              style={{ background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe", borderRadius: "0.5rem", padding: "0.45rem 1.1rem", fontWeight: 700, fontSize: "0.8rem", cursor: "pointer", marginRight: "0.5rem" }}
+                            >Editar</button>
+                          )}
+                          {isAprovado && planoModo === "professor_autonomo" && (
+                            <button onClick={() => abrirPlanoDisc(disciplina, id)}
+                              style={{ background: "linear-gradient(135deg,#3b82f6,#6366f1)", color: "#fff", border: "none", borderRadius: "0.5rem", padding: "0.45rem 1.1rem", fontWeight: 700, fontSize: "0.8rem", cursor: "pointer", marginRight: "0.5rem" }}
                             >Editar</button>
                           )}
                           {isLiberacaoSolicitada && (
                             <button onClick={() => setModalGovernanca({ tipo: "APROVADO", turma: turmaNomeSelecionada, planoId: id, solicitacaoJaFeita: true })}
-                              style={{ background: "#f5f3ff", color: "#6d28d9", border: "1px solid #ddd6fe", borderRadius: "0.5rem", padding: "0.45rem 1.1rem", fontWeight: 700, fontSize: "0.8rem", cursor: "pointer" }}
+                              style={{ background: "#f5f3ff", color: "#6d28d9", border: "1px solid #ddd6fe", borderRadius: "0.5rem", padding: "0.45rem 1.1rem", fontWeight: 700, fontSize: "0.8rem", cursor: "pointer", marginRight: "0.5rem" }}
                             >Editar</button>
                           )}
                           {isDevolvido && (
                             <button onClick={() => setModalGovernanca({ tipo: "DEVOLVIDO", turma: turmaNomeSelecionada, motivo: motivo_devolucao, planoId: id })}
-                              style={{ background: "#fffbeb", color: "#92400e", border: "1px solid #fde68a", borderRadius: "0.5rem", padding: "0.45rem 1.1rem", fontWeight: 700, fontSize: "0.8rem", cursor: "pointer" }}
+                              style={{ background: "#fffbeb", color: "#92400e", border: "1px solid #fde68a", borderRadius: "0.5rem", padding: "0.45rem 1.1rem", fontWeight: 700, fontSize: "0.8rem", cursor: "pointer", marginRight: "0.5rem" }}
                             >Ver motivo</button>
+                          )}
+                          
+                          {/* Botão Excluir */}
+                          {!isPendente && planoModo !== "coordenacao_decide" && (
+                            <button onClick={() => setModalExcluirPlano({ id, disciplina, turma: turmaNomeSelecionada })}
+                              style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca", borderRadius: "0.5rem", padding: "0.45rem 1.1rem", fontWeight: 700, fontSize: "0.8rem", cursor: "pointer" }}
+                              title="Excluir Plano"
+                            >Excluir</button>
                           )}
                         </td>
                       </tr>
@@ -2074,6 +2112,65 @@ export default function Planos() {
           return { ok: true, type: "success", text: "Item adicionado com sucesso." };
         }}
       />
+
+      {/* ═══ Modal Premium de Exclusão do Plano ═══ */}
+      {modalExcluirPlano && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col scale-in-center">
+            {/* Header Red */}
+            <div className="bg-gradient-to-r from-red-500 via-rose-600 to-red-600 px-6 py-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-white/20 rounded-2xl backdrop-blur-sm shadow-lg">
+                  <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </div>
+                <div>
+                  <h4 className="text-xl font-black text-white tracking-tight">Excluir Plano</h4>
+                  <p className="text-red-100 text-sm font-semibold mt-0.5">Plano de Avaliação Pedagógica</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-8 pb-10">
+              <div className="mb-6 space-y-4">
+                <p className="text-gray-600 text-center font-medium leading-relaxed">
+                  Tem certeza de que deseja excluir o plano de avaliação de <b>{modalExcluirPlano.disciplina}</b> para a turma <b>{modalExcluirPlano.turma}</b>?
+                </p>
+                <div className="bg-red-50 border border-red-100 p-4 rounded-xl text-sm text-red-800">
+                  ⚠️ Esta ação removerá permanentemente os itens de avaliação. <b>A exclusão será impedida</b> se já houverem notas lançadas no diário para este plano.
+                </div>
+              </div>
+
+              <div className="flex gap-4">
+                <button
+                  onClick={() => setModalExcluirPlano(null)}
+                  disabled={enviandoPAP}
+                  className="flex-1 px-4 py-3.5 rounded-xl font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 transition duration-200"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleExcluirPlano}
+                  disabled={enviandoPAP}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3.5 rounded-xl font-bold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 transition shadow-lg shadow-red-500/30"
+                >
+                  {enviandoPAP ? (
+                    "Excluindo..."
+                  ) : (
+                    <>
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      Sim, Excluir
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ═══ Modal Recall — Tipo de Avaliação pendente ═══ */}
       <ModalRecallTipoAvaliacao />

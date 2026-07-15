@@ -856,7 +856,7 @@ export default function Planos() {
       {mostrarTabela && (
         <section className="bg-white rounded-xl shadow-lg p-6">
           {/* Banner de governança (modo consulta) */}
-          {(papStatus === "BLOQUEADO_TEMPO" || papStatus === "APROVADO" || papStatus === "ENVIADO") && (
+          {(papStatus === "BLOQUEADO_TEMPO" || (planoModo !== "professor_autonomo" && (papStatus === "APROVADO" || papStatus === "ENVIADO"))) && (
             <div className="mb-4 rounded-lg px-4 py-3 text-sm bg-gray-50 text-gray-700 border">
               <span className="font-bold">Modo:</span>{" "}
               {papStatus === "BLOQUEADO_TEMPO"
@@ -1060,14 +1060,12 @@ export default function Planos() {
 
               }}
               disabled={
-                papStatus === "ENVIADO" ||
-                papStatus === "APROVADO" ||
-                papStatus === "BLOQUEADO_TEMPO"
+                papStatus === "BLOQUEADO_TEMPO" ||
+                (planoModo !== "professor_autonomo" && (papStatus === "ENVIADO" || papStatus === "APROVADO"))
               }
               className={`px-4 py-2 rounded-lg text-white font-semibold shadow transition ${
-                papStatus === "ENVIADO" ||
-                papStatus === "APROVADO" ||
-                papStatus === "BLOQUEADO_TEMPO"
+                papStatus === "BLOQUEADO_TEMPO" ||
+                (planoModo !== "professor_autonomo" && (papStatus === "ENVIADO" || papStatus === "APROVADO"))
                   ? "bg-gray-300 cursor-not-allowed"
                   : pontosOk || pontosExcedeu
                     ? "bg-blue-600 opacity-70 hover:opacity-80"
@@ -1076,9 +1074,9 @@ export default function Planos() {
               title={
                 papStatus === "BLOQUEADO_TEMPO"
                   ? "Bimestre encerrado (somente consulta)"
-                  : papStatus === "ENVIADO"
+                  : planoModo !== "professor_autonomo" && papStatus === "ENVIADO"
                     ? "PAP enviado (aguardando direção)"
-                    : papStatus === "APROVADO"
+                    : planoModo !== "professor_autonomo" && papStatus === "APROVADO"
                       ? "PAP aprovado (bloqueado)"
                       : pontosOk
                         ? "Pontuação completa (10/10)"
@@ -1316,9 +1314,9 @@ export default function Planos() {
                     }
                   }
                 }}
-                disabled={!papKeyAtiva || papStatus === "BLOQUEADO_TEMPO" || papStatus === "APROVADO" || papStatus === "ENVIADO"}
+                disabled={!papKeyAtiva || papStatus === "BLOQUEADO_TEMPO" || (planoModo !== "professor_autonomo" && (papStatus === "APROVADO" || papStatus === "ENVIADO"))}
                 className={`px-6 py-3 rounded-xl font-bold shadow transition ${
-                  !papKeyAtiva || papStatus === "BLOQUEADO_TEMPO" || papStatus === "APROVADO" || papStatus === "ENVIADO"
+                  !papKeyAtiva || papStatus === "BLOQUEADO_TEMPO" || (planoModo !== "professor_autonomo" && (papStatus === "APROVADO" || papStatus === "ENVIADO"))
                     ? "bg-gray-300 text-gray-600 cursor-not-allowed"
                     : "bg-blue-600 hover:bg-blue-700 text-white"
                 }`}
@@ -1345,9 +1343,9 @@ export default function Planos() {
                   // ✅ Abre modal de confirmação premium
                   setModalConfirmarEnvio(true);
                 }}
-                disabled={!papKeyAtiva || papStatus === "BLOQUEADO_TEMPO" || papStatus === "APROVADO" || papStatus === "ENVIADO"}
+                disabled={!papKeyAtiva || papStatus === "BLOQUEADO_TEMPO" || (planoModo !== "professor_autonomo" && (papStatus === "APROVADO" || papStatus === "ENVIADO"))}
                 className={`px-6 py-3 rounded-xl font-bold shadow transition ${
-                  !papKeyAtiva || papStatus === "BLOQUEADO_TEMPO" || papStatus === "APROVADO" || papStatus === "ENVIADO"
+                  !papKeyAtiva || papStatus === "BLOQUEADO_TEMPO" || (planoModo !== "professor_autonomo" && (papStatus === "APROVADO" || papStatus === "ENVIADO"))
                     ? "bg-gray-300 text-gray-600 cursor-not-allowed"
                     : "bg-green-600 hover:bg-green-700 text-white"
                 }`}

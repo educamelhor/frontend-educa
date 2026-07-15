@@ -118,6 +118,7 @@ export default function Planos() {
   // Governança: escola adota avaliação padrão bimestral + nomes das disciplinas de exceção
   const [escolaAdotaBimestral, setEscolaAdotaBimestral] = useState(false);
   const [excecoesNomes, setExcecoesNomes] = useState([]); // nomes em lowercase, ex: ["prática estudantil"]
+  const [planoModo, setPlanoModo] = useState("professor_aprovacao"); // coordenacao_decide | professor_aprovacao | professor_autonomo
 
   // Helper: retorna os itens iniciais de um plano respeitando as exceções de governança.
   // Se a disciplina for exceção ou a escola não adotar bimestral, começa sem Prova Bimestral.
@@ -137,11 +138,14 @@ export default function Planos() {
       setLoadingInicial(true);
       try {
         const escolaId = localStorage.getItem("escola_id");
-        const [resDisc, resTurmas, resCfg] = await Promise.all([
+        const [resDisc, resTurmas, resCfg, resPlanoModo] = await Promise.all([
           api.get("/professores/me/disciplinas"),
           api.get("/professores/me/turmas"),
           escolaId
             ? api.get("/api/governanca/avaliacao-config", { params: { escola_id: escolaId } }).catch(() => null)
+            : Promise.resolve(null),
+          escolaId
+            ? api.get("/api/governanca/plano-modo", { params: { escola_id: escolaId } }).catch(() => null)
             : Promise.resolve(null),
         ]);
 
@@ -156,6 +160,9 @@ export default function Planos() {
           const cfg = resCfg.data.config || {};
           setEscolaAdotaBimestral(cfg["escola.avaliacao_padrao_bimestral"] === "1");
           setExcecoesNomes(resCfg.data.excecoes_nomes || []);
+        }
+        if (resPlanoModo?.data?.ok) {
+          setPlanoModo(resPlanoModo.data.modo);
         }
       } catch (err) {
         console.error("Erro ao carregar dados do professor", err);
@@ -750,15 +757,25 @@ export default function Planos() {
                           <span style={{ background: badge.bg, color: badge.color, padding: "0.25rem 0.75rem", borderRadius: 999, fontSize: "0.72rem", fontWeight: 800 }}>{badge.text}</span>
                         </td>
                         <td style={{ padding: "1rem 1.5rem", textAlign: "right" }}>
-                          {isPendente && (
+                          {isPendente && planoModo !== "coordenacao_decide" && (
                             <button onClick={() => abrirPlanoDisc(disciplina, null)}
                               style={{ background: "linear-gradient(135deg,#3b82f6,#6366f1)", color: "#fff", border: "none", borderRadius: "0.5rem", padding: "0.45rem 1.1rem", fontWeight: 700, fontSize: "0.8rem", cursor: "pointer" }}
                             >Criar Plano</button>
                           )}
-                          {(isRascunho || isLiberado) && (
+                          {isPendente && planoModo === "coordenacao_decide" && (
+                            <span className="text-gray-400 text-xs font-bold bg-gray-100 px-3 py-1.5 rounded-lg border border-gray-200">
+                              Aguardando Direção
+                            </span>
+                          )}
+                          {(isRascunho || isLiberado) && planoModo !== "coordenacao_decide" && (
                             <button onClick={() => abrirPlanoDisc(disciplina, id)}
                               style={{ background: isLiberado ? "linear-gradient(135deg,#0d9488,#0f766e)" : "linear-gradient(135deg,#f97316,#ea580c)", color: "#fff", border: "none", borderRadius: "0.5rem", padding: "0.45rem 1.1rem", fontWeight: 700, fontSize: "0.8rem", cursor: "pointer" }}
                             >Editar</button>
+                          )}
+                          {(isRascunho || isLiberado) && planoModo === "coordenacao_decide" && (
+                            <button onClick={() => abrirPlanoDisc(disciplina, id)}
+                              style={{ background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe", borderRadius: "0.5rem", padding: "0.45rem 1.1rem", fontWeight: 700, fontSize: "0.8rem", cursor: "pointer" }}
+                            >Visualizar</button>
                           )}
                           {isEnviado && (
                             <button onClick={() => setModalGovernanca({ tipo: "ENVIADO", turma: turmaNomeSelecionada })}
@@ -1279,10 +1296,12 @@ export default function Planos() {
                       ? "Já enviado para direção"
                       : papStatus === "APROVADO"
                         ? "PAP aprovado (bloqueado)"
-                        : "Enviar este PAP para a direção/coordenação"
+                        : planoModo === "professor_autonomo"
+                          ? "Publicar este PAP e liberar o diário imediatamente"
+                          : "Enviar este PAP para a direção/coordenação"
                 }
               >
-                ENVIAR PARA DIREÇÃO
+                {planoModo === "professor_autonomo" ? "PUBLICAR PLANO" : "ENVIAR PARA DIREÇÃO"}
               </button>
 
               <button
@@ -1803,8 +1822,14 @@ export default function Planos() {
                   </svg>
                 </div>
                 <div>
-                  <h4 className="text-xl font-black text-white tracking-tight">Confirmar Envio para Direção</h4>
-                  <p className="text-emerald-100 text-sm font-semibold mt-0.5">Plano de Avaliação Pedagógica</p>
+                  <h4 className="text-xl font-black text-white tracking-tight">
+                    {planoModo === "professor_autonomo" ? "Publicar Plano de Avaliação" : "Confirmar Envio para Direção"}
+                  </h4>
+                  <p className="text-emerald-100 text-sm font-semibold mt-0.5">
+                    {planoModo === "professor_autonomo" 
+                      ? "O diário de notas será liberado imediatamente."
+                      : "Plano de Avaliação Pedagógica"}
+                  </p>
                 </div>
               </div>
             </div>
@@ -1877,13 +1902,14 @@ export default function Planos() {
                   setEnviandoPAP(true);
                   try {
                     const nomeCodigo = "Plano-" + Math.floor(Math.random() * 10000);
+                    const novoStatus = planoModo === "professor_autonomo" ? "APROVADO" : "ENVIADO";
                     const payload = {
                       disciplina: disciplinaSelecionada,
                       bimestre: bimestreSelecionado,
                       turmas: turmasDoPlanoAberto,
                       ano: new Date().getFullYear(),
                       nome_codigo: nomeCodigo,
-                      status: "ENVIADO",
+                      status: novoStatus,
                       itens
                     };
                     const { data } = await api.post("/avaliacoes", payload);
@@ -1893,12 +1919,16 @@ export default function Planos() {
                       // ✅ 2) Atualiza status imediatamente na tabela mestra
                       setDisciplinasComPlanos(prev => prev.map(d =>
                         d.disciplina === disciplinaSelecionada
-                          ? { ...d, status: "ENVIADO", id: data.plano_ids?.[0] || d.id }
+                          ? { ...d, status: novoStatus, id: data.plano_ids?.[0] || d.id }
                           : d
                       ));
                       // ✅ 3) Atualiza status local do editor
-                      setPapStatus("ENVIADO");
-                      showMsg("success", "✅ PAP enviado para a Direção com sucesso!");
+                      setPapStatus(novoStatus);
+                      if (planoModo === "professor_autonomo") {
+                        showMsg("success", "✅ Plano publicado e aprovado com sucesso! O diário já está liberado para notas.");
+                      } else {
+                        showMsg("success", "✅ PAP enviado para a Direção com sucesso!");
+                      }
                       // ✅ 4) Volta à tabela mestra
                       voltarTabelaMestra();
                     }
@@ -1932,7 +1962,7 @@ export default function Planos() {
                     <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                     </svg>
-                    Confirmar Envio
+                    {planoModo === "professor_autonomo" ? "Publicar Plano" : "Confirmar Envio"}
                   </>
                 )}
               </button>

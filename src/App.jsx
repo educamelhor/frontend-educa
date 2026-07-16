@@ -49,6 +49,7 @@ import PrivacidadePage from "./pages/PrivacidadePage";
 import ExcluirContaPage from "./pages/ExcluirContaPage";
 import CapturePrivacidadePage from "./pages/CapturePrivacidadePage";
 import SuportePage from "./pages/SuportePage";
+import VerificarCarteirinha from "./pages/VerificarCarteirinha.jsx";
 import Ferramentas from "./features/ferramentas";
 
 // ✅ MÓDULO BIBLIOTECA
@@ -278,6 +279,8 @@ export default function App() {
         <Route path="/excluir-conta" element={<ExcluirContaPage />} />
         {/* EDUCA Mobile — página pública de suporte (App Store: Guideline 1.5.0) */}
         <Route path="/suporte" element={<SuportePage />} />
+        {/* Rota pública de verificação da carteirinha */}
+        <Route path="/verificar/:token" element={<VerificarCarteirinha />} />
         {/* EDUCA-CAPTURE — páginas públicas (App Store Connect: support/privacy URLs) */}
         <Route path="/capture/privacidade" element={<CapturePrivacidadePage />} />
         <Route path="/capture/suporte" element={<CapturePrivacidadePage />} />

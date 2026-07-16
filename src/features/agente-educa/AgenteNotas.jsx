@@ -792,7 +792,7 @@ export default function AgenteNotas() {
                 Exportar Notas para EDUCADF
               </div>
               <div style={{ fontSize: "0.78rem", color: "rgba(167,243,208,0.85)", marginTop: 6 }}>
-                As notas da <strong style={{ color: "#a7f3d0" }}>Avaliação Bimestral</strong> serão enviadas
+                As notas de <strong style={{ color: "#a7f3d0" }}>toda a estrutura do seu plano</strong> serão consolidadas e enviadas
               </div>
             </div>
 
@@ -821,7 +821,7 @@ export default function AgenteNotas() {
                 fontSize: "0.78rem", color: "#6ee7b7", lineHeight: 1.6,
               }}>
                 <strong style={{ color: "#34d399" }}>📊 O que será exportado:</strong><br />
-                As <strong style={{ color: "#e2e8f0" }}>notas</strong> da coluna Avaliação Bimestral serão preenchidas no EDUCADF
+                As <strong style={{ color: "#e2e8f0" }}>notas</strong> de todas as colunas (Prova, Trabalho, Caderno, etc.) serão consolidadas e preenchidas no EDUCADF
                 para <strong style={{ color: "#e2e8f0" }}>{modalConfirm.turmas}</strong> · <strong style={{ color: "#e2e8f0" }}>{modalConfirm.bimestre}</strong>.
               </div>
 

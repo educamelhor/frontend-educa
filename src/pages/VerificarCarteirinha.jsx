@@ -11,7 +11,8 @@ export default function VerificarCarteirinha() {
   useEffect(() => {
     async function verifyToken() {
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/public/verificar-aluno/${token}`);
+        const baseUrl = import.meta.env.VITE_BACKEND_ORIGIN || import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        const response = await fetch(`${baseUrl}/public/verificar-aluno/${token}`);
         const result = await response.json();
 
         if (result.ok) {

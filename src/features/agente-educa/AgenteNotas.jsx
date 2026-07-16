@@ -644,22 +644,27 @@ export default function AgenteNotas() {
               key={f.key}
               onClick={() => setFiltro(f.key)}
               style={{
-                display: "flex", alignItems: "center", gap: 7,
-                padding: "8px 16px", borderRadius: 10, fontWeight: 700, fontSize: "0.78rem",
-                cursor: "pointer", transition: "all 0.2s",
-                border: filtro === f.key ? "1.5px solid #10b981" : "1.5px solid rgba(255,255,255,0.12)",
+                display: "flex", alignItems: "center", gap: 10,
+                padding: "10px 20px", borderRadius: 12, fontWeight: 700, fontSize: "0.82rem",
+                cursor: "pointer", transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                border: filtro === f.key ? "1px solid rgba(16, 185, 129, 0.6)" : "1px solid rgba(255, 255, 255, 0.1)",
                 background: filtro === f.key
-                  ? "linear-gradient(135deg, #10b981, #0891b2)"
-                  : "rgba(255,255,255,0.06)",
-                color: filtro === f.key ? "#fff" : "#94a3b8",
-                boxShadow: filtro === f.key ? "0 4px 14px rgba(16,185,129,0.3)" : "none",
+                  ? "linear-gradient(135deg, #10b981 0%, #0891b2 100%)"
+                  : "linear-gradient(145deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.8))",
+                color: filtro === f.key ? "#ffffff" : "#cbd5e1",
+                boxShadow: filtro === f.key 
+                  ? "0 8px 20px -4px rgba(16, 185, 129, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.3)" 
+                  : "0 4px 6px -1px rgba(0, 0, 0, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.05)",
+                backdropFilter: "blur(10px)",
               }}
             >
               {f.label}
               <span style={{
-                background: filtro === f.key ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.08)",
-                color: filtro === f.key ? "#fff" : "#64748b",
-                borderRadius: 6, padding: "1px 7px", fontSize: "0.72rem", fontWeight: 800,
+                background: filtro === f.key ? "rgba(255, 255, 255, 0.25)" : "rgba(15, 23, 42, 0.6)",
+                color: filtro === f.key ? "#ffffff" : "#94a3b8",
+                border: filtro === f.key ? "none" : "1px solid rgba(255, 255, 255, 0.05)",
+                borderRadius: 8, padding: "2px 8px", fontSize: "0.75rem", fontWeight: 800,
+                boxShadow: filtro === f.key ? "inset 0 1px 1px rgba(0,0,0,0.1)" : "inset 0 1px 1px rgba(0,0,0,0.2)",
               }}>{f.count}</span>
             </button>
           ))}
@@ -685,29 +690,34 @@ export default function AgenteNotas() {
                 onClick={() => setFiltroBimestre(b.key)}
                 title={b.label}
                 style={{
-                  display: "flex", alignItems: "center", gap: 6,
-                  padding: "7px 13px", borderRadius: 9, fontWeight: 700, fontSize: "0.74rem",
-                  cursor: "pointer", transition: "all 0.18s",
-                  border: `1.5px solid ${ativo ? b.color : "rgba(255,255,255,0.15)"}`,
+                  display: "flex", alignItems: "center", gap: 8,
+                  padding: "8px 16px", borderRadius: 10, fontWeight: 700, fontSize: "0.76rem",
+                  cursor: "pointer", transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+                  border: `1px solid ${ativo ? b.color : "rgba(255, 255, 255, 0.1)"}`,
                   background: ativo
-                    ? `linear-gradient(135deg, ${b.color}33, ${b.color}1a)`
-                    : "rgba(255,255,255,0.05)",
+                    ? `linear-gradient(135deg, ${b.color}25, ${b.color}0A)`
+                    : "linear-gradient(145deg, rgba(30, 41, 59, 0.6), rgba(15, 23, 42, 0.6))",
                   color: ativo ? b.color : "#94a3b8",
-                  boxShadow: ativo ? `0 3px 12px ${b.color}40` : "none",
+                  boxShadow: ativo 
+                    ? `0 6px 16px -4px ${b.color}40, inset 0 1px 1px rgba(255,255,255,0.1)` 
+                    : "0 3px 5px -1px rgba(0,0,0,0.2), inset 0 1px 1px rgba(255,255,255,0.05)",
+                  backdropFilter: "blur(10px)",
                 }}
               >
                 <span style={{
-                  width: 7, height: 7, borderRadius: "50%", flexShrink: 0,
-                  background: ativo ? b.color : "rgba(255,255,255,0.25)",
-                  boxShadow: ativo ? `0 0 6px ${b.color}` : "none",
-                  transition: "all 0.18s",
+                  width: 8, height: 8, borderRadius: "50%", flexShrink: 0,
+                  background: ativo ? b.color : "rgba(255,255,255,0.15)",
+                  boxShadow: ativo ? `0 0 10px ${b.color}, 0 0 4px ${b.color}` : "none",
+                  transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
                 }} />
                 {b.short}
                 <span style={{
-                  background: ativo ? `${b.color}30` : "rgba(255,255,255,0.1)",
+                  background: ativo ? `${b.color}25` : "rgba(15, 23, 42, 0.5)",
                   color: ativo ? b.color : "#64748b",
-                  borderRadius: 5, padding: "1px 6px", fontSize: "0.68rem", fontWeight: 800,
-                  minWidth: 18, textAlign: "center",
+                  border: ativo ? "none" : "1px solid rgba(255, 255, 255, 0.05)",
+                  borderRadius: 6, padding: "2px 8px", fontSize: "0.7rem", fontWeight: 800,
+                  minWidth: 20, textAlign: "center",
+                  boxShadow: "inset 0 1px 1px rgba(0,0,0,0.1)",
                 }}>{b.total}</span>
               </button>
             );

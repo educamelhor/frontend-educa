@@ -10,8 +10,16 @@ export default function VerificarCarteirinha() {
 
   useEffect(() => {
     async function verifyToken() {
+      if (!token) {
+        setError('Token não encontrado na URL.');
+        setLoading(false);
+        return;
+      }
+
       try {
-        const baseUrl = import.meta.env.VITE_BACKEND_ORIGIN || import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        let baseUrl = import.meta.env.VITE_BACKEND_ORIGIN || import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        baseUrl = baseUrl.replace(/\/api\/?$/, ''); // Remove /api do final, caso exista
+        
         const response = await fetch(`${baseUrl}/public/verificar-aluno/${token}`);
         const result = await response.json();
 

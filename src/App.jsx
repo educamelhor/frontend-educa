@@ -122,6 +122,9 @@ import EmbeddingsGerar from "./features/monitoramento/EmbeddingsGerar.jsx";
 // ⭐️ NOVO IMPORT: Boletim → Secretaria (Edição)
 import BoletimEdicao from "./features/secretaria/boletim/BoletimEdicao.jsx";
 
+// ✅ NOVO IMPORT: Diários → Secretaria
+import DiarioSecretaria from "./features/secretaria/diarios/DiarioSecretaria.jsx";
+
 // ✅ NOVO IMPORT: Relatórios da Secretaria
 import RelatoriosSecretaria from "./features/secretaria/relatorios/RelatoriosSecretaria.jsx";
 
@@ -343,6 +346,7 @@ export default function App() {
           <Route path="/secretaria/professores" element={<RequireModulo modulo="secretaria"><Professores /></RequireModulo>} />
           <Route path="/secretaria/professores/:id/ficha" element={<RequireModulo modulo="secretaria"><FichaProfessor /></RequireModulo>} />
           <Route path="/secretaria/boletim"    element={<RequireModulo modulo="secretaria"><BoletimEdicao /></RequireModulo>} />
+          <Route path="/secretaria/diarios"    element={<RequireModulo modulo="secretaria"><DiarioSecretaria /></RequireModulo>} />
           <Route path="/secretaria/relatorios" element={<RequireModulo modulo="secretaria"><RelatoriosSecretaria /></RequireModulo>} />
           {/* ✅ Agente Secretaria e Sincronizar SEEDF */}
           <Route path="/secretaria/agente"           element={<RequireModulo modulo="secretaria"><AgenteSecretaria /></RequireModulo>} />

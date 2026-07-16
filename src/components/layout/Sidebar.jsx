@@ -1452,6 +1452,18 @@ export default function Sidebar({ isOpen, onClose }) {
                 </li>
                 )}
 
+                {/* NOVO SUBMENU: Diários */}
+                {hasModulo('secretaria') && (
+                <li>
+                  <Link
+                    to="/secretaria/diarios"
+                    className={getSubmenuLinkClasses('/secretaria/diarios')}
+                  >
+                    <TableCellsIcon className="h-5 w-5 mr-2" /> Diários
+                  </Link>
+                </li>
+                )}
+
                 {/* NOVO SUBMENU: Agente */}
                 <li>
                   <Link

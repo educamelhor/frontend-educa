@@ -100,7 +100,7 @@ export default function VerificarCarteirinha() {
 
                   <div className="flex items-center text-gray-700">
                     <Hash size={16} className="mr-3 text-blue-600" />
-                    <span>Matrícula: <span className="font-semibold">{data.matricula || '-'}</span></span>
+                    <span>Registro Estudantil: <span className="font-semibold">{data.matricula || '-'}</span></span>
                   </div>
 
                   <div className="flex items-center text-gray-700">

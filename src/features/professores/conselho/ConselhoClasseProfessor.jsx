@@ -147,9 +147,10 @@ export default function ConselhoClasseProfessor() {
     setAlunosTurma([]);
     try {
       const { data } = await api.get(`/api/alunos`, {
-        params: { turma_id: turma.id, ano_letivo: anoLetivo },
+        params: { turma_id: turma.id, ano_letivo: anoLetivo, status: 'ativo' },
       });
-      setAlunosTurma(data?.alunos || data || []);
+      const alunosArray = data?.alunos || data || [];
+      setAlunosTurma(alunosArray.filter(a => a.status === 'ativo' || !a.status));
     } catch (err) {
       console.error("Erro ao buscar alunos da turma:", err);
     } finally {

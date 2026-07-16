@@ -131,6 +131,10 @@ export default function Sidebar({ isOpen, onClose }) {
         if (sortedCurrent !== sortedIncoming) {
           localStorage.setItem('modulos_ativos', JSON.stringify(incoming));
           setModulos(incoming);
+        } else {
+          // Mesmo conteúdo, mas React state pode estar dessincronizado (ex: logo após login).
+          // Garante que o estado React reflita exatamente o que está no localStorage.
+          setModulos(incoming);
         }
       } else if (data.modulos_ativos === null) {
         // CEO / super_admin → acesso irrestrito

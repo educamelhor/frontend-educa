@@ -101,20 +101,20 @@ export default function ModalDiarioSecretaria({ plano, onClose }) {
     return notas[`${alunoId}_${itemIdx}_${opIdx}`] ?? null;
   }
 
-  // ── Calcular média para exibição final (simplificada) ──────────────────
-  function calcMedia(alunoId) {
+  // ── Calcular total para exibição final (soma das notas) ────────────────
+  function calcTotal(alunoId) {
     if (!itens.length) return null;
     let total = 0;
-    let count = 0;
+    let temNota = false;
     itens.forEach((item, idx) => {
       const ops = item.oportunidades || 1;
       for (let op = 0; op < ops; op++) {
         const n = getNota(alunoId, idx, op);
-        if (n !== null) { total += Number(n); count++; }
+        if (n !== null) { total += Number(n); temNota = true; }
       }
     });
-    if (count === 0) return null;
-    return (total / count).toFixed(1);
+    if (!temNota) return null;
+    return total.toFixed(1);
   }
 
   if (!plano) return null;
@@ -266,20 +266,20 @@ export default function ModalDiarioSecretaria({ plano, onClose }) {
                               borderBottom: "2px solid rgba(99,179,237,0.25)",
                               maxWidth: "90px",
                             }}
-                            title={item.nome}
+                            title={item.atividade}
                           >
                             <span className="block truncate max-w-[80px]">
-                              {item.nome}
+                              {item.atividade}
                               {ops > 1 ? ` (${opIdx + 1})` : ""}
                             </span>
                             <span className="text-[10px] text-slate-500 font-normal">
-                              Peso {item.peso || 1}
+                              Max {item.nota_total || 10} pts
                             </span>
                           </th>
                         ));
                       })}
 
-                      {/* Coluna Média */}
+                      {/* Coluna Total */}
                       <th
                         className="px-3 py-2.5 text-center text-xs font-bold uppercase tracking-wide"
                         style={{
@@ -289,7 +289,7 @@ export default function ModalDiarioSecretaria({ plano, onClose }) {
                           minWidth: "70px",
                         }}
                       >
-                        Média
+                        Total
                       </th>
                     </tr>
                   </thead>
@@ -308,8 +308,8 @@ export default function ModalDiarioSecretaria({ plano, onClose }) {
 
                     {alunosFiltrados.map((aluno, rowIdx) => {
                       const alunoId = aluno.id || aluno.aluno_id;
-                      const media = calcMedia(alunoId);
-                      const mediaCor = corNota(media ? Number(media) : null);
+                      const totalNota = calcTotal(alunoId);
+                      const mediaCor = corNota(totalNota ? Number(totalNota) : null);
 
                       return (
                         <tr
@@ -332,7 +332,7 @@ export default function ModalDiarioSecretaria({ plano, onClose }) {
                                 {aluno.nome || aluno.estudante}
                               </span>
                               <span className="text-[10px] text-slate-400 font-mono">
-                                RE {aluno.codigo}
+                                RE {aluno.matricula || aluno.codigo || "N/D"}
                               </span>
                             </div>
                           </td>
@@ -360,16 +360,16 @@ export default function ModalDiarioSecretaria({ plano, onClose }) {
                             });
                           })}
 
-                          {/* Média */}
+                          {/* Total */}
                           <td
                             className="px-2 py-2 text-center font-bold text-sm"
                             style={{
-                              background: media !== null ? mediaCor.bg : "transparent",
-                              color: media !== null ? mediaCor.text : "#475569",
+                              background: totalNota !== null ? mediaCor.bg : "transparent",
+                              color: totalNota !== null ? mediaCor.text : "#475569",
                               borderBottom: "1px solid rgba(99,179,237,0.08)",
                             }}
                           >
-                            {media !== null ? media.replace(".", ",") : "—"}
+                            {totalNota !== null ? totalNota.replace(".", ",") : "—"}
                           </td>
                         </tr>
                       );

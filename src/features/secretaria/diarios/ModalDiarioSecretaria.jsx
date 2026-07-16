@@ -242,7 +242,7 @@ export default function ModalDiarioSecretaria({ plano, onClose }) {
                     <tr>
                       {/* Cabeçalho estático */}
                       <th
-                        className="sticky left-0 z-10 px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wide whitespace-nowrap"
+                        className="sticky left-0 z-10 px-3 py-2.5 text-center text-xs font-bold uppercase tracking-wide whitespace-nowrap"
                         style={{
                           background: "rgba(15,23,42,0.95)",
                           color: "#93c5fd",
@@ -264,11 +264,10 @@ export default function ModalDiarioSecretaria({ plano, onClose }) {
                               background: "rgba(15,23,42,0.8)",
                               color: "#cbd5e1",
                               borderBottom: "2px solid rgba(99,179,237,0.25)",
-                              maxWidth: "90px",
                             }}
                             title={item.atividade}
                           >
-                            <span className="block truncate max-w-[80px]">
+                            <span className="block">
                               {item.atividade}
                               {ops > 1 ? ` (${opIdx + 1})` : ""}
                             </span>

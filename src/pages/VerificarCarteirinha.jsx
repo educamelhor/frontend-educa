@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import api from '../services/api';
-import { CheckCircle, XCircle, AlertTriangle, ArrowLeft } from 'lucide-react';
+import { useParams } from 'react-router-dom';
+import { CheckCircle, XCircle, User, Calendar, MapPin, Hash, BookOpen } from 'lucide-react';
 
 export default function VerificarCarteirinha() {
   const { token } = useParams();
@@ -12,7 +11,7 @@ export default function VerificarCarteirinha() {
   useEffect(() => {
     async function verifyToken() {
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/carteirinha/verificar/${token}`);
+        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/public/verificar-aluno/${token}`);
         const result = await response.json();
 
         if (result.ok) {
@@ -31,85 +30,85 @@ export default function VerificarCarteirinha() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white"></div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-black text-white flex flex-col items-center justify-center p-6 font-sans">
-      
-      <div className="w-full max-w-md backdrop-blur-xl bg-white/10 rounded-3xl border border-white/20 shadow-2xl p-8 relative overflow-hidden transition-all duration-500">
+    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4 sm:p-6 font-sans">
+      <div className="w-full max-w-sm bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
         
-        {/* Glow Effects */}
-        <div className="absolute top-[-50px] left-[-50px] w-32 h-32 bg-blue-500/30 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-[-50px] right-[-50px] w-32 h-32 bg-purple-500/30 rounded-full blur-3xl"></div>
+        {/* Header - Institucional */}
+        <div className="bg-blue-800 p-4 text-center">
+          <h2 className="text-white font-bold text-lg tracking-wide uppercase">EDUCA.MELHOR</h2>
+          <p className="text-blue-200 text-xs mt-1">SISTEMA EDUCACIONAL</p>
+        </div>
 
-        <div className="relative z-10 flex flex-col items-center">
+        <div className="p-6">
           {error ? (
-            <div className="flex flex-col items-center text-center space-y-4 py-8">
-              <div className="bg-red-500/20 p-4 rounded-full border border-red-500/50">
-                <XCircle size={48} className="text-red-400" />
-              </div>
-              <h1 className="text-2xl font-bold tracking-tight">Documento Inválido</h1>
-              <p className="text-gray-300 font-medium">{error}</p>
+            <div className="flex flex-col items-center text-center space-y-4 py-6">
+              <XCircle size={64} className="text-red-500" strokeWidth={1.5} />
+              <h1 className="text-2xl font-bold text-gray-800">❌ Carteirinha inválida</h1>
+              <p className="text-gray-500 text-sm">{error}</p>
             </div>
           ) : (
-            <div className="w-full flex flex-col items-center">
-              {/* Status Badge */}
-              <div className="flex items-center space-x-2 bg-emerald-500/20 border border-emerald-500/50 text-emerald-400 px-4 py-2 rounded-full font-semibold tracking-wide mb-8 shadow-[0_0_15px_rgba(16,185,129,0.3)]">
-                <CheckCircle size={20} />
-                <span>DOCUMENTO VÁLIDO</span>
+            <div className="flex flex-col items-center">
+              
+              <div className="mb-6 flex flex-col items-center text-center">
+                <CheckCircle size={56} className="text-emerald-500 mb-3" strokeWidth={1.5} />
+                <h1 className="text-xl font-bold text-emerald-600">✅ Aluno regularmente matriculado</h1>
               </div>
 
               {/* Foto do Aluno */}
-              <div className="w-36 h-36 rounded-2xl overflow-hidden border-4 border-white/20 mb-6 shadow-xl relative">
+              <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-gray-100 mb-5 shadow-sm">
                 {data.foto ? (
                   <img src={data.foto} alt="Foto do Estudante" className="w-full h-full object-cover" />
                 ) : (
-                  <div className="w-full h-full bg-gray-800 flex items-center justify-center">
-                    <span className="text-4xl text-gray-400">{data.nome.charAt(0)}</span>
+                  <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                    <User size={48} className="text-gray-400" />
                   </div>
                 )}
               </div>
 
               {/* Informações */}
               <div className="w-full space-y-4">
-                <div className="text-center mb-6">
-                  <h1 className="text-3xl font-bold tracking-tight mb-1">{data.nome}</h1>
-                  <p className="text-blue-300 font-medium text-sm tracking-widest uppercase">{data.escola_nome}</p>
+                <div className="text-center mb-4">
+                  <h2 className="text-2xl font-bold text-gray-900">{data.nome}</h2>
                 </div>
 
-                <div className="bg-black/20 rounded-xl p-5 space-y-3 border border-white/5">
-                  <div className="flex justify-between">
-                    <span className="text-gray-400 text-xs uppercase tracking-wider font-semibold">Matrícula</span>
-                    <span className="font-medium">{data.matricula || '-'}</span>
+                <div className="bg-gray-50 rounded-xl p-4 space-y-3 border border-gray-200 text-sm">
+                  <div className="flex items-center text-gray-700">
+                    <MapPin size={16} className="mr-3 text-blue-600" />
+                    <span className="font-medium">{data.escola_nome}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400 text-xs uppercase tracking-wider font-semibold">Turma / Série</span>
-                    <span className="font-medium text-right">{data.turma_nome || '-'}</span>
+                  
+                  <div className="flex items-center text-gray-700">
+                    <BookOpen size={16} className="mr-3 text-blue-600" />
+                    <span>Turma: <span className="font-semibold">{data.turma || '-'}</span></span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400 text-xs uppercase tracking-wider font-semibold">Data Nasc.</span>
-                    <span className="font-medium">{data.data_nascimento || '-'}</span>
-                  </div>
-                </div>
 
-                <div className="bg-white/5 rounded-xl p-4 border border-white/10 text-center">
-                  <span className="text-gray-400 text-xs uppercase tracking-wider font-semibold block mb-1">Válido Até</span>
-                  <span className="text-lg font-bold text-white tracking-widest">{data.validade}</span>
+                  <div className="flex items-center text-gray-700">
+                    <Hash size={16} className="mr-3 text-blue-600" />
+                    <span>Matrícula: <span className="font-semibold">{data.matricula || '-'}</span></span>
+                  </div>
+
+                  <div className="flex items-center text-gray-700">
+                    <Calendar size={16} className="mr-3 text-blue-600" />
+                    <span>Ano Letivo: <span className="font-semibold">{data.ano_letivo || '-'}</span></span>
+                  </div>
                 </div>
               </div>
             </div>
           )}
         </div>
-      </div>
-      
-      <div className="mt-8 text-center opacity-50 text-sm">
-        <p>Sistema Educacional EDUCA.MELHOR</p>
-      </div>
 
+        {/* Footer */}
+        <div className="bg-gray-100 p-3 text-center border-t border-gray-200">
+          <p className="text-xs text-gray-500">Autenticidade garantida pelo sistema.</p>
+        </div>
+      </div>
     </div>
   );
 }

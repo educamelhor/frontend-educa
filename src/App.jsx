@@ -354,7 +354,7 @@ export default function App() {
           <Route path="/secretaria/sincronizar-seedf" element={<RequireModulo modulo="secretaria"><SincronizarSEEDF /></RequireModulo>} />
           <Route path="/secretaria/*"          element={<RequireModulo modulo="secretaria"><Secretaria /></RequireModulo>} />
           <Route path="/secretaria/modulacao"  element={<RequireModulo modulo="secretaria"><Modulacao /></RequireModulo>} />
-          <Route path="/secretaria/horarios"        element={<RequireModulo modulo="secretaria"><DiagnosticoPreGeracaoPage /></RequireModulo>} />
+          <Route path="/secretaria/horarios"        element={<RequireModulo modulo="secretaria"><HorariosPage /></RequireModulo>} />
           <Route path="/secretaria/horarios/wizard" element={<RequireModulo modulo="secretaria"><HorariosPage /></RequireModulo>} />
           <Route path="/secretaria/horarios/configuracoes-pedagogicas" element={<RequireModulo modulo="secretaria"><ConfiguracoesPedagogicas /></RequireModulo>} />
           <Route path="/secretaria/tabela-codigos" element={<RequireModulo modulo="secretaria"><TabelaCodigos /></RequireModulo>} />

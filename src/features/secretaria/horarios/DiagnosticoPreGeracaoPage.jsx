@@ -91,7 +91,7 @@ function Card({ title, icon, children, loading }) {
 }
 
 // ─── Linha de professor (Módulo 2) ───────────────────────────────────────────
-function LinhaProf({ p }) {
+function LinhaProf({ p, onIrParaDisponibilidade }) {
   const sev = SEV[p.severidade] || SEV.OK;
   const defLabel = p.deficit_slots === null
     ? "sem dados"
@@ -99,15 +99,27 @@ function LinhaProf({ p }) {
       ? `faltam ${Math.abs(p.deficit_slots)} slots`
       : `${p.deficit_slots} slots sobrando`;
 
+  const clicavel = p.severidade === "CRITICO" || p.severidade === "SEM_DISPONIBILIDADE";
+
   return (
     <div
       className="flex items-center gap-2 py-1.5 px-2 rounded-lg mb-1 text-xs"
-      style={{ background: sev.bg, border: `1px solid ${sev.border}` }}
+      style={{
+        background: sev.bg,
+        border: `1px solid ${sev.border}`,
+        cursor: clicavel && onIrParaDisponibilidade ? "pointer" : "default",
+        transition: "opacity 0.15s",
+      }}
+      onClick={clicavel && onIrParaDisponibilidade ? () => onIrParaDisponibilidade(p.professor_id) : undefined}
+      title={clicavel ? "Clique para ir à aba de Disponibilidade e corrigir" : undefined}
     >
       <span>{sev.icon}</span>
       <div className="flex-1 min-w-0">
         <p className="font-semibold truncate" style={{ color: sev.text }}>
           {p.professor_nome}
+          {clicavel && onIrParaDisponibilidade && (
+            <span style={{ marginLeft: 6, fontSize: 10, opacity: 0.75 }}>→ corrigir</span>
+          )}
         </p>
         <p className="text-gray-500">
           {p.disciplina_nome} · {p.turmas_count} turma(s) · {p.aulas_moduladas} aulas/sem
@@ -209,7 +221,7 @@ function CoberturaLista({ resumo }) {
 }
 
 // ─── Componente de Diagnóstico por Turno ──────────────────────────────────────
-function DiagnosticoTurno({ turno }) {
+function DiagnosticoTurno({ turno, onIrParaDisponibilidade }) {
   const [cobertura, setCobertura] = useState(null);
   const [disponib, setDisponib] = useState(null);
   const [turmasDisc, setTurmasDisc] = useState(null);
@@ -352,10 +364,10 @@ function DiagnosticoTurno({ turno }) {
               ) : (
                 <>
                   {disponib.conflitos.map((p) => (
-                    <LinhaProf key={p.professor_id} p={p} />
+                    <LinhaProf key={p.professor_id} p={p} onIrParaDisponibilidade={onIrParaDisponibilidade} />
                   ))}
                   {disponib.sem_disponibilidade.map((p) => (
-                    <LinhaProf key={p.professor_id} p={p} />
+                    <LinhaProf key={p.professor_id} p={p} onIrParaDisponibilidade={onIrParaDisponibilidade} />
                   ))}
                   {disponib.ok.length > 0 && (
                     <details className="mt-2">
@@ -394,7 +406,7 @@ function DiagnosticoTurno({ turno }) {
 // ─── Página Principal ─────────────────────────────────────────────────────────
 const TURNOS = ["Matutino", "Vespertino", "Noturno"];
 
-export default function DiagnosticoPreGeracaoPage() {
+export default function DiagnosticoPreGeracaoPage({ onIrParaDisponibilidade } = {}) {
   const [abaAtiva, setAbaAtiva] = useState("Matutino");
   const [turnos, setTurnos] = useState(TURNOS);
 
@@ -446,7 +458,19 @@ export default function DiagnosticoPreGeracaoPage() {
       </div>
 
       {/* Conteúdo da aba */}
-      <DiagnosticoTurno key={abaAtiva} turno={abaAtiva} />
+      <DiagnosticoTurno key={abaAtiva} turno={abaAtiva} onIrParaDisponibilidade={onIrParaDisponibilidade} />
+
+      {/* Botão Revisar quando há callback */}
+      {onIrParaDisponibilidade && (
+        <div className="mt-6 flex justify-center">
+          <button
+            onClick={() => onIrParaDisponibilidade(null)}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-blue-200 text-blue-700 text-sm font-semibold hover:bg-blue-50 transition-all"
+          >
+            ← Revisar Disponibilidade dos Professores
+          </button>
+        </div>
+      )}
     </div>
   );
 }

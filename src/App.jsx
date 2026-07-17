@@ -84,6 +84,7 @@ import LoginProfessor from "./features/login/LoginProfessor";
 import CadastroUsuario from "./features/login/CadastroUsuario.jsx";
 import TabelaCodigos from "./features/secretaria/tabela-codigos";
 import HorariosPage from "./features/secretaria/horarios/index.jsx";
+import DiagnosticoPreGeracaoPage from "./features/secretaria/horarios/DiagnosticoPreGeracaoPage.jsx";
 import LayoutGrade from "./features/secretaria/horarios/LayoutGrade.jsx";
 import ExecutarMock from "./features/secretaria/horarios/ExecutarMock.jsx";
 import AgenteCredenciais from "./features/agente-educa/Credenciais";
@@ -353,7 +354,8 @@ export default function App() {
           <Route path="/secretaria/sincronizar-seedf" element={<RequireModulo modulo="secretaria"><SincronizarSEEDF /></RequireModulo>} />
           <Route path="/secretaria/*"          element={<RequireModulo modulo="secretaria"><Secretaria /></RequireModulo>} />
           <Route path="/secretaria/modulacao"  element={<RequireModulo modulo="secretaria"><Modulacao /></RequireModulo>} />
-          <Route path="/secretaria/horarios"   element={<RequireModulo modulo="secretaria"><HorariosPage /></RequireModulo>} />
+          <Route path="/secretaria/horarios"        element={<RequireModulo modulo="secretaria"><DiagnosticoPreGeracaoPage /></RequireModulo>} />
+          <Route path="/secretaria/horarios/wizard" element={<RequireModulo modulo="secretaria"><HorariosPage /></RequireModulo>} />
           <Route path="/secretaria/horarios/configuracoes-pedagogicas" element={<RequireModulo modulo="secretaria"><ConfiguracoesPedagogicas /></RequireModulo>} />
           <Route path="/secretaria/tabela-codigos" element={<RequireModulo modulo="secretaria"><TabelaCodigos /></RequireModulo>} />
 

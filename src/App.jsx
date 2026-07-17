@@ -142,6 +142,9 @@ function ProtectedLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
 
+  // Rotas que precisam ocupar 100% da área sem padding (ex: wizard de horários)
+  const isFullBleed = location.pathname.startsWith("/secretaria/horarios");
+
   useEffect(() => {
     setSidebarOpen(false);
   }, [location.pathname]);
@@ -155,7 +158,10 @@ function ProtectedLayout() {
         <div className="sidebar-overlay" onClick={closeSidebar} />
       )}
       <Sidebar isOpen={sidebarOpen} onClose={closeSidebar} />
-      <main className="flex-1 p-3 md:p-6 bg-blue-50 overflow-auto w-full">
+      <main
+        className={`flex-1 bg-blue-50 overflow-auto w-full ${isFullBleed ? "" : "p-3 md:p-6"}`}
+        style={isFullBleed ? { display: "flex", flexDirection: "column" } : {}}
+      >
         <HeaderGlobal onToggleSidebar={toggleSidebar} sidebarOpen={sidebarOpen} />
         <Outlet />
       </main>

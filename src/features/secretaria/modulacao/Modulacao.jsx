@@ -1202,7 +1202,9 @@ export default function Modulacao() {
             onClick={() => setMostrarMenuTurno((v) => !v)}
             className="inline-flex items-center gap-2 bg-white text-blue-900 border border-blue-200 px-4 py-2 rounded shadow-sm hover:bg-blue-50"
           >
-            <span className="font-semibold uppercase">Escolher Turno</span>
+            <span className="font-semibold uppercase">
+              {turnoSelecionado ? `TURNO: ${turnoSelecionado}` : "ESCOLHER TURNO"}
+            </span>
             <ChevronDownIcon className="h-4 w-4" />
           </button>
 

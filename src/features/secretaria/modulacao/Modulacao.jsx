@@ -407,7 +407,8 @@ export default function Modulacao() {
       }
 
       // se vierem vários turnos, filtra aqui
-      lista = filtraPorTurno(lista, turno);
+      // e também removemos os professores inativos para não aparecerem nas inconsistências
+      lista = filtraPorTurno(lista, turno).filter((p) => String(p.status).toLowerCase() !== "inativo");
 
       // constrói o map { profId: aulasTotal } usando campos flexíveis
       const map = {};

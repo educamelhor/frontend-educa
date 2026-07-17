@@ -26,15 +26,15 @@ const S = {
     minHeight: "100vh",
     background: "linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0f172a 100%)",
     display: "flex", alignItems: "center", justifyContent: "center",
-    padding: "24px", fontFamily: "'Montserrat', sans-serif",
+    padding: "16px", fontFamily: "'Montserrat', sans-serif",
   },
   card: {
-    width: "100%", maxWidth: 700,
+    width: "100%", maxWidth: 580,
     background: "rgba(255,255,255,0.05)",
     backdropFilter: "blur(20px)",
     border: "1px solid rgba(255,255,255,0.12)",
-    borderRadius: 24, padding: "48px 44px",
-    boxShadow: "0 25px 60px rgba(0,0,0,0.5)",
+    borderRadius: 20, padding: "32px",
+    boxShadow: "0 15px 40px rgba(0,0,0,0.5)",
     color: "#f1f5f9",
   },
 };
@@ -54,15 +54,15 @@ function ResumoCard({ icon, titulo, children }) {
     <div style={{
       background: "rgba(255,255,255,0.05)",
       border: "1px solid rgba(255,255,255,0.1)",
-      borderRadius: 12, padding: "16px 20px", marginBottom: 12,
+      borderRadius: 10, padding: "12px 16px", marginBottom: 10,
     }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-        <span style={{ fontSize: 18 }}>{icon}</span>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+        <span style={{ fontSize: 16 }}>{icon}</span>
         <span style={{ color: "#94a3b8", fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
           {titulo}
         </span>
       </div>
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{children}</div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>{children}</div>
     </div>
   );
 }
@@ -114,45 +114,45 @@ export default function WizardConfiguracaoGrade({ onConcluir }) {
     <div style={S.outer}>
       <div style={S.card}>
         {/* ── Header ── */}
-        <div style={{ textAlign: "center", marginBottom: 40 }}>
-          <div style={{ fontSize: 44, marginBottom: 10 }}>⚙️</div>
-          <h1 style={{ fontSize: 26, fontWeight: 800, color: "#fff", margin: "0 0 6px" }}>
+        <div style={{ textAlign: "center", marginBottom: 24 }}>
+          <div style={{ fontSize: 32, marginBottom: 6 }}>⚙️</div>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: "#fff", margin: "0 0 4px" }}>
             Configuração da Grade Horária
           </h1>
-          <p style={{ color: "#64748b", fontSize: 14, margin: 0 }}>
+          <p style={{ color: "#94a3b8", fontSize: 13, margin: 0 }}>
             Configure uma vez — o sistema se adapta à realidade da sua escola.
           </p>
         </div>
 
         {/* ── Stepper ── */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 48 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 28 }}>
           {passoLabels.map((label, idx) => {
             const num = idx + 1;
             const ativo = num === passo;
             const concluido = num < passo;
             return (
               <React.Fragment key={num}>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
                   <div style={{
-                    width: 38, height: 38, borderRadius: "50%",
+                    width: 32, height: 32, borderRadius: "50%",
                     background: concluido ? "#10b981" : ativo ? "#3b82f6" : "rgba(255,255,255,0.08)",
                     border: ativo ? "2px solid #60a5fa" : "2px solid transparent",
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 15, fontWeight: 800, color: "#fff",
-                    boxShadow: ativo ? "0 0 18px rgba(59,130,246,0.55)" : "none",
-                    transition: "all 0.35s",
+                    fontSize: 13, fontWeight: 800, color: "#fff",
+                    boxShadow: ativo ? "0 0 12px rgba(59,130,246,0.5)" : "none",
+                    transition: "all 0.3s",
                   }}>
                     {concluido ? "✓" : num}
                   </div>
-                  <span style={{ fontSize: 11, color: ativo ? "#93c5fd" : "#475569", fontWeight: ativo ? 700 : 400 }}>
+                  <span style={{ fontSize: 10, color: ativo ? "#93c5fd" : "#475569", fontWeight: ativo ? 700 : 400 }}>
                     {label}
                   </span>
                 </div>
                 {idx < 3 && (
                   <div style={{
-                    height: 2, width: 64, margin: "0 6px", marginBottom: 22,
+                    height: 2, width: 44, margin: "0 4px", marginBottom: 18,
                     background: concluido ? "#10b981" : "rgba(255,255,255,0.08)",
-                    transition: "background 0.35s",
+                    transition: "background 0.3s",
                   }} />
                 )}
               </React.Fragment>
@@ -161,33 +161,33 @@ export default function WizardConfiguracaoGrade({ onConcluir }) {
         </div>
 
         {/* ── Conteúdo ── */}
-        <div style={{ minHeight: 260 }}>
+        <div style={{ minHeight: 200 }}>
 
           {/* PASSO 1 — Turnos */}
           {passo === 1 && (
             <div>
-              <h2 style={{ textAlign: "center", fontSize: 19, fontWeight: 700, color: "#e2e8f0", marginBottom: 6 }}>
+              <h2 style={{ textAlign: "center", fontSize: 17, fontWeight: 700, color: "#e2e8f0", marginBottom: 4 }}>
                 Quais turnos a escola oferece?
               </h2>
-              <p style={{ textAlign: "center", color: "#475569", fontSize: 13, marginBottom: 32 }}>
+              <p style={{ textAlign: "center", color: "#64748b", fontSize: 12, marginBottom: 20 }}>
                 Selecione todos os turnos ativos. Você poderá ajustar depois.
               </p>
-              <div style={{ display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
                 {TURNOS_CONFIG.map(t => {
                   const sel = turnos.includes(t.id);
                   return (
                     <button key={t.id} onClick={() => toggleTurno(t.id)} style={{
-                      width: 170, padding: "26px 16px", borderRadius: 18,
+                      width: 140, padding: "16px 12px", borderRadius: 16,
                       border: sel ? "2px solid #3b82f6" : "2px solid rgba(255,255,255,0.1)",
                       background: sel ? "rgba(59,130,246,0.18)" : "rgba(255,255,255,0.04)",
-                      cursor: "pointer", color: "#fff", transition: "all 0.22s",
-                      boxShadow: sel ? "0 0 22px rgba(59,130,246,0.35)" : "none",
-                      transform: sel ? "translateY(-3px) scale(1.03)" : "scale(1)",
+                      cursor: "pointer", color: "#fff", transition: "all 0.2s",
+                      boxShadow: sel ? "0 0 16px rgba(59,130,246,0.3)" : "none",
+                      transform: sel ? "translateY(-2px) scale(1.02)" : "scale(1)",
                     }}>
-                      <div style={{ fontSize: 38, marginBottom: 10 }}>{t.emoji}</div>
-                      <div style={{ fontWeight: 700, fontSize: 15 }}>{t.label}</div>
-                      <div style={{ color: "#64748b", fontSize: 12, marginTop: 4 }}>{t.desc}</div>
-                      {sel && <div style={{ marginTop: 10, color: "#60a5fa", fontSize: 12, fontWeight: 600 }}>✓ Selecionado</div>}
+                      <div style={{ fontSize: 32, marginBottom: 8 }}>{t.emoji}</div>
+                      <div style={{ fontWeight: 700, fontSize: 14 }}>{t.label}</div>
+                      <div style={{ color: "#94a3b8", fontSize: 11, marginTop: 4 }}>{t.desc}</div>
+                      {sel && <div style={{ marginTop: 8, color: "#60a5fa", fontSize: 11, fontWeight: 600 }}>✓ Selecionado</div>}
                     </button>
                   );
                 })}
@@ -198,26 +198,26 @@ export default function WizardConfiguracaoGrade({ onConcluir }) {
           {/* PASSO 2 — Dias letivos */}
           {passo === 2 && (
             <div>
-              <h2 style={{ textAlign: "center", fontSize: 19, fontWeight: 700, color: "#e2e8f0", marginBottom: 6 }}>
+              <h2 style={{ textAlign: "center", fontSize: 17, fontWeight: 700, color: "#e2e8f0", marginBottom: 4 }}>
                 Quais são os dias letivos?
               </h2>
-              <p style={{ textAlign: "center", color: "#475569", fontSize: 13, marginBottom: 32 }}>
+              <p style={{ textAlign: "center", color: "#64748b", fontSize: 12, marginBottom: 20 }}>
                 Selecione os dias em que a escola tem aulas normalmente.
               </p>
-              <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
                 {DIAS_SEMANA.map(d => {
                   const sel = dias.includes(d.num);
                   return (
                     <button key={d.num} onClick={() => toggleDia(d.num)} style={{
-                      width: 82, height: 82, borderRadius: 16,
+                      width: 68, height: 68, borderRadius: 12,
                       border: sel ? "2px solid #10b981" : "2px solid rgba(255,255,255,0.1)",
                       background: sel ? "rgba(16,185,129,0.18)" : "rgba(255,255,255,0.04)",
-                      cursor: "pointer", color: "#fff", transition: "all 0.22s",
-                      boxShadow: sel ? "0 0 18px rgba(16,185,129,0.35)" : "none",
-                      transform: sel ? "translateY(-3px) scale(1.05)" : "scale(1)",
+                      cursor: "pointer", color: "#fff", transition: "all 0.2s",
+                      boxShadow: sel ? "0 0 14px rgba(16,185,129,0.3)" : "none",
+                      transform: sel ? "translateY(-2px) scale(1.04)" : "scale(1)",
                     }}>
-                      <div style={{ fontWeight: 800, fontSize: 18 }}>{d.label}</div>
-                      <div style={{ color: sel ? "#6ee7b7" : "#475569", fontSize: 11, marginTop: 4 }}>{d.nome}</div>
+                      <div style={{ fontWeight: 800, fontSize: 16 }}>{d.label}</div>
+                      <div style={{ color: sel ? "#6ee7b7" : "#94a3b8", fontSize: 10, marginTop: 2 }}>{d.nome}</div>
                     </button>
                   );
                 })}
@@ -228,37 +228,37 @@ export default function WizardConfiguracaoGrade({ onConcluir }) {
           {/* PASSO 3 — Períodos por turno */}
           {passo === 3 && (
             <div>
-              <h2 style={{ textAlign: "center", fontSize: 19, fontWeight: 700, color: "#e2e8f0", marginBottom: 6 }}>
+              <h2 style={{ textAlign: "center", fontSize: 17, fontWeight: 700, color: "#e2e8f0", marginBottom: 4 }}>
                 Quantas aulas por dia em cada turno?
               </h2>
-              <p style={{ textAlign: "center", color: "#475569", fontSize: 13, marginBottom: 32 }}>
+              <p style={{ textAlign: "center", color: "#64748b", fontSize: 12, marginBottom: 20 }}>
                 Isso define os horários disponíveis na grade de disponibilidade dos professores.
               </p>
-              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {TURNOS_CONFIG.filter(t => turnos.includes(t.id)).map(t => (
                   <div key={t.id} style={{
                     background: "rgba(255,255,255,0.05)",
                     border: "1px solid rgba(255,255,255,0.1)",
-                    borderRadius: 14, padding: "20px 24px",
-                    display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16,
+                    borderRadius: 12, padding: "14px 20px",
+                    display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
                   }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <span style={{ fontSize: 28 }}>{t.emoji}</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <span style={{ fontSize: 24 }}>{t.emoji}</span>
                       <div>
-                        <div style={{ fontWeight: 700, fontSize: 15 }}>{t.label}</div>
-                        <div style={{ color: "#64748b", fontSize: 12 }}>aulas por dia</div>
+                        <div style={{ fontWeight: 700, fontSize: 14 }}>{t.label}</div>
+                        <div style={{ color: "#94a3b8", fontSize: 11 }}>aulas por dia</div>
                       </div>
                     </div>
-                    <div style={{ display: "flex", gap: 8 }}>
+                    <div style={{ display: "flex", gap: 6 }}>
                       {(t.id === "noturno" ? [3, 4, 5] : [4, 5, 6, 7]).map(n => (
                         <button key={n} onClick={() => setPeriodoTurno(t.id, n)} style={{
-                          width: 46, height: 46, borderRadius: 10,
+                          width: 38, height: 38, borderRadius: 8,
                           border: periodos[t.id] === n ? "2px solid #f59e0b" : "2px solid rgba(255,255,255,0.1)",
                           background: periodos[t.id] === n ? "rgba(245,158,11,0.22)" : "rgba(255,255,255,0.04)",
-                          color: periodos[t.id] === n ? "#fbbf24" : "#64748b",
-                          fontWeight: 800, fontSize: 17, cursor: "pointer", transition: "all 0.18s",
-                          boxShadow: periodos[t.id] === n ? "0 0 14px rgba(245,158,11,0.45)" : "none",
-                          transform: periodos[t.id] === n ? "scale(1.12)" : "scale(1)",
+                          color: periodos[t.id] === n ? "#fbbf24" : "#94a3b8",
+                          fontWeight: 800, fontSize: 15, cursor: "pointer", transition: "all 0.15s",
+                          boxShadow: periodos[t.id] === n ? "0 0 10px rgba(245,158,11,0.4)" : "none",
+                          transform: periodos[t.id] === n ? "scale(1.08)" : "scale(1)",
                         }}>{n}</button>
                       ))}
                     </div>
@@ -271,10 +271,10 @@ export default function WizardConfiguracaoGrade({ onConcluir }) {
           {/* PASSO 4 — Revisão */}
           {passo === 4 && (
             <div>
-              <h2 style={{ textAlign: "center", fontSize: 19, fontWeight: 700, color: "#e2e8f0", marginBottom: 6 }}>
+              <h2 style={{ textAlign: "center", fontSize: 17, fontWeight: 700, color: "#e2e8f0", marginBottom: 4 }}>
                 Tudo pronto! Revise antes de confirmar.
               </h2>
-              <p style={{ textAlign: "center", color: "#475569", fontSize: 13, marginBottom: 28 }}>
+              <p style={{ textAlign: "center", color: "#64748b", fontSize: 12, marginBottom: 20 }}>
                 Você pode ajustar estas configurações depois.
               </p>
 
@@ -312,21 +312,21 @@ export default function WizardConfiguracaoGrade({ onConcluir }) {
         </div>
 
         {/* ── Navegação ── */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 44 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 32 }}>
           <button onClick={() => setPasso(p => p - 1)} disabled={passo === 1} style={{
-            padding: "12px 24px", borderRadius: 10,
-            border: "1px solid rgba(255,255,255,0.12)",
-            background: "rgba(255,255,255,0.06)",
-            color: passo === 1 ? "#334155" : "#94a3b8",
+            padding: "10px 20px", borderRadius: 8,
+            border: passo === 1 ? "1px solid rgba(255,255,255,0.05)" : "1px solid rgba(255,255,255,0.2)",
+            background: passo === 1 ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.08)",
+            color: passo === 1 ? "#64748b" : "#e2e8f0",
             cursor: passo === 1 ? "not-allowed" : "pointer",
-            fontSize: 14, fontWeight: 500, transition: "all 0.2s",
+            fontSize: 13, fontWeight: 600, transition: "all 0.2s",
           }}>← Voltar</button>
 
           {/* dots */}
           <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
             {[1,2,3,4].map(n => (
               <div key={n} style={{
-                width: n === passo ? 22 : 8, height: 8, borderRadius: 4,
+                width: n === passo ? 18 : 6, height: 6, borderRadius: 3,
                 background: n <= passo ? "#3b82f6" : "rgba(255,255,255,0.12)",
                 transition: "all 0.3s",
               }} />
@@ -335,30 +335,30 @@ export default function WizardConfiguracaoGrade({ onConcluir }) {
 
           {passo < 4 ? (
             <button onClick={() => podeAvancar && setPasso(p => p + 1)} disabled={!podeAvancar} style={{
-              padding: "12px 28px", borderRadius: 10,
+              padding: "10px 24px", borderRadius: 8,
               background: podeAvancar
                 ? "linear-gradient(135deg, #3b82f6, #2563eb)"
                 : "rgba(255,255,255,0.06)",
               border: "none",
-              color: podeAvancar ? "#fff" : "#334155",
+              color: podeAvancar ? "#fff" : "#64748b",
               cursor: podeAvancar ? "pointer" : "not-allowed",
-              fontSize: 14, fontWeight: 700,
-              boxShadow: podeAvancar ? "0 4px 18px rgba(59,130,246,0.45)" : "none",
-              transition: "all 0.22s",
+              fontSize: 13, fontWeight: 700,
+              boxShadow: podeAvancar ? "0 4px 14px rgba(59,130,246,0.4)" : "none",
+              transition: "all 0.2s",
             }}>Próximo →</button>
           ) : (
             <button onClick={confirmar} disabled={salvando} style={{
-              padding: "12px 32px", borderRadius: 10,
+              padding: "10px 24px", borderRadius: 8,
               background: salvando
                 ? "rgba(255,255,255,0.06)"
                 : "linear-gradient(135deg, #10b981, #059669)",
               border: "none", color: "#fff",
               cursor: salvando ? "not-allowed" : "pointer",
-              fontSize: 14, fontWeight: 700,
-              boxShadow: salvando ? "none" : "0 4px 18px rgba(16,185,129,0.45)",
-              transition: "all 0.22s",
+              fontSize: 13, fontWeight: 700,
+              boxShadow: salvando ? "none" : "0 4px 14px rgba(16,185,129,0.4)",
+              transition: "all 0.2s",
             }}>
-              {salvando ? "Salvando…" : "✓ Confirmar e Começar"}
+              {salvando ? "Salvando…" : "✓ Confirmar"}
             </button>
           )}
         </div>

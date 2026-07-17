@@ -23,7 +23,8 @@ const DIAS_SEMANA = [
 
 const S = {
   outer: {
-    minHeight: "100vh",
+    minHeight: "calc(100vh - 72px)", // Compensa a altura do HeaderGlobal
+    boxSizing: "border-box",
     background: "linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0f172a 100%)",
     display: "flex", alignItems: "center", justifyContent: "center",
     padding: "16px", fontFamily: "'Montserrat', sans-serif",

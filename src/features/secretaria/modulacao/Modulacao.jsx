@@ -1032,6 +1032,18 @@ export default function Modulacao() {
       detalhe = [];
     }
 
+    // 4) Tabela global de professores para fallback de nomes perfeito
+    const nomesProfGlobal = {};
+    try {
+      const { data: listaProfs } = await api.get("/api/professores");
+      const arr = Array.isArray(listaProfs) ? listaProfs : (listaProfs?.professores || []);
+      arr.forEach((p) => {
+        if (p.id && p.nome) nomesProfGlobal[p.id] = p.nome;
+      });
+    } catch (e) {
+      // Ignora erro, usa fallback simplificado
+    }
+
     // Mapa de carga por disciplina (já carregado no estado)
     const cargaDisc = (id) => Number(cargaPorDisciplina[id]) || 1;
 
@@ -1051,7 +1063,7 @@ export default function Modulacao() {
           professores: new Map(), // id → nome
         });
       }
-      mapTD.get(k).professores.set(a.professor_id, a.professor_nome || `Professor ${a.professor_id}`);
+      mapTD.get(k).professores.set(a.professor_id, a.professor_nome || nomesProfGlobal[a.professor_id] || `Professor ${a.professor_id}`);
     }
 
     const duplicidades = [];
@@ -1099,9 +1111,9 @@ export default function Modulacao() {
 
     const cargaRestante = [];
     const overbooking = [];
-    const nomesProf = {}; // fallback de nomes
+    const nomesProf = {}; // fallback de nomes a partir das alocações
     for (const a of alocs) {
-      if (!nomesProf[a.professor_id]) nomesProf[a.professor_id] = a.professor_nome || `Professor ${a.professor_id}`;
+      if (!nomesProf[a.professor_id]) nomesProf[a.professor_id] = a.professor_nome || nomesProfGlobal[a.professor_id] || `Professor ${a.professor_id}`;
     }
 
     // Também considerar professores do turno que estejam listados no picker/lista, mesmo sem alocação
@@ -1112,7 +1124,7 @@ export default function Modulacao() {
 
       const registro = {
         professor_id: profId,
-        professor_nome: nomesProf[profId] || `Professor ${profId}`,
+        professor_nome: nomesProf[profId] || nomesProfGlobal[profId] || `Professor ${profId}`,
         total: Number(total) || 0,
         usadas,
         restante,

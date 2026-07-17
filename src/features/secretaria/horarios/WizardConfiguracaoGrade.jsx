@@ -23,15 +23,16 @@ const DIAS_SEMANA = [
 
 const S = {
   outer: {
-    height: "calc(100vh - 120px)", // Desconta header global e paddings externos
+    // Cancela o padding do <main> (p-3 = 12px mobile, md:p-6 = 24px desktop)
+    // para o fundo azul ir "de borda a borda" sem causar scroll
+    margin: "-12px -12px 0",
+    // Desconta: header global (~64px) + padding top do main (12px) + HeaderGlobal title row (~0px)
+    height: "calc(100vh - 64px - 12px)",
     boxSizing: "border-box",
     background: "linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0f172a 100%)",
-    display: "flex", alignItems: "flex-start", justifyContent: "center",
-    paddingTop: "6vh", // Aproxima o card do topo
-    paddingBottom: "24px", paddingLeft: "16px", paddingRight: "16px",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    padding: "20px 16px",
     fontFamily: "'Montserrat', sans-serif",
-    borderRadius: "12px", // Combina com os cards do sistema
-    overflowY: "auto", // Se a tela for muito pequena, rola apenas dentro da área azul
   },
   card: {
     width: "100%", maxWidth: 580,

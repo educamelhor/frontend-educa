@@ -1,0 +1,13 @@
+﻿# Snapshot pre-deploy: 2026-07-17 17:39:58
+# Commit anterior: 63c5a945
+src\components\layout\Sidebar.jsx : 1848 linhas
+src\components\layout\SidebarGuards.js : 82 linhas
+src\features\plataforma\PlataformaModulos.jsx : 1464 linhas
+src\features\direcao\governanca\Governanca.jsx : 1624 linhas
+src\features\professores\conselho\ConselhoClasseProfessor.jsx : 371 linhas
+src\features\professores\conselho\ModalRegistroConselhoProfessor.jsx : 420 linhas
+src\features\disciplinar\alunos\FichaAlunoDisciplinar.jsx : 239 linhas
+src\features\pedagogico\conselho\FichaAlunoPedagogico.jsx : 173 linhas
+src\features\professores\conselho\FichaAlunoProfessor.jsx : 188 linhas
+src\features\direcao\FichaAlunoDirecao.jsx : 150 linhas
+src\features\secretaria\alunos\FichaAlunoSecretaria.jsx : 161 linhas

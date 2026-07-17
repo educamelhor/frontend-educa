@@ -1305,15 +1305,23 @@ export default function Modulacao() {
           {inconsistencias.duplicidades.length === 0 ? (
             <div className="text-sm text-gray-600">Nenhuma.</div>
           ) : (
-            <ul className="text-sm list-disc pl-5">
+            <ul className="text-sm list-disc pl-5 space-y-1">
               {inconsistencias.duplicidades.map((d, i) => (
                 <li key={i}>
-                  <b>{d.turma_nome}</b> — {d.disciplina_nome} • {d.total} professores
+                  <b>{d.turma_nome || "Sem turma"}</b>
+                  {" — "}
+                  <span className="text-gray-700">{d.disciplina_nome}</span>
+                  {" • "}
+                  <span className="text-red-600 font-medium">{d.total} professores: </span>
+                  <span className="text-gray-600 italic">
+                    {d.professores.map((p) => p.nome || `Prof. ${p.id}`).join(", ")}
+                  </span>
                 </li>
               ))}
             </ul>
           )}
         </div>
+
 
         {/* Turma sem professor */}
         <div className="p-3 rounded border">

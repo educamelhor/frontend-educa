@@ -156,6 +156,28 @@ export default function GerarHorarioPage({ config }) {
     setMsgAcao("");
     try {
       const ids = turmas.map(t => t.id);
+
+      // DEBUG: investigar payload antes de rodar o solver
+      try {
+        const { data: dbg } = await api.post("/api/grade/debug-payload", {
+          turno: turno.toLowerCase(),
+          turma_ids: ids,
+        });
+        console.group("[DEBUG SOLVER PAYLOAD]");
+        console.log("Turmas:", dbg.turmas_count, "Demanda:", dbg.demanda_count, "Modulação:", dbg.modulacao_count);
+        console.log("Max slots por professor:", dbg.max_slots_por_professor);
+        if (dbg.sobrecarga_total > 0) {
+          console.warn(`⚠️ ${dbg.sobrecarga_total} professor(es) com SOBRECARGA de carga horária!`);
+        }
+        (dbg.professores_carga || []).forEach(p => {
+          const tag = p.sobrecarga ? "❌ SOBRECARGA" : "✅";
+          console.log(`${tag} ${p.nome}: ${p.aulas} aulas / ${p.maxSlots} slots (${p.turmas.length} turmas)`);
+        });
+        console.groupEnd();
+      } catch(dbgErr) {
+        console.warn("[DEBUG SOLVER] Falha ao buscar debug-payload:", dbgErr?.message);
+      }
+
       const { data } = await api.post("/api/grade/run-mock", {
         turno: turno.toLowerCase(),
         turma_ids: ids,

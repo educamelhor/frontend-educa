@@ -166,7 +166,7 @@ export default function DisponibilidadePage({ config, turnoInicial, highlightPro
 
   // ── Render ────────────────────────────────────────────────────
   return (
-    <div style={{ fontFamily: "'Montserrat', sans-serif", display: "flex", flexDirection: "column", gap: 0 }}>
+    <div style={{ fontFamily: "'Montserrat', sans-serif", display: "flex", flexDirection: "column", gap: 0, flex: 1, minHeight: 0 }}>
 
       {/* ── Barra superior ── */}
       <div style={{

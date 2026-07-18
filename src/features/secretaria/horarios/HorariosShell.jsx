@@ -67,15 +67,13 @@ export default function HorariosShell() {
 
   // ── Escola com configuração → 3 Abas ──
   return (
-    <div style={{ fontFamily: "'Montserrat', sans-serif", paddingBottom: 48 }}>
+    <div style={{ fontFamily: "'Montserrat', sans-serif", display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
       {/* Tab bar */}
       <div style={{
         display: "flex", alignItems: "stretch", gap: 0,
         borderBottom: "2px solid #e2e8f0",
-        marginBottom: 0,
         background: "#fff",
-        position: "sticky", top: 0, zIndex: 20,
-        boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+        zIndex: 20,
       }}>
         {ABAS.map(aba => {
           const ativo = abaAtiva === aba.id;
@@ -112,7 +110,7 @@ export default function HorariosShell() {
       </div>
 
       {/* Conteúdo da aba */}
-      <div style={{ padding: "28px 0 0" }}>
+      <div style={{ display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
         {abaAtiva === "disponibilidade" && (
           <DisponibilidadePage
             config={config}

@@ -43,6 +43,7 @@ export default function DisponibilidadePage({ config, turnoInicial, highlightPro
   const [msg, setMsg]                 = useState("");
   const [carregando, setCarregando]   = useState(true);
   const [busca, setBusca]             = useState("");
+  const [showModalLimpar, setShowModalLimpar] = useState(false);
 
   const nPeriodos = periodosPorTurno[turno] || 5;
   const dias      = DIAS.filter(d => diasLetivos.includes(d.num));
@@ -155,13 +156,11 @@ export default function DisponibilidadePage({ config, turnoInicial, highlightPro
   // ── Limpar Tudo ───────────────────────────────────────────────
   // Reseta TODOS os professores para "livre" em todos os slots e salva no BD.
   // Útil para: inicializar professores sem dados ou limpar restrições antigas.
-  async function limparTudo() {
+  async function executarLimparTudo() {
     const total = professores.length;
     if (total === 0) return;
-    const ok = window.confirm(
-      `Isso vai apagar todas as marcações de Evitar/Excluir de ${total} professores e salvar tudo como Livre.\n\nDeseja continuar?`
-    );
-    if (!ok) return;
+    
+    setShowModalLimpar(false);
 
     // 1) Monta grid zerado (tudo livre) para todos os professores
     const novoGrid = {};
@@ -253,7 +252,7 @@ export default function DisponibilidadePage({ config, turnoInicial, highlightPro
           </div>
 
           {/* Limpar Tudo */}
-          <button onClick={limparTudo} disabled={salvando} title="Apaga todas as marcações e inicializa todos os professores como Livre" style={{
+          <button onClick={() => setShowModalLimpar(true)} disabled={salvando} title="Apaga todas as marcações e inicializa todos os professores como Livre" style={{
             padding: "8px 18px", borderRadius: 8,
             border: "1px solid #fca5a5",
             background: salvando ? "#e2e8f0" : "#fff1f2",
@@ -469,6 +468,62 @@ export default function DisponibilidadePage({ config, turnoInicial, highlightPro
           )}
         </div>
       </div>
+
+      {/* ── Modal Limpar Tudo ── */}
+      {showModalLimpar && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(15, 23, 42, 0.6)", backdropFilter: "blur(4px)",
+          zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center"
+        }}>
+          <div style={{
+            background: "#fff", width: 420, borderRadius: 16, padding: 32,
+            boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+            textAlign: "center"
+          }}>
+            <div style={{
+              width: 56, height: 56, borderRadius: "50%", background: "#fee2e2",
+              color: "#dc2626", fontSize: 28, display: "flex", alignItems: "center", justifyContent: "center",
+              margin: "0 auto 20px"
+            }}>
+              ⚠️
+            </div>
+            <h3 style={{ margin: "0 0 12px", fontSize: 20, color: "#1e293b", fontWeight: 700 }}>
+              Confirmar Limpeza Total
+            </h3>
+            <p style={{ margin: "0 0 24px", color: "#64748b", fontSize: 14, lineHeight: 1.5 }}>
+              Isso vai apagar <strong>todas as marcações</strong> de Evitar/Excluir de <strong>{professores.length} professores</strong> e salvar tudo como Livre.
+              <br /><br />Esta ação não pode ser desfeita. Deseja continuar?
+            </p>
+            <div style={{ display: "flex", gap: 12, justifyContent: "center" }}>
+              <button
+                onClick={() => setShowModalLimpar(false)}
+                style={{
+                  padding: "10px 24px", borderRadius: 8, border: "1px solid #e2e8f0",
+                  background: "#fff", color: "#64748b", fontWeight: 600, cursor: "pointer",
+                  transition: "background 0.2s"
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = "#f8fafc"}
+                onMouseLeave={e => e.currentTarget.style.background = "#fff"}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={executarLimparTudo}
+                style={{
+                  padding: "10px 24px", borderRadius: 8, border: "none",
+                  background: "#ef4444", color: "#fff", fontWeight: 600, cursor: "pointer",
+                  transition: "background 0.2s"
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = "#dc2626"}
+                onMouseLeave={e => e.currentTarget.style.background = "#ef4444"}
+              >
+                Sim, Limpar Tudo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

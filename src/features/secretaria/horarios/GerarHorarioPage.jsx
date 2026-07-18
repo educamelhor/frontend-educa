@@ -110,7 +110,9 @@ export default function GerarHorarioPage({ config }) {
       setTurmas(lista);
       // Mapa de nomes
       const map = {};
-      for (const t of lista) map[t.id] = t.nome || `Turma ${t.id}`;
+      for (const t of lista) {
+        map[t.id] = t.turma || t.nome || String(t.id);
+      }
       setNomesTurmas(map);
     } catch {
       setTurmas([]);
@@ -416,7 +418,8 @@ export default function GerarHorarioPage({ config }) {
                 <ul style={{ margin: 0, paddingLeft: 20, listStyleType: "disc" }}>
                   {(resultado.diagnostico?.nao_alocadas || []).slice(0, 10).map((na, i) => (
                     <li key={i}>
-                      Turma {nomesTurmas[na.turma_id] || na.turma_id} — {nomesDisciplinas[na.disciplina_id] || na.disciplina_id} ({nomesProfessores[na.professor_id] || na.professor_id}) <strong style={{color:"#b71c1c"}}>({na.motivo})</strong>
+                      {String(nomesTurmas[na.turma_id] || na.turma_id).toUpperCase().includes('TURMA') ? '' : 'Turma '}
+                      {nomesTurmas[na.turma_id] || na.turma_id} — {nomesDisciplinas[na.disciplina_id] || na.disciplina_id} ({nomesProfessores[na.professor_id] || na.professor_id}) <strong style={{color:"#b71c1c"}}>({na.motivo})</strong>
                     </li>
                   ))}
                   {(resultado.diagnostico?.nao_alocadas?.length > 10) && (
@@ -466,11 +469,12 @@ export default function GerarHorarioPage({ config }) {
                         padding: "10px 16px", borderBottom: "1px solid #e2e8f0",
                         background: "#f8fafc", fontWeight: 700, fontSize: 14, color: "#1e3a5f",
                       }}>
-                        🏫 {nomesTurmas[turmaId] || `Turma ${turmaId}`}
+                        🏫 {String(nomesTurmas[turmaId] || turmaId).toUpperCase().includes('TURMA') ? '' : 'Turma '}
+                        {nomesTurmas[turmaId] || turmaId}
                       </div>
                       <div style={{ padding: 12 }}>
                         <GradeTurma
-                          turma={{ id: Number(turmaId), nome: nomesTurmas[turmaId] || `Turma ${turmaId}` }}
+                          turma={{ id: Number(turmaId), nome: nomesTurmas[turmaId] || turmaId }}
                           resultado={resultado}
                           periodosPorDia={buildPeriodosPorDia(grade)}
                           maps={{ disciplinaById: nomesDisciplinas, professorById: nomesProfessores }}

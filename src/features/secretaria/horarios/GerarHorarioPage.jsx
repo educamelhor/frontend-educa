@@ -26,6 +26,7 @@ function normalizeResultado(raw) {
     metrics:            src.metrics            || src.metricas         || {},
     diagnostico:        src.diagnostico        || {},
     payload_summary:    src.payload_summary    || {},
+    warnings_payload:   src.warnings_payload   || [],
     traceId:            src.traceId            || raw.traceId          || null,
   };
 }
@@ -436,7 +437,7 @@ export default function GerarHorarioPage({ config }) {
             {naoAloc > 0 && (
               <div style={{
                 background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 10,
-                padding: "12px 16px", marginBottom: 20, fontSize: 13, color: "#92400e",
+                padding: "12px 16px", marginBottom: 16, fontSize: 13, color: "#92400e",
               }}>
                 <strong style={{ display: "block", marginBottom: 8 }}>⚠️ {naoAloc} aula(s) não alocada(s)</strong>
                 <ul style={{ margin: 0, paddingLeft: 20, listStyleType: "disc" }}>
@@ -449,6 +450,30 @@ export default function GerarHorarioPage({ config }) {
                   {(resultado.diagnostico?.nao_alocadas?.length > 10) && (
                     <li>... e mais {(resultado.diagnostico.nao_alocadas.length) - 10} aulas</li>
                   )}
+                </ul>
+              </div>
+            )}
+
+            {/* ── Alerta de sobrecarga de professor ── */}
+            {(resultado.warnings_payload || []).length > 0 && (
+              <div style={{
+                background: "#fef2f2", border: "1px solid #fca5a5", borderRadius: 10,
+                padding: "12px 16px", marginBottom: 20, fontSize: 13, color: "#7f1d1d",
+              }}>
+                <strong style={{ display: "block", marginBottom: 8 }}>
+                  🔴 {resultado.warnings_payload.length} professor(es) com carga 100% dos slots disponíveis
+                </strong>
+                <p style={{ margin: "0 0 6px", fontSize: 12, color: "#991b1b" }}>
+                  Professores abaixo estão modulados para exatamente {30} aulas/semana (todos os slots). 
+                  O algoritmo precisa de perfeição absoluta para alocá-los, o que pode gerar colisões.
+                  Considere reduzir a carga modular ou liberar mais horários.
+                </p>
+                <ul style={{ margin: 0, paddingLeft: 20, listStyleType: "disc" }}>
+                  {(resultado.warnings_payload || []).map((w, i) => (
+                    <li key={i}>
+                      <strong>{w.professor_nome}</strong>: {w.aulas_demanda} aulas / {w.slots_disponiveis} slots ({w.utilization_pct}% utilização)
+                    </li>
+                  ))}
                 </ul>
               </div>
             )}

@@ -343,16 +343,17 @@ export default function DisponibilidadePage({ config, turnoInicial, highlightPro
           {carregando ? (
             <div style={{ textAlign: "center", color: "#94a3b8", padding: 40 }}>Carregando…</div>
           ) : (
-            <div style={{ display: "flex", gap: 12, flexWrap: "nowrap", justifyContent: "center", minWidth: "fit-content" }}>
+            <div style={{ display: "flex", gap: 12, flexWrap: "nowrap", justifyContent: "stretch", width: "100%" }}>
               {dias.map(d => (
                 <div key={d.num} style={{
+                  flex: 1,
                   background: "#fff",
                   borderRadius: 16,
                   boxShadow: "0 2px 12px rgba(0,0,0,0.07)",
                   border: "1px solid #e2e8f0",
                   padding: "14px 12px",
                   display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
-                  minWidth: 90,
+                  minWidth: 0,
                 }}>
                   {/* Nome do dia */}
                   <div style={{
@@ -375,14 +376,13 @@ export default function DisponibilidadePage({ config, turnoInicial, highlightPro
                         disabled={!ativo}
                         title={ativo ? `${d.nome} · ${ord(ordem)} aula · ${sc.label}` : "Selecione um professor"}
                         style={{
-                          width: 66, height: 36, borderRadius: 20,
+                          width: "100%", height: 38, borderRadius: 20,
                           border: "none",
                           background: ativo ? sc.bg : "#e2e8f0",
                           color: ativo ? sc.text : "#94a3b8",
                           fontWeight: 700, fontSize: 13,
                           cursor: ativo ? "pointer" : "not-allowed",
                           transition: "all 0.15s",
-                          transform: ativo ? "scale(1)" : "scale(0.97)",
                           boxShadow: ativo ? `0 2px 8px ${sc.bg}88` : "none",
                         }}
                         onMouseEnter={e => { if (ativo) e.currentTarget.style.background = sc.hover; }}

@@ -20,7 +20,7 @@ const STATUS_CICLO = ["livre", "evitar", "indisponivel"];
 const STATUS_STYLE = {
   livre:        { bg: "#22c55e", hover: "#16a34a", label: "Livre",         text: "#fff" },
   evitar:       { bg: "#f59e0b", hover: "#d97706", label: "Evitar",        text: "#fff" },
-  indisponivel: { bg: "#ef4444", hover: "#dc2626", label: "Indisponível",  text: "#fff" },
+  indisponivel: { bg: "#ef4444", hover: "#dc2626", label: "Excluir",       text: "#fff" },
 };
 
 function proxStatus(s) {
@@ -388,7 +388,7 @@ export default function DisponibilidadePage({ config, turnoInicial, highlightPro
                         onMouseEnter={e => { if (ativo) e.currentTarget.style.background = sc.hover; }}
                         onMouseLeave={e => { if (ativo) e.currentTarget.style.background = sc.bg; }}
                       >
-                        {ord(ordem)}
+                        {status === "livre" ? ord(ordem) : `${ord(ordem)} - ${sc.label}`}
                       </button>
                     );
                   })}

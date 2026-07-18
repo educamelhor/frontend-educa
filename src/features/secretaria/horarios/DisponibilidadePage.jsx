@@ -152,6 +152,61 @@ export default function DisponibilidadePage({ config, turnoInicial, highlightPro
     setTimeout(() => setMsg(""), 3000);
   }
 
+  // ── Limpar Tudo ───────────────────────────────────────────────
+  // Reseta TODOS os professores para "livre" em todos os slots e salva no BD.
+  // Útil para: inicializar professores sem dados ou limpar restrições antigas.
+  async function limparTudo() {
+    const total = professores.length;
+    if (total === 0) return;
+    const ok = window.confirm(
+      `Isso vai apagar todas as marcações de Evitar/Excluir de ${total} professores e salvar tudo como Livre.\n\nDeseja continuar?`
+    );
+    if (!ok) return;
+
+    // 1) Monta grid zerado (tudo livre) para todos os professores
+    const novoGrid = {};
+    const novoDirty = {};
+    for (const p of professores) {
+      novoGrid[p.id] = {};
+      novoDirty[p.id] = true;
+      for (const d of dias) {
+        novoGrid[p.id][d.num] = {};
+        for (let o = 1; o <= nPeriodos; o++) novoGrid[p.id][d.num][o] = "livre";
+      }
+    }
+    setGrid(novoGrid);
+    setDirty(novoDirty);
+
+    // 2) Salva todos no BD imediatamente
+    setSalvando(true);
+    setMsg("🧹 Limpando e salvando todos os professores…");
+    let erros = 0;
+    let salvos = 0;
+    for (const p of professores) {
+      for (const d of dias) {
+        const periodos = [];
+        for (let o = 1; o <= nPeriodos; o++) periodos.push({ ordem: o, status: "livre" });
+        try {
+          await api.post("/api/disponibilidades/upsert", {
+            professor_id:  p.id,
+            turno:         turno.toLowerCase(),
+            dia_semana:    d.num,
+            status_padrao: "livre",
+            periodos,
+          });
+          salvos++;
+        } catch { erros++; }
+      }
+    }
+    setSalvando(false);
+    setDirty({});
+    const msg = erros > 0
+      ? `⚠️ Concluído com ${erros} erros. ${salvos} registros salvos.`
+      : `✅ ${total} professores inicializados como Livre!`;
+    setMsg(msg);
+    setTimeout(() => setMsg(""), 4000);
+  }
+
   // ── Helpers ───────────────────────────────────────────────────
   const profsFiltrados = professores.filter(p =>
     !busca || `${p.nome} ${p.disciplina_nome || ""}`.toLowerCase().includes(busca.toLowerCase())
@@ -196,6 +251,22 @@ export default function DisponibilidadePage({ config, turnoInicial, highlightPro
               </button>
             ))}
           </div>
+
+          {/* Limpar Tudo */}
+          <button onClick={limparTudo} disabled={salvando} title="Apaga todas as marcações e inicializa todos os professores como Livre" style={{
+            padding: "8px 18px", borderRadius: 8,
+            border: "1px solid #fca5a5",
+            background: salvando ? "#e2e8f0" : "#fff1f2",
+            color: salvando ? "#94a3b8" : "#dc2626",
+            fontWeight: 700, fontSize: 13,
+            cursor: salvando ? "not-allowed" : "pointer",
+            transition: "all 0.18s",
+          }}
+            onMouseEnter={e => { if (!salvando) { e.currentTarget.style.background = "#fecdd3"; } }}
+            onMouseLeave={e => { if (!salvando) { e.currentTarget.style.background = "#fff1f2"; } }}
+          >
+            🧹 Limpar Tudo
+          </button>
 
           {/* Salvar */}
           <button onClick={salvarTudo} disabled={salvando || !temDirty} style={{

@@ -122,6 +122,7 @@ export default function HorariosShell() {
         {abaAtiva === "diagnostico" && (
           <DiagnosticoPreGeracaoPage
             onIrParaDisponibilidade={irParaDisponibilidade}
+            onIrParaGerar={() => setAbaAtiva("gerar")}
           />
         )}
         {abaAtiva === "gerar" && (

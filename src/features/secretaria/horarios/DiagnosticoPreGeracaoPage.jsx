@@ -221,7 +221,7 @@ function CoberturaLista({ resumo }) {
 }
 
 // ─── Componente de Diagnóstico por Turno ──────────────────────────────────────
-function DiagnosticoTurno({ turno, onIrParaDisponibilidade }) {
+function DiagnosticoTurno({ turno, onIrParaDisponibilidade, onIrParaGerar }) {
   const [cobertura, setCobertura] = useState(null);
   const [disponib, setDisponib] = useState(null);
   const [turmasDisc, setTurmasDisc] = useState(null);
@@ -326,7 +326,7 @@ function DiagnosticoTurno({ turno, onIrParaDisponibilidade }) {
           )}
 
           <button
-            onClick={() => navigate("/secretaria/horarios/wizard")}
+            onClick={() => onIrParaGerar?.(turno)}
             disabled={!podereGerar}
             className={`w-full py-2.5 rounded-xl font-bold text-sm transition-all ${
               podereGerar
@@ -406,7 +406,7 @@ function DiagnosticoTurno({ turno, onIrParaDisponibilidade }) {
 // ─── Página Principal ─────────────────────────────────────────────────────────
 const TURNOS = ["Matutino", "Vespertino", "Noturno"];
 
-export default function DiagnosticoPreGeracaoPage({ onIrParaDisponibilidade } = {}) {
+export default function DiagnosticoPreGeracaoPage({ onIrParaDisponibilidade, onIrParaGerar }) {
   const [abaAtiva, setAbaAtiva] = useState("Matutino");
   const [turnos, setTurnos] = useState(TURNOS);
 
@@ -458,7 +458,12 @@ export default function DiagnosticoPreGeracaoPage({ onIrParaDisponibilidade } = 
       </div>
 
       {/* Conteúdo da aba */}
-      <DiagnosticoTurno key={abaAtiva} turno={abaAtiva} onIrParaDisponibilidade={onIrParaDisponibilidade} />
+      <DiagnosticoTurno 
+        key={abaAtiva} 
+        turno={abaAtiva} 
+        onIrParaDisponibilidade={onIrParaDisponibilidade} 
+        onIrParaGerar={onIrParaGerar}
+      />
 
       {/* Botão Revisar quando há callback */}
       {onIrParaDisponibilidade && (

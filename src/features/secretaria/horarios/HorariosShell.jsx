@@ -10,6 +10,7 @@ import api from "../../../services/api";
 import WizardConfiguracaoGrade from "./WizardConfiguracaoGrade";
 import DisponibilidadePage from "./DisponibilidadePage";
 import DiagnosticoPreGeracaoPage from "./DiagnosticoPreGeracaoPage";
+import GerarHorarioPage from "./GerarHorarioPage";
 
 const ABAS = [
   { id: "disponibilidade", label: "📅 Disponibilidade", desc: "Configure a disponibilidade dos professores" },
@@ -126,19 +127,7 @@ export default function HorariosShell() {
           />
         )}
         {abaAtiva === "gerar" && (
-          <div style={{
-            textAlign: "center", padding: "80px 24px",
-            color: "#94a3b8",
-          }}>
-            <div style={{ fontSize: 48, marginBottom: 16 }}>⚡</div>
-            <h3 style={{ color: "#1e3a5f", fontSize: 20, marginBottom: 8 }}>
-              Motor de Geração de Horários
-            </h3>
-            <p style={{ color: "#64748b", fontSize: 14, maxWidth: 400, margin: "0 auto" }}>
-              Em breve. Primeiro configure as disponibilidades na aba anterior
-              e valide no Diagnóstico (score ≥ 50%) para habilitar a geração.
-            </p>
-          </div>
+          <GerarHorarioPage config={config} />
         )}
       </div>
     </div>

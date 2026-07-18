@@ -105,7 +105,9 @@ export default function GerarHorarioPage({ config }) {
   const carregarTurmas = useCallback(async () => {
     setCarregandoTurmas(true);
     try {
-      const { data } = await api.get("/api/turmas", { params: { turno } });
+      const hoje = new Date();
+      const anoAtual = hoje.getMonth() === 0 ? hoje.getFullYear() - 1 : hoje.getFullYear();
+      const { data } = await api.get("/api/turmas", { params: { turno, ano: anoAtual } });
       const lista = Array.isArray(data) ? data : (Array.isArray(data?.turmas) ? data.turmas : []);
       setTurmas(lista);
       // Mapa de nomes

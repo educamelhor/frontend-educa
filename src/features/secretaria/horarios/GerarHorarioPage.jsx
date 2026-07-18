@@ -412,8 +412,17 @@ export default function GerarHorarioPage({ config }) {
                 background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 10,
                 padding: "12px 16px", marginBottom: 20, fontSize: 13, color: "#92400e",
               }}>
-                <strong>⚠️ {naoAloc} aula(s) não alocada(s)</strong>
-                {" — "}Verifique a disponibilidade dos professores e a grade de horários configurada.
+                <strong style={{ display: "block", marginBottom: 8 }}>⚠️ {naoAloc} aula(s) não alocada(s)</strong>
+                <ul style={{ margin: 0, paddingLeft: 20, listStyleType: "disc" }}>
+                  {(resultado.diagnostico?.nao_alocadas || []).slice(0, 10).map((na, i) => (
+                    <li key={i}>
+                      Turma {nomesTurmas[na.turma_id] || na.turma_id} — {nomesDisciplinas[na.disciplina_id] || na.disciplina_id} ({nomesProfessores[na.professor_id] || na.professor_id}) <strong style={{color:"#b71c1c"}}>({na.motivo})</strong>
+                    </li>
+                  ))}
+                  {(resultado.diagnostico?.nao_alocadas?.length > 10) && (
+                    <li>... e mais {(resultado.diagnostico.nao_alocadas.length) - 10} aulas</li>
+                  )}
+                </ul>
               </div>
             )}
 
@@ -465,6 +474,7 @@ export default function GerarHorarioPage({ config }) {
                           resultado={resultado}
                           periodosPorDia={buildPeriodosPorDia(grade)}
                           maps={{ disciplinaById: nomesDisciplinas, professorById: nomesProfessores }}
+                          layoutMode="dias-colunas"
                         />
                       </div>
                     </div>
@@ -496,6 +506,7 @@ export default function GerarHorarioPage({ config }) {
                           resultado={resultado}
                           periodosPorDia={buildPeriodosPorDia(grade)}
                           maps={{ disciplinaById: nomesDisciplinas, turmaById: nomesTurmas }}
+                          layoutMode="dias-colunas"
                         />
                       </div>
                     </div>

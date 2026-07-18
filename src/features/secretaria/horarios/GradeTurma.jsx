@@ -70,13 +70,8 @@ export default function GradeTurma({ turma, resultado, periodosPorDia, maps = {}
   function profCompacto(nome) {
     const n = sansAccent(String(nome || ""));
     if (!n) return "";
-    const ws = n.split(" ").filter(Boolean);
-    if (ws.length === 1) return ws[0].toUpperCase();
-    const ultimo = ws[ws.length - 1].toUpperCase();
-    if (ultimo.length < 3) {
-      return ws.map((w) => w[0]?.toUpperCase()).filter(Boolean).join(".") + ".";
-    }
-    return ultimo;
+    const p = n.split(" ");
+    return p[0].toUpperCase();
   }
 
   // ---------------------------------------------------------------------------

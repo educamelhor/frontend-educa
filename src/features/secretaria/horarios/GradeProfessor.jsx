@@ -69,16 +69,11 @@ export default function GradeProfessor({ professor, resultado, periodosPorDia, m
     return base.length <= 4 ? base : base.slice(0, 4);
   }
 
-  // Turma curta: usa nome se houver; senão “Turma {id}”
+  // Turma: usa nome se houver; senão "Turma {id}"
   function turmaCompacta(nome, id) {
     if (!nome) return id != null ? `Turma ${id}` : "—";
-    const n = sansAccent(String(nome));
-    const tokens = n.split(/\s+/).filter(Boolean);
-    if (tokens.length <= 2) return n;
-    const ult = tokens[tokens.length - 1];
-    const pen = tokens[tokens.length - 2];
-    if (/[A-Za-z0-9]/.test(ult)) return `${pen} ${ult}`;
-    return tokens.slice(-2).join(" ");
+    // O usuário solicitou o nome completo (ex: 8º ANO C) ao invés de abreviado
+    return String(nome).toUpperCase();
   }
 
   // Paleta determinística por disciplina_id (mesma do GradeTurma)

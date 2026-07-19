@@ -229,12 +229,15 @@ export default function GerarHorarioPage({ config }) {
     }
   }
 
+  const [showModalPublicar, setShowModalPublicar] = useState(false);
+
   // ── Publicar grade ───────────────────────────────────────────
-  async function publicarGrade() {
-    const ok = window.confirm(
-      "Publicar a grade irá torná-la oficial e acessível a todos. Deseja continuar?"
-    );
-    if (!ok) return;
+  function publicarGrade() {
+    setShowModalPublicar(true);
+  }
+
+  async function executarPublicacao() {
+    setShowModalPublicar(false);
     setPublicando(true);
     setMsgAcao("");
     try {
@@ -571,9 +574,72 @@ export default function GerarHorarioPage({ config }) {
         )}
       </div>
 
-      {/* Animação de spin */}
+      {/* 🚀 Modal Premium para Publicar Grade */}
+      {showModalPublicar && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh",
+          background: "rgba(15, 23, 42, 0.6)", backdropFilter: "blur(4px)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          zIndex: 9999, padding: 20
+        }}>
+          <div style={{
+            background: "#fff", width: "100%", maxWidth: 420, borderRadius: 16,
+            padding: "24px 28px", boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
+            animation: "modalFadeIn 0.2s ease-out forwards"
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+              <div style={{
+                width: 48, height: 48, borderRadius: "50%", background: "#dcfce7",
+                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24
+              }}>
+                🌐
+              </div>
+              <h3 style={{ margin: 0, color: "#0f172a", fontSize: 18, fontWeight: 700 }}>
+                Publicar Grade?
+              </h3>
+            </div>
+            
+            <p style={{ margin: "0 0 24px 0", color: "#475569", fontSize: 14, lineHeight: 1.5 }}>
+              Publicar a grade irá torná-la oficial e acessível a todos os professores e alunos. Você tem certeza de que deseja continuar?
+            </p>
+            
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
+              <button
+                onClick={() => setShowModalPublicar(false)}
+                style={{
+                  padding: "10px 16px", borderRadius: 8, border: "1px solid #cbd5e1",
+                  background: "#fff", color: "#475569", fontWeight: 600, fontSize: 14,
+                  cursor: "pointer", transition: "all 0.15s"
+                }}
+                onMouseOver={(e) => e.target.style.background = "#f8fafc"}
+                onMouseOut={(e) => e.target.style.background = "#fff"}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={executarPublicacao}
+                style={{
+                  padding: "10px 20px", borderRadius: 8, border: "none",
+                  background: "#16a34a", color: "#fff", fontWeight: 600, fontSize: 14,
+                  cursor: "pointer", transition: "all 0.15s"
+                }}
+                onMouseOver={(e) => e.target.style.background = "#15803d"}
+                onMouseOut={(e) => e.target.style.background = "#16a34a"}
+              >
+                Sim, Publicar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Animação de spin e fade */}
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes modalFadeIn {
+          from { opacity: 0; transform: scale(0.95) translateY(10px); }
+          to { opacity: 1; transform: scale(1) translateY(0); }
+        }
       `}</style>
     </div>
   );

@@ -351,7 +351,7 @@ export default function Modulacao() {
               nome: a.professor_nome || `Professor ${a.professor_id}`,
               disciplina_id: Number(a.disciplina_id),
               disciplina_nome: a.disciplina_nome || "—",
-              aulas: Number(mapAulasTotais[a.professor_id] ?? 0) || 0,
+              aulas: Number(mapAulasTotais[`${a.professor_id}|${a.disciplina_id}`] ?? mapAulasTotais[a.professor_id] ?? 0) || 0,
               turno: a.turno,
             });
           }
@@ -402,20 +402,40 @@ export default function Modulacao() {
       // e também removemos os professores inativos para não aparecerem nas inconsistências
       lista = filtraPorTurno(lista, turno).filter((p) => String(p.status).toLowerCase() !== "inativo");
 
-      // constrói o map { profId: aulasTotal } usando campos flexíveis
+      // constrói o map { profId|disciplinaId: aulasTotal } usando campos flexíveis do vínculo
       const map = {};
       for (const p of lista) {
         const id = Number(p?.id ?? p?.professor_id ?? p?.uuid);
         if (!id) continue;
-        const tot =
-          Number(
-            p?.aulas ??
-            p?.carga ??
-            p?.carga_aulas ??
-            p?.cargaHoraria ??
-            0
-          ) || 0;
-        map[id] = tot;
+
+        // NOVO: busca aulas dentro dos vínculos (uma cota por disciplina)
+        const vinculos = Array.isArray(p.vinculos) ? p.vinculos : [];
+        const vinculosTurno = vinculos.filter(
+          (v) => String(v.turno || "").toLowerCase() === String(turno).toLowerCase()
+        );
+
+        if (vinculosTurno.length > 0) {
+          for (const v of vinculosTurno) {
+            const discId = v.disciplina_id;
+            const tot = Number(v.aulas ?? 0) || 0;
+            map[`${id}|${discId}`] = tot;
+          }
+        } else {
+          // fallback para modelo legado se vinculos estiver vazio
+          const tot =
+            Number(
+              p?.aulas ??
+              p?.carga ??
+              p?.carga_aulas ??
+              p?.cargaHoraria ??
+              0
+            ) || 0;
+          if (p.disciplina_id) {
+             map[`${id}|${p.disciplina_id}`] = tot;
+          } else {
+             map[id] = tot; // fallback mais fraco
+          }
+        }
       }
       setAulasTotaisPorProfessor(map);
       return map;
@@ -494,7 +514,7 @@ export default function Modulacao() {
             professor_nome: a.professor_nome || `Professor ${a.professor_id}`,
             disciplina_id: a.disciplina_id,
             disciplina_nome: a.disciplina_nome || "—",
-            aulas: Number(mapAulas[a.professor_id] ?? 0) || 0,
+            aulas: Number(mapAulas[`${a.professor_id}|${a.disciplina_id}`] ?? mapAulas[a.professor_id] ?? 0) || 0,
             carga: Number(cargaPorDisciplina[a.disciplina_id]) || 0,
             turmas: new Set(),
           });
@@ -857,7 +877,7 @@ export default function Modulacao() {
               nome: a.professor_nome || `Professor ${a.professor_id}`,
               disciplina_id: Number(a.disciplina_id),
               disciplina_nome: a.disciplina_nome || "—",
-              aulas: Number(mapAulasTotais[a.professor_id] ?? 0) || 0,
+              aulas: Number(mapAulasTotais[`${a.professor_id}|${a.disciplina_id}`] ?? mapAulasTotais[a.professor_id] ?? 0) || 0,
               turno: a.turno,
             });
           }
@@ -1106,13 +1126,13 @@ export default function Modulacao() {
     }
 
     // ─────────────────────────────────────────────────────────────
-    // (iii) CARGA RESTANTE / OVERBOOKING POR PROFESSOR
+    // (iii) CARGA RESTANTE / OVERBOOKING POR PROFESSOR × DISCIPLINA
     // ─────────────────────────────────────────────────────────────
-    // usado = soma(cargaDisc(disciplina) por alocação do professor)
-    const usadoPorProf = {};
+    const usadoPorProfDisc = {};
     for (const a of alocs) {
       const c = cargaDisc(a.disciplina_id);
-      usadoPorProf[a.professor_id] = (usadoPorProf[a.professor_id] || 0) + c;
+      const k = `${a.professor_id}|${a.disciplina_id}`;
+      usadoPorProfDisc[k] = (usadoPorProfDisc[k] || 0) + c;
     }
 
     const cargaRestante = [];
@@ -1123,9 +1143,11 @@ export default function Modulacao() {
     }
 
     // Também considerar professores do turno que estejam listados no picker/lista, mesmo sem alocação
-    for (const [profIdStr, total] of Object.entries(mapAulas || {})) {
-      const profId = Number(profIdStr);
-      const usadas = Number(usadoPorProf[profId] || 0);
+    for (const [key, total] of Object.entries(mapAulas || {})) {
+      const parts = key.split("|");
+      const profId = Number(parts[0]);
+      // se a chave for antiga (só id), usa o id, mas o ideal é que seja profId|discId
+      const usadas = Number(usadoPorProfDisc[key] || 0);
       const restante = Number(total) - usadas;
 
       const registro = {
@@ -1667,7 +1689,7 @@ export default function Modulacao() {
                                 nome: p.nome,
                                 disciplina_id: p.disciplina_id,
                                 disciplina_nome: p.disciplina_nome,
-                                aulas: Number(aulasTotaisPorProfessor[p.id] ?? p.aulas ?? 0) || 0,
+                                aulas: Number(aulasTotaisPorProfessor[`${p.id}|${p.disciplina_id}`] ?? aulasTotaisPorProfessor[p.id] ?? p.aulas ?? 0) || 0,
                                 turno: turnoSelecionado,
                               },
                             ]);

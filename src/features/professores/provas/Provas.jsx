@@ -753,7 +753,7 @@ export default function Provas() {
                   <button style={{ ...s.stepBtn, ...(active ? s.stepActive : done ? s.stepDone : s.stepIdle) }} onClick={() => goToStep(n)}>
                     <span style={s.stepNum}>{done ? '✓' : n}</span>
                     <span style={s.stepLabel}>{label}</span>
-                  ></button>
+                  </button>
                   {i < 2 && <div style={{ ...s.stepLine, background: done ? '#6366f1' : '#e2e8f0' }} />}
                 </React.Fragment>
               );
@@ -772,7 +772,7 @@ export default function Provas() {
                     <div style={{ fontSize:42, marginBottom:10 }}>{area.emoji}</div>
                     <div style={{ fontSize:18, fontWeight:800, color: area.cor, marginBottom:4 }}>{area.label}</div>
                     <div style={{ fontSize:11, color:'#64748b', lineHeight:1.4 }}>{area.disciplinas}</div>
-                  ></button>
+                  </button>
                 ))}
               </div>
             </div>

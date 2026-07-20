@@ -206,10 +206,10 @@ export default function MerendaCadastroPage() {
               <thead>
                 <tr className="bg-gray-100/90 border-b-2 border-gray-200 text-sm text-gray-600 shadow-sm">
                   <th 
-                    className="py-4 px-6 font-semibold tracking-wide cursor-pointer hover:bg-gray-200/50 transition-colors"
+                    className="py-4 px-6 font-semibold tracking-wide cursor-pointer hover:bg-gray-200/50 transition-colors text-center"
                     onClick={requestSort}
                   >
-                    <div className="flex items-center gap-2 select-none">
+                    <div className="flex items-center justify-center gap-2 select-none">
                       PRODUTO
                       {sortConfig.direction === 'asc' ? (
                         <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>

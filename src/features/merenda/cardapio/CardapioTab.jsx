@@ -159,8 +159,12 @@ export default function CardapioTab() {
     if (!kg) return 0;
     let gramatura = 1;
     if (gramaturaStr) {
+      const str = gramaturaStr.toLowerCase();
+      const isGrams = str.includes('g') && !str.includes('kg');
       const parsed = parseFloat(gramaturaStr.replace(/[^\d.,]/g, '').replace(',', '.'));
-      if (!isNaN(parsed) && parsed > 0) gramatura = parsed;
+      if (!isNaN(parsed) && parsed > 0) {
+        gramatura = isGrams ? parsed / 1000 : parsed;
+      }
     }
     return (parseFloat(kg) / gramatura).toFixed(4);
   };

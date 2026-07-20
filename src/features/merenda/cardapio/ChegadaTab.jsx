@@ -103,9 +103,15 @@ export default function ChegadaTab() {
   const getProdutoGramatura = (produtoId) => {
     const prod = produtos.find(p => p.id === parseInt(produtoId));
     if (!prod || !prod.gramatura) return 1;
+    
+    const gramaturaStr = prod.gramatura.toLowerCase();
+    const isGrams = gramaturaStr.includes('g') && !gramaturaStr.includes('kg');
+    
     // Tenta extrair número. Ex: "5,00", "5kg", "5.5"
     const parsed = parseFloat(prod.gramatura.replace(/[^\d.,]/g, '').replace(',', '.'));
-    return isNaN(parsed) ? 1 : parsed;
+    if (isNaN(parsed)) return 1;
+    
+    return isGrams ? parsed / 1000 : parsed;
   };
 
   const calcularPeso = (produtoId, qtd) => {

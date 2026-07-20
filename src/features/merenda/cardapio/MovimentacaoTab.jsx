@@ -75,11 +75,15 @@ export default function MovimentacaoTab() {
 
   const calcularPeso = (qtd) => {
     if (!qtd || !selectedEstoqueItem) return 0;
-    // Extrai a gramatura. Ex: "5,00", "5kg", "5.5"
+    // Extrai a gramatura. Ex: "5,00", "5kg", "500g"
     let gramatura = 1;
     if (selectedEstoqueItem.gramatura) {
+      const str = selectedEstoqueItem.gramatura.toLowerCase();
+      const isGrams = str.includes('g') && !str.includes('kg');
       const parsed = parseFloat(selectedEstoqueItem.gramatura.replace(/[^\d.,]/g, '').replace(',', '.'));
-      if (!isNaN(parsed)) gramatura = parsed;
+      if (!isNaN(parsed)) {
+        gramatura = isGrams ? parsed / 1000 : parsed;
+      }
     }
     return (parseFloat(qtd) * gramatura).toFixed(2);
   };

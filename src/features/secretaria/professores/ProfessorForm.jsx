@@ -508,6 +508,9 @@ export default function ProfessorForm({ open, onClose, onSubmit, onActivate, pro
               </div>
             )}
 
+              </>
+            )}
+
             {/* RODAPÉ */}
             <div className="pt-6 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4">
               <div className="w-full sm:w-auto">

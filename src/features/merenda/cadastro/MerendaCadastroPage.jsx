@@ -15,6 +15,7 @@ export default function MerendaCadastroPage() {
   const [produtos, setProdutos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busca, setBusca] = useState("");
+  const [sortConfig, setSortConfig] = useState({ key: 'produto', direction: 'asc' });
   
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -128,6 +129,22 @@ export default function MerendaCadastroPage() {
     (p.marca || "").toLowerCase().includes(busca.toLowerCase())
   );
 
+  // Ordenação
+  const produtosOrdenados = [...produtosFiltrados].sort((a, b) => {
+    const valA = (a.produto || "").toLowerCase();
+    const valB = (b.produto || "").toLowerCase();
+    if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+    if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  const requestSort = () => {
+    setSortConfig(prev => ({
+      key: 'produto',
+      direction: prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
   return (
     <div className="p-6 md:p-8 min-h-screen bg-gray-50/50">
       
@@ -188,7 +205,19 @@ export default function MerendaCadastroPage() {
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-gray-100/90 border-b-2 border-gray-200 text-sm text-gray-600 shadow-sm">
-                  <th className="py-4 px-6 font-semibold tracking-wide">PRODUTO</th>
+                  <th 
+                    className="py-4 px-6 font-semibold tracking-wide cursor-pointer hover:bg-gray-200/50 transition-colors"
+                    onClick={requestSort}
+                  >
+                    <div className="flex items-center gap-2 select-none">
+                      PRODUTO
+                      {sortConfig.direction === 'asc' ? (
+                        <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+                      ) : (
+                        <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                      )}
+                    </div>
+                  </th>
                   <th className="py-4 px-6 font-semibold tracking-wide">CATEGORIA</th>
                   <th className="py-4 px-6 font-semibold tracking-wide">GRAMATURA <span className="text-xs opacity-70 font-normal">(KG)</span></th>
                   <th className="py-4 px-6 font-semibold tracking-wide">MARCA</th>
@@ -196,7 +225,7 @@ export default function MerendaCadastroPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {produtosFiltrados.map((item) => (
+                {produtosOrdenados.map((item) => (
                   <tr key={item.id} className="hover:bg-amber-50/30 transition-colors group">
                     <td className="py-4 px-6">
                       <span className="font-medium text-gray-800">{item.produto}</span>

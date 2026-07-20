@@ -280,7 +280,7 @@ export default function ChegadaTab() {
                     <option value="">Selecione um produto...</option>
                     {produtos.map(p => (
                       <option key={p.id} value={p.id}>
-                        {p.nome} - {p.marca} ({p.gramatura})
+                        {p.produto} {p.marca ? `- ${p.marca}` : ''} {p.gramatura ? `(${p.gramatura})` : ''}
                       </option>
                     ))}
                   </select>

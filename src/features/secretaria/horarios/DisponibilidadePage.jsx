@@ -61,10 +61,17 @@ export default function DisponibilidadePage({ config, turnoInicial, highlightPro
         ? resProfs.data
         : (resProfs.data?.professores || []);
 
-      const ativos = lista.filter(p =>
-        String(p.status || "ativo").toLowerCase() !== "inativo" &&
-        String(p.turno  || "").toLowerCase() === turno.toLowerCase()
-      );
+      // NOVO: professor pode ter vínculos em múltiplos turnos.
+      // Filtra quem tem pelo menos 1 vínculo no turno selecionado.
+      const ativos = lista.filter(p => {
+        if (String(p.status || "ativo").toLowerCase() === "inativo") return false;
+        const vinculos = Array.isArray(p.vinculos) ? p.vinculos : [];
+        if (vinculos.length > 0) {
+          return vinculos.some(v => String(v.turno || "").toLowerCase() === turno.toLowerCase());
+        }
+        // fallback para modelo legado (p.turno)
+        return String(p.turno || "").toLowerCase() === turno.toLowerCase();
+      });
       setProfessores(ativos);
 
       // monta grid zerado (tudo livre)

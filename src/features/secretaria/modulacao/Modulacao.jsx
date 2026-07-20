@@ -340,37 +340,29 @@ export default function Modulacao() {
         const { data } = await api.get("/api/modulacao", { params: { turno: turnoSelecionado } });
         const alocs = normalizeAlocacoes(data);
 
-        // agrupa por professor para montar a linha única
-        const porProf = new Map();
+        // ── NOVO: 1 linha por (professor_id × disciplina_id) ──────────────────
+        const linhasMap = new Map();
         for (const a of alocs) {
-          if (!porProf.has(a.professor_id)) porProf.set(a.professor_id, []);
-          porProf.get(a.professor_id).push(a);
-        }
-
-        const profs = [];
-        for (const [profId, arr] of porProf.entries()) {
-          const any = arr[0];
-          // total vindo do módulo Professores
-          let total = mapAulasTotais[profId];
-
-        // fallback: se não veio total, estima = (qtd turmas) * (carga da disciplina)
-          if (!total) {
-            const cargaDisc = Number(cargaPorDisciplina[any.disciplina_id]) || 1;
-            total = cargaDisc * arr.length;
+          const key = `${a.professor_id}|${a.disciplina_id}`;
+          if (!linhasMap.has(key)) {
+            linhasMap.set(key, {
+              rowKey: key,
+              id: Number(a.professor_id),
+              nome: a.professor_nome || `Professor ${a.professor_id}`,
+              disciplina_id: Number(a.disciplina_id),
+              disciplina_nome: a.disciplina_nome || "—",
+              aulas: Number(mapAulasTotais[a.professor_id] ?? 0) || 0,
+              turno: a.turno,
+            });
           }
-
-          profs.push({
-            id: Number(profId),
-            nome: any.professor_nome || `Professor ${profId}`,
-            disciplina_id: any.disciplina_id,
-            disciplina_nome: any.disciplina_nome || "—",
-            aulas: Number(total),     // << total correto
-            turno: any.turno,
-          });
         }
+        const profs = Array.from(linhasMap.values()).sort((x, y) =>
+          naturalCompare(x.nome, y.nome) || naturalCompare(x.disciplina_nome, y.disciplina_nome)
+        );
 
           setProfessoresTabela(profs);
-          setAlocacoes(alocs.map((a) => ({ profId: a.professor_id, turmaId: a.turma_id })));
+          // alocacoes agora inclui discId para diferenciar linhas do mesmo professor
+          setAlocacoes(alocs.map((a) => ({ profId: a.professor_id, turmaId: a.turma_id, discId: a.disciplina_id })));
         } catch {
           setProfessoresTabela([]);
           setAlocacoes([]);
@@ -447,22 +439,29 @@ export default function Modulacao() {
         lista = filtraPorTurno(bruta, turno);
       }
 
-      const normalizados = (lista || []).map((p) => ({
-        id: p.id,
-        nome: p.nome,
-        disciplina_id: p.disciplina_id ?? p.disciplinaId ?? p?.disciplina?.id ?? null,
-        disciplina_nome: p.disciplina_nome ?? p.disciplina ?? p?.disciplina?.nome ?? "—",
-        aulas: Number(p.aulas ?? p.carga_aulas ?? 0) || 0,
-        turno:
-          p.turno ??
-          p.turno_nome ??
-          p.periodo ??
-          (Array.isArray(p.turnos) ? p.turnos.join(", ") : null) ??
-          p.disponibilidade_turno ??
-          null,
-      }));
-
-      setProfessoresDisponiveis(filtraPorTurno(normalizados, turno));
+      // ── NOVO: expande 1 linha por vínculo (prof × disciplina × turno) ──
+      const linhas = [];
+      for (const p of lista) {
+        const vinculos = Array.isArray(p.vinculos) ? p.vinculos : [];
+        const vinculosTurno = vinculos.filter(
+          (v) => String(v.turno || "").toLowerCase() === String(turno).toLowerCase()
+        );
+        if (vinculosTurno.length === 0) continue; // professor não tem vínculo neste turno
+        for (const v of vinculosTurno) {
+          linhas.push({
+            // chave única no picker: prof_id + disciplina_id
+            rowKey: `${p.id}|${v.disciplina_id}`,
+            id: p.id,
+            nome: p.nome,
+            disciplina_id: v.disciplina_id,
+            disciplina_nome: v.disciplina_nome || v.disciplina || "—",
+            aulas: Number(v.aulas ?? 0) || 0,
+            turno: v.turno,
+          });
+        }
+      }
+      linhas.sort((a, b) => naturalCompare(a.nome, b.nome) || naturalCompare(a.disciplina_nome, b.disciplina_nome));
+      setProfessoresDisponiveis(linhas);
     } catch {
       setProfessoresDisponiveis([]);
     }
@@ -577,23 +576,24 @@ export default function Modulacao() {
   // --------------------------------------------------------------------------
   // Resumo de aulas por professor (total/usadas/restante)
   // --------------------------------------------------------------------------
+  // resumoAulas agora é por rowKey (prof_id|disc_id) para não misturar disciplinas
   const resumoAulas = useMemo(() => {
     const map = {};
     for (const prof of professoresTabela) {
       const total = Number(aulasTotaisPorProfessor[prof.id] ?? prof.aulas ?? 0) || 0;
-      // MODULAÇÃO INTELIGENTE: soma a carga real de cada turma alocada ao professor
+      // soma aulas usadas SOMENTE para esta disciplina específica
       const usadas = alocacoes
-        .filter((a) => a.profId === prof.id)
+        .filter((a) => a.profId === prof.id && a.discId === prof.disciplina_id)
         .reduce((soma, a) => {
           const cargaEspecifica = cargaPorTurmaDisc[a.turmaId]?.[prof.disciplina_id];
           const carga = cargaEspecifica ?? Number(cargaPorDisciplina[prof.disciplina_id]) ?? 1;
           return soma + (carga || 1);
         }, 0);
-      map[prof.id] = {
+      map[prof.rowKey] = {
         total,
         usadas,
         restante: total - usadas,
-        carga: Number(cargaPorDisciplina[prof.disciplina_id]) || 1, // fallback global
+        carga: Number(cargaPorDisciplina[prof.disciplina_id]) || 1,
       };
     }
     return map;
@@ -615,16 +615,17 @@ export default function Modulacao() {
     setRemovendo(true);
 
     try {
+      // filtra somente as turmas desta linha (prof × disciplina)
       const turmasDoProf = alocacoes
-        .filter((a) => a.profId === removerAlvo.id)
+        .filter((a) => a.profId === removerAlvo.id && a.discId === removerAlvo.disciplina_id)
         .map((a) => a.turmaId);
 
       if (turmasDoProf.length === 0) {
-        setProfessoresTabela((arr) => arr.filter((p) => p.id !== removerAlvo.id));
+        setProfessoresTabela((arr) => arr.filter((p) => p.rowKey !== removerAlvo.rowKey));
         setRemoverOpen(false);
         setRemoverAlvo(null);
         try { await carregarProfessoresDoTurno(turnoSelecionado); } catch {}
-        showToast("success", "Professor removido da lista.");
+        showToast("success", "Linha removida da lista.");
         return;
       }
  
@@ -652,11 +653,14 @@ export default function Modulacao() {
       if (removedOk) {
         const { data } = await api.get("/api/modulacao", { params: { turno: turnoSelecionado } });
         const alocs = normalizeAlocacoes(data);
-        setAlocacoes(alocs.map((a) => ({ profId: a.professor_id, turmaId: a.turma_id })));
+        setAlocacoes(alocs.map((a) => ({ profId: a.professor_id, turmaId: a.turma_id, discId: a.disciplina_id })));
 
-        const aindaTem = alocs.some((a) => a.professor_id === removerAlvo.id);
-        if (!aindaTem) {
-          setProfessoresTabela((arr) => arr.filter((p) => p.id !== removerAlvo.id));
+        // remove somente a linha desta disciplina; outras disciplinas do prof ficam
+        const aindaTemEstaDisc = alocs.some(
+          (a) => a.professor_id === removerAlvo.id && a.disciplina_id === removerAlvo.disciplina_id
+        );
+        if (!aindaTemEstaDisc) {
+          setProfessoresTabela((arr) => arr.filter((p) => p.rowKey !== removerAlvo.rowKey));
         }
 
         try { await carregarProfessoresDoTurno(turnoSelecionado); } catch {}
@@ -715,8 +719,11 @@ export default function Modulacao() {
       }
 
       // 2) Monta PAYLOAD atual (a partir da grade/checkboxes)
+      // Usa a chave (profId, turmaId, discId) — agora que alocacoes inclui discId
       const bruto = professoresTabela.flatMap((prof) => {
-        const turmasAlocadas = alocacoes.filter((a) => a.profId === prof.id).map((a) => a.turmaId);
+        const turmasAlocadas = alocacoes
+          .filter((a) => a.profId === prof.id && a.discId === prof.disciplina_id)
+          .map((a) => a.turmaId);
         return turmasAlocadas.map((turmaId) => ({
           turno: turnoSelecionado,
           professor_id: Number(prof.id),
@@ -839,30 +846,28 @@ export default function Modulacao() {
         // atualiza map de aulas totais e remonta linhas da tabela (mesma lógica que você já usa)
         const mapAulasTotais = await carregarAulasTotaisDoTurno(turnoSelecionado);
 
-        const vistos2 = new Set();
-        const profs = [];
+        // pós-save: reconstrói linhas por (prof × disciplina)
+        const linhasMap2 = new Map();
         for (const a of alocs) {
-          if (!vistos2.has(a.professor_id)) {
-            let total = mapAulasTotais[a.professor_id];
-            if (!total) {
-              const cargaDisc = Number(cargaPorDisciplina[a.disciplina_id]) || 1;
-              const qtdTurmas = alocs.filter((x) => x.professor_id === a.professor_id).length;
-              total = cargaDisc * qtdTurmas;
-            }
-            profs.push({
-              id: a.professor_id,
+          const key = `${a.professor_id}|${a.disciplina_id}`;
+          if (!linhasMap2.has(key)) {
+            linhasMap2.set(key, {
+              rowKey: key,
+              id: Number(a.professor_id),
               nome: a.professor_nome || `Professor ${a.professor_id}`,
-              disciplina_id: a.disciplina_id,
+              disciplina_id: Number(a.disciplina_id),
               disciplina_nome: a.disciplina_nome || "—",
-              aulas: Number(total),
+              aulas: Number(mapAulasTotais[a.professor_id] ?? 0) || 0,
               turno: a.turno,
             });
-            vistos2.add(a.professor_id);
           }
         }
+        const profs2 = Array.from(linhasMap2.values()).sort((x, y) =>
+          naturalCompare(x.nome, y.nome) || naturalCompare(x.disciplina_nome, y.disciplina_nome)
+        );
 
-        setProfessoresTabela(profs);
-        setAlocacoes(alocs.map((a) => ({ profId: a.professor_id, turmaId: a.turma_id })));
+        setProfessoresTabela(profs2);
+        setAlocacoes(alocs.map((a) => ({ profId: a.professor_id, turmaId: a.turma_id, discId: a.disciplina_id })));
       } catch {
         // se falhar o refresh, mantém o estado atual
       }
@@ -1179,10 +1184,11 @@ export default function Modulacao() {
   // --------------------------------------------------------------------------
   // Render
   // --------------------------------------------------------------------------
-  const professoresJaInseridos = new Set(professoresTabela.map((p) => p.id));
+  // jaTem: verifica pela rowKey (prof_id|disc_id) para permitir 2 disciplinas do mesmo prof
+  const rowKeysJaInseridos = new Set(professoresTabela.map((p) => p.rowKey));
   const professoresParaAdicionar = professoresFiltrados.map((p) => ({
     ...p,
-    jaTem: professoresJaInseridos.has(p.id),
+    jaTem: rowKeysJaInseridos.has(p.rowKey),
   }));
 
   return (
@@ -1648,14 +1654,15 @@ export default function Modulacao() {
                       <td className="p-2 border text-center">
                         <button
                           onClick={() => {
-                            // ao selecionar no picker, adiciona professor à tabela principal
+                            // ao selecionar no picker, adiciona a linha (prof × disciplina)
                             if (!turmasTurno.length && turnoSelecionado) {
                               carregarTurmasDoTurno(turnoSelecionado);
                             }
-                            if (professoresTabela.some((x) => x.id === p.id)) return;
+                            if (rowKeysJaInseridos.has(p.rowKey)) return;
                             setProfessoresTabela((prev) => [
                               ...prev,
                               {
+                                rowKey: p.rowKey,
                                 id: p.id,
                                 nome: p.nome,
                                 disciplina_id: p.disciplina_id,
@@ -1765,14 +1772,14 @@ export default function Modulacao() {
               ) : (
                 professoresTabela.map((prof) => {
                   const r =
-                    resumoAulas[prof.id] || {
+                    resumoAulas[prof.rowKey] || {
                       total: Number(prof.aulas) || 0,
                       usadas: 0,
                       restante: Number(prof.aulas) || 0,
                     };
 
                   return (
-                    <tr key={prof.id}>
+                    <tr key={prof.rowKey}>
                       {/* Professor */}
                       <td className="py-2 px-4 border sticky left-0 z-40 bg-white w-[260px]">
                         {prof.nome}
@@ -1807,20 +1814,19 @@ export default function Modulacao() {
 
                       {/* Turmas — checkboxes com lógica inteligente de carga */}
                       {turmasTurno.map((turma) => {
+                        // ── NOVO: inclui discId na verificação para não confundir disciplinas ──
                         const isChecked = alocacoes.some(
-                          (a) => a.profId === prof.id && a.turmaId === turma.id
+                          (a) => a.profId === prof.id && a.turmaId === turma.id && a.discId === prof.disciplina_id
                         );
-                        // Carga real desta disciplina nesta turma (com fallback)
                         const cargaTurma =
                           cargaPorTurmaDisc[turma.id]?.[prof.disciplina_id] ??
                           Number(cargaPorDisciplina[prof.disciplina_id]) ??
                           1;
                         const restanteAtual = r.restante;
-                        // Bloqueia somente se não está marcado e não há saldo suficiente
                         const semSaldo = !isChecked && restanteAtual < cargaTurma;
                         const tooltipBloqueio = semSaldo
                           ? restanteAtual <= 0
-                            ? `${prof.nome} está 100% modulado (0 aulas restantes)`
+                            ? `${prof.nome} (${prof.disciplina_nome}) está 100% modulado`
                             : `Insuficiente: esta turma consome ${cargaTurma} aula(s), mas restam apenas ${restanteAtual}`
                           : `Total: ${r.total} • Usadas: ${r.usadas} • Restante: ${restanteAtual} • Esta turma: ${cargaTurma} aula(s)`;
 
@@ -1835,18 +1841,15 @@ export default function Modulacao() {
                                 style={semSaldo ? { cursor: "not-allowed", opacity: 0.35 } : {}}
                                 onChange={(e) => {
                                   if (e.target.checked) {
-                                    // verifica saldo (dupla cheque, pois disabled já bloqueia)
-                                    if (restanteAtual < cargaTurma) {
-                                      return;
-                                    }
+                                    if (restanteAtual < cargaTurma) return;
                                     setAlocacoes((prev) => [
                                       ...prev,
-                                      { profId: prof.id, turmaId: turma.id },
+                                      { profId: prof.id, turmaId: turma.id, discId: prof.disciplina_id },
                                     ]);
                                   } else {
                                     setAlocacoes((prev) =>
                                       prev.filter(
-                                        (a) => !(a.profId === prof.id && a.turmaId === turma.id)
+                                        (a) => !(a.profId === prof.id && a.turmaId === turma.id && a.discId === prof.disciplina_id)
                                       )
                                     );
                                   }
@@ -1857,13 +1860,13 @@ export default function Modulacao() {
                         );
                       })}
 
-                      {/* Ações (largura fixa e sem quebra) */}
+                      {/* Ações */}
                       <td className="py-2 px-4 border text-center w-[140px] whitespace-nowrap">
                         <button
                           type="button"
                           onClick={() => abrirRemoverLinha(prof)}
                           className="px-3 py-1 rounded border hover:bg-gray-50 disabled:opacity-50"
-                          title="Remover professor e suas marcações deste turno"
+                          title={`Remover ${prof.disciplina_nome} de ${prof.nome}`}
                           disabled={removerOpen || removendo}
                         >
                           Remover

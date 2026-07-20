@@ -61,7 +61,7 @@ export default function PreSolveStep({
 
           <button
             onClick={onIrParaLayout}
-            disabled={!turmasChecked.length}
+            disabled={!turmasChecked.length || (preSolve?.errors && preSolve.errors.length > 0)}
             className="ml-auto px-4 py-2 rounded-xl shadow bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
           >
             Ir para Layout
@@ -71,18 +71,42 @@ export default function PreSolveStep({
 
       {preSolve && (
         <div className="grid md:grid-cols-2 gap-4">
-          <div className="bg-white rounded-2xl shadow p-4">
-            <h3 className="font-semibold text-blue-900 mb-2">Avisos</h3>
-            {preSolve?.warnings?.length ? (
-              <ul className="list-disc pl-5 space-y-1 text-blue-800">
-                {preSolve.warnings.map((w, i) => (
-                  <li key={i}>{w}</li>
-                ))}
-              </ul>
-            ) : (
-              <div className="text-blue-700 text-sm">Sem avisos.</div>
-            )}
-          </div>
+          {(preSolve?.errors?.length > 0 || preSolve?.warnings?.length > 0) && (
+            <div className={`bg-white rounded-2xl shadow p-4 border-l-4 ${preSolve?.errors?.length ? 'border-red-500' : 'border-amber-500'}`}>
+              
+              {preSolve?.errors?.length > 0 && (
+                <div className="mb-4">
+                  <h3 className="font-semibold text-red-700 mb-2 flex items-center gap-2">
+                    <span>❌</span> Erros Críticos (Geração Bloqueada)
+                  </h3>
+                  <ul className="list-disc pl-5 space-y-1 text-red-600 text-sm">
+                    {preSolve.errors.map((e, i) => (
+                      <li key={i}>{e}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {preSolve?.warnings?.length > 0 && (
+                <div>
+                  <h3 className="font-semibold text-amber-700 mb-2 flex items-center gap-2">
+                    <span>⚠️</span> Avisos
+                  </h3>
+                  <ul className="list-disc pl-5 space-y-1 text-amber-700 text-sm">
+                    {preSolve.warnings.map((w, i) => (
+                      <li key={i}>{w}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
+          {(!preSolve?.errors?.length && !preSolve?.warnings?.length) && (
+            <div className="bg-white rounded-2xl shadow p-4 border-l-4 border-emerald-500 flex items-center">
+                <span className="text-emerald-600 font-medium">Tudo certo! Nenhum aviso ou erro encontrado.</span>
+            </div>
+          )}
 
           <div className="bg-white rounded-2xl shadow p-4">
             <h3 className="font-semibold text-blue-900 mb-2">Estatísticas</h3>

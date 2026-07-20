@@ -33,7 +33,12 @@ function normalizeResultado(raw) {
 
 // ── Medidor de cobertura ───────────────────────────────────────
 function CoberturaGauge({ cobertura }) {
-  const pct = Math.min(100, Math.round((cobertura || 0) * 100));
+  // O backend já manda de 0 a 100, mas a interface estava multiplicando por 100 de novo 
+  // (fazendo com que 99 virasse 9900, travado no Math.min(100)).
+  // Se for < 100, nós truncamos para não arredondar para cima.
+  const rawValue = cobertura || 0;
+  const pct = rawValue >= 100 ? 100 : Math.floor(rawValue);
+  
   const cor = pct >= 90 ? "#22c55e" : pct >= 70 ? "#f59e0b" : "#ef4444";
   const R = 40, circ = 2 * Math.PI * R;
   const dash = (pct / 100) * circ;
@@ -464,17 +469,19 @@ export default function GerarHorarioPage({ config }) {
                 padding: "12px 16px", marginBottom: 20, fontSize: 13, color: "#7f1d1d",
               }}>
                 <strong style={{ display: "block", marginBottom: 8 }}>
-                  🔴 {resultado.warnings_payload.length} professor(es) com carga 100% dos slots disponíveis
+                  🔴 {resultado.warnings_payload.length} professor(es) com carga igual ou quase no limite de slots
                 </strong>
                 <p style={{ margin: "0 0 6px", fontSize: 12, color: "#991b1b" }}>
-                  Professores abaixo estão modulados para exatamente {30} aulas/semana (todos os slots). 
-                  O algoritmo precisa de perfeição absoluta para alocá-los, o que pode gerar colisões.
+                  Professores abaixo estão modulados com carga total (ex: 30/30) ou muito próxima do limite.
+                  Isso restringe drasticamente as opções do algoritmo e frequentemente gera colisões.
                   Considere reduzir a carga modular ou liberar mais horários.
                 </p>
                 <ul style={{ margin: 0, paddingLeft: 20, listStyleType: "disc" }}>
                   {(resultado.warnings_payload || []).map((w, i) => (
                     <li key={i}>
-                      <strong>{w.professor_nome}</strong>: {w.aulas_demanda} aulas / {w.slots_disponiveis} slots ({w.utilization_pct}% utilização)
+                      <strong>{w.professor_nome}</strong>: {w.aulas_demanda} aulas / {w.slots_disponiveis} slots 
+                      ({w.utilization_pct}% utilização)
+                      {w.is_100_percent && <span style={{color:"#b71c1c", fontWeight:600, marginLeft:6}}>— 100% (Risco Crítico)</span>}
                     </li>
                   ))}
                 </ul>

@@ -18,6 +18,7 @@ import ModalExcluirOuInativar from "./ModalExcluirOuInativar";
 import { useProfessores } from "./useProfessores";
 import ProfessorTable from "./ProfessorTable";
 import ProfessorForm from "./ProfessorForm";
+import VinculoForm from "./VinculoForm";
 
 export default function Professores() {
   // ─────────────────────────────────────────────────────────────
@@ -31,6 +32,10 @@ export default function Professores() {
   // Exclusão / Inativação
   const [isExcluirOpen, setIsExcluirOpen] = useState(false);
   const [professorParaExcluir, setProfessorParaExcluir] = useState(null);
+
+  // VinculoForm — adicionar vínculo a professor existente
+  const [isVinculoOpen, setIsVinculoOpen] = useState(false);
+  const [professorParaVinculo, setProfessorParaVinculo] = useState(null);
 
   // Exclusão em lote
   const [isLoteOpen, setIsLoteOpen] = useState(false);
@@ -147,15 +152,46 @@ export default function Professores() {
     }
   };
 
+  // Adicionar vínculo a professor já existente
+  const abrirVinculo = (prof) => {
+    setProfessorParaVinculo(prof);
+    setIsVinculoOpen(true);
+  };
+
+  const handleSalvarVinculo = async ({ turno, disciplina_id, aulas }) => {
+    try {
+      await api.post(`/api/professores/${professorParaVinculo.id}/vinculos`, { turno, disciplina_id, aulas });
+      setMensagemSucesso("✅ Vínculo adicionado com sucesso!");
+      reload();
+      setTimeout(() => setMensagemSucesso(""), 3000);
+      return true;
+    } catch (err) {
+      alert("Falha ao adicionar vínculo: " + (err.response?.data?.message || err.message));
+      return false;
+    }
+  };
+
+  const handleRemoverVinculo = async (profId, vinculoId) => {
+    if (!window.confirm("Remover este vínculo?")) return;
+    try {
+      await api.delete(`/api/professores/${profId}/vinculos/${vinculoId}`);
+      setMensagemSucesso("✅ Vínculo removido!");
+      reload();
+      setTimeout(() => setMensagemSucesso(""), 3000);
+    } catch (err) {
+      alert("Falha ao remover vínculo: " + (err.response?.data?.message || err.message));
+    }
+  };
+
   // ─────────────────────────────────────────────────────────────
-  // Busca/filtragem (inclui TURNO)
+  // Busca/filtragem (inclui turno e disciplinas dos vínculos)
   const filteredProfessores = professores.filter((p) => {
     const termo = (searchTerm || "").toLowerCase();
+    const vinculosStr = (p.vinculos || []).map(v => `${v.turno} ${v.disciplina_nome}`).join(" ").toLowerCase();
     return (
       (p.cpf || "").toLowerCase().includes(termo) ||
       (p.nome || "").toLowerCase().includes(termo) ||
-      (p.turno || "").toLowerCase().includes(termo) || // 🔎 inclui turno
-      (`${p.disciplina_nome}` || "").toLowerCase().includes(termo)
+      vinculosStr.includes(termo)
     );
   });
 
@@ -290,6 +326,8 @@ export default function Professores() {
         loading={loading}
         onDelete={abrirExcluir}
         onEdit={abrirEdicao}
+        onAdicionarVinculo={abrirVinculo}
+        onRemoverVinculo={handleRemoverVinculo}
       />
 
       {/* Modal: Form Premium */}
@@ -300,6 +338,17 @@ export default function Professores() {
           onSubmit={handleSaveProfessor}
           onActivate={handleAtivarProfessor}
           professor={professorSelecionado}
+          onAdicionarVinculo={abrirVinculo}
+        />
+      )}
+
+      {/* Modal: Adicionar Vínculo */}
+      {isVinculoOpen && (
+        <VinculoForm
+          open={isVinculoOpen}
+          onClose={() => setIsVinculoOpen(false)}
+          onSalvar={handleSalvarVinculo}
+          professor={professorParaVinculo}
         />
       )}
 

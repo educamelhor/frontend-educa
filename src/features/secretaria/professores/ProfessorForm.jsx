@@ -211,8 +211,10 @@ function validarCPF(cpf) {
 }
 
 // ─────────────────────────────────────────────────────────────
-export default function ProfessorForm({ open, onClose, onSubmit, onActivate, professor }) {
+export default function ProfessorForm({ open, onClose, onSubmit, onActivate, professor, onAdicionarVinculo }) {
   const [form, setForm] = useState({ turno: "", disciplina_id: "", aulas: 0, status: "" });
+  const [profExistente, setProfExistente] = useState(null); // professor já cadastrado com este CPF
+  const [verificandoCpf, setVerificandoCpf] = useState(false);
   const [erros, setErros]     = useState({});
   const [enviando, setEnviando] = useState(false);
   const [disciplinas, setDisciplinas] = useState([]);
@@ -228,6 +230,7 @@ export default function ProfessorForm({ open, onClose, onSubmit, onActivate, pro
 
   useEffect(() => {
     if (!open) return;
+    setProfExistente(null);
     if (professor) {
       setForm({
         id: professor.id ?? null,
@@ -245,6 +248,27 @@ export default function ProfessorForm({ open, onClose, onSubmit, onActivate, pro
     }
     setErros({});
   }, [open, professor]);
+
+  // ✅ Verifica CPF ao sair do campo (somente no modo de novo cadastro)
+  const handleCpfBlur = async () => {
+    if (isEditMode) return;
+    const cpfLimpo = String(form.cpf || "").replace(/\D/g, "");
+    if (cpfLimpo.length !== 11) return;
+    setVerificandoCpf(true);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await api.get(`/api/professores/por-cpf/${cpfLimpo}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.status === 200 && res.data?.id) {
+        setProfExistente(res.data); // Exibe o banner "Professor já cadastrado"
+      }
+    } catch (e) {
+      if (e.response?.status === 404) setProfExistente(null); // Não existe, fluxo normal
+    } finally {
+      setVerificandoCpf(false);
+    }
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -278,18 +302,16 @@ export default function ProfessorForm({ open, onClose, onSubmit, onActivate, pro
   const validar = () => {
     const e = {};
     if (isEditMode) {
+      // No modo edição, mantém validação de turno + disciplina + aulas
       if (!form.turno) e.turno = "Selecione o turno";
       if (!form.disciplina_id) e.disciplina_id = "Selecione uma disciplina";
       if (form.aulas < 0 || form.aulas > 30) e.aulas = "Informe um valor entre 0 e 30";
       return e;
     }
+    // Novo cadastro: valida apenas CPF e nome
     if (!form.cpf) e.cpf = "CPF obrigatório";
     else if (!validarCPF(form.cpf)) e.cpf = "CPF inválido";
     if (!form.nome) e.nome = "Nome obrigatório";
-    if (!form.turno) e.turno = "Selecione o turno";
-    if (!form.disciplina_id) e.disciplina_id = "Selecione uma disciplina";
-    if (form.aulas === "" || form.aulas === null || form.aulas === undefined || Number(form.aulas) < 0 || Number(form.aulas) > 30)
-      e.aulas = "Carga horária inválida (0-30)";
     return e;
   };
 
@@ -335,7 +357,12 @@ export default function ProfessorForm({ open, onClose, onSubmit, onActivate, pro
                   {isEditMode ? "Editar Docente" : "Cadastrar Professor"}
                 </h2>
                 <p className="text-blue-100 text-sm opacity-90">
-                  {isEditMode ? "Atualize as informações no sistema" : "Realize o pré-cadastro de um novo docente"}
+                  {isEditMode
+                    ? "Atualize as informações no sistema"
+                    : profExistente
+                    ? "Professor já encontrado — adicione um vínculo"
+                    : "Realize o pré-cadastro de um novo docente"
+                  }
                 </p>
               </div>
             </div>
@@ -345,7 +372,37 @@ export default function ProfessorForm({ open, onClose, onSubmit, onActivate, pro
           </div>
 
           <form onSubmit={handleSubmit} className="p-6 md:p-8 space-y-6 bg-gray-50/50 overflow-y-auto overflow-x-hidden max-h-[80vh]">
-            {/* IDENTIFICAÇÃO */}
+
+            {/* BANNER: Professor já cadastrado */}
+            {!isEditMode && profExistente && (
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3">
+                <div className="text-amber-500 text-2xl mt-0.5">⚠️</div>
+                <div className="flex-1">
+                  <p className="font-bold text-amber-800 text-sm">Professor já cadastrado!</p>
+                  <p className="text-amber-700 text-xs mt-0.5">
+                    <strong>{profExistente.nome}</strong> (CPF: {profExistente.cpf}) já existe no sistema.
+                    Deseja adicionar um novo vínculo de disciplina/turno a este professor?
+                  </p>
+                  <p className="text-amber-600 text-xs mt-1">
+                    Vínculos atuais: {profExistente.vinculos?.length
+                      ? profExistente.vinculos.map(v => `${v.turno} · ${v.disciplina_nome}`).join(" | ")
+                      : "Nenhum"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { onAdicionarVinculo?.(profExistente); onClose(); }}
+                  className="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-3 py-2 rounded-xl transition-all whitespace-nowrap flex-shrink-0"
+                >
+                  + VÍNCULO
+                </button>
+              </div>
+            )}
+
+            {/* Se professor já existe, oculta o formulário de novo cadastro */}
+            {profExistente && !isEditMode ? null : (
+              <>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-1">
                 <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 ml-1">
@@ -391,59 +448,68 @@ export default function ProfessorForm({ open, onClose, onSubmit, onActivate, pro
               </div>
             </div>
 
-            {/* MODULAÇÃO */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Turno */}
-              <div className="space-y-1">
-                <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 ml-1">
-                  <ClockIcon className="w-4 h-4 text-blue-600" /> Turno
-                </label>
-                <select name="turno" value={form.turno || ""} onChange={handleChange}
-                  className="w-full h-11 border border-gray-200 rounded-xl bg-white shadow-sm focus:ring-2 focus:ring-blue-500 focus:outline-none px-3 transition-all font-medium text-gray-700">
-                  <option value="">Selecione...</option>
-                  {turnoOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                </select>
-                {erros.turno && <p className="text-red-500 text-xs mt-1 ml-1 font-medium italic">{erros.turno}</p>}
+            {/* MODULAÇÃO — só aparece no modo de edição */}
+            {isEditMode && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Turno */}
+                <div className="space-y-1">
+                  <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 ml-1">
+                    <ClockIcon className="w-4 h-4 text-blue-600" /> Turno
+                  </label>
+                  <select name="turno" value={form.turno || ""} onChange={handleChange}
+                    className="w-full h-11 border border-gray-200 rounded-xl bg-white shadow-sm focus:ring-2 focus:ring-blue-500 focus:outline-none px-3 transition-all font-medium text-gray-700">
+                    <option value="">Selecione...</option>
+                    {turnoOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                  </select>
+                  {erros.turno && <p className="text-red-500 text-xs mt-1 ml-1 font-medium italic">{erros.turno}</p>}
+                </div>
+                {/* Disciplina */}
+                <div className="space-y-1">
+                  <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 ml-1">
+                    <BookOpenIcon className="w-4 h-4 text-blue-600" /> Disciplina
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setDiscModalOpen(true)}
+                    className={`w-full h-11 border rounded-xl bg-white shadow-sm px-3 flex items-center gap-2 transition-all outline-none focus:ring-2 focus:ring-blue-500 hover:border-blue-400 hover:shadow-blue-100 group ${
+                      erros.disciplina_id ? "border-red-400 ring-1 ring-red-300" : "border-gray-200"
+                    }`}
+                  >
+                    {selectedDisc ? (
+                      <div className="flex items-center gap-1.5 overflow-hidden flex-1 min-w-0">
+                        <span className="font-bold text-gray-800 text-sm truncate">
+                          {(selectedDisc.disciplina ?? selectedDisc.nome ?? "—").toUpperCase()}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-gray-400 text-sm flex-1 text-left">Selecione...</span>
+                    )}
+                    <ChevronRightIcon className="w-4 h-4 text-gray-300 flex-shrink-0 group-hover:text-blue-400 transition-colors" />
+                  </button>
+                  {erros.disciplina_id && <p className="text-red-500 text-xs mt-1 ml-1 font-medium italic">{erros.disciplina_id}</p>}
+                </div>
+                {/* Aulas */}
+                <div className="space-y-1">
+                  <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 ml-1">
+                    <AcademicCapIcon className="w-4 h-4 text-blue-600" /> Aulas
+                  </label>
+                  <input type="number" name="aulas" min={0} max={30} value={form.aulas} onChange={handleChange}
+                    className="w-full px-3 border outline-none h-11 rounded-xl shadow-sm border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all font-bold text-center text-blue-700" />
+                  {erros.aulas && <p className="text-red-500 text-xs mt-1 ml-1 font-medium italic">{erros.aulas}</p>}
+                </div>
               </div>
+            )}
 
-              {/* Disciplina — abre modal premium */}
-              <div className="space-y-1">
-                <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 ml-1">
-                  <BookOpenIcon className="w-4 h-4 text-blue-600" /> Disciplina
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setDiscModalOpen(true)}
-                  className={`w-full h-11 border rounded-xl bg-white shadow-sm px-3 flex items-center gap-2 transition-all outline-none focus:ring-2 focus:ring-blue-500 hover:border-blue-400 hover:shadow-blue-100 group ${
-                    erros.disciplina_id ? "border-red-400 ring-1 ring-red-300" : "border-gray-200"
-                  }`}
-                >
-                  {selectedDisc ? (
-                    <div className="flex items-center gap-1.5 overflow-hidden flex-1 min-w-0">
-                      <span className="font-bold text-gray-800 text-sm truncate">
-                        {(selectedDisc.disciplina ?? selectedDisc.nome ?? "—").toUpperCase()}
-                      </span>
-                      {selectedDisc.etapa && <EtapaBadge etapa={selectedDisc.etapa} />}
-                      {selectedDisc.turno && <TurnoBadge turno={selectedDisc.turno} />}
-                    </div>
-                  ) : (
-                    <span className="text-gray-400 text-sm flex-1 text-left">Selecione...</span>
-                  )}
-                  <ChevronRightIcon className="w-4 h-4 text-gray-300 flex-shrink-0 group-hover:text-blue-400 transition-colors" />
-                </button>
-                {erros.disciplina_id && <p className="text-red-500 text-xs mt-1 ml-1 font-medium italic">{erros.disciplina_id}</p>}
+            {/* NOTA: no novo cadastro, disciplinas são adicionadas via VinculoForm após salvar */}
+            {!isEditMode && (
+              <div className="p-3 bg-blue-50/80 border border-blue-100 rounded-xl text-blue-700 text-xs flex items-start gap-2">
+                <span className="text-base mt-0.5">ℹ️</span>
+                <span>Após cadastrar o professor, você poderá adicionar seus <strong>vínculos</strong> (turno + disciplina + carga horária) pelo botão <strong>+ Vínculo</strong> no card dele.</span>
               </div>
+            )}
 
-              {/* Aulas */}
-              <div className="space-y-1">
-                <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 ml-1">
-                  <AcademicCapIcon className="w-4 h-4 text-blue-600" /> Aulas
-                </label>
-                <input type="number" name="aulas" min={0} max={30} value={form.aulas} onChange={handleChange}
-                  className="w-full px-3 border outline-none h-11 rounded-xl shadow-sm border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all font-bold text-center text-blue-700" />
-                {erros.aulas && <p className="text-red-500 text-xs mt-1 ml-1 font-medium italic">{erros.aulas}</p>}
-              </div>
-            </div>
+              </> {/* Fecha o fragmento condicional do banner */}
+            )}
 
             {/* RODAPÉ */}
             <div className="pt-6 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4">

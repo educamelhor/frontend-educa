@@ -79,10 +79,10 @@ export default function MovimentacaoTab() {
     let gramatura = 1;
     if (selectedEstoqueItem.gramatura) {
       const str = selectedEstoqueItem.gramatura.toLowerCase();
-      const isGrams = str.includes('g') && !str.includes('kg');
+      const isGramsOrMl = (str.includes('g') && !str.includes('kg')) || str.includes('ml');
       const parsed = parseFloat(selectedEstoqueItem.gramatura.replace(/[^\d.,]/g, '').replace(',', '.'));
       if (!isNaN(parsed)) {
-        gramatura = isGrams ? parsed / 1000 : parsed;
+        gramatura = isGramsOrMl ? parsed / 1000 : parsed;
       }
     }
     return (parseFloat(qtd) * gramatura).toFixed(2);

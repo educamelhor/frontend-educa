@@ -880,6 +880,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     <PrinterIcon className="h-5 w-5 mr-2" /> Gerar / Imprimir
                   </Link>
                 </li>
+                )}
                 {canGabaritoAdmin && hasModulo('gabarito.gerar') && (
                 <li>
                   <Link
@@ -889,7 +890,6 @@ export default function Sidebar({ isOpen, onClose }) {
                     <DocumentTextIcon className="h-5 w-5 mr-2" /> Capas de Provas
                   </Link>
                 </li>
-                )}
                 )}
                 {/* Corrigir Lote — somente direção/supervisor */}
                 {canGabaritoAdmin && hasModulo('gabarito.corrigir_lote') && (

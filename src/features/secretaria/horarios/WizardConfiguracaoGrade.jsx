@@ -1,36 +1,33 @@
 // src/features/secretaria/horarios/WizardConfiguracaoGrade.jsx
-// ============================================================
-// Wizard premium multi-step para configurar a grade horaria
-// de cada escola (multi-escola). 4 passos guiados.
-// ============================================================
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import api from "../../../services/api";
 
 const TURNOS_CONFIG = [
-  { id: "matutino",   label: "Matutino",   emoji: "‚òÄÔ∏è",  desc: "Manh√£",  periodos_default: 5 },
-  { id: "vespertino", label: "Vespertino", emoji: "üå§Ô∏è", desc: "Tarde",  periodos_default: 5 },
-  { id: "noturno",    label: "Noturno",    emoji: "üåô",  desc: "Noite", periodos_default: 4 },
+  { id: "matutino",   label: "Matutino",   emoji: "??",  desc: "Manh„",  periodos_default: 5 },
+  { id: "vespertino", label: "Vespertino", emoji: "???", desc: "Tarde",  periodos_default: 5 },
+  { id: "noturno",    label: "Noturno",    emoji: "??",  desc: "Noite", periodos_default: 4 },
 ];
 
 const DIAS_SEMANA = [
   { num: 1, label: "Seg", nome: "Segunda" },
-  { num: 2, label: "Ter", nome: "Ter√ßa"   },
+  { num: 2, label: "Ter", nome: "TerÁa"   },
   { num: 3, label: "Qua", nome: "Quarta"  },
   { num: 4, label: "Qui", nome: "Quinta"  },
   { num: 5, label: "Sex", nome: "Sexta"   },
-  { num: 6, label: "S√°b", nome: "S√°bado"  },
+  { num: 6, label: "S·b", nome: "S·bado"  },
 ];
 
 const S = {
   outer: {
-    flex: 1, // Ocupa todo o espa√ßo dispon√≠vel dentro do <main> sem padding
+    flex: 1,
     background: "linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0f172a 100%)",
     display: "flex", alignItems: "center", justifyContent: "center",
     padding: "20px 16px",
     fontFamily: "'Montserrat', sans-serif",
+    minHeight: "100vh"
   },
   card: {
-    width: "100%", maxWidth: 580,
+    width: "100%", maxWidth: 680,
     background: "rgba(255,255,255,0.05)",
     backdropFilter: "blur(20px)",
     border: "1px solid rgba(255,255,255,0.12)",
@@ -43,7 +40,7 @@ const S = {
 function Pill({ children, color = "#3b82f6" }) {
   return (
     <span style={{
-      background: color + "30", border: `1px solid ${color}`,
+      background: color + "30", border: 1px solid ,
       borderRadius: 8, padding: "4px 12px", fontSize: 13,
       color, fontWeight: 600, display: "inline-block",
     }}>{children}</span>
@@ -68,13 +65,33 @@ function ResumoCard({ icon, titulo, children }) {
   );
 }
 
-export default function WizardConfiguracaoGrade({ onConcluir }) {
+export default function WizardConfiguracaoGrade({ onConcluir, configInicial }) {
   const [passo, setPasso]       = useState(1);
-  const [turnos, setTurnos]     = useState(["matutino", "vespertino"]);
-  const [dias, setDias]         = useState([1, 2, 3, 4, 5]);
-  const [periodos, setPeriodos] = useState({ matutino: 5, vespertino: 5, noturno: 4 });
+  const [turnos, setTurnos]     = useState(configInicial?.turnos || ["matutino", "vespertino"]);
+  const [dias, setDias]         = useState(configInicial?.dias_semana || [1, 2, 3, 4, 5]);
+  const [periodos, setPeriodos] = useState(configInicial?.periodos || { matutino: 5, vespertino: 5, noturno: 4 });
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro]         = useState("");
+  const [disciplinasDisponiveis, setDisciplinasDisponiveis] = useState([]);
+  
+  // Regras Gerais
+  const rg = configInicial?.regras_gerais || {};
+  const [regrasGerais, setRegrasGerais] = useState({
+    preferencia_aulas_duplas: rg.preferencia_aulas_duplas !== undefined ? rg.preferencia_aulas_duplas : true,
+    aulas_duplas_separar_recreio: rg.aulas_duplas_separar_recreio !== undefined ? rg.aulas_duplas_separar_recreio : false,
+    max_aulas_mesmo_dia: rg.max_aulas_mesmo_dia || 2,
+    recreio_apos_periodo: rg.recreio_apos_periodo || { matutino: 3, vespertino: 3, noturno: 2 },
+    disciplinas_excludentes: rg.disciplinas_excludentes || []
+  });
+
+  const [selDisc1, setSelDisc1] = useState("");
+  const [selDisc2, setSelDisc2] = useState("");
+
+  useEffect(() => {
+    api.get("/api/disciplinas").then(res => {
+      setDisciplinasDisponiveis(Array.isArray(res.data) ? res.data : (res.data?.disciplinas || []));
+    }).catch(err => console.error("Erro ao carregar disciplinas:", err));
+  }, []);
 
   const toggleTurno = (id) =>
     setTurnos(prev => prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]);
@@ -87,11 +104,39 @@ export default function WizardConfiguracaoGrade({ onConcluir }) {
   const setPeriodoTurno = (turnoId, n) =>
     setPeriodos(prev => ({ ...prev, [turnoId]: n }));
 
+  const setRecreioTurno = (turnoId, n) =>
+    setRegrasGerais(prev => ({ ...prev, recreio_apos_periodo: { ...prev.recreio_apos_periodo, [turnoId]: n } }));
+
+  const addExcludente = () => {
+    if (selDisc1 && selDisc2 && selDisc1 !== selDisc2) {
+      // Ordenar os IDs para evitar duplicaÁ„o invertida
+      const par = [selDisc1, selDisc2].sort();
+      const jahExiste = regrasGerais.disciplinas_excludentes.some(p => p[0] === par[0] && p[1] === par[1]);
+      if (!jahExiste) {
+        setRegrasGerais(prev => ({ ...prev, disciplinas_excludentes: [...prev.disciplinas_excludentes, par] }));
+      }
+      setSelDisc1(""); setSelDisc2("");
+    }
+  };
+
+  const removeExcludente = (idx) => {
+    setRegrasGerais(prev => ({
+      ...prev,
+      disciplinas_excludentes: prev.disciplinas_excludentes.filter((_, i) => i !== idx)
+    }));
+  };
+
+  const getDiscNome = (idStr) => {
+    const idNum = parseInt(idStr, 10);
+    const d = disciplinasDisponiveis.find(x => x.id === idNum || String(x.id) === idStr);
+    return d ? (d.nome || d.descricao || String(idStr)) : String(idStr);
+  };
+
   const podeAvancar =
     (passo === 1 && turnos.length > 0) ||
     (passo === 2 && dias.length > 0)   ||
     (passo === 3 && turnos.every(t => (periodos[t] || 0) > 0)) ||
-    passo === 4;
+    passo === 4 || passo === 5 || passo === 6 || passo === 7;
 
   async function confirmar() {
     setSalvando(true); setErro("");
@@ -99,33 +144,31 @@ export default function WizardConfiguracaoGrade({ onConcluir }) {
       const periodosAtivos = {};
       turnos.forEach(t => { periodosAtivos[t] = periodos[t] || 5; });
       await api.post("/api/escola/configuracao-grade", {
-        turnos, dias_semana: dias, periodos: periodosAtivos,
+        turnos, dias_semana: dias, periodos: periodosAtivos, regras_gerais: regrasGerais
       });
-      onConcluir({ turnos, dias_semana: dias, periodos: periodosAtivos });
+      onConcluir({ turnos, dias_semana: dias, periodos: periodosAtivos, regras_gerais: regrasGerais });
     } catch {
-      setErro("Erro ao salvar. Verifique sua conex√£o e tente novamente.");
+      setErro("Erro ao salvar. Verifique sua conex„o e tente novamente.");
     } finally {
       setSalvando(false);
     }
   }
 
-  const passoLabels = ["Turnos", "Dias Letivos", "Per√≠odos", "Revis√£o"];
+  const passoLabels = ["Turnos", "Dias", "PerÌodos", "Regras", "Recreio", "Conflitos", "Revis„o"];
 
   return (
     <div style={S.outer}>
       <div style={S.card}>
-        {/* ‚îÄ‚îÄ Header ‚îÄ‚îÄ */}
         <div style={{ textAlign: "center", marginBottom: 24 }}>
-          <div style={{ fontSize: 32, marginBottom: 6 }}>‚öôÔ∏è</div>
+          <div style={{ fontSize: 32, marginBottom: 6 }}>??</div>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: "#fff", margin: "0 0 4px" }}>
-            Configura√ß√£o da Grade Hor√°ria
+            ConfiguraÁ„o da Grade Hor·ria
           </h1>
           <p style={{ color: "#94a3b8", fontSize: 13, margin: 0 }}>
-            Configure uma vez ‚Äî o sistema se adapta √† realidade da sua escola.
+            Configure regras globais e a inteligÍncia do algoritmo.
           </p>
         </div>
 
-        {/* ‚îÄ‚îÄ Stepper ‚îÄ‚îÄ */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 28 }}>
           {passoLabels.map((label, idx) => {
             const num = idx + 1;
@@ -135,23 +178,23 @@ export default function WizardConfiguracaoGrade({ onConcluir }) {
               <React.Fragment key={num}>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
                   <div style={{
-                    width: 32, height: 32, borderRadius: "50%",
+                    width: 28, height: 28, borderRadius: "50%",
                     background: concluido ? "#10b981" : ativo ? "#3b82f6" : "rgba(255,255,255,0.08)",
                     border: ativo ? "2px solid #60a5fa" : "2px solid transparent",
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 13, fontWeight: 800, color: "#fff",
+                    fontSize: 12, fontWeight: 800, color: "#fff",
                     boxShadow: ativo ? "0 0 12px rgba(59,130,246,0.5)" : "none",
                     transition: "all 0.3s",
                   }}>
-                    {concluido ? "‚úì" : num}
+                    {concluido ? "?" : num}
                   </div>
-                  <span style={{ fontSize: 10, color: ativo ? "#93c5fd" : "#475569", fontWeight: ativo ? 700 : 400 }}>
+                  <span style={{ fontSize: 9, color: ativo ? "#93c5fd" : "#475569", fontWeight: ativo ? 700 : 400 }}>
                     {label}
                   </span>
                 </div>
-                {idx < 3 && (
+                {idx < passoLabels.length - 1 && (
                   <div style={{
-                    height: 2, width: 44, margin: "0 4px", marginBottom: 18,
+                    height: 2, width: 14, margin: "0 2px", marginBottom: 18,
                     background: concluido ? "#10b981" : "rgba(255,255,255,0.08)",
                     transition: "background 0.3s",
                   }} />
@@ -161,19 +204,14 @@ export default function WizardConfiguracaoGrade({ onConcluir }) {
           })}
         </div>
 
-        {/* ‚îÄ‚îÄ Conte√∫do ‚îÄ‚îÄ */}
-        <div style={{ minHeight: 200 }}>
-
-          {/* PASSO 1 ‚Äî Turnos */}
+        <div style={{ minHeight: 240 }}>
+          {/* PASSO 1, 2, 3 = Turnos, Dias, Periodos */}
           {passo === 1 && (
             <div>
               <h2 style={{ textAlign: "center", fontSize: 17, fontWeight: 700, color: "#e2e8f0", marginBottom: 4 }}>
                 Quais turnos a escola oferece?
               </h2>
-              <p style={{ textAlign: "center", color: "#64748b", fontSize: 12, marginBottom: 20 }}>
-                Selecione todos os turnos ativos. Voc√™ poder√° ajustar depois.
-              </p>
-              <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap", marginTop: 20 }}>
                 {TURNOS_CONFIG.map(t => {
                   const sel = turnos.includes(t.id);
                   return (
@@ -187,8 +225,7 @@ export default function WizardConfiguracaoGrade({ onConcluir }) {
                     }}>
                       <div style={{ fontSize: 32, marginBottom: 8 }}>{t.emoji}</div>
                       <div style={{ fontWeight: 700, fontSize: 14 }}>{t.label}</div>
-                      <div style={{ color: "#94a3b8", fontSize: 11, marginTop: 4 }}>{t.desc}</div>
-                      {sel && <div style={{ marginTop: 8, color: "#60a5fa", fontSize: 11, fontWeight: 600 }}>‚úì Selecionado</div>}
+                      {sel && <div style={{ marginTop: 8, color: "#60a5fa", fontSize: 11, fontWeight: 600 }}>? Selecionado</div>}
                     </button>
                   );
                 })}
@@ -196,15 +233,11 @@ export default function WizardConfiguracaoGrade({ onConcluir }) {
             </div>
           )}
 
-          {/* PASSO 2 ‚Äî Dias letivos */}
           {passo === 2 && (
             <div>
-              <h2 style={{ textAlign: "center", fontSize: 17, fontWeight: 700, color: "#e2e8f0", marginBottom: 4 }}>
-                Quais s√£o os dias letivos?
+              <h2 style={{ textAlign: "center", fontSize: 17, fontWeight: 700, color: "#e2e8f0", marginBottom: 20 }}>
+                Quais s„o os dias letivos?
               </h2>
-              <p style={{ textAlign: "center", color: "#64748b", fontSize: 12, marginBottom: 20 }}>
-                Selecione os dias em que a escola tem aulas normalmente.
-              </p>
               <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
                 {DIAS_SEMANA.map(d => {
                   const sel = dias.includes(d.num);
@@ -214,8 +247,6 @@ export default function WizardConfiguracaoGrade({ onConcluir }) {
                       border: sel ? "2px solid #10b981" : "2px solid rgba(255,255,255,0.1)",
                       background: sel ? "rgba(16,185,129,0.18)" : "rgba(255,255,255,0.04)",
                       cursor: "pointer", color: "#fff", transition: "all 0.2s",
-                      boxShadow: sel ? "0 0 14px rgba(16,185,129,0.3)" : "none",
-                      transform: sel ? "translateY(-2px) scale(1.04)" : "scale(1)",
                     }}>
                       <div style={{ fontWeight: 800, fontSize: 16 }}>{d.label}</div>
                       <div style={{ color: sel ? "#6ee7b7" : "#94a3b8", fontSize: 10, marginTop: 2 }}>{d.nome}</div>
@@ -226,29 +257,20 @@ export default function WizardConfiguracaoGrade({ onConcluir }) {
             </div>
           )}
 
-          {/* PASSO 3 ‚Äî Per√≠odos por turno */}
           {passo === 3 && (
             <div>
-              <h2 style={{ textAlign: "center", fontSize: 17, fontWeight: 700, color: "#e2e8f0", marginBottom: 4 }}>
+              <h2 style={{ textAlign: "center", fontSize: 17, fontWeight: 700, color: "#e2e8f0", marginBottom: 20 }}>
                 Quantas aulas por dia em cada turno?
               </h2>
-              <p style={{ textAlign: "center", color: "#64748b", fontSize: 12, marginBottom: 20 }}>
-                Isso define os hor√°rios dispon√≠veis na grade de disponibilidade dos professores.
-              </p>
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {TURNOS_CONFIG.filter(t => turnos.includes(t.id)).map(t => (
                   <div key={t.id} style={{
-                    background: "rgba(255,255,255,0.05)",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    borderRadius: 12, padding: "14px 20px",
-                    display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+                    background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+                    borderRadius: 12, padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between"
                   }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <span style={{ fontSize: 24 }}>{t.emoji}</span>
-                      <div>
-                        <div style={{ fontWeight: 700, fontSize: 14 }}>{t.label}</div>
-                        <div style={{ color: "#94a3b8", fontSize: 11 }}>aulas por dia</div>
-                      </div>
+                      <div style={{ fontWeight: 700, fontSize: 14 }}>{t.label}</div>
                     </div>
                     <div style={{ display: "flex", gap: 6 }}>
                       {(t.id === "noturno" ? [3, 4, 5] : [4, 5, 6, 7]).map(n => (
@@ -258,8 +280,6 @@ export default function WizardConfiguracaoGrade({ onConcluir }) {
                           background: periodos[t.id] === n ? "rgba(245,158,11,0.22)" : "rgba(255,255,255,0.04)",
                           color: periodos[t.id] === n ? "#fbbf24" : "#94a3b8",
                           fontWeight: 800, fontSize: 15, cursor: "pointer", transition: "all 0.15s",
-                          boxShadow: periodos[t.id] === n ? "0 0 10px rgba(245,158,11,0.4)" : "none",
-                          transform: periodos[t.id] === n ? "scale(1.08)" : "scale(1)",
                         }}>{n}</button>
                       ))}
                     </div>
@@ -269,97 +289,191 @@ export default function WizardConfiguracaoGrade({ onConcluir }) {
             </div>
           )}
 
-          {/* PASSO 4 ‚Äî Revis√£o */}
+          {/* PASSO 4: Regras de Aulas */}
           {passo === 4 && (
             <div>
+              <h2 style={{ textAlign: "center", fontSize: 17, fontWeight: 700, color: "#e2e8f0", marginBottom: 20 }}>
+                Regras e Padrıes de AlocaÁ„o
+              </h2>
+              
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                <div style={{ background: "rgba(255,255,255,0.05)", padding: 16, borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)" }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}>
+                    <input type="checkbox" checked={regrasGerais.preferencia_aulas_duplas}
+                      onChange={e => setRegrasGerais({...regrasGerais, preferencia_aulas_duplas: e.target.checked})}
+                      style={{ width: 20, height: 20, accentColor: "#3b82f6" }} />
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 14 }}>Preferencialmente Aulas Duplas</div>
+                      <div style={{ fontSize: 11, color: "#94a3b8" }}>O algoritmo tentar· sempre juntar aulas da mesma disciplina de forma geminada (duas seguidas).</div>
+                    </div>
+                  </label>
+                </div>
+
+                <div style={{ background: "rgba(255,255,255,0.05)", padding: 16, borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)" }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}>
+                    <input type="checkbox" checked={regrasGerais.aulas_duplas_separar_recreio}
+                      onChange={e => setRegrasGerais({...regrasGerais, aulas_duplas_separar_recreio: e.target.checked})}
+                      style={{ width: 20, height: 20, accentColor: "#f59e0b" }} />
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: 14 }}>Permitir separar aulas pelo Recreio/Intervalo</div>
+                      <div style={{ fontSize: 11, color: "#94a3b8" }}>Se marcado, uma aula dupla pode ter a 1™ parte antes do recreio e a 2™ parte depois. Se desmarcado, o algoritmo bloqueia essa divis„o.</div>
+                    </div>
+                  </label>
+                </div>
+
+                <div style={{ background: "rgba(255,255,255,0.05)", padding: 16, borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)" }}>
+                  <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>M·ximo de aulas do professor no mesmo dia (RC02)</div>
+                  <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 10 }}>O mesmo professor n„o entrar· na mesma turma mais do que X vezes num mesmo dia.</div>
+                  <select 
+                    value={regrasGerais.max_aulas_mesmo_dia}
+                    onChange={e => setRegrasGerais({...regrasGerais, max_aulas_mesmo_dia: parseInt(e.target.value)})}
+                    style={{ background: "#0f172a", border: "1px solid rgba(255,255,255,0.2)", padding: "8px 12px", color: "#fff", borderRadius: 6, width: "100%" }}
+                  >
+                    <option value={1}>1 aula (Apenas simples)</option>
+                    <option value={2}>2 aulas (Aulas Duplas no m·ximo)</option>
+                    <option value={3}>3 aulas no dia</option>
+                    <option value={4}>4 aulas no dia</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* PASSO 5: Recreio */}
+          {passo === 5 && (
+            <div>
               <h2 style={{ textAlign: "center", fontSize: 17, fontWeight: 700, color: "#e2e8f0", marginBottom: 4 }}>
-                Tudo pronto! Revise antes de confirmar.
+                Hor·rio do Intervalo (Recreio)
               </h2>
               <p style={{ textAlign: "center", color: "#64748b", fontSize: 12, marginBottom: 20 }}>
-                Voc√™ pode ajustar estas configura√ß√µes depois.
+                ApÛs qual aula acontece o intervalo em cada turno?
               </p>
-
-              <ResumoCard icon="üîÑ" titulo="Turnos ativos">
-                {turnos.map(t => {
-                  const cfg = TURNOS_CONFIG.find(x => x.id === t);
-                  return <Pill key={t} color="#3b82f6">{cfg?.emoji} {cfg?.label}</Pill>;
-                })}
-              </ResumoCard>
-
-              <ResumoCard icon="üìÖ" titulo="Dias letivos">
-                {DIAS_SEMANA.filter(d => dias.includes(d.num)).map(d => (
-                  <Pill key={d.num} color="#10b981">{d.nome}</Pill>
-                ))}
-              </ResumoCard>
-
-              <ResumoCard icon="‚è±Ô∏è" titulo="Per√≠odos por turno">
-                {turnos.map(t => {
-                  const cfg = TURNOS_CONFIG.find(x => x.id === t);
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {TURNOS_CONFIG.filter(t => turnos.includes(t.id)).map(t => {
+                  const maxPeriodos = periodos[t.id] || 5;
+                  const atuais = regrasGerais.recreio_apos_periodo || {};
                   return (
-                    <Pill key={t} color="#f59e0b">
-                      {cfg?.emoji} {cfg?.label}: {periodos[t]} aulas/dia
-                    </Pill>
-                  );
-                })}
+                  <div key={t.id} style={{
+                    background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)",
+                    borderRadius: 12, padding: "14px 20px", display: "flex", alignItems: "center", justifyContent: "space-between"
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <span style={{ fontSize: 24 }}>{t.emoji}</span>
+                      <div style={{ fontWeight: 700, fontSize: 14 }}>{t.label}</div>
+                    </div>
+                    <select 
+                      value={atuais[t.id] || 3}
+                      onChange={e => setRecreioTurno(t.id, parseInt(e.target.value))}
+                      style={{ background: "#0f172a", border: "1px solid rgba(255,255,255,0.2)", padding: "8px 12px", color: "#fff", borderRadius: 6 }}
+                    >
+                      <option value={0}>Sem intervalo</option>
+                      {Array.from({length: maxPeriodos - 1}).map((_, i) => (
+                        <option key={i+1} value={i+1}>ApÛs a {i+1}™ aula</option>
+                      ))}
+                    </select>
+                  </div>
+                )})}
+              </div>
+            </div>
+          )}
+
+          {/* PASSO 6: Disciplinas Conflitantes */}
+          {passo === 6 && (
+            <div>
+              <h2 style={{ textAlign: "center", fontSize: 17, fontWeight: 700, color: "#e2e8f0", marginBottom: 4 }}>
+                Disciplinas Conflitantes
+              </h2>
+              <p style={{ textAlign: "center", color: "#64748b", fontSize: 12, marginBottom: 20 }}>
+                Evitar que turmas tenham estas duas disciplinas no mesmo dia.
+              </p>
+              
+              <div style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 12, padding: 16, marginBottom: 16 }}>
+                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  <select value={selDisc1} onChange={e => setSelDisc1(e.target.value)} style={{ flex: 1, background: "#0f172a", border: "1px solid rgba(255,255,255,0.2)", padding: "8px", color: "#fff", borderRadius: 6 }}>
+                    <option value="">Selecione...</option>
+                    {disciplinasDisponiveis.map(d => <option key={d.id} value={d.id}>{d.nome || d.descricao}</option>)}
+                  </select>
+                  <span style={{ fontWeight: "bold", color: "#64748b" }}>X</span>
+                  <select value={selDisc2} onChange={e => setSelDisc2(e.target.value)} style={{ flex: 1, background: "#0f172a", border: "1px solid rgba(255,255,255,0.2)", padding: "8px", color: "#fff", borderRadius: 6 }}>
+                    <option value="">Selecione...</option>
+                    {disciplinasDisponiveis.map(d => <option key={d.id} value={d.id}>{d.nome || d.descricao}</option>)}
+                  </select>
+                  <button onClick={addExcludente} disabled={!selDisc1 || !selDisc2 || selDisc1===selDisc2} style={{
+                    padding: "8px 12px", background: "#3b82f6", border: "none", borderRadius: 6, color: "#fff", cursor: "pointer", fontWeight: "bold"
+                  }}>+</button>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {regrasGerais.disciplinas_excludentes.map((par, idx) => (
+                  <div key={idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", padding: "8px 12px", borderRadius: 8 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>{getDiscNome(par[0])} <span style={{ color:"#ef4444" }}>??</span> {getDiscNome(par[1])}</span>
+                    <button onClick={() => removeExcludente(idx)} style={{ background: "transparent", border: "none", color: "#ef4444", cursor: "pointer", fontSize: 16 }}>◊</button>
+                  </div>
+                ))}
+                {regrasGerais.disciplinas_excludentes.length === 0 && (
+                  <div style={{ textAlign: "center", fontSize: 12, color: "#64748b" }}>Nenhum par conflitante cadastrado.</div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* PASSO 7: Revis„o */}
+          {passo === 7 && (
+            <div>
+              <h2 style={{ textAlign: "center", fontSize: 17, fontWeight: 700, color: "#e2e8f0", marginBottom: 20 }}>
+                Tudo pronto! Revise antes de confirmar.
+              </h2>
+              
+              <ResumoCard icon="??" titulo="Turnos & Dias">
+                {turnos.map(t => <Pill key={t} color="#3b82f6">{t}</Pill>)}
+                <div style={{ width: "100%", height: 1 }} />
+                {DIAS_SEMANA.filter(d => dias.includes(d.num)).map(d => <Pill key={d.num} color="#10b981">{d.nome}</Pill>)}
               </ResumoCard>
 
-              {erro && (
-                <p style={{ color: "#f87171", textAlign: "center", marginTop: 16, fontSize: 13 }}>
-                  {erro}
-                </p>
-              )}
+              <ResumoCard icon="??" titulo="Regras PedagÛgicas">
+                <Pill color={regrasGerais.preferencia_aulas_duplas ? "#10b981" : "#64748b"}>Aulas Duplas</Pill>
+                <Pill color={regrasGerais.max_aulas_mesmo_dia ? "#3b82f6" : "#64748b"}>Max {regrasGerais.max_aulas_mesmo_dia}/dia</Pill>
+                {!regrasGerais.aulas_duplas_separar_recreio && <Pill color="#f59e0b">Recreio n„o quebra duplas</Pill>}
+                {regrasGerais.disciplinas_excludentes.length > 0 && <Pill color="#ef4444">{regrasGerais.disciplinas_excludentes.length} Conflitos</Pill>}
+              </ResumoCard>
+
+              {erro && <p style={{ color: "#f87171", textAlign: "center", marginTop: 16, fontSize: 13 }}>{erro}</p>}
             </div>
           )}
         </div>
 
-        {/* ‚îÄ‚îÄ Navega√ß√£o ‚îÄ‚îÄ */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 32 }}>
           <button onClick={() => setPasso(p => p - 1)} disabled={passo === 1} style={{
             padding: "10px 20px", borderRadius: 8,
             border: passo === 1 ? "1px solid rgba(255,255,255,0.05)" : "1px solid rgba(255,255,255,0.2)",
             background: passo === 1 ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.08)",
             color: passo === 1 ? "#64748b" : "#e2e8f0",
-            cursor: passo === 1 ? "not-allowed" : "pointer",
-            fontSize: 13, fontWeight: 600, transition: "all 0.2s",
-          }}>‚Üê Voltar</button>
+            cursor: passo === 1 ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 600, transition: "all 0.2s",
+          }}>? Voltar</button>
 
-          {/* dots */}
-          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            {[1,2,3,4].map(n => (
+          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+            {[1,2,3,4,5,6,7].map(n => (
               <div key={n} style={{
-                width: n === passo ? 18 : 6, height: 6, borderRadius: 3,
-                background: n <= passo ? "#3b82f6" : "rgba(255,255,255,0.12)",
-                transition: "all 0.3s",
+                width: n === passo ? 16 : 4, height: 4, borderRadius: 2,
+                background: n <= passo ? "#3b82f6" : "rgba(255,255,255,0.12)", transition: "all 0.3s",
               }} />
             ))}
           </div>
 
-          {passo < 4 ? (
+          {passo < 7 ? (
             <button onClick={() => podeAvancar && setPasso(p => p + 1)} disabled={!podeAvancar} style={{
-              padding: "10px 24px", borderRadius: 8,
-              background: podeAvancar
-                ? "linear-gradient(135deg, #3b82f6, #2563eb)"
-                : "rgba(255,255,255,0.06)",
-              border: "none",
-              color: podeAvancar ? "#fff" : "#64748b",
-              cursor: podeAvancar ? "pointer" : "not-allowed",
-              fontSize: 13, fontWeight: 700,
-              boxShadow: podeAvancar ? "0 4px 14px rgba(59,130,246,0.4)" : "none",
-              transition: "all 0.2s",
-            }}>Pr√≥ximo ‚Üí</button>
+              padding: "10px 24px", borderRadius: 8, background: podeAvancar ? "linear-gradient(135deg, #3b82f6, #2563eb)" : "rgba(255,255,255,0.06)",
+              border: "none", color: podeAvancar ? "#fff" : "#64748b", cursor: podeAvancar ? "pointer" : "not-allowed",
+              fontSize: 13, fontWeight: 700, boxShadow: podeAvancar ? "0 4px 14px rgba(59,130,246,0.4)" : "none", transition: "all 0.2s",
+            }}>PrÛximo ?</button>
           ) : (
             <button onClick={confirmar} disabled={salvando} style={{
-              padding: "10px 24px", borderRadius: 8,
-              background: salvando
-                ? "rgba(255,255,255,0.06)"
-                : "linear-gradient(135deg, #10b981, #059669)",
-              border: "none", color: "#fff",
-              cursor: salvando ? "not-allowed" : "pointer",
-              fontSize: 13, fontWeight: 700,
-              boxShadow: salvando ? "none" : "0 4px 14px rgba(16,185,129,0.4)",
-              transition: "all 0.2s",
+              padding: "10px 24px", borderRadius: 8, background: salvando ? "rgba(255,255,255,0.06)" : "linear-gradient(135deg, #10b981, #059669)",
+              border: "none", color: "#fff", cursor: salvando ? "not-allowed" : "pointer",
+              fontSize: 13, fontWeight: 700, boxShadow: salvando ? "none" : "0 4px 14px rgba(16,185,129,0.4)", transition: "all 0.2s",
             }}>
-              {salvando ? "Salvando‚Ä¶" : "‚úì Confirmar"}
+              {salvando ? "SalvandoÖ" : "? Confirmar"}
             </button>
           )}
         </div>

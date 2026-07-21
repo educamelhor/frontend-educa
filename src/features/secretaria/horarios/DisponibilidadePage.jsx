@@ -252,6 +252,19 @@ export default function DisponibilidadePage({ config, turnoInicial, highlightPro
   }
 
   // ── Helpers ───────────────────────────────────────────────────
+  // Helper para extrair disciplinas únicas do professor no turno
+  const getDisciplinas = (p) => {
+    if (!p) return [];
+    if (p.vinculos && p.vinculos.length > 0) {
+      const d = p.vinculos
+        .filter(v => v.turno === turno && v.disciplina_nome)
+        .map(v => v.disciplina_nome);
+      if (d.length > 0) return [...new Set(d)];
+    }
+    const fallback = p.disciplina_nome || p.disciplina;
+    return fallback ? [fallback] : ["—"];
+  };
+
   const profsFiltrados = professores.filter(p =>
     !busca || `${p.nome} ${p.disciplina_nome || ""}`.toLowerCase().includes(busca.toLowerCase())
   );
@@ -384,11 +397,19 @@ export default function DisponibilidadePage({ config, turnoInicial, highlightPro
                   <div style={{ fontSize: 13, fontWeight: sel ? 700 : 600, color: sel ? "#1d4ed8" : "#1e293b", lineHeight: 1.3 }}>
                     {p.nome}
                   </div>
-                  <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>
-                    {(() => {
-                      const vinc = p.vinculos?.find(v => v.turno === turno) || p.vinculos?.[0];
-                      return vinc?.disciplina_nome || p.disciplina_nome || p.disciplina || "—";
-                    })()}
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
+                    {getDisciplinas(p).map(d => (
+                      <span key={d} style={{
+                        background: sel ? "#bfdbfe" : "#e2e8f0",
+                        color: sel ? "#1d4ed8" : "#475569",
+                        padding: "2px 6px",
+                        borderRadius: 4,
+                        fontSize: 10,
+                        fontWeight: 700
+                      }}>
+                        {d}
+                      </span>
+                    ))}
                   </div>
                   {isDirty && (
                     <span style={{
@@ -436,11 +457,29 @@ export default function DisponibilidadePage({ config, turnoInicial, highlightPro
                 </div>
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 700 }}>{profAtual.nome}</div>
-                  <div style={{ fontSize: 11, opacity: 0.75 }}>
-                    {(() => {
-                      const vinc = profAtual.vinculos?.find(v => v.turno === turno) || profAtual.vinculos?.[0];
-                      return vinc?.disciplina_nome || profAtual.disciplina_nome || profAtual.disciplina || "—";
-                    })()} · {turno.charAt(0).toUpperCase() + turno.slice(1)}
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
+                    {getDisciplinas(profAtual).map(d => (
+                      <span key={d} style={{
+                        background: "rgba(255,255,255,0.25)",
+                        color: "#fff",
+                        padding: "2px 8px",
+                        borderRadius: 4,
+                        fontSize: 11,
+                        fontWeight: 700
+                      }}>
+                        {d}
+                      </span>
+                    ))}
+                    <span style={{
+                      background: "rgba(0,0,0,0.15)",
+                      color: "#93c5fd",
+                      padding: "2px 8px",
+                      borderRadius: 4,
+                      fontSize: 11,
+                      fontWeight: 700
+                    }}>
+                      {turno.charAt(0).toUpperCase() + turno.slice(1)}
+                    </span>
                   </div>
                 </div>
                 <div style={{

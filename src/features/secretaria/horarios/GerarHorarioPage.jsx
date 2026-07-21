@@ -519,7 +519,13 @@ export default function GerarHorarioPage({ config }) {
                 {Object.keys(resultado.grade_por_turma || {}).length === 0 ? (
                   <p style={{ color: "#94a3b8", textAlign: "center" }}>Nenhuma grade gerada.</p>
                 ) : (
-                  Object.entries(resultado.grade_por_turma).map(([turmaId, grade]) => (
+                  Object.entries(resultado.grade_por_turma)
+                    .sort(([idA], [idB]) => {
+                      const nA = (nomesTurmas[idA] || String(idA)).toUpperCase();
+                      const nB = (nomesTurmas[idB] || String(idB)).toUpperCase();
+                      return nA.localeCompare(nB, 'pt-BR', { numeric: true });
+                    })
+                    .map(([turmaId, grade]) => (
                     <div key={turmaId} style={{
                       background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12,
                       overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.06)",

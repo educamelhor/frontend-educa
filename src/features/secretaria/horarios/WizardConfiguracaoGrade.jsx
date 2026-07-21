@@ -1,20 +1,20 @@
-// src/features/secretaria/horarios/WizardConfiguracaoGrade.jsx
+ï»¿// src/features/secretaria/horarios/WizardConfiguracaoGrade.jsx
 import React, { useState, useEffect } from "react";
 import api from "../../../services/api";
 
 const TURNOS_CONFIG = [
-  { id: "matutino",   label: "Matutino",   emoji: "??",  desc: "Manhã",  periodos_default: 5 },
+  { id: "matutino",   label: "Matutino",   emoji: "??",  desc: "ManhÃ£",  periodos_default: 5 },
   { id: "vespertino", label: "Vespertino", emoji: "???", desc: "Tarde",  periodos_default: 5 },
   { id: "noturno",    label: "Noturno",    emoji: "??",  desc: "Noite", periodos_default: 4 },
 ];
 
 const DIAS_SEMANA = [
   { num: 1, label: "Seg", nome: "Segunda" },
-  { num: 2, label: "Ter", nome: "Terça"   },
+  { num: 2, label: "Ter", nome: "TerÃ§a"   },
   { num: 3, label: "Qua", nome: "Quarta"  },
   { num: 4, label: "Qui", nome: "Quinta"  },
   { num: 5, label: "Sex", nome: "Sexta"   },
-  { num: 6, label: "Sáb", nome: "Sábado"  },
+  { num: 6, label: "SÃ¡b", nome: "SÃ¡bado"  },
 ];
 
 const S = {
@@ -40,7 +40,7 @@ const S = {
 function Pill({ children, color = "#3b82f6" }) {
   return (
     <span style={{
-      background: color + "30", border: 1px solid ,
+      background: color + "30", border: `1px solid ${color}`,
       borderRadius: 8, padding: "4px 12px", fontSize: 13,
       color, fontWeight: 600, display: "inline-block",
     }}>{children}</span>
@@ -109,7 +109,7 @@ export default function WizardConfiguracaoGrade({ onConcluir, configInicial }) {
 
   const addExcludente = () => {
     if (selDisc1 && selDisc2 && selDisc1 !== selDisc2) {
-      // Ordenar os IDs para evitar duplicação invertida
+      // Ordenar os IDs para evitar duplicaÃ§Ã£o invertida
       const par = [selDisc1, selDisc2].sort();
       const jahExiste = regrasGerais.disciplinas_excludentes.some(p => p[0] === par[0] && p[1] === par[1]);
       if (!jahExiste) {
@@ -148,13 +148,13 @@ export default function WizardConfiguracaoGrade({ onConcluir, configInicial }) {
       });
       onConcluir({ turnos, dias_semana: dias, periodos: periodosAtivos, regras_gerais: regrasGerais });
     } catch {
-      setErro("Erro ao salvar. Verifique sua conexão e tente novamente.");
+      setErro("Erro ao salvar. Verifique sua conexÃ£o e tente novamente.");
     } finally {
       setSalvando(false);
     }
   }
 
-  const passoLabels = ["Turnos", "Dias", "Períodos", "Regras", "Recreio", "Conflitos", "Revisão"];
+  const passoLabels = ["Turnos", "Dias", "PerÃ­odos", "Regras", "Recreio", "Conflitos", "RevisÃ£o"];
 
   return (
     <div style={S.outer}>
@@ -162,10 +162,10 @@ export default function WizardConfiguracaoGrade({ onConcluir, configInicial }) {
         <div style={{ textAlign: "center", marginBottom: 24 }}>
           <div style={{ fontSize: 32, marginBottom: 6 }}>??</div>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: "#fff", margin: "0 0 4px" }}>
-            Configuração da Grade Horária
+            ConfiguraÃ§Ã£o da Grade HorÃ¡ria
           </h1>
           <p style={{ color: "#94a3b8", fontSize: 13, margin: 0 }}>
-            Configure regras globais e a inteligência do algoritmo.
+            Configure regras globais e a inteligÃªncia do algoritmo.
           </p>
         </div>
 
@@ -236,7 +236,7 @@ export default function WizardConfiguracaoGrade({ onConcluir, configInicial }) {
           {passo === 2 && (
             <div>
               <h2 style={{ textAlign: "center", fontSize: 17, fontWeight: 700, color: "#e2e8f0", marginBottom: 20 }}>
-                Quais são os dias letivos?
+                Quais sÃ£o os dias letivos?
               </h2>
               <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
                 {DIAS_SEMANA.map(d => {
@@ -293,7 +293,7 @@ export default function WizardConfiguracaoGrade({ onConcluir, configInicial }) {
           {passo === 4 && (
             <div>
               <h2 style={{ textAlign: "center", fontSize: 17, fontWeight: 700, color: "#e2e8f0", marginBottom: 20 }}>
-                Regras e Padrões de Alocação
+                Regras e PadrÃµes de AlocaÃ§Ã£o
               </h2>
               
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -304,7 +304,7 @@ export default function WizardConfiguracaoGrade({ onConcluir, configInicial }) {
                       style={{ width: 20, height: 20, accentColor: "#3b82f6" }} />
                     <div>
                       <div style={{ fontWeight: 600, fontSize: 14 }}>Preferencialmente Aulas Duplas</div>
-                      <div style={{ fontSize: 11, color: "#94a3b8" }}>O algoritmo tentará sempre juntar aulas da mesma disciplina de forma geminada (duas seguidas).</div>
+                      <div style={{ fontSize: 11, color: "#94a3b8" }}>O algoritmo tentarÃ¡ sempre juntar aulas da mesma disciplina de forma geminada (duas seguidas).</div>
                     </div>
                   </label>
                 </div>
@@ -316,21 +316,21 @@ export default function WizardConfiguracaoGrade({ onConcluir, configInicial }) {
                       style={{ width: 20, height: 20, accentColor: "#f59e0b" }} />
                     <div>
                       <div style={{ fontWeight: 600, fontSize: 14 }}>Permitir separar aulas pelo Recreio/Intervalo</div>
-                      <div style={{ fontSize: 11, color: "#94a3b8" }}>Se marcado, uma aula dupla pode ter a 1ª parte antes do recreio e a 2ª parte depois. Se desmarcado, o algoritmo bloqueia essa divisão.</div>
+                      <div style={{ fontSize: 11, color: "#94a3b8" }}>Se marcado, uma aula dupla pode ter a 1Âª parte antes do recreio e a 2Âª parte depois. Se desmarcado, o algoritmo bloqueia essa divisÃ£o.</div>
                     </div>
                   </label>
                 </div>
 
                 <div style={{ background: "rgba(255,255,255,0.05)", padding: 16, borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)" }}>
-                  <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>Máximo de aulas do professor no mesmo dia (RC02)</div>
-                  <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 10 }}>O mesmo professor não entrará na mesma turma mais do que X vezes num mesmo dia.</div>
+                  <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>MÃ¡ximo de aulas do professor no mesmo dia (RC02)</div>
+                  <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 10 }}>O mesmo professor nÃ£o entrarÃ¡ na mesma turma mais do que X vezes num mesmo dia.</div>
                   <select 
                     value={regrasGerais.max_aulas_mesmo_dia}
                     onChange={e => setRegrasGerais({...regrasGerais, max_aulas_mesmo_dia: parseInt(e.target.value)})}
                     style={{ background: "#0f172a", border: "1px solid rgba(255,255,255,0.2)", padding: "8px 12px", color: "#fff", borderRadius: 6, width: "100%" }}
                   >
                     <option value={1}>1 aula (Apenas simples)</option>
-                    <option value={2}>2 aulas (Aulas Duplas no máximo)</option>
+                    <option value={2}>2 aulas (Aulas Duplas no mÃ¡ximo)</option>
                     <option value={3}>3 aulas no dia</option>
                     <option value={4}>4 aulas no dia</option>
                   </select>
@@ -343,10 +343,10 @@ export default function WizardConfiguracaoGrade({ onConcluir, configInicial }) {
           {passo === 5 && (
             <div>
               <h2 style={{ textAlign: "center", fontSize: 17, fontWeight: 700, color: "#e2e8f0", marginBottom: 4 }}>
-                Horário do Intervalo (Recreio)
+                HorÃ¡rio do Intervalo (Recreio)
               </h2>
               <p style={{ textAlign: "center", color: "#64748b", fontSize: 12, marginBottom: 20 }}>
-                Após qual aula acontece o intervalo em cada turno?
+                ApÃ³s qual aula acontece o intervalo em cada turno?
               </p>
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {TURNOS_CONFIG.filter(t => turnos.includes(t.id)).map(t => {
@@ -368,7 +368,7 @@ export default function WizardConfiguracaoGrade({ onConcluir, configInicial }) {
                     >
                       <option value={0}>Sem intervalo</option>
                       {Array.from({length: maxPeriodos - 1}).map((_, i) => (
-                        <option key={i+1} value={i+1}>Após a {i+1}ª aula</option>
+                        <option key={i+1} value={i+1}>ApÃ³s a {i+1}Âª aula</option>
                       ))}
                     </select>
                   </div>
@@ -408,7 +408,7 @@ export default function WizardConfiguracaoGrade({ onConcluir, configInicial }) {
                 {regrasGerais.disciplinas_excludentes.map((par, idx) => (
                   <div key={idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", padding: "8px 12px", borderRadius: 8 }}>
                     <span style={{ fontSize: 13, fontWeight: 600 }}>{getDiscNome(par[0])} <span style={{ color:"#ef4444" }}>??</span> {getDiscNome(par[1])}</span>
-                    <button onClick={() => removeExcludente(idx)} style={{ background: "transparent", border: "none", color: "#ef4444", cursor: "pointer", fontSize: 16 }}>×</button>
+                    <button onClick={() => removeExcludente(idx)} style={{ background: "transparent", border: "none", color: "#ef4444", cursor: "pointer", fontSize: 16 }}>Ã—</button>
                   </div>
                 ))}
                 {regrasGerais.disciplinas_excludentes.length === 0 && (
@@ -418,7 +418,7 @@ export default function WizardConfiguracaoGrade({ onConcluir, configInicial }) {
             </div>
           )}
 
-          {/* PASSO 7: Revisão */}
+          {/* PASSO 7: RevisÃ£o */}
           {passo === 7 && (
             <div>
               <h2 style={{ textAlign: "center", fontSize: 17, fontWeight: 700, color: "#e2e8f0", marginBottom: 20 }}>
@@ -431,10 +431,10 @@ export default function WizardConfiguracaoGrade({ onConcluir, configInicial }) {
                 {DIAS_SEMANA.filter(d => dias.includes(d.num)).map(d => <Pill key={d.num} color="#10b981">{d.nome}</Pill>)}
               </ResumoCard>
 
-              <ResumoCard icon="??" titulo="Regras Pedagógicas">
+              <ResumoCard icon="??" titulo="Regras PedagÃ³gicas">
                 <Pill color={regrasGerais.preferencia_aulas_duplas ? "#10b981" : "#64748b"}>Aulas Duplas</Pill>
                 <Pill color={regrasGerais.max_aulas_mesmo_dia ? "#3b82f6" : "#64748b"}>Max {regrasGerais.max_aulas_mesmo_dia}/dia</Pill>
-                {!regrasGerais.aulas_duplas_separar_recreio && <Pill color="#f59e0b">Recreio não quebra duplas</Pill>}
+                {!regrasGerais.aulas_duplas_separar_recreio && <Pill color="#f59e0b">Recreio nÃ£o quebra duplas</Pill>}
                 {regrasGerais.disciplinas_excludentes.length > 0 && <Pill color="#ef4444">{regrasGerais.disciplinas_excludentes.length} Conflitos</Pill>}
               </ResumoCard>
 
@@ -466,14 +466,14 @@ export default function WizardConfiguracaoGrade({ onConcluir, configInicial }) {
               padding: "10px 24px", borderRadius: 8, background: podeAvancar ? "linear-gradient(135deg, #3b82f6, #2563eb)" : "rgba(255,255,255,0.06)",
               border: "none", color: podeAvancar ? "#fff" : "#64748b", cursor: podeAvancar ? "pointer" : "not-allowed",
               fontSize: 13, fontWeight: 700, boxShadow: podeAvancar ? "0 4px 14px rgba(59,130,246,0.4)" : "none", transition: "all 0.2s",
-            }}>Próximo ?</button>
+            }}>PrÃ³ximo ?</button>
           ) : (
             <button onClick={confirmar} disabled={salvando} style={{
               padding: "10px 24px", borderRadius: 8, background: salvando ? "rgba(255,255,255,0.06)" : "linear-gradient(135deg, #10b981, #059669)",
               border: "none", color: "#fff", cursor: salvando ? "not-allowed" : "pointer",
               fontSize: 13, fontWeight: 700, boxShadow: salvando ? "none" : "0 4px 14px rgba(16,185,129,0.4)", transition: "all 0.2s",
             }}>
-              {salvando ? "Salvando…" : "? Confirmar"}
+              {salvando ? "Salvandoâ€¦" : "? Confirmar"}
             </button>
           )}
         </div>
@@ -481,3 +481,4 @@ export default function WizardConfiguracaoGrade({ onConcluir, configInicial }) {
     </div>
   );
 }
+

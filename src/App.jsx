@@ -41,7 +41,8 @@ import ConteudosProgramaticos from "./features/pedagogico/conteudos/ConteudosPro
 import Planos from "./features/professores/planos/Planos";
 import Avaliacoes from "./features/professores/avaliacoes/Avaliacoes";
 import ConteudosProfessor from "./features/professores/conteudos/Conteudos";
-import ProvasProfessor from "./features/professores/provas/Provas";
+import ProvasEmBreve from "./features/pedagogico/ProvasEmBreve";
+import CapasProvas from "./features/gabarito/capas/CapasProvas";
 import BoletimManual from "./features/professores/boletim/BoletimManual";
 import SolicitacoesConteudos from "./features/pedagogico/coordenacao/SolicitacoesConteudos.jsx";
 import LandingPage from "./features/landing/LandingPage";
@@ -376,6 +377,7 @@ export default function App() {
           {/* ── Gabarito Unificado ─────────────────────────────────────────── */}
           <Route path="/gabarito"              element={<RequireModulo modulo="gabarito"><GabaritoModule /></RequireModulo>} />
           <Route path="/gabarito/gerar"        element={<RequireModulo modulo="gabarito"><GabaritoModule /></RequireModulo>} />
+          <Route path="/gabarito/capas"        element={<RequireModulo modulo="gabarito"><CapasProvas /></RequireModulo>} />
           <Route path="/gabarito/corrigir-lote" element={<RequireModulo modulo="gabarito"><GabaritoModule /></RequireModulo>} />
           <Route path="/gabarito/corrigir"     element={<RequireModulo modulo="gabarito"><GabaritoModule /></RequireModulo>} />
           <Route path="/gabarito/resultados"   element={<RequireModulo modulo="gabarito"><GabaritoModule /></RequireModulo>} />
@@ -397,8 +399,8 @@ export default function App() {
           <Route path="/professores/planos"     element={<RequireModulo modulo="professores"><Planos /></RequireModulo>} />
           <Route path="/professores/avaliacoes" element={<RequireModulo modulo="professores"><Avaliacoes /></RequireModulo>} />
           <Route path="/professores/conteudos"  element={<RequireModulo modulo="professores"><ConteudosProfessor /></RequireModulo>} />
-          <Route path="/professores/provas"     element={<RequireModulo modulo="professores"><ProvasProfessor /></RequireModulo>} />
-          <Route path="/pedagogico/provas"      element={<ProvasProfessor />} />
+          <Route path="/professores/provas"     element={<Navigate to="/gabarito/capas" replace />} />
+          <Route path="/pedagogico/provas"      element={<ProvasEmBreve />} />
           <Route path="/professores/boletim"    element={<RequireModulo modulo="professores"><BoletimManual /></RequireModulo>} />
 
           {/* ── Frequência ───────────────────────────────────────────────── */}

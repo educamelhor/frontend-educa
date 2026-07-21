@@ -220,7 +220,7 @@ export default function ChegadaTab() {
                   </td>
                   <td className="py-4 px-6 text-gray-600">{Number(item.quantidade_unidades)}</td>
                   <td className="py-4 px-6 font-semibold text-emerald-600">
-                    {Number(item.peso_kg).toLocaleString('pt-BR')} kg
+                    {Number(item.peso_kg).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg
                   </td>
                   <td className="py-4 px-6">
                     {item.lote ? (

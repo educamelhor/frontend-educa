@@ -399,7 +399,7 @@ export default function App() {
           <Route path="/professores/planos"     element={<RequireModulo modulo="professores"><Planos /></RequireModulo>} />
           <Route path="/professores/avaliacoes" element={<RequireModulo modulo="professores"><Avaliacoes /></RequireModulo>} />
           <Route path="/professores/conteudos"  element={<RequireModulo modulo="professores"><ConteudosProfessor /></RequireModulo>} />
-          <Route path="/professores/provas"     element={<Navigate to="/gabarito/capas" replace />} />
+          <Route path="/professores/provas"     element={<RequireModulo modulo="professores"><ProvasEmBreve /></RequireModulo>} />
           <Route path="/pedagogico/provas"      element={<ProvasEmBreve />} />
           <Route path="/professores/boletim"    element={<RequireModulo modulo="professores"><BoletimManual /></RequireModulo>} />
 

@@ -257,7 +257,7 @@ export default function DisponibilidadePage({ config, turnoInicial, highlightPro
     if (!p) return [];
     if (p.vinculos && p.vinculos.length > 0) {
       const d = p.vinculos
-        .filter(v => v.turno === turno && v.disciplina_nome)
+        .filter(v => String(v.turno || "").toLowerCase() === String(turno).toLowerCase() && v.disciplina_nome)
         .map(v => v.disciplina_nome);
       if (d.length > 0) return [...new Set(d)];
     }

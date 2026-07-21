@@ -121,7 +121,7 @@ export default function DisponibilidadePage({ config, turnoInicial, highlightPro
       .then(res => {
         setPrefAtual({
           prefere_aula_unica: res.data?.prefere_aula_unica || 0,
-          evitar_janela_interna: res.data?.evitar_janela_interna !== undefined ? res.data.evitar_janela_interna : 1,
+          evitar_janela_interna: res.data?.evitar_janela_interna !== undefined ? res.data.evitar_janela_interna : 0,
         });
       })
       .catch(err => console.error("Erro ao carregar preferências do professor:", err));
@@ -385,7 +385,10 @@ export default function DisponibilidadePage({ config, turnoInicial, highlightPro
                     {p.nome}
                   </div>
                   <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>
-                    {p.disciplina_nome || p.disciplina || "—"}
+                    {(() => {
+                      const vinc = p.vinculos?.find(v => v.turno === turno) || p.vinculos?.[0];
+                      return vinc?.disciplina_nome || p.disciplina_nome || p.disciplina || "—";
+                    })()}
                   </div>
                   {isDirty && (
                     <span style={{
@@ -434,7 +437,10 @@ export default function DisponibilidadePage({ config, turnoInicial, highlightPro
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 700 }}>{profAtual.nome}</div>
                   <div style={{ fontSize: 11, opacity: 0.75 }}>
-                    {profAtual.disciplina_nome || profAtual.disciplina || "—"} · {turno.charAt(0).toUpperCase() + turno.slice(1)}
+                    {(() => {
+                      const vinc = profAtual.vinculos?.find(v => v.turno === turno) || profAtual.vinculos?.[0];
+                      return vinc?.disciplina_nome || profAtual.disciplina_nome || profAtual.disciplina || "—";
+                    })()} · {turno.charAt(0).toUpperCase() + turno.slice(1)}
                   </div>
                 </div>
                 <div style={{

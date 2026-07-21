@@ -1,11 +1,11 @@
-﻿// src/features/secretaria/horarios/WizardConfiguracaoGrade.jsx
+// src/features/secretaria/horarios/WizardConfiguracaoGrade.jsx
 import React, { useState, useEffect } from "react";
 import api from "../../../services/api";
 
 const TURNOS_CONFIG = [
-  { id: "matutino",   label: "Matutino",   emoji: "??",  desc: "Manhã",  periodos_default: 5 },
-  { id: "vespertino", label: "Vespertino", emoji: "???", desc: "Tarde",  periodos_default: 5 },
-  { id: "noturno",    label: "Noturno",    emoji: "??",  desc: "Noite", periodos_default: 4 },
+  { id: "matutino",   label: "Matutino",   emoji: "☀️",  desc: "Manhã",  periodos_default: 5 },
+  { id: "vespertino", label: "Vespertino", emoji: "🌤️", desc: "Tarde",  periodos_default: 5 },
+  { id: "noturno",    label: "Noturno",    emoji: "🌙",  desc: "Noite", periodos_default: 4 },
 ];
 
 const DIAS_SEMANA = [
@@ -160,7 +160,7 @@ export default function WizardConfiguracaoGrade({ onConcluir, configInicial }) {
     <div style={S.outer}>
       <div style={S.card}>
         <div style={{ textAlign: "center", marginBottom: 24 }}>
-          <div style={{ fontSize: 32, marginBottom: 6 }}>??</div>
+          <div style={{ fontSize: 32, marginBottom: 6 }}>⚙️</div>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: "#fff", margin: "0 0 4px" }}>
             Configuração da Grade Horária
           </h1>
@@ -186,7 +186,7 @@ export default function WizardConfiguracaoGrade({ onConcluir, configInicial }) {
                     boxShadow: ativo ? "0 0 12px rgba(59,130,246,0.5)" : "none",
                     transition: "all 0.3s",
                   }}>
-                    {concluido ? "?" : num}
+                    {concluido ? "✓" : num}
                   </div>
                   <span style={{ fontSize: 9, color: ativo ? "#93c5fd" : "#475569", fontWeight: ativo ? 700 : 400 }}>
                     {label}
@@ -225,7 +225,7 @@ export default function WizardConfiguracaoGrade({ onConcluir, configInicial }) {
                     }}>
                       <div style={{ fontSize: 32, marginBottom: 8 }}>{t.emoji}</div>
                       <div style={{ fontWeight: 700, fontSize: 14 }}>{t.label}</div>
-                      {sel && <div style={{ marginTop: 8, color: "#60a5fa", fontSize: 11, fontWeight: 600 }}>? Selecionado</div>}
+                      {sel && <div style={{ marginTop: 8, color: "#60a5fa", fontSize: 11, fontWeight: 600 }}>✓ Selecionado</div>}
                     </button>
                   );
                 })}
@@ -407,7 +407,7 @@ export default function WizardConfiguracaoGrade({ onConcluir, configInicial }) {
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {regrasGerais.disciplinas_excludentes.map((par, idx) => (
                   <div key={idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", padding: "8px 12px", borderRadius: 8 }}>
-                    <span style={{ fontSize: 13, fontWeight: 600 }}>{getDiscNome(par[0])} <span style={{ color:"#ef4444" }}>??</span> {getDiscNome(par[1])}</span>
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>{getDiscNome(par[0])} <span style={{ color:"#ef4444" }}>⚔️</span> {getDiscNome(par[1])}</span>
                     <button onClick={() => removeExcludente(idx)} style={{ background: "transparent", border: "none", color: "#ef4444", cursor: "pointer", fontSize: 16 }}>×</button>
                   </div>
                 ))}
@@ -425,13 +425,13 @@ export default function WizardConfiguracaoGrade({ onConcluir, configInicial }) {
                 Tudo pronto! Revise antes de confirmar.
               </h2>
               
-              <ResumoCard icon="??" titulo="Turnos & Dias">
+              <ResumoCard icon="🔄" titulo="Turnos & Dias">
                 {turnos.map(t => <Pill key={t} color="#3b82f6">{t}</Pill>)}
                 <div style={{ width: "100%", height: 1 }} />
                 {DIAS_SEMANA.filter(d => dias.includes(d.num)).map(d => <Pill key={d.num} color="#10b981">{d.nome}</Pill>)}
               </ResumoCard>
 
-              <ResumoCard icon="??" titulo="Regras Pedagógicas">
+              <ResumoCard icon="⚙️" titulo="Regras Pedagógicas">
                 <Pill color={regrasGerais.preferencia_aulas_duplas ? "#10b981" : "#64748b"}>Aulas Duplas</Pill>
                 <Pill color={regrasGerais.max_aulas_mesmo_dia ? "#3b82f6" : "#64748b"}>Max {regrasGerais.max_aulas_mesmo_dia}/dia</Pill>
                 {!regrasGerais.aulas_duplas_separar_recreio && <Pill color="#f59e0b">Recreio não quebra duplas</Pill>}
@@ -450,7 +450,7 @@ export default function WizardConfiguracaoGrade({ onConcluir, configInicial }) {
             background: passo === 1 ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.08)",
             color: passo === 1 ? "#64748b" : "#e2e8f0",
             cursor: passo === 1 ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 600, transition: "all 0.2s",
-          }}>? Voltar</button>
+          }}>← Voltar</button>
 
           <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
             {[1,2,3,4,5,6,7].map(n => (
@@ -466,14 +466,14 @@ export default function WizardConfiguracaoGrade({ onConcluir, configInicial }) {
               padding: "10px 24px", borderRadius: 8, background: podeAvancar ? "linear-gradient(135deg, #3b82f6, #2563eb)" : "rgba(255,255,255,0.06)",
               border: "none", color: podeAvancar ? "#fff" : "#64748b", cursor: podeAvancar ? "pointer" : "not-allowed",
               fontSize: 13, fontWeight: 700, boxShadow: podeAvancar ? "0 4px 14px rgba(59,130,246,0.4)" : "none", transition: "all 0.2s",
-            }}>Próximo ?</button>
+            }}>Próximo →</button>
           ) : (
             <button onClick={confirmar} disabled={salvando} style={{
               padding: "10px 24px", borderRadius: 8, background: salvando ? "rgba(255,255,255,0.06)" : "linear-gradient(135deg, #10b981, #059669)",
               border: "none", color: "#fff", cursor: salvando ? "not-allowed" : "pointer",
               fontSize: 13, fontWeight: 700, boxShadow: salvando ? "none" : "0 4px 14px rgba(16,185,129,0.4)", transition: "all 0.2s",
             }}>
-              {salvando ? "Salvando…" : "? Confirmar"}
+              {salvando ? "Salvando…" : "✓ Confirmar"}
             </button>
           )}
         </div>
@@ -481,4 +481,3 @@ export default function WizardConfiguracaoGrade({ onConcluir, configInicial }) {
     </div>
   );
 }
-

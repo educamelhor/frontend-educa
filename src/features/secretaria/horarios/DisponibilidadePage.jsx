@@ -44,6 +44,10 @@ export default function DisponibilidadePage({ config, turnoInicial, highlightPro
   const [carregando, setCarregando]   = useState(true);
   const [busca, setBusca]             = useState("");
   const [showModalLimpar, setShowModalLimpar] = useState(false);
+  
+  // Preferências do Professor Selecionado
+  const [prefAtual, setPrefAtual] = useState({ prefere_aula_unica: 0, evitar_janela_interna: 1 });
+  const [salvandoPref, setSalvandoPref] = useState(false);
 
   const nPeriodos = periodosPorTurno[turno] || 5;
   const dias      = DIAS.filter(d => diasLetivos.includes(d.num));
@@ -109,6 +113,40 @@ export default function DisponibilidadePage({ config, turnoInicial, highlightPro
   }, [turno]); // eslint-disable-line
 
   useEffect(() => { carregar(); }, [carregar]);
+
+  // ── Carga de Preferências Individuais ──────────────────────────
+  useEffect(() => {
+    if (!profSel) return;
+    api.get("/api/preferencias", { params: { professor_id: profSel, turno } })
+      .then(res => {
+        setPrefAtual({
+          prefere_aula_unica: res.data?.prefere_aula_unica || 0,
+          evitar_janela_interna: res.data?.evitar_janela_interna !== undefined ? res.data.evitar_janela_interna : 1,
+        });
+      })
+      .catch(err => console.error("Erro ao carregar preferências do professor:", err));
+  }, [profSel, turno]);
+
+  // ── Atualizar Preferência ──────────────────────────────────────
+  async function togglePref(key) {
+    if (!profSel) return;
+    const newVal = prefAtual[key] ? 0 : 1;
+    const novaPref = { ...prefAtual, [key]: newVal };
+    setPrefAtual(novaPref); // otimista
+    setSalvandoPref(true);
+    try {
+      await api.post("/api/preferencias/upsert", {
+        professor_id: profSel,
+        turno: turno,
+        ...novaPref,
+      });
+    } catch (e) {
+      console.error("Erro ao salvar preferência:", e);
+      setPrefAtual(prefAtual); // rollback em erro
+    } finally {
+      setSalvandoPref(false);
+    }
+  }
 
   // ── Toggle de slot ────────────────────────────────────────────
   function toggle(dia, ordem) {
@@ -471,6 +509,55 @@ export default function DisponibilidadePage({ config, turnoInicial, highlightPro
                   })}
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Painel de Exceções do Professor (Opcional) */}
+          {profAtual && !carregando && (
+            <div style={{
+              marginTop: 24, background: "#fff", padding: "20px 24px",
+              borderRadius: 16, border: "1px solid #e2e8f0", boxShadow: "0 2px 12px rgba(0,0,0,0.04)"
+            }}>
+              <h3 style={{ margin: "0 0 16px", fontSize: 15, fontWeight: 700, color: "#1e3a5f", display: "flex", alignItems: "center", gap: 8 }}>
+                <span>⚙️</span> Exceções para {profAtual.nome.split(" ")[0]}
+                {salvandoPref && <span style={{ fontSize: 11, color: "#94a3b8", fontWeight: 600 }}>Salvando...</span>}
+              </h3>
+              
+              <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
+                {/* Toggle: Aula Simples */}
+                <label style={{
+                  display: "flex", alignItems: "center", gap: 12, cursor: "pointer",
+                  background: prefAtual.prefere_aula_unica ? "#eff6ff" : "#f8fafc",
+                  padding: "12px 16px", borderRadius: 12, border: prefAtual.prefere_aula_unica ? "1px solid #bfdbfe" : "1px solid #e2e8f0",
+                  transition: "all 0.2s", flex: "1 1 300px"
+                }}>
+                  <div style={{ position: "relative", width: 44, height: 24, borderRadius: 12, background: prefAtual.prefere_aula_unica ? "#3b82f6" : "#cbd5e1", transition: "0.3s" }}>
+                    <div style={{ position: "absolute", top: 2, left: prefAtual.prefere_aula_unica ? 22 : 2, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "0.3s", boxShadow: "0 2px 4px rgba(0,0,0,0.2)" }} />
+                  </div>
+                  <input type="checkbox" checked={!!prefAtual.prefere_aula_unica} onChange={() => togglePref("prefere_aula_unica")} style={{ display: "none" }} />
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: prefAtual.prefere_aula_unica ? "#1e3a5f" : "#475569" }}>Preferência por Aula Simples</div>
+                    <div style={{ fontSize: 11, color: "#64748b" }}>Evita agrupar aulas em duplas (germinadas).</div>
+                  </div>
+                </label>
+
+                {/* Toggle: Sem Janelas */}
+                <label style={{
+                  display: "flex", alignItems: "center", gap: 12, cursor: "pointer",
+                  background: prefAtual.evitar_janela_interna ? "#eff6ff" : "#f8fafc",
+                  padding: "12px 16px", borderRadius: 12, border: prefAtual.evitar_janela_interna ? "1px solid #bfdbfe" : "1px solid #e2e8f0",
+                  transition: "all 0.2s", flex: "1 1 300px"
+                }}>
+                  <div style={{ position: "relative", width: 44, height: 24, borderRadius: 12, background: prefAtual.evitar_janela_interna ? "#3b82f6" : "#cbd5e1", transition: "0.3s" }}>
+                    <div style={{ position: "absolute", top: 2, left: prefAtual.evitar_janela_interna ? 22 : 2, width: 20, height: 20, borderRadius: "50%", background: "#fff", transition: "0.3s", boxShadow: "0 2px 4px rgba(0,0,0,0.2)" }} />
+                  </div>
+                  <input type="checkbox" checked={!!prefAtual.evitar_janela_interna} onChange={() => togglePref("evitar_janela_interna")} style={{ display: "none" }} />
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 14, color: prefAtual.evitar_janela_interna ? "#1e3a5f" : "#475569" }}>Sem Janelas (Horários Vagos)</div>
+                    <div style={{ fontSize: 11, color: "#64748b" }}>Obriga que os horários vagos sejam apenas no início ou no fim do turno.</div>
+                  </div>
+                </label>
+              </div>
             </div>
           )}
         </div>

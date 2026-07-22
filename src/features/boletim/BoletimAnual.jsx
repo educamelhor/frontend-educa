@@ -110,6 +110,8 @@ export default function BoletimAnual({
       let currentEscolaId = null;
       let currentEtapa = null;
       let currentTurno = null;
+      let currentRegime = null;
+      let currentTurmaId = null;
 
       // Buscar configs de governança (só se não veio como prop)
       const configPromise = boletimConfigProp
@@ -163,6 +165,8 @@ export default function BoletimAnual({
           currentEscolaId = resAluno.data.escola_id;
           currentEtapa = resAluno.data.etapa;
           currentTurno = resAluno.data.turno;
+          currentRegime = resAluno.data.regime;
+          currentTurmaId = resAluno.data.turma_id;
 
           // Aplicar config de governança
           if (resolvedConfig && !cancelado) {
@@ -216,10 +220,10 @@ export default function BoletimAnual({
       // Buscar disciplinas correspondentes de forma dinâmica
       if (currentEscolaId) {
         try {
-          if (resAluno?.data?.regime === "semestral" && resAluno?.data?.turma_id) {
+          if (currentRegime === "semestral" && currentTurmaId) {
             const [resSem1, resSem2] = await Promise.all([
-              api.get("/api/cargas-horarias", { params: { turma_id: resAluno.data.turma_id, semestre: 1 } }),
-              api.get("/api/cargas-horarias", { params: { turma_id: resAluno.data.turma_id, semestre: 2 } })
+              api.get("/api/cargas-horarias", { params: { turma_id: currentTurmaId, semestre: 1 } }),
+              api.get("/api/cargas-horarias", { params: { turma_id: currentTurmaId, semestre: 2 } })
             ]);
             if (!cancelado) {
               setDisciplinasSem1((resSem1.data?.itens || []).map(d => ({ id: d.disciplina_id, nome: d.disciplina_nome })));

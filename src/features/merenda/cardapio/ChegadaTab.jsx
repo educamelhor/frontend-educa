@@ -9,6 +9,7 @@ export default function ChegadaTab() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [sortConfig, setSortConfig] = useState({ key: 'created_at', direction: 'desc' });
 
   // Modal form state
   const [selectedProdutoId, setSelectedProdutoId] = useState("");
@@ -166,6 +167,28 @@ export default function ChegadaTab() {
     }
   };
 
+  const requestSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const entradasOrdenadas = [...entradas].sort((a, b) => {
+    let valA = a[sortConfig.key] || "";
+    let valB = b[sortConfig.key] || "";
+    
+    if (sortConfig.key === 'produto') {
+      valA = (a.produto || "").toLowerCase();
+      valB = (b.produto || "").toLowerCase();
+    }
+    
+    if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+    if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+    return 0;
+  });
+
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
@@ -186,30 +209,72 @@ export default function ChegadaTab() {
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gray-100/90 border-b-2 border-gray-200 text-sm text-gray-600 shadow-sm">
-              <th className="py-4 px-6 font-semibold tracking-wide">DATA</th>
-              <th className="py-4 px-6 font-semibold tracking-wide">PRODUTO</th>
+              <th 
+                className="py-4 px-6 font-semibold tracking-wide cursor-pointer hover:bg-gray-200/50 transition-colors"
+                onClick={() => requestSort('created_at')}
+              >
+                <div className="flex items-center gap-2 select-none">
+                  DATA
+                  {sortConfig.key === 'created_at' && (
+                    sortConfig.direction === 'asc' ? (
+                      <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+                    ) : (
+                      <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    )
+                  )}
+                </div>
+              </th>
+              <th 
+                className="py-4 px-6 font-semibold tracking-wide cursor-pointer hover:bg-gray-200/50 transition-colors text-center"
+                onClick={() => requestSort('produto')}
+              >
+                <div className="flex items-center justify-center gap-2 select-none">
+                  PRODUTO
+                  {sortConfig.key === 'produto' && (
+                    sortConfig.direction === 'asc' ? (
+                      <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+                    ) : (
+                      <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    )
+                  )}
+                </div>
+              </th>
               <th className="py-4 px-6 font-semibold tracking-wide">ORIGEM</th>
               <th className="py-4 px-6 font-semibold tracking-wide">UNIDADES</th>
               <th className="py-4 px-6 font-semibold tracking-wide">PESO TOTAL <span className="text-xs opacity-70 font-normal">(KG)</span></th>
               <th className="py-4 px-6 font-semibold tracking-wide">LOTE</th>
-              <th className="py-4 px-6 font-semibold tracking-wide">VALIDADE</th>
+              <th 
+                className="py-4 px-6 font-semibold tracking-wide cursor-pointer hover:bg-gray-200/50 transition-colors"
+                onClick={() => requestSort('validade')}
+              >
+                <div className="flex items-center gap-2 select-none">
+                  VALIDADE
+                  {sortConfig.key === 'validade' && (
+                    sortConfig.direction === 'asc' ? (
+                      <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+                    ) : (
+                      <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                    )
+                  )}
+                </div>
+              </th>
               <th className="py-4 px-6 text-center font-semibold tracking-wide">AÇÕES</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {entradas.length === 0 ? (
+            {entradasOrdenadas.length === 0 ? (
               <tr>
                 <td colSpan="8" className="py-12 text-center text-gray-500">
                   Nenhuma entrada registrada até o momento.
                 </td>
               </tr>
             ) : (
-              entradas.map((item) => (
+              entradasOrdenadas.map((item) => (
                 <tr key={item.id} className="hover:bg-amber-50/30 transition-colors">
                   <td className="py-4 px-6 text-gray-600">
                     {new Date(item.created_at).toLocaleDateString('pt-BR')}
                   </td>
-                  <td className="py-4 px-6">
+                  <td className="py-4 px-6 text-center">
                     <div className="font-medium text-gray-800">{item.produto}</div>
                     <div className="text-xs text-gray-500">{item.marca}</div>
                   </td>

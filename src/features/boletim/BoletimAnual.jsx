@@ -90,6 +90,8 @@ export default function BoletimAnual({
   const [erro, setErro] = useState("");
   const [showSemNotas, setShowSemNotas] = useState(true);
   const [disciplinasList, setDisciplinasList] = useState([]);
+  const [disciplinasSem1, setDisciplinasSem1] = useState([]);
+  const [disciplinasSem2, setDisciplinasSem2] = useState([]);
 
   // Governança: config flags do boletim
   const [govConfig, setGovConfig] = useState({
@@ -214,19 +216,30 @@ export default function BoletimAnual({
       // Buscar disciplinas correspondentes de forma dinâmica
       if (currentEscolaId) {
         try {
-          const resDisc = await api.get("/api/disciplinas", {
-            params: {
-              escola_id: currentEscolaId,
-              etapa: currentEtapa,
-              turno: currentTurno,
-            },
-          });
-          if (!cancelado && Array.isArray(resDisc.data)) {
-            const parsed = resDisc.data.map((d) => ({
-              id: d.id,
-              nome: d.nome || d.disciplina,
-            }));
-            setDisciplinasList(parsed);
+          if (resAluno?.data?.regime === "semestral" && resAluno?.data?.turma_id) {
+            const [resSem1, resSem2] = await Promise.all([
+              api.get("/api/cargas-horarias", { params: { turma_id: resAluno.data.turma_id, semestre: 1 } }),
+              api.get("/api/cargas-horarias", { params: { turma_id: resAluno.data.turma_id, semestre: 2 } })
+            ]);
+            if (!cancelado) {
+              setDisciplinasSem1((resSem1.data?.itens || []).map(d => ({ id: d.disciplina_id, nome: d.disciplina_nome })));
+              setDisciplinasSem2((resSem2.data?.itens || []).map(d => ({ id: d.disciplina_id, nome: d.disciplina_nome })));
+            }
+          } else {
+            const resDisc = await api.get("/api/disciplinas", {
+              params: {
+                escola_id: currentEscolaId,
+                etapa: currentEtapa,
+                turno: currentTurno,
+              },
+            });
+            if (!cancelado && Array.isArray(resDisc.data)) {
+              const parsed = resDisc.data.map((d) => ({
+                id: d.id,
+                nome: d.nome || d.disciplina,
+              }));
+              setDisciplinasList(parsed);
+            }
           }
         } catch (err) {
           console.error("Erro ao carregar disciplinas do aluno:", err);
@@ -440,7 +453,10 @@ export default function BoletimAnual({
               <tr>
                 <th rowSpan={3} className={s.cabDisc}>Componentes<br />Curriculares</th>
                 <th colSpan={govConfig.exibirFaltas ? 5 : 3} className={s.anoHeader}>1º SEMESTRE ({ANO_CORRENTE})</th>
+                
+                <th rowSpan={3} className={s.cabDisc} style={{ borderLeft: "2px solid #cbd5e1" }}>Componentes<br />Curriculares</th>
                 <th colSpan={govConfig.exibirFaltas ? 5 : 3} className={s.anoHeader}>2º SEMESTRE ({ANO_CORRENTE})</th>
+                
                 <th rowSpan={2} colSpan={govConfig.exibirFaltas ? 2 : 1} className={s.resultadoHeader}>Resultado Final</th>
                 <th rowSpan={3} className={s.situacaoHeader}>Situação<br />Final</th>
               </tr>
@@ -475,69 +491,90 @@ export default function BoletimAnual({
               </tr>
             </thead>
             <tbody>
-              {disciplinas.map((disc) => {
-                const bims = [1, 2, 3, 4].map((b) => findNota(disc.id, b));
-                const bimsSem1 = bims.slice(0, 2);
-                const bimsSem2 = bims.slice(2, 4);
-
-                const calcMediaSem = (arrBims) => {
-                  const hasGrade = arrBims.some(x => x.nota != null && x.nota !== "");
-                  if (!hasGrade) return "";
-                  const sum = arrBims.reduce((acc, x) => acc + (x.nota != null && x.nota !== "" ? Number(x.nota) : 0), 0);
-                  return (sum / 2).toFixed(2);
-                };
-
-                const mediaSem1 = calcMediaSem(bimsSem1);
-                const mediaSem2 = calcMediaSem(bimsSem2);
-                const faltasFin = bims.reduce((a, b) => a + (Number(b.faltas) || 0), 0);
-
-                // Resultado Final uses the average of the whole year? The user said "Aprovação só no final do ano". 
-                // We'll use the overall average (sum / 4 or depending on how many bimestres had grades)
-                const validBims = bims.filter(x => x.nota != null && x.nota !== "");
-                let mediaFin = "";
-                if (validBims.length > 0) {
-                  const sumTotal = validBims.reduce((a, b) => a + Number(b.nota), 0);
-                  mediaFin = (sumTotal / (validBims.length > 2 ? 4 : 2)).toFixed(2);
+              {(() => {
+                const maxLength = Math.max(disciplinasSem1.length, disciplinasSem2.length);
+                const zippedDisciplinas = [];
+                for (let i = 0; i < maxLength; i++) {
+                  zippedDisciplinas.push({
+                    sem1: disciplinasSem1[i] || null,
+                    sem2: disciplinasSem2[i] || null
+                  });
                 }
+                
+                return zippedDisciplinas.map((row, idx) => {
+                  const disc1 = row.sem1;
+                  const disc2 = row.sem2;
+                  
+                  // Sem 1 logic
+                  const bimsSem1 = disc1 ? [1, 2].map((b) => findNota(disc1.id, b)) : [];
+                  const mediaSem1 = bimsSem1.some(x => x.nota != null && x.nota !== "") 
+                      ? (bimsSem1.reduce((a, x) => a + Number(x.nota || 0), 0) / 2).toFixed(2) 
+                      : "";
 
-                // Situação Final
-                const getSituacaoSemestral = (bimsArr) => {
-                  const n4 = bimsArr[3]?.nota; // 4º bim (index 3)
-                  if (n4 == null || n4 === "") return <span className={s.statusCursando}>Cursando...</span>;
-                  const valid = bimsArr.map(x => Number(x.nota)).filter(n => !isNaN(n));
-                  if (valid.length < 4) return <span className={s.statusCursando}>Cursando...</span>;
-                  const avg = valid.reduce((a, b) => a + b, 0) / 4;
-                  return avg >= 5 ? <span className={s.statusAprovado}>APROVADO</span> : <span className={s.statusRecuperacao}>RECUPERAÇÃO</span>;
-                };
+                  // Sem 2 logic
+                  const bimsSem2 = disc2 ? [3, 4].map((b) => findNota(disc2.id, b)) : [];
+                  const mediaSem2 = bimsSem2.some(x => x.nota != null && x.nota !== "") 
+                      ? (bimsSem2.reduce((a, x) => a + Number(x.nota || 0), 0) / 2).toFixed(2) 
+                      : "";
 
-                return (
-                  <tr key={disc.id}>
-                    <td className={s.disc}>{disc.nome.toUpperCase()}</td>
-                    {/* 1º Semestre */}
-                    {bimsSem1.map((x, i) => (
-                      <React.Fragment key={`b1${i}`}>
-                        <td className={s.notaCell}>{x.nota != null ? fmt(Number(x.nota).toFixed(2)) : ""}</td>
-                        {govConfig.exibirFaltas && <td className={s.faltaCell}>{x.faltas != null ? x.faltas : ""}</td>}
-                      </React.Fragment>
-                    ))}
-                    <td className={s.mediaCell}>{fmt(mediaSem1)}</td>
-                    
-                    {/* 2º Semestre */}
-                    {bimsSem2.map((x, i) => (
-                      <React.Fragment key={`b2${i}`}>
-                        <td className={s.notaCell}>{x.nota != null ? fmt(Number(x.nota).toFixed(2)) : ""}</td>
-                        {govConfig.exibirFaltas && <td className={s.faltaCell}>{x.faltas != null ? x.faltas : ""}</td>}
-                      </React.Fragment>
-                    ))}
-                    <td className={s.mediaCell}>{fmt(mediaSem2)}</td>
-                    
-                    {/* Resultado Final */}
-                    <td className={s.finalCell}>{fmt(mediaFin)}</td>
-                    {govConfig.exibirFaltas && <td className={s.faltasFinalCell}>{faltasFin || ""}</td>}
-                    <td className={s.situacaoCell}>{getSituacaoSemestral(bims)}</td>
-                  </tr>
-                );
-              })}
+                  // Result / Final
+                  let mediaFin = mediaSem2;
+                  let faltasFin = disc2 ? bimsSem2.reduce((a, b) => a + (Number(b.faltas) || 0), 0) : "";
+                  let sitFinal = <span className={s.statusCursando}>Cursando...</span>;
+                  if (disc2) {
+                     const n4 = bimsSem2[1]?.nota;
+                     if (n4 != null && n4 !== "") {
+                         const valid = bimsSem2.map(x => Number(x.nota)).filter(n => !isNaN(n));
+                         if (valid.length >= 2) {
+                             const avg = valid.reduce((a, b) => a + b, 0) / 2;
+                             sitFinal = avg >= 5 ? <span className={s.statusAprovado}>APROVADO</span> : <span className={s.statusRecuperacao}>RECUPERAÇÃO</span>;
+                         }
+                     }
+                  } else {
+                     sitFinal = null;
+                     mediaFin = "";
+                  }
+
+                  return (
+                    <tr key={idx}>
+                      {/* 1º Semestre */}
+                      <td className={s.disc}>{disc1 ? disc1.nome.toUpperCase() : ""}</td>
+                      {disc1 ? bimsSem1.map((x, i) => (
+                        <React.Fragment key={`b1${i}`}>
+                          <td className={s.notaCell}>{x.nota != null ? fmt(Number(x.nota).toFixed(2)) : ""}</td>
+                          {govConfig.exibirFaltas && <td className={s.faltaCell}>{x.faltas != null ? x.faltas : ""}</td>}
+                        </React.Fragment>
+                      )) : (
+                         <React.Fragment>
+                            <td className={s.notaCell}></td>{govConfig.exibirFaltas && <td className={s.faltaCell}></td>}
+                            <td className={s.notaCell}></td>{govConfig.exibirFaltas && <td className={s.faltaCell}></td>}
+                         </React.Fragment>
+                      )}
+                      <td className={s.mediaCell}>{disc1 ? fmt(mediaSem1) : ""}</td>
+
+                      {/* 2º Semestre */}
+                      <td className={s.disc} style={{ borderLeft: "2px solid #cbd5e1" }}>{disc2 ? disc2.nome.toUpperCase() : ""}</td>
+                      {disc2 ? bimsSem2.map((x, i) => (
+                        <React.Fragment key={`b2${i}`}>
+                          <td className={s.notaCell}>{x.nota != null ? fmt(Number(x.nota).toFixed(2)) : ""}</td>
+                          {govConfig.exibirFaltas && <td className={s.faltaCell}>{x.faltas != null ? x.faltas : ""}</td>}
+                        </React.Fragment>
+                      )) : (
+                         <React.Fragment>
+                            <td className={s.notaCell}></td>{govConfig.exibirFaltas && <td className={s.faltaCell}></td>}
+                            <td className={s.notaCell}></td>{govConfig.exibirFaltas && <td className={s.faltaCell}></td>}
+                         </React.Fragment>
+                      )}
+                      <td className={s.mediaCell}>{disc2 ? fmt(mediaSem2) : ""}</td>
+                      
+                      {/* Resultado Final (for Sem 2) */}
+                      <td className={s.finalCell}>{disc2 ? fmt(mediaFin) : ""}</td>
+                      {govConfig.exibirFaltas && <td className={s.faltasFinalCell}>{disc2 ? faltasFin : ""}</td>}
+                      <td className={s.situacaoCell}>{disc2 ? sitFinal : ""}</td>
+                    </tr>
+                  );
+                });
+              })()}
             </tbody>
           </table>
         ) : (

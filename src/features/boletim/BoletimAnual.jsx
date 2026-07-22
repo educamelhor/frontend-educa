@@ -90,8 +90,6 @@ export default function BoletimAnual({
   const [erro, setErro] = useState("");
   const [showSemNotas, setShowSemNotas] = useState(true);
   const [disciplinasList, setDisciplinasList] = useState([]);
-  const [disciplinasSem1, setDisciplinasSem1] = useState([]);
-  const [disciplinasSem2, setDisciplinasSem2] = useState([]);
 
   // Governança: config flags do boletim
   const [govConfig, setGovConfig] = useState({
@@ -216,31 +214,19 @@ export default function BoletimAnual({
       // Buscar disciplinas correspondentes de forma dinâmica
       if (currentEscolaId) {
         try {
-          if (resAluno?.data?.regime === "semestral" && resAluno?.data?.turma_id) {
-            // Busca as cargas horárias dos 2 semestres
-            const [resSem1, resSem2] = await Promise.all([
-              api.get("/api/cargas-horarias", { params: { turma_id: resAluno.data.turma_id, semestre: 1 } }),
-              api.get("/api/cargas-horarias", { params: { turma_id: resAluno.data.turma_id, semestre: 2 } })
-            ]);
-            if (!cancelado) {
-              setDisciplinasSem1((resSem1.data?.itens || []).map(d => ({ id: d.disciplina_id, nome: d.disciplina_nome })));
-              setDisciplinasSem2((resSem2.data?.itens || []).map(d => ({ id: d.disciplina_id, nome: d.disciplina_nome })));
-            }
-          } else {
-            const resDisc = await api.get("/api/disciplinas", {
-              params: {
-                escola_id: currentEscolaId,
-                etapa: currentEtapa,
-                turno: currentTurno,
-              },
-            });
-            if (!cancelado && Array.isArray(resDisc.data)) {
-              const parsed = resDisc.data.map((d) => ({
-                id: d.id,
-                nome: d.nome || d.disciplina,
-              }));
-              setDisciplinasList(parsed);
-            }
+          const resDisc = await api.get("/api/disciplinas", {
+            params: {
+              escola_id: currentEscolaId,
+              etapa: currentEtapa,
+              turno: currentTurno,
+            },
+          });
+          if (!cancelado && Array.isArray(resDisc.data)) {
+            const parsed = resDisc.data.map((d) => ({
+              id: d.id,
+              nome: d.nome || d.disciplina,
+            }));
+            setDisciplinasList(parsed);
           }
         } catch (err) {
           console.error("Erro ao carregar disciplinas do aluno:", err);
@@ -449,122 +435,111 @@ export default function BoletimAnual({
       {/* ──── TABELA DE BOLETIM ──── */}
       <div className={s.tabelaContainer}>
         {aluno?.regime === "semestral" ? (
-          <>
-            {/* 1º SEMESTRE */}
-            <div style={{ padding: "8px 16px", backgroundColor: "#e2e8f0", fontWeight: "bold", borderBottom: "1px solid #cbd5e1" }}>
-              1º SEMESTRE (1º e 2º Bimestres)
-            </div>
-            <table className={s.tabela}>
-              <thead>
-                <tr>
-                  <th rowSpan={3} className={s.cabDisc}>Componentes<br />Curriculares</th>
-                  <th colSpan={govConfig.exibirFaltas ? 4 : 2} className={s.anoHeader}>{ANO_CORRENTE}</th>
-                  <th rowSpan={2} className={s.mediaCell} style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', fontWeight: 700, fontSize: '0.7rem', padding: '4px 2px', minWidth: 24 }}>Média</th>
-                </tr>
-                <tr>
-                  {[1, 2].map((i) => (
-                    <th key={`bim${i}`} colSpan={govConfig.exibirFaltas ? 2 : 1} className={s.bimestreHeader}>{i}º BIM.</th>
-                  ))}
-                </tr>
-                <tr>
-                  {[1, 2].map((i) => (
-                    <React.Fragment key={`sub${i}`}>
-                      <th className={s.rotated}>Notas</th>
-                      {govConfig.exibirFaltas && <th className={s.rotated}>Faltas</th>}
-                    </React.Fragment>
-                  ))}
-                  <th className={s.rotated}>Média</th>
-                </tr>
-              </thead>
-              <tbody>
-                {disciplinasSem1.map((disc) => {
-                  const bims = [1, 2].map((b) => findNota(disc.id, b));
-                  const sum = bims.reduce((acc, x) => acc + (x.nota != null && x.nota !== "" ? Number(x.nota) : 0), 0);
-                  const hasGrade = bims.some(x => x.nota != null && x.nota !== "");
-                  const media = hasGrade ? (sum / 2).toFixed(2) : "";
+          <table className={s.tabela}>
+            <thead>
+              <tr>
+                <th rowSpan={3} className={s.cabDisc}>Componentes<br />Curriculares</th>
+                <th colSpan={govConfig.exibirFaltas ? 5 : 3} className={s.anoHeader}>1º SEMESTRE ({ANO_CORRENTE})</th>
+                <th colSpan={govConfig.exibirFaltas ? 5 : 3} className={s.anoHeader}>2º SEMESTRE ({ANO_CORRENTE})</th>
+                <th rowSpan={2} colSpan={govConfig.exibirFaltas ? 2 : 1} className={s.resultadoHeader}>Resultado Final</th>
+                <th rowSpan={3} className={s.situacaoHeader}>Situação<br />Final</th>
+              </tr>
+              <tr>
+                {/* 1º Semestre */}
+                {[1, 2].map((i) => (
+                  <th key={`bim${i}`} colSpan={govConfig.exibirFaltas ? 2 : 1} className={s.bimestreHeader}>{i}º BIM.</th>
+                ))}
+                <th rowSpan={2} className={s.mediaCell} style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', fontWeight: 700, fontSize: '0.7rem', padding: '4px 2px', minWidth: 24 }}>Média</th>
+                
+                {/* 2º Semestre */}
+                {[3, 4].map((i) => (
+                  <th key={`bim${i}`} colSpan={govConfig.exibirFaltas ? 2 : 1} className={s.bimestreHeader}>{i}º BIM.</th>
+                ))}
+                <th rowSpan={2} className={s.mediaCell} style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', fontWeight: 700, fontSize: '0.7rem', padding: '4px 2px', minWidth: 24 }}>Média</th>
+              </tr>
+              <tr>
+                {[1, 2].map((i) => (
+                  <React.Fragment key={`sub${i}`}>
+                    <th className={s.rotated}>Notas</th>
+                    {govConfig.exibirFaltas && <th className={s.rotated}>Faltas</th>}
+                  </React.Fragment>
+                ))}
+                {[3, 4].map((i) => (
+                  <React.Fragment key={`sub${i}`}>
+                    <th className={s.rotated}>Notas</th>
+                    {govConfig.exibirFaltas && <th className={s.rotated}>Faltas</th>}
+                  </React.Fragment>
+                ))}
+                <th className={s.rotated}>Notas</th>
+                {govConfig.exibirFaltas && <th className={s.rotated}>Faltas</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {disciplinas.map((disc) => {
+                const bims = [1, 2, 3, 4].map((b) => findNota(disc.id, b));
+                const bimsSem1 = bims.slice(0, 2);
+                const bimsSem2 = bims.slice(2, 4);
 
-                  return (
-                    <tr key={disc.id}>
-                      <td className={s.disc}>{disc.nome.toUpperCase()}</td>
-                      {bims.map((x, i) => (
-                        <React.Fragment key={`b${i}`}>
-                          <td className={s.notaCell}>{x.nota != null ? fmt(Number(x.nota).toFixed(2)) : ""}</td>
-                          {govConfig.exibirFaltas && <td className={s.faltaCell}>{x.faltas != null ? x.faltas : ""}</td>}
-                        </React.Fragment>
-                      ))}
-                      <td className={s.mediaCell}>{fmt(media)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                const calcMediaSem = (arrBims) => {
+                  const hasGrade = arrBims.some(x => x.nota != null && x.nota !== "");
+                  if (!hasGrade) return "";
+                  const sum = arrBims.reduce((acc, x) => acc + (x.nota != null && x.nota !== "" ? Number(x.nota) : 0), 0);
+                  return (sum / 2).toFixed(2);
+                };
 
-            {/* 2º SEMESTRE */}
-            <div style={{ padding: "8px 16px", backgroundColor: "#e2e8f0", fontWeight: "bold", borderBottom: "1px solid #cbd5e1", marginTop: 20 }}>
-              2º SEMESTRE (3º e 4º Bimestres)
-            </div>
-            <table className={s.tabela}>
-              <thead>
-                <tr>
-                  <th rowSpan={3} className={s.cabDisc}>Componentes<br />Curriculares</th>
-                  <th colSpan={govConfig.exibirFaltas ? 4 : 2} className={s.anoHeader}>{ANO_CORRENTE}</th>
-                  <th rowSpan={2} className={s.mediaCell} style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', fontWeight: 700, fontSize: '0.7rem', padding: '4px 2px', minWidth: 24 }}>Média</th>
-                  <th rowSpan={2} colSpan={govConfig.exibirFaltas ? 2 : 1} className={s.resultadoHeader}>Resultado Final</th>
-                  <th rowSpan={3} className={s.situacaoHeader}>Situação<br />Final</th>
-                </tr>
-                <tr>
-                  {[3, 4].map((i) => (
-                    <th key={`bim${i}`} colSpan={govConfig.exibirFaltas ? 2 : 1} className={s.bimestreHeader}>{i}º BIM.</th>
-                  ))}
-                </tr>
-                <tr>
-                  {[3, 4].map((i) => (
-                    <React.Fragment key={`sub${i}`}>
-                      <th className={s.rotated}>Notas</th>
-                      {govConfig.exibirFaltas && <th className={s.rotated}>Faltas</th>}
-                    </React.Fragment>
-                  ))}
-                  <th className={s.rotated}>Média</th>
-                  <th className={s.rotated}>Notas</th>
-                  {govConfig.exibirFaltas && <th className={s.rotated}>Faltas</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {disciplinasSem2.map((disc) => {
-                  const bims = [3, 4].map((b) => findNota(disc.id, b));
-                  const sum = bims.reduce((acc, x) => acc + (x.nota != null && x.nota !== "" ? Number(x.nota) : 0), 0);
-                  const hasGrade = bims.some(x => x.nota != null && x.nota !== "");
-                  const media = hasGrade ? (sum / 2).toFixed(2) : "";
-                  const faltasFin = bims.reduce((a, b) => a + (Number(b.faltas) || 0), 0);
+                const mediaSem1 = calcMediaSem(bimsSem1);
+                const mediaSem2 = calcMediaSem(bimsSem2);
+                const faltasFin = bims.reduce((a, b) => a + (Number(b.faltas) || 0), 0);
 
-                  const getSituacaoSemestral = (bimsSem2) => {
-                    const n4 = bimsSem2[1]?.nota; // 4º bim (index 1 of bims array)
-                    if (n4 == null || n4 === "") return <span className={s.statusCursando}>Cursando...</span>;
-                    const valid = bimsSem2.map(x => Number(x.nota)).filter(n => !isNaN(n));
-                    if (valid.length < 2) return <span className={s.statusCursando}>Cursando...</span>;
-                    const avg = valid.reduce((a, b) => a + b, 0) / 2;
-                    return avg >= 5 ? <span className={s.statusAprovado}>APROVADO</span> : <span className={s.statusRecuperacao}>RECUPERAÇÃO</span>;
-                  };
+                // Resultado Final uses the average of the whole year? The user said "Aprovação só no final do ano". 
+                // We'll use the overall average (sum / 4 or depending on how many bimestres had grades)
+                const validBims = bims.filter(x => x.nota != null && x.nota !== "");
+                let mediaFin = "";
+                if (validBims.length > 0) {
+                  const sumTotal = validBims.reduce((a, b) => a + Number(b.nota), 0);
+                  mediaFin = (sumTotal / (validBims.length > 2 ? 4 : 2)).toFixed(2);
+                }
 
-                  return (
-                    <tr key={disc.id}>
-                      <td className={s.disc}>{disc.nome.toUpperCase()}</td>
-                      {bims.map((x, i) => (
-                        <React.Fragment key={`b${i}`}>
-                          <td className={s.notaCell}>{x.nota != null ? fmt(Number(x.nota).toFixed(2)) : ""}</td>
-                          {govConfig.exibirFaltas && <td className={s.faltaCell}>{x.faltas != null ? x.faltas : ""}</td>}
-                        </React.Fragment>
-                      ))}
-                      <td className={s.mediaCell}>{fmt(media)}</td>
-                      <td className={s.finalCell}>{fmt(media)}</td>
-                      {govConfig.exibirFaltas && <td className={s.faltasFinalCell}>{faltasFin || ""}</td>}
-                      <td className={s.situacaoCell}>{getSituacaoSemestral(bims)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </>
+                // Situação Final
+                const getSituacaoSemestral = (bimsArr) => {
+                  const n4 = bimsArr[3]?.nota; // 4º bim (index 3)
+                  if (n4 == null || n4 === "") return <span className={s.statusCursando}>Cursando...</span>;
+                  const valid = bimsArr.map(x => Number(x.nota)).filter(n => !isNaN(n));
+                  if (valid.length < 4) return <span className={s.statusCursando}>Cursando...</span>;
+                  const avg = valid.reduce((a, b) => a + b, 0) / 4;
+                  return avg >= 5 ? <span className={s.statusAprovado}>APROVADO</span> : <span className={s.statusRecuperacao}>RECUPERAÇÃO</span>;
+                };
+
+                return (
+                  <tr key={disc.id}>
+                    <td className={s.disc}>{disc.nome.toUpperCase()}</td>
+                    {/* 1º Semestre */}
+                    {bimsSem1.map((x, i) => (
+                      <React.Fragment key={`b1${i}`}>
+                        <td className={s.notaCell}>{x.nota != null ? fmt(Number(x.nota).toFixed(2)) : ""}</td>
+                        {govConfig.exibirFaltas && <td className={s.faltaCell}>{x.faltas != null ? x.faltas : ""}</td>}
+                      </React.Fragment>
+                    ))}
+                    <td className={s.mediaCell}>{fmt(mediaSem1)}</td>
+                    
+                    {/* 2º Semestre */}
+                    {bimsSem2.map((x, i) => (
+                      <React.Fragment key={`b2${i}`}>
+                        <td className={s.notaCell}>{x.nota != null ? fmt(Number(x.nota).toFixed(2)) : ""}</td>
+                        {govConfig.exibirFaltas && <td className={s.faltaCell}>{x.faltas != null ? x.faltas : ""}</td>}
+                      </React.Fragment>
+                    ))}
+                    <td className={s.mediaCell}>{fmt(mediaSem2)}</td>
+                    
+                    {/* Resultado Final */}
+                    <td className={s.finalCell}>{fmt(mediaFin)}</td>
+                    {govConfig.exibirFaltas && <td className={s.faltasFinalCell}>{faltasFin || ""}</td>}
+                    <td className={s.situacaoCell}>{getSituacaoSemestral(bims)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         ) : (
           <table className={s.tabela}>
             <thead>

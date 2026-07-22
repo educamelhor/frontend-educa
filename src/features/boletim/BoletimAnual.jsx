@@ -141,6 +141,8 @@ export default function BoletimAnual({
             id: alunoPreCarregado?.id || null,
             escola_id: alunoPreCarregado?.escola_id || null,
             etapa: alunoPreCarregado?.etapa || null,
+            regime: alunoPreCarregado?.regime || null,
+            turma_id: alunoPreCarregado?.turma_id || null,
           };
           setAluno(studentObj);
           setNotas(notasPreCarregadas);
@@ -148,7 +150,10 @@ export default function BoletimAnual({
           currentEscolaId = studentObj.escola_id;
           currentEtapa = studentObj.etapa;
           currentTurno = studentObj.turno;
+          currentRegime = studentObj.regime;
+          currentTurmaId = studentObj.turma_id;
         }
+
       } else {
         // Fluxo individual
         try {

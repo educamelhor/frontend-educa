@@ -116,6 +116,9 @@ export default function TurmaForm({ open, onClose, onSubmit, turma }) {
     const escolaIdLocal = localStorage.getItem('escola_id') || '';
 
     const dados = {
+      // id incluso para que ListaTurmas.handleSaveTurma pule a verificação
+      // de duplicidade para a própria turma sendo editada
+      ...(form.id ? { id: form.id } : {}),
       nome: form.nome.trim().toUpperCase(),
       etapa: form.etapa.trim().toUpperCase(),
       ano: String(form.ano).trim(),

@@ -705,7 +705,7 @@ export default function BoletimAnual({
         {/* Grid de Rankings (governança: exibirRanking) */}
         {govConfig.exibirRanking && (
           <div className={s.rankingGrid}>
-            <RankingCard icon="🏫" titulo="Ranking Turma" data={ranking?.turma} />
+            <RankingCard icon="📊" titulo="Ranking Turma" data={ranking?.turma} />
             <RankingCard icon="📚" titulo="Ranking Série" data={ranking?.serie} />
             <RankingCard icon="🕐" titulo="Ranking Turno" data={ranking?.turno} />
             <RankingCard icon="🏆" titulo="Ranking Escola" data={ranking?.escola} />
@@ -714,7 +714,7 @@ export default function BoletimAnual({
 
         {/* Observações */}
         <div className={s.observacoes}>
-          <strong>📌 Observações:</strong>
+          <strong>💡 Observações:</strong>
           <span>Procure sempre melhorar suas notas e frequência escolar!</span>
         </div>
 

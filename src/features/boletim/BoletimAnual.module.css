@@ -571,15 +571,14 @@
 
   .boletimAnualWrapper {
     background: #fff !important;
-    padding: 0 !important;
+    /* Espaço no topo feito via padding (dentro do HTML),
+       imune a conflitos entre Playwright e leitores de PDF */
+    padding: 18mm 0 0 0 !important;
     min-height: unset !important;
     height: auto !important;
-    /* Wrapper se ajusta à largura natural da tabela */
     width: fit-content !important;
     max-width: 100% !important;
-    /* Centraliza o conjunto na página */
     margin: 0 auto !important;
-    /* Evita quebra de página dentro de um boletim */
     page-break-inside: avoid;
     break-inside: avoid;
   }

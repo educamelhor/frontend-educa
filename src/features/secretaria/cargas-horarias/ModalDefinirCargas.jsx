@@ -46,7 +46,7 @@ function getCargaFromDisciplina(d) {
 // ============================================================================
 // Componente
 // ============================================================================
-export default function ModalDefinirCargas({ turno, turma, onClose }) {
+export default function ModalDefinirCargas({ turno, turma, onClose, semestre = 1 }) {
   // --------------------------------------------------------------------------
   // Estado: formulário e dados
   // --------------------------------------------------------------------------
@@ -158,6 +158,7 @@ export default function ModalDefinirCargas({ turno, turma, onClose }) {
         // Mantido aqui por compatibilidade com versões antigas.
         escola_id,
         turma_id: turma?.id,
+        semestre,
         itens: selecionadas, // array de ids (string/number)
       };
 

@@ -60,6 +60,7 @@ export default function DiarioSecretaria() {
   const [filtroBimestre,   setFiltroBimestre]   = useState("todos");
   const [filtroTurno,      setFiltroTurno]      = useState("todos");
   const [filtroTurma,      setFiltroTurma]      = useState("todas");
+  const [filtroSemestre,   setFiltroSemestre]   = useState("todos"); // 'todos', '1' ou '2'
   const [turmas,           setTurmas]           = useState([]);
   const [buscaProfessor,   setBuscaProfessor]   = useState("");
 
@@ -109,6 +110,7 @@ export default function DiarioSecretaria() {
       if (filtroBimestre !== "todos") params.bimestre = filtroBimestre;
       if (filtroTurno    !== "todos") params.turno    = filtroTurno;
       if (filtroTurma    !== "todas") params.turma_id = filtroTurma;
+      if (filtroSemestre !== "todos") params.semestre = Number(filtroSemestre);
 
       const res = await api.get("/api/secretaria/relatorios/diarios", { params });
       setDiarios(Array.isArray(res.data?.diarios) ? res.data.diarios : []);
@@ -124,7 +126,7 @@ export default function DiarioSecretaria() {
   useEffect(() => {
     fetchDiarios();
     // eslint-disable-next-line
-  }, [filtroAno, filtroBimestre, filtroTurno, filtroTurma]);
+  }, [filtroAno, filtroBimestre, filtroTurno, filtroTurma, filtroSemestre]);
 
   // ── Filtro local por professor ────────────────────────────────────────────
   const diariosFiltrados = useMemo(() => {
@@ -208,7 +210,7 @@ export default function DiarioSecretaria() {
             <label className="block text-xs font-semibold text-gray-600 mb-1.5">🏫 Turma</label>
             <select
               value={filtroTurma}
-              onChange={(e) => setFiltroTurma(e.target.value)}
+              onChange={(e) => { setFiltroTurma(e.target.value); setFiltroSemestre("todos"); }}
               className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400 transition"
             >
               <option value="todas">Todas</option>
@@ -217,6 +219,26 @@ export default function DiarioSecretaria() {
               ))}
             </select>
           </div>
+
+          {/* Semestre — aparece se a turma selecionada for semestral */}
+          {(() => {
+            const turmaSel = turmas.find(t => String(t.id) === String(filtroTurma));
+            if (!turmaSel || turmaSel.regime !== 'semestral') return null;
+            return (
+              <div className="flex-1 min-w-[130px]">
+                <label className="block text-xs font-semibold text-blue-600 mb-1.5">📅 Semestre</label>
+                <select
+                  value={filtroSemestre}
+                  onChange={(e) => setFiltroSemestre(e.target.value)}
+                  className="w-full px-3 py-2 border border-blue-300 rounded-xl text-sm bg-blue-50 focus:outline-none focus:ring-2 focus:ring-blue-400 transition font-semibold text-blue-800"
+                >
+                  <option value="todos">Todos</option>
+                  <option value="1">1º Semestre</option>
+                  <option value="2">2º Semestre</option>
+                </select>
+              </div>
+            );
+          })()}
 
           {/* Atualizar */}
           <button

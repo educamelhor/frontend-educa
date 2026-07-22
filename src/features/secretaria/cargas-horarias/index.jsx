@@ -1,9 +1,10 @@
 // src/features/secretaria/cargas-horarias/index.jsx
 // ============================================================================
 // Cargas Horárias — define quais disciplinas cada turma tem
+// Suporte a regimes: ANUAL (1 conjunto anual) e SEMESTRAL (1º e 2º semestres)
 // ============================================================================
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import api from "../../../services/api";
 import Modal from "../../../components/ui/Modal";
 import ModalDefinirCargas from "./ModalDefinirCargas";
@@ -27,6 +28,27 @@ function normalizaTexto(str) {
     .trim();
 }
 
+// ─── Componente de tabs de semestre ──────────────────────────────────────────
+function TabsSemestre({ semestre, onChange }) {
+  return (
+    <div className="flex gap-1 mb-4 bg-blue-50 rounded-xl p-1 w-fit mx-auto">
+      {[1, 2].map((s) => (
+        <button
+          key={s}
+          onClick={() => onChange(s)}
+          className={`px-6 py-2 rounded-lg text-sm font-semibold transition-all ${
+            semestre === s
+              ? "bg-blue-700 text-white shadow"
+              : "text-blue-700 hover:bg-blue-100"
+          }`}
+        >
+          📅 {s}º Semestre
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function CargasHorariasPage() {
   // ─── Estados principais ───────────────────────────────────────────────────
   const [anoLetivo, setAnoLetivo] = useState(getAnoLetivoAtual());
@@ -36,6 +58,9 @@ export default function CargasHorariasPage() {
   const [erroTurmas, setErroTurmas] = useState("");
   const [turmaSelecionada, setTurmaSelecionada] = useState(null);
 
+  // ─── Semestre ─────────────────────────────────────────────────────────────
+  const [semestreSelecionado, setSemestreSelecionado] = useState(1);
+
   const [openModalDefinir, setOpenModalDefinir] = useState(false);
   const [openModalEditar, setOpenModalEditar] = useState(false);
   const [openModalLote, setOpenModalLote] = useState(false);
@@ -44,6 +69,7 @@ export default function CargasHorariasPage() {
   const [erroCargas, setErroCargas] = useState("");
   const [cargasTurma, setCargasTurma] = useState([]);
   const [totalCarga, setTotalCarga] = useState(0);
+  const [copiando, setCopiando] = useState(false);
 
   const turnos = ["Matutino", "Vespertino", "Noturno"];
 
@@ -53,6 +79,9 @@ export default function CargasHorariasPage() {
     set.add(getAnoLetivoAtual());
     return Array.from(set).sort((a, b) => b - a);
   }, [turmas]);
+
+  // Regime da turma selecionada
+  const ehSemestral = turmaSelecionada?.regime === "semestral";
 
   // ─── Carregar turmas ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -80,6 +109,31 @@ export default function CargasHorariasPage() {
       Number(t.ano) === anoLetivo
   );
 
+  // ─── Carregar cargas da turma (por semestre) ──────────────────────────────
+  const recarregarCargasDaTurma = useCallback(async (turmaId, semestre = 1) => {
+    setLoadingCargas(true);
+    setErroCargas("");
+    try {
+      const { data } = await api.get("/api/cargas-horarias", {
+        params: { turma_id: turmaId, semestre },
+      });
+      const itens = data?.itens ?? [];
+      setCargasTurma(itens);
+      setTotalCarga(Number(data?.totalCarga) || 0);
+    } catch (err) {
+      console.error("Erro ao recarregar cargas:", err);
+      setErroCargas("Não foi possível recarregar as cargas desta turma.");
+    } finally {
+      setLoadingCargas(false);
+    }
+  }, []);
+
+  // Recarrega automaticamente quando muda o semestre
+  useEffect(() => {
+    if (!turmaSelecionada) return;
+    recarregarCargasDaTurma(turmaSelecionada.id, semestreSelecionado);
+  }, [semestreSelecionado, turmaSelecionada?.id]);
+
   // ─── Handlers ─────────────────────────────────────────────────────────────
   const handleClickTurno = (turno) => {
     setTurnoSelecionado(turno);
@@ -87,6 +141,7 @@ export default function CargasHorariasPage() {
     setCargasTurma([]);
     setTotalCarga(0);
     setErroCargas("");
+    setSemestreSelecionado(1);
   };
 
   const handleChangeAno = (novoAno) => {
@@ -95,6 +150,7 @@ export default function CargasHorariasPage() {
     setCargasTurma([]);
     setTotalCarga(0);
     setErroCargas("");
+    setSemestreSelecionado(1);
   };
 
   const handleClickTurma = async (turma) => {
@@ -102,11 +158,12 @@ export default function CargasHorariasPage() {
     setCargasTurma([]);
     setTotalCarga(0);
     setErroCargas("");
+    setSemestreSelecionado(1); // sempre começa no 1º semestre
     setLoadingCargas(true);
 
     try {
       const { data } = await api.get("/api/cargas-horarias", {
-        params: { turma_id: turma.id },
+        params: { turma_id: turma.id, semestre: 1 },
       });
       const itens = data?.itens ?? [];
       if (itens.length > 0) {
@@ -126,7 +183,7 @@ export default function CargasHorariasPage() {
   const handleModalDefinirClose = async () => {
     setOpenModalDefinir(false);
     if (!turmaSelecionada) return;
-    await recarregarCargasDaTurma(turmaSelecionada.id);
+    await recarregarCargasDaTurma(turmaSelecionada.id, semestreSelecionado);
   };
 
   const handleAbrirEditar = () => setOpenModalEditar(true);
@@ -134,26 +191,35 @@ export default function CargasHorariasPage() {
   const handleModalEditarClose = async () => {
     setOpenModalEditar(false);
     if (!turmaSelecionada) return;
-    await recarregarCargasDaTurma(turmaSelecionada.id);
+    await recarregarCargasDaTurma(turmaSelecionada.id, semestreSelecionado);
   };
 
-  async function recarregarCargasDaTurma(turmaId) {
-    setLoadingCargas(true);
-    setErroCargas("");
+  // ─── Copiar do 1º para o 2º semestre ─────────────────────────────────────
+  const handleCopiarSemestre = async () => {
+    if (!turmaSelecionada) return;
+    const de = semestreSelecionado;
+    const para = de === 1 ? 2 : 1;
+    const confirm = window.confirm(
+      `Deseja copiar as cargas do ${de}º semestre para o ${para}º semestre?\nAs cargas existentes no ${para}º semestre serão substituídas.`
+    );
+    if (!confirm) return;
+
+    setCopiando(true);
     try {
-      const { data } = await api.get("/api/cargas-horarias", {
-        params: { turma_id: turmaId },
+      await api.post("/api/cargas-horarias/copiar-semestre", {
+        turma_ids: [turmaSelecionada.id],
+        de,
+        para,
       });
-      const itens = data?.itens ?? [];
-      setCargasTurma(itens);
-      setTotalCarga(Number(data?.totalCarga) || 0);
+      alert(`✅ Cargas copiadas para o ${para}º semestre com sucesso!`);
+      // Muda para o semestre destino e recarrega
+      setSemestreSelecionado(para);
     } catch (err) {
-      console.error("Erro ao recarregar cargas:", err);
-      setErroCargas("Não foi possível recarregar as cargas desta turma.");
+      alert(err?.response?.data?.message || "Erro ao copiar semestre.");
     } finally {
-      setLoadingCargas(false);
+      setCopiando(false);
     }
-  }
+  };
 
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
@@ -166,10 +232,7 @@ export default function CargasHorariasPage() {
         Cargas Horárias
       </h1>
 
-
       {/* ── Conteúdo principal ─────────────────────────────────────────────── */}
-
-      {/* ── Cargas por Turma ────────────────────────────────────────────────── */}
       <>
         {/* Seletor de Ano Letivo */}
         <div className="flex justify-center items-center gap-3 mb-6">
@@ -239,9 +302,12 @@ export default function CargasHorariasPage() {
                     className={`bg-gradient-to-b from-blue-200 to-blue-50 rounded-md px-3 py-2 shadow-md cursor-pointer hover:shadow-xl transition-transform hover:scale-105 text-center font-bold text-blue-900 text-sm whitespace-nowrap ${
                       turmaSelecionada?.id === turma.id ? "ring-2 ring-green-600" : ""
                     }`}
-                    title={`Turma ${turma.turma}`}
+                    title={`Turma ${turma.turma}${turma.regime === 'semestral' ? ' 📅 Semestral' : ''}`}
                   >
                     {turma.turma}
+                    {turma.regime === "semestral" && (
+                      <span className="block text-xs text-blue-600 font-normal mt-0.5">📅</span>
+                    )}
                   </div>
                 ))
               ) : (
@@ -257,11 +323,28 @@ export default function CargasHorariasPage() {
         {turmaSelecionada && !openModalDefinir && (
           <div className="bg-white rounded-lg shadow-md p-4">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-semibold text-blue-800">
-                Disciplinas da Turma {turmaSelecionada.turma}
-              </h2>
+              <div>
+                <h2 className="text-2xl font-semibold text-blue-800">
+                  Disciplinas da Turma {turmaSelecionada.turma}
+                </h2>
+                {ehSemestral && (
+                  <span className="text-sm text-blue-600 font-medium flex items-center gap-1 mt-0.5">
+                    📅 Regime Semestral
+                  </span>
+                )}
+              </div>
 
-              <div className="flex gap-2">
+              <div className="flex gap-2 items-center">
+                {ehSemestral && (
+                  <button
+                    onClick={handleCopiarSemestre}
+                    disabled={copiando}
+                    className="px-3 py-2 rounded bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold transition"
+                    title={`Copiar cargas deste semestre para o ${semestreSelecionado === 1 ? '2º' : '1º'} semestre`}
+                  >
+                    {copiando ? "Copiando…" : `📋 Copiar para ${semestreSelecionado === 1 ? '2º' : '1º'} Sem.`}
+                  </button>
+                )}
                 <button
                   onClick={handleAbrirEditar}
                   className="px-4 py-2 rounded bg-green-600 hover:bg-green-700 text-white"
@@ -276,6 +359,14 @@ export default function CargasHorariasPage() {
                 )}
               </div>
             </div>
+
+            {/* Tabs de Semestre — apenas para turmas semestrais */}
+            {ehSemestral && (
+              <TabsSemestre
+                semestre={semestreSelecionado}
+                onChange={setSemestreSelecionado}
+              />
+            )}
 
             {loadingCargas ? (
               <p className="text-center text-gray-500">Carregando…</p>
@@ -304,7 +395,10 @@ export default function CargasHorariasPage() {
               </div>
             ) : (
               <div className="p-3 border rounded bg-gray-50 text-gray-600">
-                Nenhuma disciplina cadastrada para esta turma ainda.
+                {ehSemestral
+                  ? `Nenhuma disciplina cadastrada para o ${semestreSelecionado}º semestre desta turma.`
+                  : "Nenhuma disciplina cadastrada para esta turma ainda."
+                }
               </div>
             )}
           </div>
@@ -317,6 +411,7 @@ export default function CargasHorariasPage() {
               turno={turnoSelecionado}
               turma={turmaSelecionada}
               onClose={handleModalDefinirClose}
+              semestre={semestreSelecionado}
             />
           )}
         </Modal>
@@ -329,6 +424,7 @@ export default function CargasHorariasPage() {
                 turma={turmaSelecionada}
                 turno={turnoSelecionado}
                 onSaved={handleModalEditarClose}
+                semestre={semestreSelecionado}
               />
             </div>
           )}

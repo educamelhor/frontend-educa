@@ -20,6 +20,7 @@ export default function TurmaForm({ open, onClose, onSubmit, turma }) {
     ano: anoAtual,
     turno: '',
     serie: '',
+    regime: 'anual',
   });
 
   const [errors, setErrors] = useState({});
@@ -65,6 +66,7 @@ export default function TurmaForm({ open, onClose, onSubmit, turma }) {
         ano: turma.ano ?? anoAtual,
         turno: turma.turno?.toUpperCase() ?? '',
         serie: turma.serie ?? '',
+        regime: turma.regime ?? 'anual',
       });
     } else {
       setForm({
@@ -73,7 +75,8 @@ export default function TurmaForm({ open, onClose, onSubmit, turma }) {
         etapa: '',
         ano: anoAtual,
         turno: '',
-        serie: ''
+        serie: '',
+        regime: 'anual',
       });
       setErrors({});
     }
@@ -118,6 +121,7 @@ export default function TurmaForm({ open, onClose, onSubmit, turma }) {
       ano: String(form.ano).trim(),
       turno: form.turno.trim().toUpperCase(),
       serie: form.serie.trim().toUpperCase(),
+      regime: form.regime || 'anual',
       // escola_id incluso apenas para a verificação de duplicidade cliente-side antes do POST
       _escola_id_local: escolaIdLocal,
     };
@@ -227,6 +231,31 @@ export default function TurmaForm({ open, onClose, onSubmit, turma }) {
           />
         )}
         {errors.serie && <p className="text-red-600 text-sm">{errors.serie}</p>}
+      </div>
+
+      {/* Regime */}
+      <div>
+        <label className="block mb-1 font-medium text-gray-700">Regime Letivo</label>
+        <div className="flex gap-3">
+          {[
+            { value: 'anual',     label: '🗓️ Anual',     desc: 'Grade igual nos 2 semestres' },
+            { value: 'semestral', label: '📅 Semestral', desc: 'Grade diferente por semestre' },
+          ].map(op => (
+            <button
+              key={op.value}
+              type="button"
+              onClick={() => setForm(f => ({ ...f, regime: op.value }))}
+              className={`flex-1 flex flex-col items-center gap-1 px-4 py-3 rounded-lg border-2 transition text-sm font-semibold ${
+                form.regime === op.value
+                  ? 'border-blue-600 bg-blue-50 text-blue-800'
+                  : 'border-gray-200 bg-white text-gray-600 hover:border-blue-300'
+              }`}
+            >
+              <span className="text-base">{op.label}</span>
+              <span className="text-xs font-normal text-gray-500">{op.desc}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Botões */}

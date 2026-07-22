@@ -65,6 +65,7 @@ export default function ListaCargasHorarias({
   turma = null, // { id, turma, ... }
   turno = null, // string opcional, ajuda a filtrar disciplinas do turno
   onSaved, // callback opcional após salvar no modo turma
+  semestre = 1, // 1 ou 2 (usado quando turma.regime === 'semestral')
 }) {
   // ==========================================================================
   // ESTADOS — MODO GERAL
@@ -153,9 +154,9 @@ export default function ListaCargasHorarias({
         }));
         setDisciplinas(normalizadas);
 
-        // 2) Cargas já definidas para a turma
+        // 2) Cargas já definidas para a turma (filtradas por semestre)
         const { data: dataCargas } = await api.get("/api/cargas-horarias", {
-          params: { turma_id: turma.id },
+          params: { turma_id: turma.id, semestre },
         });
         const itens = Array.isArray(dataCargas?.itens) ? dataCargas.itens : [];
         const ids = itens.map((it) => asId(it.disciplina_id));
@@ -172,7 +173,7 @@ export default function ListaCargasHorarias({
     }
     loadTurma();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [turma?.id, turno, escola_id]);
+  }, [turma?.id, turno, escola_id, semestre]);
 
   // ==========================================================================
   // AÇÕES — MODO GERAL
@@ -266,6 +267,7 @@ export default function ListaCargasHorarias({
         // mas mantemos por compatibilidade
         escola_id,
         turma_id: turma?.id,
+        semestre,
         itens,
       };
       const { data } = await api.post("/api/cargas-horarias/definir", payload);

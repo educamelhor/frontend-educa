@@ -572,15 +572,26 @@
   .boletimAnualWrapper {
     background: #fff !important;
     padding: 0 !important;
-    /* Remove min-height para evitar página em branco após o conteúdo */
     min-height: unset !important;
     height: auto !important;
-    /* Centraliza na página A4 */
+    /* Wrapper se ajusta à largura natural da tabela */
+    width: fit-content !important;
     max-width: 100% !important;
-    margin: 0 !important;
+    /* Centraliza o conjunto na página */
+    margin: 0 auto !important;
     /* Evita quebra de página dentro de um boletim */
     page-break-inside: avoid;
     break-inside: avoid;
+  }
+
+  /* Todos os banners acompanham a largura do wrapper (= largura da tabela) */
+  .cabecalho,
+  .dadosAluno,
+  .tabelaContainer,
+  .rodape,
+  .observacoes {
+    width: 100% !important;
+    box-sizing: border-box !important;
   }
 
   /* ── Cabeçalho compactado ── */

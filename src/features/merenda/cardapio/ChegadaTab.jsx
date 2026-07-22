@@ -182,8 +182,11 @@ export default function ChegadaTab() {
     if (sortConfig.key === 'produto') {
       valA = (a.produto || "").toLowerCase();
       valB = (b.produto || "").toLowerCase();
+      const compare = valA.localeCompare(valB, 'pt-BR', { sensitivity: 'base' });
+      return sortConfig.direction === 'asc' ? compare : -compare;
     }
     
+    // Fallback normal para datas (como created_at, validade) e outros
     if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
     if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
     return 0;

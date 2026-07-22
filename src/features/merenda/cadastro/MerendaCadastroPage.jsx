@@ -133,9 +133,8 @@ export default function MerendaCadastroPage() {
   const produtosOrdenados = [...produtosFiltrados].sort((a, b) => {
     const valA = (a.produto || "").toLowerCase();
     const valB = (b.produto || "").toLowerCase();
-    if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
-    if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
-    return 0;
+    const compare = valA.localeCompare(valB, 'pt-BR', { sensitivity: 'base' });
+    return sortConfig.direction === 'asc' ? compare : -compare;
   });
 
   const requestSort = () => {

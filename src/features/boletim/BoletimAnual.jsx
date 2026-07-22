@@ -298,15 +298,22 @@ export default function BoletimAnual({
   // Helpers
   // ───────────────────────────────────────────────────────────────
   const findNota = (discId, bim) => {
-    const targetDisc = disciplinas.find((d) => d.id === discId);
-    if (!targetDisc) return {};
-    const targetNameNorm = normalizeName(targetDisc.nome);
+    // Para turmas semestrais, disciplinas vêm de disciplinasSem1/Sem2, não de 'disciplinas'.
+    // Monta uma lista combinada de todas as fontes para resolver o nome.
+    const todasAsFontes = [
+      ...disciplinas,
+      ...disciplinasSem1,
+      ...disciplinasSem2,
+    ];
+    const targetDisc = todasAsFontes.find((d) => d.id === discId);
+    const targetNameNorm = targetDisc ? normalizeName(targetDisc.nome) : null;
 
     return (
       notas.find((n) => {
-        const noteNameNorm = normalizeName(n.disciplina);
-        const matchName = noteNameNorm === targetNameNorm;
         const matchId = n.disciplina_id !== undefined && Number(n.disciplina_id) === Number(discId);
+        const matchName = targetNameNorm
+          ? normalizeName(n.disciplina) === targetNameNorm
+          : false;
 
         return (
           (matchId || matchName) &&

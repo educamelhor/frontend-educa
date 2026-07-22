@@ -148,8 +148,10 @@
 
 /* Cabeçalho da tabela */
 .cabDisc {
-  width: 18%;
-  padding: 0.6rem;
+  width: 12%;
+  min-width: 80px;
+  max-width: 130px;
+  padding: 0.6rem 0.4rem;
   background: linear-gradient(135deg, #f8fafc, #f1f5f9);
   font-weight: 700;
   text-align: center;
@@ -210,23 +212,26 @@
   color: #fff;
   text-align: center;
   vertical-align: middle;
-  padding: 0.35rem 0.3rem;
+  padding: 0.35rem 0.2rem;
   font-weight: 700;
-  font-size: 0.65rem;
-  width: 60px;
-  max-width: 70px;
+  font-size: 0.6rem;
+  width: 46px;
+  max-width: 50px;
 }
 
 /* ─── Corpo da Tabela ──────────────────────────────────────────────── */
 .disc {
-  padding: 0.4rem 0.6rem;
+  padding: 0.4rem 0.4rem;
   text-align: left;
   vertical-align: middle;
   font-weight: 600;
   color: #1e293b;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   background: #fafbfc;
   white-space: nowrap;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .notaCell {
@@ -270,11 +275,11 @@
 
 .situacaoCell {
   font-weight: 700;
-  font-size: 0.65rem;
+  font-size: 0.6rem;
   background: linear-gradient(135deg, #f5f3ff, #ede9fe);
-  width: 60px;
-  max-width: 70px;
-  padding: 0.2rem 0.15rem;
+  width: 46px;
+  max-width: 50px;
+  padding: 0.2rem 0.1rem;
 }
 
 /* Zebra striping suave */
@@ -665,12 +670,30 @@
 
   .cabDisc {
     font-size: 6.5pt !important;
-    min-width: 90px !important;
-    max-width: 120px !important;
+    width: 11% !important;
+    min-width: 75px !important;
+    max-width: 110px !important;
+    padding: 2px 3px !important;
   }
 
   .disc {
     font-size: 6.5pt !important;
+    max-width: 110px !important;
+    padding: 2px 3px !important;
+  }
+
+  .situacaoHeader {
+    width: 42px !important;
+    max-width: 46px !important;
+    font-size: 5.5pt !important;
+    padding: 2px 1px !important;
+  }
+
+  .situacaoCell {
+    width: 42px !important;
+    max-width: 46px !important;
+    font-size: 5.5pt !important;
+    padding: 2px 1px !important;
   }
 
   /* Esconde sidebar e header global */

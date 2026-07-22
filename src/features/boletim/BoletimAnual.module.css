@@ -566,7 +566,7 @@
 @media print {
   @page {
     size: A4 landscape;
-    margin: 22mm 18mm 8mm 18mm; /* top right bottom left — igual ao Playwright */
+    margin: 0; /* Playwright controla as margens via page.pdf() — sem conflito */
   }
 
   .boletimAnualWrapper {

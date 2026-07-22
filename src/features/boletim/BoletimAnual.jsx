@@ -465,13 +465,13 @@ export default function BoletimAnual({
                 {[1, 2].map((i) => (
                   <th key={`bim${i}`} colSpan={govConfig.exibirFaltas ? 2 : 1} className={s.bimestreHeader}>{i}º BIM.</th>
                 ))}
-                <th rowSpan={2} className={s.mediaCell} style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', fontWeight: 700, fontSize: '0.7rem', padding: '4px 2px', minWidth: 24 }}>Média</th>
+                <th rowSpan={2} className={s.mediaCell} style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', fontWeight: 700, fontSize: '0.7rem', padding: '4px 2px', width: '28px', maxWidth: '28px' }}>Média</th>
                 
                 {/* 2º Semestre */}
                 {[3, 4].map((i) => (
                   <th key={`bim${i}`} colSpan={govConfig.exibirFaltas ? 2 : 1} className={s.bimestreHeader}>{i}º BIM.</th>
                 ))}
-                <th rowSpan={2} className={s.mediaCell} style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', fontWeight: 700, fontSize: '0.7rem', padding: '4px 2px', minWidth: 24 }}>Média</th>
+                <th rowSpan={2} className={s.mediaCell} style={{ writingMode: 'vertical-rl', transform: 'rotate(180deg)', fontWeight: 700, fontSize: '0.7rem', padding: '4px 2px', width: '28px', maxWidth: '28px' }}>Média</th>
               </tr>
               <tr>
                 {[1, 2].map((i) => (

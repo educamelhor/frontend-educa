@@ -561,7 +561,7 @@
 @media print {
   @page {
     size: A4 landscape;
-    margin: 8mm;
+    margin: 8mm 15mm; /* mais margem lateral = mais espaço elegante na tabela */
   }
 
   .boletimAnualWrapper {
@@ -578,34 +578,79 @@
     break-inside: avoid;
   }
 
+  /* ── Cabeçalho compactado ── */
   .cabecalho {
     box-shadow: none !important;
     border: 1px solid #ddd !important;
     border-radius: 0 !important;
+    padding: 0.4rem 1rem !important;   /* de 1.25rem para 0.4rem */
+    margin-bottom: 0.4rem !important;
+    gap: 0.75rem !important;
   }
 
   .cabecalho::before {
     display: none !important;
   }
 
+  .cabecalhoLogo {
+    height: 2.6rem !important;  /* de 5rem para 2.6rem */
+  }
+
+  .cabecalhoLogoSmall {
+    height: 2rem !important;   /* de 3.5rem para 2rem */
+  }
+
+  .cabecalhoTexto div {
+    font-size: 0.65rem !important;
+    line-height: 1.2 !important;
+  }
+
+  .cabecalhoTexto div:first-child {
+    font-size: 0.7rem !important;
+  }
+
+  .anoLetivoBadge {
+    font-size: 0.65rem !important;
+    padding: 0.2rem 0.7rem !important;
+    margin-top: 0.2rem !important;
+  }
+
+  /* ── Dados do Aluno compactados ── */
+  .dadosAluno {
+    padding: 0.35rem 0.75rem !important;
+    margin-bottom: 0.4rem !important;
+    gap: 0.3rem !important;
+    flex-wrap: nowrap !important;
+  }
+
+  /* ── Tabela ── */
   .tabelaContainer {
     box-shadow: none !important;
     border-radius: 0 !important;
   }
 
+  /* ── Rodapé (cards) compactado ── */
   .rodape {
     box-shadow: none !important;
     border-radius: 0 !important;
-    margin-bottom: 0 !important;  /* elimina espaço vazio que gera página em branco */
+    margin-bottom: 0 !important;
+    padding: 0.4rem 0.75rem !important;
+    gap: 0.5rem !important;
   }
 
-  .btnImprimir {
-    display: none !important;
+  .rankingCard {
+    padding: 0.25rem 0.5rem !important;
+    border-radius: 6px !important;
+    min-width: unset !important;
   }
 
   .rankingCard:hover {
     transform: none !important;
     box-shadow: none !important;
+  }
+
+  .btnImprimir {
+    display: none !important;
   }
 
   body {
@@ -615,14 +660,17 @@
   .tabela th,
   .tabela td {
     padding: 2px !important;
+    font-size: 7pt !important;
   }
 
-  .cabecalhoLogo {
-    height: 4rem;
+  .cabDisc {
+    font-size: 6.5pt !important;
+    min-width: 90px !important;
+    max-width: 120px !important;
   }
 
-  .cabecalhoLogoSmall {
-    height: 2.5rem;
+  .disc {
+    font-size: 6.5pt !important;
   }
 
   /* Esconde sidebar e header global */

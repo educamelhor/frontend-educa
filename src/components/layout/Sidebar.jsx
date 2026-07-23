@@ -459,6 +459,32 @@ export default function Sidebar({ isOpen, onClose }) {
               <Cog6ToothIcon className="h-5 w-5 mr-2" style={{ color: isActive('/plataforma/governanca') ? '#a78bfa' : undefined }} />
               <span className="flex-1 text-left" style={{ fontWeight: 600 }}>Governança</span>
             </Link>
+
+            {/* LINK: Plataforma - Banco Master */}
+            <Link
+              to="/plataforma/banco-master"
+              className={getMainLinkClasses('/plataforma/banco-master')}
+              style={{
+                marginTop: 8,
+                background: isActive('/plataforma/banco-master')
+                  ? 'linear-gradient(90deg, rgba(124,58,237,0.25), transparent)'
+                  : undefined,
+                borderTop: '1px solid rgba(124,58,237,0.2)',
+                paddingTop: 8,
+              }}
+            >
+              <span className="h-5 w-5 mr-2 flex items-center justify-center" style={{ fontSize: '1rem' }}>⭐</span>
+              <span className="flex-1 text-left" style={{ fontWeight: 700, color: isActive('/plataforma/banco-master') ? '#a78bfa' : undefined }}>Banco Master</span>
+              <span style={{
+                fontSize: '0.55rem',
+                fontWeight: 800,
+                background: 'linear-gradient(135deg, #7c3aed, #a855f7)',
+                color: '#fff',
+                padding: '2px 6px',
+                borderRadius: '8px',
+                letterSpacing: '0.5px',
+              }}>PREMIUM</span>
+            </Link>
           </>
         ) : (
           <>

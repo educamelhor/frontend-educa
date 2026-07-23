@@ -77,6 +77,7 @@ import PlataformaSuporte from "./features/plataforma/PlataformaSuporte.jsx";
 import PlataformaGovernanca from "./features/plataforma/PlataformaGovernanca.jsx";
 import PlataformaDashboard from "./features/plataforma/PlataformaDashboard.jsx";
 import PlataformaModulos from "./features/plataforma/PlataformaModulos.jsx";
+import BancoMaster from "./features/plataforma/BancoMaster.jsx";
 import BoletimTurmas from "./features/impressao/BoletimTurmas";
 import ListasImpressao from "./features/impressao/ListasImpressao";
 import DocumentosImpressao from "./features/impressao/DocumentosImpressao";
@@ -308,6 +309,7 @@ export default function App() {
           <Route path="/plataforma/usage/:id"      element={<RequireCeo><UsageEscolaDetalhe /></RequireCeo>} />
           <Route path="/plataforma/suporte"        element={<RequireCeo><PlataformaSuporte /></RequireCeo>} />
           <Route path="/plataforma/governanca"     element={<RequireCeo><PlataformaGovernanca /></RequireCeo>} />
+          <Route path="/plataforma/banco-master"   element={<RequireCeo><BancoMaster /></RequireCeo>} />
         </Route>
 
         {/* Rotas protegidas do SISTEMA ESCOLAR */}

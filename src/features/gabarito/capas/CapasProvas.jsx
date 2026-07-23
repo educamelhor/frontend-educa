@@ -167,9 +167,12 @@ export default function CapasProvas() {
   // Filtra por Bimestre, Turno, Ano e Série (via lookup nas turmas da escola)
   const avaliacoesFiltradas = React.useMemo(() => {
     return avaliacoes.filter(av => {
-      // Filtro por bimestre: só filtra se AMBOS estão definidos
+      // Filtro por bimestre: s\u00f3 filtra se AMBOS est\u00e3o definidos
+      // O BD pode armazenar bimestre como n\u00famero (2) ou como texto ("2º Bimestre")
+      // parseInt("2º Bimestre") = 2, parseInt("2") = 2 — funciona para ambos os formatos
       if (form.bimestre && av.bimestre) {
-        if (Number(av.bimestre) !== Number(form.bimestre)) return false;
+        const avBim = parseInt(String(av.bimestre), 10);
+        if (!isNaN(avBim) && avBim !== Number(form.bimestre)) return false;
       }
 
       // Filtro por turno: case-insensitive; se o gabarito não tem turno, deixa passar

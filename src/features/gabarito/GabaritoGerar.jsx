@@ -328,6 +328,7 @@ export default function GabaritoGerar() {
         disciplinas_config: discConfig.length > 0 ? discConfig : null,
         turmas_ids: turmaIds && turmaIds.length > 0 ? turmaIds : null,
         turno: turnoSel || null,
+        data_aplicacao: dataAplicacao || null,
       };
 
       const avalResp = await api.post("/gabarito-avaliacoes", avaliacaoPayload);

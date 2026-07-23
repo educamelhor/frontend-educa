@@ -135,11 +135,15 @@ export default function CapasProvas() {
     }
   }, []);
 
-  const loadTodasTurmas = useCallback(async () => {
+  const loadTodasTurmas = useCallback(async (ano) => {
     try {
-      const res = await fetch(`${API}/api/turmas`, { headers: authH() });
+      // Filtra pelo ano letivo para não buscar turmas de outros anos
+      const url = ano
+        ? `${API}/api/turmas?ano=${ano}`
+        : `${API}/api/turmas`;
+      const res = await fetch(url, { headers: authH() });
       const data = await res.json();
-      setTodasTurmas(data || []);
+      setTodasTurmas(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Erro ao carregar turmas da escola', err);
     }
@@ -186,7 +190,12 @@ export default function CapasProvas() {
         const idsGabarito = av.turmas_ids.map(Number);
         const turmasDoGabarito = todasTurmas.filter(t => idsGabarito.includes(Number(t.id)));
         const serieUpper = form.serie.toUpperCase().trim();
-        const temSerie = turmasDoGabarito.some(t => (t.nome || '').toUpperCase().includes(serieUpper));
+        // A API retorna o nome da turma no campo 'turma' (alias de nome) e a série no campo 'serie'
+        const temSerie = turmasDoGabarito.some(t => {
+          const nomeTurma = (t.turma || t.nome || '').toUpperCase();
+          const serieTurma = (t.serie || '').toUpperCase();
+          return nomeTurma.includes(serieUpper) || serieTurma.includes(serieUpper);
+        });
         if (!temSerie) return false;
       }
 
@@ -205,7 +214,7 @@ export default function CapasProvas() {
   }, [avaliacoesFiltradas, form.avaliacao_id]);
 
   useEffect(() => { loadAvaliacoes(); }, [loadAvaliacoes]);
-  useEffect(() => { loadTodasTurmas(); }, [loadTodasTurmas]);
+  useEffect(() => { loadTodasTurmas(form.ano); }, [loadTodasTurmas, form.ano]);
   useEffect(() => { loadTurmas(form.avaliacao_id); }, [form.avaliacao_id, loadTurmas]);
 
   const { logoEsquerda, logoDireita } = useEscolaLogos();

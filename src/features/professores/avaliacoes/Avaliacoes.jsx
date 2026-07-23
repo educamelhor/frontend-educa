@@ -1255,8 +1255,8 @@ export default function Avaliacoes() {
 
       {/* ───────────────── GRID DE AVALIAÇÃO ───────────────── */}
       {selecaoCompleta && plano && (
-        <section className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-200 flex flex-col relative transition-all duration-500 ease-in-out">
-            <div className={`${diarioFechado ? 'bg-emerald-800' : 'bg-slate-800'} text-white p-6 flex items-center justify-between transition-colors duration-300`}>
+        <section className="bg-white rounded-2xl shadow-xl border border-gray-200 flex flex-col relative transition-all duration-500 ease-in-out">
+            <div className={`${diarioFechado ? 'bg-emerald-800' : 'bg-slate-800'} text-white p-6 flex items-center justify-between transition-colors duration-300 rounded-t-2xl`}>
                 <div>
                    <h3 className="text-xl font-bold flex items-center gap-2">
                       {diarioFechado ? (
@@ -1390,7 +1390,7 @@ export default function Avaliacoes() {
                        </div>
                     </div>
                 ) : (
-                    <div className="overflow-x-auto overflow-y-auto max-h-[600px] w-full p-0">
+                    <div className="overflow-x-auto w-full p-0">
                         <table className="w-full text-left border-collapse whitespace-nowrap">
                             <thead className="bg-slate-100 text-slate-600 sticky top-0 z-20 shadow-sm shadow-slate-200">
                                 <tr>
@@ -1532,7 +1532,7 @@ export default function Avaliacoes() {
                 )}
             </div>
 
-            <div className="bg-slate-50 border-t border-slate-200 p-4 flex items-center justify-between text-xs text-slate-500 font-medium">
+            <div className="bg-slate-50 border-t border-slate-200 p-4 flex items-center justify-between text-xs text-slate-500 font-medium rounded-b-2xl">
                 {diarioFechado ? (
                   <span className="flex items-center gap-1.5 text-emerald-600 font-bold">
                     <LockClosedIcon className="w-4 h-4" /> Diário fechado. Notas exportadas para o boletim.

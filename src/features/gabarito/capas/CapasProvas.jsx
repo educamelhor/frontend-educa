@@ -123,6 +123,7 @@ export default function CapasProvas() {
 
   const [avaliacoes, setAvaliacoes] = useState([]);
   const [turmas, setTurmas] = useState([]);
+  const [todasTurmas, setTodasTurmas] = useState([]); // todas as turmas da escola
 
   const loadAvaliacoes = useCallback(async () => {
     try {
@@ -131,6 +132,16 @@ export default function CapasProvas() {
       setAvaliacoes(data || []);
     } catch (err) {
       console.error('Erro ao carregar avaliações', err);
+    }
+  }, []);
+
+  const loadTodasTurmas = useCallback(async () => {
+    try {
+      const res = await fetch(`${API}/api/turmas`, { headers: authH() });
+      const data = await res.json();
+      setTodasTurmas(data || []);
+    } catch (err) {
+      console.error('Erro ao carregar turmas da escola', err);
     }
   }, []);
 
@@ -148,7 +159,45 @@ export default function CapasProvas() {
     }
   }, []);
 
+  // Filtragem inteligente de avaliações (Opção B)
+  // Filtra por Bimestre, Turno, Ano e Série (via lookup nas turmas da escola)
+  const avaliacoesFiltradas = React.useMemo(() => {
+    return avaliacoes.filter(av => {
+      // Filtro por bimestre
+      if (form.bimestre && av.bimestre && Number(av.bimestre) !== Number(form.bimestre)) return false;
+
+      // Filtro por turno (apenas se o gabarito tem turno definido)
+      if (form.turno && av.turno && av.turno !== form.turno) return false;
+
+      // Filtro por ano letivo (usando o ano de criação do gabarito)
+      if (form.ano && av.created_at) {
+        const anoGabarito = new Date(av.created_at).getFullYear();
+        if (anoGabarito !== Number(form.ano)) return false;
+      }
+
+      // Filtro por série (Opção B): ao menos uma turma vinculada deve pertencer à série selecionada
+      if (form.serie && todasTurmas.length > 0 && av.turmas_ids && av.turmas_ids.length > 0) {
+        const turmasDoGabarito = todasTurmas.filter(t => av.turmas_ids.includes(t.id));
+        const temSerie = turmasDoGabarito.some(t => (t.nome || '').toUpperCase().includes(form.serie.toUpperCase()));
+        if (!temSerie) return false;
+      }
+
+      return true;
+    });
+  }, [avaliacoes, todasTurmas, form.bimestre, form.turno, form.ano, form.serie]);
+
+  // Se a avaliação selecionada sair da lista filtrada, resetar
+  useEffect(() => {
+    if (form.avaliacao_id && avaliacoesFiltradas.length > 0) {
+      const ainda = avaliacoesFiltradas.some(av => String(av.id) === String(form.avaliacao_id));
+      if (!ainda) {
+        setForm(f => ({ ...f, avaliacao_id: '', turma_id: '' }));
+      }
+    }
+  }, [avaliacoesFiltradas, form.avaliacao_id]);
+
   useEffect(() => { loadAvaliacoes(); }, [loadAvaliacoes]);
+  useEffect(() => { loadTodasTurmas(); }, [loadTodasTurmas]);
   useEffect(() => { loadTurmas(form.avaliacao_id); }, [form.avaliacao_id, loadTurmas]);
 
   const { logoEsquerda, logoDireita } = useEscolaLogos();
@@ -982,9 +1031,13 @@ export default function CapasProvas() {
                       setForm(f => ({ ...f, avaliacao_id: e.target.value, turma_id: '' }));
                     }}>
                       <option value="">-- Nenhuma (Capa Avulsa) --</option>
-                      {avaliacoes.map(av => (
-                        <option key={av.id} value={av.id}>{av.titulo} ({av.ano})</option>
-                      ))}
+                      {avaliacoesFiltradas.length === 0 && (form.serie || form.turno || form.bimestre) ? (
+                        <option value="" disabled>Nenhum gabarito encontrado para os filtros selecionados</option>
+                      ) : (
+                        avaliacoesFiltradas.map(av => (
+                          <option key={av.id} value={av.id}>{av.titulo} ({new Date(av.created_at).getFullYear()})</option>
+                        ))
+                      )}
                     </select>
                   </div>
                   {form.avaliacao_id && (

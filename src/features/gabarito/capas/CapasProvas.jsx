@@ -1057,20 +1057,19 @@ export default function CapasProvas() {
                       )}
                     </select>
                     {/* DEBUG TEMPORÁRIO */}
-                    <div style={{ fontSize: 10, color: '#666', marginTop: 4, lineHeight: 1.6, background: '#f8f8f8', padding: '4px 6px', borderRadius: 4 }}>
-                      📊 Total: {avaliacoes.length} | Filtrados: {avaliacoesFiltradas.length} | Turmas: {todasTurmas.length}
-                      {avaliacoes.length > 0 && (() => {
-                        const av = avaliacoes[0];
-                        const bimOk = !(form.bimestre && av.bimestre && Number(av.bimestre) !== Number(form.bimestre));
-                        const turnoOk = !(form.turno && av.turno && av.turno.toUpperCase().trim() !== form.turno.toUpperCase().trim());
-                        const anoOk = !(form.ano && av.created_at && new Date(av.created_at).getFullYear() !== Number(form.ano));
-                        const ids = (av.turmas_ids || []).map(Number);
-                        const matches = todasTurmas.filter(t => ids.includes(Number(t.id)));
-                        const serieOk = !form.serie || !todasTurmas.length || !ids.length || matches.some(t => (t.turma||t.serie||'').toUpperCase().includes(form.serie.toUpperCase()));
+                    <div style={{ fontSize: 10, color: '#444', marginTop: 4, lineHeight: 1.6, background: '#f0f4ff', padding: '5px 8px', borderRadius: 4, fontFamily: 'monospace' }}>
+                      {(() => {
+                        const passB = avaliacoes.filter(av => !(form.bimestre && av.bimestre && Number(av.bimestre) !== Number(form.bimestre))).length;
+                        const passT = avaliacoes.filter(av => !(form.turno && av.turno && av.turno.toUpperCase().trim() !== form.turno.toUpperCase().trim())).length;
+                        const passA = avaliacoes.filter(av => !(form.ano && av.created_at && new Date(av.created_at).getFullYear() !== Number(form.ano))).length;
+                        const bimsUnicos = [...new Set(avaliacoes.map(av => String(av.bimestre)))].join(', ');
+                        const turnosUnicos = [...new Set(avaliacoes.map(av => String(av.turno)))].join(', ');
                         return (
                           <span>
-                            <br/>GAB[0]: bim={bimOk?'✓':'✗'} turno={turnoOk?'✓':'✗'} ano={anoOk?'✓':'✗'} serie={serieOk?'✓':'✗'}
-                            <br/>turmas_ids={JSON.stringify(ids.slice(0,3))} → matches={matches.length} → 1ªMatch: {matches[0]?.turma||matches[0]?.serie||'?'}
+                            📊 Total: {avaliacoes.length} | Filtrados: {avaliacoesFiltradas.length} | Turmas: {todasTurmas.length}<br/>
+                            bimestre={form.bimestre} → passam: {passB}/27 | bimestres no BD: [{bimsUnicos}]<br/>
+                            turno="{form.turno}" → passam: {passT}/27 | turnos no BD: [{turnosUnicos}]<br/>
+                            ano={form.ano} → passam: {passA}/27
                           </span>
                         );
                       })()}

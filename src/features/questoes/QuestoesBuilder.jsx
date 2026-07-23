@@ -131,7 +131,7 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
         explicacao:   editingQuestao.explicacao || '',
         tags:         tagsArr,
         temas:        temasArr,
-        imagem:       editingQuestao.imagem_base64 || null,
+        imagem:       editingQuestao.imagem_url || editingQuestao.imagem_base64 || null,
         compartilhada: editingQuestao.compartilhada || false,
       });
       setOpenBlocks({ 1: true, 2: true, 3: true, 4: false });
@@ -240,7 +240,7 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
       resposta_aberta:   form.resposta_aberta,
       tags:              form.tags.join(','),
       temas:             form.temas.length > 0 ? JSON.stringify(form.temas) : null,
-      imagem_base64:     form.imagem || null,
+      imagem_url:        form.imagem || null,
       explicacao:        form.explicacao,
       compartilhada:     form.compartilhada ? 1 : 0,
       status,

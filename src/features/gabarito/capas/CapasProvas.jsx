@@ -1059,24 +1059,7 @@ export default function CapasProvas() {
                         ))
                       )}
                     </select>
-                    {/* DEBUG TEMPORÁRIO */}
-                    <div style={{ fontSize: 10, color: '#444', marginTop: 4, lineHeight: 1.6, background: '#f0f4ff', padding: '5px 8px', borderRadius: 4, fontFamily: 'monospace' }}>
-                      {(() => {
-                        const passB = avaliacoes.filter(av => !(form.bimestre && av.bimestre && Number(av.bimestre) !== Number(form.bimestre))).length;
-                        const passT = avaliacoes.filter(av => !(form.turno && av.turno && av.turno.toUpperCase().trim() !== form.turno.toUpperCase().trim())).length;
-                        const passA = avaliacoes.filter(av => !(form.ano && av.created_at && new Date(av.created_at).getFullYear() !== Number(form.ano))).length;
-                        const bimsUnicos = [...new Set(avaliacoes.map(av => String(av.bimestre)))].join(', ');
-                        const turnosUnicos = [...new Set(avaliacoes.map(av => String(av.turno)))].join(', ');
-                        return (
-                          <span>
-                            📊 Total: {avaliacoes.length} | Filtrados: {avaliacoesFiltradas.length} | Turmas: {todasTurmas.length}<br/>
-                            bimestre={form.bimestre} → passam: {passB}/27 | bimestres no BD: [{bimsUnicos}]<br/>
-                            turno="{form.turno}" → passam: {passT}/27 | turnos no BD: [{turnosUnicos}]<br/>
-                            ano={form.ano} → passam: {passA}/27
-                          </span>
-                        );
-                      })()}
-                    </div>
+
                   </div>
                   {form.avaliacao_id && (
                     <div style={{ flex: 1 }}>

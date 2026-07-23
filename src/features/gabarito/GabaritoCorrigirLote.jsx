@@ -755,6 +755,7 @@ export default function GabaritoCorrigirLote() {
         verificarStatusImportacao(avaliacaoAtiva.id);
       }
     } catch (err) {
+      setDeleteArquivoModal(null);
       const msg = err.response?.data?.error || "Erro ao excluir gabarito.";
       showToast(msg, "error");
     }

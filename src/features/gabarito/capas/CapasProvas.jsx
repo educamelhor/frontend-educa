@@ -127,7 +127,7 @@ export default function CapasProvas() {
 
   const loadAvaliacoes = useCallback(async () => {
     try {
-      const res = await fetch(`${API}/api/gabarito-avaliacoes?status=publicada`, { headers: authH() });
+      const res = await fetch(`${API}/api/gabarito-avaliacoes`, { headers: authH() });
       const data = await res.json();
       setAvaliacoes(data || []);
     } catch (err) {

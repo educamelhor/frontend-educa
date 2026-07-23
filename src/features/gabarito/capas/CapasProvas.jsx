@@ -1047,6 +1047,12 @@ export default function CapasProvas() {
                         ))
                       )}
                     </select>
+                    {/* DEBUG TEMPORÁRIO - remover após diagnóstico */}
+                    <div style={{ fontSize: 10, color: '#999', marginTop: 4, lineHeight: 1.4 }}>
+                      📊 Total carregados: {avaliacoes.length} | Após filtros: {avaliacoesFiltradas.length} | Turmas escola: {todasTurmas.length}
+                      <br/>Filtros: bim={String(form.bimestre)} | turno="{form.turno}" | ano={form.ano} | serie="{form.serie}"
+                      {avaliacoes.length > 0 && <span> | Ex. bim={String(avaliacoes[0]?.bimestre)} turno="{avaliacoes[0]?.turno}" year={avaliacoes[0]?.created_at?.substring(0,10)}</span>}
+                    </div>
                   </div>
                   {form.avaliacao_id && (
                     <div style={{ flex: 1 }}>

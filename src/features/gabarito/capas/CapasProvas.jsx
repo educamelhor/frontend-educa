@@ -163,11 +163,15 @@ export default function CapasProvas() {
   // Filtra por Bimestre, Turno, Ano e Série (via lookup nas turmas da escola)
   const avaliacoesFiltradas = React.useMemo(() => {
     return avaliacoes.filter(av => {
-      // Filtro por bimestre
-      if (form.bimestre && av.bimestre && Number(av.bimestre) !== Number(form.bimestre)) return false;
+      // Filtro por bimestre: só filtra se AMBOS estão definidos
+      if (form.bimestre && av.bimestre) {
+        if (Number(av.bimestre) !== Number(form.bimestre)) return false;
+      }
 
-      // Filtro por turno (apenas se o gabarito tem turno definido)
-      if (form.turno && av.turno && av.turno !== form.turno) return false;
+      // Filtro por turno: case-insensitive; se o gabarito não tem turno, deixa passar
+      if (form.turno && av.turno) {
+        if (av.turno.toUpperCase().trim() !== form.turno.toUpperCase().trim()) return false;
+      }
 
       // Filtro por ano letivo (usando o ano de criação do gabarito)
       if (form.ano && av.created_at) {
@@ -175,10 +179,14 @@ export default function CapasProvas() {
         if (anoGabarito !== Number(form.ano)) return false;
       }
 
-      // Filtro por série (Opção B): ao menos uma turma vinculada deve pertencer à série selecionada
+      // Filtro por série (Opção B): ao menos uma turma vinculada deve pertencer à série
+      // Se o gabarito não tem turmas_ids (criado por turno inteiro), deixa passar
       if (form.serie && todasTurmas.length > 0 && av.turmas_ids && av.turmas_ids.length > 0) {
-        const turmasDoGabarito = todasTurmas.filter(t => av.turmas_ids.includes(t.id));
-        const temSerie = turmasDoGabarito.some(t => (t.nome || '').toUpperCase().includes(form.serie.toUpperCase()));
+        // Normaliza os ids para comparar como números
+        const idsGabarito = av.turmas_ids.map(Number);
+        const turmasDoGabarito = todasTurmas.filter(t => idsGabarito.includes(Number(t.id)));
+        const serieUpper = form.serie.toUpperCase().trim();
+        const temSerie = turmasDoGabarito.some(t => (t.nome || '').toUpperCase().includes(serieUpper));
         if (!temSerie) return false;
       }
 

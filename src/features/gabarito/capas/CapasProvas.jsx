@@ -1056,11 +1056,24 @@ export default function CapasProvas() {
                         ))
                       )}
                     </select>
-                    {/* DEBUG TEMPORÁRIO - remover após diagnóstico */}
-                    <div style={{ fontSize: 10, color: '#999', marginTop: 4, lineHeight: 1.4 }}>
-                      📊 Total carregados: {avaliacoes.length} | Após filtros: {avaliacoesFiltradas.length} | Turmas escola: {todasTurmas.length}
-                      <br/>Filtros: bim={String(form.bimestre)} | turno="{form.turno}" | ano={form.ano} | serie="{form.serie}"
-                      {avaliacoes.length > 0 && <span> | Ex. bim={String(avaliacoes[0]?.bimestre)} turno="{avaliacoes[0]?.turno}" year={avaliacoes[0]?.created_at?.substring(0,10)}</span>}
+                    {/* DEBUG TEMPORÁRIO */}
+                    <div style={{ fontSize: 10, color: '#666', marginTop: 4, lineHeight: 1.6, background: '#f8f8f8', padding: '4px 6px', borderRadius: 4 }}>
+                      📊 Total: {avaliacoes.length} | Filtrados: {avaliacoesFiltradas.length} | Turmas: {todasTurmas.length}
+                      {avaliacoes.length > 0 && (() => {
+                        const av = avaliacoes[0];
+                        const bimOk = !(form.bimestre && av.bimestre && Number(av.bimestre) !== Number(form.bimestre));
+                        const turnoOk = !(form.turno && av.turno && av.turno.toUpperCase().trim() !== form.turno.toUpperCase().trim());
+                        const anoOk = !(form.ano && av.created_at && new Date(av.created_at).getFullYear() !== Number(form.ano));
+                        const ids = (av.turmas_ids || []).map(Number);
+                        const matches = todasTurmas.filter(t => ids.includes(Number(t.id)));
+                        const serieOk = !form.serie || !todasTurmas.length || !ids.length || matches.some(t => (t.turma||t.serie||'').toUpperCase().includes(form.serie.toUpperCase()));
+                        return (
+                          <span>
+                            <br/>GAB[0]: bim={bimOk?'✓':'✗'} turno={turnoOk?'✓':'✗'} ano={anoOk?'✓':'✗'} serie={serieOk?'✓':'✗'}
+                            <br/>turmas_ids={JSON.stringify(ids.slice(0,3))} → matches={matches.length} → 1ªMatch: {matches[0]?.turma||matches[0]?.serie||'?'}
+                          </span>
+                        );
+                      })()}
                     </div>
                   </div>
                   {form.avaliacao_id && (

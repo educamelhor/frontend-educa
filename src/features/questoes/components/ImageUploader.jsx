@@ -1,7 +1,7 @@
 // src/features/questoes/components/ImageUploader.jsx
 // Upload de imagem via DO Spaces — retorna URL pública em vez de Base64
 import React, { useRef, useState } from 'react';
-import api from '../../../../services/api';
+import api from '../../../services/api';
 
 export default function ImageUploader({ value, onChange }) {
   const inputRef = useRef();

@@ -123,7 +123,11 @@ function QuestaoPreview({ questao, onAprovar, onArquivar, aprovando }) {
   }
 
   let alts = [];
-  try { alts = JSON.parse(questao.alternativas_json || '[]'); } catch {}
+  try {
+    alts = Array.isArray(questao.alternativas_json)
+      ? questao.alternativas_json
+      : JSON.parse(questao.alternativas_json || '[]');
+  } catch {}
 
   let dicas = [];
   try { dicas = Array.isArray(questao.dicas) ? questao.dicas : JSON.parse(questao.dicas || '[]'); } catch {}

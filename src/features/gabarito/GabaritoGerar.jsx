@@ -66,6 +66,7 @@ export default function GabaritoGerar() {
   const [avaliacoesAnteriores, setAvaliacoesAnteriores] = useState([]);
   const [loadingAnteriores, setLoadingAnteriores] = useState(false);
   const [buscaReimpressao, setBuscaReimpressao] = useState("");
+  const [deleteModal, setDeleteModal] = useState(null); // Estado para o modal premium de exclusão
 
   const showToast = useCallback((msg, type = "success") => {
     setToast({ msg, type });
@@ -119,6 +120,19 @@ export default function GabaritoGerar() {
       setAvaliacoesAnteriores(resp.data || []);
     } catch { }
     setLoadingAnteriores(false);
+  }
+
+  async function handleDeleteAvaliacao() {
+    if (!deleteModal) return;
+    try {
+      await api.delete(`/gabarito-avaliacoes/${deleteModal.id}`);
+      showToast("Avaliação excluída com sucesso!", "success");
+      setDeleteModal(null);
+      carregarAvaliacoes(); // Recarrega a lista
+    } catch (err) {
+      console.error(err);
+      showToast("Erro ao excluir avaliação.", "error");
+    }
   }
 
   // ─── Carregar Avaliação Existente (Reimpressão) ───
@@ -1094,14 +1108,27 @@ export default function GabaritoGerar() {
                       <td style={{ padding: "12px 14px" }}>{TIPOS_AVALIACAO.find((t) => t.id === a.tipo)?.label || a.tipo}</td>
                       <td style={{ padding: "12px 14px" }}>{a.num_questoes} Qts</td>
                       <td style={{ padding: "12px 14px" }}>
-                        <button
-                          type="button"
-                          className="gab-btn gab-btn-ghost gab-btn-sm"
-                          onClick={() => carregarParaReimpressao(a)}
-                          style={{ fontSize: "0.75rem", padding: "6px 12px" }}
-                        >
-                          Carregar
-                        </button>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                          <button
+                            type="button"
+                            className="gab-btn gab-btn-ghost gab-btn-sm"
+                            onClick={() => carregarParaReimpressao(a)}
+                            style={{ fontSize: "0.75rem", padding: "6px 12px" }}
+                          >
+                            Carregar
+                          </button>
+                          <button
+                            type="button"
+                            className="gab-btn gab-btn-ghost gab-btn-sm"
+                            style={{ color: "var(--gab-red-light, #ef4444)", padding: "6px 8px" }}
+                            onClick={() => setDeleteModal(a)}
+                            title="Excluir Avaliação"
+                          >
+                            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1111,6 +1138,119 @@ export default function GabaritoGerar() {
           )}
         </div>
       </div>
+
+      {/* ═══ Modal Premium de Confirmação de Exclusão ═══ */}
+      {deleteModal && (
+        <div
+          style={{
+            position: "fixed", inset: 0, zIndex: 9999,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)",
+            animation: "gab-fade-in 0.25s ease-out",
+          }}
+          onClick={() => setDeleteModal(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "linear-gradient(145deg, #1a1f2e 0%, #111827 100%)",
+              border: "1px solid rgba(239,68,68,0.2)",
+              borderRadius: 20, maxWidth: 440, width: "95%",
+              padding: 0, overflow: "hidden",
+              boxShadow: "0 24px 64px rgba(0,0,0,0.5), 0 0 40px rgba(239,68,68,0.08)",
+              animation: "gab-slide-up 0.35s ease-out",
+            }}
+          >
+            {/* Header vermelha */}
+            <div style={{
+              padding: "24px 28px 16px",
+              background: "linear-gradient(135deg, rgba(239,68,68,0.12) 0%, rgba(239,68,68,0.03) 100%)",
+              borderBottom: "1px solid rgba(239,68,68,0.15)",
+              display: "flex", alignItems: "center", gap: 14,
+            }}>
+              <div style={{
+                width: 48, height: 48, borderRadius: 14,
+                background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.25)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: "1.4rem",
+              }}>🗑️</div>
+              <div>
+                <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--gab-red-light, #f87171)", letterSpacing: "0.5px" }}>
+                  Excluir Avaliação
+                </div>
+                <div style={{ fontSize: "0.78rem", color: "var(--gab-text-muted)", marginTop: 2 }}>
+                  Esta ação não poderá ser desfeita
+                </div>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: "20px 28px" }}>
+              <div style={{
+                padding: "16px 20px", borderRadius: 12,
+                background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)",
+                marginBottom: 20,
+              }}>
+                <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--gab-text-primary)", marginBottom: 6 }}>
+                  {deleteModal.titulo}
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 12, fontSize: "0.78rem", color: "var(--gab-text-muted)" }}>
+                  <span>{deleteModal.num_questoes} questões</span>
+                  <span>· {deleteModal.num_alternativas} alternativas</span>
+                  <span>· Nota {deleteModal.nota_total}</span>
+                  {deleteModal.bimestre && <span>· {deleteModal.bimestre}</span>}
+                </div>
+              </div>
+
+              <div style={{
+                padding: "12px 16px", borderRadius: 10,
+                background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.12)",
+                fontSize: "0.8rem", color: "var(--gab-text-secondary)", lineHeight: 1.5,
+              }}>
+                ⚠️ Todos os dados vinculados a esta avaliação (gabarito oficial e notas) serão removidos permanentemente.
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div style={{
+              padding: "16px 28px",
+              background: "rgba(0,0,0,0.2)",
+              borderTop: "1px solid rgba(255,255,255,0.04)",
+              display: "flex", justifyContent: "flex-end", gap: 12,
+            }}>
+              <button
+                type="button"
+                onClick={() => setDeleteModal(null)}
+                style={{
+                  padding: "10px 16px", borderRadius: 8, fontSize: "0.85rem", fontWeight: 600,
+                  background: "transparent", border: "1px solid rgba(255,255,255,0.1)",
+                  color: "var(--gab-text-secondary)", cursor: "pointer",
+                  transition: "all 0.2s",
+                }}
+                onMouseOver={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.05)"; e.currentTarget.style.color = "var(--gab-text-primary)"; }}
+                onMouseOut={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--gab-text-secondary)"; }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteAvaliacao}
+                style={{
+                  padding: "10px 18px", borderRadius: 8, fontSize: "0.85rem", fontWeight: 600,
+                  background: "var(--gab-red-light, #ef4444)", border: "none",
+                  color: "#fff", cursor: "pointer",
+                  boxShadow: "0 4px 12px rgba(239,68,68,0.25)",
+                  transition: "all 0.2s",
+                }}
+                onMouseOver={(e) => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 6px 16px rgba(239,68,68,0.4)"; }}
+                onMouseOut={(e) => { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = "0 4px 12px rgba(239,68,68,0.25)"; }}
+              >
+                Excluir Definitivamente
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

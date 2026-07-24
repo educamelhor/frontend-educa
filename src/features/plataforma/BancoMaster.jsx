@@ -206,24 +206,37 @@ function QuestaoPreview({ questao, onAprovar, onArquivar, aprovando }) {
         <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#7c3aed', letterSpacing: '1px', marginBottom: 8 }}>
           ENUNCIADO
         </div>
+
+        {/* 1️⃣ Texto do enunciado (parte inicial — antes da imagem) */}
+        <LatexText text={questao.enunciado} />
+
+        {/* 2️⃣ Imagem da questão (tamanho controlado — premium mas proporcional) */}
+        {questao.imagem_url && (
+          <div style={{ textAlign: 'center', margin: '14px 0' }}>
+            <img
+              src={questao.imagem_url}
+              alt="Figura da questão"
+              style={{
+                display: 'inline-block',
+                maxWidth: '55%',
+                maxHeight: 260,
+                height: 'auto',
+                borderRadius: 8,
+                border: '1px solid rgba(255,255,255,0.12)',
+                objectFit: 'contain',
+              }}
+            />
+          </div>
+        )}
+
+        {/* 3️⃣ Texto complementar (parte após a imagem — ex: "Considerando a figura acima...") */}
         {questao.texto_apoio && (
-          <div style={{
-            borderLeft: '3px solid rgba(124,58,237,0.4)', paddingLeft: 10,
-            marginBottom: 12, color: '#94a3b8', fontSize: '0.84rem', fontStyle: 'italic',
-          }}>
+          <div style={{ marginTop: questao.imagem_url ? 4 : 12 }}>
             <LatexText text={questao.texto_apoio} />
           </div>
         )}
-        <LatexText text={questao.enunciado} />
-
-        {questao.imagem_url && (
-          <img
-            src={questao.imagem_url}
-            alt="Figura da questão"
-            style={{ display: 'block', width: '100%', height: 'auto', marginTop: 12, borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)' }}
-          />
-        )}
       </div>
+
 
       {/* ALTERNATIVAS (objetiva) */}
       {alts.length > 0 && (

@@ -113,11 +113,6 @@ export default function StreamCamera({ cameraId, titulo, registros }) {
   useEffect(() => {
     console.log("[StreamCamera] useEffect snap — cameraId:", cameraId, "API_ORIGIN:", API_ORIGIN);
 
-    if (cameraId !== 1) {
-      setImgSrc("");
-      return;
-    }
-
     const escolaDir = resolveEscolaDir();
     console.log("[StreamCamera] escolaDir:", escolaDir);
 
@@ -153,12 +148,6 @@ export default function StreamCamera({ cameraId, titulo, registros }) {
   //    - Normalizar a estrutura (bbox -> x,y,w,h) sem alterar desenho
   // ----------------------------------------------------------------------------
   useEffect(() => {
-    // FASE ATUAL: somente câmera 1 deve buscar faces (zero requests cams 2 e 3)
-    if (cameraId !== 1) {
-      setFacesData({ width: 0, height: 0, faces: [] });
-      return;
-    }
-
     let cancelado = false;
 
     async function fetchFaces() {

@@ -66,6 +66,14 @@ const TIPOS_LISTA = [
     color: "from-emerald-500 to-teal-700",
     badge: "NOVO",
   },
+  {
+    id: "medias",
+    nome: "Lista de Médias",
+    desc: "Média de todas as disciplinas do bimestre selecionado (Ano letivo atual)",
+    icon: ChartBarIcon,
+    color: "from-cyan-500 to-cyan-700",
+    badge: "NOVO",
+  },
 ];
 
 export default function ListasImpressao() {
@@ -78,6 +86,7 @@ export default function ListasImpressao() {
   const [turnoSelecionado, setTurnoSelecionado] = useState(null);
   const [turmaSelecionada, setTurmaSelecionada] = useState(null);
   const [tipoLista, setTipoLista] = useState(null);
+  const [bimestreSelecionado, setBimestreSelecionado] = useState(null);
 
   // Extras
   const [tituloPersonalizado, setTituloPersonalizado] = useState("");
@@ -96,6 +105,7 @@ export default function ListasImpressao() {
   const [gerandoNotas, setGerandoNotas] = useState(false);
 
   const turnos = ["Matutino", "Vespertino", "Noturno"];
+  const bimestres = ["1º Bimestre", "2º Bimestre", "3º Bimestre", "4º Bimestre"];
 
   // ─── Buscar turmas (filtradas pelo ano letivo atual) ───
   useEffect(() => {
@@ -199,6 +209,34 @@ export default function ListasImpressao() {
     }
   };
 
+  // ═══ GERAR PDF (Lista de Médias) ═══
+  const handleGerarPDFMedias = async () => {
+    if (!bimestreSelecionado || !turmaSelecionada) return;
+    setGerando(true);
+    try {
+      const params = new URLSearchParams({ 
+        bimestre: bimestreSelecionado, 
+        ano: ANO_LETIVO,
+        data: dataAplicacao 
+      });
+      if (tituloPersonalizado.trim()) params.set("titulo", tituloPersonalizado.trim());
+
+      const response = await api.get(
+        `/api/listas-impressao/medias/${turmaSelecionada.id}?${params.toString()}`,
+        { responseType: "blob" }
+      );
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      window.open(url, "_blank");
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (err) {
+      console.error("Erro ao gerar Lista de Médias:", err);
+      alert("Erro ao gerar o PDF de médias. Verifique a conexão e tente novamente.");
+    } finally {
+      setGerando(false);
+    }
+  };
+
   // ═══ GERAR PDF POR TURNO (todas as turmas) ═══
   const handleGerarPDFTurno = async () => {
     if (!tipoLista || !turnoSelecionado) return;
@@ -226,16 +264,24 @@ export default function ListasImpressao() {
 
   // ─── Stepper ───
   const isNotas = tipoLista?.id === "notas";
+  const isMedias = tipoLista?.id === "medias";
+  
   const step = isNotas
     ? (!tipoLista ? 1 : !avaliacaoSelecionada ? 2 : !turmaNota ? 3 : 4)
+    : isMedias
+    ? (!tipoLista ? 1 : !bimestreSelecionado ? 2 : !turnoSelecionado ? 3 : !turmaSelecionada ? 4 : 5)
     : (!tipoLista ? 1 : !turnoSelecionado ? 2 : !turmaSelecionada ? 3 : 4);
 
   const stepLabels = isNotas
     ? [{ n: 1, label: "Tipo" }, { n: 2, label: "Avaliação" }, { n: 3, label: "Turma" }, { n: 4, label: "Gerar PDF" }]
+    : isMedias
+    ? [{ n: 1, label: "Tipo" }, { n: 2, label: "Bimestre" }, { n: 3, label: "Turno" }, { n: 4, label: "Turma" }, { n: 5, label: "Gerar PDF" }]
     : [{ n: 1, label: "Tipo" }, { n: 2, label: "Turno" }, { n: 3, label: "Turma" }, { n: 4, label: "Gerar PDF" }];
 
   const stepHint = isNotas
     ? (step === 1 ? "Escolha o tipo de lista" : step === 2 ? "Selecione a avaliação" : step === 3 ? "Selecione a turma" : "Pronto para gerar!")
+    : isMedias
+    ? (step === 1 ? "Escolha o tipo de lista" : step === 2 ? "Selecione o bimestre" : step === 3 ? "Selecione o turno" : step === 4 ? "Selecione a turma" : "Pronto para gerar!")
     : (step === 1 ? "Escolha o tipo de lista" : step === 2 ? "Selecione o turno" : step === 3 ? "Selecione a turma" : "Pronto para gerar!");
 
   return (
@@ -303,6 +349,7 @@ export default function ListasImpressao() {
                   setTurnoSelecionado(null);
                   setAvaliacaoSelecionada(null);
                   setTurmaNota(null);
+                  setBimestreSelecionado(null);
                 }}
                 className={`group relative overflow-hidden rounded-xl border-2 text-left p-4 transition-all duration-200 ${
                   sel
@@ -504,17 +551,49 @@ export default function ListasImpressao() {
       )}
 
       {/* ════════════════════════════════════════════════════════
-          FLUXO PADRÃO (não é notas)
+          FLUXO PADRÃO E LISTA DE MÉDIAS
           ════════════════════════════════════════════════════════ */}
       {tipoLista && tipoLista.id !== "notas" && (
         <>
-          {/* ─── STEP 2: Turno ─── */}
-          <div className="mb-8 animate-fadeIn">
-            <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-              <span className="h-7 w-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center text-sm font-extrabold">2</span>
-              Turno
-            </h2>
-            <div className="flex flex-wrap gap-3">
+          {/* ─── STEP 2: Bimestre (Apenas Lista de Médias) ─── */}
+          {tipoLista.id === "medias" && (
+            <div className="mb-8 animate-fadeIn">
+              <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                <span className="h-7 w-7 rounded-lg bg-cyan-100 text-cyan-700 flex items-center justify-center text-sm font-extrabold">2</span>
+                Bimestre
+              </h2>
+              <div className="flex flex-wrap gap-3">
+                {bimestres.map((bim) => (
+                  <button
+                    key={bim}
+                    onClick={() => {
+                      setBimestreSelecionado(bim);
+                      setTurnoSelecionado(null);
+                      setTurmaSelecionada(null);
+                    }}
+                    className={`px-6 py-3 rounded-xl font-bold text-sm transition-all shadow-sm ${
+                      bimestreSelecionado === bim
+                        ? "bg-cyan-600 text-white shadow-lg shadow-cyan-300/40 scale-105"
+                        : "bg-white text-cyan-800 border border-cyan-200 hover:bg-cyan-50 hover:border-cyan-400"
+                    }`}
+                  >
+                    {bim}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ─── STEP 2 ou 3: Turno ─── */}
+          {(tipoLista.id !== "medias" || bimestreSelecionado) && (
+            <div className="mb-8 animate-fadeIn">
+              <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                <span className="h-7 w-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center text-sm font-extrabold">
+                  {tipoLista.id === "medias" ? "3" : "2"}
+                </span>
+                Turno
+              </h2>
+              <div className="flex flex-wrap gap-3">
               {turnos.map((turno) => (
                 <button
                   key={turno}
@@ -602,11 +681,13 @@ export default function ListasImpressao() {
             </div>
           </div>
 
-          {/* ─── STEP 3: Turma ─── */}
+          {/* ─── STEP 3 ou 4: Turma ─── */}
           {turnoSelecionado && (
             <div className="mb-8 animate-fadeIn">
               <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                <span className="h-7 w-7 rounded-lg bg-green-100 text-green-700 flex items-center justify-center text-sm font-extrabold">3</span>
+                <span className="h-7 w-7 rounded-lg bg-green-100 text-green-700 flex items-center justify-center text-sm font-extrabold">
+                  {tipoLista.id === "medias" ? "4" : "3"}
+                </span>
                 Turma
                 <span className="text-xs font-normal text-gray-400 ml-1">(Ano Letivo {ANO_LETIVO})</span>
               </h2>
@@ -637,12 +718,14 @@ export default function ListasImpressao() {
             </div>
           )}
 
-          {/* ─── STEP 4: Configuração + Gerar PDF ─── */}
+          {/* ─── STEP 4 ou 5: Configuração + Gerar PDF ─── */}
           {turmaSelecionada && tipoLista && (
             <div className="animate-fadeIn">
               <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 mb-6">
                 <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4 flex items-center gap-2">
-                  <span className="h-6 w-6 rounded-md bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-extrabold">4</span>
+                  <span className="h-6 w-6 rounded-md bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-extrabold">
+                    {tipoLista.id === "medias" ? "5" : "4"}
+                  </span>
                   Configurar e Gerar PDF
                 </h3>
 
@@ -678,7 +761,7 @@ export default function ListasImpressao() {
                     </div>
                   )}
                   <button
-                    onClick={handleGerarPDF}
+                    onClick={tipoLista.id === "medias" ? handleGerarPDFMedias : handleGerarPDF}
                     disabled={gerando}
                     className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-bold text-sm shadow-lg hover:shadow-xl hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >

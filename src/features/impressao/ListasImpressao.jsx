@@ -613,8 +613,9 @@ export default function ListasImpressao() {
             </div>
 
             {/* Card: Gerar PDF do Turno Completo */}
-            <div className="mt-5 bg-gradient-to-br from-indigo-50 via-blue-50 to-purple-50 rounded-xl border-2 border-indigo-200 p-5 shadow-sm">
-              <div className="flex items-start gap-4">
+            {tipoLista.id !== "medias" && (
+              <div className="mt-5 bg-gradient-to-br from-indigo-50 via-blue-50 to-purple-50 rounded-xl border-2 border-indigo-200 p-5 shadow-sm">
+                <div className="flex items-start gap-4">
                 <div className="hidden sm:flex h-12 w-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 items-center justify-center flex-shrink-0 shadow-lg shadow-indigo-300/40">
                   <DocumentDuplicateIcon className="h-6 w-6 text-white" />
                 </div>
@@ -676,9 +677,10 @@ export default function ListasImpressao() {
                       )}
                     </button>
                   </div>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
           )}
 
@@ -727,29 +729,46 @@ export default function ListasImpressao() {
                   <span className="h-6 w-6 rounded-md bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-extrabold">
                     {tipoLista.id === "medias" ? "5" : "4"}
                   </span>
-                  Configurar e Gerar PDF
+                  {tipoLista.id === "medias" ? "Gerar Lista de Médias" : "Configurar e Gerar PDF"}
                 </h3>
 
+                {tipoLista.id === "medias" && (
+                  <div className="mb-5 p-3 bg-gradient-to-r from-cyan-50 to-blue-50 rounded-lg border border-cyan-100">
+                    <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs text-gray-600">
+                      <span><strong className="text-cyan-700">Bimestre:</strong> {bimestreSelecionado}</span>
+                      <span><strong className="text-cyan-700">Turno:</strong> {turnoSelecionado}</span>
+                      <span><strong className="text-cyan-700">Turma:</strong> {turmaSelecionada.turma}</span>
+                    </div>
+                    <p className="mt-2 text-xs text-gray-500">
+                      {"\uD83D\uDCCA"} O PDF será gerado instantaneamente com todas as médias do bimestre e estatísticas da turma!
+                    </p>
+                  </div>
+                )}
+
                 <div className="flex flex-wrap items-end gap-4">
-                  <div className="flex-1 min-w-[200px]">
-                    <label className="text-xs font-bold text-gray-600 uppercase tracking-wider">Título da lista</label>
-                    <input
-                      type="text"
-                      value={tituloPersonalizado}
-                      onChange={(e) => setTituloPersonalizado(e.target.value)}
-                      placeholder={tipoLista.nome}
-                      className="mt-1 w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-gray-600 uppercase tracking-wider">Data</label>
-                    <input
-                      type="date"
-                      value={dataAplicacao}
-                      onChange={(e) => setDataAplicacao(e.target.value)}
-                      className="mt-1 px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                    />
-                  </div>
+                  {tipoLista.id !== "medias" && (
+                    <>
+                      <div className="flex-1 min-w-[200px]">
+                        <label className="text-xs font-bold text-gray-600 uppercase tracking-wider">Título da lista</label>
+                        <input
+                          type="text"
+                          value={tituloPersonalizado}
+                          onChange={(e) => setTituloPersonalizado(e.target.value)}
+                          placeholder={tipoLista.nome}
+                          className="mt-1 w-full px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-600 uppercase tracking-wider">Data</label>
+                        <input
+                          type="date"
+                          value={dataAplicacao}
+                          onChange={(e) => setDataAplicacao(e.target.value)}
+                          className="mt-1 px-3 py-2 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                        />
+                      </div>
+                    </>
+                  )}
                   {tipoLista.id === "branco" && (
                     <div>
                       <label className="text-xs font-bold text-gray-600 uppercase tracking-wider">Linhas</label>

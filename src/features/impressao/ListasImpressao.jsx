@@ -680,6 +680,7 @@ export default function ListasImpressao() {
               </div>
             </div>
           </div>
+          )}
 
           {/* ─── STEP 3 ou 4: Turma ─── */}
           {turnoSelecionado && (

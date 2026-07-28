@@ -455,7 +455,8 @@ export default function ChegadaTab() {
                         <input
                           type="number"
                           required
-                          min="1"
+                          min={isPerecivel ? "0.001" : "1"}
+                          step={isPerecivel ? "any" : "1"}
                           value={loteItem.quantidade_unidades}
                           onChange={(e) => handleLoteChange(index, "quantidade_unidades", e.target.value)}
                           className="w-full px-3 py-2 border border-gray-200 rounded-lg outline-none focus:border-amber-400"

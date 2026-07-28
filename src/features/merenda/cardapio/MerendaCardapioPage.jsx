@@ -13,6 +13,8 @@ import MovimentacaoTab from "./MovimentacaoTab";
 import PercapitaTab from "./PercapitaTab";
 import CardapioTab from "./CardapioTab";
 import SaldoTab from "./SaldoTab";
+import DistribuicaoTab from "./DistribuicaoTab";
+import { ClipboardDocumentCheckIcon } from "@heroicons/react/24/outline";
 
 export default function MerendaCardapioPage() {
   const [activeTab, setActiveTab] = useState("chegada");
@@ -23,6 +25,7 @@ export default function MerendaCardapioPage() {
     { id: "percapita", label: "PERCÁPITA", icon: <ScaleIcon className="w-5 h-5" /> },
     { id: "cardapio", label: "CARDÁPIO", icon: <CalendarDaysIcon className="w-5 h-5" /> },
     { id: "saldo", label: "SALDO", icon: <BanknotesIcon className="w-5 h-5" /> },
+    { id: "distribuicao", label: "DISTRIBUIÇÃO", icon: <ClipboardDocumentCheckIcon className="w-5 h-5" /> },
   ];
 
   return (
@@ -83,6 +86,10 @@ export default function MerendaCardapioPage() {
 
         {activeTab === "saldo" && (
           <SaldoTab />
+        )}
+
+        {activeTab === "distribuicao" && (
+          <DistribuicaoTab />
         )}
       </div>
 

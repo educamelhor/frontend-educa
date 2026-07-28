@@ -104,6 +104,20 @@ export default function CardapioTab() {
 
   const closeModal = () => setIsModalOpen(false);
 
+  const handleLoteSelect = (value) => {
+    if (!value) {
+      setSelectedLoteId("");
+      return;
+    }
+    const itemEstoque = estoque.find(e => getEstoqueKey(e) === value);
+    if (itemEstoque && !itemEstoque.percapita_id) {
+      toast.error("Falta percápita! Configure na aba 'PERCÁPITA' antes de adicionar ao cardápio.");
+      setSelectedLoteId("");
+      return;
+    }
+    setSelectedLoteId(value);
+  };
+
   const handleAddItem = () => {
     if (!selectedLoteId) return;
     const itemEstoque = estoque.find(e => getEstoqueKey(e) === selectedLoteId);
@@ -111,11 +125,6 @@ export default function CardapioTab() {
 
     if (itensSelecionados.find(i => i.key === selectedLoteId)) {
       toast.error("Este lote já foi adicionado ao cardápio.");
-      return;
-    }
-
-    if (!itemEstoque.percapita_id) {
-      toast.error("Falta percápita! Configure na aba 'PERCÁPITA' antes de adicionar ao cardápio.");
       return;
     }
 
@@ -211,16 +220,7 @@ export default function CardapioTab() {
     }
     
     if (itensSelecionados.length === 0) {
-      setConfirmConfig({
-        isOpen: true,
-        title: "Cardápio Vazio",
-        message: "Você não incluiu nenhum gênero alimentício. Deseja salvar o cardápio vazio?",
-        type: "warning",
-        onConfirm: () => {
-          setConfirmConfig({ isOpen: false });
-          executeSubmit();
-        }
-      });
+      toast.error("Adicione ao menos um gênero alimentício antes de salvar o cardápio.");
       return;
     }
     
@@ -389,7 +389,7 @@ export default function CardapioTab() {
                     <label className="block text-sm font-semibold text-gray-700 mb-2">Selecione Gêneros para a Receita</label>
                     <select
                       value={selectedLoteId}
-                      onChange={(e) => setSelectedLoteId(e.target.value)}
+                      onChange={(e) => handleLoteSelect(e.target.value)}
                       className="w-full px-4 py-3 border border-gray-300 rounded-xl outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20"
                     >
                       <option value="">Selecione um lote em estoque...</option>

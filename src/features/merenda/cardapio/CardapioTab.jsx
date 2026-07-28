@@ -115,7 +115,7 @@ export default function CardapioTab() {
     }
 
     if (!itemEstoque.percapita_id) {
-      toast.error("Este produto não possui percápita configurada.");
+      toast.error("Falta percápita! Configure na aba 'PERCÁPITA' antes de adicionar ao cardápio.");
       return;
     }
 
@@ -398,9 +398,9 @@ export default function CardapioTab() {
                         let text = `${e.produto} - ${e.marca}`;
                         if (e.lote) text += ` | Lote: ${e.lote}`;
                         text += ` | Saldo: ${Number(e.saldo_kg).toLocaleString('pt-BR')} kg`;
-                        if (!hasPerc) text += ' (S/ PERCÁPITA)';
+                        if (!hasPerc) text += ' (FALTA PERCÁPITA)';
                         return (
-                          <option key={getEstoqueKey(e)} value={getEstoqueKey(e)} disabled={!hasPerc}>
+                          <option key={getEstoqueKey(e)} value={getEstoqueKey(e)}>
                             {text}
                           </option>
                         );

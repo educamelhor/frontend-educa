@@ -6,6 +6,7 @@ import api from "../../../services/api";
 export default function SaldoTab() {
   const [itens, setItens] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [distribuicoes, setDistribuicoes] = useState([]);
   
   const [isConferencia, setIsConferencia] = useState(false);
   const [conferenciaData, setConferenciaData] = useState({}); // { key: kg }
@@ -13,7 +14,17 @@ export default function SaldoTab() {
 
   useEffect(() => {
     fetchSaldoCompleto();
+    fetchDistribuicoes();
   }, []);
+
+  const fetchDistribuicoes = async () => {
+    try {
+      const { data } = await api.get("/api/merenda/distribuicoes");
+      setDistribuicoes(data || []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const fetchSaldoCompleto = async () => {
     setLoading(true);
@@ -37,6 +48,17 @@ export default function SaldoTab() {
   };
 
   const getEstoqueKey = (item) => `${item.produto_id}||${item.lote || ''}||${item.validade || ''}`;
+
+  const getDistribuicao = (dataChegada) => {
+    if (!dataChegada || distribuicoes.length === 0) return null;
+    const dateStr = String(dataChegada).split('T')[0];
+    const index = distribuicoes.findIndex(d => {
+      const inicio = String(d.data_inicio).split('T')[0];
+      const fim = String(d.data_fim).split('T')[0];
+      return dateStr >= inicio && dateStr <= fim;
+    });
+    return index >= 0 ? `${index + 1}ª` : null;
+  };
 
   const toggleConferencia = () => {
     setIsConferencia(!isConferencia);
@@ -159,6 +181,7 @@ export default function SaldoTab() {
             <thead className="bg-gray-50 border-b-2 border-gray-100 text-gray-600 print:bg-white print:border-gray-800">
               <tr>
                 <th className="py-4 px-6 font-semibold tracking-wide">PRODUTO / CATEGORIA</th>
+                <th className="py-4 px-6 font-semibold tracking-wide">DISTRIBUIÇÃO</th>
                 <th className="py-4 px-6 font-semibold tracking-wide">LOTE</th>
                 <th className="py-4 px-6 font-semibold tracking-wide">VALIDADE</th>
                 <th className="py-4 px-6 font-semibold tracking-wide text-right">SALDO SISTEMA</th>
@@ -174,7 +197,7 @@ export default function SaldoTab() {
             <tbody className="divide-y divide-gray-50 print:divide-gray-200">
               {itens.length === 0 ? (
                 <tr>
-                  <td colSpan={isConferencia ? 6 : 4} className="py-12 text-center text-gray-500">
+                  <td colSpan={isConferencia ? 7 : 5} className="py-12 text-center text-gray-500">
                     Nenhum gênero foi registrado no estoque até o momento.
                   </td>
                 </tr>
@@ -209,6 +232,18 @@ export default function SaldoTab() {
                       <td className="py-3 px-6">
                         <div className="font-semibold text-gray-800">{item.produto}</div>
                         <div className="text-xs text-gray-500">{item.marca} • {item.categoria}</div>
+                      </td>
+                      <td className="py-3 px-6">
+                        {(() => {
+                          const dist = getDistribuicao(item.data_chegada);
+                          return dist ? (
+                            <span className="px-3 py-1 bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 text-xs font-bold rounded-lg border border-blue-200 shadow-sm">
+                              {dist}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          );
+                        })()}
                       </td>
                       <td className="py-3 px-6">
                         {item.lote ? (

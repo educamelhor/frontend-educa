@@ -6,7 +6,7 @@ import {
   XMarkIcon 
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
-import api from "../../../../services/api";
+import api from "../../../services/api";
 
 export default function DistribuicaoTab() {
   const [distribuicoes, setDistribuicoes] = useState([]);

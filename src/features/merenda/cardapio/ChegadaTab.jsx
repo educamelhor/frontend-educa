@@ -15,6 +15,10 @@ export default function ChegadaTab() {
   const [selectedProdutoId, setSelectedProdutoId] = useState("");
   const [selectedOrigem, setSelectedOrigem] = useState("Governo (SEEDF)");
   const [lotes, setLotes] = useState([{ quantidade_unidades: "", lote: "", validade: "" }]);
+  
+  const [keepDate, setKeepDate] = useState(false);
+  const [globalDataChegada, setGlobalDataChegada] = useState("");
+  const [dataChegada, setDataChegada] = useState("");
 
   useEffect(() => {
     fetchEntradas();
@@ -47,6 +51,8 @@ export default function ChegadaTab() {
     setSelectedProdutoId("");
     setSelectedOrigem("Governo (SEEDF)");
     setLotes([{ quantidade_unidades: "", lote: "", validade: "" }]);
+    
+    setDataChegada(keepDate ? globalDataChegada : "");
     setIsModalOpen(true);
   };
 
@@ -54,6 +60,12 @@ export default function ChegadaTab() {
     setEditingId(item.id);
     setSelectedProdutoId(item.produto_id.toString());
     setSelectedOrigem(item.origem || "Governo (SEEDF)");
+    
+    let chegadaFormatada = "";
+    if (item.created_at) {
+      chegadaFormatada = String(item.created_at).split('T')[0];
+    }
+    setDataChegada(chegadaFormatada);
     
     // Formata a data para yyyy-mm-dd
     let valFormatada = "";
@@ -146,13 +158,14 @@ export default function ChegadaTab() {
     try {
       if (editingId) {
         // Se está editando, manda PUT para a primeira e única linha
-        const editPayload = { ...payloadLotes[0], origem: selectedOrigem };
+        const editPayload = { ...payloadLotes[0], origem: selectedOrigem, data_chegada: dataChegada };
         await api.put(`/api/merenda/entradas/${editingId}`, editPayload);
         toast.success("Entrada atualizada com sucesso!");
       } else {
         await api.post("/api/merenda/entradas", {
           produto_id: selectedProdutoId,
           origem: selectedOrigem,
+          data_chegada: dataChegada,
           lotes: payloadLotes
         });
         toast.success("Chegada registrada com sucesso!");
@@ -342,7 +355,7 @@ export default function ChegadaTab() {
             </div>
 
             <form onSubmit={handleSubmit} className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">Gênero Alimentício</label>
                   <select
@@ -375,6 +388,44 @@ export default function ChegadaTab() {
                     <option value="Outros">Outros</option>
                   </select>
                 </div>
+              </div>
+
+              <div className="mb-6 p-4 bg-slate-50 border border-slate-100 rounded-xl flex flex-col md:flex-row gap-4 items-center justify-between">
+                <div className="w-full md:w-1/2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">
+                    Data da Chegada <span className="text-gray-400 font-normal">(Opcional)</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={dataChegada}
+                    onChange={(e) => {
+                      setDataChegada(e.target.value);
+                      if (keepDate) setGlobalDataChegada(e.target.value);
+                    }}
+                    className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">
+                    Se vazio, usará a data de hoje.
+                  </p>
+                </div>
+
+                {!editingId && (
+                  <div className="flex items-center gap-2 mt-2 md:mt-0">
+                    <input
+                      type="checkbox"
+                      id="keepDate"
+                      checked={keepDate}
+                      onChange={(e) => {
+                        setKeepDate(e.target.checked);
+                        if (e.target.checked) setGlobalDataChegada(dataChegada);
+                      }}
+                      className="w-4 h-4 text-amber-500 border-gray-300 rounded focus:ring-amber-400 cursor-pointer"
+                    />
+                    <label htmlFor="keepDate" className="text-sm font-medium text-gray-700 cursor-pointer select-none">
+                      Fixar esta data para próximos cadastros
+                    </label>
+                  </div>
+                )}
               </div>
 
               {selectedProdutoId && (

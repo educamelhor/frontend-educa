@@ -37,7 +37,7 @@ export default function SaldoTab() {
     }
   };
 
-  const getEstoqueKey = (item) => `${item.produto_id}||${item.lote || ''}||${item.validade || ''}`;
+  const getEstoqueKey = (item) => String(item.produto_id);
 
   const toggleConferencia = () => {
     setIsConferencia(!isConferencia);
@@ -50,11 +50,10 @@ export default function SaldoTab() {
   const handleSaveConferencia = async () => {
     setSaving(true);
     const payload = Object.entries(conferenciaData).map(([key, kgStr]) => {
-      const [produto_id, lote, validade] = key.split('||');
       return {
-        produto_id,
-        lote: lote || null,
-        validade: validade || null,
+        produto_id: key,
+        lote: null,
+        validade: null,
         quantidade_deposito_kg: parseFloat(kgStr) || 0
       };
     }).filter(i => !isNaN(i.quantidade_deposito_kg));
@@ -232,16 +231,13 @@ export default function SaldoTab() {
                       </td>
                       <td className="py-3 px-6">
                         {item.lote ? (
-                          <span className="font-mono bg-gray-100 px-2 py-0.5 rounded text-gray-600 text-xs border border-gray-200">
+                          <span className="font-mono bg-gray-100 px-2 py-0.5 rounded text-gray-600 text-[11px] border border-gray-200">
                             {item.lote}
                           </span>
                         ) : <span className="text-gray-400">-</span>}
                       </td>
-                      <td className="py-3 px-6 text-gray-600">
-                        {item.validade ? (() => {
-                          const [yyyy, mm, dd] = String(item.validade).split('T')[0].split('-');
-                          return `${dd}/${mm}/${yyyy}`;
-                        })() : <span className="text-gray-400">-</span>}
+                      <td className="py-3 px-6 text-gray-600 text-xs">
+                        {item.validade || <span className="text-gray-400">-</span>}
                       </td>
                       <td className="py-3 px-6 text-right">
                         <div className={`text-base font-bold ${isZerado ? 'text-gray-400' : 'text-gray-800'}`}>

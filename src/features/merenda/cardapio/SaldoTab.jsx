@@ -14,17 +14,7 @@ export default function SaldoTab() {
 
   useEffect(() => {
     fetchSaldoCompleto();
-    fetchDistribuicoes();
   }, []);
-
-  const fetchDistribuicoes = async () => {
-    try {
-      const { data } = await api.get("/api/merenda/distribuicoes");
-      setDistribuicoes(data || []);
-    } catch (err) {
-      console.error(err);
-    }
-  };
 
   const fetchSaldoCompleto = async () => {
     setLoading(true);
@@ -48,17 +38,6 @@ export default function SaldoTab() {
   };
 
   const getEstoqueKey = (item) => `${item.produto_id}||${item.lote || ''}||${item.validade || ''}`;
-
-  const getDistribuicao = (dataChegada) => {
-    if (!dataChegada || distribuicoes.length === 0) return null;
-    const dateStr = String(dataChegada).split('T')[0];
-    const index = distribuicoes.findIndex(d => {
-      const inicio = String(d.data_inicio).split('T')[0];
-      const fim = String(d.data_fim).split('T')[0];
-      return dateStr >= inicio && dateStr <= fim;
-    });
-    return index >= 0 ? `${index + 1}ª` : null;
-  };
 
   const toggleConferencia = () => {
     setIsConferencia(!isConferencia);
@@ -234,16 +213,22 @@ export default function SaldoTab() {
                         <div className="text-xs text-gray-500">{item.marca} • {item.categoria}</div>
                       </td>
                       <td className="py-3 px-6">
-                        {(() => {
-                          const dist = getDistribuicao(item.data_chegada);
-                          return dist ? (
-                            <span className="px-3 py-1 bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 text-xs font-bold rounded-lg border border-blue-200 shadow-sm">
-                              {dist}
-                            </span>
-                          ) : (
-                            <span className="text-gray-400">-</span>
-                          );
-                        })()}
+                        {item.distribuicoes_breakdown && item.distribuicoes_breakdown.length > 0 ? (
+                          <div className="flex flex-col gap-1.5">
+                            {item.distribuicoes_breakdown.map((b, i) => (
+                              <div key={i} className="flex items-center gap-1.5">
+                                <span className="px-2 py-0.5 bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-700 text-[11px] font-bold rounded-md border border-blue-200 shadow-sm whitespace-nowrap">
+                                  {b.nome} dist.
+                                </span>
+                                <span className="text-xs text-gray-500 font-medium">
+                                  ({Number(b.kg).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 2 })} kg)
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
                       </td>
                       <td className="py-3 px-6">
                         {item.lote ? (

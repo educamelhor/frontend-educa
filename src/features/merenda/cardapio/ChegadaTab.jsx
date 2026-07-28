@@ -428,7 +428,11 @@ export default function ChegadaTab() {
                 )}
               </div>
 
-              {selectedProdutoId && (
+              {selectedProdutoId && (() => {
+                const selectedProduct = produtos.find(p => p.id.toString() === selectedProdutoId);
+                const isPerecivel = selectedProduct?.categoria === 'Perecível';
+
+                return (
                 <div className="space-y-4">
                   <div className="flex justify-between items-center mb-2">
                     <h3 className="text-sm font-semibold text-gray-700">Lotes e Validades recebidos</h3>
@@ -458,10 +462,12 @@ export default function ChegadaTab() {
                         />
                       </div>
                       <div className="flex-1">
-                        <label className="block text-xs font-semibold text-gray-600 mb-1">Lote</label>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">
+                          Lote {isPerecivel && <span className="font-normal text-gray-400">(Opcional)</span>}
+                        </label>
                         <input
                           type="text"
-                          required
+                          required={!isPerecivel}
                           value={loteItem.lote}
                           onChange={(e) => handleLoteChange(index, "lote", e.target.value)}
                           placeholder="Ex: L123"
@@ -496,7 +502,8 @@ export default function ChegadaTab() {
                     </div>
                   ))}
                 </div>
-              )}
+                );
+              })()}
 
               <div className="mt-8 flex justify-end gap-3 pt-4 border-t border-gray-100">
                 <button

@@ -122,21 +122,8 @@ export default function Professores() {
       }
     }
 
-    // ➕ Novo: valida duplicidade CPF + disciplina antes de criar
-    try {
-      const res = await api.get(
-        `/api/professores/por-cpf-e-disciplina/${dados.cpf}/${dados.disciplina_id}`
-      );
-      if (res.data) {
-        alert("❌ Já existe um professor cadastrado com este CPF nessa disciplina.");
-        return false;
-      }
-    } catch (err) {
-      if (err.response?.status !== 404) {
-        alert("Erro ao verificar CPF/disciplina.");
-        return false;
-      }
-    }
+    // (A validação de duplicidade agora é feita exclusivamente pelo backend, 
+    // que retorna HTTP 409 caso o CPF já exista, ativando o banner no formulário)
 
     try {
       await api.post("/api/professores", dados); // inclui turno no payload de criação

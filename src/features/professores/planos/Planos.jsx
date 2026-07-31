@@ -1289,10 +1289,12 @@ export default function Planos() {
 
                   try {
                     const nomeCodigo = "Plano-" + Math.floor(Math.random() * 10000); // Gerado via backend depois logicamente
+                    const turmaObj = turmas.find(t => String(t.id) === String(turmaSelecionada) || t.nome === turmaSelecionada);
                     const payload = {
                       disciplina: disciplinaSelecionada,
                       bimestre: bimestreSelecionado,
                       turmas: turmasDoPlanoAberto,
+                      turno: turmaObj?.turno || null,
                       ano: new Date().getFullYear(),
                       nome_codigo: nomeCodigo,
                       status: "RASCUNHO",
@@ -1965,10 +1967,12 @@ export default function Planos() {
                   try {
                     const nomeCodigo = "Plano-" + Math.floor(Math.random() * 10000);
                     const novoStatus = planoModo === "professor_autonomo" ? "APROVADO" : "ENVIADO";
+                    const turmaObj = turmas.find(t => String(t.id) === String(turmaSelecionada) || t.nome === turmaSelecionada);
                     const payload = {
                       disciplina: disciplinaSelecionada,
                       bimestre: bimestreSelecionado,
                       turmas: turmasDoPlanoAberto,
+                      turno: turmaObj?.turno || null,
                       ano: new Date().getFullYear(),
                       nome_codigo: nomeCodigo,
                       status: novoStatus,

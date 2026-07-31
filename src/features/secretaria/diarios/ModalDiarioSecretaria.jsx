@@ -22,6 +22,7 @@ import {
   ClipboardDocumentListIcon,
   LockClosedIcon,
   LockOpenIcon,
+  ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
 
 // ── Cor da célula por nota ──────────────────────────────────────────────────
@@ -41,13 +42,41 @@ function labelBimestre(raw) {
   return raw;
 }
 
-export default function ModalDiarioSecretaria({ plano, onClose }) {
+export default function ModalDiarioSecretaria({ plano, onClose, onToggleStatus }) {
   const [loading, setLoading]         = useState(true);
   const [erro, setErro]               = useState(null);
   const [itens, setItens]             = useState([]);      // colunas do diário
   const [alunos, setAlunos]           = useState([]);      // lista ordenada
   const [notas, setNotas]             = useState({});      // { "alunoId_itemIdx_opIdx": valor }
   const [buscaAluno, setBuscaAluno]   = useState("");
+
+  const [modalConfirmacaoCadeado, setModalConfirmacaoCadeado] = useState(false);
+  const [processandoCadeado, setProcessandoCadeado] = useState(false);
+
+  // Função para alternar o status
+  const handleToggleCadeado = async () => {
+    if (processandoCadeado) return;
+    setProcessandoCadeado(true);
+    try {
+      const acao = plano.diario_fechado ? 'abrir' : 'fechar';
+      const res = await api.post("/secretaria/relatorios/diarios/toggle-status", {
+        plano_id: plano.plano_id,
+        turma_id: plano.turma_id,
+        acao
+      });
+      if (res.data?.ok) {
+        if (onToggleStatus) onToggleStatus(acao === 'fechar' ? 1 : 0);
+        setModalConfirmacaoCadeado(false);
+      } else {
+        alert(res.data?.error || "Erro ao alterar o status do diário.");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Erro de comunicação ao alterar o status.");
+    } finally {
+      setProcessandoCadeado(false);
+    }
+  };
 
   useEffect(() => {
     if (!plano?.plano_id) return;
@@ -160,9 +189,10 @@ export default function ModalDiarioSecretaria({ plano, onClose }) {
           </div>
 
           <div className="flex items-center gap-3 flex-shrink-0">
-            {/* Badge Diário Fechado/Aberto */}
-            <span
-              className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold"
+            {/* Badge Diário Fechado/Aberto Clicável */}
+            <button
+              onClick={() => setModalConfirmacaoCadeado(true)}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold cursor-pointer transition-all hover:scale-105 active:scale-95"
               style={
                 plano.diario_fechado
                   ? { background: "rgba(239,68,68,0.15)", color: "#fca5a5", border: "1px solid rgba(239,68,68,0.3)" }
@@ -173,7 +203,7 @@ export default function ModalDiarioSecretaria({ plano, onClose }) {
                 ? <><LockClosedIcon className="h-3.5 w-3.5" /> Diário Fechado</>
                 : <><LockOpenIcon className="h-3.5 w-3.5" /> Diário Aberto</>
               }
-            </span>
+            </button>
 
             <button
               onClick={onClose}
@@ -412,6 +442,46 @@ export default function ModalDiarioSecretaria({ plano, onClose }) {
           </button>
         </div>
       </div>
+
+      {/* ── Modal de Confirmação ─────────────────────────────────────── */}
+      {modalConfirmacaoCadeado && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-700/50 rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4">
+            <div className="flex items-center gap-4 mb-4">
+              <div className={`p-3 rounded-full ${plano.diario_fechado ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                <ExclamationTriangleIcon className="h-6 w-6" />
+              </div>
+              <h3 className="text-lg font-bold text-white">Confirmação</h3>
+            </div>
+            <p className="text-slate-300 text-sm mb-6">
+              Deseja realmente {plano.diario_fechado ? "abrir" : "fechar"} esse diário?
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setModalConfirmacaoCadeado(false)}
+                disabled={processandoCadeado}
+                className="px-4 py-2 rounded-lg text-sm font-semibold text-slate-300 bg-slate-800 hover:bg-slate-700 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleToggleCadeado}
+                disabled={processandoCadeado}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold text-white transition-colors ${
+                  plano.diario_fechado 
+                    ? 'bg-emerald-600 hover:bg-emerald-500' 
+                    : 'bg-red-600 hover:bg-red-500'
+                } flex items-center gap-2`}
+              >
+                {processandoCadeado && (
+                  <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                )}
+                Sim, {plano.diario_fechado ? "Abrir" : "Fechar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

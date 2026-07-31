@@ -382,6 +382,15 @@ export default function DiarioSecretaria() {
         <ModalDiarioSecretaria
           plano={modalPlano}
           onClose={() => setModalPlano(null)}
+          onToggleStatus={(novoStatus) => {
+            setDiarios(prev => prev.map(d => 
+              d.plano_id === modalPlano.plano_id && d.turma_id === modalPlano.turma_id 
+                ? { ...d, diario_fechado: novoStatus } 
+                : d
+            ));
+            // Atualiza o plano passado para o modal também para não piscar
+            setModalPlano(prev => ({ ...prev, diario_fechado: novoStatus }));
+          }}
         />
       )}
     </div>

@@ -128,6 +128,14 @@ const MODULOS_TREE = [
       { id: 'merenda.relatorios', label: 'Relatórios' },
     ]
   },
+  {
+    id: 'comunicacao', label: 'Comunicação', icon: '💬',
+    filhos: [
+      { id: 'comunicacao.avisos', label: 'Avisos' },
+      { id: 'comunicacao.comunicados', label: 'Comunicados' },
+      { id: 'comunicacao.mural', label: 'Mural' },
+    ]
+  },
 ];
 
 // ── Group accent colors (cycle) ───────────────────────────────────────────────

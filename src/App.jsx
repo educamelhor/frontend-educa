@@ -139,6 +139,11 @@ import PlanoAvaliacaoPage from "./features/pedagogico/relatorios/PlanoAvaliacaoP
 import MerendaCadastroPage from "./features/merenda/cadastro";
 import MerendaCardapioPage from "./features/merenda/cardapio/MerendaCardapioPage";
 
+// ✅ MÓDULO COMUNICAÇÃO
+import AvisosPage from "./features/comunicacao/avisos/AvisosPage";
+import ComunicadosPage from "./features/comunicacao/comunicados/ComunicadosPage";
+import MuralPage from "./features/comunicacao/mural/MuralPage";
+
 // Layout protegido para rotas autenticadas
 function ProtectedLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -414,6 +419,11 @@ export default function App() {
           {/* ── Merenda ─────────────────────────────────────────────────── */}
           <Route path="/merenda/cadastro" element={<RequireModulo modulo="merenda.cadastro"><MerendaCadastroPage /></RequireModulo>} />
           <Route path="/merenda/cardapio" element={<MerendaCardapioPage />} />
+
+          {/* ── Comunicação ──────────────────────────────────────────────── */}
+          <Route path="/comunicacao/avisos"      element={<RequireModulo modulo="comunicacao"><AvisosPage /></RequireModulo>} />
+          <Route path="/comunicacao/comunicados" element={<RequireModulo modulo="comunicacao"><ComunicadosPage /></RequireModulo>} />
+          <Route path="/comunicacao/mural"       element={<RequireModulo modulo="comunicacao"><MuralPage /></RequireModulo>} />
 
           {/* ── Impressão ────────────────────────────────────────────────── */}
           <Route path="/impressao/gabaritos"   element={<RequireModulo modulo="impressao"><GerarGabaritos /></RequireModulo>} />

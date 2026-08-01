@@ -188,6 +188,21 @@ export default function EmprestimosPage() {
     } finally { setDevolvendo(null); }
   };
 
+  const handleRenovar = async (id) => {
+    const dias = window.prompt('Quantos dias a mais para devolução?', '7');
+    if (dias === null) return;
+    const qtd = parseInt(dias, 10);
+    if (isNaN(qtd) || qtd <= 0) return alert('Quantidade de dias inválida');
+    
+    setDevolvendo(id);
+    try {
+      await api.put(`/api/biblioteca/emprestimos/${id}/renovar`, { dias_adicionais: qtd });
+      fetchEmprestimos();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Erro ao renovar empréstimo');
+    } finally { setDevolvendo(null); }
+  };
+
   const isAtrasado = (emp) => {
     if (emp.status !== 'ativo' || !emp.data_prevista_devolucao) return false;
     return new Date(emp.data_prevista_devolucao) < new Date();
@@ -280,12 +295,21 @@ export default function EmprestimosPage() {
                     </span>
                   </td>
                   <td className="py-3 px-4">
-                    {emp.status === 'ativo' && (
-                      <button onClick={() => handleDevolver(emp.id)} disabled={devolvendo === emp.id}
-                        className="text-xs font-bold px-3 py-1.5 rounded-lg text-white transition"
-                        style={{ background: devolvendo === emp.id ? '#94a3b8' : 'linear-gradient(135deg, #10b981, #059669)' }}>
-                        {devolvendo === emp.id ? '⏳' : '✅ Devolver'}
-                      </button>
+                    {emp.status !== 'devolvido' && (
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => handleDevolver(emp.id)} disabled={devolvendo === emp.id}
+                          className="text-xs font-bold px-3 py-1.5 rounded-lg text-white transition"
+                          style={{ background: devolvendo === emp.id ? '#94a3b8' : 'linear-gradient(135deg, #10b981, #059669)' }}
+                          title="Registrar devolução">
+                          {devolvendo === emp.id ? '⏳' : '✅ Devolver'}
+                        </button>
+                        <button onClick={() => handleRenovar(emp.id)} disabled={devolvendo === emp.id}
+                          className="text-xs font-bold px-3 py-1.5 rounded-lg text-white transition"
+                          style={{ background: devolvendo === emp.id ? '#94a3b8' : 'linear-gradient(135deg, #3b82f6, #2563eb)' }}
+                          title="Renovar prazo de devolução">
+                          🔄 Renovar
+                        </button>
+                      </div>
                     )}
                     {emp.status === 'devolvido' && (
                       <span className="text-xs text-slate-400">{emp.data_devolucao ? new Date(emp.data_devolucao).toLocaleDateString('pt-BR') : '—'}</span>

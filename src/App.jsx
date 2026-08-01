@@ -58,6 +58,7 @@ import BibliotecaAcervo from "./features/biblioteca/acervo/AcervoPage";
 import BibliotecaEmprestimos from "./features/biblioteca/emprestimos/EmprestimosPage";
 import BibliotecaAlunos from "./features/biblioteca/alunos/AlunosLeitorPage";
 import LeitorDestaque from "./features/biblioteca/leitor-destaque/LeitorDestaquePage";
+import VitrinePage from "./features/biblioteca/leitor-destaque/VitrinePage.jsx";
 import BibliotecaConcurso from "./features/biblioteca/concurso/ConcursoPage";
 import BibliotecaMetadados from "./features/biblioteca/metadados/MetadadosPage";
 
@@ -298,6 +299,9 @@ export default function App() {
         <Route path="/suporte" element={<SuportePage />} />
         {/* Rota pública de verificação da carteirinha */}
         <Route path="/verificar/:token" element={<VerificarCarteirinha />} />
+        
+        {/* Rota pública da Vitrine de Destaques (Biblioteca) */}
+        <Route path="/biblioteca/vitrine/:escolaId" element={<VitrinePage />} />
         {/* EDUCA-CAPTURE — páginas públicas (App Store Connect: support/privacy URLs) */}
         <Route path="/capture/privacidade" element={<CapturePrivacidadePage />} />
         <Route path="/capture/suporte" element={<CapturePrivacidadePage />} />

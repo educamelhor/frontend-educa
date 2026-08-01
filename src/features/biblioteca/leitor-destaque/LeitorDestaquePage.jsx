@@ -339,11 +339,21 @@ export default function LeitorDestaquePage() {
             </div>
             <p className="text-amber-200 text-sm">Gerencie resenhas, aprove e destaque os melhores leitores</p>
           </div>
-          <button onClick={() => setModalNova(true)} className="flex items-center gap-2 font-bold text-sm px-5 py-3 rounded-xl text-white transition" style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.25)', backdropFilter: 'blur(8px)' }}
-            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}>
-            ✍️ Nova Resenha
-          </button>
+          <div className="flex items-center gap-3">
+            <button onClick={() => {
+              const escolaId = localStorage.getItem('escola_id');
+              if (escolaId) window.open(`/biblioteca/vitrine/${escolaId}`, '_blank');
+            }} className="flex items-center gap-2 font-bold text-sm px-5 py-3 rounded-xl text-white transition" style={{ background: 'linear-gradient(135deg, #10b981, #059669)', border: '1px solid rgba(255,255,255,0.15)', boxShadow: '0 4px 12px rgba(16,185,129,0.3)' }}
+              onMouseEnter={e => e.currentTarget.style.filter = 'brightness(1.1)'}
+              onMouseLeave={e => e.currentTarget.style.filter = 'brightness(1)'}>
+              📺 Abrir Vitrine Pública
+            </button>
+            <button onClick={() => setModalNova(true)} className="flex items-center gap-2 font-bold text-sm px-5 py-3 rounded-xl text-white transition" style={{ background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.25)', backdropFilter: 'blur(8px)' }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}>
+              ✍️ Nova Resenha
+            </button>
+          </div>
         </div>
       </div>
 

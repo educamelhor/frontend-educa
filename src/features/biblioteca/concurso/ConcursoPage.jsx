@@ -216,6 +216,17 @@ export default function ConcursoPage() {
           {/* Filtros de período */}
           <div className="flex gap-2 mb-6 flex-wrap items-center">
             <span className="text-sm font-semibold text-slate-500">Período:</span>
+            <select 
+              value={anoFiltro} 
+              onChange={e => setAnoFiltro(Number(e.target.value))}
+              className="px-2 py-1 rounded-lg text-xs font-bold border outline-none mr-2 focus:ring-2 focus:ring-teal-300"
+              style={{ borderColor: '#e2e8f0', background: '#fff', color: '#475569' }}
+            >
+              {[...Array(5)].map((_, i) => {
+                const year = new Date().getFullYear() - i;
+                return <option key={year} value={year}>{year}</option>;
+              })}
+            </select>
             <button onClick={() => setMesFiltro('')}
               className="px-3 py-1.5 rounded-lg text-xs font-bold transition"
               style={{ background: !mesFiltro ? '#0d9488' : '#f1f5f9', color: !mesFiltro ? '#fff' : '#475569' }}>

@@ -32,6 +32,11 @@ const IconEdit = () => (
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
   </svg>
 );
+const IconTrash = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+  </svg>
+);
 
 const CATEGORIAS = [
   { value: '', label: 'Todas as categorias' },
@@ -44,7 +49,7 @@ const CATEGORIAS = [
   { value: 'outro', label: '📦 Outro' },
 ];
 
-function LivroCard({ livro, onEdit }) {
+function LivroCard({ livro, onEdit, onDelete }) {
   const [hovered, setHovered] = useState(false);
   const disponivel = livro.exemplares_disponiveis > 0;
 
@@ -115,15 +120,23 @@ function LivroCard({ livro, onEdit }) {
           </span>
         </div>
 
-        {/* Overlay botão editar */}
+        {/* Overlay botões editar/excluir */}
         {hovered && (
-          <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.3)' }}>
+          <div className="absolute inset-0 flex items-center justify-center gap-2" style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)' }}>
             <button
               onClick={(e) => { e.stopPropagation(); onEdit(livro); }}
-              className="flex items-center gap-1 text-xs font-bold px-3 py-2 rounded-lg"
+              className="flex items-center gap-1 text-xs font-bold px-3 py-2 rounded-lg transition-transform hover:scale-105"
               style={{ background: 'rgba(255,255,255,0.95)', color: '#0f172a' }}
             >
               <IconEdit /> Editar
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); onDelete(livro); }}
+              className="flex items-center gap-1 text-xs font-bold px-3 py-2 rounded-lg transition-transform hover:scale-105"
+              style={{ background: '#ef4444', color: '#fff' }}
+              title="Inativar livro na escola"
+            >
+              <IconTrash />
             </button>
           </div>
         )}
@@ -213,6 +226,17 @@ export default function AcervoPage() {
     setModalOpen(false);
     setEditando(null);
     if (refresh) fetchLivros(page);
+  };
+
+  const handleDelete = async (livro) => {
+    if (window.confirm(`Tem certeza que deseja inativar o livro "${livro.titulo}" do seu acervo escolar? O histórico de empréstimos será mantido.`)) {
+      try {
+        await api.delete(`/api/biblioteca/acervo/${livro.id}`);
+        fetchLivros(page);
+      } catch (err) {
+        alert(err.response?.data?.error || 'Erro ao inativar livro.');
+      }
+    }
   };
 
   const totalPages = Math.ceil(total / LIMIT);
@@ -343,7 +367,7 @@ export default function AcervoPage() {
         <>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 mb-6">
             {livros.map(livro => (
-              <LivroCard key={livro.id} livro={livro} onEdit={handleEdit} />
+              <LivroCard key={livro.id} livro={livro} onEdit={handleEdit} onDelete={handleDelete} />
             ))}
           </div>
 

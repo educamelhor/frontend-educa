@@ -1,7 +1,6 @@
 // src/features/comunicacao/comunicados/ComunicadosPage.jsx
-import React, { useState, useEffect, useRef, useContext } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api from '../../../services/api';
-import { AuthContext } from '../../../contexts/AuthContext';
 import { 
   MegaphoneIcon, 
   PlusIcon, 
@@ -21,9 +20,9 @@ const formatDate = (dateString) => {
 };
 
 export default function ComunicadosPage() {
-  const { escolaId, user } = useContext(AuthContext);
+  const escolaId = localStorage.getItem('escola_id');
   const perfil = String(localStorage.getItem('perfil') || '').toLowerCase().trim();
-  const canManage = ['diretor', 'vice_diretor', 'coordenador', 'supervisor'].includes(perfil) || user?.role === 'sysadmin';
+  const canManage = ['diretor', 'vice_diretor', 'coordenador', 'supervisor', 'master'].includes(perfil);
 
   const [comunicados, setComunicados] = useState([]);
   const [loading, setLoading] = useState(true);

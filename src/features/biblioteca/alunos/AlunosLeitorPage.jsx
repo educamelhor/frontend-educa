@@ -38,6 +38,8 @@ export default function AlunosLeitorPage() {
   const [alunoSel, setAlunoSel] = useState(null);
   const [historico, setHistorico] = useState(null);
   const [loadingHist, setLoadingHist] = useState(false);
+  const [limitEmp, setLimitEmp] = useState(5);
+  const [limitRes, setLimitRes] = useState(5);
   const [turmas, setTurmas] = useState([]);
   const [loadingTurmas, setLoadingTurmas] = useState(false);
   const searchRef = useRef(null);
@@ -70,6 +72,8 @@ export default function AlunosLeitorPage() {
     setAlunos([]);
     setBuscaAluno(aluno.nome);
     setLoadingHist(true);
+    setLimitEmp(5);
+    setLimitRes(5);
     try {
       const { data } = await api.get(`/api/biblioteca/alunos/${aluno.id}/historico`);
       setHistorico(data);
@@ -195,7 +199,7 @@ export default function AlunosLeitorPage() {
                 <p className="text-sm text-slate-400 mb-6">Nenhum empréstimo encontrado.</p>
               ) : (
                 <div className="space-y-3 mb-6">
-                  {historico.emprestimos.map((emp) => (
+                  {historico.emprestimos.slice(0, limitEmp).map((emp) => (
                     <div key={emp.id} className="flex items-center gap-4 p-3 rounded-xl" style={{ background: '#f8fafc', border: '1px solid #f1f5f9' }}>
                       <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
                         style={{ background: emp.status === 'devolvido' ? 'rgba(16,185,129,0.1)' : 'rgba(59,130,246,0.1)' }}>
@@ -213,6 +217,11 @@ export default function AlunosLeitorPage() {
                       </div>
                     </div>
                   ))}
+                  {historico.emprestimos.length > limitEmp && (
+                    <button onClick={() => setLimitEmp(l => l + 5)} className="w-full py-2 mt-2 text-sm font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-xl transition">
+                      Ver mais empréstimos ({historico.emprestimos.length - limitEmp} restantes)
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -221,7 +230,7 @@ export default function AlunosLeitorPage() {
                 <>
                   <h3 className="font-bold text-slate-700 mb-3 flex items-center gap-2"><span>✍️</span> Resenhas produzidas</h3>
                   <div className="space-y-3">
-                    {historico.resenhas.map(r => (
+                    {historico.resenhas.slice(0, limitRes).map(r => (
                       <div key={r.id} className="p-4 rounded-2xl" style={{ background: '#faf5ff', border: '1px solid #e9d5ff' }}>
                         <div className="flex items-center justify-between mb-2">
                           <p className="font-bold text-sm text-purple-900">{r.livro_titulo}</p>
@@ -242,6 +251,11 @@ export default function AlunosLeitorPage() {
                         {r.resenha && <p className="text-xs text-purple-700 line-clamp-3">{r.resenha}</p>}
                       </div>
                     ))}
+                    {historico.resenhas.length > limitRes && (
+                      <button onClick={() => setLimitRes(l => l + 5)} className="w-full py-2 mt-2 text-sm font-bold text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-xl transition">
+                        Ver mais resenhas ({historico.resenhas.length - limitRes} restantes)
+                      </button>
+                    )}
                   </div>
                 </>
               )}

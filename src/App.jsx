@@ -60,6 +60,7 @@ import BibliotecaAlunos from "./features/biblioteca/alunos/AlunosLeitorPage";
 import LeitorDestaque from "./features/biblioteca/leitor-destaque/LeitorDestaquePage";
 import VitrinePage from "./features/biblioteca/leitor-destaque/VitrinePage.jsx";
 import BibliotecaConcurso from "./features/biblioteca/concurso/ConcursoPage";
+import BancoPerguntasPage from "./features/biblioteca/resenhas/BancoPerguntasPage.jsx";
 import BibliotecaMetadados from "./features/biblioteca/metadados/MetadadosPage";
 
 // ✅ Direção (Diretor) — Devices EDUCA-CAPTURE
@@ -447,6 +448,7 @@ export default function App() {
           <Route path="/biblioteca/emprestimos"     element={<RequireModulo modulo="biblioteca"><BibliotecaEmprestimos /></RequireModulo>} />
           <Route path="/biblioteca/alunos"          element={<RequireModulo modulo="biblioteca"><BibliotecaAlunos /></RequireModulo>} />
           <Route path="/biblioteca/leitor-destaque" element={<RequireModulo modulo="biblioteca"><LeitorDestaque /></RequireModulo>} />
+          <Route path="/biblioteca/resenhas-config" element={<RequireModulo modulo="biblioteca"><BancoPerguntasPage /></RequireModulo>} />
           <Route path="/biblioteca/concurso"        element={<RequireModulo modulo="biblioteca"><BibliotecaConcurso /></RequireModulo>} />
           <Route path="/biblioteca/metadados"       element={<RequireModulo modulo="biblioteca"><BibliotecaMetadados /></RequireModulo>} />
 

@@ -835,6 +835,22 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
                 )}
+                {hasModulo('biblioteca.leitor_destaque') && (
+                <li>
+                  <Link
+                    to="/biblioteca/resenhas-config"
+                    className={getSubmenuLinkClasses('/biblioteca/resenhas-config')}
+                    style={{
+                      background: isActive('/biblioteca/resenhas-config')
+                        ? 'linear-gradient(90deg, rgba(59,130,246,0.15), transparent)'
+                        : undefined,
+                    }}
+                  >
+                    <span className="mr-2 text-base" style={{ lineHeight: 1 }}>📝</span>
+                    <span className="flex-1" style={{ color: isActive('/biblioteca/resenhas-config') ? '#3b82f6' : undefined }}>Banco de Perguntas</span>
+                  </Link>
+                </li>
+                )}
                 {hasModulo('biblioteca.metadados') && (
                 <li>
                   <Link

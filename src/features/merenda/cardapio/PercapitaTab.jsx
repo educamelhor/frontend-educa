@@ -79,9 +79,36 @@ export default function PercapitaTab() {
     }
   };
 
+  const [refeicoesServidas, setRefeicoesServidas] = useState(null);
+  const [isServidasModalOpen, setIsServidasModalOpen] = useState(false);
+  const [tempServidas, setTempServidas] = useState("");
+
+  const servidasVal = refeicoesServidas !== null ? refeicoesServidas : totalAlunos;
+
+  const handleOpenServidasModal = () => {
+    setTempServidas(servidasVal.toString());
+    setIsServidasModalOpen(true);
+  };
+
+  const handleSaveServidas = (e) => {
+    e.preventDefault();
+    const val = parseInt(tempServidas, 10);
+    if (isNaN(val) || val < 0) {
+      toast.error("Insira um valor numérico válido.");
+      return;
+    }
+    if (val > totalAlunos) {
+      toast.error("A quantidade de refeições servidas não pode ser superior à quantidade de alunos ativos.");
+      return;
+    }
+    setRefeicoesServidas(val);
+    setIsServidasModalOpen(false);
+    toast.success("Quantidade de refeições servidas atualizada para simulação.");
+  };
+
   const calcularRefeicoes = (saldoKg, percapita) => {
-    if (!percapita || !totalAlunos || totalAlunos === 0) return 0;
-    const kgPorRefeicao = parseFloat(percapita) * totalAlunos;
+    if (!percapita || !servidasVal || servidasVal === 0) return 0;
+    const kgPorRefeicao = parseFloat(percapita) * servidasVal;
     if (kgPorRefeicao === 0) return 0;
     return Math.floor(parseFloat(saldoKg) / kgPorRefeicao);
   };
@@ -111,6 +138,18 @@ export default function PercapitaTab() {
         </div>
         
         <div className="flex items-center gap-4">
+          <div 
+            onClick={handleOpenServidasModal}
+            className="bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-100 flex flex-col items-end cursor-pointer hover:bg-emerald-100 transition-colors"
+            title="Clique para ajustar as Refeições Servidas"
+          >
+            <span className="text-xs text-emerald-700 font-semibold uppercase tracking-wider flex items-center gap-1">
+              Refeições Servidas
+              <PencilSquareIcon className="w-3 h-3" />
+            </span>
+            <span className="text-xl font-bold text-emerald-600">{servidasVal}</span>
+          </div>
+
           <div className="bg-amber-50 px-4 py-2 rounded-xl border border-amber-100 flex flex-col items-end">
             <span className="text-xs text-amber-700 font-semibold uppercase tracking-wider">Alunos Ativos</span>
             <span className="text-xl font-bold text-amber-600">{totalAlunos}</span>
@@ -299,6 +338,58 @@ export default function PercapitaTab() {
                   ) : (
                     "Salvar Per capita"
                   )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Refeições Servidas */}
+      {isServidasModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+              <h3 className="text-lg font-bold text-gray-800">
+                Refeições Servidas
+              </h3>
+              <button onClick={() => setIsServidasModalOpen(false)} className="text-gray-400 hover:text-gray-600">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveServidas} className="p-6">
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Quantidade</label>
+                <input
+                  type="number"
+                  required
+                  min="0"
+                  max={totalAlunos}
+                  value={tempServidas}
+                  onChange={(e) => setTempServidas(e.target.value)}
+                  className="w-full px-4 py-2 border border-emerald-300 rounded-xl outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 bg-emerald-50/30 font-semibold"
+                />
+                <p className="text-xs text-gray-500 mt-2">
+                  Informe quantas refeições serão efetivamente servidas. (Máximo: {totalAlunos})
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setIsServidasModalOpen(false)}
+                  className="px-5 py-2.5 text-gray-600 font-medium hover:bg-gray-100 rounded-xl transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold rounded-xl shadow-md transition-colors"
+                >
+                  Salvar
                 </button>
               </div>
             </form>

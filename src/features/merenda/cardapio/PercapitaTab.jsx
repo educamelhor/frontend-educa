@@ -150,7 +150,7 @@ export default function PercapitaTab() {
         <div className="flex items-center gap-4">
           <div 
             onClick={handleOpenServidasModal}
-            className="bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-100 flex flex-col items-end cursor-pointer hover:bg-emerald-100 transition-colors"
+            className="bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-100 flex flex-col items-center cursor-pointer hover:bg-emerald-100 transition-colors"
             title="Clique para ajustar as Refeições Servidas"
           >
             <span className="text-xs text-emerald-700 font-semibold uppercase tracking-wider flex items-center gap-1">
@@ -160,7 +160,7 @@ export default function PercapitaTab() {
             <span className="text-xl font-bold text-emerald-600">{servidasVal}</span>
           </div>
 
-          <div className="bg-amber-50 px-4 py-2 rounded-xl border border-amber-100 flex flex-col items-end">
+          <div className="bg-amber-50 px-4 py-2 rounded-xl border border-amber-100 flex flex-col items-center">
             <span className="text-xs text-amber-700 font-semibold uppercase tracking-wider">Alunos Ativos</span>
             <span className="text-xl font-bold text-amber-600">{totalAlunos}</span>
           </div>

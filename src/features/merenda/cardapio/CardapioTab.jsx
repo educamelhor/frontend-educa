@@ -135,6 +135,7 @@ export default function CardapioTab() {
   useEffect(() => {
     fetchCardapios();
     fetchEstoque();
+    fetchReceitasEProdutos();
   }, [currentDate]);
 
   const fetchCardapios = async () => {
@@ -191,15 +192,22 @@ export default function CardapioTab() {
       setNomeCardapio(cardapioExistente.nome);
       setTurnoCardapio(cardapioExistente.turno || "Todos");
       setRefeicoesCardapio(cardapioExistente.refeicoes_cardapio != null ? String(cardapioExistente.refeicoes_cardapio) : "");
-      const formatItens = cardapioExistente.itens.map(i => ({
-        key: `${i.produto_id}||${i.lote || ''}||${i.validade || ''}`,
-        produto_id: i.produto_id,
-        lote: i.lote,
-        validade: i.validade,
-        produto: i.produto,
-        marca: i.marca,
-        quantidade_kg: Number(i.quantidade_kg)
-      }));
+      const formatItens = cardapioExistente.itens.map(i => {
+        const estKey = `${i.produto_id}||${i.lote || ''}||${i.validade || ''}`;
+        const itemEstoque = estoque.find(e => getEstoqueKey(e) === estKey) || {};
+        return {
+          key: estKey,
+          produto_id: i.produto_id,
+          lote: i.lote,
+          validade: i.validade,
+          produto: i.produto,
+          marca: i.marca,
+          quantidade_kg: Number(i.quantidade_kg),
+          gramaturaStr: i.gramaturaStr || itemEstoque.gramatura,
+          percapita_kg: itemEstoque.percapita_kg,
+          saldo_kg: itemEstoque.saldo_kg
+        };
+      });
       setItensSelecionados(formatItens);
     } else {
       setEditingId(null);
@@ -232,6 +240,47 @@ export default function CardapioTab() {
     setSelectedLoteId(value);
   };
 
+  const handleReceitaSelectParaCardapio = (receitaNome) => {
+    setNomeCardapio(receitaNome);
+    if (!receitaNome) {
+      setItensSelecionados([]);
+      return;
+    }
+    const receita = receitas.find(r => r.nome === receitaNome);
+    if (!receita) return;
+
+    const refParaCalculo = refeicoesCardapio ? parseInt(refeicoesCardapio, 10) : (refeicoesServidas !== null ? refeicoesServidas : totalAlunos);
+    const novosItens = [];
+
+    for (const prod of receita.itens) {
+      const lotesDisponiveis = estoque.filter(e => e.produto_id === prod.id && Number(e.saldo_kg) > 0 && e.percapita_id);
+      lotesDisponiveis.sort((a, b) => new Date(a.validade || '9999-12-31') - new Date(b.validade || '9999-12-31'));
+
+      if (lotesDisponiveis.length > 0) {
+        const itemEstoque = lotesDisponiveis[0];
+        const kgNecessario = Number(itemEstoque.percapita_kg) * refParaCalculo;
+        const saldoKg = Number(itemEstoque.saldo_kg);
+        const previewKg = kgNecessario > saldoKg ? saldoKg : kgNecessario;
+
+        novosItens.push({
+          key: getEstoqueKey(itemEstoque),
+          produto_id: itemEstoque.produto_id,
+          lote: itemEstoque.lote,
+          validade: itemEstoque.validade,
+          produto: itemEstoque.produto,
+          marca: itemEstoque.marca,
+          quantidade_kg: previewKg,
+          gramaturaStr: itemEstoque.gramatura,
+          percapita_kg: itemEstoque.percapita_kg,
+          saldo_kg: itemEstoque.saldo_kg
+        });
+      } else {
+        toast.error(`Ingrediente "${prod.produto}" sem saldo ou per capita configurada.`);
+      }
+    }
+    setItensSelecionados(novosItens);
+  };
+
   const handleAddItem = () => {
     if (!selectedLoteId) return;
     const itemEstoque = estoque.find(e => getEstoqueKey(e) === selectedLoteId);
@@ -242,83 +291,77 @@ export default function CardapioTab() {
       return;
     }
 
-    // Usa refeicoesCardapio do campo do modal (ou fallback para refeicoesServidas, ou totalAlunos)
-    const refParaCalculo = refeicoesCardapio
-      ? parseInt(refeicoesCardapio, 10)
-      : (refeicoesServidas !== null ? refeicoesServidas : totalAlunos);
-
+    const refParaCalculo = refeicoesCardapio ? parseInt(refeicoesCardapio, 10) : (refeicoesServidas !== null ? refeicoesServidas : totalAlunos);
     const kgNecessario = Number(itemEstoque.percapita_kg) * refParaCalculo;
     const saldoKg = Number(itemEstoque.saldo_kg);
-
-    const proceedAddItem = (kgUsado) => {
-      setItensSelecionados(prev => [...prev, {
-        key: selectedLoteId,
-        produto_id: itemEstoque.produto_id,
-        lote: itemEstoque.lote,
-        validade: itemEstoque.validade,
-        produto: itemEstoque.produto,
-        marca: itemEstoque.marca,
-        quantidade_kg: kgUsado,
-        gramaturaStr: itemEstoque.gramatura
-      }]);
-      setSelectedLoteId("");
-    };
-
-    // Possibilidade 2: Saldo abundante
-    if (saldoKg >= kgNecessario * 2) {
-      proceedAddItem(kgNecessario);
-      return;
-    }
-
-    // Possibilidade 4: Saldo insuficiente
-    if (saldoKg < kgNecessario) {
-      setIntelligentModalConfig({
-        isOpen: true,
-        type: 4,
-        item: itemEstoque,
-        kgNecessario,
-        saldoKg,
-        refParaCalculo,
-        kgInput: String(saldoKg)
-      });
-      return;
-    }
-
-    // Possibilidade 3: Saldo Crítico
-    if (saldoKg >= kgNecessario && saldoKg < kgNecessario * 2) {
-      setIntelligentModalConfig({
-        isOpen: true,
-        type: 3,
-        item: itemEstoque,
-        kgNecessario,
-        saldoKg,
-        refParaCalculo,
-        kgInput: String(kgNecessario)
-      });
-      return;
-    }
-  };
-
-  const confirmIntelligentAdd = (kgUsado) => {
-    if (!intelligentModalConfig.item) return;
-    const parsedKg = parseFloat(kgUsado);
-    if (isNaN(parsedKg) || parsedKg <= 0) {
-      toast.error("Informe uma quantidade válida.");
-      return;
-    }
+    const previewKg = kgNecessario > saldoKg ? saldoKg : kgNecessario;
 
     setItensSelecionados(prev => [...prev, {
-      key: getEstoqueKey(intelligentModalConfig.item),
-      produto_id: intelligentModalConfig.item.produto_id,
-      lote: intelligentModalConfig.item.lote,
-      validade: intelligentModalConfig.item.validade,
-      produto: intelligentModalConfig.item.produto,
-      marca: intelligentModalConfig.item.marca,
-      quantidade_kg: parsedKg,
-      gramaturaStr: intelligentModalConfig.item.gramatura
+      key: selectedLoteId,
+      produto_id: itemEstoque.produto_id,
+      lote: itemEstoque.lote,
+      validade: itemEstoque.validade,
+      produto: itemEstoque.produto,
+      marca: itemEstoque.marca,
+      quantidade_kg: previewKg,
+      gramaturaStr: itemEstoque.gramatura,
+      percapita_kg: itemEstoque.percapita_kg,
+      saldo_kg: itemEstoque.saldo_kg
     }]);
     setSelectedLoteId("");
-    setIntelligentModalConfig({ isOpen: false, item: null });
+  };
+
+  const [intelligentQueue, setIntelligentQueue] = useState([]);
+  const [isProcessingQueue, setIsProcessingQueue] = useState(false);
+
+  const processNextInQueue = (currentQueue, currentItens) => {
+    const problemIndex = currentQueue.findIndex(q => q.type === 3 || q.type === 4);
+    
+    if (problemIndex === -1) {
+      // Resolve all items
+      const resolvedItens = currentItens.map(i => {
+         const qItem = currentQueue.find(q => q.item.key === i.key);
+         return { ...i, quantidade_kg: qItem ? qItem.kgUsado : i.quantidade_kg };
+      });
+      setItensSelecionados(resolvedItens);
+      setIsProcessingQueue(false);
+      setIntelligentQueue([]);
+      setIntelligentModalConfig({ isOpen: false, item: null });
+      executeSubmit(resolvedItens);
+      return;
+    }
+
+    const problem = currentQueue[problemIndex];
+    setIntelligentModalConfig({
+      isOpen: true,
+      type: problem.type,
+      item: problem.item,
+      kgNecessario: problem.kgNecessario,
+      saldoKg: problem.saldoKg,
+      refParaCalculo: problem.refParaCalculo,
+      kgInput: problem.type === 4 ? String(problem.saldoKg) : String(problem.kgNecessario),
+      queueIndex: problemIndex
+    });
+  };
+
+  const confirmIntelligentAdd = (kgUsadoStr) => {
+    const kgUsado = parseFloat(kgUsadoStr);
+    if (isNaN(kgUsado) || kgUsado <= 0) return toast.error("Quantidade inválida.");
+
+    const newItens = itensSelecionados.map(i => {
+      if (i.key === intelligentModalConfig.item.key) {
+         return { ...i, quantidade_kg: kgUsado };
+      }
+      return i;
+    });
+    setItensSelecionados(newItens);
+
+    const newQueue = [...intelligentQueue];
+    newQueue[intelligentModalConfig.queueIndex].type = 2; // Resolved
+    newQueue[intelligentModalConfig.queueIndex].kgUsado = kgUsado;
+    
+    setIntelligentQueue(newQueue);
+    processNextInQueue(newQueue, newItens);
   };
 
   const handleRefeicoesChange = (e) => {
@@ -360,7 +403,7 @@ export default function CardapioTab() {
     return (parseFloat(kg) / gramatura).toFixed(4);
   };
 
-  const executeSubmit = async () => {
+  const executeSubmit = async (finalItens) => {
     const refFinal = refeicoesCardapio
       ? parseInt(refeicoesCardapio, 10)
       : (refeicoesServidas !== null ? refeicoesServidas : totalAlunos);
@@ -370,7 +413,7 @@ export default function CardapioTab() {
       nome: nomeCardapio,
       turno: turnoCardapio,
       refeicoes_cardapio: refFinal,
-      itens: itensSelecionados.map(i => ({
+      itens: finalItens.map(i => ({
         produto_id: i.produto_id,
         lote: i.lote,
         validade: i.validade,
@@ -411,7 +454,25 @@ export default function CardapioTab() {
       return;
     }
     
-    executeSubmit();
+    const refParaCalculo = refeicoesCardapio ? parseInt(refeicoesCardapio, 10) : (refeicoesServidas !== null ? refeicoesServidas : totalAlunos);
+    const queue = [];
+    
+    for (let item of itensSelecionados) {
+      const kgNecessario = Number(item.percapita_kg) * refParaCalculo;
+      const saldoKg = Number(item.saldo_kg);
+      
+      if (saldoKg < kgNecessario) {
+        queue.push({ type: 4, item, kgNecessario, saldoKg, refParaCalculo });
+      } else if (saldoKg >= kgNecessario && saldoKg < kgNecessario * 2) {
+        queue.push({ type: 3, item, kgNecessario, saldoKg, refParaCalculo });
+      } else {
+        queue.push({ type: 2, item, kgNecessario, saldoKg, refParaCalculo, kgUsado: kgNecessario });
+      }
+    }
+
+    setIntelligentQueue(queue);
+    setIsProcessingQueue(true);
+    processNextInQueue(queue, itensSelecionados);
   };
 
   const handleDelete = (id, nome) => {
@@ -542,15 +603,18 @@ export default function CardapioTab() {
             <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6">
               <div className="grid grid-cols-1 md:grid-cols-12 gap-6 mb-6">
                 <div className="md:col-span-5">
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Refeição (Nome)</label>
-                  <input
-                    type="text"
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Refeição (Receita)</label>
+                  <select
                     required
                     value={nomeCardapio}
-                    onChange={(e) => setNomeCardapio(e.target.value)}
-                    placeholder="Ex: Galinhada e Suco de Melão"
+                    onChange={(e) => handleReceitaSelectParaCardapio(e.target.value)}
                     className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20 text-gray-700 font-medium bg-gray-50/50"
-                  />
+                  >
+                    <option value="">Selecione uma receita...</option>
+                    {receitas.map(r => (
+                      <option key={r.id} value={r.nome}>{r.nome}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="md:col-span-3">
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Turno</label>

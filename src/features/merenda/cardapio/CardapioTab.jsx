@@ -9,6 +9,8 @@ export default function CardapioTab() {
   
   const [estoque, setEstoque] = useState([]);
   const [totalAlunos, setTotalAlunos] = useState(0);
+  const [refeicoesServidas, setRefeicoesServidas] = useState(null);
+  const [refeicoesCardapio, setRefeicoesCardapio] = useState("");
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -45,6 +47,10 @@ export default function CardapioTab() {
     try {
       const { data } = await api.get("/api/merenda/percapita");
       setTotalAlunos(data.total_alunos || 0);
+      const servidas = data.refeicoes_servidas !== undefined && data.refeicoes_servidas !== null
+        ? data.refeicoes_servidas
+        : (data.total_alunos || 0);
+      setRefeicoesServidas(servidas);
       setEstoque(data.itens || []);
     } catch (err) {
       console.error(err);
@@ -78,6 +84,7 @@ export default function CardapioTab() {
       setDataCardapio(String(cardapioExistente.data_cardapio).split('T')[0]);
       setNomeCardapio(cardapioExistente.nome);
       setTurnoCardapio(cardapioExistente.turno || "Todos");
+      setRefeicoesCardapio(cardapioExistente.refeicoes_cardapio != null ? String(cardapioExistente.refeicoes_cardapio) : "");
       const formatItens = cardapioExistente.itens.map(i => ({
         key: `${i.produto_id}||${i.lote || ''}||${i.validade || ''}`,
         produto_id: i.produto_id,
@@ -95,6 +102,7 @@ export default function CardapioTab() {
       setDataCardapio(`${year}-${mesFormatado}-${diaFormatado}`);
       setNomeCardapio("");
       setTurnoCardapio("Todos");
+      setRefeicoesCardapio("");
       setItensSelecionados([]);
     }
     setSelectedLoteId("");
@@ -128,7 +136,12 @@ export default function CardapioTab() {
       return;
     }
 
-    const kgNecessario = Number(itemEstoque.percapita_kg) * totalAlunos;
+    // Usa refeicoesCardapio do campo do modal (ou fallback para refeicoesServidas, ou totalAlunos)
+    const refParaCalculo = refeicoesCardapio
+      ? parseInt(refeicoesCardapio, 10)
+      : (refeicoesServidas !== null ? refeicoesServidas : totalAlunos);
+
+    const kgNecessario = Number(itemEstoque.percapita_kg) * refParaCalculo;
     const saldoKg = Number(itemEstoque.saldo_kg);
 
     const proceedAddItem = (kgUsado) => {
@@ -149,7 +162,7 @@ export default function CardapioTab() {
       setConfirmConfig({
         isOpen: true,
         title: "Atenção: Saldo Insuficiente",
-        message: `O saldo deste lote é de ${saldoKg.toLocaleString('pt-BR')}kg, mas a per capita exige ${kgNecessario.toLocaleString('pt-BR')}kg para ${totalAlunos} alunos.\n\nDeseja utilizar todo o saldo restante deste lote mesmo assim?`,
+        message: `O saldo deste lote é de ${saldoKg.toLocaleString('pt-BR')}kg, mas a per capita exige ${kgNecessario.toLocaleString('pt-BR')}kg para ${refParaCalculo} refeições.\n\nDeseja utilizar todo o saldo restante deste lote mesmo assim?`,
         type: "warning",
         onConfirm: () => {
           proceedAddItem(saldoKg);
@@ -179,10 +192,15 @@ export default function CardapioTab() {
   };
 
   const executeSubmit = async () => {
+    const refFinal = refeicoesCardapio
+      ? parseInt(refeicoesCardapio, 10)
+      : (refeicoesServidas !== null ? refeicoesServidas : totalAlunos);
+
     const payload = {
       data_cardapio: dataCardapio,
       nome: nomeCardapio,
       turno: turnoCardapio,
+      refeicoes_cardapio: refFinal,
       itens: itensSelecionados.map(i => ({
         produto_id: i.produto_id,
         lote: i.lote,
@@ -346,8 +364,8 @@ export default function CardapioTab() {
             </div>
 
             <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6">
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-6 mb-8">
-                <div className="md:col-span-6">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-6 mb-6">
+                <div className="md:col-span-5">
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Refeição (Nome)</label>
                   <input
                     type="text"
@@ -371,7 +389,22 @@ export default function CardapioTab() {
                     <option value="Noturno">Noturno</option>
                   </select>
                 </div>
-                <div className="md:col-span-3">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Refeições desse Cardápio
+                    <span className="ml-1 text-xs font-normal text-gray-400">(fallback: {refeicoesServidas !== null ? refeicoesServidas : totalAlunos})</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max={totalAlunos}
+                    value={refeicoesCardapio}
+                    onChange={(e) => setRefeicoesCardapio(e.target.value)}
+                    placeholder={String(refeicoesServidas !== null ? refeicoesServidas : totalAlunos)}
+                    className="w-full px-4 py-3 border border-emerald-200 rounded-xl outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20 text-gray-700 font-semibold bg-emerald-50/30"
+                  />
+                </div>
+                <div className="md:col-span-2">
                   <label className="block text-sm font-semibold text-gray-700 mb-2">Data (Referência)</label>
                   <input
                     type="date"
@@ -418,7 +451,11 @@ export default function CardapioTab() {
                 </div>
                 <p className="text-xs text-gray-500 mt-3 flex items-center gap-1">
                   <svg className="w-4 h-4 text-emerald-500" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
-                  O consumo será debitado baseado em <b>{totalAlunos} alunos ativos</b>.
+                  O consumo será debitado baseado em <b>
+                    {refeicoesCardapio
+                      ? `${refeicoesCardapio} refeições desse cardápio`
+                      : `${refeicoesServidas !== null ? refeicoesServidas : totalAlunos} refeições servidas (padrão)`}
+                  </b>.
                 </p>
               </div>
 

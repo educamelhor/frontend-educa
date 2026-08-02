@@ -25,6 +25,17 @@ function ResenhaCard({ resenha, onStatusChange }) {
     } finally { setLoading(false); }
   };
 
+  const handleDelete = async () => {
+    if (!window.confirm('Tem certeza que deseja excluir esta resenha? Essa ação não pode ser desfeita.')) return;
+    setLoading(true);
+    try {
+      await api.delete(`/api/biblioteca/resenhas/${resenha.id}`);
+      onStatusChange();
+    } catch (err) {
+      alert(err.response?.data?.error || 'Erro ao excluir resenha');
+    } finally { setLoading(false); }
+  };
+
   const stars = resenha.avaliacao || 0;
 
   return (
@@ -150,6 +161,12 @@ function ResenhaCard({ resenha, onStatusChange }) {
                 Remover destaque
               </button>
             )}
+            <button onClick={handleDelete} disabled={loading}
+              className="text-xs font-bold px-3 py-1.5 rounded-lg text-white transition hover:bg-red-600"
+              style={{ background: '#ef4444' }}
+              title="Excluir resenha permanentemente">
+              🗑️ Excluir
+            </button>
           </div>
         </div>
       </div>

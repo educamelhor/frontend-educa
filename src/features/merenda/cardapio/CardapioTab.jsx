@@ -175,6 +175,29 @@ export default function CardapioTab() {
     proceedAddItem(kgNecessario);
   };
 
+  const handleRefeicoesChange = (e) => {
+    const val = e.target.value;
+    setRefeicoesCardapio(val);
+    
+    const refParaCalculo = val
+      ? parseInt(val, 10)
+      : (refeicoesServidas !== null ? refeicoesServidas : totalAlunos);
+
+    if (itensSelecionados.length > 0) {
+      setItensSelecionados(prev => prev.map(item => {
+        const itemEstoque = estoque.find(est => getEstoqueKey(est) === item.key);
+        if (itemEstoque) {
+          const kgNecessario = Number(itemEstoque.percapita_kg) * refParaCalculo;
+          const saldoKg = Number(itemEstoque.saldo_kg);
+          // Atualiza respeitando o limite do saldo
+          const kgUsado = kgNecessario > saldoKg ? saldoKg : kgNecessario;
+          return { ...item, quantidade_kg: kgUsado };
+        }
+        return item;
+      }));
+    }
+  };
+
   const handleRemoveItem = (key) => setItensSelecionados(itensSelecionados.filter(i => i.key !== key));
 
   const calcularUnidades = (kg, gramaturaStr) => {
@@ -399,7 +422,7 @@ export default function CardapioTab() {
                     min="1"
                     max={totalAlunos}
                     value={refeicoesCardapio}
-                    onChange={(e) => setRefeicoesCardapio(e.target.value)}
+                    onChange={handleRefeicoesChange}
                     placeholder={String(refeicoesServidas !== null ? refeicoesServidas : totalAlunos)}
                     className="w-full px-4 py-3 border border-emerald-200 rounded-xl outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20 text-gray-700 font-semibold bg-emerald-50/30"
                   />

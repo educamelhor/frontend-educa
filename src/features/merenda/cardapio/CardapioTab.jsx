@@ -37,6 +37,101 @@ export default function CardapioTab() {
   const [itensSelecionados, setItensSelecionados] = useState([]);
   const [selectedLoteId, setSelectedLoteId] = useState(""); // para a listbox
 
+  // Receitas State
+  const [isReceitaModalOpen, setIsReceitaModalOpen] = useState(false);
+  const [receitas, setReceitas] = useState([]);
+  const [produtos, setProdutos] = useState([]);
+  const [nomeReceita, setNomeReceita] = useState("");
+  const [itensReceita, setItensReceita] = useState([]); 
+  const [selectedProdutoId, setSelectedProdutoId] = useState("");
+  const [editingReceitaId, setEditingReceitaId] = useState(null);
+  const [savingReceita, setSavingReceita] = useState(false);
+
+  const fetchReceitasEProdutos = async () => {
+    try {
+      const [resRec, resProd] = await Promise.all([
+        api.get("/api/merenda/receitas"),
+        api.get("/api/merenda/produtos")
+      ]);
+      setReceitas(resRec.data);
+      setProdutos(resProd.data);
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao carregar dados de receitas.");
+    }
+  };
+
+  const openReceitaModal = () => {
+    setNomeReceita("");
+    setItensReceita([]);
+    setEditingReceitaId(null);
+    setSelectedProdutoId("");
+    fetchReceitasEProdutos();
+    setIsReceitaModalOpen(true);
+  };
+
+  const handleEditReceita = (receita) => {
+    setEditingReceitaId(receita.id);
+    setNomeReceita(receita.nome);
+    setItensReceita(receita.itens.map(i => ({
+      id: i.id,
+      produto: i.produto,
+      marca: i.marca,
+      categoria: i.categoria
+    })));
+  };
+
+  const handleDeleteReceita = async (id) => {
+    if (!window.confirm("Deseja realmente excluir esta receita?")) return;
+    try {
+      await api.delete(`/api/merenda/receitas/${id}`);
+      toast.success("Receita excluída com sucesso.");
+      fetchReceitasEProdutos();
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao excluir receita.");
+    }
+  };
+
+  const handleSaveReceita = async () => {
+    if (!nomeReceita) return toast.error("Informe o nome da receita.");
+    if (itensReceita.length === 0) return toast.error("Adicione ao menos um ingrediente.");
+    setSavingReceita(true);
+    try {
+      const payload = {
+        nome: nomeReceita,
+        itens: itensReceita.map(i => i.id)
+      };
+      if (editingReceitaId) {
+        await api.put(`/api/merenda/receitas/${editingReceitaId}`, payload);
+        toast.success("Receita atualizada.");
+      } else {
+        await api.post("/api/merenda/receitas", payload);
+        toast.success("Receita cadastrada.");
+      }
+      setNomeReceita("");
+      setItensReceita([]);
+      setEditingReceitaId(null);
+      fetchReceitasEProdutos();
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao salvar receita.");
+    } finally {
+      setSavingReceita(false);
+    }
+  };
+
+  const handleAddProdutoReceita = () => {
+    if (!selectedProdutoId) return;
+    const prod = produtos.find(p => p.id === parseInt(selectedProdutoId));
+    if (!prod) return;
+    if (itensReceita.some(i => i.id === prod.id)) {
+      return toast.error("Ingrediente já adicionado.");
+    }
+    setItensReceita([...itensReceita, prod]);
+    setSelectedProdutoId("");
+  };
+
   useEffect(() => {
     fetchCardapios();
     fetchEstoque();
@@ -360,6 +455,13 @@ export default function CardapioTab() {
               <ChevronRightIcon className="w-5 h-5 text-gray-600" />
             </button>
           </div>
+          <button
+            onClick={() => openReceitaModal()}
+            className="px-5 py-2.5 bg-gradient-to-r from-indigo-500 to-blue-500 text-white font-semibold rounded-xl shadow-md hover:shadow-lg transition-all flex items-center gap-2"
+          >
+            <PlusIcon className="w-5 h-5" />
+            Nova Receita
+          </button>
           <button
             onClick={() => openModal()}
             className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-semibold rounded-xl shadow-md hover:shadow-lg transition-all flex items-center gap-2"
@@ -686,6 +788,192 @@ export default function CardapioTab() {
                 className="px-6 py-2.5 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all bg-emerald-500 hover:bg-emerald-600"
               >
                 Confirmar Gênero
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Gestão de Receitas */}
+      {isReceitaModalOpen && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 sm:p-6 bg-gray-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-[2rem] shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 border border-white/20">
+            {/* Header Modal */}
+            <div className="px-6 sm:px-8 py-5 border-b border-gray-100 flex justify-between items-center bg-gradient-to-r from-indigo-50 to-blue-50">
+              <div>
+                <h2 className="text-2xl font-black text-indigo-900 tracking-tight">
+                  Gestão de Receitas
+                </h2>
+                <p className="text-sm font-medium text-indigo-600/80 mt-1">Crie receitas para agilizar a montagem do cardápio</p>
+              </div>
+              <button
+                onClick={() => setIsReceitaModalOpen(false)}
+                className="p-2.5 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-100 rounded-full transition-all"
+              >
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            {/* Body Modal */}
+            <div className="p-6 sm:px-8 overflow-y-auto flex-1 bg-gray-50/30 flex flex-col gap-8">
+              
+              {/* Form de Criação/Edição */}
+              <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+                <h3 className="text-lg font-bold text-gray-800 mb-4">{editingReceitaId ? 'Editar Receita' : 'Nova Receita'}</h3>
+                <div className="flex flex-col md:flex-row gap-4 mb-4">
+                  <div className="flex-1">
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Nome da Receita</label>
+                    <input
+                      type="text"
+                      value={nomeReceita}
+                      onChange={(e) => setNomeReceita(e.target.value)}
+                      placeholder="Ex: Galinhada"
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/20 text-gray-700 font-medium bg-gray-50/50"
+                    />
+                  </div>
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Adicionar Gênero (Ingrediente)</label>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <select
+                      value={selectedProdutoId}
+                      onChange={(e) => setSelectedProdutoId(e.target.value)}
+                      className="flex-1 px-4 py-3 border border-gray-200 rounded-xl outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/20 bg-gray-50/50"
+                    >
+                      <option value="">Selecione um gênero...</option>
+                      {produtos.map(p => (
+                        <option key={p.id} value={p.id}>{p.produto} - {p.marca}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={handleAddProdutoReceita}
+                      className="px-5 py-3 bg-indigo-100 hover:bg-indigo-200 text-indigo-700 font-bold rounded-xl transition-colors whitespace-nowrap"
+                    >
+                      Adicionar
+                    </button>
+                  </div>
+                </div>
+
+                {itensReceita.length > 0 && (
+                  <div className="border border-gray-200 rounded-xl overflow-hidden mb-4">
+                    <table className="w-full text-sm text-left">
+                      <thead className="text-xs text-gray-500 uppercase bg-gray-50">
+                        <tr>
+                          <th className="py-3 px-4">Gênero</th>
+                          <th className="py-3 px-4">Marca</th>
+                          <th className="py-3 px-4 text-center">Ação</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {itensReceita.map(item => (
+                          <tr key={item.id} className="border-t border-gray-100">
+                            <td className="py-3 px-4 font-medium text-gray-800">{item.produto}</td>
+                            <td className="py-3 px-4 text-gray-600">{item.marca}</td>
+                            <td className="py-3 px-4 text-center">
+                              <button
+                                type="button"
+                                onClick={() => setItensReceita(itensReceita.filter(i => i.id !== item.id))}
+                                className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                              >
+                                <TrashIcon className="w-5 h-5" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                
+                <div className="flex justify-end gap-3">
+                  {editingReceitaId && (
+                    <button
+                      onClick={() => {
+                        setNomeReceita("");
+                        setItensReceita([]);
+                        setEditingReceitaId(null);
+                      }}
+                      className="px-6 py-2.5 text-gray-700 font-semibold hover:bg-gray-100 rounded-xl transition-colors"
+                    >
+                      Cancelar Edição
+                    </button>
+                  )}
+                  <button
+                    onClick={handleSaveReceita}
+                    disabled={savingReceita}
+                    className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md transition-all disabled:opacity-50"
+                  >
+                    {savingReceita ? "Salvando..." : (editingReceitaId ? "Atualizar Receita" : "Salvar Receita")}
+                  </button>
+                </div>
+              </div>
+
+              {/* Tabela de Receitas Salvas */}
+              <div>
+                <h3 className="text-lg font-bold text-gray-800 mb-4">Receitas Cadastradas</h3>
+                {receitas.length === 0 ? (
+                  <div className="p-8 text-center border-2 border-dashed border-gray-200 rounded-2xl bg-white">
+                    <p className="text-gray-500 font-medium">Nenhuma receita cadastrada ainda.</p>
+                  </div>
+                ) : (
+                  <div className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
+                    <table className="w-full text-sm text-left">
+                      <thead className="text-xs text-gray-500 uppercase bg-gray-50 border-b border-gray-200">
+                        <tr>
+                          <th className="py-4 px-5">Nome da Receita</th>
+                          <th className="py-4 px-5">Ingredientes</th>
+                          <th className="py-4 px-5 text-right">Ações</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {receitas.map(r => (
+                          <tr key={r.id} className="hover:bg-gray-50/50 transition-colors">
+                            <td className="py-4 px-5 font-bold text-gray-800">{r.nome}</td>
+                            <td className="py-4 px-5 text-gray-600">
+                              <div className="flex flex-wrap gap-1">
+                                {r.itens?.map(i => (
+                                  <span key={i.id} className="px-2 py-1 bg-gray-100 text-gray-600 text-[11px] font-medium rounded border border-gray-200 shadow-sm">
+                                    {i.produto}
+                                  </span>
+                                ))}
+                              </div>
+                            </td>
+                            <td className="py-4 px-5">
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  onClick={() => handleEditReceita(r)}
+                                  className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                  title="Editar"
+                                >
+                                  <PencilSquareIcon className="w-5 h-5" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteReceita(r.id)}
+                                  className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                  title="Excluir"
+                                >
+                                  <TrashIcon className="w-5 h-5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+              
+            </div>
+            {/* Footer Modal */}
+            <div className="px-6 py-5 border-t border-gray-100 bg-gray-50 flex justify-end">
+              <button
+                onClick={() => setIsReceitaModalOpen(false)}
+                className="px-6 py-2.5 text-gray-700 font-semibold hover:bg-gray-200 rounded-xl transition-colors"
+              >
+                Fechar
               </button>
             </div>
           </div>

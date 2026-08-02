@@ -17,6 +17,9 @@ export default function CardapioTab() {
 
   // Custom Confirm Modal State
   const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, title: "", message: "", onConfirm: null, type: "danger" });
+  
+  // Missing Items Modal State
+  const [missingItemsModal, setMissingItemsModal] = useState({ isOpen: false, items: [] });
 
   // Intelligent Modal State (Assistente de Estoque)
   const [intelligentModalConfig, setIntelligentModalConfig] = useState({
@@ -285,10 +288,7 @@ export default function CardapioTab() {
       // Bloqueia e avisa
       setNomeCardapio("");
       setItensSelecionados([]);
-      toast.error(
-        `Os seguintes itens ainda não têm saldo ou Per Capita cadastrada: ${itensComProblema.join(', ')}. Por gentileza, ajuste-os no estoque/per capita e volte aqui.`, 
-        { duration: 8000 }
-      );
+      setMissingItemsModal({ isOpen: true, items: itensComProblema });
       return;
     }
 
@@ -1091,6 +1091,47 @@ export default function CardapioTab() {
                 className={`px-6 py-2.5 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all ${confirmConfig.type === 'danger' ? 'bg-red-500 hover:bg-red-600' : 'bg-amber-500 hover:bg-amber-600'}`}
               >
                 Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Premium para Itens Sem Per Capita / Sem Saldo */}
+      {missingItemsModal.isOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200 border border-white/20">
+            <div className="px-6 py-5 border-b flex items-center gap-4 bg-red-50 border-red-100">
+              <div className="bg-red-100 p-2.5 rounded-full text-red-600 shadow-sm flex-shrink-0">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold tracking-tight text-red-900">
+                Ação Bloqueada
+              </h3>
+            </div>
+            <div className="p-6 bg-white space-y-4">
+              <p className="text-gray-700 text-[15px] leading-relaxed">
+                A receita selecionada possui itens que ainda não têm <b>Saldo</b> no estoque ou não possuem a <b>Per Capita</b> cadastrada:
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {missingItemsModal.items.map((item, idx) => (
+                  <span key={idx} className="px-3 py-1.5 bg-red-50 text-red-700 text-sm font-semibold rounded-lg border border-red-100">
+                    {item}
+                  </span>
+                ))}
+              </div>
+              <p className="text-gray-600 text-sm italic mt-2">
+                Por gentileza, ajuste estes itens no cadastro de estoque / per capita e volte aqui.
+              </p>
+            </div>
+            <div className="px-6 py-5 bg-gray-50 border-t border-gray-100 flex justify-end rounded-b-3xl">
+              <button
+                onClick={() => setMissingItemsModal({ isOpen: false, items: [] })}
+                className="px-6 py-2.5 bg-gray-800 text-white font-bold rounded-xl shadow-md hover:bg-gray-900 hover:shadow-lg transition-all"
+              >
+                Entendi
               </button>
             </div>
           </div>

@@ -111,7 +111,7 @@ export default function CardapioTab() {
     }
     const itemEstoque = estoque.find(e => getEstoqueKey(e) === value);
     if (itemEstoque && !itemEstoque.percapita_id) {
-      toast.error("Falta percápita! Configure na aba 'PERCÁPITA' antes de adicionar ao cardápio.");
+      toast.error("Falta per capita! Configure na aba 'PER CAPITA' antes de adicionar ao cardápio.");
       setSelectedLoteId("");
       return;
     }
@@ -149,7 +149,7 @@ export default function CardapioTab() {
       setConfirmConfig({
         isOpen: true,
         title: "Atenção: Saldo Insuficiente",
-        message: `O saldo deste lote é de ${saldoKg.toLocaleString('pt-BR')}kg, mas a percápita exige ${kgNecessario.toLocaleString('pt-BR')}kg para ${totalAlunos} alunos.\n\nDeseja utilizar todo o saldo restante deste lote mesmo assim?`,
+        message: `O saldo deste lote é de ${saldoKg.toLocaleString('pt-BR')}kg, mas a per capita exige ${kgNecessario.toLocaleString('pt-BR')}kg para ${totalAlunos} alunos.\n\nDeseja utilizar todo o saldo restante deste lote mesmo assim?`,
         type: "warning",
         onConfirm: () => {
           proceedAddItem(saldoKg);
@@ -398,7 +398,7 @@ export default function CardapioTab() {
                         let text = `${e.produto} - ${e.marca}`;
                         if (e.lote) text += ` | Lote: ${e.lote}`;
                         text += ` | Saldo: ${Number(e.saldo_kg).toLocaleString('pt-BR')} kg`;
-                        if (!hasPerc) text += ' (FALTA PERCÁPITA)';
+                        if (!hasPerc) text += ' (FALTA PER CAPITA)';
                         return (
                           <option key={getEstoqueKey(e)} value={getEstoqueKey(e)}>
                             {text}

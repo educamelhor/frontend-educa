@@ -22,7 +22,7 @@ export default function MerendaCardapioPage() {
   const tabs = [
     { id: "chegada", label: "CHEGADA DE GÊNEROS", icon: <TruckIcon className="w-5 h-5" /> },
     { id: "movimentacao", label: "MOVIMENTAÇÃO DE GÊNEROS", icon: <ArrowsRightLeftIcon className="w-5 h-5" /> },
-    { id: "percapita", label: "PERCÁPITA", icon: <ScaleIcon className="w-5 h-5" /> },
+    { id: "percapita", label: "PER CAPITA", icon: <ScaleIcon className="w-5 h-5" /> },
     { id: "cardapio", label: "CARDÁPIO", icon: <CalendarDaysIcon className="w-5 h-5" /> },
     { id: "saldo", label: "SALDO", icon: <BanknotesIcon className="w-5 h-5" /> },
     { id: "distribuicao", label: "DISTRIBUIÇÃO", icon: <ClipboardDocumentCheckIcon className="w-5 h-5" /> },

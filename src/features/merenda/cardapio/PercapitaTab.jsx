@@ -24,7 +24,7 @@ export default function PercapitaTab() {
       setItens(data.itens || []);
     } catch (err) {
       console.error(err);
-      toast.error("Erro ao carregar dados de percápita.");
+      toast.error("Erro ao carregar dados de per capita.");
     }
   };
 
@@ -39,14 +39,14 @@ export default function PercapitaTab() {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Deseja realmente remover a configuração de percápita deste produto?")) return;
+    if (!window.confirm("Deseja realmente remover a configuração de per capita deste produto?")) return;
     try {
       await api.delete(`/api/merenda/percapita/${id}`);
-      toast.success("Percápita removida com sucesso.");
+      toast.success("Per capita removida com sucesso.");
       fetchPercapita();
     } catch (err) {
       console.error(err);
-      toast.error("Erro ao remover percápita.");
+      toast.error("Erro ao remover per capita.");
     }
   };
 
@@ -58,7 +58,7 @@ export default function PercapitaTab() {
     }
     const percapitaNum = parseFloat(percapitaKg);
     if (!percapitaNum || percapitaNum <= 0) {
-      toast.error("A percápita deve ser maior que zero.");
+      toast.error("A per capita deve ser maior que zero.");
       return;
     }
 
@@ -68,12 +68,12 @@ export default function PercapitaTab() {
         produto_id: selectedProdutoId,
         percapita_kg: percapitaNum,
       });
-      toast.success("Percápita configurada com sucesso!");
+      toast.success("Per capita configurada com sucesso!");
       handleCloseModal();
       fetchPercapita();
     } catch (err) {
       console.error(err);
-      toast.error("Erro ao salvar percápita.");
+      toast.error("Erro ao salvar per capita.");
     } finally {
       setSaving(false);
     }
@@ -104,7 +104,7 @@ export default function PercapitaTab() {
     <div className="p-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
-          <h2 className="text-xl font-bold text-gray-800">Percápita e Rendimento</h2>
+          <h2 className="text-xl font-bold text-gray-800">Per capita e Rendimento</h2>
           <p className="text-sm text-gray-500">
             Configure o consumo por aluno e veja a previsão de refeições do estoque atual.
           </p>
@@ -121,7 +121,7 @@ export default function PercapitaTab() {
             className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-semibold rounded-xl shadow-md hover:shadow-lg transition-all flex items-center gap-2"
           >
             <PlusIcon className="w-5 h-5" />
-            Cadastrar Percápita
+            Cadastrar Per capita
           </button>
         </div>
       </div>
@@ -134,7 +134,7 @@ export default function PercapitaTab() {
                 <th className="py-4 px-6 font-semibold tracking-wide">PRODUTO (ESTOQUE)</th>
                 <th className="py-4 px-6 font-semibold tracking-wide">LOTE / VAL.</th>
                 <th className="py-4 px-6 font-semibold tracking-wide">SALDO (KG)</th>
-                <th className="py-4 px-6 font-semibold tracking-wide">PERCÁPITA (KG)</th>
+                <th className="py-4 px-6 font-semibold tracking-wide">PER CAPITA (KG)</th>
                 <th className="py-4 px-6 font-semibold tracking-wide text-center">REFEIÇÕES</th>
                 <th className="py-4 px-6 text-center font-semibold tracking-wide">AÇÕES</th>
               </tr>
@@ -143,7 +143,7 @@ export default function PercapitaTab() {
               {itens.length === 0 ? (
                 <tr>
                   <td colSpan="6" className="py-12 text-center text-gray-500">
-                    Não há itens com saldo no estoque para configurar percápita.
+                    Não há itens com saldo no estoque para configurar per capita.
                   </td>
                 </tr>
               ) : (
@@ -197,14 +197,14 @@ export default function PercapitaTab() {
                               <button
                                 onClick={() => handleOpenModal(item.produto_id, item.percapita_kg)}
                                 className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
-                                title="Editar Percápita"
+                                title="Editar Per capita"
                               >
                                 <PencilSquareIcon className="w-5 h-5" />
                               </button>
                               <button
                                 onClick={() => handleDelete(item.percapita_id)}
                                 className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                title="Excluir Percápita"
+                                title="Excluir Per capita"
                               >
                                 <TrashIcon className="w-5 h-5" />
                               </button>
@@ -234,7 +234,7 @@ export default function PercapitaTab() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
               <h3 className="text-lg font-bold text-gray-800">
-                {percapitaKg ? 'Editar Percápita' : 'Cadastrar Percápita'}
+                {percapitaKg ? 'Editar Per capita' : 'Cadastrar Per capita'}
               </h3>
               <button onClick={handleCloseModal} className="text-gray-400 hover:text-gray-600">
                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -262,7 +262,7 @@ export default function PercapitaTab() {
               </div>
 
               <div className="mb-6">
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Percápita por Aluno (KG)</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Per capita por Aluno (KG)</label>
                 <div className="relative">
                   <input
                     type="number"
@@ -297,7 +297,7 @@ export default function PercapitaTab() {
                   {saving ? (
                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   ) : (
-                    "Salvar Percápita"
+                    "Salvar Per capita"
                   )}
                 </button>
               </div>

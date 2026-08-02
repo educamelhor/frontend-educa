@@ -138,6 +138,7 @@ export default function ConcursoPage() {
   const [concursos, setConcursos] = useState([]);
   const [loadingConcursos, setLoadingConcursos] = useState(true);
   const [modalNovo, setModalNovo] = useState(false);
+  const [concursoFiltro, setConcursoFiltro] = useState('');
   const [mesFiltro, setMesFiltro] = useState('');
   const [anoFiltro, setAnoFiltro] = useState(new Date().getFullYear());
 
@@ -145,12 +146,17 @@ export default function ConcursoPage() {
     setLoadingRanking(true);
     try {
       const params = {};
-      if (mesFiltro) { params.mes = mesFiltro; params.ano = anoFiltro; }
+      if (concursoFiltro) {
+        params.concurso_id = concursoFiltro;
+      } else if (mesFiltro) {
+        params.mes = mesFiltro;
+        params.ano = anoFiltro;
+      }
       const { data } = await api.get('/api/biblioteca/ranking', { params });
       setRanking(data.ranking || []);
     } catch { setRanking([]); }
     finally { setLoadingRanking(false); }
-  }, [mesFiltro, anoFiltro]);
+  }, [mesFiltro, anoFiltro, concursoFiltro]);
 
   const fetchConcursos = useCallback(async () => {
     setLoadingConcursos(true);
@@ -162,7 +168,7 @@ export default function ConcursoPage() {
   }, []);
 
   useEffect(() => { fetchRanking(); }, [fetchRanking]);
-  useEffect(() => { if (tab === 'concursos') fetchConcursos(); }, [tab]);
+  useEffect(() => { fetchConcursos(); }, [fetchConcursos]);
 
   const toggleStatus = async (id, currentStatus) => {
     const next = currentStatus === 'rascunho' ? 'ativo' : currentStatus === 'ativo' ? 'encerrado' : 'rascunho';
@@ -213,32 +219,52 @@ export default function ConcursoPage() {
 
       {tab === 'ranking' && (
         <>
-          {/* Filtros de período */}
-          <div className="flex gap-2 mb-6 flex-wrap items-center">
-            <span className="text-sm font-semibold text-slate-500">Período:</span>
+          {/* Filtros de período / concurso */}
+          <div className="flex gap-2 mb-6 flex-wrap items-center bg-slate-50 p-3 rounded-2xl border border-slate-200 shadow-sm">
+            <span className="text-sm font-semibold text-slate-500 mr-2">Modo:</span>
+            
             <select 
-              value={anoFiltro} 
-              onChange={e => setAnoFiltro(Number(e.target.value))}
-              className="px-2 py-1 rounded-lg text-xs font-bold border outline-none mr-2 focus:ring-2 focus:ring-teal-300"
-              style={{ borderColor: '#e2e8f0', background: '#fff', color: '#475569' }}
+              value={concursoFiltro} 
+              onChange={e => {
+                setConcursoFiltro(e.target.value);
+                if (e.target.value) setMesFiltro(''); // limpa mes se concurso
+              }}
+              className="px-3 py-2 rounded-xl text-sm font-bold border outline-none focus:ring-2 focus:ring-teal-300 transition"
+              style={{ borderColor: '#cbd5e1', background: '#fff', color: concursoFiltro ? '#0f766e' : '#64748b' }}
             >
-              {[...Array(5)].map((_, i) => {
-                const year = new Date().getFullYear() - i;
-                return <option key={year} value={year}>{year}</option>;
-              })}
+              <option value="">Geral / Por Mês</option>
+              {concursos.map(c => (
+                <option key={c.id} value={c.id}>🎪 {c.titulo}</option>
+              ))}
             </select>
-            <button onClick={() => setMesFiltro('')}
-              className="px-3 py-1.5 rounded-lg text-xs font-bold transition"
-              style={{ background: !mesFiltro ? '#0d9488' : '#f1f5f9', color: !mesFiltro ? '#fff' : '#475569' }}>
-              Geral
-            </button>
-            {meses.map((m, i) => (
-              <button key={i} onClick={() => setMesFiltro(String(i + 1))}
-                className="px-3 py-1.5 rounded-lg text-xs font-bold transition"
-                style={{ background: mesFiltro === String(i + 1) ? '#0d9488' : '#f1f5f9', color: mesFiltro === String(i + 1) ? '#fff' : '#475569' }}>
-                {m}
-              </button>
-            ))}
+
+            {!concursoFiltro && (
+              <div className="flex items-center gap-2 ml-4 border-l pl-4 border-slate-200">
+                <select 
+                  value={anoFiltro} 
+                  onChange={e => setAnoFiltro(Number(e.target.value))}
+                  className="px-2 py-1.5 rounded-lg text-xs font-bold border outline-none focus:ring-2 focus:ring-teal-300"
+                  style={{ borderColor: '#e2e8f0', background: '#fff', color: '#475569' }}
+                >
+                  {[...Array(5)].map((_, i) => {
+                    const year = new Date().getFullYear() - i;
+                    return <option key={year} value={year}>{year}</option>;
+                  })}
+                </select>
+                <button onClick={() => setMesFiltro('')}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold transition"
+                  style={{ background: !mesFiltro ? '#0d9488' : '#e2e8f0', color: !mesFiltro ? '#fff' : '#475569' }}>
+                  Anual
+                </button>
+                {meses.map((m, i) => (
+                  <button key={i} onClick={() => setMesFiltro(String(i + 1))}
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold transition"
+                    style={{ background: mesFiltro === String(i + 1) ? '#0d9488' : '#f8fafc', color: mesFiltro === String(i + 1) ? '#fff' : '#64748b' }}>
+                    {m}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {loadingRanking ? (

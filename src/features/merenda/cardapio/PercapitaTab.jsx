@@ -21,6 +21,7 @@ export default function PercapitaTab() {
     try {
       const { data } = await api.get("/api/merenda/percapita");
       setTotalAlunos(data.total_alunos || 0);
+      setRefeicoesServidas(data.refeicoes_servidas !== undefined ? data.refeicoes_servidas : null);
       setItens(data.itens || []);
     } catch (err) {
       console.error(err);
@@ -90,7 +91,7 @@ export default function PercapitaTab() {
     setIsServidasModalOpen(true);
   };
 
-  const handleSaveServidas = (e) => {
+  const handleSaveServidas = async (e) => {
     e.preventDefault();
     const val = parseInt(tempServidas, 10);
     if (isNaN(val) || val < 0) {
@@ -101,9 +102,18 @@ export default function PercapitaTab() {
       toast.error("A quantidade de refeições servidas não pode ser superior à quantidade de alunos ativos.");
       return;
     }
-    setRefeicoesServidas(val);
-    setIsServidasModalOpen(false);
-    toast.success("Quantidade de refeições servidas atualizada para simulação.");
+
+    try {
+      await api.post("/api/merenda/config/refeicoes-servidas", {
+        refeicoes_servidas: val
+      });
+      setRefeicoesServidas(val);
+      setIsServidasModalOpen(false);
+      toast.success("Quantidade de refeições servidas salva com sucesso.");
+    } catch (err) {
+      console.error(err);
+      toast.error("Erro ao salvar a quantidade de refeições servidas.");
+    }
   };
 
   const calcularRefeicoes = (saldoKg, percapita) => {

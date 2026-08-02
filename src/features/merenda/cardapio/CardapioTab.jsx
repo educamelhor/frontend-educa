@@ -254,9 +254,19 @@ export default function CardapioTab() {
 
     const refParaCalculo = refeicoesCardapio ? parseInt(refeicoesCardapio, 10) : (refeicoesServidas !== null ? refeicoesServidas : totalAlunos);
     const novosItens = [];
-    const itensComProblema = [];
+    const itensComProblema = []; // Para erro de Per Capita (Bloqueia)
+    const itensSemSaldo = []; // Para erro de Saldo Zero (Apenas avisa e ignora)
 
     for (const prod of receita.itens) {
+      // 1. Verifica se o produto ao menos tem percapita configurada (mesmo que sem saldo)
+      const temPercapita = estoque.some(e => e.produto_id === prod.id && e.percapita_id);
+      
+      if (!temPercapita) {
+        itensComProblema.push(prod.produto);
+        continue; // Nem tenta procurar saldo se já sabemos que quebra a regra da per capita
+      }
+
+      // 2. Procura um lote válido com saldo > 0
       const lotesDisponiveis = estoque.filter(e => e.produto_id === prod.id && Number(e.saldo_kg) > 0 && e.percapita_id);
       lotesDisponiveis.sort((a, b) => new Date(a.validade || '9999-12-31') - new Date(b.validade || '9999-12-31'));
 
@@ -279,13 +289,13 @@ export default function CardapioTab() {
           saldo_kg: itemEstoque.saldo_kg
         });
       } else {
-        // Se o item não tem saldo > 0 ou não tem percapita_id, registramos para alertar
-        itensComProblema.push(prod.produto);
+        // Tem per capita, mas não tem saldo > 0 em nenhum lote
+        itensSemSaldo.push(prod.produto);
       }
     }
 
     if (itensComProblema.length > 0) {
-      // Bloqueia e avisa
+      // Bloqueia e avisa apenas os que faltam Per Capita
       setNomeCardapio("");
       setItensSelecionados([]);
       setMissingItemsModal({ isOpen: true, items: itensComProblema });
@@ -293,6 +303,11 @@ export default function CardapioTab() {
     }
 
     setItensSelecionados(novosItens);
+    
+    // Avisa sutilmente sobre os itens ignorados por falta de saldo físico
+    if (itensSemSaldo.length > 0) {
+      toast.error(`Ingrediente(s) ignorado(s) por falta de saldo: ${itensSemSaldo.join(', ')}`, { duration: 6000 });
+    }
   };
 
   const handleAddItem = () => {

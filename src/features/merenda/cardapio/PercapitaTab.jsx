@@ -135,7 +135,7 @@ export default function PercapitaTab() {
                 <th className="py-4 px-6 font-semibold tracking-wide">LOTE / VAL.</th>
                 <th className="py-4 px-6 font-semibold tracking-wide">SALDO (KG)</th>
                 <th className="py-4 px-6 font-semibold tracking-wide">PER CAPITA (KG)</th>
-                <th className="py-4 px-6 font-semibold tracking-wide text-center">REFEIÇÕES</th>
+                <th className="py-4 px-6 font-semibold tracking-wide text-center">QUANTIDADE DE REFEIÇÕES</th>
                 <th className="py-4 px-6 text-center font-semibold tracking-wide">AÇÕES</th>
               </tr>
             </thead>

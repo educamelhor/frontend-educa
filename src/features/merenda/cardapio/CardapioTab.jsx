@@ -251,6 +251,7 @@ export default function CardapioTab() {
 
     const refParaCalculo = refeicoesCardapio ? parseInt(refeicoesCardapio, 10) : (refeicoesServidas !== null ? refeicoesServidas : totalAlunos);
     const novosItens = [];
+    const itensComProblema = [];
 
     for (const prod of receita.itens) {
       const lotesDisponiveis = estoque.filter(e => e.produto_id === prod.id && Number(e.saldo_kg) > 0 && e.percapita_id);
@@ -275,9 +276,22 @@ export default function CardapioTab() {
           saldo_kg: itemEstoque.saldo_kg
         });
       } else {
-        toast.error(`Ingrediente "${prod.produto}" sem saldo ou per capita configurada.`);
+        // Se o item não tem saldo > 0 ou não tem percapita_id, registramos para alertar
+        itensComProblema.push(prod.produto);
       }
     }
+
+    if (itensComProblema.length > 0) {
+      // Bloqueia e avisa
+      setNomeCardapio("");
+      setItensSelecionados([]);
+      toast.error(
+        `Os seguintes itens ainda não têm saldo ou Per Capita cadastrada: ${itensComProblema.join(', ')}. Por gentileza, ajuste-os no estoque/per capita e volte aqui.`, 
+        { duration: 8000 }
+      );
+      return;
+    }
+
     setItensSelecionados(novosItens);
   };
 

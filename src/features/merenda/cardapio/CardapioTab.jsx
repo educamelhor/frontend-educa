@@ -18,6 +18,17 @@ export default function CardapioTab() {
   // Custom Confirm Modal State
   const [confirmConfig, setConfirmConfig] = useState({ isOpen: false, title: "", message: "", onConfirm: null, type: "danger" });
 
+  // Intelligent Modal State (Assistente de Estoque)
+  const [intelligentModalConfig, setIntelligentModalConfig] = useState({
+    isOpen: false,
+    type: null, 
+    item: null,
+    kgNecessario: 0,
+    saldoKg: 0,
+    refParaCalculo: 0,
+    kgInput: ""
+  });
+
   // Form State
   const [editingId, setEditingId] = useState(null);
   const [dataCardapio, setDataCardapio] = useState("");
@@ -158,21 +169,61 @@ export default function CardapioTab() {
       setSelectedLoteId("");
     };
 
-    if (kgNecessario > saldoKg) {
-      setConfirmConfig({
+    // Possibilidade 2: Saldo abundante
+    if (saldoKg >= kgNecessario * 2) {
+      proceedAddItem(kgNecessario);
+      return;
+    }
+
+    // Possibilidade 4: Saldo insuficiente
+    if (saldoKg < kgNecessario) {
+      setIntelligentModalConfig({
         isOpen: true,
-        title: "Atenção: Saldo Insuficiente",
-        message: `O saldo deste lote é de ${saldoKg.toLocaleString('pt-BR')}kg, mas a per capita exige ${kgNecessario.toLocaleString('pt-BR')}kg para ${refParaCalculo} refeições.\n\nDeseja utilizar todo o saldo restante deste lote mesmo assim?`,
-        type: "warning",
-        onConfirm: () => {
-          proceedAddItem(saldoKg);
-          setConfirmConfig({ isOpen: false });
-        }
+        type: 4,
+        item: itemEstoque,
+        kgNecessario,
+        saldoKg,
+        refParaCalculo,
+        kgInput: String(saldoKg)
       });
       return;
     }
-    
-    proceedAddItem(kgNecessario);
+
+    // Possibilidade 3: Saldo Crítico
+    if (saldoKg >= kgNecessario && saldoKg < kgNecessario * 2) {
+      setIntelligentModalConfig({
+        isOpen: true,
+        type: 3,
+        item: itemEstoque,
+        kgNecessario,
+        saldoKg,
+        refParaCalculo,
+        kgInput: String(kgNecessario)
+      });
+      return;
+    }
+  };
+
+  const confirmIntelligentAdd = (kgUsado) => {
+    if (!intelligentModalConfig.item) return;
+    const parsedKg = parseFloat(kgUsado);
+    if (isNaN(parsedKg) || parsedKg <= 0) {
+      toast.error("Informe uma quantidade válida.");
+      return;
+    }
+
+    setItensSelecionados(prev => [...prev, {
+      key: getEstoqueKey(intelligentModalConfig.item),
+      produto_id: intelligentModalConfig.item.produto_id,
+      lote: intelligentModalConfig.item.lote,
+      validade: intelligentModalConfig.item.validade,
+      produto: intelligentModalConfig.item.produto,
+      marca: intelligentModalConfig.item.marca,
+      quantidade_kg: parsedKg,
+      gramaturaStr: intelligentModalConfig.item.gramatura
+    }]);
+    setSelectedLoteId("");
+    setIntelligentModalConfig({ isOpen: false, item: null });
   };
 
   const handleRefeicoesChange = (e) => {
@@ -549,6 +600,93 @@ export default function CardapioTab() {
                   )}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Inteligente de Assistente de Estoque */}
+      {intelligentModalConfig.isOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200 border border-white/20">
+            <div className={`px-6 py-5 border-b flex items-center gap-4 ${intelligentModalConfig.type === 4 ? 'bg-red-50 border-red-100' : 'bg-amber-50 border-amber-100'}`}>
+              <div className={`p-2.5 rounded-full shadow-sm ${intelligentModalConfig.type === 4 ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'}`}>
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+              </div>
+              <h3 className={`text-xl font-bold tracking-tight ${intelligentModalConfig.type === 4 ? 'text-red-900' : 'text-amber-900'}`}>
+                {intelligentModalConfig.type === 4 ? "Saldo Insuficiente" : "Aviso de Saldo Crítico"}
+              </h3>
+            </div>
+            
+            <div className="p-6 bg-white space-y-5">
+              <p className="text-gray-700 text-[15px] leading-relaxed">
+                {intelligentModalConfig.type === 4 ? (
+                  <>
+                    Atenção! A per capita exige <b>{intelligentModalConfig.kgNecessario.toLocaleString('pt-BR')} kg</b> para as {intelligentModalConfig.refParaCalculo} refeições deste cardápio, mas você possui apenas <b>{intelligentModalConfig.saldoKg.toLocaleString('pt-BR')} kg</b> deste lote no depósito.
+                  </>
+                ) : (
+                  <>
+                    O saldo atual de <b>{intelligentModalConfig.saldoKg.toLocaleString('pt-BR')} kg</b> atende este cardápio ({intelligentModalConfig.kgNecessario.toLocaleString('pt-BR')} kg), mas deixará um resto de <b>{(intelligentModalConfig.saldoKg - intelligentModalConfig.kgNecessario).toLocaleString('pt-BR')} kg</b> no depósito, o que é <span className="text-amber-600 font-semibold">insuficiente para um próximo cardápio idêntico</span>.
+                  </>
+                )}
+              </p>
+
+              <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">Quantidade a consumir neste cardápio (kg):</label>
+                <input
+                  type="number"
+                  min="0"
+                  max={intelligentModalConfig.saldoKg}
+                  step="0.001"
+                  value={intelligentModalConfig.kgInput}
+                  onChange={(e) => setIntelligentModalConfig(prev => ({...prev, kgInput: e.target.value}))}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20 text-gray-800 font-bold bg-white shadow-inner"
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Ações Rápidas:</p>
+                
+                {intelligentModalConfig.type === 3 && (
+                  <button
+                    onClick={() => setIntelligentModalConfig(prev => ({...prev, kgInput: String(prev.kgNecessario)}))}
+                    className="w-full py-2 px-4 text-sm font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 rounded-lg text-left transition-colors"
+                  >
+                    👉 <b>Manter Per capita:</b> Usar {intelligentModalConfig.kgNecessario.toLocaleString('pt-BR')} kg e deixar o resto
+                  </button>
+                )}
+
+                <button
+                  onClick={() => setIntelligentModalConfig(prev => ({...prev, kgInput: String(prev.saldoKg)}))}
+                  className="w-full py-2 px-4 text-sm font-medium text-red-700 bg-red-50 border border-red-100 hover:bg-red-100 rounded-lg text-left transition-colors"
+                >
+                  🧨 <b>Zerar Estoque:</b> Consumir todos os {intelligentModalConfig.saldoKg.toLocaleString('pt-BR')} kg
+                </button>
+
+                {intelligentModalConfig.type === 3 && (
+                  <button
+                    onClick={() => setIntelligentModalConfig(prev => ({...prev, kgInput: String(prev.saldoKg / 2)}))}
+                    className="w-full py-2 px-4 text-sm font-medium text-amber-700 bg-amber-50 border border-amber-100 hover:bg-amber-100 rounded-lg text-left transition-colors"
+                  >
+                    ⚖️ <b>Dividir Saldo:</b> Consumir {(intelligentModalConfig.saldoKg / 2).toLocaleString('pt-BR')} kg (Metade agora, metade depois)
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="px-6 py-5 bg-gray-50 border-t border-gray-100 flex justify-end gap-3 rounded-b-3xl">
+              <button
+                onClick={() => setIntelligentModalConfig({ isOpen: false, type: null, item: null, kgNecessario: 0, saldoKg: 0, refParaCalculo: 0, kgInput: "" })}
+                className="px-6 py-2.5 text-gray-700 font-semibold hover:bg-gray-200 rounded-xl transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => confirmIntelligentAdd(intelligentModalConfig.kgInput)}
+                className="px-6 py-2.5 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all bg-emerald-500 hover:bg-emerald-600"
+              >
+                Confirmar Gênero
+              </button>
             </div>
           </div>
         </div>

@@ -172,15 +172,19 @@ function NovaResenhaModal({ onClose }) {
 
   useEffect(() => {
     async function loadPerguntas() {
+      if (!livroSel) {
+        setPerguntas([]);
+        return;
+      }
       try {
-        const { data } = await api.get('/api/biblioteca/perguntas');
+        const { data } = await api.get('/api/biblioteca/perguntas', { params: { livro_id: livroSel.id } });
         setPerguntas(data.perguntas || []);
       } catch(e) {
         console.error("Erro ao carregar perguntas", e);
       }
     }
     loadPerguntas();
-  }, []);
+  }, [livroSel]);
 
   useEffect(() => {
     const t = setTimeout(async () => {
@@ -300,7 +304,7 @@ function NovaResenhaModal({ onClose }) {
           </div>
 
           {/* Resumo / Resenha / Favorito */}
-          {[
+          {perguntas.length === 0 && [
             { key: 'resumo', label: 'Resumo do livro', rows: 3, placeholder: 'Escreva um resumo breve...' },
             { key: 'resenha', label: 'Resenha crítica', rows: 4, placeholder: 'O que achou do livro? O que mais gostou?' },
             { key: 'favorito', label: 'Trecho favorito', rows: 2, placeholder: 'Trecho que mais te marcou...' },
@@ -315,18 +319,20 @@ function NovaResenhaModal({ onClose }) {
           ))}
 
           {perguntas.length > 0 && (
-            <div className="pt-4 border-t border-slate-100">
-              <h3 className="text-sm font-bold text-slate-700 mb-3">📋 Perguntas Adicionais</h3>
-              <div className="space-y-3">
+            <div className="pt-2">
+              <h3 className="text-sm font-bold text-slate-700 mb-3">📋 Avaliação de Leitura</h3>
+              <p className="text-xs text-slate-500 mb-4">Este livro possui questões específicas configuradas.</p>
+              <div className="space-y-4">
                 {perguntas.map(p => (
                   <div key={p.id}>
-                    <label className="block text-xs font-bold mb-1 text-slate-500">{p.pergunta}</label>
+                    <label className="block text-xs font-bold mb-1 text-slate-700">{p.pergunta}</label>
                     <textarea 
                       value={respostas[p.id] || ''} 
                       onChange={e => setRespostas(prev => ({ ...prev, [p.id]: e.target.value }))}
-                      rows={2} 
-                      className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none focus:ring-2 focus:ring-blue-300 resize-none"
-                      style={{ borderColor: '#e2e8f0' }} 
+                      rows={3} 
+                      placeholder="Sua resposta..."
+                      className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 resize-none transition shadow-inner"
+                      style={{ borderColor: '#cbd5e1', background: '#f8fafc' }} 
                     />
                   </div>
                 ))}

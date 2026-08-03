@@ -57,7 +57,7 @@ export default function AtivarDiretor() {
     if (!t) { setErro("Cole o código de acesso recebido."); return; }
     setLoading(true); setErro("");
     try {
-      const { data } = await api.post(`/api/plataforma/convites/${t}/validar`);
+      const { data } = await api.post(`/api/convites-ativacao/${t}/validar`);
       setUsuario(data.usuario);
       setEmail(data.usuario?.email || "");
       setConviteToken(t);
@@ -73,7 +73,7 @@ export default function AtivarDiretor() {
     if (!email || !email.includes("@")) { setErro("Informe um e-mail válido."); return; }
     setLoading(true); setErro("");
     try {
-      const { data } = await api.post(`/api/plataforma/convites/${tokenLimpo}/enviar-codigo`, { email });
+      const { data } = await api.post(`/api/convites-ativacao/${tokenLimpo}/enviar-codigo`, { email });
       // Em dev, pode vir o código no response
       if (data._dev_codigo) console.log("[DEV] Código OTP:", data._dev_codigo);
       setCodigoDigitos(["", "", "", "", "", ""]);
@@ -123,7 +123,7 @@ export default function AtivarDiretor() {
     if (senha !== senha2) { setErro("As senhas não coincidem."); return; }
     setLoading(true); setErro("");
     try {
-      await api.post(`/api/plataforma/convites/${tokenLimpo}/ativar`, {
+      await api.post(`/api/convites-ativacao/${tokenLimpo}/ativar`, {
         codigo: codigoCompleto,
         email: email.trim().toLowerCase(),
         senha,

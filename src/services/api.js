@@ -109,7 +109,14 @@ api.interceptors.response.use(
     const status = error?.response?.status;
 
     // Se 401, limpa sessão e volta pro login
-    if (status === 401) {
+    // ⚠️  Exceção: páginas públicas (ativação de conta, cadastro) não redirecionam
+    // pois o usuário ainda não tem sessão e o 401 viria de endpoint protegido por engano.
+    const PAGINAS_PUBLICAS = ["/ativar-diretor", "/cadastro"];
+    const estaEmPaginaPublica = PAGINAS_PUBLICAS.some(
+      (p) => window?.location?.pathname?.startsWith(p)
+    );
+
+    if (status === 401 && !estaEmPaginaPublica) {
       try {
         localStorage.removeItem("token");
         // mantém escola_id/nome_escola se você quiser; aqui vou manter e limpar só token

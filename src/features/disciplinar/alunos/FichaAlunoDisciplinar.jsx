@@ -10,6 +10,7 @@ import api from "../../../services/api";
 import { Button } from "../../../components/ui/Button";
 import { AcademicCapIcon } from "@heroicons/react/24/solid";
 import ModalRelatorioDisciplinar from "../../alunos/ModalRelatorioDisciplinar";
+import ModalZoomFoto from "../../pedagogico/conselho/ModalZoomFoto";
 
 export default function FichaAlunoDisciplinar({ codigo: codigoProp }) {
   const { codigo: codigoParam } = useParams();
@@ -21,6 +22,11 @@ export default function FichaAlunoDisciplinar({ codigo: codigoProp }) {
   const [erro, setErro] = useState(null);
   const [modalRelatorioOpen, setModalRelatorioOpen] = useState(false);
   const [ocorrenciasCount, setOcorrenciasCount] = useState(null);
+
+  // ── Zoom da foto ───────────────────────────────────────────────────────────
+  const [zoomOpen, setZoomOpen] = useState(false);
+  const [zoomSrc,  setZoomSrc]  = useState("");
+  const [zoomAlt,  setZoomAlt]  = useState("");
 
   const retryOnceRef = useRef(false);
 
@@ -132,7 +138,20 @@ export default function FichaAlunoDisciplinar({ codigo: codigoProp }) {
                 key={fotoURL}
                 src={fotoURL}
                 alt={aluno.estudante || ""}
-                style={{ width: 64, height: 64, borderRadius: '50%', objectFit: 'cover', border: '3px solid rgba(255,255,255,0.3)' }}
+                style={{
+                  width: 64, height: 64, borderRadius: '50%', objectFit: 'cover',
+                  border: '3px solid rgba(255,255,255,0.3)',
+                  cursor: 'pointer',
+                  transition: 'transform 0.15s, box-shadow 0.15s',
+                }}
+                title="Clique para ampliar a foto"
+                onClick={() => {
+                  setZoomSrc(fotoURL);
+                  setZoomAlt(`Foto de ${aluno.estudante || 'estudante'}`);
+                  setZoomOpen(true);
+                }}
+                onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.08)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(255,255,255,0.5)'; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)';    e.currentTarget.style.boxShadow = 'none'; }}
                 onError={(e) => {
                   if (!retryOnceRef.current) {
                     retryOnceRef.current = true;
@@ -254,6 +273,16 @@ export default function FichaAlunoDisciplinar({ codigo: codigoProp }) {
         onClose={() => setModalRelatorioOpen(false)}
         aluno={aluno}
       />
+
+      {/* Zoom de foto — mesmo padrão do Conselho de Classe */}
+      {zoomOpen && (
+        <ModalZoomFoto
+          open={zoomOpen}
+          src={zoomSrc}
+          alt={zoomAlt}
+          onClose={() => setZoomOpen(false)}
+        />
+      )}
     </div>
   );
 }

@@ -643,30 +643,11 @@ export default function AgenteNotas() {
             <button
               key={f.key}
               onClick={() => setFiltro(f.key)}
-              style={{
-                display: "flex", alignItems: "center", gap: 10,
-                padding: "10px 20px", borderRadius: 12, fontWeight: 700, fontSize: "0.82rem",
-                cursor: "pointer", transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                border: filtro === f.key ? "1px solid rgba(16, 185, 129, 0.6)" : "1px solid rgba(255, 255, 255, 0.1)",
-                background: filtro === f.key
-                  ? "linear-gradient(135deg, #10b981 0%, #0891b2 100%)"
-                  : "linear-gradient(145deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.8))",
-                color: filtro === f.key ? "#ffffff" : "#cbd5e1",
-                boxShadow: filtro === f.key 
-                  ? "0 8px 20px -4px rgba(16, 185, 129, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.3)" 
-                  : "0 4px 6px -1px rgba(0, 0, 0, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.05)",
-                backdropFilter: "blur(10px)",
-              }}
-            >
-              {f.label}
-              <span style={{
-                background: filtro === f.key ? "rgba(255, 255, 255, 0.25)" : "rgba(15, 23, 42, 0.6)",
-                color: filtro === f.key ? "#ffffff" : "#94a3b8",
-                border: filtro === f.key ? "none" : "1px solid rgba(255, 255, 255, 0.05)",
-                borderRadius: 8, padding: "2px 8px", fontSize: "0.75rem", fontWeight: 800,
-                boxShadow: filtro === f.key ? "inset 0 1px 1px rgba(0,0,0,0.1)" : "inset 0 1px 1px rgba(0,0,0,0.2)",
-              }}>{f.count}</span>
-            </button>
+                className={`premium-pill-btn premium-pill-btn-green ${filtro === f.key ? 'active' : ''}`}
+              >
+                {f.label}
+                <span className="badge">{f.count}</span>
+              </button>
           ))}
         </div>
 
@@ -688,38 +669,12 @@ export default function AgenteNotas() {
               <button
                 key={b.key}
                 onClick={() => setFiltroBimestre(b.key)}
-                title={b.label}
-                style={{
-                  display: "flex", alignItems: "center", gap: 8,
-                  padding: "8px 16px", borderRadius: 10, fontWeight: 700, fontSize: "0.76rem",
-                  cursor: "pointer", transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                  border: `1px solid ${ativo ? b.color : "rgba(255, 255, 255, 0.1)"}`,
-                  background: ativo
-                    ? `linear-gradient(135deg, ${b.color}25, ${b.color}0A)`
-                    : "linear-gradient(145deg, rgba(30, 41, 59, 0.6), rgba(15, 23, 42, 0.6))",
-                  color: ativo ? b.color : "#94a3b8",
-                  boxShadow: ativo 
-                    ? `0 6px 16px -4px ${b.color}40, inset 0 1px 1px rgba(255,255,255,0.1)` 
-                    : "0 3px 5px -1px rgba(0,0,0,0.2), inset 0 1px 1px rgba(255,255,255,0.05)",
-                  backdropFilter: "blur(10px)",
-                }}
-              >
-                <span style={{
-                  width: 8, height: 8, borderRadius: "50%", flexShrink: 0,
-                  background: ativo ? b.color : "rgba(255,255,255,0.15)",
-                  boxShadow: ativo ? `0 0 10px ${b.color}, 0 0 4px ${b.color}` : "none",
-                  transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-                }} />
-                {b.short}
-                <span style={{
-                  background: ativo ? `${b.color}25` : "rgba(15, 23, 42, 0.5)",
-                  color: ativo ? b.color : "#64748b",
-                  border: ativo ? "none" : "1px solid rgba(255, 255, 255, 0.05)",
-                  borderRadius: 6, padding: "2px 8px", fontSize: "0.7rem", fontWeight: 800,
-                  minWidth: 20, textAlign: "center",
-                  boxShadow: "inset 0 1px 1px rgba(0,0,0,0.1)",
-                }}>{b.total}</span>
-              </button>
+                  title={b.label}
+                  className={`premium-pill-btn premium-pill-btn-green premium-pill-sm ${ativo ? 'active' : ''}`}
+                >
+                  {b.short}
+                  <span className="badge" style={ativo ? {} : { opacity: b.total === 0 ? 0.3 : 1 }}>{b.total}</span>
+                </button>
             );
           })}
         </div>

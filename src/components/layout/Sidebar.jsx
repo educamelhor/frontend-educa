@@ -1741,7 +1741,6 @@ export default function Sidebar({ isOpen, onClose }) {
                 )}
 
                 {/* Agenda Pedagógica */}
-                {hasModulo('pedagogico.agenda') && (
                 <li>
                   <Link
                     to="/pedagogico/agenda"
@@ -1765,7 +1764,6 @@ export default function Sidebar({ isOpen, onClose }) {
                     }}>NOVO</span>
                   </Link>
                 </li>
-                )}
 
               </ul>
             )}

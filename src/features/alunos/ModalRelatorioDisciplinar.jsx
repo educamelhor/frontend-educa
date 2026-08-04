@@ -30,6 +30,10 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
     const [modalInfoOpen, setModalInfoOpen] = useState(false);
     const [infoMensagem, setInfoMensagem] = useState("");
 
+    // Estado do novo Modal de Observações (Internas)
+    const [modalObservacaoOpen, setModalObservacaoOpen] = useState(false);
+    const [observacaoInterna, setObservacaoInterna] = useState("");
+
     // Estados de Exclusão
     const [modalExcluirOpen, setModalExcluirOpen] = useState(false);
     const [ocorrenciaParaExcluir, setOcorrenciaParaExcluir] = useState(null);
@@ -95,11 +99,13 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
         try {
             await api.put(
                 `/api/alunos/${aluno.id}/ocorrencias/${ocorrenciaParaComparecimento.id}/comparecimento`,
-                { modo: modoFinalizacao }
+                { modo: modoFinalizacao, observacao_interna: observacaoInterna }
             );
             fetchOcorrencias();
             setModalComparecimentoOpen(false);
+            setModalObservacaoOpen(false);
             setOcorrenciaParaComparecimento(null);
+            setObservacaoInterna("");
         } catch (err) {
             console.error("Erro ao registrar comparecimento:", err);
             alert("Erro ao registrar comparecimento.");
@@ -687,10 +693,10 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
                                 </button>
                                 <button
                                     type="button"
-                                    onClick={handleConfirmarComparecimento}
+                                    onClick={() => setModalObservacaoOpen(true)}
                                     disabled={registrandoComparecimento}
                                     style={{
-                                        flex:2, padding:"12px", borderRadius:12, border:"none", fontSize:14, fontWeight:600, color:"#fff",
+                                        flex:2, padding:"12px 16px", borderRadius:12, border:"none", fontSize:14, fontWeight:600, color:"#fff",
                                         cursor: registrandoComparecimento ? "not-allowed" : "pointer",
                                         background: registrandoComparecimento ? "#9ca3af" : "linear-gradient(135deg, #14532d, #166534)",
                                         boxShadow: registrandoComparecimento ? "none" : "0 4px 14px rgba(20,83,45,0.3)",
@@ -700,13 +706,74 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
                                     onMouseEnter={e => { if(!registrandoComparecimento) { e.currentTarget.style.boxShadow="0 6px 20px rgba(20,83,45,0.4)"; e.currentTarget.style.transform="translateY(-1px)"; } }}
                                     onMouseLeave={e => { e.currentTarget.style.boxShadow="0 4px 14px rgba(20,83,45,0.3)"; e.currentTarget.style.transform="translateY(0)"; }}
                                 >
-                                    {registrandoComparecimento ? (
-                                        <><div style={{ width:16, height:16, border:"2px solid rgba(255,255,255,0.3)", borderTop:"2px solid #fff", borderRadius:"50%", animation:"spin 0.8s linear infinite" }} />Finalizando...</>
-                                    ) : (
-                                        <><CheckCircleIcon className="h-5 w-5" />Finalizar Registro</>
-                                    )}
+                                    <CheckCircleIcon className="h-5 w-5" />Avançar
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de Observações Internas (Intermediário antes de finalizar) */}
+            {modalObservacaoOpen && (
+                <div
+                    className="fixed inset-0 z-[80] flex items-center justify-center p-4"
+                    style={{ background: "rgba(15,23,42,0.65)", backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)" }}
+                >
+                    <style>{`
+                        @keyframes obsSlideIn { from { opacity:0; transform:scale(0.92) translateY(20px) } to { opacity:1; transform:scale(1) translateY(0) } }
+                    `}</style>
+                    <div
+                        className="bg-white w-full max-w-md overflow-hidden flex flex-col"
+                        style={{ borderRadius: 20, boxShadow: "0 25px 50px -12px rgba(0,0,0,0.35)", animation: "obsSlideIn 0.3s cubic-bezier(0.16,1,0.3,1) forwards" }}
+                    >
+                        <div className="px-6 py-5 border-b flex items-center justify-between" style={{ background: "linear-gradient(135deg, #1e293b, #0f172a)" }}>
+                            <h2 className="text-lg font-bold text-white m-0 flex items-center gap-2">
+                                <ClipboardDocumentListIcon className="h-5 w-5 text-gray-300" />
+                                Observações Internas
+                            </h2>
+                            <button
+                                onClick={() => setModalObservacaoOpen(false)}
+                                className="text-gray-400 hover:text-white transition"
+                                title="Fechar"
+                            >
+                                <XMarkIcon className="h-5 w-5" />
+                            </button>
+                        </div>
+                        <div className="p-6">
+                            <p className="text-sm text-gray-600 mb-3 font-medium">
+                                Deseja adicionar alguma observação sobre esta finalização? (Opcional)
+                            </p>
+                            <p className="text-xs text-amber-700 font-medium mb-4 bg-amber-50 p-2 rounded-lg border border-amber-200 inline-flex items-center gap-1.5">
+                                <span>🔒</span> Registro Interno: visível apenas para a equipe disciplinar. Não sairá em impressões.
+                            </p>
+                            <textarea
+                                value={observacaoInterna}
+                                onChange={(e) => setObservacaoInterna(e.target.value)}
+                                className="w-full border border-gray-300 rounded-xl p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all outline-none resize-none"
+                                rows={4}
+                                placeholder="Digite aqui alguma observação relevante..."
+                            />
+                        </div>
+                        <div className="px-6 py-4 bg-gray-50 border-t flex justify-end gap-3">
+                            <button
+                                onClick={() => setModalObservacaoOpen(false)}
+                                disabled={registrandoComparecimento}
+                                className="px-4 py-2 text-gray-600 bg-white border border-gray-300 rounded-xl font-medium hover:bg-gray-50 transition disabled:opacity-50"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleConfirmarComparecimento}
+                                disabled={registrandoComparecimento}
+                                className="px-5 py-2 text-white bg-green-600 rounded-xl font-medium hover:bg-green-700 transition flex items-center gap-2 disabled:opacity-50 shadow-sm"
+                            >
+                                {registrandoComparecimento ? (
+                                    <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Finalizando...</>
+                                ) : (
+                                    <><CheckCircleIcon className="h-5 w-5" /> Finalizar Registro</>
+                                )}
+                            </button>
                         </div>
                     </div>
                 </div>

@@ -29,6 +29,7 @@ import {
   Cog6ToothIcon,
   XMarkIcon,
   BoltIcon,
+  CalendarDaysIcon,
 } from '@heroicons/react/24/outline';
 import {
   PERFIS_MILITARES_SET,
@@ -1730,6 +1731,33 @@ export default function Sidebar({ isOpen, onClose }) {
                       fontSize: '0.5rem',
                       fontWeight: 800,
                       background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                      color: '#fff',
+                      padding: '1px 5px',
+                      borderRadius: '6px',
+                      letterSpacing: '0.5px',
+                    }}>NOVO</span>
+                  </Link>
+                </li>
+                )}
+
+                {/* Agenda Pedagógica */}
+                {hasModulo('pedagogico.agenda') && (
+                <li>
+                  <Link
+                    to="/pedagogico/agenda"
+                    className={getSubmenuLinkClasses('/pedagogico/agenda')}
+                    style={{
+                      background: isActive('/pedagogico/agenda')
+                        ? 'linear-gradient(90deg, rgba(16,185,129,0.15), transparent)'
+                        : undefined,
+                    }}
+                  >
+                    <CalendarDaysIcon className="h-5 w-5 mr-2" style={{ color: isActive('/pedagogico/agenda') ? '#34d399' : undefined }} />
+                    <span className="flex-1">Agenda</span>
+                    <span style={{
+                      fontSize: '0.5rem',
+                      fontWeight: 800,
+                      background: 'linear-gradient(135deg, #059669, #34d399)',
                       color: '#fff',
                       padding: '1px 5px',
                       borderRadius: '6px',

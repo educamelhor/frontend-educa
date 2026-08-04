@@ -136,6 +136,7 @@ import RelatoriosSecretaria from "./features/secretaria/relatorios/RelatoriosSec
 // ✅ NOVO IMPORT: Relatórios Pedagógicos
 import RelatoriosPedagogicos from "./features/pedagogico/relatorios/RelatoriosPedagogicos.jsx";
 import PlanoAvaliacaoPage from "./features/pedagogico/relatorios/PlanoAvaliacaoPage.jsx";
+import AgendaPedagogica from "./features/pedagogico/agenda/AgendaPedagogica.jsx";
 
 // ✅ MÓDULO MERENDA
 import MerendaCadastroPage from "./features/merenda/cadastro";
@@ -406,6 +407,7 @@ export default function App() {
           {/* ✅ Relatórios Pedagógicos */}
           <Route path="/pedagogico/relatorios" element={<RequireModulo modulo="pedagogico"><RelatoriosPedagogicos /></RequireModulo>} />
           <Route path="/pedagogico/relatorios/plano-avaliacao" element={<RequireModulo modulo="pedagogico"><PlanoAvaliacaoPage /></RequireModulo>} />
+          <Route path="/pedagogico/agenda" element={<RequireModulo modulo="pedagogico"><AgendaPedagogica /></RequireModulo>} />
 
           {/* ── Professores ──────────────────────────────────────────────── */}
           <Route path="/professores/planos"     element={<RequireModulo modulo="professores"><Planos /></RequireModulo>} />

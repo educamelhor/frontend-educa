@@ -168,9 +168,6 @@ export default function Sidebar({ isOpen, onClose }) {
     applyModulosFromServer();
   }, [location.pathname, applyModulosFromServer]);
 
-  // hasModulo: null = sem restrição = true; array = verifica se contém o módulo
-  const hasModulo = (mod) => _modulos === null || _modulos.includes(mod);
-
   // ── Perfil do usuário logado ──
   const getPerfil = () =>
     String(localStorage.getItem('perfil') || '').toLowerCase().trim();
@@ -180,6 +177,14 @@ export default function Sidebar({ isOpen, onClose }) {
   const isDisciplinar = PERFIS_MILITARES_SET.has(perfil);
   const isProfessor = perfil === 'professor';
   const isSecretario = perfil === 'secretario' || perfil === 'secretaria';
+
+  // hasModulo: null = sem restrição = true; array = verifica se contém o módulo
+  const hasModulo = (mod) => {
+    // DISCIPLINAR: autônomo e padrão p/ escolas cívico-militares (CEO não configura).
+    // Evita bloqueio em escolas recém-inseridas (ex: CEF113-CCMDF) que não possuem o módulo ativado no BD.
+    if (isDisciplinar && mod?.startsWith('disciplinar')) return true;
+    return _modulos === null || _modulos.includes(mod);
+  };
 
   // Iniciando pelos 3 módulos solicitados
   const canConteudos = isScopeEscola && !isDisciplinar && !isProfessor && hasPerm('conteudos:ver');

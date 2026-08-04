@@ -559,9 +559,10 @@ function ModalAgendaTema({ tema, eventos, loading, onClose, onEventoCriado, onEv
               </div>
 
               {/* Data início */}
-              <div>
+              {/* Data início */}
+              <div style={{ gridColumn: tema.id === 'semana_prova' ? 'span 2' : 'span 1' }}>
                 <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#475569", marginBottom: 6 }}>
-                  Data de início *
+                  {tema.id === 'semana_prova' ? 'Data da prova *' : 'Data de início *'}
                 </label>
                 <input
                   type="date"
@@ -574,6 +575,7 @@ function ModalAgendaTema({ tema, eventos, loading, onClose, onEventoCriado, onEv
               </div>
 
               {/* Data fim */}
+              {tema.id !== 'semana_prova' && (
               <div>
                 <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#475569", marginBottom: 6 }}>
                   Data de término
@@ -587,6 +589,7 @@ function ModalAgendaTema({ tema, eventos, loading, onClose, onEventoCriado, onEv
                   onBlur={(e) => { e.currentTarget.style.borderColor = "#e2e8f0"; e.currentTarget.style.boxShadow = "none"; }}
                 />
               </div>
+              )}
 
               {/* Descrição */}
               <div style={{ gridColumn: "span 2" }}>

@@ -31,6 +31,7 @@ const MODULOS_TREE = [
   {
     id: 'pedagogico', label: 'Pedagógico', icon: '🎓',
     filhos: [
+      { id: 'pedagogico.agenda', label: 'Agenda' },
       { id: 'pedagogico.conselho', label: 'Conselho de Classe' },
       { id: 'pedagogico.conteudos', label: 'Conteúdos' },
       { id: 'pedagogico.relatorios', label: 'Relatórios' },

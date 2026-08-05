@@ -1405,7 +1405,47 @@ export default function Avaliacoes() {
                                     <th rowSpan={2} className="px-6 py-4 font-bold border-b border-r border-slate-200 w-10 text-center">Nº</th>
                                     <th rowSpan={2} className="px-6 py-4 font-bold border-b border-r border-slate-200 bg-slate-100 sticky left-0 z-30 min-w-[250px] shadow-sm">Estudante</th>
 
-                                     {/* CABEÇALHO 1 - Títulos das Atividades */}                                      {(Array.isArray(plano.itens) ? plano.itens : JSON.parse(plano.itens || "[]")).map((item, idx) => {                                        const dataExibir = item.data_inicio ? String(item.data_inicio).slice(0, 10) : null;                                        const dataFormatada = dataExibir                                          ? new Date(dataExibir + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })                                          : null;                                        const podeEditar = !item.fixo_direcao && !diarioFechado;                                        return (                                          <th key={idx} colSpan={Number(item.oportunidades) || 1} className="px-4 py-2 text-center text-[11px] font-black uppercase tracking-wider text-indigo-800 border-b border-r border-indigo-100 bg-indigo-50/50">                                            {item.atividade}                                            <div className="text-[10px] text-indigo-500 font-semibold lowercase mt-0.5">                                              (Max: {item.nota_total} pts)                                            </div>                                            {item.fixo_direcao ? (                                              <div className="flex flex-col items-center justify-center gap-1 mt-1">                                                <div title="Data gerenciada pela Direção" style={{ fontSize: "0.62rem", color: "#92400e", fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", gap: 2 }}>                                                  {"\uD83D\uDD12"} {dataFormatada || "a definir"}                                                </div>                                                {!diarioFechado && (                                                  <button                                                    onClick={() => setModalAEE({ item, itemIdx: idx })}                                                    title="Lançar nota manual para alunos com Atendimento Diferencial (AEE)"                                                    style={{ fontSize: "0.55rem", padding: "2px 6px", borderRadius: "4px", backgroundColor: "#fef3c7", border: "1px solid #f59e0b", color: "#b45309", cursor: "pointer", fontWeight: "bold" }}                                                  >                                                    Lançar AEE                                                  </button>                                                )}                                              </div>                                            ) : (                                              <button                                                onClick={() => { if (!podeEditar) return; setDataEditTemp(dataExibir || ""); setModalDataItem({ itemId: item.id, itemIdx: idx, atividade: item.atividade, dataAtual: dataExibir }); }}                                                title={podeEditar ? "Clique para definir a data" : "Diário fechado"}                                                style={{ marginTop: 3, display: "flex", alignItems: "center", justifyContent: "center", gap: 3, fontSize: "0.62rem", fontWeight: 700, color: dataFormatada ? "#1d4ed8" : "#94a3b8", background: dataFormatada ? "rgba(59,130,246,0.1)" : "rgba(148,163,184,0.1)", border: "1px dashed " + (dataFormatada ? "rgba(59,130,246,0.4)" : "rgba(148,163,184,0.4)"), borderRadius: "0.3rem", padding: "1px 5px", cursor: podeEditar ? "pointer" : "default", width: "100%", transition: "all 0.15s" }}                                              >                                                {"\uD83D\uDCC5"} {dataFormatada || "+ data"}                                              </button>                                            )}                                          </th>                                        );                                      })}
+                                     {/* CABEÇALHO 1 - Títulos das Atividades */}
+                                     {(Array.isArray(plano.itens) ? plano.itens : JSON.parse(plano.itens || "[]")).map((item, idx) => {
+                                       const dataExibir = item.data_inicio ? String(item.data_inicio).slice(0, 10) : null;
+                                       const dataFormatada = dataExibir
+                                         ? new Date(dataExibir + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })
+                                         : null;
+                                       const podeEditar = !diarioFechado;
+                                       const btnData = (
+                                         <button
+                                           onClick={() => { if (!podeEditar) return; setDataEditTemp(dataExibir || ""); setModalDataItem({ itemId: item.id, itemIdx: idx, atividade: item.atividade, dataAtual: dataExibir }); }}
+                                           title={podeEditar ? "Clique para definir a data" : "Diário fechado"}
+                                           style={{ marginTop: 3, display: "flex", alignItems: "center", justifyContent: "center", gap: 3, fontSize: "0.62rem", fontWeight: 700, color: dataFormatada ? "#1d4ed8" : "#94a3b8", background: dataFormatada ? "rgba(59,130,246,0.1)" : "rgba(148,163,184,0.1)", border: "1px dashed " + (dataFormatada ? "rgba(59,130,246,0.4)" : "rgba(148,163,184,0.4)"), borderRadius: "0.3rem", padding: "1px 5px", cursor: podeEditar ? "pointer" : "default", width: "100%", transition: "all 0.15s" }}
+                                         >
+                                           {"\uD83D\uDCC5"} {dataFormatada || "+ data"}
+                                         </button>
+                                       );
+                                       return (
+                                         <th key={idx} colSpan={Number(item.oportunidades) || 1} className="px-4 py-2 text-center text-[11px] font-black uppercase tracking-wider text-indigo-800 border-b border-r border-indigo-100 bg-indigo-50/50">
+                                           {item.atividade}
+                                           <div className="text-[10px] text-indigo-500 font-semibold lowercase mt-0.5">
+                                             (Max: {item.nota_total} pts)
+                                           </div>
+                                           {item.fixo_direcao ? (
+                                             <div className="flex flex-col items-center justify-center gap-1 mt-1">
+                                               {btnData}
+                                               {!diarioFechado && (
+                                                 <button
+                                                   onClick={() => setModalAEE({ item, itemIdx: idx })}
+                                                   title="Lançar nota manual para alunos com Atendimento Diferencial (AEE)"
+                                                   style={{ fontSize: "0.55rem", padding: "2px 6px", borderRadius: "4px", backgroundColor: "#fef3c7", border: "1px solid #f59e0b", color: "#b45309", cursor: "pointer", fontWeight: "bold" }}
+                                                 >
+                                                   Lançar AEE
+                                                 </button>
+                                               )}
+                                             </div>
+                                           ) : (
+                                             btnData
+                                           )}
+                                         </th>
+                                       );
+                                     })}
 
                                     <th rowSpan={2} className="px-6 py-4 font-black uppercase tracking-widest text-center border-b border-slate-200 text-slate-800 bg-slate-200 min-w-[120px]">TOTAL</th>
                                 </tr>

@@ -1128,26 +1128,32 @@ export default function Planos() {
                     </td>
                     <td className="border px-4 py-2">
                       {isFixo ? (
-                        // ✅ Data da Prova Bimestral: somente leitura para o professor
-                        // A data será definida pela Direção / Coordenação
+                        // ✅ Data da Prova Bimestral: editável pelo professor através de modal próprio
                         <div className="flex items-center justify-center">
-                          <div
-                            title={
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (papStatus === "BLOQUEADO_TEMPO") {
+                                return showMsg("info", "Bimestre encerrado: não é mais possível editar este item.");
+                              }
+                              if (papStatus !== "RASCUNHO" && papStatus !== "LIBERADO" && planoModo !== "professor_autonomo") {
+                                return showMsg("info", "Sua solicitação para editar este item foi enviada para a direção. Em breve você poderá editar.");
+                              }
+                              setDataFixoTemp(item.data_inicio || "");
+                              setModalDataFixo(true);
+                            }}
+                            title="Clique para definir a data da Prova Bimestral"
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold select-none cursor-pointer transition ${
                               item.data_inicio
-                                ? `Data da prova: ${new Date(item.data_inicio + 'T12:00:00').toLocaleDateString('pt-BR')} — definida pela Direção`
-                                : 'Data a ser definida pela Direção / Coordenação'
-                            }
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold select-none cursor-not-allowed ${
-                              item.data_inicio
-                                ? 'bg-green-50 text-green-700 border border-green-200'
-                                : 'bg-slate-100 text-slate-400 border border-slate-200'
+                                ? 'bg-green-50 text-green-700 border border-green-200 hover:bg-green-100'
+                                : 'bg-slate-100 text-slate-600 border border-slate-300 hover:bg-slate-200'
                             }`}
                           >
                             <CalendarDaysIcon className="h-4 w-4 flex-shrink-0" />
                             {item.data_inicio
                               ? new Date(item.data_inicio + 'T12:00:00').toLocaleDateString('pt-BR')
-                              : 'A definir 🔒'}
-                          </div>
+                              : 'Definir Data'}
+                          </button>
                         </div>
                       ) : (
                         <div className="flex items-center justify-center gap-2">

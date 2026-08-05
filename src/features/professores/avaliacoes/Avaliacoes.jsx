@@ -78,6 +78,7 @@ export default function Avaliacoes() {
 
   // Novo fluxo: EXPORTAR BOLETIM em etapas
   const [modalNotasPendentes, setModalNotasPendentes] = useState(false);
+  const [modalDataBimestralFaltando, setModalDataBimestralFaltando] = useState(false);
   const [modalConfirmarExportar, setModalConfirmarExportar] = useState(false);
   const [modalProgressoExportar, setModalProgressoExportar] = useState(false);
   const [progressoExportar, setProgressoExportar] = useState(0); // 0-100
@@ -735,6 +736,13 @@ export default function Avaliacoes() {
   // NOVO FLUXO: EXPORTAR BOLETIM com progresso
   // ---------------------------
   const handleClickExportarBoletim = () => {
+    // NOVA VALIDAÇÃO: Prova Bimestral sem data
+    const provaBimestralItem = plano?.itens?.find(i => i.fixo_direcao === 1);
+    if (provaBimestralItem && !provaBimestralItem.data_inicio) {
+      setModalDataBimestralFaltando(true);
+      return;
+    }
+
     if (!todasNotasLancadas) {
       setModalNotasPendentes(true);
     } else {

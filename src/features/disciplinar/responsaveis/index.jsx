@@ -197,12 +197,9 @@ export default function ResponsaveisDisciplinar() {
   };
 
   const formatCpf = (val) => {
-    return val
-      .replace(/\D/g, "")
-      .replace(/(\d{3})(\d)/, "$1.$2")
-      .replace(/(\d{3})(\d)/, "$1.$2")
-      .replace(/(\d{3})(\d{1,2})/, "$1-$2")
-      .replace(/(-\d{2})\d+?$/, "$1");
+    if (!val) return "";
+    const digits = String(val).replace(/\D/g, "").padStart(11, "0");
+    return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.***.***-$4");
   };
 
   const formatTelefone = (val) => {

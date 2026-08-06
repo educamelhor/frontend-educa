@@ -29,11 +29,11 @@ function anoLetivoPadrao() {
   return mes <= 1 ? hoje.getFullYear() - 1 : hoje.getFullYear();
 }
 
-// ── Formatar CPF ──
+// ── Formatar CPF (Máscara LGPD) ──
 function formatarCPF(cpf) {
   if (!cpf) return "—";
   const digits = String(cpf).replace(/\D/g, "").padStart(11, "0");
-  return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+  return digits.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.***.***-$4");
 }
 
 function formatTelefone(val) {

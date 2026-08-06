@@ -20,6 +20,12 @@ import ProfessorTable from "./ProfessorTable";
 import ProfessorForm from "./ProfessorForm";
 import VinculoForm from "./VinculoForm";
 
+function formatarCPF(cpf = "") {
+  cpf = String(cpf).replace(/[^\d]/g, "");
+  if (cpf.length !== 11) return cpf;
+  return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.***.***-$4");
+}
+
 export default function Professores() {
   // ─────────────────────────────────────────────────────────────
   // Estados principais
@@ -584,7 +590,7 @@ function ModalExcluirLote({ professores, onClose, onSuccess }) {
                     {p.nome}
                   </p>
                   <p style={{ color: '#6b7280', fontSize: 11, margin: '2px 0 0' }}>
-                    {p.cpf}
+                    {formatarCPF(p.cpf)}
                     {p.turno ? ` · ${p.turno.toUpperCase()}` : ''}
                     {p.disciplina_nome ? ` · ${p.disciplina_nome}` : ''}
                   </p>
@@ -613,7 +619,7 @@ function ModalExcluirLote({ professores, onClose, onSuccess }) {
               <div style={{ maxHeight: 160, overflowY: 'auto', marginTop: 8 }}>
                 {professores.filter(p => selecionados.has(p.id)).map(p => (
                   <p key={p.id} style={{ fontSize: 12, color: '#6b7280', margin: '3px 0' }}>
-                    • {p.nome} ({p.cpf})
+                    • {p.nome} ({formatarCPF(p.cpf)})
                   </p>
                 ))}
               </div>

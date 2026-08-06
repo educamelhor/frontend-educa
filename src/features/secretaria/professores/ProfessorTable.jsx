@@ -22,7 +22,7 @@ import { useNavigate } from "react-router-dom";
 function formatarCPF(cpf = "") {
   cpf = cpf.replace(/[^\d]/g, "");
   if (cpf.length !== 11) return cpf;
-  return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+  return cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.***.***-$4");
 }
 
 // Cores para turno

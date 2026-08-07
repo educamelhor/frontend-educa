@@ -12,7 +12,7 @@
 // ────────────────────────────────────────────────────────────────
 
 import React, { useState, useEffect } from "react";
-import { AcademicCapIcon, PlusCircleIcon, FolderOpenIcon } from "@heroicons/react/24/solid";
+import { AcademicCapIcon, PlusCircleIcon, FolderOpenIcon, DocumentTextIcon } from "@heroicons/react/24/solid";
 import AlunoTable from "./AlunoTable";
 import AlunoForm from "./AlunoForm";
 import ModalExcluirOuInativar from "./ModalExcluirOuInativar";
@@ -289,6 +289,16 @@ export default function Alunos() {
               >
                 <FolderOpenIcon className="w-5 h-5" />
                 Incluir Estudantes
+              </button>
+
+              <button
+                type="button"
+                onClick={() => { /* TODO: Implementar função no próximo passo */ }}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-yellow-500 text-white hover:bg-yellow-600 transition shadow-sm font-medium"
+                title="Lista IEDUCAR"
+              >
+                <DocumentTextIcon className="w-5 h-5" />
+                Lista IEDUCAR
               </button>
             </>
           )}

@@ -217,7 +217,7 @@ export default function ImportPDF({ open, onClose, onFinish }) {
     setSubmitting(true);
 
     try {
-      const rota = "/api/alunos/importar-pdf";
+      const rota = "/api/alunos/importar-pdf-ieducar";
 
       const { data } = await api.post(rota, formData, {
         timeout: 120_000, // 2min — importação em lote pode ser demorada

@@ -256,14 +256,14 @@ export default function ConselhoClasseResumo() {
     setLoadingTurmas(true);
     try {
       const escola_id = localStorage.getItem("escola_id") || 1;
-      const { data } = await api.get("/api/turmas", { params: { escola_id } });
+      const { data } = await api.get("/api/turmas", { params: { escola_id, ano: anoLetivo } });
       setTurmas(Array.isArray(data) ? data : []);
     } catch {
       setTurmas([]);
     } finally {
       setLoadingTurmas(false);
     }
-  }, []);
+  }, [anoLetivo]);
 
   useEffect(() => { fetchTurmas(); }, [fetchTurmas, anoLetivo]);
 
@@ -306,7 +306,7 @@ export default function ConselhoClasseResumo() {
       const url = window.URL.createObjectURL(new Blob([resp.data], { type: "application/pdf" }));
       const link = document.createElement("a");
       link.href = url;
-      const nomeTurma = (turmaSelecionada.nome || "turma").replace(/\s/g, "_").replace(/[^a-zA-Z0-9_]/g, "");
+    const nomeTurma = (turmaSelecionada.turma || turmaSelecionada.nome || "turma").replace(/\s/g, "_").replace(/[^a-zA-Z0-9_]/g, "");
       link.setAttribute("download", `Conselho_${nomeTurma}_${anoLetivo}.pdf`);
       document.body.appendChild(link);
       link.click();
@@ -318,11 +318,10 @@ export default function ConselhoClasseResumo() {
     }
   };
 
-  // ── Turmas filtradas por turno e ano ────────────────────────────────────
+  // ── Turmas filtradas por turno (ano já vem filtrado da API) ────────────────
   const turmasFiltradas = turmas.filter(
     t => turnoSelecionado &&
-      normalizaTurno(t.turno) === normalizaTurno(turnoSelecionado) &&
-      Number(t.ano) === anoLetivo
+      normalizaTurno(t.turno) === normalizaTurno(turnoSelecionado)
   );
 
   // ── Estatísticas ──────────────────────────────────────────────────────────
@@ -406,7 +405,7 @@ export default function ConselhoClasseResumo() {
             borderTop: "1px solid rgba(255,255,255,0.1)", flexWrap: "wrap",
           }}>
             {[
-              { label: "Turma",        value: dados.turma?.nome,                  color: "#c7d2fe" },
+              { label: "Turma",        value: dados.turma?.turma || dados.turma?.nome || turmaSelecionada?.turma || turmaSelecionada?.nome, color: "#c7d2fe" },
               { label: "Turno",        value: dados.turma?.turno || "—",          color: "#c7d2fe" },
               { label: "Alunos",       value: totalAlunos,                         color: "#c7d2fe" },
               { label: "Observações",  value: totalRegistros,                      color: "#10b981" },
@@ -491,7 +490,7 @@ export default function ConselhoClasseResumo() {
             <div>
               <div style={{ fontWeight: 800, fontSize: "0.95rem", color: "#1e293b" }}>Selecione a Turma</div>
               <div style={{ fontSize: "0.75rem", color: "#64748b" }}>
-                {loadingTurmas ? "Carregando turmas..." : `${turmasFiltradas.length} turma${turmasFiltradas.length !== 1 ? "s" : ""} no turno ${turnoSelecionado}`}
+                {turmasFiltradas.length} turma{turmasFiltradas.length !== 1 ? "s" : ""} encontrada{turmasFiltradas.length !== 1 ? "s" : ""} no turno {turnoSelecionado} em {anoLetivo}
               </div>
             </div>
           </div>
@@ -508,6 +507,7 @@ export default function ConselhoClasseResumo() {
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
               {turmasFiltradas.map(turma => {
                 const ativo = turmaSelecionada?.id === turma.id;
+                const nomeTurma = turma.turma || turma.nome || "—";
                 return (
                   <button key={turma.id} onClick={() => handleTurma(turma)} style={{
                     padding: "10px 20px", borderRadius: 10, cursor: "pointer", fontFamily: "inherit",
@@ -521,7 +521,7 @@ export default function ConselhoClasseResumo() {
                     onMouseEnter={e => { if (!ativo) e.currentTarget.style.borderColor = "#1e3a5f"; }}
                     onMouseLeave={e => { if (!ativo) e.currentTarget.style.borderColor = "#e2e8f0"; }}
                   >
-                    {turma.nome}
+                    {nomeTurma}
                   </button>
                 );
               })}
@@ -546,7 +546,7 @@ export default function ConselhoClasseResumo() {
               }}>3</div>
               <div>
                 <div style={{ fontWeight: 800, fontSize: "0.95rem", color: "#1e293b" }}>
-                  {turmaSelecionada.nome} — {turnoSelecionado}
+                  {turmaSelecionada.turma} — {turnoSelecionado}
                 </div>
                 {dados && (
                   <div style={{ fontSize: "0.75rem", color: "#64748b" }}>

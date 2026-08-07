@@ -58,17 +58,40 @@ function Spinner({ size = 24, color = "#6366f1" }) {
   );
 }
 
-// ─── Foto do aluno com fallback ────────────────────────────────────────────────
+// ─── Foto do aluno com fallback (Iniciais) ───────────────────────────────────
 function FotoAluno({ aluno, stamp }) {
+  const [imgError, setImgError] = useState(false);
   const src = getFotoURL(aluno, { stamp });
+  const nomeAluno = aluno?.nome || aluno?.estudante || "AL";
+  
+  const iniciais = nomeAluno
+    .split(" ")
+    .filter(n => n.trim().length > 0)
+    .slice(0, 2)
+    .map(n => n[0])
+    .join("")
+    .toUpperCase();
+
+  if (imgError || !src || src.includes("placeholder.png")) {
+    return (
+      <div style={{
+        width: 56, height: 56, borderRadius: "50%",
+        border: "3px solid rgba(255,255,255,0.2)", flexShrink: 0,
+        boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+        background: "linear-gradient(135deg, #1e3a5f, #3b82f6)",
+        color: "#ffffff", display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: "1.2rem", fontWeight: "bold", fontFamily: "inherit"
+      }}>
+        {iniciais}
+      </div>
+    );
+  }
+
   return (
     <img
       src={src}
-      alt={aluno.nome}
-      onError={e => {
-        e.currentTarget.onerror = null;
-        e.currentTarget.src = "/images/placeholder.png";
-      }}
+      alt={nomeAluno}
+      onError={() => setImgError(true)}
       style={{
         width: 56, height: 56, borderRadius: "50%", objectFit: "cover",
         border: "3px solid rgba(255,255,255,0.2)", flexShrink: 0,

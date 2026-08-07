@@ -65,7 +65,10 @@ function FotoAluno({ aluno, stamp }) {
     <img
       src={src}
       alt={aluno.nome}
-      onError={e => { e.currentTarget.src = "/images/placeholder.png"; }}
+      onError={e => {
+        e.currentTarget.onerror = null;
+        e.currentTarget.src = "/images/placeholder.png";
+      }}
       style={{
         width: 56, height: 56, borderRadius: "50%", objectFit: "cover",
         border: "3px solid rgba(255,255,255,0.2)", flexShrink: 0,

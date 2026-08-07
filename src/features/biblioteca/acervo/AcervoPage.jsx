@@ -151,8 +151,13 @@ function LivroCard({ livro, onEdit, onDelete }) {
           {livro.titulo}
         </h3>
         {livro.autor && (
-          <p className="text-xs mb-2" style={{ color: '#94a3b8' }}>
+          <p className="text-xs mb-1" style={{ color: '#94a3b8' }}>
             {livro.autor}
+          </p>
+        )}
+        {livro.local_estante && (
+          <p className="text-xs mb-2 font-medium" style={{ color: '#0d9488' }}>
+            📍 {livro.local_estante}
           </p>
         )}
         <div className="flex items-center justify-between">

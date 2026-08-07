@@ -50,6 +50,7 @@ export default function CadastroLivroModal({ livro, onClose }) {
     sinopse: '',
     num_paginas: '',
     exemplares: 1,
+    local_estante: '',
     capa_url: '',
   });
   const [capaPreview, setCapaPreview] = useState(null);
@@ -74,6 +75,7 @@ export default function CadastroLivroModal({ livro, onClose }) {
         sinopse: livro.sinopse || '',
         num_paginas: livro.num_paginas || '',
         exemplares: livro.exemplares || 1,
+        local_estante: livro.local_estante || '',
         capa_url: livro.capa_url || '',
       });
       if (livro.capa_url) setCapaPreview(livro.capa_url);
@@ -388,6 +390,7 @@ export default function CadastroLivroModal({ livro, onClose }) {
               </select>
             </div>
             <InputField label="Quantidade de exemplares" name="exemplares" value={form.exemplares} onChange={handleChange} type="number" required />
+            <InputField label="Local / Estante" name="local_estante" value={form.local_estante} onChange={handleChange} placeholder="Ex: Prateleira 3, Corredor B" />
           </div>
 
           {/* Sinopse */}

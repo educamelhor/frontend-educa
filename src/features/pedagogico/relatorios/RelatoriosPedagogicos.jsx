@@ -249,10 +249,10 @@ export default function RelatoriosPedagogicos() {
         <ReportCard
           icon="👥"
           title="Conselho de Classe — Resumo"
-          description="Relatório consolidado dos conselhos de classe realizados, alunos em risco e encaminhamentos."
+          description="Relatório consolidado com todas as observações dos professores por aluno, para o professor conselheiro utilizar nas reuniões de pais."
           route="/pedagogico/relatorios/conselho"
-          available={false}
-          badge="EM BREVE"
+          available={true}
+          badge="DISPONÍVEL"
         />
 
         <ReportCard

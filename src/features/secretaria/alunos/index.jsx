@@ -17,6 +17,7 @@ import AlunoTable from "./AlunoTable";
 import AlunoForm from "./AlunoForm";
 import ModalExcluirOuInativar from "./ModalExcluirOuInativar";
 import ImportCSV from "./ImportCSV";
+import ImportPDF from "./ImportPDF";
 import Input from "../../../components/ui/Input";
 import styles from "./styles.module.css";
 import api from "../../../services/api";
@@ -65,6 +66,7 @@ export default function Alunos() {
   const [turmas, setTurmas] = useState([]);
   const [alunoParaExcluirOuInativar, setAlunoParaExcluirOuInativar] = useState(null);
   const [isImportOpen, setImportOpen] = useState(false);
+  const [isImportPdfOpen, setImportPdfOpen] = useState(false);
   const [resultadoImportacao, setResultadoImportacao] = useState(null);
 
   // ────────────────────────────────────────────────────────────────
@@ -293,7 +295,7 @@ export default function Alunos() {
 
               <button
                 type="button"
-                onClick={() => { /* TODO: Implementar função no próximo passo */ }}
+                onClick={() => setImportPdfOpen(true)}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-yellow-500 text-white hover:bg-yellow-600 transition shadow-sm font-medium"
                 title="Lista IEDUCAR"
               >
@@ -542,7 +544,7 @@ export default function Alunos() {
         </div>
       )}
 
-      {/* Modal Importação */}
+      {/* Modal Importação (CSV) */}
       <ImportCSV
         open={isImportOpen}
         onClose={() => setImportOpen(false)}
@@ -567,6 +569,33 @@ export default function Alunos() {
             }
           } else {
             setImportOpen(false);
+            setResultadoImportacao({ message: "📥 Importação concluída." });
+          }
+        }}
+      />
+      {/* Modal Importação (PDF) - Lista IEDUCAR */}
+      <ImportPDF
+        open={isImportPdfOpen}
+        onClose={() => setImportPdfOpen(false)}
+        onFinish={async (res) => {
+          await fetchAlunos();
+          if (res && typeof res === "object") {
+            if (res.status === "erro") {
+              setImportPdfOpen(false);
+              setResultadoImportacao({ message: res.message || "Erro na importação." });
+            } else {
+              setResultadoImportacao({
+                localizados: res.localizados ?? 0,
+                inseridos: res.inseridos ?? 0,
+                jaExistiam: res.jaExistiam ?? 0,
+                reativados: res.reativados ?? 0,
+                inativados: res.inativados ?? 0,
+                turma: res.turma || res.turmaNome || res.nomeTurma || undefined,
+                message: res.message,
+              });
+            }
+          } else {
+            setImportPdfOpen(false);
             setResultadoImportacao({ message: "📥 Importação concluída." });
           }
         }}

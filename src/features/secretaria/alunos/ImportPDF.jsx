@@ -191,8 +191,8 @@ export default function ImportPDF({ open, onClose, onFinish }) {
     // Valida extensão
     const ext = file.name.split(".").pop()?.toLowerCase();
 
-    if (ext !== "pdf" && ext !== "xlsx") {
-      alert("Formato não suportado. Selecione um arquivo PDF ou XLSX.");
+    if (ext !== "pdf") {
+      alert("Formato não suportado. Selecione um arquivo PDF.");
       e.target.value = null;
       return;
     }
@@ -217,8 +217,7 @@ export default function ImportPDF({ open, onClose, onFinish }) {
     setSubmitting(true);
 
     try {
-      const rota =
-        ext === "pdf" ? "/api/alunos/importar-pdf" : "/api/alunos/importar-xlsx";
+      const rota = "/api/alunos/importar-pdf";
 
       const { data } = await api.post(rota, formData, {
         timeout: 120_000, // 2min — importação em lote pode ser demorada
@@ -306,7 +305,7 @@ export default function ImportPDF({ open, onClose, onFinish }) {
         {/* Cabeçalho */}
         <div className="flex items-center justify-between px-5 py-4 border-b">
           <h2 className="text-lg font-semibold text-gray-800">
-            Incluir Estudantes (PDF/XLSX)
+            Importar Lista IEDUCAR (PDF)
           </h2>
           <button
             onClick={onClose}
@@ -320,16 +319,16 @@ export default function ImportPDF({ open, onClose, onFinish }) {
         {/* Corpo */}
         <div className="px-5 py-4 space-y-4">
           <p className="text-sm text-gray-600">
-            Selecione um arquivo <strong>PDF</strong> (padrão do sistema) ou{" "}
-            <strong>XLSX</strong> contendo os alunos. O nome do arquivo será usado
-            como rótulo da turma para o relatório de feedback.
+            Selecione o arquivo <strong>PDF</strong> exportado do sistema{" "}
+            <strong>IEDUCAR</strong> contendo a lista de estudantes. O nome do arquivo será usado
+            como rótulo da turma (Ex: <strong>9º ANO K.pdf</strong>).
           </p>
 
           {/* Input escondido */}
           <input
             ref={fileRef}
             type="file"
-            accept=".pdf,.xlsx"
+            accept=".pdf"
             hidden
             onChange={handleFileSelected}
           />
@@ -366,9 +365,7 @@ export default function ImportPDF({ open, onClose, onFinish }) {
           )}
 
           <p className="text-xs text-gray-500">
-            Dica: ao importar <strong>PDF</strong>, a planilha <em>.xlsx</em> será
-            baixada automaticamente com os alunos identificados, incluindo a coluna{" "}
-            <code>turma</code>.
+            ⚠️ O nome do arquivo deve corresponder exatamente ao nome da turma cadastrada (ex: <code>9º ANO K.pdf</code>).
           </p>
         </div>
       </div>

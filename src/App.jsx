@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect } from "react";
 import { Toaster } from "react-hot-toast";
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from "react-router-dom";
 import Sidebar from "./components/layout/Sidebar";
+import { PERFIS_MILITARES_SET } from "./components/layout/SidebarGuards";
 import HeaderGlobal from "./components/layout/HeaderGlobal";
 import Home from "./features/home/Home.jsx";
 import Alunos from "./features/secretaria/alunos";
@@ -274,6 +275,16 @@ function RequireModulo({ modulo, children }) {
       return Array.isArray(arr) ? arr : [];
     } catch { return []; }
   };
+
+  const perfil = String(localStorage.getItem('perfil') || '').toLowerCase().trim();
+  const isDisciplinar = PERFIS_MILITARES_SET.has(perfil);
+
+  // REGRA DE OURO DISCIPLINAR: O módulo disciplinar é autônomo e padrão para escolas cívico-militares.
+  // Escolas novas (ex: CEF113-CCMDF) não possuem o módulo ativado no BD pelo CEO.
+  if (isDisciplinar && modulo?.startsWith('disciplinar')) {
+    return children;
+  }
+
   const modulos = getModulos();
   // Aceita: módulo exato ('frequencia') OU qualquer submódulo ('frequencia.atestados')
   // Isso permite que professor com 'frequencia.atestados' acesse /frequencia/atestados

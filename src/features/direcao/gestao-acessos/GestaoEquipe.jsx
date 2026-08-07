@@ -11,6 +11,7 @@ const FUNCOES = [
   { value: "subcomandante_disciplinar", label: "Subcomandante Disciplinar" },
   { value: "supervisor_disciplinar", label: "Supervisor Disciplinar" },
   { value: "monitor_disciplinar", label: "Monitor Disciplinar" },
+  { value: "secretario", label: "Secretário" },
 ];
 
 function fmtCPF(v) {

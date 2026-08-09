@@ -30,6 +30,7 @@ import {
   XMarkIcon,
   BoltIcon,
   CalendarDaysIcon,
+  PlusCircleIcon,
 } from '@heroicons/react/24/outline';
 import {
   PERFIS_MILITARES_SET,
@@ -1270,7 +1271,22 @@ export default function Sidebar({ isOpen, onClose }) {
                   >
                     <DocumentTextIcon className="h-5 w-5 mr-2"
                       style={{ color: isActive('/disciplinar/aph-cbmdf') ? '#dc2626' : undefined }} />
-                    <span className="flex-1">APH-CBMDF</span>
+                    <span className="flex-1">Certificado APH</span>
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/disciplinar/aph"
+                    className={getSubmenuLinkClasses('/disciplinar/aph')}
+                    style={{
+                      background: isActive('/disciplinar/aph')
+                        ? 'linear-gradient(90deg, rgba(220,38,38,0.15), transparent)'
+                        : undefined,
+                    }}
+                  >
+                    <PlusCircleIcon className="h-5 w-5 mr-2"
+                      style={{ color: isActive('/disciplinar/aph') ? '#dc2626' : undefined }} />
+                    <span className="flex-1">APH</span>
                   </Link>
                 </li>
               </ul>

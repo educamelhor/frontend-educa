@@ -1284,9 +1284,12 @@ export default function Sidebar({ isOpen, onClose }) {
                         : undefined,
                     }}
                   >
-                    <PlusCircleIcon className="h-5 w-5 mr-2"
+                    <PlusCircleIcon className="h-5 w-5 mr-2 flex-shrink-0"
                       style={{ color: isActive('/disciplinar/aph', true) ? '#dc2626' : undefined }} />
                     <span className="flex-1">APH</span>
+                    <span className="ml-2 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded animate-pulse shadow-sm border border-red-400/50">
+                      NOVO
+                    </span>
                   </Link>
                 </li>
               </ul>

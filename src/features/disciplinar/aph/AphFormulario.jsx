@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'react-hot-toast';
 import api from '../../../services/api';
 import { 
@@ -13,6 +13,7 @@ import {
 
 export default function AphFormulario({ aluno, onBack, onSuccess }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const topoRef = useRef(null);
 
   // Form State
   const [local, setLocal] = useState('');
@@ -26,9 +27,11 @@ export default function AphFormulario({ aluno, onBack, onSuccess }) {
   const [desfecho, setDesfecho] = useState('');
   const [comunicacaoResp, setComunicacaoResp] = useState('');
 
-  // Rola para o topo assim que o formulário é montado (quando o aluno é selecionado)
+  // Rola para o topo do formulário de forma robusta garantindo que divs com overflow também rolem
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (topoRef.current) {
+      topoRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   }, []);
 
   // Opções rápidas
@@ -84,7 +87,7 @@ export default function AphFormulario({ aluno, onBack, onSuccess }) {
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+    <div ref={topoRef} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
       {/* HEADER DO FORMULÁRIO */}
       <div className="bg-red-600 px-8 py-6 text-white flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">

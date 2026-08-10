@@ -52,9 +52,8 @@ export default function AphSelecaoAluno({ onSelectAluno }) {
     setTurmaSelecionada(turma);
     setLoadingAlunos(true);
     try {
-      const escola_id = localStorage.getItem("escola_id") || 1;
-      const { data } = await api.get("/api/alunos", { params: { escola_id, turma_id: turma.id } });
-      setAlunos(data || []);
+      const { data } = await api.get(`/api/turmas/${turma.id}/alunos`);
+      setAlunos(Array.isArray(data) ? data : (data.alunos || []));
     } catch (err) {
       console.error("Erro ao buscar alunos:", err);
     } finally {

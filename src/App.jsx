@@ -18,6 +18,7 @@ import HistoricoDisciplinar from "./features/disciplinar/historico";
 import AtasDisciplinar from "./features/disciplinar/atas/AtasPage.jsx";
 import LiberacaoDisciplinar from "./features/disciplinar/liberacao/LiberacaoPage.jsx";
 import AphCbmdfPage from "./features/disciplinar/aph-cbmdf/AphCbmdfPage.jsx";
+import AphPage from "./features/disciplinar/aph/AphPage.jsx";
 import Boletim from "./features/boletim/Boletim";
 import BoletimAnual from "./features/boletim/BoletimAnual";
 import FichaAlunoDirecao from "./features/direcao/FichaAlunoDirecao";
@@ -358,6 +359,7 @@ export default function App() {
           <Route path="/disciplinar/manual"     element={<RequireModulo modulo="disciplinar.manual"><ManualDisciplinar /></RequireModulo>} />
           <Route path="/disciplinar/suporte"    element={<RequireModulo modulo="disciplinar"><SuporteSAC /></RequireModulo>} />
           <Route path="/disciplinar/aph-cbmdf" element={<RequireModulo modulo="disciplinar"><AphCbmdfPage /></RequireModulo>} />
+          <Route path="/disciplinar/aph" element={<RequireModulo modulo="disciplinar"><AphPage /></RequireModulo>} />
 
           {/* ── Monitoramento ────────────────────────────────────────────── */}
           <Route path="/monitoramento" element={<RequireModulo modulo="monitoramento"><RequirePerm perm="monitoramento.visualizar"><Monitoramento /></RequirePerm></RequireModulo>} />

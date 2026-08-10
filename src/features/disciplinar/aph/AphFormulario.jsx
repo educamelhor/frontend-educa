@@ -110,8 +110,12 @@ export default function AphFormulario({ aluno, onBack, onSuccess }) {
           </button>
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-white/20 rounded-full overflow-hidden flex items-center justify-center border-2 border-white/30">
-              {aluno.foto_url ? (
-                <img src={aluno.foto_url} alt={aluno.nome} className="w-full h-full object-cover" />
+              {aluno.foto || aluno.foto_url ? (
+                <img 
+                  src={aluno.foto_url || (aluno.foto.startsWith('http') ? aluno.foto : `${api.defaults.baseURL?.replace(/\/api$/, '') || ''}${aluno.foto.startsWith('/') ? '' : '/'}${aluno.foto}`)} 
+                  alt={aluno.nome} 
+                  className="w-full h-full object-cover" 
+                />
               ) : (
                 <UserCircleIcon className="w-8 h-8 text-white/70" />
               )}
@@ -119,16 +123,21 @@ export default function AphFormulario({ aluno, onBack, onSuccess }) {
             <div>
               <h2 className="text-xl font-bold">{aluno.nome}</h2>
               <div className="text-red-100 text-sm flex gap-3 opacity-90">
-                <span>Turma: {aluno.turma?.turma || "N/D"}</span>
-                <span>Matrícula: {aluno.matricula || "N/D"}</span>
+                <span>Turma: {aluno.turma_nome || aluno.turma?.turma || "N/D"}</span>
+                <span>Matrícula: {aluno.matricula || "S/N"}</span>
               </div>
             </div>
           </div>
         </div>
-        <div className="text-right text-sm text-red-100 hidden md:block">
-          <div>Data: {new Date().toLocaleDateString('pt-BR')}</div>
-          <div>Hora: {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</div>
-        </div>
+          <div className="text-right flex flex-col md:items-end">
+            <div className="text-sm font-bold bg-white/20 px-3 py-1 rounded-md mb-2 w-max inline-block">
+              Nº APH: (Gerado ao salvar)
+            </div>
+            <div className="text-sm text-red-100">
+              Data: {new Date().toLocaleDateString('pt-BR')}
+              <br />
+              Hora: {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+            </div>
       </div>
 
       <form onSubmit={handleSubmit} className="p-8 space-y-10">

@@ -162,12 +162,16 @@ export default function AphSelecaoAluno({ onSelectAluno }) {
               {alunos.map(aluno => (
                 <button
                   key={aluno.id}
-                  onClick={() => onSelectAluno(aluno)}
+                  onClick={() => onSelectAluno({ ...aluno, turma_nome: turmaSelecionada.turma })}
                   className="flex items-center gap-4 p-4 rounded-xl border border-gray-100 hover:border-red-300 hover:bg-red-50 transition-all text-left group"
                 >
                   <div className="w-12 h-12 bg-gray-100 rounded-full flex-shrink-0 overflow-hidden flex items-center justify-center border-2 border-transparent group-hover:border-red-200">
-                    {aluno.foto_url ? (
-                      <img src={aluno.foto_url} alt={aluno.nome} className="w-full h-full object-cover" />
+                    {aluno.foto || aluno.foto_url ? (
+                      <img 
+                        src={aluno.foto_url || (aluno.foto.startsWith('http') ? aluno.foto : `${api.defaults.baseURL?.replace(/\/api$/, '') || ''}${aluno.foto.startsWith('/') ? '' : '/'}${aluno.foto}`)} 
+                        alt={aluno.nome} 
+                        className="w-full h-full object-cover" 
+                      />
                     ) : (
                       <UserCircleIcon className="w-10 h-10 text-gray-400" />
                     )}

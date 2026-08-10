@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { toast } from 'react-hot-toast';
+import api from '../../../services/api';
 import { 
   ArrowLeftIcon, 
   UserCircleIcon,
@@ -44,13 +45,37 @@ export default function AphFormulario({ aluno, onBack, onSuccess }) {
       return;
     }
     
-    setIsSubmitting(true);
-    // Mock API Call
-    setTimeout(() => {
+    try {
+      setIsSubmitting(true);
+      const payload = {
+        aluno_id: aluno.id,
+        escola_id: localStorage.getItem("escola_id") || 1,
+        local,
+        solicitante,
+        motivos,
+        relato,
+        condicao_geral: condicaoGeral,
+        sinais,
+        atendimentos,
+        descricao_atendimento: descricaoAtendimento,
+        desfecho,
+        comunicacao_resp: comunicacaoResp
+      };
+      
+      const response = await api.post('/api/aph', payload);
+      
+      if (response.data?.success) {
+        toast.success("Atendimento APH registrado com sucesso!");
+        onSuccess();
+      } else {
+        toast.error("Erro ao registrar atendimento APH.");
+      }
+    } catch (error) {
+      console.error("Erro APH:", error);
+      toast.error("Erro de comunicação com o servidor.");
+    } finally {
       setIsSubmitting(false);
-      toast.success("Atendimento APH registrado com sucesso!");
-      onSuccess();
-    }, 1200);
+    }
   };
 
   return (

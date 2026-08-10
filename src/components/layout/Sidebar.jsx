@@ -1277,15 +1277,15 @@ export default function Sidebar({ isOpen, onClose }) {
                 <li>
                   <Link
                     to="/disciplinar/aph"
-                    className={getSubmenuLinkClasses('/disciplinar/aph')}
+                    className={getSubmenuLinkClasses('/disciplinar/aph', true)}
                     style={{
-                      background: isActive('/disciplinar/aph')
+                      background: isActive('/disciplinar/aph', true)
                         ? 'linear-gradient(90deg, rgba(220,38,38,0.15), transparent)'
                         : undefined,
                     }}
                   >
                     <PlusCircleIcon className="h-5 w-5 mr-2"
-                      style={{ color: isActive('/disciplinar/aph') ? '#dc2626' : undefined }} />
+                      style={{ color: isActive('/disciplinar/aph', true) ? '#dc2626' : undefined }} />
                     <span className="flex-1">APH</span>
                   </Link>
                 </li>

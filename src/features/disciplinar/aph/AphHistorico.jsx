@@ -291,7 +291,10 @@ export default function AphHistorico() {
     async function loadTurmas() {
       try {
         const { data } = await api.get("/api/turmas");
-        setTurmas(data.turmas || data || []);
+        const lista = data.turmas || data || [];
+        const anoAtual = new Date().getFullYear();
+        const turmasAtivas = lista.filter(t => t.ano == anoAtual);
+        setTurmas(turmasAtivas);
       } catch (err) {
         console.error("Erro ao carregar turmas", err);
       }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import api from '../../../services/api';
 import { 
@@ -25,6 +25,11 @@ export default function AphFormulario({ aluno, onBack, onSuccess }) {
   const [descricaoAtendimento, setDescricaoAtendimento] = useState('');
   const [desfecho, setDesfecho] = useState('');
   const [comunicacaoResp, setComunicacaoResp] = useState('');
+
+  // Rola para o topo assim que o formulário é montado (quando o aluno é selecionado)
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
 
   // Opções rápidas
   const locaisOptions = ["Sala de aula", "Quadra", "Pátio", "Refeitório", "Corredor", "Banheiro", "Entrada/saída", "Outro"];

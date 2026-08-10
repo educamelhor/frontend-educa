@@ -29,6 +29,8 @@ export default function AphFormulario({ aluno, onBack, onSuccess }) {
   const [outroMaterial, setOutroMaterial] = useState('');
   const [desfecho, setDesfecho] = useState('');
   const [comunicacaoResp, setComunicacaoResp] = useState('');
+  const [horaComunicacao, setHoraComunicacao] = useState('');
+  const [horaComparecimento, setHoraComparecimento] = useState('');
 
   // Rola para o topo do formulário de forma robusta garantindo que divs com overflow também rolem
   useEffect(() => {
@@ -73,7 +75,9 @@ export default function AphFormulario({ aluno, onBack, onSuccess }) {
         materiais,
         outro_material: outroMaterial,
         desfecho,
-        comunicacao_resp: comunicacaoResp
+        comunicacao_resp: comunicacaoResp,
+        hora_comunicacao: horaComunicacao,
+        hora_comparecimento: horaComparecimento
       };
       
       const response = await api.post('/api/aph', payload);
@@ -325,16 +329,42 @@ export default function AphFormulario({ aluno, onBack, onSuccess }) {
             </div>
             <div className="flex-1">
               <label className="block text-sm font-bold text-gray-700 mb-3">Comunicação ao Responsável:</label>
-              <div className="space-y-2">
+              <div className="space-y-4">
                 {["Não foi necessária", "Responsável comunicado (via telefone/app)", "Tentativa de contato sem sucesso", "Responsável compareceu à escola"].map(c => (
-                  <label key={c} className="flex items-center gap-3 cursor-pointer">
-                    <input 
-                      type="radio" name="comunicacao" value={c}
-                      checked={comunicacaoResp === c} onChange={() => setComunicacaoResp(c)}
-                      className="w-4 h-4 text-red-600 focus:ring-red-500"
-                    />
-                    <span className="text-sm text-gray-800 font-medium">{c}</span>
-                  </label>
+                  <div key={c} className="flex flex-col">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input 
+                        type="radio" name="comunicacao" value={c}
+                        checked={comunicacaoResp === c} onChange={() => setComunicacaoResp(c)}
+                        className="w-4 h-4 text-red-600 focus:ring-red-500"
+                      />
+                      <span className="text-sm text-gray-800 font-medium">{c}</span>
+                    </label>
+                    
+                    {c === "Responsável comunicado (via telefone/app)" && comunicacaoResp === c && (
+                      <div className="ml-7 mt-2 animate-fade-in-up">
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Horário da Comunicação:</label>
+                        <input 
+                          type="time" 
+                          value={horaComunicacao} 
+                          onChange={(e) => setHoraComunicacao(e.target.value)}
+                          className="w-32 p-2 text-sm border border-red-200 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
+                        />
+                      </div>
+                    )}
+
+                    {c === "Responsável compareceu à escola" && comunicacaoResp === c && (
+                      <div className="ml-7 mt-2 animate-fade-in-up">
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Horário do Comparecimento:</label>
+                        <input 
+                          type="time" 
+                          value={horaComparecimento} 
+                          onChange={(e) => setHoraComparecimento(e.target.value)}
+                          className="w-32 p-2 text-sm border border-red-200 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
+                        />
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
             </div>

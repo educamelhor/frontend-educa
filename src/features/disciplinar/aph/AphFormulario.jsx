@@ -8,7 +8,8 @@ import {
   ClockIcon,
   ShieldCheckIcon,
   CheckBadgeIcon,
-  InformationCircleIcon
+  InformationCircleIcon,
+  ArchiveBoxIcon
 } from '@heroicons/react/24/outline';
 
 export default function AphFormulario({ aluno, onBack, onSuccess }) {
@@ -24,6 +25,8 @@ export default function AphFormulario({ aluno, onBack, onSuccess }) {
   const [sinais, setSinais] = useState([]);
   const [atendimentos, setAtendimentos] = useState([]);
   const [descricaoAtendimento, setDescricaoAtendimento] = useState('');
+  const [materiais, setMateriais] = useState([]);
+  const [outroMaterial, setOutroMaterial] = useState('');
   const [desfecho, setDesfecho] = useState('');
   const [comunicacaoResp, setComunicacaoResp] = useState('');
 
@@ -39,6 +42,7 @@ export default function AphFormulario({ aluno, onBack, onSuccess }) {
   const motivosOptions = ["Mal-estar", "Dor", "Dor de cabeça", "Dor abdominal", "Náusea/vômito", "Tontura", "Desmaio", "Febre", "Queda", "Corte/ferimento", "Sangramento", "Contusão/pancada", "Entorse", "Suspeita de fratura", "Queimadura", "Reação alérgica", "Falta de ar", "Crise convulsiva"];
   const sinaisOptions = ["Dor", "Sangramento", "Inchaço", "Ferimento", "Dificuldade de movimento", "Outros"];
   const atendimentosOptions = ["Avaliação/observação", "Higienização do ferimento", "Curativo", "Gelo/compressa fria", "Controle de sangramento", "Imobilização", "Repouso", "Sinais vitais conferidos"];
+  const materiaisOptions = ["Atadura", "Algodão", "Gaze", "Esparadrapo", "Micropore", "Soro fisiológico", "Antisséptico", "Luvas de proced.", "Band-aid", "Bolsa térmica", "Abaixador de língua"];
   const desfechosOptions = ["Retornou para sala/aula", "Permaneceu em observação", "Foi liberado para o responsável", "Encaminhado p/ unidade de saúde", "Transportado pelo SAMU", "Transportado pelos Bombeiros"];
 
   const toggleArrayItem = (setter, array, item) => {
@@ -66,6 +70,8 @@ export default function AphFormulario({ aluno, onBack, onSuccess }) {
         sinais,
         atendimentos,
         descricao_atendimento: descricaoAtendimento,
+        materiais,
+        outro_material: outroMaterial,
         desfecho,
         comunicacao_resp: comunicacaoResp
       };
@@ -252,11 +258,54 @@ export default function AphFormulario({ aluno, onBack, onSuccess }) {
           </div>
         </section>
 
-        {/* 5. DESFECHO */}
+        {/* 5. MATERIAL UTILIZADO */}
+        <section className="bg-orange-50 p-6 rounded-xl border border-orange-100">
+          <div className="flex items-center gap-2 mb-4 border-b border-orange-200 pb-2">
+            <ArchiveBoxIcon className="w-5 h-5 text-orange-600" />
+            <h3 className="text-lg font-bold text-orange-800">5. Material Utilizado</h3>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            {materiaisOptions.map(m => (
+              <label key={m} className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-all ${
+                materiais.includes(m) ? 'bg-orange-100 border-orange-400' : 'bg-white border-orange-200 hover:bg-orange-100/50'
+              }`}>
+                <input 
+                  type="checkbox" className="mt-1 w-4 h-4 text-orange-600 rounded"
+                  checked={materiais.includes(m)}
+                  onChange={() => toggleArrayItem(setMateriais, materiais, m)}
+                />
+                <span className="text-sm text-gray-700 font-medium leading-tight">{m}</span>
+              </label>
+            ))}
+            <label className={`flex items-start gap-3 p-3 border rounded-lg cursor-pointer transition-all ${
+                materiais.includes('Outros') ? 'bg-orange-100 border-orange-400' : 'bg-white border-orange-200 hover:bg-orange-100/50'
+              }`}>
+                <input 
+                  type="checkbox" className="mt-1 w-4 h-4 text-orange-600 rounded"
+                  checked={materiais.includes('Outros')}
+                  onChange={() => toggleArrayItem(setMateriais, materiais, 'Outros')}
+                />
+                <span className="text-sm text-gray-700 font-medium leading-tight">Outros</span>
+            </label>
+          </div>
+          
+          {materiais.includes('Outros') && (
+            <div className="animate-fade-in-up mt-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Qual outro material foi utilizado?</label>
+              <input 
+                type="text" value={outroMaterial} onChange={e => setOutroMaterial(e.target.value)}
+                className="w-full md:w-1/2 p-3 border border-orange-300 rounded-lg focus:ring-2 focus:ring-orange-500 outline-none"
+                placeholder="Ex: Colar cervical, tala..."
+              />
+            </div>
+          )}
+        </section>
+
+        {/* 6. DESFECHO */}
         <section className="bg-red-50 p-6 rounded-xl border border-red-100">
           <div className="flex items-center gap-2 mb-4 border-b border-red-200 pb-2">
             <ArrowLeftIcon className="w-5 h-5 text-red-500 transform rotate-180" />
-            <h3 className="text-lg font-bold text-red-800">5. Desfecho <span className="text-red-500">*</span></h3>
+            <h3 className="text-lg font-bold text-red-800">6. Desfecho <span className="text-red-500">*</span></h3>
           </div>
           <div className="flex flex-col md:flex-row gap-6">
             <div className="flex-1">

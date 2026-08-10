@@ -138,8 +138,8 @@ export default function AphFormulario({ aluno, onBack, onSuccess }) {
               <br />
               Hora: {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
             </div>
+          </div>
       </div>
-
       <form onSubmit={handleSubmit} className="p-8 space-y-10">
 
         {/* 1. IDENTIFICAÇÃO DA OCORRÊNCIA */}

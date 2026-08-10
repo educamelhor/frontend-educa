@@ -374,7 +374,7 @@ export default function AphHistorico() {
               className="w-full px-3 py-2 text-sm border border-gray-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-400 outline-none text-gray-700 bg-white"
             >
               <option value="">Todas as Turmas</option>
-              {turmas.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
+              {turmas.map(t => <option key={t.id} value={t.id}>{t.turma || t.nome}</option>)}
             </select>
           </div>
 

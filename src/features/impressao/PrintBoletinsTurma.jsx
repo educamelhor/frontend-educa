@@ -20,6 +20,7 @@ export default function PrintBoletinsTurma() {
   const turma_id = params.get("turma_id");
   const secret = params.get("secret");
   const anoParam = params.get("ano");  // ano letivo selecionado (ex: "2026")
+  const aluno_id = params.get("aluno_id"); // se presente, filtra apenas para este aluno
 
   // -------------------------------------------------------------------------
   // Estados locais
@@ -61,6 +62,10 @@ export default function PrintBoletinsTurma() {
             resultado = res.data.alunos;
           } else if (res.data.data && res.data.data.alunos) {
             resultado = res.data.data.alunos;
+          }
+
+          if (aluno_id) {
+            resultado = resultado.filter((a) => String(a.id) === String(aluno_id));
           }
 
           setAlunos(resultado);

@@ -44,6 +44,11 @@ export default function BoletimTurmas() {
   const [sucesso, setSucesso] = useState(false);
   const [turmasSucesso, setTurmasSucesso] = useState(new Set());
 
+  const [turmaSelecionada, setTurmaSelecionada] = useState(null);
+  const [alunos, setAlunos] = useState([]);
+  const [loadingAlunos, setLoadingAlunos] = useState(false);
+  const [gerandoAluno, setGerandoAluno] = useState(null);
+
   // ── Buscar turmas e detectar todos os anos letivos disponíveis ──
   useEffect(() => {
     (async () => {
@@ -141,7 +146,65 @@ export default function BoletimTurmas() {
 
   const handleClickTurno = (turno) => {
     setTurnoSelecionado(turno);
+    setTurmaSelecionada(null);
+    setAlunos([]);
     setSucesso(false);
+  };
+
+  const handleClickTurma = async (turma) => {
+    if (gerando) return;
+    setTurmaSelecionada(turma);
+    setLoadingAlunos(true);
+    setAlunos([]);
+    setSucesso(false);
+    
+    try {
+      const { data } = await api.get("/api/alunos", { 
+        params: { 
+          turma_id: turma.id, 
+          ano_letivo: anoLetivo,
+          limit: 1000 
+        } 
+      });
+      // A rota /api/alunos retorna a lista em data.alunos ou apenas data.
+      const list = data.alunos || data || [];
+      setAlunos(list);
+    } catch (err) {
+      console.error("Erro ao buscar alunos da turma:", err);
+      alert("Erro ao buscar alunos.");
+    } finally {
+      setLoadingAlunos(false);
+    }
+  };
+
+  const handleGerarBoletimAluno = async (aluno) => {
+    if (gerandoAluno || gerando) return;
+    setGerandoAluno(aluno.id);
+    setSucesso(false);
+
+    try {
+      const { data } = await api.post(
+        "/api/boletins/gerar-aluno",
+        { turma_id: turmaSelecionada.id, aluno_id: aluno.id, ano: anoLetivo ? Number(anoLetivo) : undefined },
+        { responseType: "blob", timeout: 120000 }
+      );
+
+      const url = window.URL.createObjectURL(new Blob([data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `Boletim_${aluno.estudante.replace(/\s/g, "_")}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+
+      setSucesso(true);
+      setTimeout(() => setSucesso(false), 2200);
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao gerar boletim do aluno. Tente novamente.");
+    } finally {
+      setGerandoAluno(null);
+    }
   };
 
   return (
@@ -357,7 +420,7 @@ export default function BoletimTurmas() {
             }}>2</span>
             Turmas — {turnoSelecionado}
             <span style={{ fontSize: 12, fontWeight: 400, color: "#94a3b8", marginLeft: 2 }}>
-              (clique para baixar o PDF)
+              (selecione uma turma)
             </span>
           </h2>
 
@@ -380,6 +443,7 @@ export default function BoletimTurmas() {
               gap: 10,
             }}>
               {turmasFiltradas.map((turma) => {
+                const isSelected = turmaSelecionada?.id === turma.id;
                 const isThisGerando = gerando && turmaSendoGerada === turma.id;
                 const jaSucesso = turmasSucesso.has(turma.id);
                 const isDisabled = gerando && !isThisGerando;
@@ -387,36 +451,36 @@ export default function BoletimTurmas() {
                 return (
                   <button
                     key={turma.id}
-                    onClick={() => handleGerarBoletins(turma)}
+                    onClick={() => handleClickTurma(turma)}
                     disabled={gerando}
-                    title={`Gerar boletins — ${turma.turma}`}
-                    aria-label={`Gerar boletins da turma ${turma.turma}`}
+                    title={`Selecionar turma — ${turma.turma}`}
+                    aria-label={`Selecionar turma ${turma.turma}`}
                     style={{
                       display: "flex", flexDirection: "column",
                       alignItems: "center", justifyContent: "center",
                       gap: 6, padding: "12px 8px",
                       minHeight: 86,
                       borderRadius: 12,
-                      border: isThisGerando
+                      border: isSelected || isThisGerando
                         ? "2px solid #38bdf8"
                         : jaSucesso
                         ? "2px solid #34d399"
                         : "2px solid #e2e8f0",
-                      background: isThisGerando
+                      background: isSelected || isThisGerando
                         ? "#f0f9ff"
                         : jaSucesso
                         ? "#f0fdf4"
                         : "#fff",
                       cursor: gerando ? (isThisGerando ? "wait" : "not-allowed") : "pointer",
                       opacity: isDisabled ? 0.45 : 1,
-                      boxShadow: (isThisGerando || jaSucesso)
+                      boxShadow: (isSelected || isThisGerando || jaSucesso)
                         ? "0 4px 14px rgba(0,0,0,0.1)"
                         : "0 1px 3px rgba(0,0,0,0.06)",
                       transform: isThisGerando ? "scale(0.96)" : "scale(1)",
                       transition: "all 0.18s ease",
                     }}
                     onMouseEnter={(e) => {
-                      if (!gerando && !jaSucesso) {
+                      if (!gerando && !jaSucesso && !isSelected) {
                         e.currentTarget.style.borderColor = "#38bdf8";
                         e.currentTarget.style.boxShadow = "0 6px 20px rgba(14,165,233,0.18)";
                         e.currentTarget.style.transform = "scale(1.04)";
@@ -490,6 +554,132 @@ export default function BoletimTurmas() {
               <p style={{ margin: 0, fontSize: 12, textAlign: "center" }}>
                 Não há turmas do turno {turnoSelecionado} no ano letivo {anoLetivo}.
               </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════
+          STEP 3 — ALUNOS (Lista Individual e Lote)
+      ══════════════════════════════════════════════ */}
+      {turmaSelecionada && (
+        <div style={{ marginBottom: 28, animation: "fadeIn 0.3s ease" }}>
+          <h2 style={{
+            margin: "0 0 14px", fontSize: 15, fontWeight: 700,
+            color: "#1e293b", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
+          }}>
+            <span style={{
+              width: 26, height: 26, borderRadius: 8,
+              background: "#d1fae5", color: "#065f46",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 12, fontWeight: 800, flexShrink: 0,
+            }}>3</span>
+            Alunos — {turmaSelecionada.turma}
+          </h2>
+
+          {loadingAlunos ? (
+            <div style={{
+              display: "flex", alignItems: "center", gap: 12,
+              padding: "32px", color: "#64748b", justifyContent: "center",
+            }}>
+              <div style={{
+                width: 20, height: 20, borderRadius: "50%",
+                border: "2px solid #e2e8f0", borderTopColor: "#0ea5e9",
+                animation: "spin 0.8s linear infinite",
+              }} />
+              Carregando lista de alunos...
+            </div>
+          ) : (
+            <div style={{
+              background: "#fff",
+              border: "1px solid #e2e8f0",
+              borderRadius: 16,
+              padding: "16px",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+            }}>
+              {/* Botão para gerar a turma inteira */}
+              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 16 }}>
+                <button
+                  onClick={() => handleGerarBoletins(turmaSelecionada)}
+                  disabled={gerando}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 8,
+                    padding: "10px 20px", borderRadius: 10,
+                    background: "linear-gradient(135deg, #10b981, #059669)",
+                    color: "#fff", fontWeight: 700, fontSize: 14,
+                    border: "none", cursor: gerando ? "not-allowed" : "pointer",
+                    boxShadow: "0 4px 12px rgba(16,185,129,0.3)",
+                    opacity: gerando ? 0.7 : 1,
+                  }}
+                >
+                  <ArrowDownTrayIcon style={{ width: 18, height: 18 }} />
+                  Gerar Boletins da Turma
+                </button>
+              </div>
+
+              {alunos.length === 0 ? (
+                <div style={{ padding: "20px", textAlign: "center", color: "#64748b" }}>
+                  Nenhum aluno encontrado nesta turma.
+                </div>
+              ) : (
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+                    <thead>
+                      <tr style={{ background: "#f8fafc", color: "#64748b", borderBottom: "2px solid #e2e8f0", textAlign: "left" }}>
+                        <th style={{ padding: "12px 16px", fontWeight: 700 }}>Nº</th>
+                        <th style={{ padding: "12px 16px", fontWeight: 700 }}>RE</th>
+                        <th style={{ padding: "12px 16px", fontWeight: 700 }}>Estudante</th>
+                        <th style={{ padding: "12px 16px", fontWeight: 700, textAlign: "right" }}>Ação</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {alunos.map((aluno, index) => {
+                        const isThisGerando = gerandoAluno === aluno.id;
+                        return (
+                          <tr key={aluno.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                            <td style={{ padding: "12px 16px", color: "#64748b", width: 50 }}>
+                              {String(index + 1).padStart(2, "0")}
+                            </td>
+                            <td style={{ padding: "12px 16px", color: "#94a3b8", width: 80, fontWeight: 600 }}>
+                              {aluno.codigo}
+                            </td>
+                            <td style={{ padding: "12px 16px", fontWeight: 600, color: "#1e293b" }}>
+                              {aluno.estudante || aluno.nome}
+                            </td>
+                            <td style={{ padding: "12px 16px", textAlign: "right" }}>
+                              <button
+                                onClick={() => handleGerarBoletimAluno(aluno)}
+                                disabled={gerando || !!gerandoAluno}
+                                title="Imprimir boletim individual"
+                                style={{
+                                  background: "#f1f5f9",
+                                  border: "none",
+                                  width: 36, height: 36,
+                                  borderRadius: 8,
+                                  display: "inline-flex", alignItems: "center", justifyContent: "center",
+                                  cursor: (gerando || gerandoAluno) ? "not-allowed" : "pointer",
+                                  color: isThisGerando ? "#0284c7" : "#64748b",
+                                  opacity: (gerando || (gerandoAluno && !isThisGerando)) ? 0.5 : 1,
+                                }}
+                              >
+                                {isThisGerando ? (
+                                  <div style={{
+                                    width: 16, height: 16, borderRadius: "50%",
+                                    border: "2px solid #bae6fd", borderTopColor: "#0284c7",
+                                    animation: "spin 0.8s linear infinite",
+                                  }} />
+                                ) : (
+                                  <PrinterIcon style={{ width: 18, height: 18 }} />
+                                )}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
         </div>

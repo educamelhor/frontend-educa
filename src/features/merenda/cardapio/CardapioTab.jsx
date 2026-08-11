@@ -386,7 +386,7 @@ export default function CardapioTab() {
       kgNecessario: problem.kgNecessario,
       saldoKg: problem.saldoKg,
       refParaCalculo: problem.refParaCalculo,
-      kgInput: problem.type === 4 ? String(problem.saldoKg) : String(problem.kgNecessario),
+      kgInput: problem.type === 4 ? parseFloat(Number(problem.saldoKg).toFixed(3)).toString() : parseFloat(Number(problem.kgNecessario).toFixed(3)).toString(),
       queueIndex: problemIndex
     });
   };
@@ -774,7 +774,7 @@ export default function CardapioTab() {
                             <div className="flex items-center justify-center gap-2">
                               <button
                                 type="button"
-                                onClick={() => setEditItemModal({ isOpen: true, itemKey: item.key, kgInput: String(item.quantidade_kg), produto: item.produto })}
+                                onClick={() => setEditItemModal({ isOpen: true, itemKey: item.key, kgInput: parseFloat(Number(item.quantidade_kg).toFixed(3)).toString(), produto: item.produto })}
                                 className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
                                 title="Editar Quantidade"
                               >

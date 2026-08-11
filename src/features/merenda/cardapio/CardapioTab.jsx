@@ -21,6 +21,9 @@ export default function CardapioTab() {
   // Missing Items Modal State
   const [missingItemsModal, setMissingItemsModal] = useState({ isOpen: false, items: [] });
   const [pendingReceitaSelection, setPendingReceitaSelection] = useState({ receitaNome: "", novosItens: [] });
+  
+  // Edit Item Modal State
+  const [editItemModal, setEditItemModal] = useState({ isOpen: false, itemKey: null, kgInput: "", produto: "" });
 
   // Intelligent Modal State (Assistente de Estoque)
   const [intelligentModalConfig, setIntelligentModalConfig] = useState({
@@ -433,6 +436,13 @@ export default function CardapioTab() {
 
   const handleRemoveItem = (key) => setItensSelecionados(itensSelecionados.filter(i => i.key !== key));
 
+  const handleSaveEditItem = () => {
+    const kg = parseFloat(editItemModal.kgInput);
+    if (isNaN(kg) || kg < 0) return toast.error("Valor inválido.");
+    setItensSelecionados(prev => prev.map(i => i.key === editItemModal.itemKey ? { ...i, quantidade_kg: kg } : i));
+    setEditItemModal({ isOpen: false, itemKey: null, kgInput: "", produto: "" });
+  };
+
   const calcularUnidades = (kg, gramaturaStr) => {
     if (!kg) return 0;
     let gramatura = 1;
@@ -751,7 +761,7 @@ export default function CardapioTab() {
                         <th className="py-3 px-4 font-semibold">Produto</th>
                         <th className="py-3 px-4 font-semibold">Lote</th>
                         <th className="py-3 px-4 font-semibold">Consumo (Baixa)</th>
-                        <th className="py-3 px-4 text-center font-semibold">Remover</th>
+                        <th className="py-3 px-4 text-center font-semibold">Ações</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
@@ -761,13 +771,24 @@ export default function CardapioTab() {
                           <td className="py-3 px-4 text-gray-600">{item.lote || '-'}</td>
                           <td className="py-3 px-4 font-bold text-red-500">- {item.quantidade_kg.toLocaleString('pt-BR')} kg</td>
                           <td className="py-3 px-4 text-center">
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveItem(item.key)}
-                              className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                            >
-                              <TrashIcon className="w-5 h-5" />
-                            </button>
+                            <div className="flex items-center justify-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setEditItemModal({ isOpen: true, itemKey: item.key, kgInput: String(item.quantidade_kg), produto: item.produto })}
+                                className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                                title="Editar Quantidade"
+                              >
+                                <PencilSquareIcon className="w-5 h-5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveItem(item.key)}
+                                className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                title="Remover"
+                              >
+                                <TrashIcon className="w-5 h-5" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -1168,6 +1189,49 @@ export default function CardapioTab() {
                 className="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all"
               >
                 Continuar Mesmo Assim
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mini Modal para Editar Quantidade */}
+      {editItemModal.isOpen && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="px-5 py-4 border-b flex items-center gap-3 bg-blue-50 border-blue-100">
+              <PencilSquareIcon className="w-5 h-5 text-blue-600" />
+              <h3 className="font-bold text-blue-900">Ajustar Quantidade</h3>
+            </div>
+            <div className="p-5">
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                {editItemModal.produto}
+              </label>
+              <p className="text-xs text-gray-500 mb-3">Informe a quantidade em kg (baixa no estoque)</p>
+              <input
+                type="number"
+                min="0"
+                step="0.001"
+                value={editItemModal.kgInput}
+                onChange={(e) => setEditItemModal(prev => ({ ...prev, kgInput: e.target.value }))}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 text-gray-800 font-bold"
+                autoFocus
+              />
+            </div>
+            <div className="px-5 py-4 bg-gray-50 border-t flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setEditItemModal({ isOpen: false, itemKey: null, kgInput: "", produto: "" })}
+                className="px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveEditItem}
+                className="px-4 py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition-colors"
+              >
+                Salvar
               </button>
             </div>
           </div>

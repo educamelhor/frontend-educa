@@ -20,6 +20,7 @@ export default function CardapioTab() {
   
   // Missing Items Modal State
   const [missingItemsModal, setMissingItemsModal] = useState({ isOpen: false, items: [] });
+  const [pendingReceitaSelection, setPendingReceitaSelection] = useState({ receitaNome: "", novosItens: [] });
 
   // Intelligent Modal State (Assistente de Estoque)
   const [intelligentModalConfig, setIntelligentModalConfig] = useState({
@@ -254,60 +255,74 @@ export default function CardapioTab() {
 
     const refParaCalculo = refeicoesCardapio ? parseInt(refeicoesCardapio, 10) : (refeicoesServidas !== null ? refeicoesServidas : totalAlunos);
     const novosItens = [];
-    const itensComProblema = []; // Para erro de Per Capita (Bloqueia)
-    const itensSemSaldo = []; // Para erro de Saldo Zero (Apenas avisa e ignora)
+    const itensComProblema = []; // Para erro de Per Capita ou Saldo Zero
 
     for (const prod of receita.itens) {
-      // 1. Verifica se o produto ao menos tem percapita configurada (mesmo que sem saldo)
       const temPercapita = estoque.some(e => e.produto_id === prod.id && e.percapita_id);
-      
-      if (!temPercapita) {
-        itensComProblema.push(prod.produto);
-        continue; // Nem tenta procurar saldo se já sabemos que quebra a regra da per capita
-      }
-
-      // 2. Procura um lote válido com saldo > 0
       const lotesDisponiveis = estoque.filter(e => e.produto_id === prod.id && Number(e.saldo_kg) > 0 && e.percapita_id);
-      lotesDisponiveis.sort((a, b) => new Date(a.validade || '9999-12-31') - new Date(b.validade || '9999-12-31'));
-
-      if (lotesDisponiveis.length > 0) {
-        const itemEstoque = lotesDisponiveis[0];
-        const kgNecessario = Number(itemEstoque.percapita_kg) * refParaCalculo;
-        const saldoKg = Number(itemEstoque.saldo_kg);
-        const previewKg = kgNecessario > saldoKg ? saldoKg : kgNecessario;
-
+      
+      if (!temPercapita || lotesDisponiveis.length === 0) {
+        itensComProblema.push(prod.produto);
+        // Mesmo com problema, adicionamos à lista com valores zerados para o usuário gerenciar
+        // Tentamos buscar a marca e gramatura caso exista no estoque (ou no cadastro geral, se estivesse disponível)
+        const itemEstoqueBase = estoque.find(e => e.produto_id === prod.id) || {};
+        
         novosItens.push({
-          key: getEstoqueKey(itemEstoque),
-          produto_id: itemEstoque.produto_id,
-          lote: itemEstoque.lote,
-          validade: itemEstoque.validade,
-          produto: itemEstoque.produto,
-          marca: itemEstoque.marca,
-          quantidade_kg: previewKg,
-          gramaturaStr: itemEstoque.gramatura,
-          percapita_kg: itemEstoque.percapita_kg,
-          saldo_kg: itemEstoque.saldo_kg
+          key: `${prod.id}||PENDENTE||${Date.now()}_${Math.random()}`,
+          produto_id: prod.id,
+          lote: "-",
+          validade: null,
+          produto: prod.produto,
+          marca: itemEstoqueBase.marca || "-",
+          quantidade_kg: 0,
+          gramaturaStr: itemEstoqueBase.gramatura || "-",
+          percapita_kg: itemEstoqueBase.percapita_kg || 0,
+          saldo_kg: 0
         });
-      } else {
-        // Tem per capita, mas não tem saldo > 0 em nenhum lote
-        itensSemSaldo.push(prod.produto);
+        continue;
       }
+
+      // Procura um lote válido com saldo > 0
+      lotesDisponiveis.sort((a, b) => new Date(a.validade || '9999-12-31') - new Date(b.validade || '9999-12-31'));
+      const itemEstoque = lotesDisponiveis[0];
+      const kgNecessario = Number(itemEstoque.percapita_kg) * refParaCalculo;
+      const saldoKg = Number(itemEstoque.saldo_kg);
+      const previewKg = kgNecessario > saldoKg ? saldoKg : kgNecessario;
+
+      novosItens.push({
+        key: getEstoqueKey(itemEstoque),
+        produto_id: itemEstoque.produto_id,
+        lote: itemEstoque.lote,
+        validade: itemEstoque.validade,
+        produto: itemEstoque.produto,
+        marca: itemEstoque.marca,
+        quantidade_kg: previewKg,
+        gramaturaStr: itemEstoque.gramatura,
+        percapita_kg: itemEstoque.percapita_kg,
+        saldo_kg: itemEstoque.saldo_kg
+      });
     }
 
     if (itensComProblema.length > 0) {
-      // Bloqueia e avisa apenas os que faltam Per Capita
-      setNomeCardapio("");
-      setItensSelecionados([]);
+      setPendingReceitaSelection({ receitaNome, novosItens });
       setMissingItemsModal({ isOpen: true, items: itensComProblema });
       return;
     }
 
     setItensSelecionados(novosItens);
-    
-    // Avisa sutilmente sobre os itens ignorados por falta de saldo físico
-    if (itensSemSaldo.length > 0) {
-      toast.error(`Ingrediente(s) ignorado(s) por falta de saldo: ${itensSemSaldo.join(', ')}`, { duration: 6000 });
-    }
+  };
+
+  const handleConfirmReceitaSelection = () => {
+    setItensSelecionados(pendingReceitaSelection.novosItens);
+    setMissingItemsModal({ isOpen: false, items: [] });
+    setPendingReceitaSelection({ receitaNome: "", novosItens: [] });
+  };
+
+  const handleCancelReceitaSelection = () => {
+    setNomeCardapio("");
+    setItensSelecionados([]);
+    setMissingItemsModal({ isOpen: false, items: [] });
+    setPendingReceitaSelection({ receitaNome: "", novosItens: [] });
   };
 
   const handleAddItem = () => {
@@ -1116,14 +1131,14 @@ export default function CardapioTab() {
       {missingItemsModal.isOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200 border border-white/20">
-            <div className="px-6 py-5 border-b flex items-center gap-4 bg-red-50 border-red-100">
-              <div className="bg-red-100 p-2.5 rounded-full text-red-600 shadow-sm flex-shrink-0">
+            <div className="px-6 py-5 border-b flex items-center gap-4 bg-amber-50 border-amber-100">
+              <div className="bg-amber-100 p-2.5 rounded-full text-amber-600 shadow-sm flex-shrink-0">
                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold tracking-tight text-red-900">
-                Ação Bloqueada
+              <h3 className="text-xl font-bold tracking-tight text-amber-900">
+                Atenção: Itens Incompletos
               </h3>
             </div>
             <div className="p-6 bg-white space-y-4">
@@ -1132,21 +1147,27 @@ export default function CardapioTab() {
               </p>
               <div className="flex flex-wrap gap-2">
                 {missingItemsModal.items.map((item, idx) => (
-                  <span key={idx} className="px-3 py-1.5 bg-red-50 text-red-700 text-sm font-semibold rounded-lg border border-red-100">
+                  <span key={idx} className="px-3 py-1.5 bg-amber-50 text-amber-700 text-sm font-semibold rounded-lg border border-amber-100">
                     {item}
                   </span>
                 ))}
               </div>
-              <p className="text-gray-600 text-sm italic mt-2">
-                Por gentileza, ajuste estes itens no cadastro de estoque / per capita e volte aqui.
+              <p className="text-gray-600 text-sm mt-2">
+                Você pode continuar e gerenciar estes itens diretamente na lista (ex: excluir ou inserir manualmente depois).
               </p>
             </div>
-            <div className="px-6 py-5 bg-gray-50 border-t border-gray-100 flex justify-end rounded-b-3xl">
+            <div className="px-6 py-5 bg-gray-50 border-t border-gray-100 flex justify-end gap-3 rounded-b-3xl">
               <button
-                onClick={() => setMissingItemsModal({ isOpen: false, items: [] })}
-                className="px-6 py-2.5 bg-gray-800 text-white font-bold rounded-xl shadow-md hover:bg-gray-900 hover:shadow-lg transition-all"
+                onClick={handleCancelReceitaSelection}
+                className="px-6 py-2.5 text-gray-700 font-semibold hover:bg-gray-200 rounded-xl transition-colors"
               >
-                Entendi
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmReceitaSelection}
+                className="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all"
+              >
+                Continuar Mesmo Assim
               </button>
             </div>
           </div>

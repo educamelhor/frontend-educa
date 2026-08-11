@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { PlusIcon, TrashIcon, PencilSquareIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import api from "../../../services/api";
@@ -137,6 +137,36 @@ export default function PercapitaTab() {
     }
   });
 
+  const produtosAgrupados = useMemo(() => {
+    const map = new Map();
+    itens.forEach(item => {
+      if (!map.has(item.produto_id)) {
+        map.set(item.produto_id, {
+          ...item,
+          saldo_kg: Number(item.saldo_kg || 0),
+          lotes: item.lote ? [
+            {
+              lote: item.lote,
+              validade: item.validade,
+              saldo_kg: Number(item.saldo_kg || 0)
+            }
+          ] : []
+        });
+      } else {
+        const ag = map.get(item.produto_id);
+        ag.saldo_kg += Number(item.saldo_kg || 0);
+        if (item.lote) {
+          ag.lotes.push({
+            lote: item.lote,
+            validade: item.validade,
+            saldo_kg: Number(item.saldo_kg || 0)
+          });
+        }
+      }
+    });
+    return Array.from(map.values());
+  }, [itens]);
+
   return (
     <div className="p-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
@@ -189,33 +219,38 @@ export default function PercapitaTab() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {itens.length === 0 ? (
+              {produtosAgrupados.length === 0 ? (
                 <tr>
                   <td colSpan="6" className="py-12 text-center text-gray-500">
-                    Não há itens com saldo no estoque para configurar per capita.
+                    Não há itens cadastrados para configurar per capita.
                   </td>
                 </tr>
               ) : (
-                itens.map((item, index) => {
+                produtosAgrupados.map((item, index) => {
                   const refeicoes = calcularRefeicoes(item.saldo_kg, item.percapita_kg);
                   return (
                     <tr key={index} className="hover:bg-amber-50/30 transition-colors">
                       <td className="py-4 px-6">
                         <div className="font-medium text-gray-800">{item.produto}</div>
-                        <div className="text-xs text-gray-500">{item.marca}</div>
+                        <div className="text-xs text-gray-500">{item.marca || "-"}</div>
                       </td>
                       <td className="py-4 px-6">
-                        {item.lote ? (
-                          <div className="px-2 py-1 bg-gray-100 text-gray-600 text-xs font-mono rounded border border-gray-200 inline-block mb-1">
-                            {item.lote}
+                        {item.lotes && item.lotes.length > 0 ? (
+                          <div className="flex flex-wrap gap-2">
+                            {item.lotes.map((l, i) => (
+                              <div key={i} className="flex flex-col border border-gray-200 rounded-md p-1.5 bg-gray-50 text-xs">
+                                <span className="font-mono font-semibold text-gray-700">{l.lote}</span>
+                                <span className="text-gray-500 text-[10px]">
+                                  {l.validade ? (() => {
+                                    const [yyyy, mm, dd] = String(l.validade).split('T')[0].split('-');
+                                    return `${dd}/${mm}/${yyyy}`;
+                                  })() : '-'}
+                                </span>
+                                <span className="text-emerald-600 font-bold text-[10px]">{Number(l.saldo_kg).toLocaleString('pt-BR')} kg</span>
+                              </div>
+                            ))}
                           </div>
                         ) : <span className="text-gray-400">-</span>}
-                        <div className="text-xs text-gray-500 mt-1">
-                          {item.validade ? (() => {
-                            const [yyyy, mm, dd] = String(item.validade).split('T')[0].split('-');
-                            return `${dd}/${mm}/${yyyy}`;
-                          })() : ''}
-                        </div>
                       </td>
                       <td className="py-4 px-6 font-semibold text-gray-700">
                         {Number(item.saldo_kg).toLocaleString('pt-BR')} kg

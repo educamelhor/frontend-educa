@@ -131,7 +131,7 @@ export default function PercapitaTab() {
       mapProdutos.set(item.produto_id, true);
       produtosUnicos.push({
         id: item.produto_id,
-        nome: `${item.produto} - ${item.marca}`,
+        nome: item.marca ? `${item.produto} - ${item.marca}` : item.produto,
         temPercapita: !!item.percapita_id
       });
     }

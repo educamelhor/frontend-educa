@@ -306,10 +306,9 @@ export default function AgentePlanos() {
   };
 
   // ── Filtros ────────────────────────────────────────────
-  const planosComBimestral = planos.filter(p => {
-    const itens = Array.isArray(p.itens) ? p.itens : JSON.parse(p.itens || "[]");
-    return itens.some(i => i.fixo_direcao);
-  });
+  // Exibe TODOS os planos do professor — inclusive disciplinas de exceção
+  // (ex: PRÁTICA ESTUDANTIL, GEOMETRIA) que não possuem Prova Bimestral (fixo_direcao).
+  const planosComBimestral = planos;
 
   // Filtro por bimestre
   const planosPorBimestre = filtroBimestre === "todos"

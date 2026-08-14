@@ -56,8 +56,7 @@ function NotaCard({ plano, onExportar, onReexportar, exportandoId, onVerRelatori
   const estruturaExportada = !!plano.agente_exportado_em;
   const notasExportadas    = !!plano.agente_notas_exportadas_em;
   const podeExportar       = estruturaExportada && !notasExportadas && !emExecucao &&
-                             (plano.status === "APROVADO" || plano.status === "ENVIADO") &&
-                             !!bimestral;
+                             (plano.status === "APROVADO" || plano.status === "ENVIADO");
 
   return (
     <div
@@ -196,11 +195,6 @@ function NotaCard({ plano, onExportar, onReexportar, exportandoId, onVerRelatori
                     </button>
                   )}
                 </>
-              ) : !bimestral ? (
-                <div style={{ padding: "8px 14px", borderRadius: 12, fontSize: "0.7rem", background: "rgba(148,163,184,0.06)", border: "1px solid rgba(148,163,184,0.15)", color: "#64748b", display: "flex", alignItems: "center", gap: 6 }}>
-                  <LockClosedIcon style={{ width: 14 }} />
-                  Sem col. Bimestral
-                </div>
               ) : !estruturaExportada ? (
                 <div style={{ padding: "8px 14px", borderRadius: 12, fontSize: "0.7rem", background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.2)", color: "#f59e0b", display: "flex", alignItems: "center", gap: 6 }}>
                   <ExclamationTriangleIcon style={{ width: 14 }} />
@@ -326,10 +320,9 @@ export default function AgenteNotas() {
   };
 
   // ── Filtros ─────────────────────────────────────────────
-  const planosComBimestral = planos.filter(p => {
-    const itens = Array.isArray(p.itens) ? p.itens : JSON.parse(p.itens || "[]");
-    return itens.some(i => i.fixo_direcao);
-  });
+  // Exibe TODOS os planos do professor — inclusive disciplinas de exceção
+  // (ex: PRÁTICA ESTUDANTIL, GEOMETRIA) que não possuem Prova Bimestral (fixo_direcao).
+  const planosComBimestral = planos;
 
   // Filtro por bimestre
   const planosPorBimestre = filtroBimestre === "todos"

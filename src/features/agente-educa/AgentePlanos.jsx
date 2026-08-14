@@ -163,15 +163,6 @@ function PlanCard({ plano, onExportar, onReexportar, exportandoId }) {
                     </button>
                   )}
                 </>
-              ) : !bimestral ? (
-                <div style={{
-                  padding: "8px 14px", borderRadius: 12, fontSize: "0.7rem",
-                  background: "rgba(148,163,184,0.06)", border: "1px solid rgba(148,163,184,0.15)",
-                  color: "#64748b", display: "flex", alignItems: "center", gap: 6,
-                }}>
-                  <LockClosedIcon style={{ width: 14 }} />
-                  Sem col. Bimestral
-                </div>
               ) : !podeExportar ? (
                 <div style={{
                   padding: "8px 14px", borderRadius: 12, fontSize: "0.7rem",

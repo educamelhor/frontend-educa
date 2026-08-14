@@ -356,33 +356,41 @@ export default function AgenteNotas() {
   const traduzirErroAgente = (msg) => {
     if (!msg) return 'O agente encontrou um erro no EDUCADF. Tente novamente.';
     const m = msg.toLowerCase();
-    // Portal fora do ar — verificado PRIMEIRO
+    // 1. Portal fora do ar — prioridade máxima
     if (m.includes('portal_indisponivel') || m.includes('problemas técnicos') ||
         m.includes('erro interno') || m.includes('serviço indisponível') ||
         m.includes('bad gateway') || m.includes('gateway timeout') || m.includes('sistema indisponível'))
       return '⚠️ O EDUCADF está apresentando instabilidade técnica. Aguarde alguns minutos e tente novamente.';
+    // 2. Dropdown vazio
     if (m.includes('dropdown vazio') || m.includes('no items found') || m.includes('turmas disponíveis'))
       return '⚠️ O EDUCADF não retornou as turmas disponíveis — instabilidade do portal. Aguarde um minuto e tente novamente.';
-    if (m.includes('swal') || m.includes('intercepts pointer') || m.includes('overlay'))
-      return 'O portal EDUCADF exibiu uma janela de alerta que bloqueou a operação. Tente novamente — o agente agora fecha esse alerta automaticamente.';
-    if (m.includes('login') || m.includes('senha') || m.includes('credencial'))
-      return 'Falha no login do EDUCADF. Verifique suas credenciais em Agente EDUCA > Configurações.';
-    // Mismatch de bimestre — deve vir ANTES do check genérico de "turma"
+    // 3. Mismatch de bimestre — deve vir ANTES do check genérico de "turma"
     if (m.includes('bimestre_indisponivel') || m.includes('não possui eventos do') || m.includes('exibe apenas')) {
       const bimAlvo = msg.match(/eventos do (\dº Bimestre)/i)?.[1] || 'bimestre solicitado';
       const bimDisp = msg.match(/exibe apenas:\s*([^.]+)/i)?.[1]?.trim() || '';
       return `⚠️ O calendário EDUCADF não tem eventos do ${bimAlvo} para esta turma.` +
              (bimDisp ? ` Os eventos disponíveis são do: ${bimDisp}.` : '') +
-             ' Verifique se o bimestre do plano está correto ou atualize o plano para o período letivo atual no EDUCADF.';
+             ' Verifique se o bimestre do plano está correto.';
     }
+    // 4. Timeout — DEVE vir ANTES do check de turma/calendário
+    // O erro de timeout contém a URL com "calendario" na string, o que causaria
+    // falso positivo no bloco de "turma não encontrada" abaixo.
+    if (m.includes('timeout') || m.includes('time out') || m.includes('exceeded') ||
+        m.includes('page.goto') || m.includes('page.waitfor'))
+      return '⏱️ O portal EDUCADF demorou demais para responder (tempo limite excedido). Isso indica instabilidade momentânea do portal — não é um problema com a turma ou o plano. Aguarde alguns minutos e tente novamente.';
+    // 5. Popup/overlay bloqueando
+    if (m.includes('swal') || m.includes('intercepts pointer') || m.includes('overlay'))
+      return 'O portal EDUCADF exibiu uma janela de alerta que bloqueou a operação. Tente novamente — o agente fecha esse alerta automaticamente.';
+    // 6. Credenciais
+    if (m.includes('login') || m.includes('senha') || m.includes('credencial'))
+      return '🔑 Falha no login do EDUCADF. Verifique suas credenciais em Agente EDUCA > Configurações.';
+    // 7. Turma não encontrada (genuíno — após descartar timeout)
     if (m.includes('turma') || m.includes('calendário') || m.includes('calendario'))
-      return 'Turma não encontrada no EDUCADF. Verifique se a turma está cadastrada para este bimestre.';
-
+      return '🔍 Turma não localizada no EDUCADF. Verifique se o Mapeamento Global de Turmas foi preenchido pela secretaria.';
+    // 8. Erro ao preencher notas
     if (m.includes('nota') || m.includes('aluno') || m.includes('coluna'))
       return 'Erro ao preencher notas no EDUCADF. Verifique se a estrutura (Etapa 1) foi exportada corretamente.';
-    if (m.includes('timeout') || m.includes('time out'))
-      return 'O EDUCADF demorou demais para responder. Tente novamente — o portal pode estar sobrecarregado.';
-    return msg.length > 200 ? msg.substring(0, 200) + '...' : msg;
+    return msg.length > 220 ? msg.substring(0, 220) + '...' : msg;
   };
 
   const pollarNotas = async (plano, startTime) => {

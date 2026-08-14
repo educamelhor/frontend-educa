@@ -354,19 +354,21 @@ export default function AgentePlanos() {
              (bimDisp ? ` Os eventos disponíveis são do: ${bimDisp}.` : '') +
              ' Verifique se o bimestre do plano está correto ou atualize o plano para o período letivo atual no EDUCADF.';
     }
+    // ── Timeout de carregamento de página — DEVE vir ANTES do check de turma/calendário ──
+    if (m.includes('timeout') || m.includes('time out') || m.includes('exceeded') ||
+        m.includes('page.goto') || m.includes('page.waitfor'))
+      return '⏱️ O portal EDUCADF demorou demais para responder (tempo limite excedido). Isso indica instabilidade momentânea do portal — não é um problema com a turma ou o plano. Aguarde alguns minutos e tente novamente.';
     if (m.includes('swal') || m.includes('intercepts pointer') || m.includes('overlay'))
       return 'O portal EDUCADF exibiu uma janela de alerta que bloqueou a operação. Tente novamente — o agente agora fecha esse alerta automaticamente.';
     if (m.includes('login') || m.includes('senha') || m.includes('credencial'))
       return 'Falha no login do EDUCADF. Verifique suas credenciais em Agente EDUCA > Configurações.';
     if (m.includes('turma') || m.includes('calendário') || m.includes('calendario'))
-      return `Turma não encontrada no EDUCADF: "${msg.match(/"([^"]+)"/)?.[1] || 'ver detalhes'}". Verifique se a turma está cadastrada no EDUCADF para este bimestre.`;
+      return `🔍 Turma não localizada no EDUCADF: "${msg.match(/"([^"]+)"/) ?.[1] || 'ver detalhes'}". Verifique se o Mapeamento Global de Turmas foi preenchido pela secretaria.`;
     if (m.includes('filtrar') || m.includes('filtro'))
       return 'Falha ao aplicar filtros no EDUCADF. O portal pode estar lento — tente novamente em alguns minutos.';
     if (m.includes('aba') || m.includes('procedimento'))
       return 'Não foi possível abrir a aba de Procedimentos Avaliativos no EDUCADF. O portal pode estar em manutenção.';
-    if (m.includes('timeout') || m.includes('time out'))
-      return 'O EDUCADF demorou demais para responder. Tente novamente — o portal pode estar sobrecarregado.';
-    return msg.length > 200 ? msg.substring(0, 200) + '...' : msg;
+    return msg.length > 220 ? msg.substring(0, 220) + '...' : msg;
   };
 
   const pollarEstrutura = async (plano, startTime) => {

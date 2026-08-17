@@ -1313,12 +1313,13 @@ export default function Planos() {
                       showMsg("success", "✅ Rascunho salvo! Continue editando ou clique em VOLTAR PARA O PAINEL.");
                     }
                   } catch (err) {
-                    console.error(err);
+                    console.error('[Planos] Erro ao salvar rascunho:', err?.response?.data || err);
                     const errData = err?.response?.data;
                     if (err?.response?.status === 409 && errData?.item_bloqueado) {
                       showMsg("error", errData.error || `Não é possível remover "${errData.item_bloqueado}" — há notas lançadas nessa atividade.`);
                     } else {
-                      showMsg("error", "Erro ao salvar rascunho.");
+                      const detalhe = errData?.detalhe || errData?.error || '';
+                      showMsg("error", `Erro ao salvar rascunho.${detalhe ? ' Detalhe: ' + detalhe : ''}`);
                     }
                   }
                 }}

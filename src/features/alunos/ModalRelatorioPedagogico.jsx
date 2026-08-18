@@ -302,9 +302,27 @@ export default function ModalRelatorioPedagogico({ open, onClose, aluno, somente
                                                 {oc.nome_usuario_registro || '—'}
                                             </td>
                                             <td className="px-4 py-3">
-                                                <span className={`px-2 py-1 text-xs font-medium rounded-full border ${statusBadge(oc.status)}`}>
-                                                    {oc.status}
-                                                </span>
+                                                <div className="flex flex-col gap-1 items-start">
+                                                    <span className={`px-2 py-1 text-xs font-medium rounded-full border ${statusBadge(oc.status)}`}>
+                                                        {oc.status}
+                                                    </span>
+                                                    {!isProfessor && (() => {
+                                                        try {
+                                                            const visList = typeof oc.visualizacoes === 'string' ? JSON.parse(oc.visualizacoes) : oc.visualizacoes;
+                                                            if (!Array.isArray(visList) || visList.length === 0) return null;
+                                                            return (
+                                                                <div className="mt-1 flex flex-col gap-1">
+                                                                    {visList.map((vis, idx) => (
+                                                                        <span key={idx} className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-600 bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap" title={`Visualizado em ${vis.data}`}>
+                                                                            <svg className="w-2.5 h-2.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                                                            {vis.nome ? vis.nome.split(' ')[0] : 'Familiar'} {vis.master ? '(Master)' : ''}
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            );
+                                                        } catch { return null; }
+                                                    })()}
+                                                </div>
                                             </td>
                                             <td className="px-4 py-3 text-center">
                                                 <div className="flex justify-center gap-2">
@@ -497,3 +515,4 @@ export default function ModalRelatorioPedagogico({ open, onClose, aluno, somente
         </div>
     );
 }
+

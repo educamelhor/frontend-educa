@@ -512,15 +512,18 @@ export default function CardapioTab() {
     const queue = [];
     
     for (let item of itensSelecionados) {
-      const kgNecessario = Number(item.percapita_kg) * refParaCalculo;
+      const kgIdeal = Number(item.percapita_kg) * refParaCalculo;
+      const kgAtual = Number(item.quantidade_kg);
       const saldoKg = Number(item.saldo_kg);
       
-      if (saldoKg < kgNecessario) {
-        queue.push({ type: 4, item, kgNecessario, saldoKg, refParaCalculo });
-      } else if (saldoKg >= kgNecessario && saldoKg < kgNecessario * 2) {
-        queue.push({ type: 3, item, kgNecessario, saldoKg, refParaCalculo });
+      if (kgAtual > saldoKg) {
+        queue.push({ type: 4, item, kgNecessario: kgAtual, saldoKg, refParaCalculo });
+      } else if (saldoKg < kgIdeal) {
+        queue.push({ type: 4, item, kgNecessario: kgIdeal, saldoKg, refParaCalculo });
+      } else if (saldoKg >= kgAtual && saldoKg < kgAtual * 2) {
+        queue.push({ type: 3, item, kgNecessario: kgAtual, saldoKg, refParaCalculo });
       } else {
-        queue.push({ type: 2, item, kgNecessario, saldoKg, refParaCalculo, kgUsado: kgNecessario });
+        queue.push({ type: 2, item, kgNecessario: kgAtual, saldoKg, refParaCalculo, kgUsado: kgAtual });
       }
     }
 
@@ -853,11 +856,11 @@ export default function CardapioTab() {
               <p className="text-gray-700 text-[15px] leading-relaxed">
                 {intelligentModalConfig.type === 4 ? (
                   <>
-                    Atenção! A per capita exige <b>{intelligentModalConfig.kgNecessario.toLocaleString('pt-BR')} kg</b> para as {intelligentModalConfig.refParaCalculo} refeições deste cardápio, mas você possui apenas <b>{intelligentModalConfig.saldoKg.toLocaleString('pt-BR')} kg</b> deste lote no depósito.
+                    Atenção! A per capita exige <b>{intelligentModalConfig.kgNecessario.toLocaleString('pt-BR')} kg</b> de <b>{intelligentModalConfig.item.produto}</b> para as {intelligentModalConfig.refParaCalculo} refeições deste cardápio, mas você possui apenas <b>{intelligentModalConfig.saldoKg.toLocaleString('pt-BR')} kg</b> deste lote no depósito.
                   </>
                 ) : (
                   <>
-                    O saldo atual de <b>{intelligentModalConfig.saldoKg.toLocaleString('pt-BR')} kg</b> atende este cardápio ({intelligentModalConfig.kgNecessario.toLocaleString('pt-BR')} kg), mas deixará um resto de <b>{(intelligentModalConfig.saldoKg - intelligentModalConfig.kgNecessario).toLocaleString('pt-BR')} kg</b> no depósito, o que é <span className="text-amber-600 font-semibold">insuficiente para um próximo cardápio idêntico</span>.
+                    O saldo atual de <b>{intelligentModalConfig.saldoKg.toLocaleString('pt-BR')} kg</b> de <b>{intelligentModalConfig.item.produto}</b> atende este cardápio ({intelligentModalConfig.kgNecessario.toLocaleString('pt-BR')} kg), mas deixará um resto de <b>{(intelligentModalConfig.saldoKg - intelligentModalConfig.kgNecessario).toLocaleString('pt-BR')} kg</b> no depósito, o que é <span className="text-amber-600 font-semibold">insuficiente para um próximo cardápio idêntico</span>.
                   </>
                 )}
               </p>

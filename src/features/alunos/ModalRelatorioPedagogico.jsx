@@ -313,9 +313,12 @@ export default function ModalRelatorioPedagogico({ open, onClose, aluno, somente
                                                             return (
                                                                 <div className="mt-1 flex flex-col gap-1">
                                                                     {visList.map((vis, idx) => (
-                                                                        <span key={idx} className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-600 bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap" title={`Visualizado em ${vis.data}`}>
-                                                                            <svg className="w-2.5 h-2.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-                                                                            {vis.nome ? vis.nome.split(' ')[0] : 'Familiar'} {vis.master ? '(Master)' : ''}
+                                                                        <span key={idx} className="inline-flex items-center gap-1.5 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-md shadow-sm whitespace-nowrap transition-all hover:bg-emerald-100 hover:shadow" title={`Visualizado em ${vis.data}`}>
+                                                                            <div className="relative flex items-center justify-center h-3 w-3">
+                                                                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60"></span>
+                                                                              <svg className="relative w-3 h-3 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                                                            </div>
+                                                                            <span className="tracking-wide uppercase">{vis.nome ? vis.nome.split(' ')[0] : 'Familiar'} {vis.master ? '(Master)' : ''}</span>
                                                                         </span>
                                                                     ))}
                                                                 </div>

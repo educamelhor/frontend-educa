@@ -170,11 +170,15 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
     // Calcula a pontuação: pontos do BD já possuem sinal correto
     // (negativo para medidas disciplinares, positivo para elogios)
     // REGISTRADA + FINALIZADA afetam a pontuação; CANCELADA é ignorada
+    // Art. 46 III: Suspensão = pontos_base × dias_suspensão
     const pontuacaoCalculada = React.useMemo(() => {
         let pontuacao = PONTUACAO_INICIAL;
         for (const oc of ocorrencias) {
             if (oc.status === 'CANCELADA') continue;
-            const pts = Number(oc.pontos) || 0;
+            let pts = Number(oc.pontos) || 0;
+            if (String(oc.medida_disciplinar || '').trim() === 'Suspensão' && Number(oc.dias_suspensao) > 0) {
+                pts = pts * Number(oc.dias_suspensao);
+            }
             pontuacao += pts;
         }
         // Adiciona bônus de mérito

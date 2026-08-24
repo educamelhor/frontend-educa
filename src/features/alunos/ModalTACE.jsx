@@ -43,28 +43,21 @@ export default function ModalTACE({ open, onClose, aluno, onSaved }) {
       setSaved(false);
       setError("");
 
-      // Buscar TACE dados + ocorrências + bônus de mérito em paralelo (BUG 4)
+      // Buscar TACE dados + pontuação canônica em paralelo
       Promise.all([
         api.get(`/api/tace/dados/${aluno.id}`).catch(() => ({ data: {} })),
-        api.get(`/api/alunos/${aluno.id}/ocorrencias`).catch(() => ({ data: [] })),
-        api.get(`/api/relatorio-disciplinar/merito/${aluno.id}`).catch(() => ({ data: { bonusTotal: 0, totalBonusDias: 0 } })),
+        api.get(`/api/relatorio-disciplinar/pontuacao/${aluno.id}`).catch(() => ({ data: { pontuacao: null } })),
       ])
-        .then(([taceRes, ocRes, meritoRes]) => {
+        .then(([taceRes, pontuacaoRes]) => {
           setReconhecimento(taceRes.data.reconhecimento_fatos || "");
           setCompromisso(taceRes.data.compromisso_conduta || "");
 
-          // Calcular pontuação incluindo bônus de mérito (mesma lógica do ModalRelatorioDisciplinar)
-          const PONTUACAO_INICIAL = 8.0;
-          let pts = PONTUACAO_INICIAL;
-          const ocorrencias = Array.isArray(ocRes.data) ? ocRes.data : [];
-          for (const oc of ocorrencias) {
-            if (oc.status === 'CANCELADA') continue; // cancelada reverte, não conta
-            pts += Number(oc.pontos) || 0;
-          }
-          // Adiciona bônus de mérito (dias sem ocorrência negativa)
-          const bonusTotal = Number(meritoRes.data?.bonusTotal) || 0;
-          pts += bonusTotal;
-          setPontuacao(Math.max(0, Math.min(10, parseFloat(pts.toFixed(2)))));
+          // Pontuação canônica: mesma lógica do PDF Relatório Disciplinar
+          const pt = pontuacaoRes.data?.pontuacao;
+          setPontuacao(pt !== null && pt !== undefined
+            ? Math.max(0, Math.min(10, parseFloat(pt)))
+            : 8.0
+          );
         })
         .finally(() => setLoading(false));
     }

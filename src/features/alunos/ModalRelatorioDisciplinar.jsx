@@ -19,6 +19,7 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
     const [ocorrencias, setOcorrencias] = useState([]);
     const [loading, setLoading] = useState(false);
     const [bonusMerito, setBonusMerito] = useState({ bonusTotal: 0, totalBonusDias: 0 });
+    const [pontuacaoCanonica, setPontuacaoCanonica] = useState(null); // pontuação do endpoint centralizado
 
     // Estados do comparecimento
     const [modalComparecimentoOpen, setModalComparecimentoOpen] = useState(false);
@@ -167,11 +168,14 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
     // ==================== PONTUAÇÃO & COMPORTAMENTO ====================
     const PONTUACAO_INICIAL = 8.00;
 
-    // Calcula a pontuação: pontos do BD já possuem sinal correto
-    // (negativo para medidas disciplinares, positivo para elogios)
-    // REGISTRADA + FINALIZADA afetam a pontuação; CANCELADA é ignorada
-    // Art. 46 III: Suspensão = pontos_base × dias_suspensão
+    // Usa pontuação canônica do backend (mesma lógica do PDF Relatório).
+    // Fallback: cálculo local para compatibilidade caso o endpoint falhe.
     const pontuacaoCalculada = React.useMemo(() => {
+        // Se o backend retornou a pontuação canônica, usa ela diretamente
+        if (pontuacaoCanonica !== null && pontuacaoCanonica !== undefined) {
+            return pontuacaoCanonica;
+        }
+        // Fallback: cálculo local (inclui suspensão × dias + bônus de mérito)
         let pontuacao = PONTUACAO_INICIAL;
         for (const oc of ocorrencias) {
             if (oc.status === 'CANCELADA') continue;
@@ -181,11 +185,9 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
             }
             pontuacao += pts;
         }
-        // Adiciona bônus de mérito
         pontuacao += Number(bonusMerito.bonusTotal) || 0;
-        // Limitar entre 0 e 10
         return Math.max(0, Math.min(10, parseFloat(pontuacao.toFixed(2))));
-    }, [ocorrencias, bonusMerito]);
+    }, [ocorrencias, bonusMerito, pontuacaoCanonica]);
 
     // Classifica o comportamento conforme Art. 45
     const getComportamento = (nota) => {

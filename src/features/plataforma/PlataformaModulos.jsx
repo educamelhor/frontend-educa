@@ -539,21 +539,28 @@ function StatusBadge({ status }) {
 // - 'subcomandante', 'supervisor_disciplinar', 'monitor_disciplinar' removidos:
 //   módulo DISCIPLINAR é padrão/fixo para escolas CCMDF — CEO não o gerencia.
 const PERFIS_LISTA = [
-  { key: 'diretor',         label: 'Diretor Pedagógico' },
-  { key: 'vice_diretor',    label: 'Vice-Diretor' },
-  { key: 'professor',       label: 'Professor' },
-  { key: 'coordenador',     label: 'Coordenador' },
-  { key: 'supervisor',      label: 'Supervisor' },
-  { key: 'pedagogo',        label: 'Pedagogo' },
-  { key: 'secretaria',      label: 'Secretaria' },
-  { key: 'orientador',      label: 'Orientador' },
-  { key: 'aluno',           label: 'Aluno' },
-  { key: 'biblioteca',      label: 'Biblioteca' },
-  { key: 'educador_social', label: 'Educador Social' },
-  { key: 'merenda',         label: 'Merenda' },
-  { key: 'psicologo',       label: 'Psicólogo' },
-  { key: 'responsavel',     label: 'Responsável' },
-  { key: 'vigilancia',      label: 'Vigilância' },
+  { key: 'diretor',                   label: 'Diretor' },
+  { key: 'vice_diretor',              label: 'Vice-Diretor' },
+  { key: 'coordenacao',               label: 'Coordenação' },
+  { key: 'secretaria',                label: 'Secretaria' },
+  { key: 'orientador',                label: 'Orientador' },
+  { key: 'supervisor_pedagogico',     label: 'Supervisor Pedagógico' },
+  { key: 'supervisor_administrativo', label: 'Supervisor Administrativo' },
+  { key: 'disciplinar',               label: 'Disciplinar' },
+  { key: 'administrativo',            label: 'Administrativo' },
+  { key: 'psicopedagogia',            label: 'Psicopedagogia' },
+  { key: 'sala_recurso',              label: 'Sala de Recurso' },
+  { key: 'apoio',                     label: 'Apoio' },
+  { key: 'educador_social',           label: 'Educador Social' },
+  { key: 'vigilancia',                label: 'Vigilância' },
+  { key: 'merenda',                   label: 'Merenda' },
+  { key: 'biblioteca',                label: 'Biblioteca' },
+  { key: 'professor',                 label: 'Professor' },
+  { key: 'pedagogo',                  label: 'Pedagogo' },
+  { key: 'aluno',                     label: 'Aluno' },
+  { key: 'responsavel',               label: 'Responsável' },
+  { key: 'psicologo',                 label: 'Psicólogo' },
+  { key: 'monitor',                   label: 'Monitor' }
 ];
 
 // ── Main Component ────────────────────────────────────────────────────────────

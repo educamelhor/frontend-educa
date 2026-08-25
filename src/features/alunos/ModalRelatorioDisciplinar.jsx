@@ -65,12 +65,19 @@ export default function ModalRelatorioDisciplinar({ open, onClose, aluno }) {
     const fetchOcorrencias = async () => {
         setLoading(true);
         try {
-            const [ocRes, meritoRes] = await Promise.all([
+            // Busca ocorrências + pontuação canônica (mesma lógica do PDF Relatório)
+            const [ocRes, pontuacaoRes] = await Promise.all([
                 api.get(`/api/alunos/${aluno.id}/ocorrencias`),
-                api.get(`/api/relatorio-disciplinar/merito/${aluno.id}`).catch(() => ({ data: { bonusTotal: 0, totalBonusDias: 0 } }))
+                api.get(`/api/relatorio-disciplinar/pontuacao/${aluno.id}`)
+                    .catch(() => ({ data: { pontuacao: null, bonusMerito: 0 } }))
             ]);
             setOcorrencias(ocRes.data);
-            setBonusMerito(meritoRes.data || { bonusTotal: 0, totalBonusDias: 0 });
+            setBonusMerito({ bonusTotal: pontuacaoRes.data.bonusMerito || 0 });
+            setPontuacaoCanonica(
+                pontuacaoRes.data.pontuacao != null
+                    ? parseFloat(pontuacaoRes.data.pontuacao)
+                    : null
+            );
         } catch (err) {
             console.error("Erro ao carregar ocorrências", err);
         } finally {

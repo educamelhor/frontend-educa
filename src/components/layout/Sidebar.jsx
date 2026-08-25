@@ -503,7 +503,7 @@ export default function Sidebar({ isOpen, onClose }) {
             </Link>
 
             {/* LINK: Estudantes — só aparece se CEO configurou módulo 'estudantes' explicitamente */}
-            {!isDisciplinar && !isProfessor && !isCoord && !isSecretario && hasModulo('estudantes') && (
+            {!isDisciplinar && !isProfessor && !isCoord && hasModulo('estudantes') && (
             <Link to="/alunos" className={getMainLinkClasses('/alunos')}>
               <UserGroupIcon className="h-5 w-5 mr-2" />
               Estudantes
@@ -588,7 +588,7 @@ export default function Sidebar({ isOpen, onClose }) {
             </ul>
 
             </>
-            ) : !isDisciplinar && !isCoord && !isSecretario && hasModulo('professores') && (
+            ) : !isDisciplinar && !isCoord && hasModulo('professores') && (
             <>
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-2 transition"
@@ -717,7 +717,7 @@ export default function Sidebar({ isOpen, onClose }) {
             )}
 
             {/* LINK: Ferramentas */}
-            {!isDisciplinar && !isProfessor && !isCoord && !isSecretario && hasModulo('ferramentas') && (
+            {!isDisciplinar && !isProfessor && !isCoord && hasModulo('ferramentas') && (
             <Link to="/ferramentas" className={getMainLinkClasses('/ferramentas')}>
               <WrenchIcon className="h-5 w-5 mr-2" />
               Ferramentas
@@ -729,7 +729,7 @@ export default function Sidebar({ isOpen, onClose }) {
                 Acesso: direção, coordenação, supervisão, sala recurso
                 Restrito: professor, militar/disciplinar, coordenador de turma
             ──────────────────────────────── */}
-            {isScopeEscola && !isDisciplinar && !isProfessor && !isCoord && !isSecretario && hasModulo('biblioteca') && (
+            {isScopeEscola && !isDisciplinar && !isProfessor && !isCoord && hasModulo('biblioteca') && (
             <>
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-2 transition"
@@ -1331,8 +1331,6 @@ export default function Sidebar({ isOpen, onClose }) {
             {/* ───────────────────────────────
                 GRUPO: Agente EDUCA
             ─────────────────────────────── */}
-            {!isSecretario && (
-              <>
                 <button
                   className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-6 transition"
                   onClick={() => setOpenGroup(openGroup === 'agente-educa' ? null : 'agente-educa')}
@@ -1406,8 +1404,6 @@ export default function Sidebar({ isOpen, onClose }) {
                     )}
                   </ul>
                 )}
-              </>
-            )}
           </>
         )}
 
@@ -1625,7 +1621,7 @@ export default function Sidebar({ isOpen, onClose }) {
             </>
             )}
 
-        {isScopeEscola && !isDisciplinar && !isProfessor && !isSecretario && hasModulo('pedagogico') && (
+        {isScopeEscola && !isDisciplinar && !isProfessor && hasModulo('pedagogico') && (
           <>
             {/* ───────────────────────────────
                 GRUPO: Pedagógico
@@ -1791,7 +1787,7 @@ export default function Sidebar({ isOpen, onClose }) {
           </>
         )}
 
-        {isScopeEscola && !isDisciplinar && !isProfessor && !isSecretario && hasModulo('frequencia') && (
+        {isScopeEscola && !isDisciplinar && !isProfessor && hasModulo('frequencia') && (
           <>
             {/* ───────────────────────────────
                 GRUPO: Frequência
@@ -1949,7 +1945,7 @@ export default function Sidebar({ isOpen, onClose }) {
             GRUPO: Merenda
             Acesso: direção, coordenação — exceto professor, militar/disciplinar, secretário
         ─────────────── */}
-        {isScopeEscola && !isDisciplinar && !isProfessor && !isSecretario && hasModulo('merenda') && (
+        {isScopeEscola && !isDisciplinar && !isProfessor && hasModulo('merenda') && (
           <>
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-2 transition"

@@ -14,28 +14,28 @@ import api from "../../../services/api";
    Constantes
    ═══════════════════════════════════════════════════════════ */
 const FUNCOES = [
-  { value: 'diretor',                   label: 'Diretor' },
-  { value: 'vice_diretor',              label: 'Vice-Diretor' },
-  { value: 'coordenacao',               label: 'Coordenação' },
-  { value: 'secretaria',                label: 'Secretaria' },
-  { value: 'orientador',                label: 'Orientador' },
-  { value: 'supervisor_pedagogico',     label: 'Supervisor Pedagógico' },
-  { value: 'supervisor_administrativo', label: 'Supervisor Administrativo' },
-  { value: 'disciplinar',               label: 'Disciplinar' },
   { value: 'administrativo',            label: 'Administrativo' },
-  { value: 'psicopedagogia',            label: 'Psicopedagogia' },
-  { value: 'sala_recurso',              label: 'Sala de Recurso' },
-  { value: 'apoio',                     label: 'Apoio' },
-  { value: 'educador_social',           label: 'Educador Social' },
-  { value: 'vigilancia',                label: 'Vigilância' },
-  { value: 'merenda',                   label: 'Merenda' },
-  { value: 'biblioteca',                label: 'Biblioteca' },
-  { value: 'professor',                 label: 'Professor' },
-  { value: 'pedagogo',                  label: 'Pedagogo' },
   { value: 'aluno',                     label: 'Aluno' },
-  { value: 'responsavel',               label: 'Responsável' },
+  { value: 'apoio',                     label: 'Apoio' },
+  { value: 'biblioteca',                label: 'Biblioteca' },
+  { value: 'coordenacao',               label: 'Coordenação' },
+  { value: 'diretor',                   label: 'Diretor' },
+  { value: 'disciplinar',               label: 'Disciplinar' },
+  { value: 'educador_social',           label: 'Educador Social' },
+  { value: 'merenda',                   label: 'Merenda' },
+  { value: 'monitor',                   label: 'Monitor' },
+  { value: 'orientador',                label: 'Orientador' },
+  { value: 'pedagogo',                  label: 'Pedagogo' },
+  { value: 'professor',                 label: 'Professor' },
+  { value: 'psicopedagogia',            label: 'Psicopedagogia' },
   { value: 'psicologo',                 label: 'Psicólogo' },
-  { value: 'monitor',                   label: 'Monitor' }
+  { value: 'responsavel',               label: 'Responsável' },
+  { value: 'sala_recurso',              label: 'Sala de Recurso' },
+  { value: 'secretaria',                label: 'Secretaria' },
+  { value: 'supervisor_administrativo', label: 'Supervisor Administrativo' },
+  { value: 'supervisor_pedagogico',     label: 'Supervisor Pedagógico' },
+  { value: 'vice_diretor',              label: 'Vice-Diretor' },
+  { value: 'vigilancia',                label: 'Vigilância' }
 ];
 
 /* ═══════════════════════════════════════════════════════════

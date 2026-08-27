@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { PlusIcon, TrashIcon, PencilSquareIcon, ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import api from "../../../services/api";
@@ -172,6 +172,34 @@ export default function CardapioTab() {
     }
   };
 
+  const produtosAgrupados = useMemo(() => {
+    const map = new Map();
+    estoque.forEach(item => {
+      if (!map.has(item.produto_id)) {
+        map.set(item.produto_id, {
+          ...item,
+          saldo_kg: Number(item.saldo_kg || 0),
+          lotes: item.lote ? [{ lote: item.lote, validade: item.validade, saldo_kg: Number(item.saldo_kg || 0) }] : []
+        });
+      } else {
+        const ag = map.get(item.produto_id);
+        ag.saldo_kg += Number(item.saldo_kg || 0);
+        if (item.lote) {
+          ag.lotes.push({ lote: item.lote, validade: item.validade, saldo_kg: Number(item.saldo_kg || 0) });
+        }
+      }
+    });
+    const array = Array.from(map.values());
+    array.forEach(p => {
+      p.lotes.sort((a, b) => {
+        if (!a.validade) return 1;
+        if (!b.validade) return -1;
+        return new Date(a.validade) - new Date(b.validade);
+      });
+    });
+    return array;
+  }, [estoque]);
+
   // Funções de Calendário
   const nextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
   const prevMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
@@ -199,23 +227,31 @@ export default function CardapioTab() {
       setNomeCardapio(cardapioExistente.nome);
       setTurnoCardapio(cardapioExistente.turno || "Todos");
       setRefeicoesCardapio(cardapioExistente.refeicoes_cardapio != null ? String(cardapioExistente.refeicoes_cardapio) : "");
-      const formatItens = cardapioExistente.itens.map(i => {
-        const estKey = `${i.produto_id}||${i.lote || ''}||${i.validade || ''}`;
-        const itemEstoque = estoque.find(e => getEstoqueKey(e) === estKey) || {};
-        return {
-          key: estKey,
-          produto_id: i.produto_id,
-          lote: i.lote,
-          validade: i.validade,
-          produto: i.produto,
-          marca: i.marca,
-          quantidade_kg: Number(i.quantidade_kg),
-          gramaturaStr: i.gramaturaStr || itemEstoque.gramatura,
-          percapita_kg: itemEstoque.percapita_kg,
-          saldo_kg: itemEstoque.saldo_kg
-        };
+      const groupedMap = new Map();
+      cardapioExistente.itens.forEach(i => {
+         if (!groupedMap.has(i.produto_id)) {
+            const estItems = estoque.filter(e => e.produto_id === i.produto_id);
+            const refEstoque = estItems[0] || {};
+            const totalSaldo = estItems.reduce((acc, curr) => acc + Number(curr.saldo_kg || 0), 0);
+            const lotesDisp = estItems.map(e => ({ lote: e.lote, validade: e.validade, saldo_kg: Number(e.saldo_kg || 0) })).filter(e => e.lote);
+            lotesDisp.sort((a,b) => (a.validade && b.validade) ? new Date(a.validade) - new Date(b.validade) : 0);
+
+            groupedMap.set(i.produto_id, {
+               key: i.produto_id,
+               produto_id: i.produto_id,
+               produto: i.produto,
+               marca: i.marca,
+               quantidade_kg: Number(i.quantidade_kg),
+               gramaturaStr: i.gramaturaStr || refEstoque.gramatura,
+               percapita_kg: refEstoque.percapita_kg,
+               saldo_kg: totalSaldo,
+               lotesDisponiveis: lotesDisp
+            });
+         } else {
+            groupedMap.get(i.produto_id).quantidade_kg += Number(i.quantidade_kg);
+         }
       });
-      setItensSelecionados(formatItens);
+      setItensSelecionados(Array.from(groupedMap.values()));
     } else {
       setEditingId(null);
       const diaFormatado = day ? String(day).padStart(2, '0') : String(new Date().getDate()).padStart(2, '0');
@@ -238,7 +274,7 @@ export default function CardapioTab() {
       setSelectedLoteId("");
       return;
     }
-    const itemEstoque = estoque.find(e => getEstoqueKey(e) === value);
+    const itemEstoque = produtosAgrupados.find(p => p.produto_id === parseInt(value, 10));
     if (itemEstoque && !itemEstoque.percapita_id) {
       toast.error("Falta per capita! Configure na aba 'PER CAPITA' antes de adicionar ao cardápio.");
       setSelectedLoteId("");
@@ -258,51 +294,43 @@ export default function CardapioTab() {
 
     const refParaCalculo = refeicoesCardapio ? parseInt(refeicoesCardapio, 10) : (refeicoesServidas !== null ? refeicoesServidas : totalAlunos);
     const novosItens = [];
-    const itensComProblema = []; // Para erro de Per Capita ou Saldo Zero
+    const itensComProblema = []; 
 
     for (const prod of receita.itens) {
-      const temPercapita = estoque.some(e => e.produto_id === prod.id && e.percapita_id);
-      const lotesDisponiveis = estoque.filter(e => e.produto_id === prod.id && Number(e.saldo_kg) > 0 && e.percapita_id);
+      const prodAgrupado = produtosAgrupados.find(p => p.produto_id === prod.id);
+      const temPercapita = prodAgrupado && prodAgrupado.percapita_id;
+      const temSaldo = prodAgrupado && Number(prodAgrupado.saldo_kg) > 0;
       
-      if (!temPercapita || lotesDisponiveis.length === 0) {
+      if (!temPercapita || !temSaldo) {
         itensComProblema.push(prod.produto);
-        // Mesmo com problema, adicionamos à lista com valores zerados para o usuário gerenciar
-        // Tentamos buscar a marca e gramatura caso exista no estoque (ou no cadastro geral, se estivesse disponível)
-        const itemEstoqueBase = estoque.find(e => e.produto_id === prod.id) || {};
-        
         novosItens.push({
-          key: `${prod.id}||PENDENTE||${Date.now()}_${Math.random()}`,
+          key: prod.id,
           produto_id: prod.id,
-          lote: "-",
-          validade: null,
           produto: prod.produto,
-          marca: itemEstoqueBase.marca || "-",
+          marca: prodAgrupado?.marca || "-",
           quantidade_kg: 0,
-          gramaturaStr: itemEstoqueBase.gramatura || "-",
-          percapita_kg: itemEstoqueBase.percapita_kg || 0,
-          saldo_kg: 0
+          gramaturaStr: prodAgrupado?.gramatura || "-",
+          percapita_kg: prodAgrupado?.percapita_kg || 0,
+          saldo_kg: prodAgrupado?.saldo_kg || 0,
+          lotesDisponiveis: prodAgrupado?.lotes || []
         });
         continue;
       }
 
-      // Procura um lote válido com saldo > 0
-      lotesDisponiveis.sort((a, b) => new Date(a.validade || '9999-12-31') - new Date(b.validade || '9999-12-31'));
-      const itemEstoque = lotesDisponiveis[0];
-      const kgNecessario = Number(itemEstoque.percapita_kg) * refParaCalculo;
-      const saldoKg = Number(itemEstoque.saldo_kg);
+      const kgNecessario = Number(prodAgrupado.percapita_kg) * refParaCalculo;
+      const saldoKg = Number(prodAgrupado.saldo_kg);
       const previewKg = kgNecessario > saldoKg ? saldoKg : kgNecessario;
 
       novosItens.push({
-        key: getEstoqueKey(itemEstoque),
-        produto_id: itemEstoque.produto_id,
-        lote: itemEstoque.lote,
-        validade: itemEstoque.validade,
-        produto: itemEstoque.produto,
-        marca: itemEstoque.marca,
+        key: prodAgrupado.produto_id,
+        produto_id: prodAgrupado.produto_id,
+        produto: prodAgrupado.produto,
+        marca: prodAgrupado.marca,
         quantidade_kg: previewKg,
-        gramaturaStr: itemEstoque.gramatura,
-        percapita_kg: itemEstoque.percapita_kg,
-        saldo_kg: itemEstoque.saldo_kg
+        gramaturaStr: prodAgrupado.gramatura,
+        percapita_kg: prodAgrupado.percapita_kg,
+        saldo_kg: prodAgrupado.saldo_kg,
+        lotesDisponiveis: prodAgrupado.lotes
       });
     }
 
@@ -330,11 +358,11 @@ export default function CardapioTab() {
 
   const handleAddItem = () => {
     if (!selectedLoteId) return;
-    const itemEstoque = estoque.find(e => getEstoqueKey(e) === selectedLoteId);
+    const itemEstoque = produtosAgrupados.find(p => p.produto_id === parseInt(selectedLoteId, 10));
     if (!itemEstoque) return;
 
-    if (itensSelecionados.find(i => i.key === selectedLoteId)) {
-      toast.error("Este lote já foi adicionado ao cardápio.");
+    if (itensSelecionados.find(i => i.produto_id === itemEstoque.produto_id)) {
+      toast.error("Este gênero já foi adicionado ao cardápio.");
       return;
     }
 
@@ -344,16 +372,15 @@ export default function CardapioTab() {
     const previewKg = kgNecessario > saldoKg ? saldoKg : kgNecessario;
 
     setItensSelecionados(prev => [...prev, {
-      key: selectedLoteId,
+      key: itemEstoque.produto_id,
       produto_id: itemEstoque.produto_id,
-      lote: itemEstoque.lote,
-      validade: itemEstoque.validade,
       produto: itemEstoque.produto,
       marca: itemEstoque.marca,
       quantidade_kg: previewKg,
       gramaturaStr: itemEstoque.gramatura,
       percapita_kg: itemEstoque.percapita_kg,
-      saldo_kg: itemEstoque.saldo_kg
+      saldo_kg: itemEstoque.saldo_kg,
+      lotesDisponiveis: itemEstoque.lotes
     }]);
     setSelectedLoteId("");
   };
@@ -421,11 +448,10 @@ export default function CardapioTab() {
 
     if (itensSelecionados.length > 0) {
       setItensSelecionados(prev => prev.map(item => {
-        const itemEstoque = estoque.find(est => getEstoqueKey(est) === item.key);
+        const itemEstoque = produtosAgrupados.find(est => est.produto_id === item.produto_id);
         if (itemEstoque) {
           const kgNecessario = Number(itemEstoque.percapita_kg) * refParaCalculo;
           const saldoKg = Number(itemEstoque.saldo_kg);
-          // Atualiza respeitando o limite do saldo
           const kgUsado = kgNecessario > saldoKg ? saldoKg : kgNecessario;
           return { ...item, quantidade_kg: kgUsado };
         }
@@ -462,18 +488,48 @@ export default function CardapioTab() {
       ? parseInt(refeicoesCardapio, 10)
       : (refeicoesServidas !== null ? refeicoesServidas : totalAlunos);
 
+    const itensPayload = [];
+    finalItens.forEach(i => {
+      if (i.lotesDisponiveis && i.lotesDisponiveis.length > 0) {
+        let remainingKg = i.quantidade_kg;
+        for (let idx = 0; idx < i.lotesDisponiveis.length; idx++) {
+           const lote = i.lotesDisponiveis[idx];
+           if (remainingKg <= 0) break;
+           
+           let takingKg = Math.min(remainingKg, lote.saldo_kg);
+           
+           if (idx === i.lotesDisponiveis.length - 1 && remainingKg > takingKg) {
+               takingKg = remainingKg; 
+           }
+
+           if (takingKg > 0) {
+               itensPayload.push({
+                   produto_id: i.produto_id,
+                   lote: lote.lote,
+                   validade: lote.validade,
+                   quantidade_kg: takingKg,
+                   quantidade_unidades: calcularUnidades(takingKg, i.gramaturaStr || "1")
+               });
+               remainingKg -= takingKg;
+           }
+        }
+      } else {
+        itensPayload.push({
+           produto_id: i.produto_id,
+           lote: null,
+           validade: null,
+           quantidade_kg: i.quantidade_kg,
+           quantidade_unidades: calcularUnidades(i.quantidade_kg, i.gramaturaStr || "1")
+        });
+      }
+    });
+
     const payload = {
       data_cardapio: dataCardapio,
       nome: nomeCardapio,
       turno: turnoCardapio,
       refeicoes_cardapio: refFinal,
-      itens: finalItens.map(i => ({
-        produto_id: i.produto_id,
-        lote: i.lote,
-        validade: i.validade,
-        quantidade_kg: i.quantidade_kg,
-        quantidade_unidades: calcularUnidades(i.quantidade_kg, i.gramaturaStr || "1")
-      }))
+      itens: itensPayload
     };
 
     setSaving(true);
@@ -722,15 +778,14 @@ export default function CardapioTab() {
                       onChange={(e) => handleLoteSelect(e.target.value)}
                       className="w-full px-4 py-3 border border-gray-300 rounded-xl outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20"
                     >
-                      <option value="">Selecione um lote em estoque...</option>
-                      {estoque.map(e => {
-                        const hasPerc = !!e.percapita_id;
-                        let text = `${e.produto} - ${e.marca}`;
-                        if (e.lote) text += ` | Lote: ${e.lote}`;
-                        text += ` | Saldo: ${Number(e.saldo_kg).toLocaleString('pt-BR')} kg`;
+                      <option value="">Selecione um gênero em estoque...</option>
+                      {produtosAgrupados.map(p => {
+                        const hasPerc = !!p.percapita_id;
+                        let text = `${p.produto} - ${p.marca || ''}`;
+                        text += ` | Saldo Total: ${Number(p.saldo_kg).toLocaleString('pt-BR')} kg`;
                         if (!hasPerc) text += ' (FALTA PER CAPITA)';
                         return (
-                          <option key={getEstoqueKey(e)} value={getEstoqueKey(e)}>
+                          <option key={p.produto_id} value={p.produto_id}>
                             {text}
                           </option>
                         );
@@ -771,7 +826,19 @@ export default function CardapioTab() {
                       {itensSelecionados.map(item => (
                         <tr key={item.key} className="hover:bg-gray-50">
                           <td className="py-3 px-4 font-medium text-gray-800">{item.produto} - {item.marca}</td>
-                          <td className="py-3 px-4 text-gray-600">{item.lote || '-'}</td>
+                          <td className="py-3 px-4 text-gray-600">
+                            {item.lotesDisponiveis && item.lotesDisponiveis.length > 0 ? (
+                              <div className="flex flex-wrap gap-1">
+                                {item.lotesDisponiveis.map((lote, idx) => (
+                                  <span key={idx} className="px-2 py-0.5 text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200 rounded-md whitespace-nowrap">
+                                    {lote.lote ? `Lote: ${lote.lote}` : 'Sem Lote'} {lote.validade && `(Vál: ${new Date(lote.validade).toLocaleDateString('pt-BR')})`}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              '-'
+                            )}
+                          </td>
                           <td className="py-3 px-4 font-bold text-red-500">- {item.quantidade_kg.toLocaleString('pt-BR')} kg</td>
                           <td className="py-3 px-4 text-center">
                             <div className="flex items-center justify-center gap-2">
@@ -856,7 +923,7 @@ export default function CardapioTab() {
               <p className="text-gray-700 text-[15px] leading-relaxed">
                 {intelligentModalConfig.type === 4 ? (
                   <>
-                    Atenção! A per capita exige <b>{intelligentModalConfig.kgNecessario.toLocaleString('pt-BR')} kg</b> de <b>{intelligentModalConfig.item.produto}</b> para as {intelligentModalConfig.refParaCalculo} refeições deste cardápio, mas você possui apenas <b>{intelligentModalConfig.saldoKg.toLocaleString('pt-BR')} kg</b> deste lote no depósito.
+                    Atenção! A per capita exige <b>{intelligentModalConfig.kgNecessario.toLocaleString('pt-BR')} kg</b> de <b>{intelligentModalConfig.item.produto}</b> para as {intelligentModalConfig.refParaCalculo} refeições deste cardápio, mas você possui apenas <b>{intelligentModalConfig.saldoKg.toLocaleString('pt-BR')} kg</b> deste gênero no depósito.
                   </>
                 ) : (
                   <>

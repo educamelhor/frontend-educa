@@ -389,7 +389,7 @@ export default function CardapioTab() {
   const [isProcessingQueue, setIsProcessingQueue] = useState(false);
 
   const processNextInQueue = (currentQueue, currentItens) => {
-    const problemIndex = currentQueue.findIndex(q => q.type === 3 || q.type === 4);
+    const problemIndex = currentQueue.findIndex(q => q.type === 4);
     
     if (problemIndex === -1) {
       // Resolve all items
@@ -409,11 +409,13 @@ export default function CardapioTab() {
     setIntelligentModalConfig({
       isOpen: true,
       type: problem.type,
+      reason: problem.reason,
       item: problem.item,
       kgNecessario: problem.kgNecessario,
+      kgIdeal: problem.kgIdeal,
       saldoKg: problem.saldoKg,
       refParaCalculo: problem.refParaCalculo,
-      kgInput: problem.type === 4 ? parseFloat(Number(problem.saldoKg).toFixed(3)).toString() : parseFloat(Number(problem.kgNecessario).toFixed(3)).toString(),
+      kgInput: parseFloat(Number(problem.saldoKg).toFixed(3)).toString(),
       queueIndex: problemIndex
     });
   };
@@ -573,11 +575,9 @@ export default function CardapioTab() {
       const saldoKg = Number(item.saldo_kg);
       
       if (kgAtual > saldoKg) {
-        queue.push({ type: 4, item, kgNecessario: kgAtual, saldoKg, refParaCalculo });
+        queue.push({ type: 4, reason: 'exceeded', item, kgNecessario: kgAtual, saldoKg, refParaCalculo, kgIdeal });
       } else if (saldoKg < kgIdeal) {
-        queue.push({ type: 4, item, kgNecessario: kgIdeal, saldoKg, refParaCalculo });
-      } else if (saldoKg >= kgAtual && saldoKg < kgAtual * 2) {
-        queue.push({ type: 3, item, kgNecessario: kgAtual, saldoKg, refParaCalculo });
+        queue.push({ type: 4, reason: 'short', item, kgNecessario: kgIdeal, saldoKg, refParaCalculo, kgIdeal });
       } else {
         queue.push({ type: 2, item, kgNecessario: kgAtual, saldoKg, refParaCalculo, kgUsado: kgAtual });
       }
@@ -910,24 +910,24 @@ export default function CardapioTab() {
       {intelligentModalConfig.isOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200 border border-white/20">
-            <div className={`px-6 py-5 border-b flex items-center gap-4 ${intelligentModalConfig.type === 4 ? 'bg-red-50 border-red-100' : 'bg-amber-50 border-amber-100'}`}>
-              <div className={`p-2.5 rounded-full shadow-sm ${intelligentModalConfig.type === 4 ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'}`}>
+            <div className={`px-6 py-5 border-b flex items-center gap-4 bg-red-50 border-red-100`}>
+              <div className={`p-2.5 rounded-full shadow-sm bg-red-100 text-red-600`}>
                 <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
               </div>
-              <h3 className={`text-xl font-bold tracking-tight ${intelligentModalConfig.type === 4 ? 'text-red-900' : 'text-amber-900'}`}>
-                {intelligentModalConfig.type === 4 ? "Saldo Insuficiente" : "Aviso de Saldo Crítico"}
+              <h3 className={`text-xl font-bold tracking-tight text-red-900`}>
+                Saldo Insuficiente
               </h3>
             </div>
             
             <div className="p-6 bg-white space-y-5">
               <p className="text-gray-700 text-[15px] leading-relaxed">
-                {intelligentModalConfig.type === 4 ? (
+                {intelligentModalConfig.reason === 'short' ? (
                   <>
-                    Atenção! A per capita exige <b>{intelligentModalConfig.kgNecessario.toLocaleString('pt-BR')} kg</b> de <b>{intelligentModalConfig.item.produto}</b> para as {intelligentModalConfig.refParaCalculo} refeições deste cardápio, mas você possui apenas <b>{intelligentModalConfig.saldoKg.toLocaleString('pt-BR')} kg</b> deste gênero no depósito.
+                    A per capita exige <b>{intelligentModalConfig.kgIdeal?.toLocaleString('pt-BR')} kg</b> de <b>{intelligentModalConfig.item?.produto}</b> para as {intelligentModalConfig.refParaCalculo} refeições deste cardápio. No entanto, você possui apenas <b>{intelligentModalConfig.saldoKg.toLocaleString('pt-BR')} kg</b> no depósito (faltam <b>{(intelligentModalConfig.kgIdeal - intelligentModalConfig.saldoKg).toLocaleString('pt-BR')} kg</b> para a per capita completa).
                   </>
                 ) : (
                   <>
-                    O saldo atual de <b>{intelligentModalConfig.saldoKg.toLocaleString('pt-BR')} kg</b> de <b>{intelligentModalConfig.item.produto}</b> atende este cardápio ({intelligentModalConfig.kgNecessario.toLocaleString('pt-BR')} kg), mas deixará um resto de <b>{(intelligentModalConfig.saldoKg - intelligentModalConfig.kgNecessario).toLocaleString('pt-BR')} kg</b> no depósito, o que é <span className="text-amber-600 font-semibold">insuficiente para um próximo cardápio idêntico</span>.
+                    Atenção! Você digitou <b>{intelligentModalConfig.kgNecessario?.toLocaleString('pt-BR')} kg</b> de <b>{intelligentModalConfig.item?.produto}</b>, mas você possui apenas <b>{intelligentModalConfig.saldoKg.toLocaleString('pt-BR')} kg</b> no depósito.
                   </>
                 )}
               </p>
@@ -948,30 +948,12 @@ export default function CardapioTab() {
               <div className="flex flex-col gap-2">
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Ações Rápidas:</p>
                 
-                {intelligentModalConfig.type === 3 && (
-                  <button
-                    onClick={() => setIntelligentModalConfig(prev => ({...prev, kgInput: String(prev.kgNecessario)}))}
-                    className="w-full py-2 px-4 text-sm font-medium text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 rounded-lg text-left transition-colors"
-                  >
-                    👉 <b>Manter Per capita:</b> Usar {intelligentModalConfig.kgNecessario.toLocaleString('pt-BR')} kg e deixar o resto
-                  </button>
-                )}
-
                 <button
                   onClick={() => setIntelligentModalConfig(prev => ({...prev, kgInput: String(prev.saldoKg)}))}
-                  className="w-full py-2 px-4 text-sm font-medium text-red-700 bg-red-50 border border-red-100 hover:bg-red-100 rounded-lg text-left transition-colors"
+                  className="w-full py-2 px-4 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-100 hover:bg-emerald-100 rounded-lg text-left transition-colors"
                 >
-                  🧨 <b>Zerar Estoque:</b> Consumir todos os {intelligentModalConfig.saldoKg.toLocaleString('pt-BR')} kg
+                  👉 <b>Continuar com saldo disponível:</b> Consumir todos os {intelligentModalConfig.saldoKg.toLocaleString('pt-BR')} kg
                 </button>
-
-                {intelligentModalConfig.type === 3 && (
-                  <button
-                    onClick={() => setIntelligentModalConfig(prev => ({...prev, kgInput: String(prev.saldoKg / 2)}))}
-                    className="w-full py-2 px-4 text-sm font-medium text-amber-700 bg-amber-50 border border-amber-100 hover:bg-amber-100 rounded-lg text-left transition-colors"
-                  >
-                    ⚖️ <b>Dividir Saldo:</b> Consumir {(intelligentModalConfig.saldoKg / 2).toLocaleString('pt-BR')} kg (Metade agora, metade depois)
-                  </button>
-                )}
               </div>
             </div>
 

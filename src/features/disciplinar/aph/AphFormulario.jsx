@@ -34,6 +34,7 @@ export default function AphFormulario({ aluno, onBack, onSuccess }) {
   const [sinaisPa, setSinaisPa] = useState('');
   const [sinaisFc, setSinaisFc] = useState('');
   const [sinaisTemperatura, setSinaisTemperatura] = useState('');
+  const [desfechoDetalhes, setDesfechoDetalhes] = useState('');
 
   // Rola para o topo do formulário de forma robusta garantindo que divs com overflow também rolem
   useEffect(() => {
@@ -83,7 +84,8 @@ export default function AphFormulario({ aluno, onBack, onSuccess }) {
           hora_comparecimento: horaComparecimento,
           sinais_pa: sinaisPa,
           sinais_fc: sinaisFc,
-          sinais_temperatura: sinaisTemperatura
+          sinais_temperatura: sinaisTemperatura,
+          desfecho_detalhes: desfechoDetalhes
         };
       
       const response = await api.post('/api/aph', payload);
@@ -358,6 +360,17 @@ export default function AphFormulario({ aluno, onBack, onSuccess }) {
                   </label>
                 ))}
               </div>
+              
+              {["Encaminhado p/ unidade de saúde", "Transportado pelo SAMU", "Transportado pelos Bombeiros"].includes(desfecho) && (
+                <div className="mt-4 animate-fade-in-up">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Detalhes Adicionais</label>
+                  <input 
+                    type="text" value={desfechoDetalhes} onChange={e => setDesfechoDetalhes(e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
+                    placeholder="Ex: Nº Protocolo, nome do médico/unidade, etc."
+                  />
+                </div>
+              )}
             </div>
             <div className="flex-1">
               <label className="block text-sm font-bold text-gray-700 mb-3">Comunicação ao Responsável:</label>

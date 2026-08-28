@@ -246,6 +246,7 @@ function ModalDetalhes({ atend, onClose }) {
           {atend.desfecho && (
             <Section icon={CheckBadgeIcon} title="7. Desfecho">
               <p className="text-sm font-semibold text-gray-800">{atend.desfecho}</p>
+                {atend.desfecho_detalhes && <p className="text-sm text-gray-700 italic mt-1">Detalhes: {atend.desfecho_detalhes}</p>}
             </Section>
           )}
 

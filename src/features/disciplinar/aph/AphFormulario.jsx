@@ -31,6 +31,9 @@ export default function AphFormulario({ aluno, onBack, onSuccess }) {
   const [comunicacaoResp, setComunicacaoResp] = useState('');
   const [horaComunicacao, setHoraComunicacao] = useState('');
   const [horaComparecimento, setHoraComparecimento] = useState('');
+  const [sinaisPa, setSinaisPa] = useState('');
+  const [sinaisFc, setSinaisFc] = useState('');
+  const [sinaisTemperatura, setSinaisTemperatura] = useState('');
 
   // Rola para o topo do formulário de forma robusta garantindo que divs com overflow também rolem
   useEffect(() => {
@@ -77,8 +80,11 @@ export default function AphFormulario({ aluno, onBack, onSuccess }) {
         desfecho,
         comunicacao_resp: comunicacaoResp,
         hora_comunicacao: horaComunicacao,
-        hora_comparecimento: horaComparecimento
-      };
+          hora_comparecimento: horaComparecimento,
+          sinais_pa: sinaisPa,
+          sinais_fc: sinaisFc,
+          sinais_temperatura: sinaisTemperatura
+        };
       
       const response = await api.post('/api/aph', payload);
       
@@ -261,6 +267,23 @@ export default function AphFormulario({ aluno, onBack, onSuccess }) {
               </label>
             ))}
           </div>
+          {atendimentos.includes("Sinais vitais conferidos") && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 mt-2 p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div>
+                <label className="block text-sm font-medium text-green-800 mb-1">P.A. (Pressão Arterial)</label>
+                <input type="text" value={sinaisPa} onChange={e => setSinaisPa(e.target.value)} placeholder="Ex: 120x80" className="w-full p-2 border border-green-300 rounded-md focus:ring-2 focus:ring-green-500 outline-none" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-green-800 mb-1">F.C. (BPM)</label>
+                <input type="text" value={sinaisFc} onChange={e => setSinaisFc(e.target.value)} placeholder="Ex: 80" className="w-full p-2 border border-green-300 rounded-md focus:ring-2 focus:ring-green-500 outline-none" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-green-800 mb-1">Temperatura (ºC)</label>
+                <input type="text" value={sinaisTemperatura} onChange={e => setSinaisTemperatura(e.target.value)} placeholder="Ex: 36.5" className="w-full p-2 border border-green-300 rounded-md focus:ring-2 focus:ring-green-500 outline-none" />
+              </div>
+            </div>
+          )}
+          
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Descrição adicional do atendimento</label>
             <input 

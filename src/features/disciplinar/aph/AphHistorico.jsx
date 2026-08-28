@@ -225,6 +225,13 @@ function ModalDetalhes({ atend, onClose }) {
           {(atendimentos.length > 0 || atend.descricao_atendimento) && (
             <Section icon={CheckBadgeIcon} title="5. Atendimento Realizado">
               {atendimentos.length > 0 && <div className="mb-2">{atendimentos.map(a => <Chip key={a} label={a} color="bg-green-50 text-green-700 border-green-100" />)}</div>}
+              {(atend.sinais_pa || atend.sinais_fc || atend.sinais_temperatura) && (
+                <div className="flex gap-4 mt-2 text-sm text-gray-700 bg-gray-50 p-2 rounded-md">
+                  {atend.sinais_pa && <span><strong>PA:</strong> {atend.sinais_pa}</span>}
+                  {atend.sinais_fc && <span><strong>FC:</strong> {atend.sinais_fc}</span>}
+                  {atend.sinais_temperatura && <span><strong>Temp:</strong> {atend.sinais_temperatura}</span>}
+                </div>
+              )}
               {atend.descricao_atendimento && <p className="text-sm text-gray-700 italic mt-2">"{atend.descricao_atendimento}"</p>}
             </Section>
           )}

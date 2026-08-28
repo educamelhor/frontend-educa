@@ -40,8 +40,8 @@ export default function AphFormulario({ aluno, onBack, onSuccess }) {
   }, []);
 
   // Opções rápidas
-  const locaisOptions = ["Sala de aula", "Quadra", "Pátio", "Refeitório", "Corredor", "Banheiro", "Entrada/saída", "Outro"];
-  const motivosOptions = ["Mal-estar", "Dor", "Dor de cabeça", "Dor abdominal", "Náusea/vômito", "Tontura", "Desmaio", "Febre", "Queda", "Corte/ferimento", "Sangramento", "Contusão/pancada", "Entorse", "Suspeita de fratura", "Queimadura", "Reação alérgica", "Falta de ar", "Crise convulsiva"];
+  const locaisOptions = ["Sala de aula", "Sala do disciplinar", "Quadra", "Pátio", "Refeitório", "Corredor", "Banheiro", "Entrada/saída", "Outro"];
+  const motivosOptions = ["Mal-estar", "Dor", "Dor de cabeça", "Dor abdominal", "Cólica menstrual", "Náusea/vômito", "Tontura", "Desmaio", "Febre", "Queda", "Corte/ferimento", "Sangramento", "Contusão/pancada", "Entorse", "Suspeita de fratura", "Queimadura", "Reação alérgica", "Falta de ar", "Crise convulsiva", "Choque", "Crise de ansiedade"];
   const sinaisOptions = ["Dor", "Sangramento", "Inchaço", "Ferimento", "Dificuldade de movimento", "Outros"];
   const atendimentosOptions = ["Avaliação/observação", "Higienização do ferimento", "Curativo", "Gelo/compressa fria", "Controle de sangramento", "Imobilização", "Repouso", "Sinais vitais conferidos"];
   const materiaisOptions = ["Atadura", "Algodão", "Gaze", "Esparadrapo", "Micropore", "Soro fisiológico", "Antisséptico", "Luvas de proced.", "Band-aid", "Bolsa térmica", "Abaixador de língua"];

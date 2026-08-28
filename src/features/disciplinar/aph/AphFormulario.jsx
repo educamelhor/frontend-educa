@@ -56,6 +56,24 @@ export default function AphFormulario({ aluno, onBack, onSuccess }) {
     else setter([...array, item]);
   };
 
+  const handleComunicacaoChange = (val) => {
+    if (val === "Não foi necessária") {
+      setComunicacaoResp(["Não foi necessária"]);
+      setHoraComunicacao('');
+      setHoraComparecimento('');
+    } else {
+      let newArr = comunicacaoResp.filter(x => x !== "Não foi necessária");
+      if (newArr.includes(val)) {
+        newArr = newArr.filter(x => x !== val);
+        if (val === "Responsável comunicado (via telefone/app)") setHoraComunicacao('');
+        if (val === "Responsável compareceu à escola") setHoraComparecimento('');
+      } else {
+        newArr.push(val);
+      }
+      setComunicacaoResp(newArr);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!local || motivos.length === 0 || !desfecho) {

@@ -372,7 +372,6 @@ export default function AphFormulario({ aluno, onBack, onSuccess }) {
                 </div>
               )}
             </div>
-            </div>
           </div>
         </section>
 
@@ -419,7 +418,7 @@ export default function AphFormulario({ aluno, onBack, onSuccess }) {
                 )}
               </div>
             ))}
-          
+          </div>
         </section>
 
         {/* SUBMIT */}

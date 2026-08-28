@@ -372,48 +372,54 @@ export default function AphFormulario({ aluno, onBack, onSuccess }) {
                 </div>
               )}
             </div>
-            <div className="flex-1">
-              <label className="block text-sm font-bold text-gray-700 mb-3">Comunicação ao Responsável:</label>
-              <div className="space-y-4">
-                {["Não foi necessária", "Responsável comunicado (via telefone/app)", "Tentativa de contato sem sucesso", "Responsável compareceu à escola"].map(c => (
-                  <div key={c} className="flex flex-col">
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input 
-                        type="radio" name="comunicacao" value={c}
-                        checked={comunicacaoResp === c} onChange={() => setComunicacaoResp(c)}
-                        className="w-4 h-4 text-red-600 focus:ring-red-500"
-                      />
-                      <span className="text-sm text-gray-800 font-medium">{c}</span>
-                    </label>
-                    
-                    {c === "Responsável comunicado (via telefone/app)" && comunicacaoResp === c && (
-                      <div className="ml-7 mt-2 animate-fade-in-up">
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Horário da Comunicação:</label>
-                        <input 
-                          type="time" 
-                          value={horaComunicacao} 
-                          onChange={(e) => setHoraComunicacao(e.target.value)}
-                          className="w-32 p-2 text-sm border border-red-200 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
-                        />
-                      </div>
-                    )}
-
-                    {c === "Responsável compareceu à escola" && comunicacaoResp === c && (
-                      <div className="ml-7 mt-2 animate-fade-in-up">
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Horário do Comparecimento:</label>
-                        <input 
-                          type="time" 
-                          value={horaComparecimento} 
-                          onChange={(e) => setHoraComparecimento(e.target.value)}
-                          className="w-32 p-2 text-sm border border-red-200 rounded-lg focus:ring-2 focus:ring-red-500 outline-none"
-                        />
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
             </div>
           </div>
+        </section>
+
+        {/* 7. COMUNICAÇÃO AO RESPONSÁVEL */}
+        <section className="bg-blue-50 p-6 rounded-xl border border-blue-100">
+          <div className="flex items-center gap-2 mb-4 border-b border-blue-200 pb-2">
+            <UserCircleIcon className="w-5 h-5 text-blue-600" />
+            <h3 className="text-lg font-bold text-blue-800">7. Comunicação ao Responsável</h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {["Não foi necessária", "Responsável comunicado (via telefone/app)", "Tentativa de contato sem sucesso", "Responsável compareceu à escola"].map(c => (
+              <div key={c} className="flex flex-col">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input 
+                    type="checkbox" value={c}
+                    checked={comunicacaoResp.includes(c)} onChange={() => handleComunicacaoChange(c)}
+                    className="mt-1 w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-800 font-medium leading-tight">{c}</span>
+                </label>
+                
+                {c === "Responsável comunicado (via telefone/app)" && comunicacaoResp.includes(c) && (
+                  <div className="ml-7 mt-2 animate-fade-in-up">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Horário da Comunicação:</label>
+                    <input 
+                      type="time" 
+                      value={horaComunicacao} 
+                      onChange={(e) => setHoraComunicacao(e.target.value)}
+                      className="w-32 p-2 text-sm border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                )}
+
+                {c === "Responsável compareceu à escola" && comunicacaoResp.includes(c) && (
+                  <div className="ml-7 mt-2 animate-fade-in-up">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Horário do Comparecimento:</label>
+                    <input 
+                      type="time" 
+                      value={horaComparecimento} 
+                      onChange={(e) => setHoraComparecimento(e.target.value)}
+                      className="w-32 p-2 text-sm border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
+          
         </section>
 
         {/* SUBMIT */}

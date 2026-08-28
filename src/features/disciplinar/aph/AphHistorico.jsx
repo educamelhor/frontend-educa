@@ -252,7 +252,19 @@ function ModalDetalhes({ atend, onClose }) {
 
           {atend.comunicacao_resp && (
             <Section icon={ClockIcon} title="8. Comunicação ao Responsável">
-              <p className="text-sm font-semibold text-gray-800">{atend.comunicacao_resp}</p>
+              <div className="space-y-1 mb-2">
+                  {(() => {
+                    try {
+                      const parsed = JSON.parse(atend.comunicacao_resp);
+                      if (Array.isArray(parsed)) {
+                        return parsed.map(c => <p key={c} className="text-sm font-semibold text-gray-800">{c}</p>);
+                      }
+                      return <p className="text-sm font-semibold text-gray-800">{atend.comunicacao_resp}</p>;
+                    } catch(e) {
+                      return <p className="text-sm font-semibold text-gray-800">{atend.comunicacao_resp}</p>;
+                    }
+                  })()}
+                </div>
               <div className="flex gap-4 mt-2">
                 {atend.hora_comunicacao && <p className="text-xs text-gray-500">Horário da comunicação: <strong>{atend.hora_comunicacao}</strong></p>}
                 {atend.hora_comparecimento && <p className="text-xs text-gray-500">Comparecimento: <strong>{atend.hora_comparecimento}</strong></p>}

@@ -231,8 +231,8 @@ export default function Planos() {
               const res = await api.get("/avaliacoes", {
                 params: { disciplina: disc, bimestre: bimestreSelecionado, ano }
               });
-              const planos = res.data || [];
-              const planoNoBanco = planos.find(p => p.turmas === turmaNome);
+              const normStr = (s) => String(s || "").trim().toUpperCase().replace(/\s+/g, " ");
+              const planoNoBanco = planos.find(p => normStr(p.turmas) === normStr(turmaNome));
               return {
                 disciplina: disc,
                 id: planoNoBanco?.id || null,

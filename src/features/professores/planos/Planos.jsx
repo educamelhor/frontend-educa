@@ -231,6 +231,7 @@ export default function Planos() {
               const res = await api.get("/avaliacoes", {
                 params: { disciplina: disc, bimestre: bimestreSelecionado, ano }
               });
+              const planos = res.data || [];
               const normStr = (s) => String(s || "").trim().toUpperCase().replace(/\s+/g, " ");
               const planoNoBanco = planos.find(p => normStr(p.turmas) === normStr(turmaNome));
               return {
@@ -239,7 +240,8 @@ export default function Planos() {
                 status: planoNoBanco?.status || "PENDENTE",
                 motivo_devolucao: planoNoBanco?.motivo_devolucao || null,
               };
-            } catch {
+            } catch (err) {
+              console.error(`Erro ao buscar plano para disciplina ${disc}:`, err);
               return { disciplina: disc, id: null, status: "PENDENTE", motivo_devolucao: null };
             }
           })
@@ -304,9 +306,9 @@ export default function Planos() {
     setModoEdicaoPlano(false);
     setMostrarTabela(false);
     // ✅ Força o useEffect a recarregar a lista de planos (status atualizado)
-    const disc = disciplinaSelecionada;
-    setDisciplinaSelecionada(null);
-    setTimeout(() => setDisciplinaSelecionada(disc), 80);
+    const turmaCache = turmaSelecionada;
+    setTurmaSelecionada(null);
+    setTimeout(() => setTurmaSelecionada(turmaCache), 50);
   };
 
 

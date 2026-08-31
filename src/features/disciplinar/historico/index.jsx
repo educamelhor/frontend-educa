@@ -61,7 +61,7 @@ export default function HistoricoDisciplinar() {
   const [filtroTurma, setFiltroTurma] = useState("");
   const [filtroTurno, setFiltroTurno] = useState("");
   const [filtroAluno, setFiltroAluno] = useState("");
-  const [filtroTipo, setFiltroTipo] = useState("");
+  const [filtroMedida, setFiltroMedida] = useState("");
   const [filtroResponsavel, setFiltroResponsavel] = useState("");
   const [filtroDataInicio, setFiltroDataInicio] = useState("");
   const [filtroDataFim, setFiltroDataFim] = useState("");
@@ -93,7 +93,7 @@ export default function HistoricoDisciplinar() {
       if (filtroTurma) params.append("turma_id", filtroTurma);
       if (filtroTurno) params.append("turno", filtroTurno);
       if (filtroAluno) params.append("aluno_nome", filtroAluno);
-      if (filtroTipo) params.append("tipo_ocorrencia", filtroTipo);
+      if (filtroMedida) params.append("medida_disciplinar", filtroMedida);
       if (filtroResponsavel) params.append("convocar_responsavel", "1");
       if (filtroDataInicio) params.append("data_inicio", filtroDataInicio);
       if (filtroDataFim) params.append("data_fim", filtroDataFim);
@@ -110,20 +110,20 @@ export default function HistoricoDisciplinar() {
       console.error("Erro ao buscar histórico:", err);
     }
     setLoading(false);
-  }, [page, filtroStatus, filtroTurma, filtroTurno, filtroAluno, filtroTipo, filtroResponsavel, filtroDataInicio, filtroDataFim]);
+  }, [page, filtroStatus, filtroTurma, filtroTurno, filtroAluno, filtroMedida, filtroResponsavel, filtroDataInicio, filtroDataFim]);
 
   useEffect(() => { fetchHistorico(); }, [fetchHistorico]);
 
   // Reset page on filter change
-  useEffect(() => { setPage(1); }, [filtroStatus, filtroTurma, filtroTurno, filtroAluno, filtroTipo, filtroResponsavel, filtroDataInicio, filtroDataFim]);
+  useEffect(() => { setPage(1); }, [filtroStatus, filtroTurma, filtroTurno, filtroAluno, filtroMedida, filtroResponsavel, filtroDataInicio, filtroDataFim]);
 
   const limparFiltros = () => {
     setFiltroStatus(""); setFiltroTurma(""); setFiltroTurno(""); setFiltroAluno("");
-    setFiltroTipo(""); setFiltroResponsavel(""); setFiltroDataInicio(""); setFiltroDataFim("");
+    setFiltroMedida(""); setFiltroResponsavel(""); setFiltroDataInicio(""); setFiltroDataFim("");
     setPage(1);
   };
 
-  const temFiltrosAtivos = filtroStatus || filtroTurma || filtroTurno || filtroAluno || filtroTipo || filtroResponsavel || filtroDataInicio || filtroDataFim;
+  const temFiltrosAtivos = filtroStatus || filtroTurma || filtroTurno || filtroAluno || filtroMedida || filtroResponsavel || filtroDataInicio || filtroDataFim;
 
   // Abrir ModalRelatorioDisciplinar com dados do aluno montados do registro
   const abrirRelatorio = (registro) => {
@@ -377,7 +377,7 @@ export default function HistoricoDisciplinar() {
               🔍 Filtros Avançados
               {temFiltrosAtivos && (
                 <span className="disc-active-count">
-                  {[filtroStatus, filtroTurma, filtroTurno, filtroAluno, filtroTipo, filtroResponsavel, filtroDataInicio, filtroDataFim].filter(Boolean).length} ativo(s)
+                  {[filtroStatus, filtroTurma, filtroTurno, filtroAluno, filtroMedida, filtroResponsavel, filtroDataInicio, filtroDataFim].filter(Boolean).length} ativo(s)
                 </span>
               )}
             </h3>
@@ -421,16 +421,19 @@ export default function HistoricoDisciplinar() {
                   </select>
                 </div>
                 <div className="disc-filter-group">
-                  <label>Tipo de Ocorrência</label>
-                  <select value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value)}>
-                    <option value="">Todos os tipos</option>
-                    <option value="ADVERTENCIA">Advertência</option>
-                    <option value="REPREENSAO">Repreensão</option>
-                    <option value="SUSPENSAO">Suspensão</option>
-                    <option value="ELOGIO">Elogio</option>
-                    <option value="MERITO">Mérito</option>
-                  </select>
-                </div>
+                    <label>Medida Disciplinar</label>
+                    <select value={filtroMedida} onChange={(e) => setFiltroMedida(e.target.value)}>
+                      <option value="">Todas as medidas</option>
+                      <option value="Ações Educativas">Ações Educativas</option>
+                      <option value="Advertência Escrita">Advertência Escrita</option>
+                      <option value="Advertência Oral">Advertência Oral</option>
+                      <option value="Ajuste">Ajuste</option>
+                      <option value="Bônus de Média Bimestral">Bônus de Média Bimestral</option>
+                      <option value="Elogio">Elogio</option>
+                      <option value="Suspensão">Suspensão</option>
+                      <option value="Transferência">Transferência</option>
+                    </select>
+                  </div>
                 <div className="disc-filter-group">
                   <label>Buscar Aluno</label>
                   <input

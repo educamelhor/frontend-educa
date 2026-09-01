@@ -44,11 +44,11 @@ export default function AphFormulario({ aluno, onBack, onSuccess }) {
   }, []);
 
   // Opções rápidas
-  const locaisOptions = ["Sala de aula", "Sala do disciplinar", "Quadra", "Pátio", "Refeitório", "Corredor", "Banheiro", "Entrada/saída", "Outro"];
-  const motivosOptions = ["Mal-estar", "Dor", "Dor de cabeça", "Dor abdominal", "Cólica menstrual", "Náusea/vômito", "Tontura", "Desmaio", "Febre", "Queda", "Corte/ferimento", "Sangramento", "Contusão/pancada", "Entorse", "Suspeita de fratura", "Queimadura", "Reação alérgica", "Falta de ar", "Crise convulsiva", "Choque", "Crise de ansiedade"];
-  const sinaisOptions = ["Dor", "Sangramento", "Inchaço", "Ferimento", "Dificuldade de movimento", "Outros"];
-  const atendimentosOptions = ["Avaliação/observação", "Higienização do ferimento", "Curativo", "Gelo/compressa fria", "Controle de sangramento", "Imobilização", "Repouso", "Sinais vitais conferidos"];
-  const materiaisOptions = ["Atadura", "Algodão", "Gaze", "Esparadrapo", "Micropore", "Soro fisiológico", "Antisséptico", "Luvas de proced.", "Band-aid", "Bolsa térmica", "Abaixador de língua"];
+  const locaisOptions = ["Banheiro", "Corredor", "Entrada/saída", "Outro", "Pátio", "Quadra", "Refeitório", "Sala de aula", "Sala do disciplinar"];
+  const motivosOptions = ["Choque", "Cólica menstrual", "Contusão/pancada", "Corte/ferimento", "Crise convulsiva", "Crise de ansiedade", "Desmaio", "Dor", "Dor abdominal", "Dor de cabeça", "Entorse", "Falta de ar", "Febre", "Mal-estar", "Náusea/vômito", "Queda", "Queimadura", "Reação alérgica", "Sangramento", "Suspeita de fratura", "Tontura"];
+  const sinaisOptions = ["Dificuldade de movimento", "Dor", "Ferimento", "Inchaço", "Outros", "Sangramento"];
+  const atendimentosOptions = ["Avaliação/observação", "Controle de sangramento", "Curativo", "Gelo/compressa fria", "Higienização do ferimento", "Imobilização", "Repouso", "Sinais vitais conferidos"];
+  const materiaisOptions = ["Abaixador de língua", "Algodão", "Antisséptico", "Atadura", "Band-aid", "Bolsa térmica", "Esparadrapo", "Gaze", "Luvas de proced.", "Micropore", "Soro fisiológico"];
   const desfechosOptions = ["Retornou para sala/aula", "Permaneceu em observação", "Foi liberado para o responsável", "Encaminhado p/ unidade de saúde", "Transportado pelo SAMU", "Transportado pelos Bombeiros"];
 
   const toggleArrayItem = (setter, array, item) => {
@@ -236,7 +236,7 @@ export default function AphFormulario({ aluno, onBack, onSuccess }) {
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-3">Condição Geral</label>
               <div className="flex gap-3">
-                {["Consciente", "Sonolento", "Desorientado", "Inconsciente"].map(cond => (
+                {["Consciente", "Desorientado", "Inconsciente", "Sonolento"].map(cond => (
                   <label key={cond} className="flex items-center gap-2 cursor-pointer">
                     <input 
                       type="radio" name="condicao" value={cond}

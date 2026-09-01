@@ -10,6 +10,7 @@ import AphMaterial from './AphMaterial';
 
 export default function AphPage() {
   const [activeTab, setActiveTab] = useState('novo');
+  const [editRecord, setEditRecord] = useState(null);
 
   const tabs = [
     { id: 'novo', label: 'Novo Atendimento', icon: HeartIcon, component: AphNovaOcorrencia },
@@ -61,7 +62,7 @@ export default function AphPage() {
       {/* Content Area */}
       <div className="max-w-6xl mx-auto w-full px-6 py-8">
         <div className="animate-fade-in-up">
-          <ActiveComponent />
+          <ActiveComponent onEdit={(record) => { setEditRecord(record); setActiveTab('novo'); }} editRecord={editRecord} onClearEdit={() => setEditRecord(null)} />
         </div>
       </div>
       

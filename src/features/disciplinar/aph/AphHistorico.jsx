@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import api from "../../../services/api";
 import {
   MagnifyingGlassIcon,
@@ -140,7 +141,7 @@ function AtendimentoCard({ atend, onVerDetalhes, baseURL }) {
 // ──────────────────────────────────────────────────────
 // MODAL DE DETALHES
 // ──────────────────────────────────────────────────────
-function ModalDetalhes({ atend, onClose }) {
+function ModalDetalhes({ atend, onClose, onEdit }) {
   if (!atend) return null;
   const motivos      = parseJsonField(atend.motivos);
   const sinais       = parseJsonField(atend.sinais);
@@ -180,104 +181,12 @@ function ModalDetalhes({ atend, onClose }) {
             </p>
           </div>
           <div className="flex items-center gap-2 print:hidden">
-            <button onClick={() => window.print()} title="Imprimir" className="p-2 bg-white/20 hover:bg-white/30 rounded-full transition-colors">
-              <PrinterIcon className="w-5 h-5" />
+            <button onClick={() => window.print()} className="flex items-center gap-2 px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl text-sm transition-colors">
+              <PrinterIcon className="w-4 h-4" /> Imprimir
             </button>
-            <button onClick={onClose} title="Fechar" className="p-2 bg-white/20 hover:bg-white/30 rounded-full transition-colors">
-              <XMarkIcon className="w-5 h-5" />
+            <button onClick={() => { if(onEdit) onEdit(atend); onClose(); }} className="px-5 py-2.5 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold rounded-xl text-sm transition-colors">
+              Editar
             </button>
-          </div>
-        </div>
-
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto p-6 print:overflow-visible">
-          <Section icon={ShieldCheckIcon} title="1. Identificação">
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div><span className="text-gray-400 text-xs">Aluno</span><p className="font-semibold text-gray-800">{atend.aluno_nome || "--"}</p></div>
-              <div><span className="text-gray-400 text-xs">Turma / Matrícula</span><p className="font-semibold text-gray-800">{atend.turma_nome || "--"} / {atend.aluno_matricula || "--"}</p></div>
-              <div><span className="text-gray-400 text-xs">Data</span><p className="font-semibold text-gray-800">{formatarData(atend.data_ocorrencia)}</p></div>
-              <div><span className="text-gray-400 text-xs">Hora</span><p className="font-semibold text-gray-800">{formatarHora(atend.data_ocorrencia)}</p></div>
-              {atend.socorrista_nome && <div className="col-span-2"><span className="text-gray-400 text-xs">Socorrista</span><p className="font-semibold text-gray-800">{atend.socorrista_nome}</p></div>}
-            </div>
-          </Section>
-
-          <Section icon={MapPinIcon} title="2. Local da Ocorrência">
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div><span className="text-gray-400 text-xs">Local</span><p className="font-semibold text-gray-800">{atend.local || "--"}</p></div>
-              {atend.solicitante && <div><span className="text-gray-400 text-xs">Solicitante</span><p className="font-semibold text-gray-800">{atend.solicitante}</p></div>}
-            </div>
-          </Section>
-
-          <Section icon={ExclamationCircleIcon} title="3. Motivo do Atendimento">
-            {motivos.length > 0 && <div className="mb-3">{motivos.map(m => <Chip key={m} label={m} color={motivoColor(m)} />)}</div>}
-            {atend.relato && <p className="text-sm text-gray-700 italic">"{atend.relato}"</p>}
-          </Section>
-
-          {(atend.condicao_geral || sinais.length > 0) && (
-            <Section icon={ShieldCheckIcon} title="4. Avaliação Inicial">
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                {atend.condicao_geral && <div><span className="text-gray-400 text-xs">Condição Geral</span><p className="font-semibold text-gray-800">{atend.condicao_geral}</p></div>}
-                {sinais.length > 0 && <div className="col-span-2"><span className="text-gray-400 text-xs">Queixas / Sinais</span><div className="mt-1">{sinais.map(s => <Chip key={s} label={s} />)}</div></div>}
-              </div>
-            </Section>
-          )}
-
-          {(atendimentos.length > 0 || atend.descricao_atendimento) && (
-            <Section icon={CheckBadgeIcon} title="5. Atendimento Realizado">
-              {atendimentos.length > 0 && <div className="mb-2">{atendimentos.map(a => <Chip key={a} label={a} color="bg-green-50 text-green-700 border-green-100" />)}</div>}
-              {(atend.sinais_pa || atend.sinais_fc || atend.sinais_temperatura) && (
-                <div className="flex gap-4 mt-2 text-sm text-gray-700 bg-gray-50 p-2 rounded-md">
-                  {atend.sinais_pa && <span><strong>PA:</strong> {atend.sinais_pa}</span>}
-                  {atend.sinais_fc && <span><strong>FC:</strong> {atend.sinais_fc}</span>}
-                  {atend.sinais_temperatura && <span><strong>Temp:</strong> {atend.sinais_temperatura}</span>}
-                </div>
-              )}
-              {atend.descricao_atendimento && <p className="text-sm text-gray-700 italic mt-2">"{atend.descricao_atendimento}"</p>}
-            </Section>
-          )}
-
-          {(materiais.length > 0 || atend.outro_material) && (
-            <Section icon={ArchiveBoxIcon} title="6. Material Utilizado">
-              {materiais.length > 0 && <div>{materiais.map(m => <Chip key={m} label={m} color="bg-purple-50 text-purple-700 border-purple-100" />)}</div>}
-              {atend.outro_material && <div className="mt-1"><Chip label={`Outros: ${atend.outro_material}`} color="bg-gray-100 text-gray-700 border-gray-200" /></div>}
-            </Section>
-          )}
-
-          {atend.desfecho && (
-            <Section icon={CheckBadgeIcon} title="7. Desfecho">
-              <p className="text-sm font-semibold text-gray-800">{atend.desfecho}</p>
-                {atend.desfecho_detalhes && <p className="text-sm text-gray-700 italic mt-1">Detalhes: {atend.desfecho_detalhes}</p>}
-            </Section>
-          )}
-
-          {atend.comunicacao_resp && (
-            <Section icon={ClockIcon} title="8. Comunicação ao Responsável">
-              <div className="space-y-1 mb-2">
-                  {(() => {
-                    try {
-                      const parsed = JSON.parse(atend.comunicacao_resp);
-                      if (Array.isArray(parsed)) {
-                        return parsed.map(c => <p key={c} className="text-sm font-semibold text-gray-800">{c}</p>);
-                      }
-                      return <p className="text-sm font-semibold text-gray-800">{atend.comunicacao_resp}</p>;
-                    } catch(e) {
-                      return <p className="text-sm font-semibold text-gray-800">{atend.comunicacao_resp}</p>;
-                    }
-                  })()}
-                </div>
-              <div className="flex gap-4 mt-2">
-                {atend.hora_comunicacao && <p className="text-xs text-gray-500">Horário da comunicação: <strong>{atend.hora_comunicacao}</strong></p>}
-                {atend.hora_comparecimento && <p className="text-xs text-gray-500">Comparecimento: <strong>{atend.hora_comparecimento}</strong></p>}
-              </div>
-            </Section>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100 flex-shrink-0 print:hidden">
-          <button onClick={() => window.print()} className="flex items-center gap-2 px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl text-sm transition-colors">
-            <PrinterIcon className="w-4 h-4" /> Imprimir
-          </button>
           <button onClick={onClose} className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl text-sm transition-colors">
             Fechar
           </button>
@@ -290,7 +199,7 @@ function ModalDetalhes({ atend, onClose }) {
 // ──────────────────────────────────────────────────────
 // COMPONENTE PRINCIPAL
 // ──────────────────────────────────────────────────────
-export default function AphHistorico() {
+export default function AphHistorico({ onEdit }) {
   const [atendimentos, setAtendimentos] = useState([]);
   const [loading, setLoading]           = useState(true);
   const [turmas, setTurmas]             = useState([]);
@@ -453,7 +362,7 @@ export default function AphHistorico() {
       </div>
 
       {/* Modal Overlay */}
-      {atendDetalhes && <ModalDetalhes atend={atendDetalhes} onClose={() => setAtendDetalhes(null)} />}
+      {atendDetalhes && <ModalDetalhes atend={atendDetalhes} onClose={() => setAtendDetalhes(null)} onEdit={onEdit} />}
 
       <style>{`
         .animate-fade-in-up { animation: fadeInUp 0.3s ease-out forwards; }

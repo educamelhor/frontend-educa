@@ -12,7 +12,7 @@ import {
   ArchiveBoxIcon
 } from '@heroicons/react/24/outline';
 
-export default function AphFormulario({ aluno, onBack, onSuccess }) {
+export default function AphFormulario({ aluno, onBack, onSuccess, editRecord }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const topoRef = useRef(null);
 
@@ -28,9 +28,48 @@ export default function AphFormulario({ aluno, onBack, onSuccess }) {
   const [materiais, setMateriais] = useState([]);
   const [outroMaterial, setOutroMaterial] = useState('');
   const [desfecho, setDesfecho] = useState('');
-  const [comunicacaoResp, setComunicacaoResp] = useState('');
+  const [comunicacaoResp, setComunicacaoResp] = useState([]);
   const [horaComunicacao, setHoraComunicacao] = useState('');
   const [horaComparecimento, setHoraComparecimento] = useState('');
+
+  useEffect(() => {
+    if (editRecord) {
+      try {
+        setLocal(editRecord.local || "");
+        setSolicitante(editRecord.solicitante || "");
+        setMotivos(editRecord.motivos ? JSON.parse(editRecord.motivos) : []);
+        setRelato(editRecord.relato || "");
+        setCondicaoGeral(editRecord.condicao_geral || "");
+        setSinais(editRecord.sinais ? JSON.parse(editRecord.sinais) : []);
+        setAtendimentos(editRecord.atendimentos ? JSON.parse(editRecord.atendimentos) : []);
+        setDescricaoAtendimento(editRecord.descricao_atendimento || "");
+        setMateriais(editRecord.materiais ? JSON.parse(editRecord.materiais) : []);
+        setOutroMaterial(editRecord.outro_material || "");
+        setDesfecho(editRecord.desfecho || "");
+        setDesfechoDetalhes(editRecord.desfecho_detalhes || "");
+        setSinaisPa(editRecord.sinais_pa || "");
+        setSinaisFc(editRecord.sinais_fc || "");
+        setSinaisTemperatura(editRecord.sinais_temperatura || "");
+        
+        const com_resp = editRecord.comunicacao_resp;
+        if (com_resp) {
+          try {
+            const parsed = JSON.parse(com_resp);
+            if (Array.isArray(parsed)) setComunicacaoResp(parsed);
+            else setComunicacaoResp([com_resp]);
+          } catch(e) {
+            setComunicacaoResp([com_resp]);
+          }
+        }
+        
+        if (editRecord.hora_comunicacao) setHoraComunicacao(editRecord.hora_comunicacao.substring(0,5));
+        if (editRecord.hora_comparecimento) setHoraComparecimento(editRecord.hora_comparecimento.substring(0,5));
+      } catch (e) {
+        console.error("Erro ao preencher dados de edicao", e);
+      }
+    }
+  }, [editRecord]);
+
   const [sinaisPa, setSinaisPa] = useState('');
   const [sinaisFc, setSinaisFc] = useState('');
   const [sinaisTemperatura, setSinaisTemperatura] = useState('');

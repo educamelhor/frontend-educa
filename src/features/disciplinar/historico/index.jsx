@@ -63,6 +63,8 @@ export default function HistoricoDisciplinar() {
   const [filtroAluno, setFiltroAluno] = useState("");
   const [filtroMedida, setFiltroMedida] = useState("");
   const [filtroResponsavel, setFiltroResponsavel] = useState("");
+  const [filtroMilitar, setFiltroMilitar] = useState("");
+  const [militares, setMilitares] = useState([]);
   const [filtroDataInicio, setFiltroDataInicio] = useState("");
   const [filtroDataFim, setFiltroDataFim] = useState("");
   const [showFilters, setShowFilters] = useState(false);
@@ -95,6 +97,7 @@ export default function HistoricoDisciplinar() {
       if (filtroAluno) params.append("aluno_nome", filtroAluno);
       if (filtroMedida) params.append("medida_disciplinar", filtroMedida);
       if (filtroResponsavel) params.append("convocar_responsavel", "1");
+        if (filtroMilitar) params.append("militar_id", filtroMilitar);
       if (filtroDataInicio) params.append("data_inicio", filtroDataInicio);
       if (filtroDataFim) params.append("data_fim", filtroDataFim);
 
@@ -110,20 +113,20 @@ export default function HistoricoDisciplinar() {
       console.error("Erro ao buscar histórico:", err);
     }
     setLoading(false);
-  }, [page, filtroStatus, filtroTurma, filtroTurno, filtroAluno, filtroMedida, filtroResponsavel, filtroDataInicio, filtroDataFim]);
+  }, [page, filtroStatus, filtroTurma, filtroTurno, filtroAluno, filtroMedida, filtroResponsavel, filtroMilitar, filtroDataInicio, filtroDataFim]);
 
   useEffect(() => { fetchHistorico(); }, [fetchHistorico]);
 
   // Reset page on filter change
-  useEffect(() => { setPage(1); }, [filtroStatus, filtroTurma, filtroTurno, filtroAluno, filtroMedida, filtroResponsavel, filtroDataInicio, filtroDataFim]);
+  useEffect(() => { setPage(1); }, [filtroStatus, filtroTurma, filtroTurno, filtroAluno, filtroMedida, filtroResponsavel, filtroMilitar, filtroDataInicio, filtroDataFim]);
 
   const limparFiltros = () => {
     setFiltroStatus(""); setFiltroTurma(""); setFiltroTurno(""); setFiltroAluno("");
-    setFiltroMedida(""); setFiltroResponsavel(""); setFiltroDataInicio(""); setFiltroDataFim("");
+    setFiltroMedida(""); setFiltroResponsavel(""); setFiltroMilitar(""); setFiltroDataInicio(""); setFiltroDataFim("");
     setPage(1);
   };
 
-  const temFiltrosAtivos = filtroStatus || filtroTurma || filtroTurno || filtroAluno || filtroMedida || filtroResponsavel || filtroDataInicio || filtroDataFim;
+  const temFiltrosAtivos = filtroStatus || filtroTurma || filtroTurno || filtroAluno || filtroMedida || filtroResponsavel || filtroMilitar || filtroDataInicio || filtroDataFim;
 
   // Abrir ModalRelatorioDisciplinar com dados do aluno montados do registro
   const abrirRelatorio = (registro) => {
@@ -377,7 +380,7 @@ export default function HistoricoDisciplinar() {
               🔍 Filtros Avançados
               {temFiltrosAtivos && (
                 <span className="disc-active-count">
-                  {[filtroStatus, filtroTurma, filtroTurno, filtroAluno, filtroMedida, filtroResponsavel, filtroDataInicio, filtroDataFim].filter(Boolean).length} ativo(s)
+                  {[filtroStatus, filtroTurma, filtroTurno, filtroAluno, filtroMedida, filtroResponsavel, filtroMilitar, filtroDataInicio, filtroDataFim].filter(Boolean).length} ativo(s)
                 </span>
               )}
             </h3>
@@ -444,12 +447,14 @@ export default function HistoricoDisciplinar() {
                   />
                 </div>
                 <div className="disc-filter-group">
-                  <label>Responsável</label>
-                  <select value={filtroResponsavel} onChange={(e) => setFiltroResponsavel(e.target.value)}>
-                    <option value="">Todos</option>
-                    <option value="1">⏳ Aguardando comparecimento</option>
-                  </select>
-                </div>
+                    <label>Militar Responsável</label>
+                    <select value={filtroMilitar} onChange={(e) => setFiltroMilitar(e.target.value)}>
+                      <option value="">Todos</option>
+                      {militares.map(m => (
+                        <option key={m.id} value={m.id}>{m.nome}</option>
+                      ))}
+                    </select>
+                  </div>
                 <div className="disc-filter-group">
                   <label>Data Início</label>
                   <input

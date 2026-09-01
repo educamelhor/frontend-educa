@@ -274,19 +274,22 @@ function ModalDetalhes({ atend, onClose, onEdit }) {
           )}
         </div>
 
-        {/* Footer */}
-        <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100 flex-shrink-0 print:hidden">
-          <button onClick={() => window.print()} className="flex items-center gap-2 px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl text-sm transition-colors">
-            <PrinterIcon className="w-4 h-4" /> Imprimir
-          </button>
-          <button onClick={onClose} className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl text-sm transition-colors">
-            Fechar
-          </button>
+          {/* Footer */}
+          <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100 flex-shrink-0 print:hidden">
+            <button onClick={() => window.print()} className="flex items-center gap-2 px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl text-sm transition-colors">
+              <PrinterIcon className="w-4 h-4" /> Imprimir
+            </button>
+            <button onClick={() => { if(onEdit) onEdit(atend); onClose(); }} className="px-5 py-2.5 bg-yellow-500 hover:bg-yellow-600 text-white font-semibold rounded-xl text-sm transition-colors">
+              Editar
+            </button>
+            <button onClick={onClose} className="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-xl text-sm transition-colors">
+              Fechar
+            </button>
+          </div>
         </div>
       </div>
-    </div>
-  );
-}
+    , document.body);
+  }
 
 // ──────────────────────────────────────────────────────
 // COMPONENTE PRINCIPAL

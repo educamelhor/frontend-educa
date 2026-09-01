@@ -12,6 +12,13 @@ import {
   ArchiveBoxIcon
 } from '@heroicons/react/24/outline';
 
+
+function parseJsonField(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  try { return JSON.parse(value); } catch { return []; }
+}
+
 export default function AphFormulario({ aluno, onBack, onSuccess, editRecord }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const topoRef = useRef(null);
@@ -32,18 +39,24 @@ export default function AphFormulario({ aluno, onBack, onSuccess, editRecord }) 
   const [horaComunicacao, setHoraComunicacao] = useState('');
   const [horaComparecimento, setHoraComparecimento] = useState('');
 
+
+  const [sinaisPa, setSinaisPa] = useState('');
+  const [sinaisFc, setSinaisFc] = useState('');
+  const [sinaisTemperatura, setSinaisTemperatura] = useState('');
+  const [desfechoDetalhes, setDesfechoDetalhes] = useState('');
+
   useEffect(() => {
     if (editRecord) {
       try {
         setLocal(editRecord.local || "");
         setSolicitante(editRecord.solicitante || "");
-        setMotivos(editRecord.motivos ? JSON.parse(editRecord.motivos) : []);
+        setMotivos(parseJsonField(editRecord.motivos));
         setRelato(editRecord.relato || "");
         setCondicaoGeral(editRecord.condicao_geral || "");
-        setSinais(editRecord.sinais ? JSON.parse(editRecord.sinais) : []);
-        setAtendimentos(editRecord.atendimentos ? JSON.parse(editRecord.atendimentos) : []);
+        setSinais(parseJsonField(editRecord.sinais));
+        setAtendimentos(parseJsonField(editRecord.atendimentos));
         setDescricaoAtendimento(editRecord.descricao_atendimento || "");
-        setMateriais(editRecord.materiais ? JSON.parse(editRecord.materiais) : []);
+        setMateriais(parseJsonField(editRecord.materiais));
         setOutroMaterial(editRecord.outro_material || "");
         setDesfecho(editRecord.desfecho || "");
         setDesfechoDetalhes(editRecord.desfecho_detalhes || "");
@@ -69,11 +82,6 @@ export default function AphFormulario({ aluno, onBack, onSuccess, editRecord }) 
       }
     }
   }, [editRecord]);
-
-  const [sinaisPa, setSinaisPa] = useState('');
-  const [sinaisFc, setSinaisFc] = useState('');
-  const [sinaisTemperatura, setSinaisTemperatura] = useState('');
-  const [desfechoDetalhes, setDesfechoDetalhes] = useState('');
 
   // Rola para o topo do formulário de forma robusta garantindo que divs com overflow também rolem
   useEffect(() => {

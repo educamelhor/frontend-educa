@@ -70,7 +70,7 @@ export default function HistoricoDisciplinar() {
   const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState(1);
 
-  // ── Fetch Turmas ──────────────────────────────────────────────────────
+  // ── Fetch Turmas & Militares ───────────────────────────────────────────
   useEffect(() => {
     const ANO_LETIVO = String(new Date().getFullYear());
     api.get("/api/turmas")
@@ -81,6 +81,15 @@ export default function HistoricoDisciplinar() {
         setTurnosLista(turnos);
       })
       .catch(() => {});
+
+    api.get("/registros-ocorrencias/militares")
+      .then((r) => {
+        const data = Array.isArray(r.data) ? r.data : (r.data?.militares || []);
+        setMilitares(data);
+      })
+      .catch((err) => {
+        console.error("Erro ao carregar militares:", err);
+      });
   }, []);
 
   // ── Fetch Histórico ───────────────────────────────────────────────────

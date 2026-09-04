@@ -16,7 +16,9 @@ import {
   HeartIcon,
   ShieldCheckIcon,
   InformationCircleIcon,
-  CheckCircleIcon
+  CheckCircleIcon,
+  MagnifyingGlassPlusIcon,
+  XMarkIcon,
 } from "@heroicons/react/24/outline";
 
 import ModalAdequacaoCurricular from "./ModalAdequacaoCurricular";
@@ -49,6 +51,18 @@ export default function ProntuarioAlunoAEE() {
   const [editLaudo, setEditLaudo] = useState(null);
 
   const [modalAtendimentoOpen, setModalAtendimentoOpen] = useState(false);
+  const [fotoZoom, setFotoZoom] = useState(null);
+
+  // Fecha fotoZoom ao pressionar tecla ESC
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") setFotoZoom(null);
+    };
+    if (fotoZoom) {
+      window.addEventListener("keydown", handleKeyDown);
+    }
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [fotoZoom]);
 
   // PDI form state
   const [salvandoPdi, setSalvandoPdi] = useState(false);
@@ -221,13 +235,22 @@ export default function ProntuarioAlunoAEE() {
       <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 rounded-2xl p-6 text-white shadow-xl">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
           <div className="flex items-center gap-5">
-            <div className="relative">
+            <div
+              onClick={() => aluno.foto && setFotoZoom(aluno)}
+              className={`relative ${aluno.foto ? "cursor-pointer group" : ""}`}
+              title={aluno.foto ? "Clique para ampliar a foto do estudante" : aluno.estudante}
+            >
               {aluno.foto ? (
-                <img
-                  src={aluno.foto}
-                  alt={aluno.estudante}
-                  className="w-20 h-20 rounded-2xl object-cover border-2 border-white/30 shadow-lg"
-                />
+                <div className="relative">
+                  <img
+                    src={aluno.foto}
+                    alt={aluno.estudante}
+                    className="w-20 h-20 rounded-2xl object-cover border-2 border-white/30 shadow-lg group-hover:ring-2 group-hover:ring-blue-400 group-hover:scale-105 transition-all"
+                  />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 rounded-2xl flex items-center justify-center transition-opacity">
+                    <MagnifyingGlassPlusIcon className="w-6 h-6 text-white" />
+                  </div>
+                </div>
               ) : (
                 <div className="w-20 h-20 rounded-2xl bg-white/10 border-2 border-white/20 flex items-center justify-center font-black text-2xl text-blue-200">
                   {aluno.estudante?.charAt(0) || "?"}
@@ -765,6 +788,60 @@ export default function ProntuarioAlunoAEE() {
         aluno={aluno}
         onSuccess={carregarProntuario}
       />
+
+      {/* Modal de Zoom da Foto do Estudante */}
+      {fotoZoom && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn"
+          onClick={() => setFotoZoom(null)}
+        >
+          <div
+            className="relative max-w-lg w-full bg-slate-900 border border-slate-700/80 rounded-3xl overflow-hidden shadow-2xl flex flex-col items-center p-6 text-white space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header com Nome e Botão Fechar */}
+            <div className="w-full flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="pr-4">
+                <h3 className="text-lg font-black text-white leading-tight">
+                  {fotoZoom.estudante}
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  Cód: <span className="text-slate-200 font-semibold">{fotoZoom.codigo || "—"}</span>
+                  {fotoZoom.turma_nome && (
+                    <> • Turma: <span className="text-blue-300 font-semibold">{fotoZoom.turma_nome}</span> {fotoZoom.turma_turno ? `(${fotoZoom.turma_turno})` : ""}</>
+                  )}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setFotoZoom(null)}
+                className="p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors flex-shrink-0"
+                title="Fechar (Esc)"
+              >
+                <XMarkIcon className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Imagem Ampliada */}
+            <div className="w-full flex justify-center py-2">
+              <img
+                src={fotoZoom.foto}
+                alt={fotoZoom.estudante}
+                className="max-h-[65vh] w-auto max-w-full rounded-2xl object-contain border-2 border-slate-700 shadow-2xl bg-black"
+              />
+            </div>
+
+            {/* Rodapé / Dica */}
+            <div className="w-full flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-800">
+              <span className="flex items-center gap-1.5 text-blue-400 font-semibold">
+                <SparklesIcon className="w-4 h-4" /> Prontuário Sala de Recursos (AEE)
+              </span>
+              <span>Clique fora ou no ✕ para fechar</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

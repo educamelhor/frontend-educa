@@ -8,12 +8,14 @@ import {
   UserGroupIcon,
   ClockIcon,
   MagnifyingGlassIcon,
+  MagnifyingGlassPlusIcon,
   PlusIcon,
   FunnelIcon,
   AcademicCapIcon,
   ClipboardDocumentCheckIcon,
   Cog6ToothIcon,
-  HeartIcon
+  HeartIcon,
+  XMarkIcon,
 } from "@heroicons/react/24/outline";
 
 import ModalConfigAlunoAEE from "./ModalConfigAlunoAEE";
@@ -50,6 +52,18 @@ export default function PainelSalaRecursos() {
   // Modais rápidos
   const [alunoConfigModal, setAlunoConfigModal] = useState(null);
   const [alunoLaudoModal, setAlunoLaudoModal] = useState(null);
+  const [fotoZoom, setFotoZoom] = useState(null);
+
+  // Fecha fotoZoom ao pressionar tecla ESC
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") setFotoZoom(null);
+    };
+    if (fotoZoom) {
+      window.addEventListener("keydown", handleKeyDown);
+    }
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [fotoZoom]);
 
   const carregarStats = async (ano = anoLetivo) => {
     try {
@@ -335,9 +349,22 @@ export default function PainelSalaRecursos() {
                   <tr key={a.id} className="hover:bg-blue-50/40 transition-colors">
                     <td className="py-3.5 px-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 font-bold flex items-center justify-center text-xs flex-shrink-0 border border-slate-200">
+                        <div
+                          onClick={() => a.foto && setFotoZoom(a)}
+                          className={`w-10 h-10 rounded-xl bg-slate-100 text-slate-700 font-bold flex items-center justify-center text-xs flex-shrink-0 border border-slate-200 select-none ${
+                            a.foto
+                              ? "cursor-pointer hover:ring-2 hover:ring-blue-500 hover:scale-105 transition-all group relative overflow-hidden shadow-sm"
+                              : ""
+                          }`}
+                          title={a.foto ? "Clique para ampliar a foto do estudante" : a.estudante}
+                        >
                           {a.foto ? (
-                            <img src={a.foto} alt={a.estudante} className="w-full h-full rounded-xl object-cover" />
+                            <>
+                              <img src={a.foto} alt={a.estudante} className="w-full h-full rounded-xl object-cover" />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 rounded-xl flex items-center justify-center transition-opacity">
+                                <MagnifyingGlassPlusIcon className="w-4 h-4 text-white" />
+                              </div>
+                            </>
                           ) : (
                             a.estudante?.charAt(0) || "?"
                           )}
@@ -442,6 +469,60 @@ export default function PainelSalaRecursos() {
           carregarAlunos();
         }}
       />
+
+      {/* Modal de Zoom da Foto do Estudante */}
+      {fotoZoom && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fadeIn"
+          onClick={() => setFotoZoom(null)}
+        >
+          <div
+            className="relative max-w-lg w-full bg-slate-900 border border-slate-700/80 rounded-3xl overflow-hidden shadow-2xl flex flex-col items-center p-6 text-white space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header com Nome e Botão Fechar */}
+            <div className="w-full flex items-center justify-between pb-3 border-b border-slate-800">
+              <div className="pr-4">
+                <h3 className="text-lg font-black text-white leading-tight">
+                  {fotoZoom.estudante}
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  Cód: <span className="text-slate-200 font-semibold">{fotoZoom.codigo || "—"}</span>
+                  {fotoZoom.turma_nome && (
+                    <> • Turma: <span className="text-blue-300 font-semibold">{fotoZoom.turma_nome}</span> {fotoZoom.turma_turno ? `(${fotoZoom.turma_turno})` : ""}</>
+                  )}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setFotoZoom(null)}
+                className="p-2 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors flex-shrink-0"
+                title="Fechar (Esc)"
+              >
+                <XMarkIcon className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Imagem Ampliada */}
+            <div className="w-full flex justify-center py-2">
+              <img
+                src={fotoZoom.foto}
+                alt={fotoZoom.estudante}
+                className="max-h-[65vh] w-auto max-w-full rounded-2xl object-contain border-2 border-slate-700 shadow-2xl bg-black"
+              />
+            </div>
+
+            {/* Rodapé / Dica */}
+            <div className="w-full flex items-center justify-between text-[11px] text-slate-400 pt-2 border-t border-slate-800">
+              <span className="flex items-center gap-1.5 text-blue-400 font-semibold">
+                <SparklesIcon className="w-4 h-4" /> Aluno Sala de Recursos (AEE)
+              </span>
+              <span>Clique fora ou no ✕ para fechar</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

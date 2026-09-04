@@ -31,12 +31,14 @@ import {
   BoltIcon,
   CalendarDaysIcon,
   PlusCircleIcon,
+  SparklesIcon,
 } from '@heroicons/react/24/outline';
 import {
   PERFIS_MILITARES_SET,
   PERFIS_GESTAO_EQUIPE,
   PERFIS_GOVERNANCA,
   PERFIS_SEM_AGENTE_EDUCA,
+  PERFIS_SALA_RECURSO,
   getInitialOpenGroup,
 } from './SidebarGuards';
 // ⚠️  Guards de acesso centralizados em SidebarGuards.js
@@ -179,6 +181,7 @@ export default function Sidebar({ isOpen, onClose }) {
   const isDisciplinar = PERFIS_MILITARES_SET.has(perfil);
   const isProfessor = perfil === 'professor';
   const isSecretario = perfil === 'secretario' || perfil === 'secretaria';
+  const isSalaRecurso = PERFIS_SALA_RECURSO.has(perfil) || perfil === 'sala_recurso' || perfil === 'sala_de_recurso';
 
   // hasModulo: null = sem restrição = true; array = verifica se contém o módulo
   const hasModulo = (mod) => {
@@ -2155,6 +2158,78 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
                 )}
+              </ul>
+            )}
+          </>
+        )}
+
+        {/* ────────────────────────────────────────────────────
+            GRUPO: SALA DE RECURSOS (AEE)
+            Acesso: Sala de recurso, coordenação, pedagógico, direção
+            Guard: isScopeEscola && !isDisciplinar && (isSalaRecurso || hasModulo('sala_recurso'))
+        ──────────────────────────────────────────────────── */}
+        {isScopeEscola && !isDisciplinar && (isSalaRecurso || hasModulo('sala_recurso')) && (
+          <>
+            <button
+              className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-2 transition"
+              onClick={() => setOpenGroup(openGroup === 'sala_recurso' ? null : 'sala_recurso')}
+              type="button"
+              style={{
+                background: openGroup === 'sala_recurso'
+                  ? 'linear-gradient(90deg, rgba(59,130,246,0.2), transparent)'
+                  : undefined,
+              }}
+            >
+              <SparklesIcon className="h-5 w-5 mr-2" style={{ color: openGroup === 'sala_recurso' ? '#60a5fa' : '#93c5fd' }} />
+              <span className="flex-1 text-left" style={{ fontWeight: 700 }}>Sala de Recursos</span>
+              <span style={{
+                fontSize: '0.55rem',
+                fontWeight: 800,
+                background: 'linear-gradient(135deg, #2563eb, #7c3aed)',
+                color: '#fff',
+                padding: '2px 6px',
+                borderRadius: '8px',
+                letterSpacing: '0.5px',
+                marginRight: 4,
+              }}>AEE</span>
+              {openGroup === 'sala_recurso' ? (
+                <ChevronDownIcon className="h-4 w-4" />
+              ) : (
+                <ChevronRightIcon className="h-4 w-4" />
+              )}
+            </button>
+
+            {openGroup === 'sala_recurso' && (
+              <ul className="ml-4 mb-2">
+                <li>
+                  <Link
+                    to="/sala-recursos"
+                    className={getSubmenuLinkClasses('/sala-recursos')}
+                    style={{
+                      background: isActive('/sala-recursos') && location.pathname === '/sala-recursos'
+                        ? 'linear-gradient(90deg, rgba(59,130,246,0.18), transparent)'
+                        : undefined,
+                    }}
+                  >
+                    <UserGroupIcon className="h-5 w-5 mr-2" style={{ color: isActive('/sala-recursos') ? '#60a5fa' : undefined }} />
+                    <span className="flex-1">Alunos AEE</span>
+                  </Link>
+                </li>
+
+                <li>
+                  <Link
+                    to="/sala-recursos/adequacoes"
+                    className={getSubmenuLinkClasses('/sala-recursos/adequacoes')}
+                    style={{
+                      background: isActive('/sala-recursos/adequacoes')
+                        ? 'linear-gradient(90deg, rgba(59,130,246,0.18), transparent)'
+                        : undefined,
+                    }}
+                  >
+                    <SparklesIcon className="h-5 w-5 mr-2" style={{ color: isActive('/sala-recursos/adequacoes') ? '#60a5fa' : undefined }} />
+                    <span className="flex-1">Adequações Curriculares</span>
+                  </Link>
+                </li>
               </ul>
             )}
           </>

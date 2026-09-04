@@ -150,6 +150,13 @@ import AvisosPage from "./features/comunicacao/avisos/AvisosPage";
 import ComunicadosPage from "./features/comunicacao/comunicados/ComunicadosPage";
 import MuralPage from "./features/comunicacao/mural/MuralPage";
 
+// ✅ MÓDULO SALA DE RECURSOS (AEE)
+import {
+  PainelSalaRecursos,
+  ProntuarioAlunoAEE,
+  AdequacoesCurriculares,
+} from "./features/sala-recursos";
+
 // Layout protegido para rotas autenticadas
 function ProtectedLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -280,10 +287,16 @@ function RequireModulo({ modulo, children }) {
 
   const perfil = String(localStorage.getItem('perfil') || '').toLowerCase().trim();
   const isDisciplinar = PERFIS_MILITARES_SET.has(perfil);
+  const isSalaRecursoPerfil = perfil === 'sala_recurso' || perfil === 'sala_de_recurso' || perfil === 'psicopedagogia';
 
   // REGRA DE OURO DISCIPLINAR: O módulo disciplinar é autônomo e padrão para escolas cívico-militares.
   // Escolas novas (ex: CEF113-CCMDF) não possuem o módulo ativado no BD pelo CEO.
   if (isDisciplinar && modulo?.startsWith('disciplinar')) {
+    return children;
+  }
+
+  // Perfis da Sala de Recursos têm acesso direto ao seu módulo
+  if (isSalaRecursoPerfil && modulo?.startsWith('sala_recurso')) {
     return children;
   }
 
@@ -446,6 +459,11 @@ export default function App() {
           <Route path="/comunicacao/avisos"      element={<RequireModulo modulo="comunicacao"><AvisosPage /></RequireModulo>} />
           <Route path="/comunicacao/comunicados" element={<RequireModulo modulo="comunicacao"><ComunicadosPage /></RequireModulo>} />
           <Route path="/comunicacao/mural"       element={<RequireModulo modulo="comunicacao"><MuralPage /></RequireModulo>} />
+
+          {/* ── Sala de Recursos (AEE) ──────────────────────────────────── */}
+          <Route path="/sala-recursos" element={<RequireModulo modulo="sala_recurso"><PainelSalaRecursos /></RequireModulo>} />
+          <Route path="/sala-recursos/aluno/:id" element={<RequireModulo modulo="sala_recurso"><ProntuarioAlunoAEE /></RequireModulo>} />
+          <Route path="/sala-recursos/adequacoes" element={<RequireModulo modulo="sala_recurso"><AdequacoesCurriculares /></RequireModulo>} />
 
           {/* ── Impressão ────────────────────────────────────────────────── */}
           <Route path="/impressao/gabaritos"   element={<RequireModulo modulo="impressao"><GerarGabaritos /></RequireModulo>} />

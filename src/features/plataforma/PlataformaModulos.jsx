@@ -137,6 +137,15 @@ const MODULOS_TREE = [
       { id: 'comunicacao.mural', label: 'Mural' },
     ]
   },
+  {
+    id: 'sala_recurso', label: 'Sala de Recursos (AEE)', icon: '🧩',
+    filhos: [
+      { id: 'sala_recurso.alunos', label: 'Alunos AEE' },
+      { id: 'sala_recurso.adequacoes', label: 'Adequações Curriculares' },
+      { id: 'sala_recurso.pdi', label: 'Plano Individual (PDI/PEI)' },
+      { id: 'sala_recurso.atendimentos', label: 'Diário de Sessões' },
+    ]
+  },
 ];
 
 // ── Group accent colors (cycle) ───────────────────────────────────────────────

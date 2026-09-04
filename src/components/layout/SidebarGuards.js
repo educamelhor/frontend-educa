@@ -72,6 +72,21 @@ export const PERFIS_GESTAO_EQUIPE = new Set([
 ]);
 
 /**
+ * Perfis com acesso natural ao módulo Sala de Recursos (AEE).
+ */
+export const PERFIS_SALA_RECURSO = new Set([
+  'sala_recurso',
+  'sala_de_recurso',
+  'psicopedagogia',
+  'orientador',
+  'pedagogo',
+  'coordenador',
+  'coordenacao',
+  'diretor',
+  'vice_diretor',
+]);
+
+/**
  * Retorna o perfil do usuário logado (normalizado).
  */
 export function getPerfil() {

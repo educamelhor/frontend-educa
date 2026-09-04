@@ -121,7 +121,7 @@ export default function AdequacoesCurriculares() {
       </div>
 
       {/* Filtros */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm grid grid-cols-1 sm:grid-cols-4 gap-3">
         <div className="relative sm:col-span-2">
           <MagnifyingGlassIcon className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
@@ -131,6 +131,18 @@ export default function AdequacoesCurriculares() {
             placeholder="Filtrar por estudante, disciplina ou turma..."
             className="w-full text-sm pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-600"
           />
+        </div>
+
+        <div>
+          <select
+            value={anoLetivo}
+            onChange={(e) => setAnoLetivo(Number(e.target.value))}
+            className="w-full text-sm py-2.5 px-3 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-600 font-bold text-blue-900"
+          >
+            <option value={2026}>Ano: 2026</option>
+            <option value={2025}>Ano: 2025</option>
+            <option value={2024}>Ano: 2024</option>
+          </select>
         </div>
 
         <div>

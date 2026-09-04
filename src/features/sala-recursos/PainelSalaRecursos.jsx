@@ -34,6 +34,12 @@ export default function PainelSalaRecursos() {
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
 
+  const currentYear = new Date().getFullYear();
+  const [anoLetivo, setAnoLetivo] = useState(() => {
+    const saved = localStorage.getItem("ano_letivo");
+    return saved ? Number(saved) : currentYear;
+  });
+
   // Filtros
   const [filtroTexto, setFiltroTexto] = useState("");
   const [turnoSelecionado, setTurnoSelecionado] = useState("");
@@ -45,18 +51,18 @@ export default function PainelSalaRecursos() {
   const [alunoConfigModal, setAlunoConfigModal] = useState(null);
   const [alunoLaudoModal, setAlunoLaudoModal] = useState(null);
 
-  const carregarStats = async () => {
+  const carregarStats = async (ano = anoLetivo) => {
     try {
-      const res = await api.get("/api/sala-recursos/stats");
+      const res = await api.get("/api/sala-recursos/stats", { params: { ano_letivo: ano } });
       if (res.data) setStats(res.data);
     } catch (err) {
       console.error("Erro ao carregar estatísticas AEE:", err);
     }
   };
 
-  const carregarTurmas = async () => {
+  const carregarTurmas = async (ano = anoLetivo) => {
     try {
-      const res = await api.get("/api/turmas");
+      const res = await api.get("/api/turmas", { params: { ano } });
       const list = res.data?.turmas || res.data || [];
       setTurmas(Array.isArray(list) ? list : []);
     } catch (err) {
@@ -70,6 +76,7 @@ export default function PainelSalaRecursos() {
     try {
       const params = new URLSearchParams();
       if (filtroTexto) params.append("filtro", filtroTexto);
+      if (anoLetivo) params.append("ano_letivo", anoLetivo);
       if (turnoSelecionado) params.append("turno", turnoSelecionado);
       if (turmaSelecionada) params.append("turma_id", turmaSelecionada);
       if (statusAee) params.append("status_aee", statusAee);
@@ -86,16 +93,16 @@ export default function PainelSalaRecursos() {
   };
 
   useEffect(() => {
-    carregarStats();
-    carregarTurmas();
-  }, []);
+    carregarStats(anoLetivo);
+    carregarTurmas(anoLetivo);
+  }, [anoLetivo]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       carregarAlunos();
     }, 250);
     return () => clearTimeout(timer);
-  }, [filtroTexto, turnoSelecionado, turmaSelecionada, statusAee, apenasAee]);
+  }, [filtroTexto, anoLetivo, turnoSelecionado, turmaSelecionada, statusAee, apenasAee]);
 
   const formatDate = (val) => {
     if (!val) return "—";
@@ -185,9 +192,9 @@ export default function PainelSalaRecursos() {
 
       {/* Barra de Filtros e Busca */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-12 gap-3">
           {/* Busca Textual */}
-          <div className="relative sm:col-span-2 lg:col-span-2">
+          <div className="relative sm:col-span-2 md:col-span-3 lg:col-span-4">
             <MagnifyingGlassIcon className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
@@ -198,8 +205,25 @@ export default function PainelSalaRecursos() {
             />
           </div>
 
+          {/* Filtro por Ano Letivo */}
+          <div className="sm:col-span-1 md:col-span-1 lg:col-span-2">
+            <select
+              value={anoLetivo}
+              onChange={(e) => {
+                const novoAno = Number(e.target.value);
+                setAnoLetivo(novoAno);
+                setTurmaSelecionada("");
+              }}
+              className="w-full text-sm py-2.5 px-3 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-600 font-bold text-blue-900"
+            >
+              <option value={2026}>Ano Letivo: 2026</option>
+              <option value={2025}>Ano Letivo: 2025</option>
+              <option value={2024}>Ano Letivo: 2024</option>
+            </select>
+          </div>
+
           {/* Filtro por Turno */}
-          <div>
+          <div className="sm:col-span-1 md:col-span-1 lg:col-span-2">
             <select
               value={turnoSelecionado}
               onChange={(e) => {
@@ -217,7 +241,7 @@ export default function PainelSalaRecursos() {
           </div>
 
           {/* Filtro por Turma */}
-          <div>
+          <div className="sm:col-span-1 md:col-span-1 lg:col-span-2">
             <select
               value={turmaSelecionada}
               onChange={(e) => setTurmaSelecionada(e.target.value)}
@@ -238,7 +262,7 @@ export default function PainelSalaRecursos() {
           </div>
 
           {/* Filtro por Status AEE */}
-          <div>
+          <div className="sm:col-span-1 md:col-span-1 lg:col-span-2">
             <select
               value={statusAee}
               onChange={(e) => setStatusAee(e.target.value)}

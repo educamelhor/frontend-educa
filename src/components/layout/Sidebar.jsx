@@ -280,6 +280,7 @@ export default function Sidebar({ isOpen, onClose }) {
     else if (p.startsWith('/biblioteca')) setOpenGroup('biblioteca');
     else if (p.startsWith('/merenda')) setOpenGroup('merenda');
     else if (p.startsWith('/comunicacao')) setOpenGroup('comunicacao');
+    else if (p.startsWith('/sala-recursos')) setOpenGroup('sala_recurso');
     else setOpenGroup(null);
   }, [location.pathname]);
 
@@ -2204,14 +2205,9 @@ export default function Sidebar({ isOpen, onClose }) {
                 <li>
                   <Link
                     to="/sala-recursos"
-                    className={getSubmenuLinkClasses('/sala-recursos')}
-                    style={{
-                      background: isActive('/sala-recursos') && location.pathname === '/sala-recursos'
-                        ? 'linear-gradient(90deg, rgba(59,130,246,0.18), transparent)'
-                        : undefined,
-                    }}
+                    className={getSubmenuLinkClasses('/sala-recursos', true)}
                   >
-                    <UserGroupIcon className="h-5 w-5 mr-2" style={{ color: isActive('/sala-recursos') ? '#60a5fa' : undefined }} />
+                    <UserGroupIcon className="h-5 w-5 mr-2" style={{ color: isActive('/sala-recursos', true) ? '#60a5fa' : undefined }} />
                     <span className="flex-1">Alunos AEE</span>
                   </Link>
                 </li>
@@ -2220,11 +2216,6 @@ export default function Sidebar({ isOpen, onClose }) {
                   <Link
                     to="/sala-recursos/adequacoes"
                     className={getSubmenuLinkClasses('/sala-recursos/adequacoes')}
-                    style={{
-                      background: isActive('/sala-recursos/adequacoes')
-                        ? 'linear-gradient(90deg, rgba(59,130,246,0.18), transparent)'
-                        : undefined,
-                    }}
                   >
                     <SparklesIcon className="h-5 w-5 mr-2" style={{ color: isActive('/sala-recursos/adequacoes') ? '#60a5fa' : undefined }} />
                     <span className="flex-1">Adequações Curriculares</span>

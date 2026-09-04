@@ -36,6 +36,7 @@ export default function PainelSalaRecursos() {
 
   // Filtros
   const [filtroTexto, setFiltroTexto] = useState("");
+  const [turnoSelecionado, setTurnoSelecionado] = useState("");
   const [turmaSelecionada, setTurmaSelecionada] = useState("");
   const [statusAee, setStatusAee] = useState("ativo");
   const [apenasAee, setApenasAee] = useState(true);
@@ -69,6 +70,7 @@ export default function PainelSalaRecursos() {
     try {
       const params = new URLSearchParams();
       if (filtroTexto) params.append("filtro", filtroTexto);
+      if (turnoSelecionado) params.append("turno", turnoSelecionado);
       if (turmaSelecionada) params.append("turma_id", turmaSelecionada);
       if (statusAee) params.append("status_aee", statusAee);
       params.append("apenas_aee", apenasAee ? "1" : "0");
@@ -93,7 +95,7 @@ export default function PainelSalaRecursos() {
       carregarAlunos();
     }, 250);
     return () => clearTimeout(timer);
-  }, [filtroTexto, turmaSelecionada, statusAee, apenasAee]);
+  }, [filtroTexto, turnoSelecionado, turmaSelecionada, statusAee, apenasAee]);
 
   const formatDate = (val) => {
     if (!val) return "—";
@@ -183,9 +185,9 @@ export default function PainelSalaRecursos() {
 
       {/* Barra de Filtros e Busca */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           {/* Busca Textual */}
-          <div className="relative md:col-span-2">
+          <div className="relative sm:col-span-2 lg:col-span-2">
             <MagnifyingGlassIcon className="w-5 h-5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
@@ -196,17 +198,42 @@ export default function PainelSalaRecursos() {
             />
           </div>
 
+          {/* Filtro por Turno */}
+          <div>
+            <select
+              value={turnoSelecionado}
+              onChange={(e) => {
+                setTurnoSelecionado(e.target.value);
+                setTurmaSelecionada("");
+              }}
+              className="w-full text-sm py-2.5 px-3 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-600 font-medium text-slate-700"
+            >
+              <option value="">Todos os Turnos</option>
+              <option value="Matutino">Turno: Matutino</option>
+              <option value="Vespertino">Turno: Vespertino</option>
+              <option value="Noturno">Turno: Noturno</option>
+              <option value="Integral">Turno: Integral</option>
+            </select>
+          </div>
+
           {/* Filtro por Turma */}
           <div>
             <select
               value={turmaSelecionada}
               onChange={(e) => setTurmaSelecionada(e.target.value)}
-              className="w-full text-sm py-2.5 px-3 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-600"
+              className="w-full text-sm py-2.5 px-3 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-600 font-medium text-slate-700"
             >
               <option value="">Todas as Turmas</option>
-              {turmas.map((t) => (
-                <option key={t.id} value={t.id}>{t.nome} ({t.turno || "—"})</option>
-              ))}
+              {turmas
+                .filter((t) => !turnoSelecionado || String(t.turno || "").toLowerCase() === turnoSelecionado.toLowerCase())
+                .map((t) => {
+                  const nomeTurma = t.turma || t.nome || t.nome_oficial || t.serie || `Turma ${t.id}`;
+                  return (
+                    <option key={t.id} value={t.id}>
+                      {nomeTurma} {t.turno ? `(${t.turno})` : ""}
+                    </option>
+                  );
+                })}
             </select>
           </div>
 
@@ -215,7 +242,7 @@ export default function PainelSalaRecursos() {
             <select
               value={statusAee}
               onChange={(e) => setStatusAee(e.target.value)}
-              className="w-full text-sm py-2.5 px-3 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-600"
+              className="w-full text-sm py-2.5 px-3 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-600 font-medium text-slate-700"
             >
               <option value="ativo">Status: Ativos no AEE</option>
               <option value="em_avaliacao">Status: Em Avaliação</option>

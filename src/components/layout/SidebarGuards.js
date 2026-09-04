@@ -100,5 +100,7 @@ export function getPerfil() {
 export function getInitialOpenGroup() {
   const p = getPerfil();
   // 'diretor_disciplinar' e 'comandante' abrem direto no menu Disciplinar
-  return (p === 'diretor_disciplinar' || p === 'comandante') ? 'disciplinar' : null;
+  if (p === 'diretor_disciplinar' || p === 'comandante') return 'disciplinar';
+  if (p === 'sala_recurso' || p === 'sala_de_recurso' || p === 'psicopedagogia') return 'sala_recurso';
+  return null;
 }

@@ -2221,6 +2221,16 @@ export default function Sidebar({ isOpen, onClose }) {
                     <span className="flex-1">Adequações Curriculares</span>
                   </Link>
                 </li>
+
+                <li>
+                  <Link
+                    to="/sala-recursos/impressao"
+                    className={getSubmenuLinkClasses('/sala-recursos/impressao')}
+                  >
+                    <PrinterIcon className="h-5 w-5 mr-2" style={{ color: isActive('/sala-recursos/impressao') ? '#60a5fa' : undefined }} />
+                    <span className="flex-1">Impressão</span>
+                  </Link>
+                </li>
               </ul>
             )}
           </>

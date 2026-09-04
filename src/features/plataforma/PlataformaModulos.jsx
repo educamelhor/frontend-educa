@@ -142,6 +142,7 @@ const MODULOS_TREE = [
     filhos: [
       { id: 'sala_recurso.alunos', label: 'Alunos AEE' },
       { id: 'sala_recurso.adequacoes', label: 'Adequações Curriculares' },
+      { id: 'sala_recurso.impressao', label: 'Impressão' },
       { id: 'sala_recurso.pdi', label: 'Plano Individual (PDI/PEI)' },
       { id: 'sala_recurso.atendimentos', label: 'Diário de Sessões' },
     ]

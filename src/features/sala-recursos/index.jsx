@@ -6,3 +6,4 @@ export { default as ModalAdequacaoCurricular } from "./ModalAdequacaoCurricular"
 export { default as ModalConfigAlunoAEE } from "./ModalConfigAlunoAEE";
 export { default as ModalLaudoMedico } from "./ModalLaudoMedico";
 export { default as ModalRegistroAtendimento } from "./ModalRegistroAtendimento";
+export { default as ImpressaoSalaRecursos } from "./ImpressaoSalaRecursos";

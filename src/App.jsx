@@ -155,6 +155,7 @@ import {
   PainelSalaRecursos,
   ProntuarioAlunoAEE,
   AdequacoesCurriculares,
+  ImpressaoSalaRecursos,
 } from "./features/sala-recursos";
 
 // Layout protegido para rotas autenticadas
@@ -464,6 +465,7 @@ export default function App() {
           <Route path="/sala-recursos" element={<RequireModulo modulo="sala_recurso"><PainelSalaRecursos /></RequireModulo>} />
           <Route path="/sala-recursos/aluno/:id" element={<RequireModulo modulo="sala_recurso"><ProntuarioAlunoAEE /></RequireModulo>} />
           <Route path="/sala-recursos/adequacoes" element={<RequireModulo modulo="sala_recurso"><AdequacoesCurriculares /></RequireModulo>} />
+          <Route path="/sala-recursos/impressao" element={<RequireModulo modulo="sala_recurso"><ImpressaoSalaRecursos /></RequireModulo>} />
 
           {/* ── Impressão ────────────────────────────────────────────────── */}
           <Route path="/impressao/gabaritos"   element={<RequireModulo modulo="impressao"><GerarGabaritos /></RequireModulo>} />

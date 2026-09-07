@@ -11,6 +11,7 @@ import {
   MagnifyingGlassIcon,
   CheckCircleIcon,
   ClockIcon,
+  ExclamationTriangleIcon,
   PencilSquareIcon,
   XMarkIcon,
   MagnifyingGlassPlusIcon,
@@ -20,6 +21,23 @@ import {
   LightBulbIcon,
   CheckIcon,
 } from "@heroicons/react/24/outline";
+
+// Helper para calcular o status e a quantidade de campos preenchidos (de 4)
+const getStatusAdequacao = (adeq) => {
+  if (!adeq) return { status: "pendente", preenchidos: 0, total: 4 };
+  const c1 = !!(adeq.habilidades_prioritarias && adeq.habilidades_prioritarias.trim());
+  const c2 = !!(
+    (adeq.metodologias_estrategias && adeq.metodologias_estrategias.trim()) ||
+    (adeq.conteudos_adaptados && adeq.conteudos_adaptados.trim())
+  );
+  const c3 = !!(adeq.recursos_didaticos && adeq.recursos_didaticos.trim());
+  const c4 = !!(adeq.avaliacao_adaptada && adeq.avaliacao_adaptada.trim());
+
+  const preenchidos = [c1, c2, c3, c4].filter(Boolean).length;
+  if (preenchidos === 0) return { status: "pendente", preenchidos: 0, total: 4 };
+  if (preenchidos === 4) return { status: "concluido", preenchidos: 4, total: 4 };
+  return { status: "andamento", preenchidos, total: 4 };
+};
 
 const BIMESTRES = ["1º Bimestre", "2º Bimestre", "3º Bimestre", "4º Bimestre"];
 
@@ -232,10 +250,15 @@ export default function SalaRecursoProfessor() {
   // Salvar Adequação
   const handleSalvarAdequacao = async (andPrint = false) => {
     if (!alunoEmEdicao) return;
-    if (!formHabilidades.trim() && !formEstrategias.trim()) {
-      toast.error("Por favor, preencha ao menos as habilidades ou estratégias pedagógicas.");
-      return;
-    }
+
+    const c1 = !!formHabilidades.trim();
+    const c2 = !!formConteudos.trim();
+    const c3 = !!formEstrategias.trim();
+    const c4 = !!formAvaliacao.trim();
+    const preenchidos = [c1, c2, c3, c4].filter(Boolean).length;
+
+    const statusCalculado =
+      preenchidos === 4 ? "concluido" : preenchidos > 0 ? "andamento" : "pendente";
 
     setSalvandoAdequacao(true);
     try {
@@ -246,16 +269,23 @@ export default function SalaRecursoProfessor() {
         bimestre,
         disciplina: disciplinaSelecionada,
         professor_regente: professorNome,
-        habilidades_prioritarias: formHabilidades,
-        metodologias_estrategias: formConteudos,
-        recursos_didaticos: formEstrategias,
-        avaliacao_adaptada: formAvaliacao,
-        status: "concluido",
+        habilidades_prioritarias: formHabilidades.trim(),
+        metodologias_estrategias: formConteudos.trim(),
+        recursos_didaticos: formEstrategias.trim(),
+        avaliacao_adaptada: formAvaliacao.trim(),
+        status: statusCalculado,
       };
 
       const res = await api.post("/api/sala-recursos/adequacoes", payload);
       if (res.data?.ok) {
-        toast.success(res.data.message || "Adequação curricular salva com sucesso!");
+        if (preenchidos === 4) {
+          toast.success("Adequação registrada com sucesso (4/4 campos preenchidos)!");
+        } else if (preenchidos > 0) {
+          toast.success(`Adequação salva em andamento (${preenchidos}/4 campos preenchidos).`);
+        } else {
+          toast("Adequação salva como pendente (campos vazios).", { icon: "ℹ️" });
+        }
+
         await carregarAlunosEAdequacoes();
 
         if (andPrint) {
@@ -459,15 +489,20 @@ export default function SalaRecursoProfessor() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {alunosFiltrados.map((aluno) => {
               const adeq = adequacaoPorAluno[aluno.id];
-              const isConcluido = !!adeq;
+              const infoStatus = getStatusAdequacao(adeq);
+              const isPendente = infoStatus.status === "pendente";
+              const isAndamento = infoStatus.status === "andamento";
+              const isConcluido = infoStatus.status === "concluido";
 
               return (
                 <div
                   key={aluno.id}
                   className={`bg-white rounded-2xl border-2 p-5 transition-all shadow-sm flex flex-col justify-between space-y-4 ${
                     isConcluido
-                      ? "border-emerald-200 hover:border-emerald-400 hover:shadow-md"
-                      : "border-slate-200 hover:border-blue-300 hover:shadow-md"
+                      ? "border-emerald-300 hover:border-emerald-500 hover:shadow-md"
+                      : isAndamento
+                      ? "border-amber-300 hover:border-amber-500 hover:shadow-md"
+                      : "border-red-200 hover:border-red-400 hover:shadow-md"
                   }`}
                 >
                   <div className="flex items-start gap-3.5">
@@ -503,15 +538,24 @@ export default function SalaRecursoProfessor() {
                         <h3 className="text-sm font-black text-slate-900 truncate">
                           {aluno.estudante}
                         </h3>
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-black border flex-shrink-0 ${
-                            isConcluido
-                              ? "bg-emerald-50 text-emerald-800 border-emerald-300"
-                              : "bg-amber-50 text-amber-800 border-amber-300"
-                          }`}
-                        >
-                          {isConcluido ? "✓ Adequação Registrada" : "⏳ Pendente"}
-                        </span>
+
+                        {/* Badges de Status (Vermelho, Amarelo, Verde) */}
+                        {isConcluido ? (
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black border flex-shrink-0 bg-emerald-50 text-emerald-800 border-emerald-300 flex items-center gap-1">
+                            <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-600" />
+                            ✓ Adequação Registrada
+                          </span>
+                        ) : isAndamento ? (
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black border flex-shrink-0 bg-amber-50 text-amber-900 border-amber-300 flex items-center gap-1">
+                            <ExclamationTriangleIcon className="w-3.5 h-3.5 text-amber-600" />
+                            Adequação em Andamento ({infoStatus.preenchidos}/4)
+                          </span>
+                        ) : (
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black border flex-shrink-0 bg-red-50 text-red-800 border-red-200 flex items-center gap-1">
+                            <ClockIcon className="w-3.5 h-3.5 text-red-500" />
+                            ⏳ Pendente
+                          </span>
+                        )}
                       </div>
 
                       <p className="text-[11px] text-slate-500 mt-0.5">
@@ -535,10 +579,10 @@ export default function SalaRecursoProfessor() {
                   </div>
 
                   {/* Resumo da Adequação do Bimestre */}
-                  {adeq ? (
-                    <div className="bg-slate-50 p-3 rounded-xl border border-slate-200/80 text-xs text-slate-700 space-y-1.5">
+                  {isConcluido ? (
+                    <div className="bg-emerald-50/40 p-3 rounded-xl border border-emerald-200/80 text-xs text-slate-700 space-y-1.5">
                       <div>
-                        <span className="font-bold text-slate-900 block text-[11px] uppercase tracking-wide">
+                        <span className="font-bold text-emerald-950 block text-[11px] uppercase tracking-wide">
                           Foco de Aprendizagem ({disciplinaSelecionada} • {bimestre}):
                         </span>
                         <p className="line-clamp-2 text-slate-600 mt-0.5">
@@ -547,7 +591,7 @@ export default function SalaRecursoProfessor() {
                       </div>
                       {adeq.recursos_didaticos && (
                         <div>
-                          <span className="font-bold text-slate-900 block text-[11px] uppercase tracking-wide">
+                          <span className="font-bold text-emerald-950 block text-[11px] uppercase tracking-wide">
                             Estratégias / Recursos:
                           </span>
                           <p className="line-clamp-2 text-slate-600 mt-0.5">
@@ -556,8 +600,43 @@ export default function SalaRecursoProfessor() {
                         </div>
                       )}
                     </div>
+                  ) : isAndamento ? (
+                    <div className="bg-amber-50/60 p-3 rounded-xl border border-amber-200 text-xs text-slate-700 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-amber-950 block text-[11px] uppercase tracking-wide">
+                          Preenchimento Parcial ({disciplinaSelecionada} • {bimestre}):
+                        </span>
+                        <span className="text-[10px] font-black text-amber-900 bg-amber-200/70 px-2 py-0.5 rounded-md">
+                          {infoStatus.preenchidos} de 4 colunas
+                        </span>
+                      </div>
+                      {adeq.habilidades_prioritarias?.trim() && (
+                        <div>
+                          <span className="font-semibold text-slate-800 text-[11px] block">1. Objetivos:</span>
+                          <p className="line-clamp-1 text-slate-600">{adeq.habilidades_prioritarias}</p>
+                        </div>
+                      )}
+                      {(adeq.conteudos_adaptados?.trim() || adeq.metodologias_estrategias?.trim()) && (
+                        <div>
+                          <span className="font-semibold text-slate-800 text-[11px] block">2. Conteúdos:</span>
+                          <p className="line-clamp-1 text-slate-600">{adeq.conteudos_adaptados || adeq.metodologias_estrategias}</p>
+                        </div>
+                      )}
+                      {adeq.recursos_didaticos?.trim() && (
+                        <div>
+                          <span className="font-semibold text-slate-800 text-[11px] block">3. Recursos:</span>
+                          <p className="line-clamp-1 text-slate-600">{adeq.recursos_didaticos}</p>
+                        </div>
+                      )}
+                      {adeq.avaliacao_adaptada?.trim() && (
+                        <div>
+                          <span className="font-semibold text-slate-800 text-[11px] block">4. Avaliação:</span>
+                          <p className="line-clamp-1 text-slate-600">{adeq.avaliacao_adaptada}</p>
+                        </div>
+                      )}
+                    </div>
                   ) : (
-                    <div className="bg-amber-50/60 p-3 rounded-xl border border-amber-200 text-xs text-amber-800">
+                    <div className="bg-red-50/50 p-3 rounded-xl border border-red-200/80 text-xs text-red-800">
                       Nenhuma adequação curricular registrada para <strong>{disciplinaSelecionada}</strong> no <strong>{bimestre}</strong>.
                     </div>
                   )}
@@ -569,11 +648,17 @@ export default function SalaRecursoProfessor() {
                       className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black transition-all ${
                         isConcluido
                           ? "bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300"
-                          : "bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/20"
+                          : isAndamento
+                          ? "bg-amber-500 hover:bg-amber-600 text-slate-950 shadow-md shadow-amber-500/20"
+                          : "bg-red-600 hover:bg-red-700 text-white shadow-md shadow-red-500/20"
                       }`}
                     >
                       <PencilSquareIcon className="w-4 h-4" />
-                      {isConcluido ? "Editar Adequação" : "Preencher Adequação"}
+                      {isConcluido
+                        ? "Editar Adequação"
+                        : isAndamento
+                        ? "Continuar Preenchimento"
+                        : "Preencher Adequação"}
                     </button>
 
                     <button
@@ -628,12 +713,58 @@ export default function SalaRecursoProfessor() {
 
             {/* Corpo do Formulário */}
             <div className="p-6 space-y-5 max-h-[72vh] overflow-y-auto">
-              {/* Informativo SEEDF */}
-              <div className="bg-blue-50/70 p-3.5 rounded-2xl border border-blue-200 flex items-start gap-3">
-                <InformationCircleIcon className="w-5 h-5 text-blue-700 flex-shrink-0 mt-0.5" />
-                <p className="text-xs text-blue-950 leading-relaxed">
-                  Os 4 campos abaixo compõem as colunas oficiais da ficha de adequação curricular padronizada pela <strong>SEEDF</strong>. Os dados preenchidos serão integrados ao dossiê AEE do aluno.
-                </p>
+              {/* Informativo SEEDF + Indicador de Progresso */}
+              <div className="bg-blue-50/70 p-3.5 rounded-2xl border border-blue-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-start gap-2.5">
+                  <InformationCircleIcon className="w-5 h-5 text-blue-700 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-blue-950 leading-relaxed">
+                    Os 4 campos abaixo compõem as colunas oficiais da ficha padronizada pela <strong>SEEDF</strong>.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span
+                    className={`px-3 py-1 rounded-full text-xs font-black border ${
+                      ([
+                        !!formHabilidades.trim(),
+                        !!formConteudos.trim(),
+                        !!formEstrategias.trim(),
+                        !!formAvaliacao.trim(),
+                      ].filter(Boolean).length === 4)
+                        ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                        : ([
+                            !!formHabilidades.trim(),
+                            !!formConteudos.trim(),
+                            !!formEstrategias.trim(),
+                            !!formAvaliacao.trim(),
+                          ].filter(Boolean).length > 0)
+                        ? "bg-amber-100 text-amber-900 border-amber-300"
+                        : "bg-red-100 text-red-800 border-red-300"
+                    }`}
+                  >
+                    {[
+                      !!formHabilidades.trim(),
+                      !!formConteudos.trim(),
+                      !!formEstrategias.trim(),
+                      !!formAvaliacao.trim(),
+                    ].filter(Boolean).length === 4
+                      ? "✓ 4/4 Completo (Adequação Registrada)"
+                      : [
+                          !!formHabilidades.trim(),
+                          !!formConteudos.trim(),
+                          !!formEstrategias.trim(),
+                          !!formAvaliacao.trim(),
+                        ].filter(Boolean).length > 0
+                      ? `⚠️ ${
+                          [
+                            !!formHabilidades.trim(),
+                            !!formConteudos.trim(),
+                            !!formEstrategias.trim(),
+                            !!formAvaliacao.trim(),
+                          ].filter(Boolean).length
+                        }/4 Preenchidos (Em Andamento)`
+                      : "🔴 0/4 Preenchidos (Pendente)"}
+                  </span>
+                </div>
               </div>
 
               {/* Coluna 1: Objetivos para as aprendizagens */}

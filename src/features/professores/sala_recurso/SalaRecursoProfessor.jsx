@@ -64,7 +64,7 @@ export default function SalaRecursoProfessor() {
   const [turmaSelecionada, setTurmaSelecionada] = useState("");
   const [disciplinas, setDisciplinas] = useState([]);
   const [disciplinaSelecionada, setDisciplinaSelecionada] = useState("");
-  const [filtroTexto, setFiltroTexto] = useState("");
+  const [estudanteSelecionado, setEstudanteSelecionado] = useState("");
 
   // Dados dos alunos e adequações
   const [alunos, setAlunos] = useState([]);
@@ -89,7 +89,12 @@ export default function SalaRecursoProfessor() {
 
   // Nome do professor logado
   const professorNome = useMemo(() => {
-    return localStorage.getItem("usuario_nome") || localStorage.getItem("nome") || "Professor(a)";
+    return (
+      localStorage.getItem("userName") ||
+      localStorage.getItem("usuario_nome") ||
+      localStorage.getItem("nome") ||
+      "Professor(a)"
+    );
   }, []);
 
   // 1. Carrega Turmas e Disciplinas do Professor Logado
@@ -179,6 +184,7 @@ export default function SalaRecursoProfessor() {
 
   useEffect(() => {
     carregarAlunosEAdequacoes();
+    setEstudanteSelecionado("");
   }, [turmaSelecionada, disciplinaSelecionada, bimestre, anoLetivo]);
 
   // Mapa de adequações por aluno_id
@@ -190,17 +196,18 @@ export default function SalaRecursoProfessor() {
     return map;
   }, [adequacoes]);
 
-  // Filtro textual
-  const alunosFiltrados = useMemo(() => {
-    if (!filtroTexto.trim()) return alunos;
-    const txt = filtroTexto.toLowerCase();
-    return alunos.filter(
-      (a) =>
-        a.estudante?.toLowerCase().includes(txt) ||
-        String(a.codigo || "").includes(txt) ||
-        a.laudos?.some((l) => String(l.cid || "").toLowerCase().includes(txt) || l.diagnostico?.toLowerCase().includes(txt))
+  // Lista ordenada de estudantes da turma
+  const alunosOrdenados = useMemo(() => {
+    return [...alunos].sort((a, b) =>
+      (a.estudante || "").localeCompare(b.estudante || "", "pt-BR", { sensitivity: "base" })
     );
-  }, [alunos, filtroTexto]);
+  }, [alunos]);
+
+  // Estudantes filtrados pelo dropdown
+  const alunosFiltrados = useMemo(() => {
+    if (!estudanteSelecionado) return alunosOrdenados;
+    return alunosOrdenados.filter((a) => String(a.id) === String(estudanteSelecionado));
+  }, [alunosOrdenados, estudanteSelecionado]);
 
   // Abrir Modal de Edição da Adequação
   const handleAbrirEdicao = (aluno) => {
@@ -401,29 +408,24 @@ export default function SalaRecursoProfessor() {
             </select>
           </div>
 
-          {/* Busca Textual */}
+          {/* Seletor de Estudante */}
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-              <MagnifyingGlassIcon className="w-4 h-4 text-slate-400" />
-              Filtrar Estudante / CID:
+              <UserGroupIcon className="w-4 h-4 text-blue-600" />
+              Filtrar Estudante:
             </label>
-            <div className="relative">
-              <input
-                type="text"
-                value={filtroTexto}
-                onChange={(e) => setFiltroTexto(e.target.value)}
-                placeholder="Nome, código, laudo..."
-                className="w-full text-sm py-2.5 pl-3 pr-8 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-600"
-              />
-              {filtroTexto && (
-                <button
-                  onClick={() => setFiltroTexto("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                >
-                  <XMarkIcon className="w-4 h-4" />
-                </button>
-              )}
-            </div>
+            <select
+              value={estudanteSelecionado}
+              onChange={(e) => setEstudanteSelecionado(e.target.value)}
+              className="w-full text-sm py-2.5 px-3 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-600 font-bold text-slate-800"
+            >
+              <option value="">Todos os Estudantes ({alunos.length})</option>
+              {alunosOrdenados.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.estudante} {a.codigo ? `(${a.codigo})` : ""}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
       </section>
@@ -474,15 +476,20 @@ export default function SalaRecursoProfessor() {
                       onClick={() => {
                         if (aluno.foto) setFotoZoom(aluno);
                       }}
-                      className={`w-13 h-13 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-slate-700 flex-shrink-0 relative overflow-hidden select-none ${
+                      className={`w-14 h-14 min-w-[56px] min-h-[56px] max-w-[56px] max-h-[56px] rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-slate-700 flex-shrink-0 relative overflow-hidden select-none ${
                         aluno.foto ? "cursor-pointer hover:ring-2 hover:ring-blue-500 group" : ""
                       }`}
+                      style={{ width: "56px", height: "56px" }}
                       title={aluno.foto ? "Clique para ampliar a foto" : aluno.estudante}
                     >
                       {aluno.foto ? (
                         <>
-                          <img src={aluno.foto} alt={aluno.estudante} className="w-full h-full object-cover" />
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                          <img
+                            src={aluno.foto}
+                            alt={aluno.estudante}
+                            className="w-full h-full object-cover rounded-2xl block"
+                          />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity rounded-2xl">
                             <MagnifyingGlassPlusIcon className="w-4 h-4 text-white" />
                           </div>
                         </>

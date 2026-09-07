@@ -19,12 +19,18 @@ import {
   CheckCircleIcon,
   MagnifyingGlassPlusIcon,
   XMarkIcon,
+  LockClosedIcon,
+  ArrowDownTrayIcon,
+  EyeIcon,
+  PaperClipIcon
 } from "@heroicons/react/24/outline";
 
 import ModalAdequacaoCurricular from "./ModalAdequacaoCurricular";
 import ModalConfigAlunoAEE from "./ModalConfigAlunoAEE";
 import ModalLaudoMedico from "./ModalLaudoMedico";
 import ModalRegistroAtendimento from "./ModalRegistroAtendimento";
+import ModalAutenticacaoLaudo from "./ModalAutenticacaoLaudo";
+import ModalVisualizadorDocumento from "./ModalVisualizadorDocumento";
 
 export default function ProntuarioAlunoAEE() {
   const { id } = useParams();
@@ -49,6 +55,13 @@ export default function ProntuarioAlunoAEE() {
   
   const [modalLaudoOpen, setModalLaudoOpen] = useState(false);
   const [editLaudo, setEditLaudo] = useState(null);
+
+  // Modais de Segurança e Download Protegido
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authModalLaudo, setAuthModalLaudo] = useState(null);
+  const [authModalModo, setAuthModalModo] = useState("download"); // 'download' | 'view'
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerDoc, setViewerDoc] = useState(null);
 
   const [modalAtendimentoOpen, setModalAtendimentoOpen] = useState(false);
   const [fotoZoom, setFotoZoom] = useState(null);
@@ -156,6 +169,60 @@ export default function ProntuarioAlunoAEE() {
       carregarProntuario();
     } catch (err) {
       alert("Erro ao remover laudo: " + (err.response?.data?.message || err.message));
+    }
+  };
+
+  // ── Handlers de Autenticação e Download de Laudo Protegido (LGPD) ──
+  const handleSolicitarDownload = (l) => {
+    setAuthModalLaudo(l);
+    setAuthModalModo("download");
+    setAuthModalOpen(true);
+  };
+
+  const handleSolicitarVisualizacao = (l) => {
+    setAuthModalLaudo(l);
+    setAuthModalModo("view");
+    setAuthModalOpen(true);
+  };
+
+  const handleConfirmarAutenticacao = async (senha) => {
+    if (!authModalLaudo?.id) return;
+
+    if (authModalModo === "download") {
+      const response = await api.post(
+        `/api/sala-recursos/laudos/${authModalLaudo.id}/download-protegido`,
+        { senha },
+        { responseType: "blob" }
+      );
+
+      const blob = new Blob([response.data], { type: "application/pdf" });
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      const safeTitle = (authModalLaudo.titulo || authModalLaudo.tipo_documento || "Documento_AEE")
+        .replace(/[^a-zA-Z0-9_-]/g, "_");
+      link.download = `Dossie_AEE_${safeTitle}_${authModalLaudo.aluno_id || "aluno"}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+
+      alert("🔒 PDF protegido baixado com sucesso!\n\nPor exigência da LGPD, o arquivo foi criptografado com a sua senha pessoal de login. Digite-a no leitor de PDF (Adobe Reader, celular, navegador) para abri-lo.");
+    } else {
+      const response = await api.post(
+        `/api/sala-recursos/laudos/${authModalLaudo.id}/visualizar-seguro`,
+        { senha }
+      );
+
+      if (response.data?.ok && response.data?.dataUrl) {
+        setViewerDoc({
+          dataUrl: response.data.dataUrl,
+          filename: response.data.filename,
+          laudo: authModalLaudo,
+          aluno
+        });
+        setViewerOpen(true);
+      }
     }
   };
 
@@ -464,98 +531,223 @@ export default function ProntuarioAlunoAEE() {
         </div>
       )}
 
-      {/* ─── ABA 2: LAUDOS MÉDICOS ───────────────────────────────────────────── */}
+      {/* ─── ABA 2: LAUDOS & DIAGNÓSTICOS (DOSSIÊ SEGURO LGPD) ──────────────── */}
       {abaAtiva === "laudos" && (
         <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm">
             <div>
-              <h2 className="text-base font-bold text-slate-800">Laudos Médicos e Diagnósticos Clínicos</h2>
-              <p className="text-xs text-slate-500">Histórico de laudos médicos, CIDs, prescrições e terapias externas.</p>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold text-slate-800">Dossiê de Laudos & Diagnósticos Clínicos</h2>
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  <LockClosedIcon className="w-3 h-3 inline" /> LGPD Criptografado
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Histórico de laudos médicos, atestados, relatórios e documentos comprobatórios com criptografia AES-256.
+              </p>
             </div>
             <button
               onClick={() => {
                 setEditLaudo(null);
                 setModalLaudoOpen(true);
               }}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold rounded-xl shadow-sm transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold rounded-xl shadow-sm hover:shadow transition-all"
             >
               <PlusIcon className="w-4 h-4" /> Adicionar Laudo
             </button>
           </div>
 
           {laudos.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center space-y-3">
-              <DocumentTextIcon className="w-12 h-12 text-slate-300 mx-auto" />
-              <h3 className="text-base font-bold text-slate-700">Nenhum laudo cadastrado</h3>
-              <p className="text-xs text-slate-500 max-w-md mx-auto">
-                Adicione as informações médicas e diagnósticas para embasar o atendimento educacional especializado.
-              </p>
+            <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center space-y-4 shadow-sm">
+              <div className="w-16 h-16 rounded-3xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 mx-auto shadow-inner">
+                <ShieldCheckIcon className="w-9 h-9" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-slate-800">Nenhum laudo ou documento anexado</h3>
+                <p className="text-xs text-slate-500 max-w-md mx-auto">
+                  Adicione laudos médicos, relatórios multidisciplinares ou fotos de atestados para embasar o atendimento AEE do estudante com segurança criptográfica.
+                </p>
+              </div>
               <button
                 onClick={() => {
                   setEditLaudo(null);
                   setModalLaudoOpen(true);
                 }}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-700 text-white text-sm font-bold rounded-xl"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold rounded-xl shadow-md transition-colors"
               >
                 <PlusIcon className="w-4 h-4" /> Cadastrar Laudo
               </button>
             </div>
           ) : (
-            <div className="space-y-3">
-              {laudos.map((l) => (
-                <div key={l.id} className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="inline-flex items-center gap-2 px-3 py-1 bg-amber-100 text-amber-900 font-black text-sm rounded-lg border border-amber-200">
-                        CID: {l.cid || "Não informado"}
+            <div className="space-y-4">
+              {laudos.map((l) => {
+                const temArquivo = Boolean(l.possui_arquivo || l.arquivo_path);
+                return (
+                  <div
+                    key={l.id}
+                    className="bg-white rounded-3xl border border-slate-200 p-5 sm:p-6 shadow-sm hover:shadow-md transition-all space-y-4"
+                  >
+                    {/* Cabeçalho do Card */}
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-900 border border-blue-200">
+                            📋 {l.tipo_documento || "Laudo Médico"}
+                          </span>
+
+                          {l.cid ? (
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-amber-100 text-amber-900 font-black text-xs rounded-full border border-amber-200">
+                              CID: {l.cid}
+                            </span>
+                          ) : (
+                            <span className="text-[11px] text-slate-400 font-medium">CID não especificado</span>
+                          )}
+
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <LockClosedIcon className="w-2.5 h-2.5" /> AES-256
+                          </span>
+                        </div>
+
+                        <h3 className="text-base font-bold text-slate-900 mt-1">
+                          {l.titulo || l.diagnostico || `${l.tipo_documento || "Laudo"} - ${aluno?.estudante}`}
+                        </h3>
                       </div>
-                      <h3 className="text-base font-bold text-slate-900 mt-2">{l.diagnostico || "Diagnóstico não descrito"}</h3>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        Emissor: <strong>{l.medico_nome || "—"}</strong> ({l.medico_crm || "CRM não informado"}) • {l.medico_especialidade || "Especialista"}
+
+                      <div className="flex items-center gap-1.5 self-end sm:self-center">
+                        <button
+                          onClick={() => {
+                            setEditLaudo(l);
+                            setModalLaudoOpen(true);
+                          }}
+                          className="p-2 text-slate-500 hover:text-emerald-700 hover:bg-emerald-50 rounded-xl transition-colors"
+                          title="Editar metadados"
+                        >
+                          <PencilSquareIcon className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteLaudo(l.id)}
+                          className="p-2 text-slate-400 hover:text-red-700 hover:bg-red-50 rounded-xl transition-colors"
+                          title="Excluir documento"
+                        >
+                          <TrashIcon className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Descrição do Diagnóstico se houver */}
+                    {l.diagnostico && l.titulo && (
+                      <div className="text-xs text-slate-700 bg-slate-50/70 p-3 rounded-2xl border border-slate-100">
+                        <span className="font-bold text-slate-900 block mb-0.5">🧠 Diagnóstico Clínico:</span>
+                        <p className="text-slate-600 leading-relaxed">{l.diagnostico}</p>
+                      </div>
+                    )}
+
+                    {/* Grid de Metadados */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs bg-slate-50/80 p-3.5 rounded-2xl border border-slate-100">
+                      <div>
+                        <span className="font-bold text-slate-700 block text-[11px] uppercase tracking-wider">👨‍⚕️ Profissional / Emissor:</span>
+                        <p className="text-slate-900 font-semibold truncate mt-0.5">
+                          {l.medico_nome || "—"}
+                        </p>
+                        <p className="text-[11px] text-slate-500">
+                          {l.medico_crm ? `CRM: ${l.medico_crm}` : "Sem CRM"} • {l.medico_especialidade || "Especialista"}
+                        </p>
+                      </div>
+
+                      <div>
+                        <span className="font-bold text-slate-700 block text-[11px] uppercase tracking-wider">📅 Emissão & Validade:</span>
+                        <p className="text-slate-900 font-semibold mt-0.5">
+                          Emitido: {formatDate(l.data_laudo)}
+                        </p>
+                        <p className="text-[11px] text-slate-500">
+                          Revisão: {l.data_validade ? formatDate(l.data_validade) : "Indeterminada"}
+                        </p>
+                      </div>
+
+                      <div>
+                        <span className="font-bold text-slate-700 block text-[11px] uppercase tracking-wider">💊 Medicamentos:</span>
+                        <p className="text-slate-700 mt-0.5 truncate" title={l.medicamentos || "Nenhum informado"}>
+                          {l.medicamentos || "Nenhum informado"}
+                        </p>
+                      </div>
+
+                      <div>
+                        <span className="font-bold text-slate-700 block text-[11px] uppercase tracking-wider">🏥 Terapias / Externo:</span>
+                        <p className="text-slate-700 mt-0.5 truncate" title={l.acompanhamento_externo || "Nenhum informado"}>
+                          {l.acompanhamento_externo || "Nenhum informado"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Observações */}
+                    {l.observacoes && (
+                      <p className="text-xs text-slate-600 italic bg-amber-50/50 p-3 rounded-xl border border-amber-100/80">
+                        💬 <strong>Observações:</strong> {l.observacoes}
                       </p>
-                    </div>
+                    )}
 
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => {
-                          setEditLaudo(l);
-                          setModalLaudoOpen(true);
-                        }}
-                        className="p-1.5 text-slate-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg"
-                      >
-                        <PencilSquareIcon className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteLaudo(l.id)}
-                        className="p-1.5 text-slate-400 hover:text-red-700 hover:bg-red-50 rounded-lg"
-                      >
-                        <TrashIcon className="w-4 h-4" />
-                      </button>
+                    {/* Barra de Ações & Download Protegido */}
+                    <div className="pt-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-t border-slate-100">
+                      <div className="flex items-center gap-2 text-xs text-slate-500">
+                        {temArquivo ? (
+                          <div className="flex items-center gap-1.5 text-emerald-800 font-medium bg-emerald-50 px-3 py-1 rounded-xl border border-emerald-200">
+                            <PaperClipIcon className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>{l.arquivo_nome_original || "Documento digitalizado"}</span>
+                            {l.arquivo_tamanho > 0 && (
+                              <span className="text-[10px] text-emerald-600">
+                                ({Math.round(l.arquivo_tamanho / 1024)} KB)
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 italic text-xs">
+                            Nenhum arquivo digital anexado (Apenas registro textual)
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                        {temArquivo ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handleSolicitarVisualizacao(l)}
+                              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold transition-colors shadow-2xs"
+                              title="Visualizar documento na tela"
+                            >
+                              <EyeIcon className="w-4 h-4 text-slate-600" />
+                              <span>Visualizar</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleSolicitarDownload(l)}
+                              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-blue-700 to-indigo-800 hover:from-blue-800 hover:to-indigo-900 text-white text-xs font-bold shadow-sm hover:shadow transition-all"
+                              title="Baixar cópia PDF protegida com sua senha de login"
+                            >
+                              <LockClosedIcon className="w-3.5 h-3.5 text-emerald-300" />
+                              <ArrowDownTrayIcon className="w-3.5 h-3.5" />
+                              <span>Baixar PDF Protegido</span>
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditLaudo(l);
+                              setModalLaudoOpen(true);
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold border border-emerald-200 transition-colors"
+                          >
+                            <PaperClipIcon className="w-3.5 h-3.5" />
+                            <span>Anexar Arquivo / Imagem</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs bg-slate-50 p-3 rounded-xl border border-slate-100">
-                    <div>
-                      <span className="font-bold text-slate-700 block">📅 Data de Emissão:</span>
-                      <span className="text-slate-600">{formatDate(l.data_laudo)}</span>
-                    </div>
-                    <div>
-                      <span className="font-bold text-slate-700 block">💊 Medicamentos em Uso:</span>
-                      <span className="text-slate-600">{l.medicamentos || "Nenhum informado"}</span>
-                    </div>
-                    <div>
-                      <span className="font-bold text-slate-700 block">🏥 Terapias / Externo:</span>
-                      <span className="text-slate-600">{l.acompanhamento_externo || "Nenhum informado"}</span>
-                    </div>
-                  </div>
-
-                  {l.observacoes && (
-                    <p className="text-xs text-slate-600 italic bg-amber-50/50 p-2.5 rounded-lg border border-amber-100">
-                      💬 Observações: {l.observacoes}
-                    </p>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -780,6 +972,33 @@ export default function ProntuarioAlunoAEE() {
         aluno={aluno}
         laudo={editLaudo}
         onSuccess={carregarProntuario}
+      />
+
+      {/* Modal de Autenticação para Download e Visualização com Senha (LGPD) */}
+      <ModalAutenticacaoLaudo
+        isOpen={authModalOpen}
+        onClose={() => {
+          setAuthModalOpen(false);
+          setAuthModalLaudo(null);
+        }}
+        laudo={authModalLaudo}
+        modo={authModalModo}
+        onConfirmar={handleConfirmarAutenticacao}
+      />
+
+      {/* Modal de Visualização Segura de Documento em Memória */}
+      <ModalVisualizadorDocumento
+        isOpen={viewerOpen}
+        onClose={() => {
+          setViewerOpen(false);
+          setViewerDoc(null);
+        }}
+        docData={viewerDoc}
+        onDownload={() => {
+          if (viewerDoc?.laudo) {
+            handleSolicitarDownload(viewerDoc.laudo);
+          }
+        }}
       />
 
       <ModalRegistroAtendimento

@@ -46,6 +46,7 @@ import ConteudosProfessor from "./features/professores/conteudos/Conteudos";
 import ProvasEmBreve from "./features/pedagogico/ProvasEmBreve";
 import CapasProvas from "./features/gabarito/capas/CapasProvas";
 import BoletimManual from "./features/professores/boletim/BoletimManual";
+import SalaRecursoProfessor from "./features/professores/sala_recurso";
 import SolicitacoesConteudos from "./features/pedagogico/coordenacao/SolicitacoesConteudos.jsx";
 import LandingPage from "./features/landing/LandingPage";
 import PrivacidadePage from "./pages/PrivacidadePage";
@@ -439,10 +440,11 @@ export default function App() {
           <Route path="/pedagogico/agenda" element={<RequireModulo modulo="pedagogico"><AgendaPedagogica /></RequireModulo>} />
 
           {/* ── Professores ──────────────────────────────────────────────── */}
-          <Route path="/professores/planos"     element={<RequireModulo modulo="professores"><Planos /></RequireModulo>} />
-          <Route path="/professores/avaliacoes" element={<RequireModulo modulo="professores"><Avaliacoes /></RequireModulo>} />
-          <Route path="/professores/conteudos"  element={<RequireModulo modulo="professores"><ConteudosProfessor /></RequireModulo>} />
-          <Route path="/professores/provas"     element={<RequireModulo modulo="professores"><ProvasEmBreve /></RequireModulo>} />
+          <Route path="/professores/planos"       element={<RequireModulo modulo="professores"><Planos /></RequireModulo>} />
+          <Route path="/professores/avaliacoes"   element={<RequireModulo modulo="professores"><Avaliacoes /></RequireModulo>} />
+          <Route path="/professores/conteudos"    element={<RequireModulo modulo="professores"><ConteudosProfessor /></RequireModulo>} />
+          <Route path="/professores/sala-recurso" element={<RequireModulo modulo="professores"><SalaRecursoProfessor /></RequireModulo>} />
+          <Route path="/professores/provas"       element={<RequireModulo modulo="professores"><ProvasEmBreve /></RequireModulo>} />
           <Route path="/pedagogico/provas"      element={<ProvasEmBreve />} />
           <Route path="/professores/boletim"    element={<RequireModulo modulo="professores"><BoletimManual /></RequireModulo>} />
 

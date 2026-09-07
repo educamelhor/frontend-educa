@@ -115,50 +115,103 @@ export default function SalaRecursoProfessor() {
     );
   }, []);
 
-  // 1. Carrega Turmas e Disciplinas do Professor Logado
+  // 1. Carrega Turmas do Professor Logado
   useEffect(() => {
-    const carregarTurmasEDisciplinas = async () => {
+    const carregarTurmas = async () => {
       setLoadingInicial(true);
       try {
-        const [resTurmas, resDisc] = await Promise.all([
-          api.get("/professores/me/turmas", { params: { ano: anoLetivo } }).catch(() => null),
-          api.get("/professores/me/disciplinas", { params: { ano: anoLetivo } }).catch(() => null),
-        ]);
+        const resTurmas = await api
+          .get("/professores/me/turmas", { params: { ano: anoLetivo } })
+          .catch(() => null);
 
         let turmasList = [];
         if (resTurmas?.data?.ok && Array.isArray(resTurmas.data.turmas)) {
           turmasList = resTurmas.data.turmas;
         } else {
           // Fallback para lista geral de turmas da escola se não for professor estrito
-          const resFallback = await api.get("/api/turmas", { params: { ano: anoLetivo } }).catch(() => null);
+          const resFallback = await api
+            .get("/api/turmas", { params: { ano: anoLetivo } })
+            .catch(() => null);
           turmasList = resFallback?.data?.turmas || resFallback?.data || [];
         }
         setTurmas(turmasList);
 
         if (turmasList.length > 0) {
-          setTurmaSelecionada(String(turmasList[0].id));
-        }
-
-        let discList = [];
-        if (resDisc?.data?.ok && Array.isArray(resDisc.data.disciplinas)) {
-          discList = resDisc.data.disciplinas.map((d) => (typeof d === "string" ? d : d.nome)).filter(Boolean);
-        }
-        if (discList.length === 0) {
-          discList = ["Língua Portuguesa", "Matemática", "Ciências", "História", "Geografia", "Artes", "Educação Física", "Inglês"];
-        }
-        setDisciplinas(discList);
-        if (discList.length > 0) {
-          setDisciplinaSelecionada(discList[0]);
+          setTurmaSelecionada((prev) => {
+            const exists = turmasList.some((t) => String(t.id) === String(prev));
+            return exists ? prev : String(turmasList[0].id);
+          });
+        } else {
+          setTurmaSelecionada("");
         }
       } catch (err) {
-        console.error("Erro ao carregar turmas e disciplinas:", err);
+        console.error("Erro ao carregar turmas:", err);
       } finally {
         setLoadingInicial(false);
       }
     };
 
-    carregarTurmasEDisciplinas();
+    carregarTurmas();
   }, [anoLetivo]);
+
+  // 2. Carrega Componentes Curriculares Vinculados ao Professor para a Turma Selecionada
+  useEffect(() => {
+    const carregarDisciplinas = async () => {
+      if (!turmaSelecionada) {
+        setDisciplinas([]);
+        setDisciplinaSelecionada("");
+        return;
+      }
+
+      try {
+        // 1) Busca disciplinas que o professor leciona nesta turma específica
+        const resDiscTurma = await api
+          .get(`/professores/me/turmas/${turmaSelecionada}/disciplinas`)
+          .catch(() => null);
+
+        let discList = [];
+        if (
+          resDiscTurma?.data?.ok &&
+          Array.isArray(resDiscTurma.data.disciplinas) &&
+          resDiscTurma.data.disciplinas.length > 0
+        ) {
+          discList = resDiscTurma.data.disciplinas
+            .map((d) => (typeof d === "string" ? d : d.nome))
+            .filter(Boolean);
+        } else {
+          // 2) Fallback: busca disciplinas gerais moduladas do professor
+          const resDiscGeral = await api
+            .get("/professores/me/disciplinas", { params: { ano: anoLetivo } })
+            .catch(() => null);
+
+          if (
+            resDiscGeral?.data?.ok &&
+            Array.isArray(resDiscGeral.data.disciplinas) &&
+            resDiscGeral.data.disciplinas.length > 0
+          ) {
+            discList = resDiscGeral.data.disciplinas
+              .map((d) => (typeof d === "string" ? d : d.nome))
+              .filter(Boolean);
+          }
+        }
+
+        // Deduplica e ordena alfabeticamente
+        discList = Array.from(new Set(discList)).sort((a, b) =>
+          a.localeCompare(b, "pt-BR", { sensitivity: "base" })
+        );
+
+        setDisciplinas(discList);
+        setDisciplinaSelecionada((prev) => {
+          if (discList.includes(prev)) return prev;
+          return discList[0] || "";
+        });
+      } catch (err) {
+        console.error("Erro ao carregar disciplinas do professor:", err);
+      }
+    };
+
+    carregarDisciplinas();
+  }, [turmaSelecionada, anoLetivo]);
 
   // 2. Carrega Alunos AEE e Adequações da Turma Selecionada
   const carregarAlunosEAdequacoes = async () => {
@@ -430,11 +483,15 @@ export default function SalaRecursoProfessor() {
               onChange={(e) => setDisciplinaSelecionada(e.target.value)}
               className="w-full text-sm py-2.5 px-3 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-600 font-bold text-blue-900"
             >
-              {disciplinas.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
+              {disciplinas.length === 0 ? (
+                <option value="">Nenhum componente vinculado</option>
+              ) : (
+                disciplinas.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))
+              )}
             </select>
           </div>
 

@@ -380,12 +380,14 @@ export default function SalaRecursoProfessor() {
     window.open(url, "_blank");
   };
 
-  // Helper para adicionar sugestão
+  // Helper para adicionar sugestão rápida com marcador (bolinha)
   const adicionarSugestao = (setter, currentValue, texto) => {
-    if (!currentValue.trim()) {
-      setter(texto);
+    const limpo = (currentValue || "").trim();
+    if (!limpo) {
+      setter(`• ${texto}`);
     } else {
-      setter(`${currentValue}\n• ${texto}`);
+      const base = limpo.startsWith("• ") || limpo.startsWith("- ") ? limpo : `• ${limpo}`;
+      setter(`${base}\n• ${texto}`);
     }
   };
 

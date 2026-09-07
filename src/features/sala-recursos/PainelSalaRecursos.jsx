@@ -46,7 +46,7 @@ export default function PainelSalaRecursos() {
   const [filtroTexto, setFiltroTexto] = useState("");
   const [turnoSelecionado, setTurnoSelecionado] = useState("");
   const [turmaSelecionada, setTurmaSelecionada] = useState("");
-  const [statusAee, setStatusAee] = useState("ativo");
+  const [statusAee, setStatusAee] = useState("");
   const [apenasAee, setApenasAee] = useState(true);
 
   // Modais rápidos
@@ -282,10 +282,10 @@ export default function PainelSalaRecursos() {
               onChange={(e) => setStatusAee(e.target.value)}
               className="w-full text-sm py-2.5 px-3 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-600 font-medium text-slate-700"
             >
+              <option value="">Status: Todos no AEE ({stats.total_alunos_aee || 0})</option>
               <option value="ativo">Status: Ativos no AEE</option>
-              <option value="em_avaliacao">Status: Em Avaliação</option>
-              <option value="todos">Status: Todos</option>
-              <option value="desligado">Status: Desligados</option>
+              <option value="pendente_config">Status: Pendente de Configuração</option>
+              <option value="desligado">Status: Desligados do AEE</option>
             </select>
           </div>
         </div>
@@ -407,12 +407,24 @@ export default function PainelSalaRecursos() {
                     </td>
 
                     <td className="py-3.5 px-3 text-xs">
-                      <span className="font-semibold text-slate-800 block">
-                        {a.tipo_atendimento ? a.tipo_atendimento.replace("Sala de Recursos Multifuncionais ", "") : "Não configurado"}
-                      </span>
-                      <span className="text-slate-500">
-                        {a.turno_atendimento || "Contraturno"} {a.dias_semana ? `(${a.dias_semana})` : ""}
-                      </span>
+                      {a.tipo_atendimento ? (
+                        <>
+                          <span className="font-semibold text-slate-800 block">
+                            {a.tipo_atendimento.replace("Sala de Recursos Multifuncionais ", "")}
+                          </span>
+                          <span className="text-slate-500">
+                            {a.turno_atendimento || "Contraturno"} {a.dias_semana ? `(${a.dias_semana})` : ""}
+                          </span>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => setAlunoConfigModal(a)}
+                          className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-md transition-colors"
+                          title="Clique para configurar o atendimento AEE deste estudante"
+                        >
+                          <Cog6ToothIcon className="w-3.5 h-3.5 text-amber-600" /> Configurar AEE
+                        </button>
+                      )}
                     </td>
 
                     <td className="py-3.5 px-3 text-center">

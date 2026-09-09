@@ -138,6 +138,13 @@ export default function Alunos() {
     return norm.includes("inativo");
   }
 
+  // Helper: detectar busca por AEE (Atendimento Educacional Especializado)
+  // Ativa quando o usuário digita "aee" em qualquer combinação de maiúsculas/minúsculas
+  function isBuscaAEE(termo) {
+    const q = String(termo || "").trim();
+    return q.toLowerCase() === "aee";
+  }
+
   // ────────────────────────────────────────────────────────────────
   // Buscar alunos (com backend filtrando por status quando necessário)
   // ────────────────────────────────────────────────────────────────
@@ -148,13 +155,14 @@ export default function Alunos() {
 
       const escolaId = localStorage.getItem("escola_id") || undefined;
       const somenteInativos = isBuscaInativos(debouncedFiltro);
+      const somenteAEE     = isBuscaAEE(debouncedFiltro);
 
-      // Quando for busca de INATIVOS:
-      // - enviamos status=inativo;
-      // - limpamos o filtro textual para trazer todos os inativos (paginação normal).
+      // Quando INATIVOS: envia status=inativo, limpa filtro textual.
+      // Quando AEE: envia aee=1, limpa filtro textual.
       const params = {
-        filtro: somenteInativos ? "" : debouncedFiltro,
+        filtro: (somenteInativos || somenteAEE) ? "" : debouncedFiltro,
         status: somenteInativos ? "inativo" : "",
+        aee:    somenteAEE ? "1" : "",
         ano_letivo: anoLetivo || undefined,
         limit,
         offset: (page - 1) * limit,

@@ -81,11 +81,24 @@ const SUGESTOES_RAPIDAS = {
     "Vocabulário temático contextualizado com imagens de apoio.",
   ],
   estrategias: [
+    "Adaptar as atividades de acordo com o nível de desenvolvimento, ritmo e necessidades individuais de cada aluno.",
+    "Adaptar materiais e recursos pedagógicos sempre que necessário, garantindo acessibilidade e participação.",
+    "Apresentar as instruções de forma clara, objetiva e em pequenas etapas, utilizando demonstrações quando necessário.",
+    "Incentivar a interação entre os alunos, promovendo atividades em duplas ou pequenos grupos.",
+    "Instruções fragmentadas em etapas simples e sequenciais.",
+    "Mediação direta e incentivo constante à participação ativa.",
+    "Oferecer apoio individualizado durante a realização das atividades, reduzindo gradualmente a ajuda conforme o aluno desenvolve autonomia.",
+    "Organizar o ambiente de maneira estruturada, segura e acessível, minimizando estímulos que possam dificultar a concentração.",
+    "Permitir diferentes formas de participação e expressão, como fala, gestos, desenhos, apontamentos ou manipulação de objetos.",
+    "Propor atividades que estimulem a coordenação motora, atenção, percepção, memória, comunicação e interação social.",
+    "Realizar intervenções durante a atividade, observando as dificuldades e ajustando a proposta de acordo com as necessidades do aluno.",
+    "Tempo estendido para realização de exercícios e atividades em sala.",
     "Textos em fonte ampliada (tamanho 14 ou 16) com espaçamento duplo.",
     "Uso de esquemas visuais, ilustrações e mapas conceituais.",
-    "Instruções fragmentadas em etapas simples e sequenciais.",
-    "Tempo estendido para realização de exercícios e atividades em sala.",
-    "Mediação direta e incentivo constante à participação ativa.",
+    "Utilizar imagens, figuras, cartões, objetos, jogos e recursos de comunicação alternativa para favorecer a aprendizagem.",
+    "Utilizar materiais concretos, recursos visuais e atividades lúdicas para facilitar a compreensão do conteúdo.",
+    "Utilizar repetição e retomada dos conteúdos, respeitando o tempo necessário para a aprendizagem.",
+    "Valorizar as potencialidades e conquistas individuais, utilizando reforço positivo e incentivo.",
   ],
   avaliacao: [
     "Avaliação formativa e processual contínua com registros no portfólio pedagógico.",
@@ -936,9 +949,9 @@ export default function SalaRecursoProfessor() {
                   placeholder="Ex: Textos em fonte ampliada (tamanho 14/16); Instruções fragmentadas; Apoio com mapas conceituais..."
                   className="w-full text-xs p-3 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-600 leading-relaxed"
                 />
-                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                <div className="flex flex-wrap items-center gap-1.5 pt-1 max-h-36 overflow-y-auto pr-1">
                   <span className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1">
-                    <LightBulbIcon className="w-3.5 h-3.5 text-amber-500" /> Sugestões:
+                    <LightBulbIcon className="w-3.5 h-3.5 text-amber-500" /> Sugestões ({SUGESTOES_RAPIDAS.estrategias.length}):
                   </span>
                   {SUGESTOES_RAPIDAS.estrategias.map((sug, i) => (
                     <button

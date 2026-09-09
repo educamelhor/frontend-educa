@@ -44,10 +44,35 @@ const BIMESTRES = ["1º Bimestre", "2º Bimestre", "3º Bimestre", "4º Bimestre
 // Sugestões pedagógicas rápidas para apoio ao professor
 const SUGESTOES_RAPIDAS = {
   habilidades: [
-    "Desenvolver compreensão textual e identificação de ideias centrais com mediação individualizada.",
+    "Ampliar a capacidade de atenção, concentração e compreensão.",
+    "Ampliar o vocabulário e as formas de comunicação.",
+    "Aprimorar habilidades de vida diária e autonomia.",
+    "Associar imagens, palavras, números ou quantidades.",
     "Compreender conceitos matemáticos fundamentais por meio de material concreto e recursos visuais.",
+    "Demonstrar compreensão do conteúdo por meio de fala, gestos, desenhos, apontamentos ou outros recursos de comunicação.",
+    "Desenvolver a autonomia e a participação do aluno nas atividades propostas.",
+    "Desenvolver a coordenação motora fina e ampla por meio de atividades lúdicas.",
+    "Desenvolver a coordenação motora por meio de pintura, recorte, colagem e traçados.",
+    "Desenvolver a percepção, memória, raciocínio e associação.",
+    "Desenvolver compreensão textual e identificação de ideias centrais com mediação individualizada.",
+    "Desenvolver habilidades cognitivas, motoras, sociais e emocionais.",
+    "Desenvolver noções de quantidade, sequência, espaço e tempo.",
+    "Estimular a atenção e a permanência na atividade pelo tempo possível.",
+    "Estimular a comunicação e a interação com colegas e professores.",
+    "Estimular a expressão de ideias, sentimentos e necessidades.",
+    "Expressar escolhas, preferências, sentimentos e necessidades.",
     "Expressar ideias com autonomia através de linguagem verbal, escrita orientada ou desenhos.",
+    "Favorecer a inclusão e a participação ativa no ambiente escolar.",
+    "Identificar diferenças e semelhanças entre objetos e figuras.",
+    "Incentivar a resolução de situações-problema de acordo com as possibilidades do aluno.",
+    "Interagir com os colegas, compartilhando materiais e participando de brincadeiras.",
     "Participar das atividades coletivas com suporte pedagógico e tempo estendido.",
+    "Participar de atividades individuais e coletivas respeitando seus limites e possibilidades.",
+    "Promover a autoestima, a confiança e o sentimento de pertencimento.",
+    "Reconhecer cores, formas, números, letras, imagens ou objetos do cotidiano.",
+    "Reconhecer e utilizar recursos de comunicação alternativa, quando necessário.",
+    "Resolver pequenas situações-problema utilizando estratégias próprias.",
+    "Seguir instruções simples, com apoio visual ou verbal quando necessário.",
   ],
   conteudos: [
     "Gêneros textuais curtos e estruturação de frases;",
@@ -843,18 +868,19 @@ export default function SalaRecursoProfessor() {
                   className="w-full text-xs p-3 bg-slate-50 border border-slate-300 rounded-xl focus:bg-white focus:ring-2 focus:ring-blue-600 leading-relaxed"
                 />
                 {/* Sugestões Rápidas */}
-                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                <div className="flex flex-wrap items-center gap-1.5 pt-1 max-h-36 overflow-y-auto pr-1">
                   <span className="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1">
-                    <LightBulbIcon className="w-3.5 h-3.5 text-amber-500" /> Sugestões:
+                    <LightBulbIcon className="w-3.5 h-3.5 text-amber-500" /> Sugestões ({SUGESTOES_RAPIDAS.habilidades.length}):
                   </span>
                   {SUGESTOES_RAPIDAS.habilidades.map((sug, i) => (
                     <button
                       key={i}
                       type="button"
+                      title={sug}
                       onClick={() => adicionarSugestao(setFormHabilidades, formHabilidades, sug)}
-                      className="px-2 py-0.5 bg-slate-100 hover:bg-blue-100 text-slate-700 hover:text-blue-900 text-[10px] font-medium rounded border border-slate-200 transition-colors"
+                      className="px-2 py-0.5 bg-slate-100 hover:bg-blue-100 text-slate-700 hover:text-blue-900 text-[10px] font-medium rounded border border-slate-200 transition-colors text-left"
                     >
-                      + {sug.slice(0, 45)}...
+                      + {sug.length > 45 ? `${sug.slice(0, 45)}...` : sug}
                     </button>
                   ))}
                 </div>
@@ -884,10 +910,11 @@ export default function SalaRecursoProfessor() {
                     <button
                       key={i}
                       type="button"
+                      title={sug}
                       onClick={() => adicionarSugestao(setFormConteudos, formConteudos, sug)}
-                      className="px-2 py-0.5 bg-slate-100 hover:bg-blue-100 text-slate-700 hover:text-blue-900 text-[10px] font-medium rounded border border-slate-200 transition-colors"
+                      className="px-2 py-0.5 bg-slate-100 hover:bg-blue-100 text-slate-700 hover:text-blue-900 text-[10px] font-medium rounded border border-slate-200 transition-colors text-left"
                     >
-                      + {sug.slice(0, 45)}...
+                      + {sug.length > 45 ? `${sug.slice(0, 45)}...` : sug}
                     </button>
                   ))}
                 </div>
@@ -917,10 +944,11 @@ export default function SalaRecursoProfessor() {
                     <button
                       key={i}
                       type="button"
+                      title={sug}
                       onClick={() => adicionarSugestao(setFormEstrategias, formEstrategias, sug)}
-                      className="px-2 py-0.5 bg-slate-100 hover:bg-blue-100 text-slate-700 hover:text-blue-900 text-[10px] font-medium rounded border border-slate-200 transition-colors"
+                      className="px-2 py-0.5 bg-slate-100 hover:bg-blue-100 text-slate-700 hover:text-blue-900 text-[10px] font-medium rounded border border-slate-200 transition-colors text-left"
                     >
-                      + {sug.slice(0, 45)}...
+                      + {sug.length > 45 ? `${sug.slice(0, 45)}...` : sug}
                     </button>
                   ))}
                 </div>
@@ -950,10 +978,11 @@ export default function SalaRecursoProfessor() {
                     <button
                       key={i}
                       type="button"
+                      title={sug}
                       onClick={() => adicionarSugestao(setFormAvaliacao, formAvaliacao, sug)}
-                      className="px-2 py-0.5 bg-slate-100 hover:bg-blue-100 text-slate-700 hover:text-blue-900 text-[10px] font-medium rounded border border-slate-200 transition-colors"
+                      className="px-2 py-0.5 bg-slate-100 hover:bg-blue-100 text-slate-700 hover:text-blue-900 text-[10px] font-medium rounded border border-slate-200 transition-colors text-left"
                     >
-                      + {sug.slice(0, 45)}...
+                      + {sug.length > 45 ? `${sug.slice(0, 45)}...` : sug}
                     </button>
                   ))}
                 </div>

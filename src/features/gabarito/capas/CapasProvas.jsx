@@ -1238,6 +1238,9 @@ export default function CapasProvas() {
                       <span>🏷️</span> Identificação da turma na impressão e QR Code:
                     </span>
                     <span style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
                       background: effectiveArea?.cor || '#6366f1',
                       color: '#fff',
                       fontSize: 11.5,
@@ -1247,6 +1250,7 @@ export default function CapasProvas() {
                       letterSpacing: '0.04em',
                       textTransform: 'uppercase',
                       boxShadow: `0 2px 6px ${effectiveArea?.cor || '#6366f1'}30`,
+                      lineHeight: 1.1,
                     }}>
                       TURMA: {turmaNome}
                     </span>

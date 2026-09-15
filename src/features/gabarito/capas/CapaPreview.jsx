@@ -87,6 +87,7 @@ export default function CapaPreview({
           <span style={{
             display: 'inline-flex',
             alignItems: 'center',
+            justifyContent: 'center',
             gap: 4,
             background: area.cor,
             color: '#ffffff',
@@ -97,6 +98,7 @@ export default function CapaPreview({
             letterSpacing: '0.04em',
             textTransform: 'uppercase',
             boxShadow: `0 2px 6px ${area.cor}35`,
+            lineHeight: 1.1,
           }}>
             TURMA: {turmaNome}
           </span>

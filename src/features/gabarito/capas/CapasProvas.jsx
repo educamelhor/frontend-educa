@@ -1455,33 +1455,51 @@ export default function CapasProvas() {
                 </div>
               </div>
 
-              {/* Live Preview */}
-              <div style={{ flex:1 }}>
-                <h3 style={{ fontSize:13, fontWeight:700, color:'#64748b', marginBottom:12, textTransform:'uppercase', letterSpacing:'0.05em' }}>Pré-visualização</h3>
-                <div style={{ width: 595*0.55, height: 842*0.55, overflow:'hidden', borderRadius:8, boxShadow:'0 8px 32px rgba(0,0,0,0.15)', border:'1px solid #e2e8f0', position:'relative' }}>
-                  <CapaPreview
-                    area={effectiveArea}
-                    template={selectedTemplate}
-                    titulo={form.titulo}
-                    serie={form.serie}
-                    bimestre={form.bimestre}
-                    turmaNome={turmas.find(t => String(t.id) === String(form.turma_id))?.nome || ''}
-                    instrucoes={form.instrucoes}
-                    scale={0.55}
-                    escolaNome={escolaNome}
-                    logoEsq={logoEsquerda}
-                    logoDir={logoDireita}
-                    customImage={customImage}
-                    imageFitMode={imageFitMode}
-                    imageFrame={imageFrame}
-                    imageZoom={imageZoom}
-                    imageOffsetX={imageOffsetX}
-                    imageOffsetY={imageOffsetY}
-                    imageHeight={imageHeight}
-                    imageWidthPct={imageWidthPct}
-                  />
+              {/* Live Preview — Sticky (sempre visível ao rolar a página) */}
+              <div style={{
+                flex: 1,
+                position: 'sticky',
+                top: 16,
+                alignSelf: 'flex-start',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                zIndex: 10,
+              }}>
+                <div style={{ width: 595*0.55 }}>
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10 }}>
+                    <h3 style={{ fontSize:13, fontWeight:700, color:'#64748b', margin:0, textTransform:'uppercase', letterSpacing:'0.05em' }}>
+                      Pré-visualização
+                    </h3>
+                    <span style={{ fontSize:10, background:'#e0e7ff', color:'#4338ca', fontWeight:700, padding:'2px 8px', borderRadius:12, display:'flex', alignItems:'center', gap:4 }}>
+                      <span>👁️</span> Fixa na tela
+                    </span>
+                  </div>
+                  <div style={{ width: 595*0.55, height: 842*0.55, overflow:'hidden', borderRadius:8, boxShadow:'0 8px 32px rgba(0,0,0,0.15)', border:'1px solid #e2e8f0', position:'relative', background:'#fff' }}>
+                    <CapaPreview
+                      area={effectiveArea}
+                      template={selectedTemplate}
+                      titulo={form.titulo}
+                      serie={form.serie}
+                      bimestre={form.bimestre}
+                      turmaNome={turmas.find(t => String(t.id) === String(form.turma_id))?.nome || ''}
+                      instrucoes={form.instrucoes}
+                      scale={0.55}
+                      escolaNome={escolaNome}
+                      logoEsq={logoEsquerda}
+                      logoDir={logoDireita}
+                      customImage={customImage}
+                      imageFitMode={imageFitMode}
+                      imageFrame={imageFrame}
+                      imageZoom={imageZoom}
+                      imageOffsetX={imageOffsetX}
+                      imageOffsetY={imageOffsetY}
+                      imageHeight={imageHeight}
+                      imageWidthPct={imageWidthPct}
+                    />
+                  </div>
+                  <p style={{ fontSize:11, color:'#94a3b8', marginTop:8, textAlign:'center' }}>Preview em tempo real · PDF gerado em A4</p>
                 </div>
-                <p style={{ fontSize:11, color:'#94a3b8', marginTop:8, textAlign:'center' }}>Preview aproximado · PDF gerado em A4</p>
               </div>
             </div>
           )}

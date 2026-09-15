@@ -96,10 +96,13 @@ export default function CapasProvas() {
   // ── Custom image state ─────────────────────────────────────────────
   const [customImage, setCustomImage] = useState(null); // dataURL
   const [noCustomImage, setNoCustomImage] = useState(false); // usuário optou por nenhuma imagem
+  const [imageFitMode, setImageFitMode] = useState('contain'); // 'contain' | 'cover'
+  const [imageFrame, setImageFrame] = useState(true); // moldura elegante
+  const [showFineTuning, setShowFineTuning] = useState(false);
   const [imageZoom, setImageZoom] = useState(1);
   const [imageOffsetX, setImageOffsetX] = useState(0);
   const [imageOffsetY, setImageOffsetY] = useState(0);
-  const [imageHeight, setImageHeight] = useState(200);  // altura em px (escala 1:1)
+  const [imageHeight, setImageHeight] = useState(220);  // altura em px (escala 1:1)
   const [imageWidthPct, setImageWidthPct] = useState(100); // largura em % (50–100)
   const fileInputRef = useRef(null);
   const previewCaptureRef = useRef(null);
@@ -237,8 +240,12 @@ export default function CapasProvas() {
     reader.onload = ev => {
       setCustomImage(ev.target.result);
       setNoCustomImage(false); // inserir imagem cancela o "sem imagem"
-      setImageZoom(1); setImageOffsetX(0); setImageOffsetY(0);
-      setImageHeight(200);
+      setImageFitMode('contain'); // enquadramento padrão: imagem inteira sem cortes
+      setImageFrame(true);       // moldura elegante ativa
+      setImageZoom(1);
+      setImageOffsetX(0);
+      setImageOffsetY(0);
+      setImageHeight(220);
       setImageWidthPct(100);
     };
     reader.readAsDataURL(file);
@@ -248,8 +255,13 @@ export default function CapasProvas() {
   function removeCustomImage() {
     setCustomImage(null);
     setNoCustomImage(false);
-    setImageZoom(1); setImageOffsetX(0); setImageOffsetY(0);
-    setImageHeight(200);
+    setImageFitMode('contain');
+    setImageFrame(true);
+    setShowFineTuning(false);
+    setImageZoom(1);
+    setImageOffsetX(0);
+    setImageOffsetY(0);
+    setImageHeight(220);
     setImageWidthPct(100);
   }
 
@@ -393,16 +405,16 @@ export default function CapasProvas() {
         // ══ PASSO 2: Desenhar imagem do usuário (somente se não for "Sem imagem") ════
         if (customImage) {
           const zoneW = clearW;
-          const zoneH_max = clearMaxY - clearY; // altura máxima disponível
+          const zoneH_max = Math.max(100, clearMaxY - clearY - 24); // altura máxima útil da zona
 
-          // Largura: imageWidthPct% da zona, centrada
-          const drawW  = Math.min((imageWidthPct / 100) * zoneW, zoneW);
-          const drawX  = clearX + (zoneW - drawW) / 2;
+          // Largura da moldura/área da imagem
+          const frameW = Math.min((imageWidthPct / 100) * (zoneW - 20), zoneW - 20);
+          const frameX = clearX + (zoneW - frameW) / 2;
 
-          // Altura: imageHeight pts × 2, limitada ao máximo da zona
-          const drawH  = Math.min(imageHeight * 2, zoneH_max);
-          // Âncora: parte inferior da zona (igual ao comportamento das imagens padrão)
-          const drawY  = clearMaxY - drawH;
+          // Altura da moldura/área da imagem
+          const frameH = Math.min(imageHeight * 2, zoneH_max);
+          // Centraliza suavemente no espaço disponível de Campo 4 (evita abismo em branco)
+          const frameY = clearY + 12 + Math.max(0, (zoneH_max - frameH) / 2);
 
           // Carrega imagem do usuário
           const userImg = new Image();
@@ -412,25 +424,56 @@ export default function CapasProvas() {
           const iw = userImg.naturalWidth  || userImg.width  || 1;
           const ih = userImg.naturalHeight || userImg.height || 1;
 
-          // Mode cover: escala para preencher drawW × drawH sem distorcer
-          let coverW, coverH;
-          if (iw / ih > drawW / drawH) {
-            coverH = drawH; coverW = coverH * (iw / ih);
-          } else {
-            coverW = drawW; coverH = coverW / (iw / ih);
+          // Desenha moldura elegante se ativada
+          if (imageFrame) {
+            ctx.save();
+            ctx.strokeStyle = `${effectiveArea.cor}44`;
+            ctx.lineWidth = 2.5;
+            ctx.fillStyle = '#ffffff';
+            if (typeof ctx.roundRect === 'function') {
+              ctx.beginPath();
+              ctx.roundRect(frameX, frameY, frameW, frameH, 12);
+              ctx.fill();
+              ctx.stroke();
+            } else {
+              ctx.fillRect(frameX, frameY, frameW, frameH);
+              ctx.strokeRect(frameX, frameY, frameW, frameH);
+            }
+            ctx.restore();
           }
-          // Aplica zoom do usuário (sempre ≥ 1 para não deixar bordas brancas)
-          const z = Math.max(1, imageZoom);
-          coverW *= z;
-          coverH *= z;
 
-          const cx = drawX + drawW / 2 + (imageOffsetX / 100) * drawW;
-          const cy = drawY + drawH / 2 + (imageOffsetY / 100) * drawH;
+          // Padding interno para que a imagem não cole na borda da moldura
+          const pad = imageFrame ? 10 : 0;
+          const innerW = frameW - pad * 2;
+          const innerH = frameH - pad * 2;
+          const innerX = frameX + pad;
+          const innerY = frameY + pad;
+
+          let fitW, fitH;
+          if (imageFitMode === 'contain') {
+            // MODO CONTER: 100% da imagem visível, sem cortes e sem distorção
+            const scale = Math.min(innerW / iw, innerH / ih) * imageZoom;
+            fitW = iw * scale;
+            fitH = ih * scale;
+          } else {
+            // MODO PREENCHER (COVER): preenche toda a área
+            const scale = Math.max(innerW / iw, innerH / ih) * Math.max(1, imageZoom);
+            fitW = iw * scale;
+            fitH = ih * scale;
+          }
+
+          const cx = innerX + innerW / 2 + (imageOffsetX / 100) * innerW;
+          const cy = innerY + innerH / 2 + (imageOffsetY / 100) * innerH;
+
           ctx.save();
           ctx.beginPath();
-          ctx.rect(drawX, drawY, drawW, drawH);
+          if (typeof ctx.roundRect === 'function' && imageFrame) {
+            ctx.roundRect(innerX, innerY, innerW, innerH, 8);
+          } else {
+            ctx.rect(innerX, innerY, innerW, innerH);
+          }
           ctx.clip();
-          ctx.drawImage(userImg, cx - coverW / 2, cy - coverH / 2, coverW, coverH);
+          ctx.drawImage(userImg, cx - fitW / 2, cy - fitH / 2, fitW, fitH);
           ctx.restore();
         }
         // noCustomImage: zona já foi limpa acima com branco — nenhuma imagem é desenhada
@@ -508,10 +551,13 @@ export default function CapasProvas() {
     setForm({ titulo: '', serie: '', turno: '', bimestre: 1, ano: ANO_CORRENTE, instrucoes: '' });
     setCustomImage(null);
     setNoCustomImage(false);
+    setImageFitMode('contain');
+    setImageFrame(true);
+    setShowFineTuning(false);
     setImageZoom(1);
     setImageOffsetX(0);
     setImageOffsetY(0);
-    setImageHeight(200);
+    setImageHeight(220);
     setImageWidthPct(100);
     setCustomColor(null);
     setEditingCapaId(null);
@@ -1140,7 +1186,8 @@ export default function CapasProvas() {
                           <img src={customImage} alt="Imagem selecionada" style={s.imageThumbnail} />
                         </div>
                         <div style={{ flex:1 }}>
-                          <p style={{ fontSize:11, color:'#475569', margin:'0 0 8px' }}>Imagem carregada. Ajuste o zoom e a posição no preview ao lado.</p>
+                          <div style={{ fontSize:12, fontWeight:700, color:'#1e293b', marginBottom:2 }}>Imagem Carregada</div>
+                          <p style={{ fontSize:11, color:'#64748b', margin:'0 0 8px', lineHeight:1.3 }}>Enquadramento automático ativo (sem cortes indesejados).</p>
                           <div style={{ display:'flex', gap:6 }}>
                             <button style={s.btnChangeImage} onClick={() => fileInputRef.current?.click()}>🔄 Trocar</button>
                             <button style={s.btnRemoveImage} onClick={removeCustomImage}>✕ Remover</button>
@@ -1148,90 +1195,235 @@ export default function CapasProvas() {
                         </div>
                       </div>
 
-                      {/* Zoom control */}
-                      <div style={s.zoomRow}>
-                        <span style={s.zoomLabel}>🔍 Zoom</span>
-                        <button
-                          style={s.zoomBtn}
-                          onClick={() => setImageZoom(z => Math.max(0.5, parseFloat((z - 0.1).toFixed(1))))}
-                        >−</button>
-                        <input
-                          type="range" min="0.5" max="2.5" step="0.05"
-                          value={imageZoom}
-                          onChange={e => setImageZoom(parseFloat(e.target.value))}
-                          style={s.zoomSlider}
-                        />
-                        <button
-                          style={s.zoomBtn}
-                          onClick={() => setImageZoom(z => Math.min(2.5, parseFloat((z + 0.1).toFixed(1))))}
-                        >+</button>
-                        <span style={s.zoomValue}>{imageZoom.toFixed(1)}×</span>
+                      {/* ── 1-Clique: Modo de Enquadramento Inteligente ── */}
+                      <div style={{ margin:'12px 0 10px' }}>
+                        <div style={{ fontSize:11, fontWeight:800, color:'#475569', marginBottom:6, textTransform:'uppercase', letterSpacing:'0.04em' }}>
+                          Modo de Enquadramento
+                        </div>
+                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                          {/* Botão Ajustar Inteira */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setImageFitMode('contain');
+                              setImageZoom(1);
+                              setImageOffsetX(0);
+                              setImageOffsetY(0);
+                            }}
+                            style={{
+                              padding:'10px 8px',
+                              borderRadius:8,
+                              border: imageFitMode === 'contain'
+                                ? `2px solid ${effectiveArea.cor}`
+                                : '1.5px solid #e2e8f0',
+                              background: imageFitMode === 'contain'
+                                ? `${effectiveArea.cor}12`
+                                : '#f8fafc',
+                              color: imageFitMode === 'contain' ? effectiveArea.cor : '#475569',
+                              fontWeight:700,
+                              fontSize:11,
+                              cursor:'pointer',
+                              display:'flex',
+                              flexDirection:'column',
+                              alignItems:'center',
+                              gap:3,
+                              textAlign:'center',
+                              transition:'all .2s ease',
+                              boxShadow: imageFitMode === 'contain' ? `0 2px 8px ${effectiveArea.cor}25` : 'none',
+                            }}
+                          >
+                            <span style={{ fontSize:16 }}>🖼️</span>
+                            <span>Ajustar Inteira</span>
+                            <span style={{ fontSize:9.5, fontWeight:500, color: imageFitMode === 'contain' ? effectiveArea.cor : '#94a3b8', opacity:0.9 }}>
+                              100% visível (sem cortes)
+                            </span>
+                          </button>
+
+                          {/* Botão Preencher Área */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setImageFitMode('cover');
+                              setImageZoom(1);
+                              setImageOffsetX(0);
+                              setImageOffsetY(0);
+                            }}
+                            style={{
+                              padding:'10px 8px',
+                              borderRadius:8,
+                              border: imageFitMode === 'cover'
+                                ? `2px solid ${effectiveArea.cor}`
+                                : '1.5px solid #e2e8f0',
+                              background: imageFitMode === 'cover'
+                                ? `${effectiveArea.cor}12`
+                                : '#f8fafc',
+                              color: imageFitMode === 'cover' ? effectiveArea.cor : '#475569',
+                              fontWeight:700,
+                              fontSize:11,
+                              cursor:'pointer',
+                              display:'flex',
+                              flexDirection:'column',
+                              alignItems:'center',
+                              gap:3,
+                              textAlign:'center',
+                              transition:'all .2s ease',
+                              boxShadow: imageFitMode === 'cover' ? `0 2px 8px ${effectiveArea.cor}25` : 'none',
+                            }}
+                          >
+                            <span style={{ fontSize:16 }}>📐</span>
+                            <span>Preencher Área</span>
+                            <span style={{ fontSize:9.5, fontWeight:500, color: imageFitMode === 'cover' ? effectiveArea.cor : '#94a3b8', opacity:0.9 }}>
+                              Formato banner panorâmico
+                            </span>
+                          </button>
+                        </div>
                       </div>
 
-                      {/* Offset X */}
-                      <div style={s.zoomRow}>
-                        <span style={s.zoomLabel}>↔ Pos. X</span>
-                        <button style={s.zoomBtn} onClick={() => setImageOffsetX(x => Math.max(-50, x - 5))}>−</button>
+                      {/* ── Moldura Elegante Toggle ── */}
+                      <label style={{
+                        display:'flex',
+                        alignItems:'center',
+                        gap:8,
+                        padding:'7px 10px',
+                        background:'#f8fafc',
+                        borderRadius:6,
+                        border:'1px solid #e2e8f0',
+                        cursor:'pointer',
+                        fontSize:11.5,
+                        fontWeight:600,
+                        color:'#334155',
+                        margin:'8px 0 10px',
+                        userSelect:'none',
+                      }}>
                         <input
-                          type="range" min="-50" max="50" step="1"
-                          value={imageOffsetX}
-                          onChange={e => setImageOffsetX(Number(e.target.value))}
-                          style={s.zoomSlider}
+                          type="checkbox"
+                          checked={imageFrame}
+                          onChange={e => setImageFrame(e.target.checked)}
+                          style={{ cursor:'pointer', accentColor: effectiveArea.cor, width:15, height:15 }}
                         />
-                        <button style={s.zoomBtn} onClick={() => setImageOffsetX(x => Math.min(50, x + 5))}>+</button>
-                        <span style={s.zoomValue}>{imageOffsetX > 0 ? '+' : ''}{imageOffsetX}%</span>
-                      </div>
+                        <span>✨ Moldura elegante na cor da avaliação</span>
+                      </label>
 
-                      {/* Offset Y */}
-                      <div style={s.zoomRow}>
-                        <span style={s.zoomLabel}>↕ Pos. Y</span>
-                        <button style={s.zoomBtn} onClick={() => setImageOffsetY(y => Math.max(-50, y - 5))}>−</button>
-                        <input
-                          type="range" min="-50" max="50" step="1"
-                          value={imageOffsetY}
-                          onChange={e => setImageOffsetY(Number(e.target.value))}
-                          style={s.zoomSlider}
-                        />
-                        <button style={s.zoomBtn} onClick={() => setImageOffsetY(y => Math.min(50, y + 5))}>+</button>
-                        <span style={s.zoomValue}>{imageOffsetY > 0 ? '+' : ''}{imageOffsetY}%</span>
-                      </div>
-
-                      {/* Separador tamanho */}
-                      <div style={{ height:'1px', background:'#e2e8f0', margin:'4px 0 6px' }} />
-
-                      {/* Altura da imagem */}
-                      <div style={s.zoomRow}>
-                        <span style={s.zoomLabel}>⇕ Altura</span>
-                        <button style={s.zoomBtn} onClick={() => setImageHeight(h => Math.max(80, h - 10))}>−</button>
-                        <input
-                          type="range" min="80" max="340" step="10"
-                          value={imageHeight}
-                          onChange={e => setImageHeight(Number(e.target.value))}
-                          style={s.zoomSlider}
-                        />
-                        <button style={s.zoomBtn} onClick={() => setImageHeight(h => Math.min(340, h + 10))}>+</button>
-                        <span style={s.zoomValue}>{imageHeight}px</span>
-                      </div>
-
-                      {/* Largura da imagem */}
-                      <div style={s.zoomRow}>
-                        <span style={s.zoomLabel}>⇔ Largura</span>
-                        <button style={s.zoomBtn} onClick={() => setImageWidthPct(w => Math.max(40, w - 5))}>−</button>
-                        <input
-                          type="range" min="40" max="100" step="5"
-                          value={imageWidthPct}
-                          onChange={e => setImageWidthPct(Number(e.target.value))}
-                          style={s.zoomSlider}
-                        />
-                        <button style={s.zoomBtn} onClick={() => setImageWidthPct(w => Math.min(100, w + 5))}>+</button>
-                        <span style={s.zoomValue}>{imageWidthPct}%</span>
-                      </div>
-
-                      {/* Reset tudo */}
+                      {/* ── Ajuste Fino (Colapsável) ── */}
                       <button
-                        style={{ ...s.btnChangeImage, marginTop:4, fontSize:11 }}
-                        onClick={() => { setImageZoom(1); setImageOffsetX(0); setImageOffsetY(0); setImageHeight(200); setImageWidthPct(100); }}
-                      >↺ Resetar tudo</button>
+                        type="button"
+                        onClick={() => setShowFineTuning(v => !v)}
+                        style={{
+                          width:'100%',
+                          padding:'7px 10px',
+                          borderRadius:6,
+                          border:'1px solid #e2e8f0',
+                          background: showFineTuning ? '#f1f5f9' : '#ffffff',
+                          color:'#475569',
+                          fontSize:11,
+                          fontWeight:700,
+                          cursor:'pointer',
+                          display:'flex',
+                          alignItems:'center',
+                          justifyContent:'space-between',
+                          marginBottom: showFineTuning ? 8 : 0,
+                          transition:'background .15s',
+                        }}
+                      >
+                        <span>🎛️ Ajustes manuais (Zoom, Posição, Altura)</span>
+                        <span style={{ fontSize:10 }}>{showFineTuning ? '▲ Fechar' : '▼ Expandir'}</span>
+                      </button>
+
+                      {showFineTuning && (
+                        <div style={{
+                          padding:'10px 12px',
+                          background:'#f8fafc',
+                          borderRadius:8,
+                          border:'1px solid #e2e8f0',
+                          marginTop:6,
+                        }}>
+                          {/* Zoom control */}
+                          <div style={s.zoomRow}>
+                            <span style={s.zoomLabel}>🔍 Zoom</span>
+                            <button
+                              style={s.zoomBtn}
+                              onClick={() => setImageZoom(z => Math.max(0.5, parseFloat((z - 0.1).toFixed(1))))}
+                            >−</button>
+                            <input
+                              type="range" min="0.5" max="2.5" step="0.05"
+                              value={imageZoom}
+                              onChange={e => setImageZoom(parseFloat(e.target.value))}
+                              style={s.zoomSlider}
+                            />
+                            <button
+                              style={s.zoomBtn}
+                              onClick={() => setImageZoom(z => Math.min(2.5, parseFloat((z + 0.1).toFixed(1))))}
+                            >+</button>
+                            <span style={s.zoomValue}>{imageZoom.toFixed(1)}×</span>
+                          </div>
+
+                          {/* Offset X */}
+                          <div style={s.zoomRow}>
+                            <span style={s.zoomLabel}>↔ Pos. X</span>
+                            <button style={s.zoomBtn} onClick={() => setImageOffsetX(x => Math.max(-50, x - 5))}>−</button>
+                            <input
+                              type="range" min="-50" max="50" step="1"
+                              value={imageOffsetX}
+                              onChange={e => setImageOffsetX(Number(e.target.value))}
+                              style={s.zoomSlider}
+                            />
+                            <button style={s.zoomBtn} onClick={() => setImageOffsetX(x => Math.min(50, x + 5))}>+</button>
+                            <span style={s.zoomValue}>{imageOffsetX > 0 ? '+' : ''}{imageOffsetX}%</span>
+                          </div>
+
+                          {/* Offset Y */}
+                          <div style={s.zoomRow}>
+                            <span style={s.zoomLabel}>↕ Pos. Y</span>
+                            <button style={s.zoomBtn} onClick={() => setImageOffsetY(y => Math.max(-50, y - 5))}>−</button>
+                            <input
+                              type="range" min="-50" max="50" step="1"
+                              value={imageOffsetY}
+                              onChange={e => setImageOffsetY(Number(e.target.value))}
+                              style={s.zoomSlider}
+                            />
+                            <button style={s.zoomBtn} onClick={() => setImageOffsetY(y => Math.min(50, y + 5))}>+</button>
+                            <span style={s.zoomValue}>{imageOffsetY > 0 ? '+' : ''}{imageOffsetY}%</span>
+                          </div>
+
+                          {/* Separador tamanho */}
+                          <div style={{ height:'1px', background:'#e2e8f0', margin:'4px 0 6px' }} />
+
+                          {/* Altura da imagem */}
+                          <div style={s.zoomRow}>
+                            <span style={s.zoomLabel}>⇕ Altura</span>
+                            <button style={s.zoomBtn} onClick={() => setImageHeight(h => Math.max(120, h - 10))}>−</button>
+                            <input
+                              type="range" min="120" max="340" step="10"
+                              value={imageHeight}
+                              onChange={e => setImageHeight(Number(e.target.value))}
+                              style={s.zoomSlider}
+                            />
+                            <button style={s.zoomBtn} onClick={() => setImageHeight(h => Math.min(340, h + 10))}>+</button>
+                            <span style={s.zoomValue}>{imageHeight}px</span>
+                          </div>
+
+                          {/* Largura da imagem */}
+                          <div style={s.zoomRow}>
+                            <span style={s.zoomLabel}>⇔ Largura</span>
+                            <button style={s.zoomBtn} onClick={() => setImageWidthPct(w => Math.max(40, w - 5))}>−</button>
+                            <input
+                              type="range" min="40" max="100" step="5"
+                              value={imageWidthPct}
+                              onChange={e => setImageWidthPct(Number(e.target.value))}
+                              style={s.zoomSlider}
+                            />
+                            <button style={s.zoomBtn} onClick={() => setImageWidthPct(w => Math.min(100, w + 5))}>+</button>
+                            <span style={s.zoomValue}>{imageWidthPct}%</span>
+                          </div>
+
+                          {/* Reset tudo */}
+                          <button
+                            type="button"
+                            style={{ ...s.btnChangeImage, marginTop:6, fontSize:11, width:'100%', justifyContent:'center' }}
+                            onClick={() => { setImageZoom(1); setImageOffsetX(0); setImageOffsetY(0); setImageHeight(220); setImageWidthPct(100); }}
+                          >↺ Restaurar Dimensões Padrão</button>
+                        </div>
+                      )}
                     </div>
                   ) : noCustomImage ? (
                     /* Estado: usuário optou por nenhuma imagem */
@@ -1280,6 +1472,8 @@ export default function CapasProvas() {
                     logoEsq={logoEsquerda}
                     logoDir={logoDireita}
                     customImage={customImage}
+                    imageFitMode={imageFitMode}
+                    imageFrame={imageFrame}
                     imageZoom={imageZoom}
                     imageOffsetX={imageOffsetX}
                     imageOffsetY={imageOffsetY}

@@ -52,7 +52,58 @@ export default function CapaPreview({
   };
 
   const baseSerie = [serie, bimestre ? `${bimestre}º BIMESTRE` : ''].filter(Boolean).join(' — ');
-  const serieText = turmaNome ? `${baseSerie} - ${turmaNome}` : baseSerie;
+
+  // ── Renderizador de Série + Badge Estilizado da Turma ──────────────────────
+  function SerieTurmaBadge({ align = 'center', color = area.cor, baseFontSize = 18, isBox = false }) {
+    if (!baseSerie && !turmaNome) return null;
+    const isLeft = align === 'left';
+    return (
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: isLeft ? 'flex-start' : 'center',
+        flexWrap: 'wrap',
+        gap: 8,
+        marginTop: isLeft ? 4 : 6,
+      }}>
+        {baseSerie && (
+          <span style={isBox ? {
+            fontSize: baseFontSize,
+            fontWeight: 900,
+            color: '#1e293b',
+            background: `${area.cor}14`,
+            padding: '3px 10px',
+            borderRadius: 4,
+            borderLeft: `3px solid ${area.cor}`,
+          } : {
+            fontSize: baseFontSize,
+            fontWeight: 900,
+            color: color,
+          }}>
+            {baseSerie}
+          </span>
+        )}
+        {turmaNome && (
+          <span style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+            background: area.cor,
+            color: '#ffffff',
+            fontSize: isBox ? 11.5 : Math.max(10, Math.round(baseFontSize * 0.55)),
+            fontWeight: 800,
+            padding: '3px 10px',
+            borderRadius: 14,
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase',
+            boxShadow: `0 2px 6px ${area.cor}35`,
+          }}>
+            TURMA: {turmaNome}
+          </span>
+        )}
+      </div>
+    );
+  }
 
   // ── Bloco de imagem no Campo 4 ─────────────────────────────────────────────
   function BottomImage({ mx = 0, mt = 0, borderRadius = 6 }) {
@@ -147,7 +198,7 @@ export default function CapaPreview({
             <div style={{ textAlign:'center', padding:'12px 10px 6px', flexShrink:0 }}>
               <div style={{ fontSize:32, fontWeight:900, color:area.cor, lineHeight:1 }}>PROVÃO DE</div>
               <div style={{ fontSize:46, fontWeight:900, color:'#111', lineHeight:1.1 }}>{area.label}</div>
-              {serieText && <div style={{ fontSize:22, fontWeight:900, color:area.cor, marginTop:6 }}>{serieText}</div>}
+              <SerieTurmaBadge align="center" color={area.cor} baseFontSize={20} />
             </div>
             {/* Instruções */}
             <div style={{ margin:'8px 10px 0', background:area.corClaro, border:`1px solid ${area.cor}`, borderRadius:4, padding:'8px 12px', overflow:'hidden', flexShrink:0 }}>
@@ -209,11 +260,7 @@ export default function CapaPreview({
           <div style={{ padding:'10px 14px 6px', flexShrink:0 }}>
             <div style={{ color:'#64748b', fontSize:11, fontWeight:800, letterSpacing:'0.06em' }}>PROVÃO DE</div>
             <div style={{ fontSize:46, fontWeight:900, color:area.cor, lineHeight:1.05, margin:'2px 0 4px' }}>{area.label}</div>
-            {serieText && (
-              <div style={{ fontSize:15, fontWeight:900, color:'#1e293b', background:`${area.cor}14`, display:'inline-block', padding:'3px 10px', borderRadius:4, borderLeft:`3px solid ${area.cor}` }}>
-                {serieText}
-              </div>
-            )}
+            <SerieTurmaBadge align="left" isBox={true} baseFontSize={15} />
           </div>
 
           {/* CAMPO 3: CARD DE ORIENTAÇÕES AOS ESTUDANTES */}
@@ -284,7 +331,7 @@ export default function CapaPreview({
             <div style={{ textAlign:'center', padding:'14px 16px 8px', flexShrink:0 }}>
               <div style={{ fontSize:16, fontWeight:700, color:area.cor }}>PROVÃO DE</div>
               <div style={{ fontSize:48, fontWeight:900, color:'#111', lineHeight:1.1 }}>{area.label}</div>
-              {serieText && <div style={{ fontSize:20, fontWeight:900, color:area.cor, marginTop:4 }}>{serieText}</div>}
+              <SerieTurmaBadge align="center" color={area.cor} baseFontSize={18} />
             </div>
             <div style={{ height:2, background:area.cor, margin:'0 16px', flexShrink:0 }} />
             {/* Instruções */}
@@ -325,7 +372,7 @@ export default function CapaPreview({
         </div>
         {/* Card branco — instruções */}
         <div style={{ background:'#fff', margin:'0', padding:'10px 14px 4px 14px', overflow:'hidden', flexShrink:0 }}>
-          {serieText && <div style={{ fontSize:20, fontWeight:900, color:area.cor, textAlign:'center', marginBottom:8 }}>{serieText}</div>}
+          <div style={{ marginBottom: 8 }}><SerieTurmaBadge align="center" color={area.cor} baseFontSize={18} /></div>
           <div style={{ background:area.corClaro, border:`1.5px solid ${area.cor}`, borderRadius:6, padding:'8px 12px', overflow:'hidden' }}>
             <div style={{ fontWeight:900, fontSize:10, color:area.cor, textAlign:'center', marginBottom:6 }}>LEIA ATENTAMENTE AS INSTRUÇÕES SEGUINTES:</div>
             <div style={{ fontSize:8, color:'#222', lineHeight:1.2, whiteSpace:'pre-wrap' }}>{instrucoes}</div>
@@ -363,7 +410,7 @@ export default function CapaPreview({
         <div style={{ textAlign:'center', padding:'12px 16px 8px', flexShrink:0 }}>
           <div style={{ fontSize:12, fontWeight:600, color:area.cor }}>PROVÃO DE</div>
           <div style={{ fontSize:48, fontWeight:900, color:'#f1f5f9', lineHeight:1.1 }}>{area.label}</div>
-          {serieText && <div style={{ fontSize:18, fontWeight:900, color:area.cor, marginTop:4 }}>{serieText}</div>}
+          <SerieTurmaBadge align="center" color={area.cor} baseFontSize={17} />
         </div>
         {/* Card dark — instruções */}
         <div style={{ margin:'8px 16px 0', background:'#1e293b', borderRadius:8, border:`1px solid ${area.cor}`, padding:'10px 14px', overflow:'hidden', flexShrink:0 }}>

@@ -152,7 +152,7 @@ export default function CapasProvas() {
     }
   }, []);
 
-  const loadTurmas = useCallback(async (avaliacaoId) => {
+  const loadTurmas = useCallback(async (avaliacaoId, preferredTurmaId = null) => {
     if (!avaliacaoId) {
       setTurmas([]);
       return;
@@ -160,7 +160,19 @@ export default function CapasProvas() {
     try {
       const res = await fetch(`${API}/api/gabarito-avaliacoes/${avaliacaoId}/turmas-vinculadas`, { headers: authH() });
       const data = await res.json();
-      setTurmas(data || []);
+      const list = Array.isArray(data) ? data : [];
+      setTurmas(list);
+      setForm(f => {
+        const targetTurmaId = preferredTurmaId || f.turma_id;
+        const exists = targetTurmaId && list.some(t => String(t.id) === String(targetTurmaId));
+        if (exists) {
+          return { ...f, turma_id: String(targetTurmaId) };
+        }
+        if (list.length === 1) {
+          return { ...f, turma_id: String(list[0].id) };
+        }
+        return { ...f, turma_id: '' };
+      });
     } catch (err) {
       console.error('Erro ao carregar turmas vinculadas', err);
     }
@@ -218,6 +230,28 @@ export default function CapasProvas() {
       }
     }
   }, [avaliacoesFiltradas, form.avaliacao_id]);
+
+  // Turmas disponíveis para seleção avulsa (quando não há avaliação do gabarito vinculada)
+  const turmasAvulsasFiltradas = React.useMemo(() => {
+    if (!form.serie) return todasTurmas;
+    const serieUpper = form.serie.toUpperCase().trim();
+    return todasTurmas.filter(t => {
+      const nomeTurma = (t.turma || t.nome || '').toUpperCase();
+      const serieTurma = (t.serie || '').toUpperCase();
+      return nomeTurma.includes(serieUpper) || serieTurma.includes(serieUpper);
+    });
+  }, [todasTurmas, form.serie]);
+
+  // Nome da turma selecionada (seja da avaliação vinculada ou seleção avulsa)
+  const turmaNome = React.useMemo(() => {
+    if (!form.turma_id) return '';
+    if (form.avaliacao_id) {
+      const found = turmas.find(t => String(t.id) === String(form.turma_id));
+      if (found) return found.nome || found.turma || '';
+    }
+    const foundTodas = todasTurmas.find(t => String(t.id) === String(form.turma_id));
+    return foundTodas ? (foundTodas.turma || foundTodas.nome || '') : '';
+  }, [form.turma_id, form.avaliacao_id, turmas, todasTurmas]);
 
   useEffect(() => { loadAvaliacoes(); }, [loadAvaliacoes]);
   useEffect(() => { loadTodasTurmas(form.ano); }, [loadTodasTurmas, form.ano]);
@@ -308,6 +342,11 @@ export default function CapasProvas() {
     if (!selectedArea || !selectedTemplate) return;
     if (!form.titulo.trim() || !form.bimestre || !form.ano) {
       showToast('Preencha título, bimestre e ano.', 'error');
+      return;
+    }
+    // Blindagem EDUCA-SCAN: se selecionou avaliação e há turmas vinculadas, turma_id é obrigatório!
+    if (form.avaliacao_id && !form.turma_id && turmas.length > 0) {
+      showToast('Selecione a turma vinculada para que o QR Code e o badge identifiquem a turma no EDUCA-SCAN.', 'error');
       return;
     }
     setGenerating(true);
@@ -580,7 +619,7 @@ export default function CapasProvas() {
       turma_id: capa.turma_id || '',
     });
     if (capa.avaliacao_id) {
-      loadTurmas(capa.avaliacao_id);
+      loadTurmas(capa.avaliacao_id, capa.turma_id);
     }
     setEditingCapaId(capa.id);
     setCustomColor(null);
@@ -845,7 +884,20 @@ export default function CapasProvas() {
                         {capa.serie && <span>·</span>}
                         <span>{capa.bimestre}º Bimestre</span>
                         {capa.turma_nome && <span>·</span>}
-                        {capa.turma_nome && <span style={{ fontWeight:700, color:'#4338ca' }}>{capa.turma_nome}</span>}
+                        {capa.turma_nome && (
+                          <span style={{
+                            background: '#e0e7ff',
+                            color: '#3730a3',
+                            padding: '2px 8px',
+                            borderRadius: 12,
+                            fontSize: 11,
+                            fontWeight: 800,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.03em',
+                          }}>
+                            TURMA: {capa.turma_nome}
+                          </span>
+                        )}
                         <span>·</span>
                         <span>{capa.ano}</span>
                       </div>
@@ -1115,18 +1167,91 @@ export default function CapasProvas() {
                     </select>
 
                   </div>
-                  {form.avaliacao_id && (
+                  {form.avaliacao_id ? (
                     <div style={{ flex: 1 }}>
-                      <label style={s.label}>Turma Específica</label>
-                      <select style={s.input} value={form.turma_id || ''} onChange={e => setForm(f => ({ ...f, turma_id: e.target.value }))}>
-                        <option value="">-- Selecione a Turma --</option>
+                      <label style={{ ...s.label, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span>Turma Vinculada *</span>
+                        <span style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          background: form.turma_id ? '#dcfce7' : '#fee2e2',
+                          color: form.turma_id ? '#16a34a' : '#dc2626',
+                          padding: '1px 7px',
+                          borderRadius: 10,
+                        }}>
+                          {form.turma_id ? '✓ QR Code Vinculado' : '⚠️ Obrigatório p/ EDUCA-SCAN'}
+                        </span>
+                      </label>
+                      <select
+                        style={{
+                          ...s.input,
+                          borderColor: !form.turma_id ? '#ef4444' : '#e2e8f0',
+                          background: !form.turma_id ? '#fffafb' : '#fff',
+                          fontWeight: 600,
+                        }}
+                        value={form.turma_id || ''}
+                        onChange={e => setForm(f => ({ ...f, turma_id: e.target.value }))}
+                      >
+                        <option value="">-- Selecione a Turma (Obrigatório) --</option>
                         {turmas.map(t => (
                           <option key={t.id} value={t.id}>{t.nome}</option>
                         ))}
                       </select>
                     </div>
+                  ) : (
+                    <div style={{ flex: 1 }}>
+                      <label style={{ ...s.label, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span>Turma (Opcional - Capa Avulsa)</span>
+                        {form.turma_id && (
+                          <span style={{ fontSize: 10, fontWeight: 700, background: '#e0e7ff', color: '#4338ca', padding: '1px 7px', borderRadius: 10 }}>
+                            ✓ Badge Ativo
+                          </span>
+                        )}
+                      </label>
+                      <select
+                        style={s.input}
+                        value={form.turma_id || ''}
+                        onChange={e => setForm(f => ({ ...f, turma_id: e.target.value }))}
+                      >
+                        <option value="">-- Nenhuma Turma --</option>
+                        {turmasAvulsasFiltradas.map(t => (
+                          <option key={t.id} value={t.id}>{t.turma || t.nome}</option>
+                        ))}
+                      </select>
+                    </div>
                   )}
                 </div>
+
+                {/* Feedback visual do badge que será impresso na capa */}
+                {turmaNome && (
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 12px',
+                    marginBottom: 12,
+                    borderRadius: 8,
+                    background: `${effectiveArea?.cor || '#6366f1'}12`,
+                    border: `1px solid ${effectiveArea?.cor || '#6366f1'}35`,
+                  }}>
+                    <span style={{ fontSize: 12, color: '#334155', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span>🏷️</span> Identificação da turma na impressão e QR Code:
+                    </span>
+                    <span style={{
+                      background: effectiveArea?.cor || '#6366f1',
+                      color: '#fff',
+                      fontSize: 11.5,
+                      fontWeight: 800,
+                      padding: '3px 10px',
+                      borderRadius: 14,
+                      letterSpacing: '0.04em',
+                      textTransform: 'uppercase',
+                      boxShadow: `0 2px 6px ${effectiveArea?.cor || '#6366f1'}30`,
+                    }}>
+                      TURMA: {turmaNome}
+                    </span>
+                  </div>
+                )}
 
                 <label style={s.label}>Instruções (editável)</label>
                 <textarea
@@ -1482,7 +1607,7 @@ export default function CapasProvas() {
                       titulo={form.titulo}
                       serie={form.serie}
                       bimestre={form.bimestre}
-                      turmaNome={turmas.find(t => String(t.id) === String(form.turma_id))?.nome || ''}
+                      turmaNome={turmaNome}
                       instrucoes={form.instrucoes}
                       scale={0.55}
                       escolaNome={escolaNome}

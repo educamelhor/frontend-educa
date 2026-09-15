@@ -229,29 +229,60 @@ export default function CardapioTab() {
       setRefeicoesCardapio(cardapioExistente.refeicoes_cardapio != null ? String(cardapioExistente.refeicoes_cardapio) : "");
       const groupedMap = new Map();
       cardapioExistente.itens.forEach(i => {
+         const qtdJaConsumida = Number(i.quantidade_kg) || 0;
+
          if (!groupedMap.has(i.produto_id)) {
             const estItems = estoque.filter(e => e.produto_id === i.produto_id);
             const refEstoque = estItems[0] || {};
-            const totalSaldo = estItems.reduce((acc, curr) => acc + Number(curr.saldo_kg || 0), 0);
-            const lotesDisp = estItems.map(e => ({ lote: e.lote, validade: e.validade, saldo_kg: Number(e.saldo_kg || 0) })).filter(e => e.lote);
-            lotesDisp.sort((a,b) => (a.validade && b.validade) ? new Date(a.validade) - new Date(b.validade) : 0);
+            
+            const lotesMap = new Map();
+            estItems.forEach(e => {
+                if (e.lote) {
+                    const key = `${e.lote}||${e.validade}`;
+                    lotesMap.set(key, { lote: e.lote, validade: e.validade, saldo_kg: Number(e.saldo_kg || 0) });
+                }
+            });
 
             groupedMap.set(i.produto_id, {
                key: i.produto_id,
                produto_id: i.produto_id,
                produto: i.produto,
                marca: i.marca,
-               quantidade_kg: Number(i.quantidade_kg),
+               quantidade_kg: 0,
                gramaturaStr: i.gramaturaStr || refEstoque.gramatura,
                percapita_kg: refEstoque.percapita_kg,
-               saldo_kg: totalSaldo,
-               lotesDisponiveis: lotesDisp
+               saldo_kg: estItems.reduce((acc, curr) => acc + Number(curr.saldo_kg || 0), 0),
+               lotesMap: lotesMap
             });
-         } else {
-            groupedMap.get(i.produto_id).quantidade_kg += Number(i.quantidade_kg);
+         }
+
+         const group = groupedMap.get(i.produto_id);
+         group.quantidade_kg += qtdJaConsumida;
+         group.saldo_kg += qtdJaConsumida; // Estorno Virtual no saldo total
+
+         // Estorno Virtual no saldo do lote
+         if (i.lote) {
+             const loteKey = `${i.lote}||${i.validade}`;
+             if (group.lotesMap.has(loteKey)) {
+                 group.lotesMap.get(loteKey).saldo_kg += qtdJaConsumida;
+             } else {
+                 group.lotesMap.set(loteKey, {
+                     lote: i.lote,
+                     validade: i.validade,
+                     saldo_kg: qtdJaConsumida
+                 });
+             }
          }
       });
-      setItensSelecionados(Array.from(groupedMap.values()));
+
+      const finalItens = Array.from(groupedMap.values()).map(group => {
+          const lotesDisponiveis = Array.from(group.lotesMap.values());
+          lotesDisponiveis.sort((a,b) => (a.validade && b.validade) ? new Date(a.validade) - new Date(b.validade) : 0);
+          delete group.lotesMap;
+          return { ...group, lotesDisponiveis };
+      });
+
+      setItensSelecionados(finalItens);
     } else {
       setEditingId(null);
       const diaFormatado = day ? String(day).padStart(2, '0') : String(new Date().getDate()).padStart(2, '0');

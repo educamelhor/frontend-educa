@@ -31,6 +31,7 @@ export default function CapaPreview({
   imageOffsetY = 0,
   imageHeight = 200,   // altura em px (escala 1:1) do bloco de imagem
   imageWidthPct = 100, // largura em % do container de imagem (0–100)
+  turmaNome = '',
 }) {
   if (!area || !template) return null;
 
@@ -50,7 +51,8 @@ export default function CapaPreview({
     flexDirection: 'column',
   };
 
-  const serieText = [serie, bimestre ? `${bimestre}º BIMESTRE` : ''].filter(Boolean).join(' - ');
+  const baseSerie = [serie, bimestre ? `${bimestre}º BIMESTRE` : ''].filter(Boolean).join(' — ');
+  const serieText = turmaNome ? `${baseSerie} - ${turmaNome}` : baseSerie;
   const IMG_H = imageHeight; // altura do bloco de imagem (controlado pelo usuário)
 
   // ── Bloco de imagem no rodapé ───────────────────────────────────────────────

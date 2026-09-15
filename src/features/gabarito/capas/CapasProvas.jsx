@@ -530,7 +530,12 @@ export default function CapasProvas() {
       bimestre: capa.bimestre || 1,
       ano: capa.ano || ANO_CORRENTE,
       instrucoes: capa.instrucoes || areaDef.instrucoesPadrao || '',
+      avaliacao_id: capa.avaliacao_id || '',
+      turma_id: capa.turma_id || '',
     });
+    if (capa.avaliacao_id) {
+      loadTurmas(capa.avaliacao_id);
+    }
     setEditingCapaId(capa.id);
     setCustomColor(null);
     setCustomImage(null);
@@ -769,6 +774,7 @@ export default function CapasProvas() {
                           titulo={capa.titulo}
                           serie={capa.serie}
                           bimestre={capa.bimestre}
+                          turmaNome={capa.turma_nome || ''}
                           instrucoes={capa.instrucoes || areaDef.instrucoesPadrao}
                           scale={0.185}
                           escolaNome={escolaNome}
@@ -792,6 +798,8 @@ export default function CapasProvas() {
                         {capa.serie && <span>{capa.serie}</span>}
                         {capa.serie && <span>·</span>}
                         <span>{capa.bimestre}º Bimestre</span>
+                        {capa.turma_nome && <span>·</span>}
+                        {capa.turma_nome && <span style={{ fontWeight:700, color:'#4338ca' }}>{capa.turma_nome}</span>}
                         <span>·</span>
                         <span>{capa.ano}</span>
                       </div>
@@ -1265,6 +1273,7 @@ export default function CapasProvas() {
                     titulo={form.titulo}
                     serie={form.serie}
                     bimestre={form.bimestre}
+                    turmaNome={turmas.find(t => String(t.id) === String(form.turma_id))?.nome || ''}
                     instrucoes={form.instrucoes}
                     scale={0.55}
                     escolaNome={escolaNome}

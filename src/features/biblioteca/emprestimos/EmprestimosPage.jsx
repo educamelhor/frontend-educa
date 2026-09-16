@@ -2,7 +2,7 @@
 // ============================================================================
 // Controle de empréstimos com controle de estoque físico
 // ============================================================================
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import api from '../../../services/api';
 
 const STATUS_MAP = {
@@ -11,42 +11,198 @@ const STATUS_MAP = {
   atrasado: { label: 'Atrasado', color: '#ef4444', bg: 'rgba(239,68,68,0.12)' },
 };
 
+const OPCOES_DIAS = [3, 5, 7, 10, 14];
+
+const TURNO_STYLES = {
+  Matutino: { emoji: '🌅', label: 'Matutino', color: '#d97706', bgActive: 'linear-gradient(135deg, #f59e0b, #d97706)', border: '#fde68a' },
+  Vespertino: { emoji: '☀️', label: 'Vespertino', color: '#0284c7', bgActive: 'linear-gradient(135deg, #0ea5e9, #0284c7)', border: '#bae6fd' },
+  Noturno: { emoji: '🌙', label: 'Noturno', color: '#7c3aed', bgActive: 'linear-gradient(135deg, #8b5cf6, #7c3aed)', border: '#ddd6fe' },
+  Integral: { emoji: '🏫', label: 'Integral', color: '#059669', bgActive: 'linear-gradient(135deg, #10b981, #059669)', border: '#a7f3d0' },
+};
+
+function formatarDataISO(d) {
+  const ano = d.getFullYear();
+  const mes = String(d.getMonth() + 1).padStart(2, '0');
+  const dia = String(d.getDate()).padStart(2, '0');
+  return `${ano}-${mes}-${dia}`;
+}
+
+function somarDias(dias) {
+  const d = new Date();
+  d.setDate(d.getDate() + dias);
+  return formatarDataISO(d);
+}
+
+function formatarDataLegivel(isoStr) {
+  if (!isoStr) return '';
+  const [ano, mes, dia] = isoStr.split('-').map(Number);
+  if (!ano || !mes || !dia) return '';
+  const d = new Date(ano, mes - 1, dia);
+  return d.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
 function NovoEmprestimoModal({ onClose }) {
-  const [busca, setBusca] = useState('');
+  // ── Livro ──
+  const [buscaLivro, setBuscaLivro] = useState('');
   const [livros, setLivros] = useState([]);
   const [livroSel, setLivroSel] = useState(null);
-  const [buscaAluno, setBuscaAluno] = useState('');
-  const [alunos, setAlunos] = useState([]);
+  const [loadingLivros, setLoadingLivros] = useState(false);
+
+  // ── Turmas & Alunos ──
+  const [turmas, setTurmas] = useState([]);
+  const [loadingTurmas, setLoadingTurmas] = useState(false);
+  const [turnoSel, setTurnoSel] = useState(null);
+  const [turmaSel, setTurmaSel] = useState(null);
+  const [alunosTurma, setAlunosTurma] = useState([]);
+  const [loadingAlunos, setLoadingAlunos] = useState(false);
+  const [filtroAlunoTexto, setFiltroAlunoTexto] = useState('');
+  const [listaAlunosAberta, setListaAlunosAberta] = useState(false);
   const [alunoSel, setAlunoSel] = useState(null);
-  const [dataDev, setDataDev] = useState('');
+
+  // ── Prazo (Dias & Data) ──
+  const [diasSel, setDiasSel] = useState(7);
+  const [dataDev, setDataDev] = useState(() => somarDias(7));
   const [obs, setObs] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  // Busca de livros com debounce
   const searchLivros = useCallback(async (q) => {
-    if (!q) { setLivros([]); return; }
+    if (!q.trim()) { setLivros([]); return; }
+    setLoadingLivros(true);
     try {
       const { data } = await api.get('/api/biblioteca/acervo', { params: { q, disponivel: '1', limit: 8 } });
       setLivros(data.livros || []);
     } catch { setLivros([]); }
+    finally { setLoadingLivros(false); }
   }, []);
 
-  const searchAlunos = useCallback(async (q) => {
-    if (!q) { setAlunos([]); return; }
+  useEffect(() => {
+    const t = setTimeout(() => searchLivros(buscaLivro), 350);
+    return () => clearTimeout(t);
+  }, [buscaLivro, searchLivros]);
+
+  // Carrega turmas da escola
+  useEffect(() => {
+    (async () => {
+      setLoadingTurmas(true);
+      try {
+        const { data } = await api.get('/api/turmas');
+        setTurmas(Array.isArray(data) ? data : []);
+      } catch (err) {
+        console.error('Erro ao carregar turmas:', err);
+      } finally {
+        setLoadingTurmas(false);
+      }
+    })();
+  }, []);
+
+  // Extrai turnos presentes nas turmas
+  const turnosDisponiveis = useMemo(() => {
+    const set = new Set();
+    turmas.forEach(t => {
+      if (t.turno) {
+        const tr = t.turno.trim();
+        const cap = tr.charAt(0).toUpperCase() + tr.slice(1).toLowerCase();
+        set.add(cap);
+      }
+    });
+    const padrao = ['Matutino', 'Vespertino', 'Noturno', 'Integral'];
+    const ordenados = padrao.filter(p => set.has(p));
+    set.forEach(s => { if (!ordenados.includes(s)) ordenados.push(s); });
+    return ordenados.length > 0 ? ordenados : ['Matutino', 'Vespertino', 'Noturno'];
+  }, [turmas]);
+
+  // Turmas filtradas pelo turno selecionado
+  const turmasDoTurno = useMemo(() => {
+    if (!turnoSel) return [];
+    return turmas.filter(t => (t.turno || '').toLowerCase().trim() === turnoSel.toLowerCase().trim());
+  }, [turmas, turnoSel]);
+
+  // Alunos filtrados dentro da turma
+  const alunosFiltrados = useMemo(() => {
+    if (!filtroAlunoTexto.trim()) return alunosTurma;
+    const q = filtroAlunoTexto.toLowerCase().trim();
+    return alunosTurma.filter(a => (a.nome || '').toLowerCase().includes(q) || (a.matricula || '').toLowerCase().includes(q));
+  }, [alunosTurma, filtroAlunoTexto]);
+
+  // Selecionar turno
+  const handleSelecionarTurno = (turno) => {
+    setTurnoSel(turno);
+    setTurmaSel(null);
+    setAlunosTurma([]);
+    setListaAlunosAberta(false);
+    setFiltroAlunoTexto('');
+  };
+
+  // Selecionar turma
+  const handleSelecionarTurma = async (turma) => {
+    if (turmaSel?.id === turma.id && listaAlunosAberta) {
+      setListaAlunosAberta(false);
+      return;
+    }
+    setTurmaSel(turma);
+    setLoadingAlunos(true);
+    setListaAlunosAberta(true);
+    setFiltroAlunoTexto('');
     try {
-      // param correto é 'filtro'; campo de nome é 'estudante'
-      const { data } = await api.get('/api/alunos', { params: { filtro: q, limit: 8, status: 'ativo' } });
-      const lista = (data.alunos || data || []).map(a => ({ ...a, nome: a.estudante || a.nome || '', turma_nome: a.turma || a.turma_nome || '' }));
-      setAlunos(lista);
-    } catch { setAlunos([]); }
-  }, []);
+      const { data } = await api.get(`/api/turmas/${turma.id}/alunos`);
+      const list = Array.isArray(data) ? data : (data.alunos || []);
+      setAlunosTurma(list);
+    } catch (err) {
+      console.error('Erro ao buscar alunos da turma:', err);
+      setAlunosTurma([]);
+    } finally {
+      setLoadingAlunos(false);
+    }
+  };
 
-  useEffect(() => { const t = setTimeout(() => searchLivros(busca), 400); return () => clearTimeout(t); }, [busca]);
-  useEffect(() => { const t = setTimeout(() => searchAlunos(buscaAluno), 400); return () => clearTimeout(t); }, [buscaAluno]);
+  // Selecionar estudante: preenche o campo e fecha a gaveta
+  const handleSelecionarAluno = (aluno) => {
+    setAlunoSel({
+      id: aluno.id,
+      nome: aluno.nome,
+      matricula: aluno.matricula,
+      turma_nome: turmaSel?.turma || '',
+      foto: aluno.foto,
+    });
+    setListaAlunosAberta(false);
+    setFiltroAlunoTexto('');
+    setError('');
+  };
 
+  // Trocar dias pré-selecionados
+  const handleSelecionarDias = (dias) => {
+    setDiasSel(dias);
+    setDataDev(somarDias(dias));
+  };
+
+  // Digitar ou escolher data no calendário
+  const handleDataManual = (val) => {
+    setDataDev(val);
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    const [ano, mes, dia] = (val || '').split('-').map(Number);
+    if (ano && mes && dia) {
+      const dTarget = new Date(ano, mes - 1, dia);
+      dTarget.setHours(0, 0, 0, 0);
+      const diff = Math.round((dTarget - hoje) / (1000 * 60 * 60 * 24));
+      if (OPCOES_DIAS.includes(diff)) {
+        setDiasSel(diff);
+      } else {
+        setDiasSel(null);
+      }
+    } else {
+      setDiasSel(null);
+    }
+  };
+
+  // Submeter empréstimo
   const handleSalvar = async () => {
-    if (!livroSel || !alunoSel) { setError('Selecione livro e aluno.'); return; }
-    setSaving(true); setError('');
+    if (!livroSel) { setError('Selecione um livro para o empréstimo.'); return; }
+    if (!alunoSel) { setError('Selecione o estudante que pegará o livro.'); return; }
+    setSaving(true);
+    setError('');
     try {
       await api.post('/api/biblioteca/emprestimos', {
         livro_id: livroSel.id,
@@ -57,98 +213,472 @@ function NovoEmprestimoModal({ onClose }) {
       onClose(true);
     } catch (err) {
       setError(err.response?.data?.error || 'Erro ao registrar empréstimo.');
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)' }}
-      onClick={e => e.target === e.currentTarget && onClose(false)}>
-      <div className="w-full max-w-lg rounded-2xl overflow-hidden" style={{ background: '#fff', boxShadow: '0 32px 80px rgba(0,0,0,0.4)', animation: 'modalEntrada 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards' }}>
-        <div className="p-5 rounded-t-2xl" style={{ background: 'linear-gradient(135deg, #1e3a8a, #1d4ed8)' }}>
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-black text-white">📋 Novo Empréstimo</h2>
-            <button onClick={() => onClose(false)} className="text-white/60 hover:text-white text-xl">✕</button>
-          </div>
-        </div>
-        <div className="p-5 space-y-4">
-          {/* Livro */}
-          <div>
-            <label className="block text-xs font-bold mb-1 text-slate-500">Livro (disponíveis)</label>
-            {livroSel ? (
-              <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
-                <span className="text-2xl">📗</span>
-                <div className="flex-1">
-                  <p className="font-bold text-sm text-slate-800">{livroSel.titulo}</p>
-                  <p className="text-xs text-slate-500">{livroSel.autor} · {livroSel.exemplares_disponiveis} disponíveis</p>
-                </div>
-                <button onClick={() => { setLivroSel(null); setBusca(''); }} className="text-xs text-red-400 hover:text-red-600">✕</button>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4"
+      style={{ background: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(8px)' }}
+      onClick={e => e.target === e.currentTarget && onClose(false)}
+    >
+      <div
+        className="w-full max-w-2xl max-h-[92vh] flex flex-col rounded-3xl overflow-hidden shadow-2xl"
+        style={{
+          background: '#ffffff',
+          boxShadow: '0 25px 60px -15px rgba(30, 58, 138, 0.45)',
+          animation: 'modalEntrada 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+        }}
+      >
+        {/* Top Header com Gradiente Premium */}
+        <div
+          className="p-5 sm:p-6 text-white relative overflow-hidden flex-shrink-0"
+          style={{ background: 'linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 50%, #2563eb 100%)' }}
+        >
+          <div className="flex items-center justify-between relative z-10">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center text-2xl border border-white/20 shadow-inner">
+                📖
               </div>
-            ) : (
-              <div className="relative">
-                <input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar livro..." className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none focus:ring-2 focus:ring-blue-300" style={{ borderColor: '#e2e8f0' }} />
-                {livros.length > 0 && (
-                  <div className="absolute w-full mt-1 rounded-xl shadow-lg border z-10 overflow-hidden" style={{ background: '#fff', borderColor: '#e2e8f0' }}>
-                    {livros.map(l => (
-                      <button key={l.id} onClick={() => { setLivroSel(l); setLivros([]); setBusca(''); }} className="w-full text-left px-3 py-2.5 text-sm hover:bg-blue-50 border-b last:border-0 transition" style={{ borderColor: '#f1f5f9' }}>
-                        <p className="font-semibold text-slate-800">{l.titulo}</p>
-                        <p className="text-xs text-slate-400">{l.autor} · {l.exemplares_disponiveis} disponível(eis)</p>
-                      </button>
-                    ))}
-                  </div>
-                )}
+              <div>
+                <h2 className="text-xl font-black tracking-tight leading-none text-white">Novo Empréstimo</h2>
+                <p className="text-blue-100 text-xs mt-1 font-medium">Selecione o livro, a turma, o aluno e o prazo de devolução</p>
               </div>
-            )}
-          </div>
-
-          {/* Aluno */}
-          <div>
-            <label className="block text-xs font-bold mb-1 text-slate-500">Aluno</label>
-            {alunoSel ? (
-              <div className="flex items-center gap-3 p-3 rounded-xl" style={{ background: '#eff6ff', border: '1px solid #bfdbfe' }}>
-                <span className="text-2xl">👤</span>
-                <div className="flex-1">
-                  <p className="font-bold text-sm text-slate-800">{alunoSel.nome}</p>
-                  <p className="text-xs text-slate-500">{alunoSel.turma_nome || alunoSel.turma || ''}</p>
-                </div>
-                <button onClick={() => { setAlunoSel(null); setBuscaAluno(''); }} className="text-xs text-red-400 hover:text-red-600">✕</button>
-              </div>
-            ) : (
-              <div className="relative">
-                <input value={buscaAluno} onChange={e => setBuscaAluno(e.target.value)} placeholder="Buscar aluno..." className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none focus:ring-2 focus:ring-blue-300" style={{ borderColor: '#e2e8f0' }} />
-                {alunos.length > 0 && (
-                  <div className="absolute w-full mt-1 rounded-xl shadow-lg border z-10 overflow-hidden" style={{ background: '#fff', borderColor: '#e2e8f0' }}>
-                    {alunos.map(a => (
-                      <button key={a.id} onClick={() => { setAlunoSel(a); setAlunos([]); setBuscaAluno(''); }} className="w-full text-left px-3 py-2.5 text-sm hover:bg-blue-50 border-b last:border-0 transition" style={{ borderColor: '#f1f5f9' }}>
-                        <p className="font-semibold text-slate-800">{a.nome}</p>
-                        <p className="text-xs text-slate-400">{a.turma_nome || a.turma || ''}</p>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Data prevista */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-bold mb-1 text-slate-500">Data prevista de devolução</label>
-              <input type="date" value={dataDev} onChange={e => setDataDev(e.target.value)} className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none focus:ring-2 focus:ring-blue-300" style={{ borderColor: '#e2e8f0' }} />
             </div>
-            <div>
-              <label className="block text-xs font-bold mb-1 text-slate-500">Observação</label>
-              <input value={obs} onChange={e => setObs(e.target.value)} placeholder="Opcional..." className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none focus:ring-2 focus:ring-blue-300" style={{ borderColor: '#e2e8f0' }} />
-            </div>
-          </div>
-
-          {error && <p className="text-sm text-red-600 bg-red-50 p-2 rounded-lg">⚠️ {error}</p>}
-
-          <div className="flex justify-end gap-3 pt-2">
-            <button onClick={() => onClose(false)} className="px-5 py-2.5 rounded-xl text-sm font-semibold" style={{ background: '#f1f5f9', color: '#475569' }}>Cancelar</button>
-            <button onClick={handleSalvar} disabled={saving} className="px-6 py-2.5 rounded-xl text-sm font-bold text-white" style={{ background: saving ? '#94a3b8' : 'linear-gradient(135deg, #1d4ed8, #1e40af)', boxShadow: saving ? 'none' : '0 4px 12px rgba(29,78,216,0.3)' }}>
-              {saving ? '⏳ Registrando...' : '📋 Registrar empréstimo'}
+            <button
+              onClick={() => onClose(false)}
+              className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 text-white/80 hover:text-white flex items-center justify-center transition-all text-sm font-bold border border-white/10"
+              title="Fechar"
+            >
+              ✕
             </button>
           </div>
+        </div>
+
+        {/* Corpo com Scroll */}
+        <div className="p-5 sm:p-6 space-y-6 overflow-y-auto flex-1 custom-scrollbar">
+
+          {/* ── ETAPA 1: LIVRO DISPONÍVEL ── */}
+          <div className="space-y-2">
+            <label className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-500">
+              <span className="flex items-center gap-1.5">
+                <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-[11px] font-black inline-flex items-center justify-center">1</span>
+                Livro (Disponíveis no Acervo)
+              </span>
+              {livroSel && (
+                <span className="text-[11px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                  Exemplar Selecionado
+                </span>
+              )}
+            </label>
+
+            {livroSel ? (
+              <div className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-gradient-to-r from-emerald-50/80 to-teal-50/80 border border-emerald-200/80 shadow-sm transition-all">
+                {livroSel.capa_url ? (
+                  <img
+                    src={livroSel.capa_url}
+                    alt={livroSel.titulo}
+                    className="w-12 h-16 object-cover rounded-xl shadow border border-emerald-200/60 flex-shrink-0"
+                  />
+                ) : (
+                  <div className="w-12 h-16 rounded-xl bg-emerald-600/10 border border-emerald-200 flex items-center justify-center text-2xl flex-shrink-0">
+                    📗
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-slate-900 text-sm truncate leading-snug">{livroSel.titulo}</p>
+                  <p className="text-xs text-slate-600 font-medium truncate mt-0.5">{livroSel.autor || 'Autor não informado'}</p>
+                  <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-600 text-white shadow-xs">
+                      {livroSel.exemplares_disponiveis} disponível(eis)
+                    </span>
+                    {livroSel.local_estante && (
+                      <span className="text-[11px] font-semibold text-slate-700 bg-white/80 px-2 py-0.5 rounded-md border border-emerald-200">
+                        📍 {livroSel.local_estante}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setLivroSel(null); setBuscaLivro(''); }}
+                  className="px-3 py-1.5 text-xs font-bold text-red-600 bg-white/80 hover:bg-red-50 border border-red-200 rounded-xl transition-all shadow-xs flex-shrink-0"
+                >
+                  ✕ Trocar
+                </button>
+              </div>
+            ) : (
+              <div className="relative">
+                <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm">
+                  🔍
+                </div>
+                <input
+                  type="text"
+                  value={buscaLivro}
+                  onChange={e => setBuscaLivro(e.target.value)}
+                  placeholder="Digite o título, autor ou código do livro..."
+                  className="w-full pl-10 pr-4 py-3 rounded-2xl text-sm border border-slate-200 bg-slate-50/60 outline-none focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all font-medium text-slate-800"
+                />
+                {loadingLivros && (
+                  <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-blue-600 flex items-center gap-1.5">
+                    <div className="w-3.5 h-3.5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                    Buscando...
+                  </div>
+                )}
+
+                {livros.length > 0 && (
+                  <div className="absolute w-full mt-2 rounded-2xl shadow-xl border border-slate-200 bg-white z-20 overflow-hidden divide-y divide-slate-100 max-h-60 overflow-y-auto">
+                    {livros.map(l => (
+                      <button
+                        key={l.id}
+                        type="button"
+                        onClick={() => { setLivroSel(l); setLivros([]); setBuscaLivro(''); setError(''); }}
+                        className="w-full text-left p-3 hover:bg-blue-50/80 transition flex items-center gap-3"
+                      >
+                        {l.capa_url ? (
+                          <img src={l.capa_url} alt="" className="w-9 h-12 object-cover rounded-lg shadow-xs flex-shrink-0" />
+                        ) : (
+                          <div className="w-9 h-12 bg-slate-100 rounded-lg flex items-center justify-center text-base flex-shrink-0">📘</div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-bold text-sm text-slate-900 truncate leading-snug">{l.titulo}</p>
+                          <p className="text-xs text-slate-500 truncate">{l.autor || 'Autor não informado'}</p>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800">
+                            {l.exemplares_disponiveis} disp.
+                          </span>
+                          {l.local_estante && (
+                            <p className="text-[10px] text-slate-400 mt-0.5 truncate max-w-28 font-medium">📍 {l.local_estante}</p>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* ── ETAPA 2: ALUNO (TURNO -> TURMA -> ALUNO) ── */}
+          <div className="space-y-3 pt-1">
+            <label className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-500">
+              <span className="flex items-center gap-1.5">
+                <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-[11px] font-black inline-flex items-center justify-center">2</span>
+                Estudante (Seleção Inteligente por Turno e Turma)
+              </span>
+              {alunoSel && (
+                <span className="text-[11px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200">
+                  Aluno Vinculado
+                </span>
+              )}
+            </label>
+
+            {/* Aluno Selecionado (Card de Destaque) */}
+            {alunoSel ? (
+              <div className="p-3.5 rounded-2xl bg-gradient-to-r from-blue-50/90 to-indigo-50/90 border border-blue-200 shadow-xs flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-11 h-11 rounded-2xl bg-blue-600 text-white font-bold flex items-center justify-center text-lg shadow-sm flex-shrink-0">
+                    {alunoSel.foto ? (
+                      <img src={alunoSel.foto} alt="" className="w-full h-full object-cover rounded-2xl" />
+                    ) : (
+                      '👤'
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="font-black text-slate-900 text-sm truncate leading-snug">{alunoSel.nome}</p>
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      <span className="text-xs font-bold text-blue-700 bg-blue-100/70 px-2 py-0.5 rounded-md">
+                        {alunoSel.turma_nome || 'Turma não informada'}
+                      </span>
+                      {alunoSel.matricula && (
+                        <span className="text-xs text-slate-500 font-medium">
+                          Matrícula: {alunoSel.matricula}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAlunoSel(null);
+                    setListaAlunosAberta(true);
+                  }}
+                  className="px-3 py-1.5 text-xs font-bold text-blue-700 bg-white hover:bg-blue-100/60 border border-blue-200 rounded-xl transition-all shadow-xs flex-shrink-0"
+                >
+                  ✕ Trocar Aluno
+                </button>
+              </div>
+            ) : null}
+
+            {/* Painel Clicável: Seleção de Turno */}
+            <div className="p-4 rounded-2xl bg-slate-50/80 border border-slate-200/80 space-y-3.5">
+              <div>
+                <p className="text-xs font-bold text-slate-600 mb-2 flex items-center gap-1.5">
+                  <span>Passo 1:</span> Selecione o Turno do Aluno:
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {turnosDisponiveis.map(turno => {
+                    const conf = TURNO_STYLES[turno] || { emoji: '📚', bgActive: 'linear-gradient(135deg, #1e40af, #2563eb)', color: '#1e40af' };
+                    const isAtivo = turnoSel === turno;
+                    const countTurmas = turmas.filter(t => (t.turno || '').toLowerCase().trim() === turno.toLowerCase().trim()).length;
+                    return (
+                      <button
+                        key={turno}
+                        type="button"
+                        onClick={() => handleSelecionarTurno(turno)}
+                        style={{
+                          background: isAtivo ? conf.bgActive : '#ffffff',
+                          color: isAtivo ? '#ffffff' : '#334155',
+                          borderColor: isAtivo ? 'transparent' : '#e2e8f0',
+                        }}
+                        className={`p-2.5 rounded-xl text-xs font-bold border transition-all duration-200 flex flex-col items-center justify-center gap-1 shadow-xs hover:scale-[1.02] active:scale-[0.98] ${isAtivo ? 'shadow-md shadow-blue-500/20 ring-2 ring-blue-300' : 'hover:bg-white hover:border-slate-300'}`}
+                      >
+                        <span className="text-lg">{conf.emoji}</span>
+                        <span>{turno}</span>
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.2 rounded-full ${isAtivo ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                          {countTurmas} {countTurmas === 1 ? 'turma' : 'turmas'}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Passo 2: Seleção de Turma */}
+              {turnoSel && (
+                <div className="pt-3 border-t border-slate-200/70 space-y-2 animate-fadeIn">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
+                      <span>Passo 2:</span> Selecione a Turma do turno {turnoSel}:
+                    </p>
+                    <span className="text-[11px] font-semibold text-slate-500">
+                      {turmasDoTurno.length} {turmasDoTurno.length === 1 ? 'turma disponível' : 'turmas disponíveis'}
+                    </span>
+                  </div>
+
+                  {loadingTurmas ? (
+                    <div className="p-3 text-center text-xs text-slate-400">Carregando turmas...</div>
+                  ) : turmasDoTurno.length === 0 ? (
+                    <div className="p-3 bg-white rounded-xl border border-dashed border-slate-200 text-center text-xs text-slate-400 font-medium">
+                      Nenhuma turma cadastrada no turno {turnoSel}.
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {turmasDoTurno.map(t => {
+                        const isTurmaAtiva = turmaSel?.id === t.id;
+                        return (
+                          <button
+                            key={t.id}
+                            type="button"
+                            onClick={() => handleSelecionarTurma(t)}
+                            className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition-all duration-150 flex items-center gap-1.5 shadow-xs hover:scale-105 active:scale-95 ${isTurmaAtiva ? 'bg-blue-600 text-white border-blue-600 ring-2 ring-blue-200 shadow-blue-500/25' : 'bg-white text-slate-700 border-slate-200 hover:border-blue-400 hover:bg-blue-50/50'}`}
+                          >
+                            <span>👥</span>
+                            <span>{t.turma}</span>
+                            {isTurmaAtiva && listaAlunosAberta && (
+                              <span className="ml-1 text-[10px] bg-blue-700/80 px-1.5 py-0.5 rounded-md text-blue-100">
+                                Aberta
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Passo 3: Lista de Alunos da Turma Selecionada */}
+              {turmaSel && listaAlunosAberta && (
+                <div className="pt-3 border-t border-slate-200/70 space-y-2.5 animate-fadeIn">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <p className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                      <span>Passo 3:</span> Clique no nome do estudante da turma <span className="text-blue-600 font-black">{turmaSel.turma}</span>:
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setListaAlunosAberta(false)}
+                      className="text-[11px] font-bold text-slate-500 hover:text-slate-700"
+                    >
+                      Fechar lista ✕
+                    </button>
+                  </div>
+
+                  {alunosTurma.length > 8 && (
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={filtroAlunoTexto}
+                        onChange={e => setFiltroAlunoTexto(e.target.value)}
+                        placeholder="Filtrar aluno por nome..."
+                        className="w-full px-3 py-1.5 pl-8 rounded-xl text-xs border border-slate-200 bg-white outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                      />
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400">🔍</span>
+                    </div>
+                  )}
+
+                  {loadingAlunos ? (
+                    <div className="p-6 text-center text-xs font-medium text-blue-600 flex items-center justify-center gap-2 bg-white rounded-xl border border-slate-100">
+                      <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                      Carregando estudantes da turma...
+                    </div>
+                  ) : alunosFiltrados.length === 0 ? (
+                    <div className="p-4 bg-white rounded-xl border border-dashed border-slate-200 text-center text-xs text-slate-400 font-medium">
+                      {alunosTurma.length === 0 ? 'Nenhum estudante matriculado nesta turma.' : 'Nenhum estudante corresponde ao filtro.'}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto p-1 custom-scrollbar">
+                      {alunosFiltrados.map(a => {
+                        const isSelecionado = alunoSel?.id === a.id;
+                        return (
+                          <button
+                            key={a.id}
+                            type="button"
+                            onClick={() => handleSelecionarAluno(a)}
+                            className={`p-2.5 rounded-xl border text-left flex items-center gap-2.5 transition-all duration-150 hover:scale-[1.01] active:scale-[0.98] ${isSelecionado ? 'bg-blue-600 text-white border-blue-600 font-bold shadow-sm' : 'bg-white text-slate-800 border-slate-200/90 hover:bg-blue-50 hover:border-blue-300'}`}
+                          >
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0 ${isSelecionado ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                              {a.foto ? (
+                                <img src={a.foto} alt="" className="w-full h-full object-cover rounded-lg" />
+                              ) : (
+                                '👤'
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className={`text-xs truncate leading-snug ${isSelecionado ? 'font-black text-white' : 'font-bold text-slate-800'}`}>
+                                {a.nome}
+                              </p>
+                              <p className={`text-[10px] truncate ${isSelecionado ? 'text-blue-100' : 'text-slate-400'}`}>
+                                Matrícula: {a.matricula || 'S/N'}
+                              </p>
+                            </div>
+                            <span className={`text-xs ${isSelecionado ? 'text-white' : 'text-slate-400'}`}>
+                              {isSelecionado ? '✓' : '→'}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ── ETAPA 3: PRAZO DE DEVOLUÇÃO (DIAS & DATA) ── */}
+          <div className="space-y-3 pt-1">
+            <label className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-500">
+              <span className="flex items-center gap-1.5">
+                <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 text-[11px] font-black inline-flex items-center justify-center">3</span>
+                Prazo e Data Prevista de Devolução
+              </span>
+              {dataDev && (
+                <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200 capitalize">
+                  📅 {formatarDataLegivel(dataDev)}
+                </span>
+              )}
+            </label>
+
+            {/* Botões inteligentes de Dias de Empréstimo */}
+            <div className="space-y-1.5">
+              <p className="text-xs font-semibold text-slate-600">Selecione a quantidade de dias:</p>
+              <div className="grid grid-cols-5 gap-2">
+                {OPCOES_DIAS.map(dias => {
+                  const isAtivo = diasSel === dias;
+                  return (
+                    <button
+                      key={dias}
+                      type="button"
+                      onClick={() => handleSelecionarDias(dias)}
+                      style={{
+                        background: isAtivo ? 'linear-gradient(135deg, #1d4ed8, #2563eb)' : '#ffffff',
+                        color: isAtivo ? '#ffffff' : '#334155',
+                        borderColor: isAtivo ? 'transparent' : '#cbd5e1',
+                      }}
+                      className={`py-2.5 rounded-xl text-xs font-black border transition-all duration-150 flex flex-col items-center justify-center shadow-xs hover:scale-105 active:scale-95 ${isAtivo ? 'ring-2 ring-blue-300 shadow-md shadow-blue-500/20' : 'hover:bg-blue-50/60 hover:border-blue-300'}`}
+                    >
+                      <span className="text-sm leading-none">{dias}</span>
+                      <span className={`text-[10px] font-semibold mt-0.5 ${isAtivo ? 'text-blue-100' : 'text-slate-400'}`}>dias</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Inputs: Data Específica e Observação */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">
+                  Ou selecione a data no calendário:
+                </label>
+                <input
+                  type="date"
+                  value={dataDev}
+                  onChange={e => handleDataManual(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl text-sm font-semibold text-slate-800 border border-slate-200 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all bg-white shadow-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">
+                  Observação <span className="text-slate-400 font-normal">(opcional)</span>:
+                </label>
+                <input
+                  type="text"
+                  value={obs}
+                  onChange={e => setObs(e.target.value)}
+                  placeholder="Ex: Devolver antes do recesso..."
+                  className="w-full px-3.5 py-2.5 rounded-xl text-sm font-medium text-slate-800 border border-slate-200 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all bg-white shadow-xs"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Alerta de erro se houver */}
+          {error && (
+            <div className="p-3.5 rounded-2xl text-xs font-bold text-red-700 bg-red-50 border border-red-200 flex items-center gap-2 animate-fadeIn">
+              <span>⚠️</span>
+              <span>{error}</span>
+            </div>
+          )}
+
+        </div>
+
+        {/* Rodapé com Ações */}
+        <div className="p-4 sm:p-5 bg-slate-50/90 border-t border-slate-200/80 flex items-center justify-end gap-3 flex-shrink-0">
+          <button
+            type="button"
+            onClick={() => onClose(false)}
+            className="px-5 py-2.5 rounded-xl text-sm font-bold text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 transition-all shadow-xs"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={handleSalvar}
+            disabled={saving || !livroSel || !alunoSel}
+            style={{
+              background: saving || !livroSel || !alunoSel ? '#94a3b8' : 'linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%)',
+              boxShadow: saving || !livroSel || !alunoSel ? 'none' : '0 4px 14px rgba(29, 78, 216, 0.35)',
+            }}
+            className="px-6 py-2.5 rounded-xl text-sm font-bold text-white transition-all flex items-center gap-2 disabled:cursor-not-allowed hover:brightness-105 active:scale-98"
+          >
+            {saving ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Registrando...
+              </>
+            ) : (
+              <>
+                <span>📋</span>
+                <span>Registrar Empréstimo</span>
+              </>
+            )}
+          </button>
         </div>
       </div>
     </div>

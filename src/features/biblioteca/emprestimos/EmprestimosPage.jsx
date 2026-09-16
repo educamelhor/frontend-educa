@@ -41,6 +41,17 @@ function formatarDataLegivel(isoStr) {
   return d.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
+// ── Calcula o ano letivo atual com corte em 15/02 (regra canônica do sistema) ──
+function anoLetivoAtual() {
+  const stored = localStorage.getItem('ano_letivo') || localStorage.getItem('anoLetivo');
+  if (stored && !isNaN(Number(stored))) return Number(stored);
+  const hoje = new Date();
+  const mes = hoje.getMonth() + 1; // 1-12
+  const dia = hoje.getDate();
+  if (mes < 2 || (mes === 2 && dia < 15)) return hoje.getFullYear() - 1;
+  return hoje.getFullYear();
+}
+
 function NovoEmprestimoModal({ onClose }) {
   // ── Livro ──
   const [buscaLivro, setBuscaLivro] = useState('');
@@ -82,13 +93,16 @@ function NovoEmprestimoModal({ onClose }) {
     return () => clearTimeout(t);
   }, [buscaLivro, searchLivros]);
 
-  // Carrega turmas da escola
+  // Carrega turmas da escola filtradas pelo ano letivo atual
   useEffect(() => {
     (async () => {
       setLoadingTurmas(true);
       try {
-        const { data } = await api.get('/api/turmas');
-        setTurmas(Array.isArray(data) ? data : []);
+        const anoAtual = anoLetivoAtual();
+        const { data } = await api.get('/api/turmas', { params: { ano: anoAtual } });
+        const lista = (Array.isArray(data) ? data : [])
+          .filter(t => !t.ano || String(t.ano) === String(anoAtual));
+        setTurmas(lista);
       } catch (err) {
         console.error('Erro ao carregar turmas:', err);
       } finally {
@@ -97,7 +111,7 @@ function NovoEmprestimoModal({ onClose }) {
     })();
   }, []);
 
-  // Extrai turnos presentes nas turmas
+  // Extrai turnos presentes nas turmas do ano letivo atual
   const turnosDisponiveis = useMemo(() => {
     const set = new Set();
     turmas.forEach(t => {
@@ -113,10 +127,12 @@ function NovoEmprestimoModal({ onClose }) {
     return ordenados.length > 0 ? ordenados : ['Matutino', 'Vespertino', 'Noturno'];
   }, [turmas]);
 
-  // Turmas filtradas pelo turno selecionado
+  // Turmas filtradas pelo turno selecionado e ordenadas alfabética/numericamente
   const turmasDoTurno = useMemo(() => {
     if (!turnoSel) return [];
-    return turmas.filter(t => (t.turno || '').toLowerCase().trim() === turnoSel.toLowerCase().trim());
+    return turmas
+      .filter(t => (t.turno || '').toLowerCase().trim() === turnoSel.toLowerCase().trim())
+      .sort((a, b) => (a.turma || '').localeCompare(b.turma || '', 'pt-BR', { numeric: true, sensitivity: 'base' }));
   }, [turmas, turnoSel]);
 
   // Alunos filtrados dentro da turma
@@ -146,7 +162,8 @@ function NovoEmprestimoModal({ onClose }) {
     setListaAlunosAberta(true);
     setFiltroAlunoTexto('');
     try {
-      const { data } = await api.get(`/api/turmas/${turma.id}/alunos`);
+      const anoAtual = anoLetivoAtual();
+      const { data } = await api.get(`/api/turmas/${turma.id}/alunos`, { params: { ano: anoAtual, ano_letivo: anoAtual } });
       const list = Array.isArray(data) ? data : (data.alunos || []);
       setAlunosTurma(list);
     } catch (err) {

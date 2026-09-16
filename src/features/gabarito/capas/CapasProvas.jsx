@@ -400,7 +400,12 @@ export default function CapasProvas() {
           `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
         // Renderiza página 1 em canvas 2× (1190×1684px)
-        const doc = await pdfjsLib.getDocument({ data: pdfBytes }).promise;
+        const doc = await pdfjsLib.getDocument({
+          data: pdfBytes,
+          cMapUrl: `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/cmaps/`,
+          cMapPacked: true,
+          standardFontDataUrl: `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/standard_fonts/`,
+        }).promise;
         const page = await doc.getPage(1);
         const viewport = page.getViewport({ scale: 2 });
         const canvas = document.createElement('canvas');

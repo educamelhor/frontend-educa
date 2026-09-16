@@ -30,7 +30,8 @@ function InputField({ label, name, value, onChange, type = 'text', placeholder, 
         placeholder={placeholder}
         required={required}
         disabled={disabled}
-        className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none focus:ring-2 focus:ring-emerald-300 transition disabled:opacity-50"
+        inputMode={type === 'number' ? 'numeric' : undefined}
+        className={`w-full px-3 py-2.5 rounded-xl text-sm border outline-none focus:ring-2 focus:ring-emerald-300 transition disabled:opacity-50 ${type === 'number' ? 'no-spinner' : ''}`}
         style={{ borderColor: '#e2e8f0', background: disabled ? '#f8fafc' : '#fff', color: '#1e293b' }}
       />
     </div>

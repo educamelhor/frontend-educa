@@ -149,6 +149,7 @@ function NovoEmprestimoModal({ onClose }) {
     setAlunosTurma([]);
     setListaAlunosAberta(false);
     setFiltroAlunoTexto('');
+    setAlunoSel(null);
   };
 
   // Selecionar turma
@@ -465,8 +466,8 @@ function NovoEmprestimoModal({ onClose }) {
                 </div>
               </div>
 
-              {/* Passo 2: Seleção de Turma */}
-              {turnoSel && (
+              {/* Passo 2: Seleção de Turma (oculta quando o aluno já foi selecionado) */}
+              {turnoSel && !alunoSel && (
                 <div className="pt-3 border-t border-slate-200/70 space-y-2 animate-fadeIn">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-bold text-slate-600 flex items-center gap-1.5">
@@ -510,7 +511,7 @@ function NovoEmprestimoModal({ onClose }) {
               )}
 
               {/* Passo 3: Lista de Alunos da Turma Selecionada */}
-              {turmaSel && listaAlunosAberta && (
+              {turmaSel && !alunoSel && listaAlunosAberta && (
                 <div className="pt-3 border-t border-slate-200/70 space-y-2.5 animate-fadeIn">
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <p className="text-xs font-bold text-slate-700 flex items-center gap-1.5">

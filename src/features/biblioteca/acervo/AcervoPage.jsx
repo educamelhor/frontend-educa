@@ -5,6 +5,8 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../../../services/api';
 import CadastroLivroModal from './CadastroLivroModal';
+import ConfirmarExclusaoModal from './ConfirmarExclusaoModal';
+import toast from 'react-hot-toast';
 
 // ── Ícones SVG inline (sem dependência extra) ─────────────────────────────────
 const IconSearch = () => (
@@ -193,6 +195,9 @@ export default function AcervoPage() {
   const [disponivelFiltro, setDisponivelFiltro] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editando, setEditando] = useState(null);
+  const [livroParaExcluir, setLivroParaExcluir] = useState(null);
+  const [excluindo, setExcluindo] = useState(false);
+  const [erroExclusao, setErroExclusao] = useState('');
   const searchTimer = useRef(null);
   const LIMIT = 24;
 
@@ -233,14 +238,26 @@ export default function AcervoPage() {
     if (refresh) fetchLivros(page);
   };
 
-  const handleDelete = async (livro) => {
-    if (window.confirm(`Tem certeza que deseja inativar o livro "${livro.titulo}" do seu acervo escolar? O histórico de empréstimos será mantido.`)) {
-      try {
-        await api.delete(`/api/biblioteca/acervo/${livro.id}`);
-        fetchLivros(page);
-      } catch (err) {
-        alert(err.response?.data?.error || 'Erro ao inativar livro.');
-      }
+  const handleDeleteClick = (livro) => {
+    setErroExclusao('');
+    setLivroParaExcluir(livro);
+  };
+
+  const handleConfirmarExclusao = async () => {
+    if (!livroParaExcluir) return;
+    setExcluindo(true);
+    setErroExclusao('');
+    try {
+      await api.delete(`/api/biblioteca/acervo/${livroParaExcluir.id}`);
+      toast.success(`"${livroParaExcluir.titulo}" inativado com sucesso!`);
+      setLivroParaExcluir(null);
+      fetchLivros(page);
+    } catch (err) {
+      const msg = err.response?.data?.error || 'Erro ao inativar livro do acervo.';
+      setErroExclusao(msg);
+      toast.error(msg);
+    } finally {
+      setExcluindo(false);
     }
   };
 
@@ -372,7 +389,7 @@ export default function AcervoPage() {
         <>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 mb-6">
             {livros.map(livro => (
-              <LivroCard key={livro.id} livro={livro} onEdit={handleEdit} onDelete={handleDelete} />
+              <LivroCard key={livro.id} livro={livro} onEdit={handleEdit} onDelete={handleDeleteClick} />
             ))}
           </div>
 
@@ -412,6 +429,22 @@ export default function AcervoPage() {
         <CadastroLivroModal
           livro={editando}
           onClose={handleModalClose}
+        />
+      )}
+
+      {/* Modal premium de confirmação de inativação */}
+      {livroParaExcluir && (
+        <ConfirmarExclusaoModal
+          livro={livroParaExcluir}
+          onConfirm={handleConfirmarExclusao}
+          onCancel={() => {
+            if (!excluindo) {
+              setLivroParaExcluir(null);
+              setErroExclusao('');
+            }
+          }}
+          loading={excluindo}
+          error={erroExclusao}
         />
       )}
     </div>

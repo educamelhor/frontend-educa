@@ -270,63 +270,100 @@ export default function CadastroLivroModal({ livro, onClose }) {
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
-          {/* ISBN + Lookup */}
-          <div
-            className="rounded-xl p-4"
-            style={{
-              background: isbnBloqueado
-                ? 'linear-gradient(135deg, #eff6ff, #dbeafe)'
-                : 'linear-gradient(135deg, #f0fdf4, #ecfdf5)',
-              border: isbnBloqueado ? '1px solid #93c5fd' : '1px solid #bbf7d0',
-            }}
-          >
-            <label className="block text-xs font-bold mb-2" style={{ color: isbnBloqueado ? '#1d4ed8' : '#065f46' }}>
-              {isbnBloqueado
-                ? '📚 Catálogo universal — metadados preenchidos automaticamente'
-                : '🔍 Pesquisa por ISBN — Google Books • Open Library • Catálogo próprio'}
-            </label>
-            <div className="flex gap-2">
+          {/* ISBN: Modo Edição (Exibe o ISBN do livro e fica bloqueado) vs Modo Cadastro (Busca por ISBN) */}
+          {isEdit ? (
+            <div
+              className="rounded-xl p-4 border"
+              style={{
+                background: 'linear-gradient(135deg, #f8fafc, #f1f5f9)',
+                borderColor: '#cbd5e1',
+              }}
+            >
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-bold text-slate-700">
+                  🔒 Código ISBN (Identificador único — Bloqueado para edição)
+                </label>
+                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-md bg-slate-200 text-slate-700 flex items-center gap-1 border border-slate-300">
+                  <span>🔒</span> Não editável
+                </span>
+              </div>
               <input
                 type="text"
                 name="isbn"
-                value={form.isbn}
-                onChange={e => { handleChange(e); setIsbnBloqueado(false); setIsbnMsg(''); }}
-                placeholder="Digite o ISBN (ex: 9788535902778 ou com traços)"
-                className="flex-1 px-3 py-2.5 rounded-xl text-sm border outline-none focus:ring-2 focus:ring-emerald-300"
-                style={{ borderColor: isbnBloqueado ? '#93c5fd' : '#86efac', background: '#fff', color: '#1e293b' }}
+                value={form.isbn || 'Sem ISBN cadastrado'}
+                disabled
+                readOnly
+                className="w-full px-3.5 py-2.5 rounded-xl text-sm border font-mono font-bold cursor-not-allowed select-none transition"
+                style={{
+                  borderColor: '#cbd5e1',
+                  background: '#e2e8f0',
+                  color: form.isbn ? '#0f172a' : '#64748b',
+                }}
               />
-              <button
-                type="button"
-                onClick={lookupISBN}
-                disabled={isbnLoading}
-                className="px-4 py-2.5 rounded-xl text-sm font-bold text-white transition"
-                style={{
-                  background: isbnLoading ? '#94a3b8' : 'linear-gradient(135deg, #10b981, #059669)',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {isbnLoading ? '⏳ Buscando...' : '🔍 Buscar'}
-              </button>
+              <p className="text-[11px] mt-1.5 text-slate-500 font-medium">
+                {form.isbn
+                  ? 'O número de ISBN identifica este livro no catálogo e não pode ser alterado. Os demais campos abaixo estão liberados para edição.'
+                  : 'Esta obra não possui ISBN registrado. Os demais campos abaixo podem ser editados normalmente.'}
+              </p>
             </div>
-            {isbnMsg && (
-              <p
-                className="text-xs mt-2 font-medium"
-                style={{
-                  color: isbnMsg.startsWith('✅') ? '#059669'
-                       : isbnMsg.startsWith('🔍') ? '#2563eb'
-                       : '#dc2626',
-                  whiteSpace: 'pre-line',
-                }}
-              >
-                {isbnMsg}
-              </p>
-            )}
-            {isbnBloqueado && (
-              <p className="text-xs mt-1 text-blue-600 font-medium">
-                🔒 Dados do catálogo universal. Apenas <strong>exemplares</strong> e <strong>categoria</strong> são editados pela escola.
-              </p>
-            )}
-          </div>
+          ) : (
+            <div
+              className="rounded-xl p-4"
+              style={{
+                background: isbnBloqueado
+                  ? 'linear-gradient(135deg, #eff6ff, #dbeafe)'
+                  : 'linear-gradient(135deg, #f0fdf4, #ecfdf5)',
+                border: isbnBloqueado ? '1px solid #93c5fd' : '1px solid #bbf7d0',
+              }}
+            >
+              <label className="block text-xs font-bold mb-2" style={{ color: isbnBloqueado ? '#1d4ed8' : '#065f46' }}>
+                {isbnBloqueado
+                  ? '📚 Catálogo universal — metadados preenchidos automaticamente'
+                  : '🔍 Pesquisa por ISBN — Google Books • Open Library • Catálogo próprio'}
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  name="isbn"
+                  value={form.isbn}
+                  onChange={e => { handleChange(e); setIsbnBloqueado(false); setIsbnMsg(''); }}
+                  placeholder="Digite o ISBN (ex: 9788535902778 ou com traços)"
+                  className="flex-1 px-3 py-2.5 rounded-xl text-sm border outline-none focus:ring-2 focus:ring-emerald-300"
+                  style={{ borderColor: isbnBloqueado ? '#93c5fd' : '#86efac', background: '#fff', color: '#1e293b' }}
+                />
+                <button
+                  type="button"
+                  onClick={lookupISBN}
+                  disabled={isbnLoading}
+                  className="px-4 py-2.5 rounded-xl text-sm font-bold text-white transition"
+                  style={{
+                    background: isbnLoading ? '#94a3b8' : 'linear-gradient(135deg, #10b981, #059669)',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {isbnLoading ? '⏳ Buscando...' : '🔍 Buscar'}
+                </button>
+              </div>
+              {isbnMsg && (
+                <p
+                  className="text-xs mt-2 font-medium"
+                  style={{
+                    color: isbnMsg.startsWith('✅') ? '#059669'
+                         : isbnMsg.startsWith('🔍') ? '#2563eb'
+                         : '#dc2626',
+                    whiteSpace: 'pre-line',
+                  }}
+                >
+                  {isbnMsg}
+                </p>
+              )}
+              {isbnBloqueado && (
+                <p className="text-xs mt-1 text-blue-600 font-medium">
+                  🔒 Dados do catálogo universal. Apenas <strong>exemplares</strong> e <strong>categoria</strong> são editados pela escola.
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Capa */}
           <div className="flex gap-4 items-start">

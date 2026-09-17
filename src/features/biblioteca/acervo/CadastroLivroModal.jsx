@@ -205,12 +205,19 @@ export default function CadastroLivroModal({ livro, onClose }) {
   // ── Salvar ──────────────────────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.titulo.trim()) { setError('Título é obrigatório.'); return; }
     const isbnLimpo = (form.isbn || '').trim().replace(/[-\s]/g, '');
     if (!isbnLimpo || isbnLimpo.length < 10) {
       setError('O código ISBN é obrigatório (mínimo de 10 dígitos numéricos).');
       return;
     }
+    if (!form.titulo.trim()) { setError('Título é obrigatório.'); return; }
+    if (!form.autor.trim()) { setError('Autor(es) é obrigatório.'); return; }
+    if (!form.editora.trim()) { setError('Editora é obrigatória.'); return; }
+    if (!form.ano_publicacao || !String(form.ano_publicacao).trim()) { setError('Ano de publicação é obrigatório.'); return; }
+    if (!form.num_paginas || parseInt(form.num_paginas) <= 0) { setError('Nº de páginas é obrigatório (maior que 0).'); return; }
+    if (!form.genero.trim()) { setError('Gênero / Assunto é obrigatório.'); return; }
+    if (!form.categoria) { setError('Categoria é obrigatória.'); return; }
+    if (!form.exemplares || parseInt(form.exemplares) <= 0) { setError('Quantidade de exemplares deve ser de pelo menos 1.'); return; }
     setSaving(true);
     setError('');
     try {
@@ -441,17 +448,20 @@ export default function CadastroLivroModal({ livro, onClose }) {
             <div className="md:col-span-2">
               <InputField label="Título" name="titulo" value={form.titulo} onChange={handleChange} required placeholder="Título do livro" />
             </div>
-            <InputField label="Autor(es)" name="autor" value={form.autor} onChange={handleChange} placeholder="Nome do autor" />
-            <InputField label="Editora" name="editora" value={form.editora} onChange={handleChange} placeholder="Nome da editora" />
-            <InputField label="Ano de publicação" name="ano_publicacao" value={form.ano_publicacao} onChange={handleChange} type="number" placeholder="2024" />
-            <InputField label="Nº de páginas" name="num_paginas" value={form.num_paginas} onChange={handleChange} type="number" placeholder="200" />
-            <InputField label="Gênero / Assunto" name="genero" value={form.genero} onChange={handleChange} placeholder="Ex: Ficção científica" />
+            <InputField label="Autor(es)" name="autor" value={form.autor} onChange={handleChange} required placeholder="Nome do autor" />
+            <InputField label="Editora" name="editora" value={form.editora} onChange={handleChange} required placeholder="Nome da editora" />
+            <InputField label="Ano de publicação" name="ano_publicacao" value={form.ano_publicacao} onChange={handleChange} type="number" required placeholder="2024" />
+            <InputField label="Nº de páginas" name="num_paginas" value={form.num_paginas} onChange={handleChange} type="number" required placeholder="200" />
+            <InputField label="Gênero / Assunto" name="genero" value={form.genero} onChange={handleChange} required placeholder="Ex: Ficção científica" />
             <div>
-              <label className="block text-xs font-semibold mb-1" style={{ color: '#64748b' }}>Categoria</label>
+              <label className="block text-xs font-semibold mb-1" style={{ color: '#64748b' }}>
+                Categoria <span style={{ color: '#ef4444' }}>*</span>
+              </label>
               <select
                 name="categoria"
                 value={form.categoria}
                 onChange={handleChange}
+                required
                 className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none focus:ring-2 focus:ring-emerald-300"
                 style={{ borderColor: '#e2e8f0', background: '#fff', color: '#1e293b' }}
               >
@@ -459,18 +469,20 @@ export default function CadastroLivroModal({ livro, onClose }) {
               </select>
             </div>
             <InputField label="Quantidade de exemplares" name="exemplares" value={form.exemplares} onChange={handleChange} type="number" required />
-            <InputField label="Local / Estante" name="local_estante" value={form.local_estante} onChange={handleChange} placeholder="Ex: Prateleira 3, Corredor B" />
+            <InputField label="Local / Estante (opcional)" name="local_estante" value={form.local_estante} onChange={handleChange} placeholder="Ex: Prateleira 3, Corredor B" />
           </div>
 
           {/* Sinopse */}
           <div>
-            <label className="block text-xs font-semibold mb-1" style={{ color: '#64748b' }}>Sinopse</label>
+            <label className="block text-xs font-semibold mb-1" style={{ color: '#64748b' }}>
+              Sinopse <span className="text-slate-400 font-normal">(opcional)</span>
+            </label>
             <textarea
               name="sinopse"
               value={form.sinopse}
               onChange={handleChange}
               rows={4}
-              placeholder="Resumo do livro..."
+              placeholder="Resumo do livro (opcional)..."
               className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none focus:ring-2 focus:ring-emerald-300 resize-none"
               style={{ borderColor: '#e2e8f0', background: '#fff', color: '#1e293b' }}
             />

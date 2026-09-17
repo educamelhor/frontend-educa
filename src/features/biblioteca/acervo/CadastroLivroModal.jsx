@@ -31,6 +31,11 @@ function InputField({ label, name, value, onChange, type = 'text', placeholder, 
         required={required}
         disabled={disabled}
         inputMode={type === 'number' ? 'numeric' : undefined}
+        onWheel={(e) => {
+          if (type === 'number') {
+            e.currentTarget.blur();
+          }
+        }}
         className={`w-full px-3 py-2.5 rounded-xl text-sm border outline-none focus:ring-2 focus:ring-emerald-300 transition disabled:opacity-50 ${type === 'number' ? 'no-spinner' : ''}`}
         style={{ borderColor: '#e2e8f0', background: disabled ? '#f8fafc' : '#fff', color: '#1e293b' }}
       />
@@ -62,6 +67,18 @@ export default function CadastroLivroModal({ livro, onClose }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const fileInputRef = useRef(null);
+  const sinopseRef = useRef(null);
+
+  const adjustSinopseHeight = () => {
+    if (sinopseRef.current) {
+      sinopseRef.current.style.height = 'auto';
+      sinopseRef.current.style.height = `${Math.max(90, sinopseRef.current.scrollHeight + 2)}px`;
+    }
+  };
+
+  useEffect(() => {
+    adjustSinopseHeight();
+  }, [form.sinopse]);
 
   useEffect(() => {
     if (livro) {
@@ -256,6 +273,7 @@ export default function CadastroLivroModal({ livro, onClose }) {
           background: '#fff',
           boxShadow: '0 32px 80px rgba(0,0,0,0.4)',
           animation: 'modalEntrada 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+          overscrollBehavior: 'contain',
         }}
       >
         {/* Header */}
@@ -478,13 +496,17 @@ export default function CadastroLivroModal({ livro, onClose }) {
               Sinopse <span className="text-slate-400 font-normal">(opcional)</span>
             </label>
             <textarea
+              ref={sinopseRef}
               name="sinopse"
               value={form.sinopse}
-              onChange={handleChange}
-              rows={4}
+              onChange={(e) => {
+                handleChange(e);
+                adjustSinopseHeight();
+              }}
+              rows={3}
               placeholder="Resumo do livro (opcional)..."
-              className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none focus:ring-2 focus:ring-emerald-300 resize-none"
-              style={{ borderColor: '#e2e8f0', background: '#fff', color: '#1e293b' }}
+              className="w-full px-3 py-2.5 rounded-xl text-sm border outline-none focus:ring-2 focus:ring-emerald-300 resize-none overflow-hidden transition-[height] duration-150"
+              style={{ borderColor: '#e2e8f0', background: '#fff', color: '#1e293b', minHeight: '88px' }}
             />
           </div>
 

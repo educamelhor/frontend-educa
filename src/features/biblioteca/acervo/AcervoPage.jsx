@@ -299,7 +299,7 @@ export default function AcervoPage() {
           </div>
           <input
             type="text"
-            placeholder="Buscar por título, autor ou ISBN..."
+            placeholder="Buscar por título, autor, editora, gênero, estante ou ISBN..."
             value={busca}
             onChange={e => setBusca(e.target.value)}
             className="w-full pl-9 pr-4 py-2.5 rounded-xl text-sm border outline-none focus:ring-2 focus:ring-emerald-300"

@@ -206,6 +206,11 @@ export default function CadastroLivroModal({ livro, onClose }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.titulo.trim()) { setError('Título é obrigatório.'); return; }
+    const isbnLimpo = (form.isbn || '').trim().replace(/[-\s]/g, '');
+    if (!isbnLimpo || isbnLimpo.length < 10) {
+      setError('O código ISBN é obrigatório (mínimo de 10 dígitos numéricos).');
+      return;
+    }
     setSaving(true);
     setError('');
     try {
@@ -270,42 +275,67 @@ export default function CadastroLivroModal({ livro, onClose }) {
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
-          {/* ISBN: Modo Edição (Exibe o ISBN do livro e fica bloqueado) vs Modo Cadastro (Busca por ISBN) */}
+          {/* ISBN: Modo Edição (Bloqueado se já possui, ou liberado para regularizar caso não tivesse) vs Modo Cadastro */}
           {isEdit ? (
-            <div
-              className="rounded-xl p-4 border"
-              style={{
-                background: 'linear-gradient(135deg, #f8fafc, #f1f5f9)',
-                borderColor: '#cbd5e1',
-              }}
-            >
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-bold text-slate-700">
-                  🔒 Código ISBN (Identificador único — Bloqueado para edição)
-                </label>
-                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-md bg-slate-200 text-slate-700 flex items-center gap-1 border border-slate-300">
-                  <span>🔒</span> Não editável
-                </span>
-              </div>
-              <input
-                type="text"
-                name="isbn"
-                value={form.isbn || 'Sem ISBN cadastrado'}
-                disabled
-                readOnly
-                className="w-full px-3.5 py-2.5 rounded-xl text-sm border font-mono font-bold cursor-not-allowed select-none transition"
+            livro?.isbn ? (
+              <div
+                className="rounded-xl p-4 border"
                 style={{
+                  background: 'linear-gradient(135deg, #f8fafc, #f1f5f9)',
                   borderColor: '#cbd5e1',
-                  background: '#e2e8f0',
-                  color: form.isbn ? '#0f172a' : '#64748b',
                 }}
-              />
-              <p className="text-[11px] mt-1.5 text-slate-500 font-medium">
-                {form.isbn
-                  ? 'O número de ISBN identifica este livro no catálogo e não pode ser alterado. Os demais campos abaixo estão liberados para edição.'
-                  : 'Esta obra não possui ISBN registrado. Os demais campos abaixo podem ser editados normalmente.'}
-              </p>
-            </div>
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold text-slate-700">
+                    🔒 Código ISBN (Identificador único — Bloqueado para edição)
+                  </label>
+                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-md bg-slate-200 text-slate-700 flex items-center gap-1 border border-slate-300">
+                    <span>🔒</span> Não editável
+                  </span>
+                </div>
+                <input
+                  type="text"
+                  name="isbn"
+                  value={form.isbn}
+                  disabled
+                  readOnly
+                  className="w-full px-3.5 py-2.5 rounded-xl text-sm border font-mono font-bold cursor-not-allowed select-none transition"
+                  style={{
+                    borderColor: '#cbd5e1',
+                    background: '#e2e8f0',
+                    color: '#0f172a',
+                  }}
+                />
+                <p className="text-[11px] mt-1.5 text-slate-500 font-medium">
+                  O número de ISBN identifica este livro no catálogo e não pode ser alterado. Os demais campos abaixo estão liberados para edição.
+                </p>
+              </div>
+            ) : (
+              <div
+                className="rounded-xl p-4 border"
+                style={{
+                  background: 'linear-gradient(135deg, #fffbeb, #fef3c7)',
+                  borderColor: '#fcd34d',
+                }}
+              >
+                <label className="block text-xs font-bold mb-1.5 text-amber-900">
+                  ⚠️ Obra cadastrada sem ISBN — Digite o código ISBN obrigatório para regularizar:
+                </label>
+                <input
+                  type="text"
+                  name="isbn"
+                  value={form.isbn}
+                  onChange={handleChange}
+                  required
+                  placeholder="Digite o ISBN obrigatório (ex: 9788535902778)"
+                  className="w-full px-3.5 py-2.5 rounded-xl text-sm border font-mono font-bold outline-none focus:ring-2 focus:ring-amber-400 bg-white"
+                  style={{ borderColor: '#f59e0b', color: '#1e293b' }}
+                />
+                <p className="text-[11px] mt-1.5 text-amber-800 font-medium">
+                  Todo livro deve possuir ISBN. Ao salvar, este código será vinculado definitivamente a este título.
+                </p>
+              </div>
+            )
           ) : (
             <div
               className="rounded-xl p-4"
@@ -319,15 +349,16 @@ export default function CadastroLivroModal({ livro, onClose }) {
               <label className="block text-xs font-bold mb-2" style={{ color: isbnBloqueado ? '#1d4ed8' : '#065f46' }}>
                 {isbnBloqueado
                   ? '📚 Catálogo universal — metadados preenchidos automaticamente'
-                  : '🔍 Pesquisa por ISBN — Google Books • Open Library • Catálogo próprio'}
+                  : '🔍 Código ISBN * (Obrigatório — digite para buscar ou cadastrar)'}
               </label>
               <div className="flex gap-2">
                 <input
                   type="text"
                   name="isbn"
                   value={form.isbn}
+                  required
                   onChange={e => { handleChange(e); setIsbnBloqueado(false); setIsbnMsg(''); }}
-                  placeholder="Digite o ISBN (ex: 9788535902778 ou com traços)"
+                  placeholder="Digite o ISBN obrigatório (ex: 9788535902778 ou com traços)"
                   className="flex-1 px-3 py-2.5 rounded-xl text-sm border outline-none focus:ring-2 focus:ring-emerald-300"
                   style={{ borderColor: isbnBloqueado ? '#93c5fd' : '#86efac', background: '#fff', color: '#1e293b' }}
                 />

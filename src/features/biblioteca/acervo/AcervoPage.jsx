@@ -39,6 +39,11 @@ const IconTrash = () => (
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
   </svg>
 );
+const IconPdf = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+  </svg>
+);
 
 const CATEGORIAS = [
   { value: '', label: 'Todas as categorias' },
@@ -198,6 +203,7 @@ export default function AcervoPage() {
   const [livroParaExcluir, setLivroParaExcluir] = useState(null);
   const [excluindo, setExcluindo] = useState(false);
   const [erroExclusao, setErroExclusao] = useState('');
+  const [gerandoPdf, setGerandoPdf] = useState(false);
   const searchTimer = useRef(null);
   const LIMIT = 24;
 
@@ -261,6 +267,31 @@ export default function AcervoPage() {
     }
   };
 
+  const handleGerarPdf = async () => {
+    setGerandoPdf(true);
+    try {
+      const params = {};
+      if (busca) params.q = busca;
+      if (categoria) params.categoria = categoria;
+      if (disponivelFiltro) params.disponivel = '1';
+
+      const response = await api.get('/api/biblioteca/acervo/relatorio-pdf', {
+        params,
+        responseType: 'blob',
+      });
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      toast.success('Lista em PDF gerada com sucesso!');
+    } catch (err) {
+      console.error('Erro ao gerar PDF do acervo:', err);
+      toast.error('Erro ao gerar o PDF do acervo.');
+    } finally {
+      setGerandoPdf(false);
+    }
+  };
+
   const totalPages = Math.ceil(total / LIMIT);
 
   return (
@@ -283,20 +314,52 @@ export default function AcervoPage() {
               {total > 0 ? `${total} título${total !== 1 ? 's' : ''} cadastrado${total !== 1 ? 's' : ''}` : 'Nenhum livro cadastrado ainda'}
             </p>
           </div>
-          <button
-            onClick={() => { setEditando(null); setModalOpen(true); }}
-            className="flex items-center gap-2 font-bold text-sm px-5 py-3 rounded-xl transition-all"
-            style={{
-              background: 'rgba(255,255,255,0.15)',
-              color: '#fff',
-              border: '1px solid rgba(255,255,255,0.25)',
-              backdropFilter: 'blur(8px)',
-            }}
-            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
-          >
-            <IconPlus /> Cadastrar Livro
-          </button>
+          <div className="flex items-center gap-3 flex-wrap">
+            <button
+              onClick={handleGerarPdf}
+              disabled={gerandoPdf}
+              className="flex items-center gap-2 font-bold text-sm px-4 py-3 rounded-xl transition-all disabled:opacity-50"
+              style={{
+                background: 'rgba(255,255,255,0.15)',
+                color: '#fff',
+                border: '1px solid rgba(255,255,255,0.25)',
+                backdropFilter: 'blur(8px)',
+              }}
+              onMouseEnter={e => !gerandoPdf && (e.currentTarget.style.background = 'rgba(255,255,255,0.25)')}
+              onMouseLeave={e => !gerandoPdf && (e.currentTarget.style.background = 'rgba(255,255,255,0.15)')}
+              title="Gerar PDF com a lista de livros cadastrados no acervo"
+            >
+              {gerandoPdf ? (
+                <>
+                  <svg className="animate-spin w-4 h-4 text-white" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  <span>Gerando PDF...</span>
+                </>
+              ) : (
+                <>
+                  <IconPdf />
+                  <span>LISTA (PDF)</span>
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={() => { setEditando(null); setModalOpen(true); }}
+              className="flex items-center gap-2 font-bold text-sm px-5 py-3 rounded-xl transition-all"
+              style={{
+                background: 'rgba(255,255,255,0.15)',
+                color: '#fff',
+                border: '1px solid rgba(255,255,255,0.25)',
+                backdropFilter: 'blur(8px)',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.25)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.15)'}
+            >
+              <IconPlus /> Cadastrar Livro
+            </button>
+          </div>
         </div>
       </div>
 

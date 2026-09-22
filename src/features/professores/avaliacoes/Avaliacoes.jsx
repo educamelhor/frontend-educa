@@ -105,13 +105,43 @@ export default function Avaliacoes() {
   // ── Recuperação Contínua (RC) e Compensatória (RCp) ──
   const [rcAtivo, setRcAtivo] = useState({}); // { [itemIdx]: boolean }
   const [rcpAtivo, setRcpAtivo] = useState({}); // { [itemIdx]: boolean }
+  const [modalAvisoRCp, setModalAvisoRCp] = useState(null); // null | { itemIdx, atividade }
 
   const toggleRC = (itemIdx) => {
-    setRcAtivo(prev => ({ ...prev, [itemIdx]: !prev[itemIdx] }));
+    setRcAtivo(prev => {
+      const novo = !prev[itemIdx];
+      if (novo) {
+        // Se ativou RC, desativa RCp para não sobrepor na tela
+        setRcpAtivo(p => ({ ...p, [itemIdx]: false }));
+      }
+      return { ...prev, [itemIdx]: novo };
+    });
   };
 
   const toggleRCp = (itemIdx) => {
-    setRcpAtivo(prev => ({ ...prev, [itemIdx]: !prev[itemIdx] }));
+    // Se já está ativo, apenas desativa (volta ao modo normal)
+    if (rcpAtivo[itemIdx]) {
+      setRcpAtivo(prev => ({ ...prev, [itemIdx]: false }));
+      return;
+    }
+
+    // Regra 5: Se o professor acionar o botão RCp e não tiver nenhum campo / aluno com código 1234,
+    // um modal premium renderiza informando que nenhum aluno deixou de realizar essa atividade.
+    const temAlunoAusente = alunos.some(aluno => {
+      const key = getNotaKey(aluno.id, itemIdx, 0);
+      return ausentesSet.has(key);
+    });
+
+    if (!temAlunoAusente) {
+      const arrItens = Array.isArray(plano?.itens) ? plano.itens : JSON.parse(plano?.itens || "[]");
+      const itemNome = arrItens[itemIdx]?.atividade || `Atividade #${itemIdx + 1}`;
+      setModalAvisoRCp({ itemIdx, atividade: itemNome });
+      return;
+    }
+
+    // Se tem alunos ausentes, ativa o modo RCp e desativa RC
+    setRcpAtivo(prev => ({ ...prev, [itemIdx]: true }));
+    setRcAtivo(prev => ({ ...prev, [itemIdx]: false }));
   };
 
   // Modal: editar data de um item de avaliação no cabeçalho do diário
@@ -335,6 +365,12 @@ export default function Avaliacoes() {
                 }
               }
             });
+            // Se ambos tiverem notas salvas na mesma coluna, prioriza RC na exibição inicial
+            Object.keys(rcDetectado).forEach(idx => {
+              if (rcDetectado[idx] && rcpDetectado[idx]) {
+                rcpDetectado[idx] = false;
+              }
+            });
             setRcAtivo(rcDetectado);
             setRcpAtivo(rcpDetectado);
           } else {
@@ -552,9 +588,12 @@ export default function Avaliacoes() {
       }
 
       // Para itens normais:
+      const keyOrig = getNotaKey(alunoId, itemIdx, 0);
+      const isAusente = ausentesSet.has(keyOrig);
+
       // Nota original (opIdx = 0)
-      const valOrig = notas[getNotaKey(alunoId, itemIdx, 0)];
-      const numOrig = (valOrig !== undefined && valOrig !== null && valOrig !== "" && !isNaN(Number(valOrig)))
+      const valOrig = notas[keyOrig];
+      const numOrig = (!isAusente && valOrig !== undefined && valOrig !== null && valOrig !== "" && !isNaN(Number(valOrig)))
         ? Number(valOrig)
         : null;
 
@@ -564,13 +603,24 @@ export default function Avaliacoes() {
         ? Number(valRC)
         : null;
 
-      // Se há nota de RC lançada, prevalece a maior entre ela e a original
-      if (numRC !== null && numOrig !== null) {
-        total += Math.max(numOrig, numRC);
-      } else if (numRC !== null) {
-        total += numRC;
-      } else if (numOrig !== null) {
-        total += numOrig;
+      // Nota RCp (opIdx = 2) - Recuperação Compensatória para ausentes
+      const valRCp = notas[getNotaKey(alunoId, itemIdx, 2)];
+      const numRCp = (valRCp !== undefined && valRCp !== null && valRCp !== "" && !isNaN(Number(valRCp)))
+        ? Number(valRCp)
+        : null;
+
+      // Se o aluno estava ausente e realizou RCp:
+      if (isAusente) {
+        if (numRCp !== null) {
+          total += numRCp;
+        }
+        return;
+      }
+
+      // Se o aluno não estava ausente: prevalece a maior nota entre original, RC e RCp
+      const candidatos = [numOrig, numRC, numRCp].filter(n => n !== null);
+      if (candidatos.length > 0) {
+        total += Math.max(...candidatos);
       }
     });
     // Padrão EDUCADF: 2 casas decimais (ex: 3.00, 4.50, 10.00)
@@ -1185,6 +1235,132 @@ export default function Avaliacoes() {
       {/* ───────────────── MENSAGEM DE PLANO NÃO DISPONÍVEL ───────────────── */}
       {renderMensagemPlanoNaoDisponivel()}
 
+      {/* ═══════════════ MODAL PREMIUM — RCP AVISO NENHUM ALUNO AUSENTE ═══════════════ */}
+      {modalAvisoRCp && (
+        <div
+          style={{
+            position: "fixed", inset: 0, zIndex: 600,
+            background: "rgba(2,6,23,0.82)",
+            backdropFilter: "blur(14px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: "1rem",
+            animation: "fadeInModal 0.25s ease",
+          }}
+          onClick={() => setModalAvisoRCp(null)}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              width: "100%", maxWidth: 480,
+              borderRadius: "1.5rem",
+              overflow: "hidden",
+              background: "linear-gradient(160deg, #0c1e33 0%, #081524 100%)",
+              border: "1px solid rgba(56,189,248,0.3)",
+              boxShadow: "0 32px 80px rgba(0,0,0,0.7), 0 0 60px rgba(56,189,248,0.1)",
+            }}
+          >
+            {/* ── Faixa superior azul / sky ── */}
+            <div style={{
+              background: "linear-gradient(135deg, #0369a1 0%, #0284c7 60%, #38bdf8 100%)",
+              padding: "2rem 2rem 1.5rem",
+              textAlign: "center",
+              position: "relative",
+              overflow: "hidden",
+            }}>
+              {/* círculos decorativos */}
+              <div style={{ position:"absolute", top:-40, right:-40, width:140, height:140, borderRadius:"50%", background:"rgba(255,255,255,0.08)", pointerEvents:"none" }} />
+              <div style={{ position:"absolute", bottom:-30, left:-30, width:100, height:100, borderRadius:"50%", background:"rgba(255,255,255,0.05)", pointerEvents:"none" }} />
+
+              <div style={{
+                width: 64, height: 64, borderRadius: "1rem",
+                background: "rgba(255,255,255,0.15)",
+                border: "2px solid rgba(255,255,255,0.3)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: "1.5rem", margin: "0 auto 1rem",
+                fontWeight: 900, color: "#fff",
+                animation: "floatIcon 3s ease-in-out infinite",
+              }}>RCp</div>
+
+              <h2 style={{ fontSize: "1.25rem", fontWeight: 900, color: "#fff", letterSpacing: "-0.02em", margin: 0 }}>
+                Recuperação Compensatória
+              </h2>
+              <p style={{ fontSize: "0.82rem", color: "rgba(224,242,254,0.9)", marginTop: "0.4rem", fontWeight: 500 }}>
+                Nenhum estudante ausente nesta atividade
+              </p>
+            </div>
+
+            {/* ── Corpo ── */}
+            <div style={{ padding: "1.75rem 2rem" }}>
+
+              {/* Card de contexto */}
+              <div style={{
+                padding: "1rem 1.25rem",
+                borderRadius: "0.875rem",
+                background: "rgba(56,189,248,0.07)",
+                border: "1px solid rgba(56,189,248,0.22)",
+                marginBottom: "1.25rem",
+              }}>
+                <div style={{ fontSize: "0.65rem", fontWeight: 800, color: "#38bdf8", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "0.6rem" }}>
+                  📌 Detalhes da Atividade
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.6rem" }}>
+                  {[
+                    { label: "Atividade",  value: modalAvisoRCp.atividade },
+                    { label: "Turma",      value: turmaObj?.nome || "" },
+                    { label: "Bimestre",   value: bimestreSelecionado },
+                    { label: "Faltosos",   value: "0 alunos (cód. 1234)" },
+                  ].map(({ label, value }) => (
+                    <div key={label} style={{
+                      padding: "0.55rem 0.75rem", borderRadius: "0.6rem",
+                      background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)",
+                    }}>
+                      <div style={{ fontSize: "0.58rem", color: "#94a3b8", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 2 }}>{label}</div>
+                      <div style={{ fontSize: "0.82rem", fontWeight: 800, color: "#e2e8f0" }}>{value}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Explicação */}
+              <div style={{
+                padding: "0.9rem 1.1rem",
+                borderRadius: "0.875rem",
+                background: "rgba(255,255,255,0.03)",
+                border: "1px solid rgba(255,255,255,0.07)",
+                marginBottom: "1.5rem",
+                fontSize: "0.82rem",
+                color: "#94a3b8",
+                lineHeight: 1.65,
+              }}>
+                A <strong style={{ color: "#38bdf8" }}>Recuperação Compensatória (RCp)</strong> tem por finalidade oportunizar a realização da atividade para estudantes que <strong style={{ color: "#f8fafc" }}>não fizeram ou não entregaram</strong> o trabalho (marcados com o código <strong style={{ color: "#f87171" }}>1234</strong>).
+                <br /><br />
+                Todos os alunos desta turma realizaram a avaliação normalmente ou ainda estão com nota em aberto. Caso algum aluno tenha faltado, registre primeiro o código <strong style={{ color: "#f87171" }}>1234</strong> na nota original para habilitar a RCp.
+              </div>
+
+              {/* Botão fechar */}
+              <button
+                onClick={() => setModalAvisoRCp(null)}
+                style={{
+                  width: "100%", padding: "0.85rem",
+                  borderRadius: "0.875rem",
+                  background: "linear-gradient(135deg, #0284c7, #0369a1)",
+                  border: "none", color: "#fff",
+                  fontWeight: 800, fontSize: "0.9rem",
+                  cursor: "pointer",
+                  boxShadow: "0 4px 20px rgba(2,132,199,0.4)",
+                  transition: "all 0.2s",
+                  letterSpacing: "0.02em",
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = "linear-gradient(135deg, #0369a1, #075985)"}
+                onMouseLeave={e => e.currentTarget.style.background = "linear-gradient(135deg, #0284c7, #0369a1)"}
+              >
+                Entendido
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ═══════════════ MODAL PREMIUM — PAP AGUARDANDO APROVAÇÃO ═══════════════ */}
       {modalPlanoPendente && (
         <div
@@ -1561,8 +1737,9 @@ export default function Avaliacoes() {
                                     {/* CABEÇALHO 2 - Oportunidades detalhadas */}
                                     {columns.map((col, idx) => {
                                         const isRcCol = !isItemFixoDirecao(col.itemIdx) && !!rcAtivo[col.itemIdx];
+                                        const isRcpCol = !isItemFixoDirecao(col.itemIdx) && !isRcCol && !!rcpAtivo[col.itemIdx];
                                         return (
-                                        <th key={`sub_${idx}`} className={`px-2 py-2 text-center text-xs font-bold border-b border-r border-slate-200 text-slate-500 transition-all ${isRcCol ? "min-w-[170px]" : "min-w-[80px]"}`}>
+                                        <th key={`sub_${idx}`} className={`px-2 py-2 text-center text-xs font-bold border-b border-r border-slate-200 text-slate-500 transition-all ${(isRcCol || isRcpCol) ? "min-w-[170px]" : "min-w-[80px]"}`}>
                                             <div className="flex flex-col items-center justify-center">
                                                {isRcCol ? (
                                                  <div className="flex items-center justify-center gap-2 text-[11px] font-bold text-cyan-800">
@@ -1570,10 +1747,16 @@ export default function Avaliacoes() {
                                                    <span className="text-[9px] text-cyan-600 font-normal">/</span>
                                                    <span className="text-[10px] text-cyan-700 font-black">RC</span>
                                                  </div>
+                                               ) : isRcpCol ? (
+                                                 <div className="flex items-center justify-center gap-2 text-[11px] font-bold text-sky-800">
+                                                   <span>Nota</span>
+                                                   <span className="text-[9px] text-sky-600 font-normal">/</span>
+                                                   <span className="text-[10px] text-sky-700 font-black">RCp</span>
+                                                 </div>
                                                ) : (
                                                  <span title={`Valor máximo para este item: ${col.maxVal}`}>{col.label}</span>
                                                )}
-                                               {col.freqTotal > 1 && !isRcCol && <span className="text-[10px] text-slate-400 font-normal">v. {col.maxVal.toFixed(1)}</span>}
+                                               {col.freqTotal > 1 && !isRcCol && !isRcpCol && <span className="text-[10px] text-slate-400 font-normal">v. {col.maxVal.toFixed(1)}</span>}
                                             </div>
                                         </th>
                                         );
@@ -1630,102 +1813,226 @@ export default function Avaliacoes() {
                                                    cor === "green" ? "bg-green-200 text-green-900" :
                                                    "bg-transparent text-indigo-900";
 
-                                                const isRcAtivoCol = !isItemFixoDirecao(col.itemIdx) && !!rcAtivo[col.itemIdx];
-                                                const keyRC = getNotaKey(aluno.id, col.itemIdx, 1);
-                                                const valRC = notas[keyRC];
-                                                const isFocusedRC = focusedKey === keyRC;
-                                                const isAusenteRC = ausentesSet.has(keyRC);
+                                                 const isRcAtivoCol = !isItemFixoDirecao(col.itemIdx) && !!rcAtivo[col.itemIdx];
+                                                 const keyRC = getNotaKey(aluno.id, col.itemIdx, 1);
+                                                 const valRC = notas[keyRC];
+                                                 const isFocusedRC = focusedKey === keyRC;
+                                                 const isAusenteRC = ausentesSet.has(keyRC);
 
-                                                let displayValRC = "";
-                                                if (!isAusenteRC && valRC !== undefined && valRC !== null && valRC !== "") {
-                                                  if (isFocusedRC) {
-                                                    displayValRC = String(valRC).replace(".", ",");
-                                                  } else {
-                                                    const numRC = Number(valRC);
-                                                    displayValRC = isNaN(numRC) ? "" : numRC.toFixed(2).replace(".", ",");
-                                                  }
-                                                }
+                                                 let displayValRC = "";
+                                                 if (!isAusenteRC && valRC !== undefined && valRC !== null && valRC !== "") {
+                                                   if (isFocusedRC) {
+                                                     displayValRC = String(valRC).replace(".", ",");
+                                                   } else {
+                                                     const numRC = Number(valRC);
+                                                     displayValRC = isNaN(numRC) ? "" : numRC.toFixed(2).replace(".", ",");
+                                                   }
+                                                 }
 
-                                                return (
-                                                <td
-                                                   key={`cell_${i}`}
-                                                   onContextMenu={(e) => !isAusente && !isItemFixoDirecao(col.itemIdx) && handleContextMenu(e, aluno.id, col.itemIdx, col.opIdx, col.maxVal)}
-                                                   className={`px-1 py-1 border-r border-slate-100 text-center relative group/cell transition-colors duration-300 ${isAusente ? "bg-red-50" : cor === "red" ? "bg-red-100" : cor === "yellow" ? "bg-yellow-100" : cor === "green" ? "bg-green-100" : ""} ${cellBloqueada && !isAusente ? "bg-amber-50/40" : ""}`}
-                                                 >
-                                                     {isAusente ? (
-                                                       <div className="flex flex-col items-center justify-center py-2 cursor-pointer group/ausente select-none"
-                                                            title="Aluno ausente (codigo 1234)"
-                                                            onClick={() => { if (!cellBloqueada) { setAusentesSet(prev=>{const s=new Set(prev);s.delete(key);return s;}); setCoresCelulas(prev=>{const c={...prev};delete c[key];return c;}); setNotas(prev=>{const n={...prev};delete n[key];return n;}); } }}>
-                                                         <span className="text-red-600 font-black text-lg leading-none">X</span>
-                                                         <span className="text-red-400 text-[9px] font-bold mt-0.5">ausente</span>
-                                                       </div>
-                                                     ) : isRcAtivoCol ? (
-                                                       /* Modo RC Ativo: Dual Input [ Nota Original ] [ RC ] [ Nota RC ] */
-                                                       <div className="flex items-center justify-center gap-1.5 px-1 py-0.5">
-                                                         {/* Campo 1: Nota Original */}
-                                                         <div className="flex-1 min-w-[52px] relative">
-                                                           <input
-                                                             type="text"
-                                                             inputMode="decimal"
-                                                             value={displayVal}
-                                                             onChange={(e) => handleNotaChange(aluno.id, col.itemIdx, col.opIdx, col.maxVal, e.target.value)}
-                                                             onFocus={() => setFocusedKey(key)}
-                                                             onBlur={() => handleNotaBlur(aluno.id, col.itemIdx, col.opIdx, col.maxVal)}
-                                                             readOnly={cellBloqueada}
-                                                             tabIndex={cellBloqueada ? -1 : 0}
-                                                             placeholder="-"
-                                                             title={`Nota original (Max: ${col.maxVal})`}
-                                                             className={`w-full text-center py-2 text-xs font-bold border border-slate-200 rounded-lg outline-none transition-all shadow-2xs focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 ${bgClass}`}
-                                                           />
-                                                         </div>
+                                                 const isRcpAtivoCol = !isItemFixoDirecao(col.itemIdx) && !isRcAtivoCol && !!rcpAtivo[col.itemIdx];
+                                                 const keyRCp = getNotaKey(aluno.id, col.itemIdx, 2);
+                                                 const valRCp = notas[keyRCp];
+                                                 const isFocusedRCp = focusedKey === keyRCp;
+                                                 const isAusenteRCp = ausentesSet.has(keyRCp);
 
-                                                         {/* Separador RC */}
-                                                         <span className="text-[9px] font-black text-cyan-700 bg-cyan-100/80 border border-cyan-300 px-1 py-1 rounded select-none shadow-2xs">
-                                                           RC
-                                                         </span>
+                                                 let displayValRCp = "";
+                                                 if (!isAusenteRCp && valRCp !== undefined && valRCp !== null && valRCp !== "") {
+                                                   if (isFocusedRCp) {
+                                                     displayValRCp = String(valRCp).replace(".", ",");
+                                                   } else {
+                                                     const numRCp = Number(valRCp);
+                                                     displayValRCp = isNaN(numRCp) ? "" : numRCp.toFixed(2).replace(".", ",");
+                                                   }
+                                                 }
 
-                                                         {/* Campo 2: Nota RC */}
-                                                         <div className="flex-1 min-w-[52px] relative">
-                                                           <input
-                                                             type="text"
-                                                             inputMode="decimal"
-                                                             value={displayValRC}
-                                                             onChange={(e) => handleNotaChange(aluno.id, col.itemIdx, 1, col.maxVal, e.target.value)}
-                                                             onFocus={() => setFocusedKey(keyRC)}
-                                                             onBlur={() => handleNotaBlur(aluno.id, col.itemIdx, 1, col.maxVal)}
-                                                             readOnly={diarioFechado}
-                                                             tabIndex={diarioFechado ? -1 : 0}
-                                                             placeholder="-"
-                                                             title={`Nota de Recuperação Contínua (Max: ${col.maxVal})`}
-                                                             className={`w-full text-center py-2 text-xs font-bold border border-cyan-200 rounded-lg outline-none transition-all shadow-2xs focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 bg-cyan-50/50 text-cyan-900 ${
-                                                               isAusenteRC ? "bg-red-50 text-red-700" : ""
-                                                             }`}
-                                                           />
-                                                         </div>
-                                                       </div>
-                                                     ) : (<>
-                                                       <input type="text" inputMode="decimal" value={displayVal}
-                                                         onChange={(e)=>handleNotaChange(aluno.id,col.itemIdx,col.opIdx,col.maxVal,e.target.value)}
-                                                         onFocus={()=>setFocusedKey(key)} onBlur={()=>handleNotaBlur(aluno.id,col.itemIdx,col.opIdx,col.maxVal)}
-                                                         readOnly={cellBloqueada} tabIndex={cellBloqueada?-1:0} placeholder="-"
-                                                         className={`w-full text-center py-2.5 font-bold border border-transparent rounded-lg outline-none transition-all ${bgClass}`}/>
-                                                       {/* Tooltip: célula bloqueada com nota importada */}
-                                                       {cellBloqueada&&!diarioFechado&&!isGabaritoVazio&&(
-                                                         <div className="absolute opacity-0 group-hover/cell:opacity-100 -top-8 left-1/2 transform -translate-x-1/2 bg-amber-700 text-white text-[10px] px-2 py-1 rounded z-50 whitespace-nowrap">
-                                                           Preenchido via Gabarito
-                                                         </div>
-                                                       )}
-                                                       {/* Hint: célula de gabarito vazia — só aceita 1234 */}
-                                                       {!cellBloqueada&&isItemFixoDirecao(col.itemIdx)&&(
-                                                         <div className="absolute opacity-0 group-hover/cell:opacity-100 -top-8 left-1/2 transform -translate-x-1/2 bg-cyan-700 text-white text-[10px] px-2 py-1 rounded z-50 whitespace-nowrap">
-                                                           Digite 1234 para ausente
-                                                         </div>
-                                                       )}
-                                                       {/* Tooltip: max val em células normais */}
-                                                       {!cellBloqueada&&!isItemFixoDirecao(col.itemIdx)&&(
-                                                         <div className="absolute opacity-0 group-hover/cell:opacity-100 -top-8 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white text-[10px] px-2 py-1 rounded z-50">Max: {col.maxVal}</div>
-                                                       )}
-                                                     </>)}
+                                                 return (
+                                                 <td
+                                                    key={`cell_${i}`}
+                                                    onContextMenu={(e) => !isAusente && !isItemFixoDirecao(col.itemIdx) && handleContextMenu(e, aluno.id, col.itemIdx, col.opIdx, col.maxVal)}
+                                                    className={`px-1 py-1 border-r border-slate-100 text-center relative group/cell transition-colors duration-300 ${isAusente ? "bg-red-50" : cor === "red" ? "bg-red-100" : cor === "yellow" ? "bg-yellow-100" : cor === "green" ? "bg-green-100" : ""} ${cellBloqueada && !isAusente ? "bg-amber-50/40" : ""}`}
+                                                  >
+                                                      {isRcpAtivoCol ? (
+                                                        /* Modo RCp Ativo:
+                                                           1) Aluno Ausente (código 1234): [ ✕ ausente ] [ RCp ] [ Input editável RCp ]
+                                                           2) Aluno com Nota: [ Nota Original ] [ RCp ] [ Campo Bloqueado Vazio ]
+                                                           3) Aluno com (-): Não recebe campo extra, permanece input normal único
+                                                        */
+                                                        isAusente ? (
+                                                          <div className="flex items-center justify-center gap-1.5 px-1 py-0.5">
+                                                            {/* Indicador Ausente à esquerda */}
+                                                            <div
+                                                              className="flex-1 min-w-[52px] py-1.5 px-1 bg-red-100/80 border border-red-300 rounded-lg flex items-center justify-center gap-1 text-red-700 cursor-pointer select-none shadow-2xs hover:bg-red-200 transition-colors"
+                                                              title="Aluno ausente nesta avaliação (código 1234). Clique para remover ausência."
+                                                              onClick={() => {
+                                                                if (!cellBloqueada) {
+                                                                  setAusentesSet(prev => { const s = new Set(prev); s.delete(key); return s; });
+                                                                  setCoresCelulas(prev => { const c = { ...prev }; delete c[key]; return c; });
+                                                                  setNotas(prev => { const n = { ...prev }; delete n[key]; return n; });
+                                                                }
+                                                              }}
+                                                            >
+                                                              <span className="font-black text-xs">✕</span>
+                                                              <span className="text-[9px] font-black uppercase tracking-tight">ausente</span>
+                                                            </div>
+
+                                                            {/* Separador RCp */}
+                                                            <span className="text-[9px] font-black text-sky-800 bg-sky-100 border border-sky-300 px-1 py-1 rounded select-none shadow-2xs">
+                                                              RCp
+                                                            </span>
+
+                                                            {/* Campo de Nota RCp (APTO A RECEBER NOTA) */}
+                                                            <div className="flex-1 min-w-[52px] relative">
+                                                              <input
+                                                                type="text"
+                                                                inputMode="decimal"
+                                                                value={displayValRCp}
+                                                                onChange={(e) => handleNotaChange(aluno.id, col.itemIdx, 2, col.maxVal, e.target.value)}
+                                                                onFocus={() => setFocusedKey(keyRCp)}
+                                                                onBlur={() => handleNotaBlur(aluno.id, col.itemIdx, 2, col.maxVal)}
+                                                                readOnly={diarioFechado}
+                                                                tabIndex={diarioFechado ? -1 : 0}
+                                                                placeholder="-"
+                                                                title={`Nota de Recuperação Compensatória (Max: ${col.maxVal})`}
+                                                                className={`w-full text-center py-2 text-xs font-bold border border-sky-300 rounded-lg outline-none transition-all shadow-2xs focus:border-sky-500 focus:ring-1 focus:ring-sky-500 bg-sky-50/70 text-sky-900 ${
+                                                                  isAusenteRCp ? "bg-red-50 text-red-700" : ""
+                                                                }`}
+                                                             />
+                                                            </div>
+                                                          </div>
+                                                        ) : (val !== undefined && val !== null && val !== "") ? (
+                                                          <div className="flex items-center justify-center gap-1.5 px-1 py-0.5">
+                                                            {/* Campo 1: Nota Original */}
+                                                            <div className="flex-1 min-w-[52px] relative">
+                                                              <input
+                                                                type="text"
+                                                                inputMode="decimal"
+                                                                value={displayVal}
+                                                                onChange={(e) => handleNotaChange(aluno.id, col.itemIdx, col.opIdx, col.maxVal, e.target.value)}
+                                                                onFocus={() => setFocusedKey(key)}
+                                                                onBlur={() => handleNotaBlur(aluno.id, col.itemIdx, col.opIdx, col.maxVal)}
+                                                                readOnly={cellBloqueada}
+                                                                tabIndex={cellBloqueada ? -1 : 0}
+                                                                placeholder="-"
+                                                                title={`Nota original (Max: ${col.maxVal})`}
+                                                                className={`w-full text-center py-2 text-xs font-bold border border-slate-200 rounded-lg outline-none transition-all shadow-2xs focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 ${bgClass}`}
+                                                              />
+                                                            </div>
+
+                                                            {/* Separador RCp */}
+                                                            <span className="text-[9px] font-black text-slate-400 bg-slate-100 border border-slate-200 px-1 py-1 rounded select-none shadow-2xs">
+                                                              RCp
+                                                            </span>
+
+                                                            {/* Campo 2: Bloqueado Vazio */}
+                                                            <div className="flex-1 min-w-[52px] relative">
+                                                              <input
+                                                                type="text"
+                                                                value=""
+                                                                readOnly
+                                                                disabled
+                                                                tabIndex={-1}
+                                                                placeholder="-"
+                                                                title="Aluno realizou a avaliação regular. Campo de RCp bloqueado para presentes."
+                                                                className="w-full text-center py-2 text-xs font-bold border border-slate-200 rounded-lg outline-none bg-slate-100 text-slate-400 cursor-not-allowed shadow-2xs"
+                                                              />
+                                                            </div>
+                                                          </div>
+                                                        ) : (
+                                                          /* Aluno com traço (-) -> Permanece input normal único */
+                                                          <>
+                                                            <input
+                                                              type="text"
+                                                              inputMode="decimal"
+                                                              value={displayVal}
+                                                              onChange={(e) => handleNotaChange(aluno.id, col.itemIdx, col.opIdx, col.maxVal, e.target.value)}
+                                                              onFocus={() => setFocusedKey(key)}
+                                                              onBlur={() => handleNotaBlur(aluno.id, col.itemIdx, col.opIdx, col.maxVal)}
+                                                              readOnly={cellBloqueada}
+                                                              tabIndex={cellBloqueada ? -1 : 0}
+                                                              placeholder="-"
+                                                              className={`w-full text-center py-2.5 font-bold border border-transparent rounded-lg outline-none transition-all ${bgClass}`}
+                                                            />
+                                                            {!cellBloqueada && !isItemFixoDirecao(col.itemIdx) && (
+                                                              <div className="absolute opacity-0 group-hover/cell:opacity-100 -top-8 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white text-[10px] px-2 py-1 rounded z-50">
+                                                                Max: {col.maxVal}
+                                                              </div>
+                                                            )}
+                                                          </>
+                                                        )
+                                                      ) : isAusente ? (
+                                                        <div className="flex flex-col items-center justify-center py-2 cursor-pointer group/ausente select-none"
+                                                             title="Aluno ausente (codigo 1234)"
+                                                             onClick={() => { if (!cellBloqueada) { setAusentesSet(prev=>{const s=new Set(prev);s.delete(key);return s;}); setCoresCelulas(prev=>{const c={...prev};delete c[key];return c;}); setNotas(prev=>{const n={...prev};delete n[key];return n;}); } }}>
+                                                          <span className="text-red-600 font-black text-lg leading-none">X</span>
+                                                          <span className="text-red-400 text-[9px] font-bold mt-0.5">ausente</span>
+                                                        </div>
+                                                      ) : isRcAtivoCol ? (
+                                                        /* Modo RC Ativo: Dual Input [ Nota Original ] [ RC ] [ Nota RC ] */
+                                                        <div className="flex items-center justify-center gap-1.5 px-1 py-0.5">
+                                                          {/* Campo 1: Nota Original */}
+                                                          <div className="flex-1 min-w-[52px] relative">
+                                                            <input
+                                                              type="text"
+                                                              inputMode="decimal"
+                                                              value={displayVal}
+                                                              onChange={(e) => handleNotaChange(aluno.id, col.itemIdx, col.opIdx, col.maxVal, e.target.value)}
+                                                              onFocus={() => setFocusedKey(key)}
+                                                              onBlur={() => handleNotaBlur(aluno.id, col.itemIdx, col.opIdx, col.maxVal)}
+                                                              readOnly={cellBloqueada}
+                                                              tabIndex={cellBloqueada ? -1 : 0}
+                                                              placeholder="-"
+                                                              title={`Nota original (Max: ${col.maxVal})`}
+                                                              className={`w-full text-center py-2 text-xs font-bold border border-slate-200 rounded-lg outline-none transition-all shadow-2xs focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 ${bgClass}`}
+                                                            />
+                                                          </div>
+
+                                                          {/* Separador RC */}
+                                                          <span className="text-[9px] font-black text-cyan-700 bg-cyan-100/80 border border-cyan-300 px-1 py-1 rounded select-none shadow-2xs">
+                                                            RC
+                                                          </span>
+
+                                                          {/* Campo 2: Nota RC */}
+                                                          <div className="flex-1 min-w-[52px] relative">
+                                                            <input
+                                                              type="text"
+                                                              inputMode="decimal"
+                                                              value={displayValRC}
+                                                              onChange={(e) => handleNotaChange(aluno.id, col.itemIdx, 1, col.maxVal, e.target.value)}
+                                                              onFocus={() => setFocusedKey(keyRC)}
+                                                              onBlur={() => handleNotaBlur(aluno.id, col.itemIdx, 1, col.maxVal)}
+                                                              readOnly={diarioFechado}
+                                                              tabIndex={diarioFechado ? -1 : 0}
+                                                              placeholder="-"
+                                                              title={`Nota de Recuperação Contínua (Max: ${col.maxVal})`}
+                                                              className={`w-full text-center py-2 text-xs font-bold border border-cyan-200 rounded-lg outline-none transition-all shadow-2xs focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 bg-cyan-50/50 text-cyan-900 ${
+                                                                isAusenteRC ? "bg-red-50 text-red-700" : ""
+                                                              }`}
+                                                            />
+                                                          </div>
+                                                        </div>
+                                                      ) : (<>
+                                                        <input type="text" inputMode="decimal" value={displayVal}
+                                                          onChange={(e)=>handleNotaChange(aluno.id,col.itemIdx,col.opIdx,col.maxVal,e.target.value)}
+                                                          onFocus={()=>setFocusedKey(key)} onBlur={()=>handleNotaBlur(aluno.id,col.itemIdx,col.opIdx,col.maxVal)}
+                                                          readOnly={cellBloqueada} tabIndex={cellBloqueada?-1:0} placeholder="-"
+                                                          className={`w-full text-center py-2.5 font-bold border border-transparent rounded-lg outline-none transition-all ${bgClass}`}/>
+                                                        {/* Tooltip: célula bloqueada com nota importada */}
+                                                        {cellBloqueada&&!diarioFechado&&!isGabaritoVazio&&(
+                                                          <div className="absolute opacity-0 group-hover/cell:opacity-100 -top-8 left-1/2 transform -translate-x-1/2 bg-amber-700 text-white text-[10px] px-2 py-1 rounded z-50 whitespace-nowrap">
+                                                            Preenchido via Gabarito
+                                                          </div>
+                                                        )}
+                                                        {/* Hint: célula de gabarito vazia — só aceita 1234 */}
+                                                        {!cellBloqueada&&isItemFixoDirecao(col.itemIdx)&&(
+                                                          <div className="absolute opacity-0 group-hover/cell:opacity-100 -top-8 left-1/2 transform -translate-x-1/2 bg-cyan-700 text-white text-[10px] px-2 py-1 rounded z-50 whitespace-nowrap">
+                                                            Digite 1234 para ausente
+                                                          </div>
+                                                        )}
+                                                        {/* Tooltip: max val em células normais */}
+                                                        {!cellBloqueada&&!isItemFixoDirecao(col.itemIdx)&&(
+                                                          <div className="absolute opacity-0 group-hover/cell:opacity-100 -top-8 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white text-[10px] px-2 py-1 rounded z-50">Max: {col.maxVal}</div>
+                                                        )}
+                                                      </>)}
                                                  </td>
                                              )})}
 

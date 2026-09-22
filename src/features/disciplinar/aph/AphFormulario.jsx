@@ -123,6 +123,11 @@ export default function AphFormulario({ aluno, onBack, onSuccess, editRecord }) 
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const alunoId = aluno?.id || aluno?.aluno_id;
+    if (!alunoId) {
+      toast.error("Erro: nenhum estudante identificado.");
+      return;
+    }
     if (!local || motivos.length === 0 || !desfecho) {
       toast.error("Preencha as informações obrigatórias (Local, Motivo e Desfecho).");
       return;
@@ -131,7 +136,7 @@ export default function AphFormulario({ aluno, onBack, onSuccess, editRecord }) 
     try {
       setIsSubmitting(true);
       const payload = {
-        aluno_id: aluno.id,
+        aluno_id: alunoId,
         escola_id: localStorage.getItem("escola_id") || 1,
         local,
         solicitante,
@@ -146,24 +151,27 @@ export default function AphFormulario({ aluno, onBack, onSuccess, editRecord }) 
         desfecho,
         comunicacao_resp: comunicacaoResp,
         hora_comunicacao: horaComunicacao,
-          hora_comparecimento: horaComparecimento,
-          sinais_pa: sinaisPa,
-          sinais_fc: sinaisFc,
-          sinais_temperatura: sinaisTemperatura,
-          desfecho_detalhes: desfechoDetalhes
-        };
+        hora_comparecimento: horaComparecimento,
+        sinais_pa: sinaisPa,
+        sinais_fc: sinaisFc,
+        sinais_temperatura: sinaisTemperatura,
+        desfecho_detalhes: desfechoDetalhes
+      };
       
-      const response = await api.post('/api/aph', payload);
+      const response = editRecord?.id
+        ? await api.put(`/api/aph/${editRecord.id}`, payload)
+        : await api.post('/api/aph', payload);
       
       if (response.data?.success) {
-        toast.success("Atendimento APH registrado com sucesso!");
+        toast.success(editRecord?.id ? "Atendimento APH atualizado com sucesso!" : "Atendimento APH registrado com sucesso!");
         onSuccess();
       } else {
-        toast.error("Erro ao registrar atendimento APH.");
+        toast.error(response.data?.error || response.data?.message || "Erro ao registrar atendimento APH.");
       }
     } catch (error) {
       console.error("Erro APH:", error);
-      toast.error("Erro de comunicação com o servidor.");
+      const errMsg = error?.response?.data?.error || error?.response?.data?.message || "Erro de comunicação com o servidor.";
+      toast.error(errMsg);
     } finally {
       setIsSubmitting(false);
     }

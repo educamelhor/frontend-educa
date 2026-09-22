@@ -63,10 +63,17 @@ export default function Planos() {
   const PONTOS_TOTAL_PAP = 10;
 
   const totalPontos = (lista) =>
-    (lista || []).reduce((acc, it) => acc + Number(it?.nota_total || 0), 0);
+    (lista || [])
+      .filter(it => !it.ponto_extra && !it.eh_ponto_extra && it.tipo_avaliacao !== "Ponto Extra")
+      .reduce((acc, it) => acc + Number(it?.nota_total || 0), 0);
 
   // Itens do PAP — inicia vazio; serão preenchidos após verificar governança da escola
   const [itens, setItens] = useState([]);
+
+  // Item de Ponto Extra (se já configurado no plano)
+  const itemPontoExtra = (itens || []).find(
+    it => it.ponto_extra || it.eh_ponto_extra || it.tipo_avaliacao === "Ponto Extra"
+  );
 
   // ✅ Cálculos dependem de "itens" — devem ficar DEPOIS do state
   const totalAtual = totalPontos(itens);
@@ -74,6 +81,13 @@ export default function Planos() {
 
   const pontosOk = Math.abs(totalAtual - PONTOS_TOTAL_PAP) < 0.0001;
   const pontosExcedeu = totalAtual > PONTOS_TOTAL_PAP;
+
+  // ✅ Estados do Modal de Ponto Extra
+  const [modalPontoExtra, setModalPontoExtra] = useState(false);
+  const [nomePontoExtra, setNomePontoExtra] = useState("Ponto Extra");
+  const [valorPontoExtra, setValorPontoExtra] = useState("2.0");
+  const [descPontoExtra, setDescPontoExtra] = useState("");
+  const [salvandoPontoExtra, setSalvandoPontoExtra] = useState(false);
 
   const [modalItemOpen, setModalItemOpen] = useState(false);
 
@@ -281,6 +295,7 @@ export default function Planos() {
              data_inicio: norm(it.data_inicio),
              data_final:  norm(it.data_final),
              data:        norm(it.data),
+             ponto_extra: !!it.ponto_extra || !!it.eh_ponto_extra || it.tipo_avaliacao === "Ponto Extra",
            })));
         } else {
            // Plano existe mas sem itens: inicializa respeitando as exceções
@@ -309,6 +324,86 @@ export default function Planos() {
     const turmaCache = turmaSelecionada;
     setTurmaSelecionada(null);
     setTimeout(() => setTurmaSelecionada(turmaCache), 50);
+  };
+
+  const handleSalvarPontoExtra = async () => {
+    const numValor = parseFloat(String(valorPontoExtra).replace(",", "."));
+    if (isNaN(numValor) || numValor <= 0) {
+      showMsg("warn", "Informe uma pontuação válida para o ponto extra (ex: 2.0).");
+      return;
+    }
+
+    setSalvandoPontoExtra(true);
+    try {
+      const nomeFinal = nomePontoExtra.trim() || "Ponto Extra";
+      const descFinal = descPontoExtra.trim() || "Bonificação bimestral (Ponto Extra)";
+
+      const idxExistente = itens.findIndex(
+        it => it.ponto_extra || it.eh_ponto_extra || it.tipo_avaliacao === "Ponto Extra"
+      );
+
+      let novosItens = [];
+      if (idxExistente >= 0) {
+        novosItens = itens.map((it, idx) =>
+          idx === idxExistente
+            ? {
+                ...it,
+                atividade: nomeFinal,
+                tipo_avaliacao: "Ponto Extra",
+                nota_total: numValor,
+                oportunidades: 1,
+                nota_invertida: 0,
+                descricao: descFinal,
+                ponto_extra: true,
+                eh_ponto_extra: 1
+              }
+            : it
+        );
+      } else {
+        const novoItem = {
+          id: "extra-" + Date.now(),
+          atividade: nomeFinal,
+          tipo_avaliacao: "Ponto Extra",
+          nota_total: numValor,
+          oportunidades: 1,
+          nota_invertida: 0,
+          descricao: descFinal,
+          ponto_extra: true,
+          eh_ponto_extra: 1
+        };
+        novosItens = [...itens, novoItem];
+      }
+
+      setItens(novosItens);
+
+      const turmaObj = turmas.find(t => String(t.id) === String(turmaSelecionada) || t.nome === turmaSelecionada);
+      const payload = {
+        disciplina: disciplinaSelecionada,
+        bimestre: bimestreSelecionado,
+        turmas: turmasDoPlanoAberto,
+        turno: turmaObj?.turno || null,
+        ano: new Date().getFullYear(),
+        nome_codigo: "Plano-" + Math.floor(Math.random() * 10000),
+        status: papStatus,
+        itens: novosItens
+      };
+
+      const { data } = await api.post("/avaliacoes", payload);
+      if (data.success) {
+        if (data.plano_ids && data.plano_ids[0]) {
+          setPapKeyAtiva(data.plano_ids[0]);
+        }
+        setModalPontoExtra(false);
+        showMsg("success", "★ Coluna de Ponto Extra configurada com sucesso! Ela já está disponível no Lançamento de Notas.");
+      } else {
+        showMsg("error", "Erro ao salvar o Ponto Extra no plano.");
+      }
+    } catch (err) {
+      console.error("Erro ao salvar Ponto Extra:", err);
+      showMsg("error", err?.response?.data?.error || "Erro ao salvar a coluna de Ponto Extra.");
+    } finally {
+      setSalvandoPontoExtra(false);
+    }
   };
 
 
@@ -880,6 +975,11 @@ export default function Planos() {
             }`}
           >
             Total do PAP: <span className="font-bold">{totalAtual}</span> / {PONTOS_TOTAL_PAP} pontos
+            {itemPontoExtra && (
+              <span className="ml-2.5 inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 font-bold text-xs shadow-2xs">
+                <span>★</span> +{itemPontoExtra.nota_total} pts ({itemPontoExtra.atividade || "Ponto Extra"})
+              </span>
+            )}
             {"  "}
             {!pontosOk && (
               <span className="ml-2">
@@ -1021,8 +1121,33 @@ export default function Planos() {
               Atividades Avaliativas
             </h3>
 
-            <button
-              type="button"
+            <div className="flex items-center gap-2.5">
+              {/* Botão PONTO EXTRA: visível quando o plano tem 10/10 e foi publicado/aprovado */}
+              {pontosOk && (papStatus === "APROVADO" || papStatus === "PUBLICADO" || (planoModo !== "professor_autonomo" && papStatus === "ENVIADO")) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (itemPontoExtra) {
+                      setNomePontoExtra(itemPontoExtra.atividade || "Ponto Extra");
+                      setValorPontoExtra(String(itemPontoExtra.nota_total ?? "2.0"));
+                      setDescPontoExtra(itemPontoExtra.descricao || "");
+                    } else {
+                      setNomePontoExtra("Ponto Extra");
+                      setValorPontoExtra("2.0");
+                      setDescPontoExtra("");
+                    }
+                    setModalPontoExtra(true);
+                  }}
+                  className="px-4 py-2 rounded-lg font-black text-xs md:text-sm tracking-wide text-amber-900 bg-gradient-to-r from-amber-300 via-yellow-300 to-amber-400 hover:from-amber-400 hover:to-yellow-400 shadow-md hover:shadow-lg transition-all active:scale-95 flex items-center gap-1.5 border border-amber-400/80 cursor-pointer"
+                  title="Criar ou editar coluna de Ponto Extra no diário"
+                >
+                  <span className="text-amber-700 text-base leading-none">★</span>
+                  <span>{itemPontoExtra ? "PONTO EXTRA (CONFIGURADO)" : "PONTO EXTRA"}</span>
+                </button>
+              )}
+
+              <button
+                type="button"
               onClick={() => {
                 // bloqueios de governança (mock)
                 if (planoModo !== "professor_autonomo") {
@@ -1089,7 +1214,7 @@ export default function Planos() {
             >
               + Item
             </button>
-
+            </div>
           </div>
 
           <table className="w-full border">
@@ -1112,6 +1237,7 @@ export default function Planos() {
                   freq > 0 ? Number((valor / freq).toFixed(2)) : valor;
 
                 const isFixo = !!item?.fixo_direcao;
+                const isExtra = !!item?.ponto_extra || !!item?.eh_ponto_extra || item?.tipo_avaliacao === "Ponto Extra";
 
                 return (
                   <tr key={`${item.atividade}-${idx}`} className="text-center">
@@ -1124,6 +1250,11 @@ export default function Planos() {
                         {isFixo && (
                           <span className="text-xs font-bold px-2 py-0.5 rounded bg-purple-100 text-purple-800">
                             FIXO (DIREÇÃO)
+                          </span>
+                        )}
+                        {isExtra && (
+                          <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs">
+                            ★ PONTO EXTRA
                           </span>
                         )}
                       </div>
@@ -1155,6 +1286,34 @@ export default function Planos() {
                             {item.data_inicio
                               ? new Date(item.data_inicio + 'T12:00:00').toLocaleDateString('pt-BR')
                               : 'Definir Data'}
+                          </button>
+                        </div>
+                      ) : isExtra ? (
+                        // ✅ Ações do Ponto Extra: editar valor/nome ou remover
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setNomePontoExtra(item.atividade || "Ponto Extra");
+                              setValorPontoExtra(String(item.nota_total ?? "2.0"));
+                              setDescPontoExtra(item.descricao || "");
+                              setModalPontoExtra(true);
+                            }}
+                            className="p-1.5 rounded text-amber-700 hover:bg-amber-100 transition cursor-pointer"
+                            title="Editar Ponto Extra"
+                          >
+                            <PencilSquareIcon className="h-5 w-5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setConfirmExcluirIndex(idx);
+                              setConfirmExcluirOpen(true);
+                            }}
+                            className="p-1.5 rounded text-red-600 hover:bg-red-50 transition cursor-pointer"
+                            title="Remover Ponto Extra"
+                          >
+                            <TrashIcon className="h-5 w-5" />
                           </button>
                         </div>
                       ) : (
@@ -1513,11 +1672,16 @@ export default function Planos() {
                     return;
                   }
 
+                  const itemExcluido = itens[confirmExcluirIndex];
                   setItens((prev) => prev.filter((_, i) => i !== confirmExcluirIndex));
                   setConfirmExcluirOpen(false);
                   setConfirmExcluirIndex(null);
 
-                  showMsg("success", "Item removido. Ajuste a pontuação para fechar 10 pontos.");
+                  if (itemExcluido?.ponto_extra || itemExcluido?.eh_ponto_extra || itemExcluido?.tipo_avaliacao === "Ponto Extra") {
+                    showMsg("success", "Coluna de Ponto Extra removida do plano.");
+                  } else {
+                    showMsg("success", "Item removido. Ajuste a pontuação para fechar 10 pontos.");
+                  }
                 }}
                 className="px-5 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold shadow transition"
               >
@@ -2038,6 +2202,134 @@ export default function Planos() {
                       <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                     </svg>
                     {planoModo === "professor_autonomo" ? "Publicar Plano" : "Confirmar Envio"}
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════
+          MODAL PREMIUM — PONTO EXTRA
+          ═══════════════════════════════════════════════════════ */}
+      {modalPontoExtra && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in"
+          onClick={() => !salvandoPontoExtra && setModalPontoExtra(false)}
+        >
+          <div
+            className="w-full max-w-lg rounded-2xl bg-white shadow-2xl overflow-hidden transform transition-all"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header gradiente premium âmbar/dourado */}
+            <div className="bg-gradient-to-r from-amber-500 via-amber-600 to-yellow-500 px-6 py-6 text-white relative">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-2xl shadow-inner font-black">
+                  ★
+                </div>
+                <div>
+                  <h4 className="text-xl font-black tracking-tight">
+                    {itemPontoExtra ? "Configurar Ponto Extra" : "Criar Coluna de Ponto Extra"}
+                  </h4>
+                  <p className="text-amber-100 text-xs font-semibold mt-0.5">
+                    Bonificação bimestral para os estudantes
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Corpo do Modal */}
+            <div className="px-6 py-5 space-y-4">
+              {/* Card de Regra e Contexto */}
+              <div className="bg-amber-50/80 border border-amber-200 rounded-xl p-4 text-xs text-amber-900 space-y-2">
+                <div className="flex items-center gap-1.5 font-black text-amber-800 uppercase tracking-wide text-[11px]">
+                  <span>💡</span>
+                  <span>Como funciona a pontuação extra</span>
+                </div>
+                <p className="leading-relaxed">
+                  A pontuação registrada nesta coluna será somada à nota do estudante <strong>somente até o limite máximo de 10,00 pontos</strong> no bimestre.
+                </p>
+                <div className="bg-white/80 p-2.5 rounded-lg border border-amber-200 font-medium text-slate-700">
+                  <span className="font-bold text-amber-900">Exemplo prático:</span> Se o aluno tiver <strong>8,00</strong> nas avaliações regulares e receber <strong>3,00</strong> no ponto extra, sua nota final será <strong>10,00</strong>.
+                </div>
+                <p className="text-[11px] text-amber-700 font-semibold">
+                  🔒 Por ser uma bonificação especial, esta coluna <strong>não possui</strong> Recuperação Contínua (RC) nem Compensatória (RCp).
+                </p>
+              </div>
+
+              {/* Campos do formulário */}
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1 uppercase tracking-wider">
+                  Nome da Atividade Avaliativa
+                </label>
+                <input
+                  type="text"
+                  value={nomePontoExtra}
+                  onChange={(e) => setNomePontoExtra(e.target.value)}
+                  placeholder="Ex: Ponto Extra, Participação em Aula, Desafio"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm font-semibold focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none transition"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1 uppercase tracking-wider">
+                  Valor Máximo da Bonificação (Pontos)
+                </label>
+                <input
+                  type="number"
+                  step="0.5"
+                  min="0.5"
+                  max="10"
+                  value={valorPontoExtra}
+                  onChange={(e) => setValorPontoExtra(e.target.value)}
+                  placeholder="Ex: 2.0"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 text-sm font-bold focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none transition"
+                />
+                <span className="text-[11px] text-gray-400 mt-1 block">
+                  Pontuação máxima que o professor poderá atribuir nesta coluna extra (ex: 2,00 pontos).
+                </span>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 mb-1 uppercase tracking-wider">
+                  Critério Pedagógico / Descrição (Opcional)
+                </label>
+                <textarea
+                  rows={2}
+                  value={descPontoExtra}
+                  onChange={(e) => setDescPontoExtra(e.target.value)}
+                  placeholder="Ex: Participação ativa em sala de aula ou entrega da lista de exercícios de desafio"
+                  className="w-full px-3.5 py-2 rounded-xl border border-gray-300 text-xs font-medium focus:border-amber-500 focus:ring-2 focus:ring-amber-200 outline-none transition resize-none"
+                />
+              </div>
+            </div>
+
+            {/* Footer do Modal */}
+            <div className="px-6 py-4 bg-gray-50 border-t flex items-center justify-end gap-3">
+              <button
+                type="button"
+                disabled={salvandoPontoExtra}
+                onClick={() => setModalPontoExtra(false)}
+                className="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-600 font-semibold hover:bg-gray-100 transition text-sm disabled:opacity-50 cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={salvandoPontoExtra}
+                onClick={handleSalvarPontoExtra}
+                className="px-6 py-2.5 rounded-xl font-bold text-white shadow-lg transition-all active:scale-95 flex items-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 disabled:opacity-60 cursor-pointer"
+              >
+                {salvandoPontoExtra ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  <>
+                    <span>★</span>
+                    <span>{itemPontoExtra ? "Salvar Alterações" : "Criar Coluna Ponto Extra"}</span>
                   </>
                 )}
               </button>

@@ -573,16 +573,28 @@ export default function Avaliacoes() {
   };
 
   const calcularTotalAluno = (alunoId) => {
-    let total = 0;
-    if (!plano || typeof plano !== 'object' || !plano.itens) return total;
+    let totalRegular = 0;
+    let totalExtra = 0;
+    if (!plano || typeof plano !== 'object' || !plano.itens) return 0;
 
     const arrItens = Array.isArray(plano.itens) ? plano.itens : JSON.parse(plano.itens || "[]");
     arrItens.forEach((item, itemIdx) => {
+      const isExtra = !!item.ponto_extra || !!item.eh_ponto_extra || item.tipo_avaliacao === "Ponto Extra";
+
       // Prova Bimestral padronizada (fixo_direcao): pega nota direta opIdx = 0
       if (item.fixo_direcao) {
         const val = notas[getNotaKey(alunoId, itemIdx, 0)];
         if (val !== undefined && val !== null && val !== "" && !isNaN(Number(val))) {
-          total += Number(val);
+          totalRegular += Number(val);
+        }
+        return;
+      }
+
+      // Se for Ponto Extra: bonificação direta no opIdx = 0 (sem RC nem RCp)
+      if (isExtra) {
+        const valExtra = notas[getNotaKey(alunoId, itemIdx, 0)];
+        if (valExtra !== undefined && valExtra !== null && valExtra !== "" && !isNaN(Number(valExtra))) {
+          totalExtra += Number(valExtra);
         }
         return;
       }
@@ -612,7 +624,7 @@ export default function Avaliacoes() {
       // Se o aluno estava ausente e realizou RCp:
       if (isAusente) {
         if (numRCp !== null) {
-          total += numRCp;
+          totalRegular += numRCp;
         }
         return;
       }
@@ -620,11 +632,18 @@ export default function Avaliacoes() {
       // Se o aluno não estava ausente: prevalece a maior nota entre original, RC e RCp
       const candidatos = [numOrig, numRC, numRCp].filter(n => n !== null);
       if (candidatos.length > 0) {
-        total += Math.max(...candidatos);
+        totalRegular += Math.max(...candidatos);
       }
     });
+
+    // Regras 3 e 4: A pontuação extra é considerada até o limite onde o total não ultrapasse 10,00 pontos
+    let totalFinal = totalRegular + totalExtra;
+    if (totalFinal > 10) {
+      totalFinal = 10;
+    }
+
     // Padrão EDUCADF: 2 casas decimais (ex: 3.00, 4.50, 10.00)
-    return parseFloat(total.toFixed(2));
+    return parseFloat(totalFinal.toFixed(2));
   };
 
   // ---------------------------
@@ -789,15 +808,17 @@ export default function Avaliacoes() {
     arrItens.forEach((item, itemIdx) => {
       const freq = Number(item.oportunidades) || 1;
       const maxPorOcorrencia = Number(item.nota_total) / freq;
+      const isExtra = !!item.ponto_extra || !!item.eh_ponto_extra || item.tipo_avaliacao === "Ponto Extra";
 
       for (let opIdx = 0; opIdx < freq; opIdx++) {
         columns.push({
           itemIdx,
           opIdx,
           title: item.atividade,
-          label: freq > 1 ? `#${opIdx + 1}` : "Nota",
+          label: isExtra ? "★ Extra" : freq > 1 ? `#${opIdx + 1}` : "Nota",
           maxVal: maxPorOcorrencia,
-          freqTotal: freq
+          freqTotal: freq,
+          ponto_extra: isExtra
         });
       }
     });
@@ -810,11 +831,13 @@ export default function Avaliacoes() {
   // Verifica se TODAS as notas foram lançadas (incluindo coluna bimestral)
   // Coluna bimestral bloqueada (fixo_direcao + avaliacaoPadrao) SEM nota = bloqueia exportação
   // Uma célula é considerada preenchida se: tem nota numérica (incl. 0) OU está em ausentesSet
+  // Colunas de Ponto Extra são opcionais (não bloqueiam exportação)
   // ---------------------------
   const todasNotasLancadas = useMemo(() => {
     if (!plano?.itens || alunos.length === 0 || columns.length === 0) return false;
     for (const aluno of alunos) {
       for (const col of columns) {
+        if (col.ponto_extra) continue;
         const key = getNotaKey(aluno.id, col.itemIdx, col.opIdx);
         const val = notas[key];
         const temNota = (val !== undefined && val !== "" && !isNaN(Number(val)));
@@ -830,6 +853,7 @@ export default function Avaliacoes() {
     if (!plano?.itens || alunos.length === 0) return [];
     const resultado = [];
     for (const col of columns) {
+      if (col.ponto_extra) continue;
       const alunosSemNota = alunos.filter(a => {
         const key = getNotaKey(a.id, col.itemIdx, col.opIdx);
         const val = notas[key];
@@ -1648,6 +1672,7 @@ export default function Avaliacoes() {
                                          ? new Date(dataExibir + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })
                                          : null;
                                        const podeEditar = !diarioFechado;
+                                       const isExtra = !!item.ponto_extra || !!item.eh_ponto_extra || item.tipo_avaliacao === "Ponto Extra";
                                        const isRcAtivo = !!rcAtivo[idx];
                                        const isRcpAtivo = !!rcpAtivo[idx];
 
@@ -1655,18 +1680,29 @@ export default function Avaliacoes() {
                                          <button
                                            onClick={() => { if (!podeEditar) return; setDataEditTemp(dataExibir || ""); setModalDataItem({ itemId: item.id, itemIdx: idx, atividade: item.atividade, dataAtual: dataExibir }); }}
                                            title={podeEditar ? "Clique para definir a data" : "Diário fechado"}
-                                           style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 3, fontSize: "0.62rem", fontWeight: 700, color: dataFormatada ? "#1d4ed8" : "#94a3b8", background: dataFormatada ? "rgba(59,130,246,0.1)" : "rgba(148,163,184,0.1)", border: "1px dashed " + (dataFormatada ? "rgba(59,130,246,0.4)" : "rgba(148,163,184,0.4)"), borderRadius: "0.3rem", padding: "1px 5px", cursor: podeEditar ? "pointer" : "default", width: "100%", transition: "all 0.15s" }}
+                                           style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 3, fontSize: "0.62rem", fontWeight: 700, color: isExtra ? "#b45309" : dataFormatada ? "#1d4ed8" : "#94a3b8", background: isExtra ? "rgba(245,158,11,0.1)" : dataFormatada ? "rgba(59,130,246,0.1)" : "rgba(148,163,184,0.1)", border: "1px dashed " + (isExtra ? "rgba(245,158,11,0.5)" : dataFormatada ? "rgba(59,130,246,0.4)" : "rgba(148,163,184,0.4)"), borderRadius: "0.3rem", padding: "1px 5px", cursor: podeEditar ? "pointer" : "default", width: "100%", transition: "all 0.15s" }}
                                          >
                                            {"\uD83D\uDCC5"} {dataFormatada || "+ data"}
                                          </button>
                                        );
                                        return (
-                                         <th key={idx} colSpan={Number(item.oportunidades) || 1} className="px-3 py-2 text-center text-[11px] font-black uppercase tracking-wider text-indigo-800 border-b border-r border-indigo-100 bg-indigo-50/50">
+                                         <th key={idx} colSpan={Number(item.oportunidades) || 1} className={`px-3 py-2 text-center text-[11px] font-black uppercase tracking-wider border-b border-r ${
+                                           isExtra
+                                             ? "text-amber-800 border-amber-200 bg-amber-50/70"
+                                             : "text-indigo-800 border-indigo-100 bg-indigo-50/50"
+                                         }`}>
                                            {item.atividade}
-                                           <div className="text-[10px] text-indigo-500 font-semibold lowercase mt-0.5">
+                                           <div className={`text-[10px] font-semibold lowercase mt-0.5 ${isExtra ? "text-amber-600" : "text-indigo-500"}`}>
                                              (Max: {item.nota_total} pts)
                                            </div>
-                                           {item.fixo_direcao ? (
+                                           {isExtra ? (
+                                             <div className="flex flex-col items-center justify-center gap-1 mt-1 w-full">
+                                               {btnData}
+                                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black bg-amber-100 text-amber-800 border border-amber-300 shadow-2xs">
+                                                 ★ Ponto Extra
+                                               </span>
+                                             </div>
+                                           ) : item.fixo_direcao ? (
                                              <div className="flex flex-col items-center justify-center gap-1 mt-1">
                                                {btnData}
                                                {!diarioFechado && (
@@ -1734,33 +1770,40 @@ export default function Avaliacoes() {
                                     <th rowSpan={2} className="px-6 py-4 font-black uppercase tracking-widest text-center border-b border-slate-200 text-slate-800 bg-slate-200 min-w-[120px]">TOTAL</th>
                                 </tr>
                                 <tr>
-                                    {/* CABEÇALHO 2 - Oportunidades detalhadas */}
-                                    {columns.map((col, idx) => {
-                                        const isRcCol = !isItemFixoDirecao(col.itemIdx) && !!rcAtivo[col.itemIdx];
-                                        const isRcpCol = !isItemFixoDirecao(col.itemIdx) && !isRcCol && !!rcpAtivo[col.itemIdx];
-                                        return (
-                                        <th key={`sub_${idx}`} className={`px-2 py-2 text-center text-xs font-bold border-b border-r border-slate-200 text-slate-500 transition-all ${(isRcCol || isRcpCol) ? "min-w-[170px]" : "min-w-[80px]"}`}>
-                                            <div className="flex flex-col items-center justify-center">
-                                               {isRcCol ? (
-                                                 <div className="flex items-center justify-center gap-2 text-[11px] font-bold text-cyan-800">
-                                                   <span>Nota</span>
-                                                   <span className="text-[9px] text-cyan-600 font-normal">/</span>
-                                                   <span className="text-[10px] text-cyan-700 font-black">RC</span>
-                                                 </div>
-                                               ) : isRcpCol ? (
-                                                 <div className="flex items-center justify-center gap-2 text-[11px] font-bold text-sky-800">
-                                                   <span>Nota</span>
-                                                   <span className="text-[9px] text-sky-600 font-normal">/</span>
-                                                   <span className="text-[10px] text-sky-700 font-black">RCp</span>
-                                                 </div>
-                                               ) : (
-                                                 <span title={`Valor máximo para este item: ${col.maxVal}`}>{col.label}</span>
-                                               )}
-                                               {col.freqTotal > 1 && !isRcCol && !isRcpCol && <span className="text-[10px] text-slate-400 font-normal">v. {col.maxVal.toFixed(1)}</span>}
-                                            </div>
-                                        </th>
-                                        );
-                                    })}
+                                     {/* CABEÇALHO 2 - Oportunidades detalhadas */}
+                                     {columns.map((col, idx) => {
+                                         const isExtraCol = !!col.ponto_extra;
+                                         const isRcCol = !isExtraCol && !isItemFixoDirecao(col.itemIdx) && !!rcAtivo[col.itemIdx];
+                                         const isRcpCol = !isExtraCol && !isItemFixoDirecao(col.itemIdx) && !isRcCol && !!rcpAtivo[col.itemIdx];
+                                         return (
+                                         <th key={`sub_${idx}`} className={`px-2 py-2 text-center text-xs font-bold border-b border-r transition-all ${
+                                           isExtraCol ? "border-amber-200 bg-amber-50/40 text-amber-800 min-w-[90px]" : "border-slate-200 text-slate-500 " + ((isRcCol || isRcpCol) ? "min-w-[170px]" : "min-w-[80px]")
+                                         }`}>
+                                             <div className="flex flex-col items-center justify-center">
+                                                {isRcCol ? (
+                                                  <div className="flex items-center justify-center gap-2 text-[11px] font-bold text-cyan-800">
+                                                    <span>Nota</span>
+                                                    <span className="text-[9px] text-cyan-600 font-normal">/</span>
+                                                    <span className="text-[10px] text-cyan-700 font-black">RC</span>
+                                                  </div>
+                                                ) : isRcpCol ? (
+                                                  <div className="flex items-center justify-center gap-2 text-[11px] font-bold text-sky-800">
+                                                    <span>Nota</span>
+                                                    <span className="text-[9px] text-sky-600 font-normal">/</span>
+                                                    <span className="text-[10px] text-sky-700 font-black">RCp</span>
+                                                  </div>
+                                                ) : isExtraCol ? (
+                                                  <span className="text-amber-800 font-black flex items-center gap-0.5" title={`Ponto Extra: Max ${col.maxVal} (limitado a 10 no total bimestral)`}>
+                                                    ★ Extra
+                                                  </span>
+                                                ) : (
+                                                  <span title={`Valor máximo para este item: ${col.maxVal}`}>{col.label}</span>
+                                                )}
+                                                {col.freqTotal > 1 && !isRcCol && !isRcpCol && !isExtraCol && <span className="text-[10px] text-slate-400 font-normal">v. {col.maxVal.toFixed(1)}</span>}
+                                             </div>
+                                         </th>
+                                         );
+                                     })}
                                 </tr>
                             </thead>
                             <tbody>
@@ -1813,44 +1856,45 @@ export default function Avaliacoes() {
                                                    cor === "green" ? "bg-green-200 text-green-900" :
                                                    "bg-transparent text-indigo-900";
 
-                                                 const isRcAtivoCol = !isItemFixoDirecao(col.itemIdx) && !!rcAtivo[col.itemIdx];
-                                                 const keyRC = getNotaKey(aluno.id, col.itemIdx, 1);
-                                                 const valRC = notas[keyRC];
-                                                 const isFocusedRC = focusedKey === keyRC;
-                                                 const isAusenteRC = ausentesSet.has(keyRC);
+                                                  const isExtraCol = !!col.ponto_extra;
+                                                  const isRcAtivoCol = !isExtraCol && !isItemFixoDirecao(col.itemIdx) && !!rcAtivo[col.itemIdx];
+                                                  const keyRC = getNotaKey(aluno.id, col.itemIdx, 1);
+                                                  const valRC = notas[keyRC];
+                                                  const isFocusedRC = focusedKey === keyRC;
+                                                  const isAusenteRC = ausentesSet.has(keyRC);
 
-                                                 let displayValRC = "";
-                                                 if (!isAusenteRC && valRC !== undefined && valRC !== null && valRC !== "") {
-                                                   if (isFocusedRC) {
-                                                     displayValRC = String(valRC).replace(".", ",");
-                                                   } else {
-                                                     const numRC = Number(valRC);
-                                                     displayValRC = isNaN(numRC) ? "" : numRC.toFixed(2).replace(".", ",");
-                                                   }
-                                                 }
+                                                  let displayValRC = "";
+                                                  if (!isAusenteRC && valRC !== undefined && valRC !== null && valRC !== "") {
+                                                    if (isFocusedRC) {
+                                                      displayValRC = String(valRC).replace(".", ",");
+                                                    } else {
+                                                      const numRC = Number(valRC);
+                                                      displayValRC = isNaN(numRC) ? "" : numRC.toFixed(2).replace(".", ",");
+                                                    }
+                                                  }
 
-                                                 const isRcpAtivoCol = !isItemFixoDirecao(col.itemIdx) && !isRcAtivoCol && !!rcpAtivo[col.itemIdx];
-                                                 const keyRCp = getNotaKey(aluno.id, col.itemIdx, 2);
-                                                 const valRCp = notas[keyRCp];
-                                                 const isFocusedRCp = focusedKey === keyRCp;
-                                                 const isAusenteRCp = ausentesSet.has(keyRCp);
+                                                  const isRcpAtivoCol = !isExtraCol && !isItemFixoDirecao(col.itemIdx) && !isRcAtivoCol && !!rcpAtivo[col.itemIdx];
+                                                  const keyRCp = getNotaKey(aluno.id, col.itemIdx, 2);
+                                                  const valRCp = notas[keyRCp];
+                                                  const isFocusedRCp = focusedKey === keyRCp;
+                                                  const isAusenteRCp = ausentesSet.has(keyRCp);
 
-                                                 let displayValRCp = "";
-                                                 if (!isAusenteRCp && valRCp !== undefined && valRCp !== null && valRCp !== "") {
-                                                   if (isFocusedRCp) {
-                                                     displayValRCp = String(valRCp).replace(".", ",");
-                                                   } else {
-                                                     const numRCp = Number(valRCp);
-                                                     displayValRCp = isNaN(numRCp) ? "" : numRCp.toFixed(2).replace(".", ",");
-                                                   }
-                                                 }
+                                                  let displayValRCp = "";
+                                                  if (!isAusenteRCp && valRCp !== undefined && valRCp !== null && valRCp !== "") {
+                                                    if (isFocusedRCp) {
+                                                      displayValRCp = String(valRCp).replace(".", ",");
+                                                    } else {
+                                                      const numRCp = Number(valRCp);
+                                                      displayValRCp = isNaN(numRCp) ? "" : numRCp.toFixed(2).replace(".", ",");
+                                                    }
+                                                  }
 
-                                                 return (
-                                                 <td
-                                                    key={`cell_${i}`}
-                                                    onContextMenu={(e) => !isAusente && !isItemFixoDirecao(col.itemIdx) && handleContextMenu(e, aluno.id, col.itemIdx, col.opIdx, col.maxVal)}
-                                                    className={`px-1 py-1 border-r border-slate-100 text-center relative group/cell transition-colors duration-300 ${isAusente ? "bg-red-50" : cor === "red" ? "bg-red-100" : cor === "yellow" ? "bg-yellow-100" : cor === "green" ? "bg-green-100" : ""} ${cellBloqueada && !isAusente ? "bg-amber-50/40" : ""}`}
-                                                  >
+                                                  return (
+                                                  <td
+                                                     key={`cell_${i}`}
+                                                     onContextMenu={(e) => !isAusente && !isItemFixoDirecao(col.itemIdx) && !isExtraCol && handleContextMenu(e, aluno.id, col.itemIdx, col.opIdx, col.maxVal)}
+                                                     className={`px-1 py-1 border-r border-slate-100 text-center relative group/cell transition-colors duration-300 ${isAusente ? "bg-red-50" : cor === "red" ? "bg-red-100" : cor === "yellow" ? "bg-yellow-100" : cor === "green" ? "bg-green-100" : isExtraCol ? "bg-amber-50/25" : ""} ${cellBloqueada && !isAusente ? "bg-amber-50/40" : ""}`}
+                                                   >
                                                       {isRcpAtivoCol ? (
                                                         /* Modo RCp Ativo:
                                                            1) Aluno Ausente (código 1234): [ ✕ ausente ] [ RCp ] [ Input editável RCp ]
@@ -2011,27 +2055,34 @@ export default function Avaliacoes() {
                                                           </div>
                                                         </div>
                                                       ) : (<>
-                                                        <input type="text" inputMode="decimal" value={displayVal}
-                                                          onChange={(e)=>handleNotaChange(aluno.id,col.itemIdx,col.opIdx,col.maxVal,e.target.value)}
-                                                          onFocus={()=>setFocusedKey(key)} onBlur={()=>handleNotaBlur(aluno.id,col.itemIdx,col.opIdx,col.maxVal)}
-                                                          readOnly={cellBloqueada} tabIndex={cellBloqueada?-1:0} placeholder="-"
-                                                          className={`w-full text-center py-2.5 font-bold border border-transparent rounded-lg outline-none transition-all ${bgClass}`}/>
-                                                        {/* Tooltip: célula bloqueada com nota importada */}
-                                                        {cellBloqueada&&!diarioFechado&&!isGabaritoVazio&&(
-                                                          <div className="absolute opacity-0 group-hover/cell:opacity-100 -top-8 left-1/2 transform -translate-x-1/2 bg-amber-700 text-white text-[10px] px-2 py-1 rounded z-50 whitespace-nowrap">
-                                                            Preenchido via Gabarito
-                                                          </div>
-                                                        )}
-                                                        {/* Hint: célula de gabarito vazia — só aceita 1234 */}
-                                                        {!cellBloqueada&&isItemFixoDirecao(col.itemIdx)&&(
-                                                          <div className="absolute opacity-0 group-hover/cell:opacity-100 -top-8 left-1/2 transform -translate-x-1/2 bg-cyan-700 text-white text-[10px] px-2 py-1 rounded z-50 whitespace-nowrap">
-                                                            Digite 1234 para ausente
-                                                          </div>
-                                                        )}
-                                                        {/* Tooltip: max val em células normais */}
-                                                        {!cellBloqueada&&!isItemFixoDirecao(col.itemIdx)&&(
-                                                          <div className="absolute opacity-0 group-hover/cell:opacity-100 -top-8 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white text-[10px] px-2 py-1 rounded z-50">Max: {col.maxVal}</div>
-                                                        )}
+                                                         <input type="text" inputMode="decimal" value={displayVal}
+                                                           onChange={(e)=>handleNotaChange(aluno.id,col.itemIdx,col.opIdx,col.maxVal,e.target.value)}
+                                                           onFocus={()=>setFocusedKey(key)} onBlur={()=>handleNotaBlur(aluno.id,col.itemIdx,col.opIdx,col.maxVal)}
+                                                           readOnly={cellBloqueada} tabIndex={cellBloqueada?-1:0} placeholder="-"
+                                                           title={isExtraCol ? `Ponto Extra (Max: ${col.maxVal} - Limitado ao teto de 10 no bimestre)` : undefined}
+                                                           className={`w-full text-center py-2.5 font-bold border rounded-lg outline-none transition-all ${
+                                                             isExtraCol
+                                                               ? "border-amber-200/80 focus:border-amber-500 focus:ring-1 focus:ring-amber-300 text-amber-900 bg-amber-50/40"
+                                                               : "border-transparent " + bgClass
+                                                           }`}/>
+                                                         {/* Tooltip: célula bloqueada com nota importada */}
+                                                         {cellBloqueada&&!diarioFechado&&!isGabaritoVazio&&(
+                                                           <div className="absolute opacity-0 group-hover/cell:opacity-100 -top-8 left-1/2 transform -translate-x-1/2 bg-amber-700 text-white text-[10px] px-2 py-1 rounded z-50 whitespace-nowrap">
+                                                             Preenchido via Gabarito
+                                                           </div>
+                                                         )}
+                                                         {/* Hint: célula de gabarito vazia — só aceita 1234 */}
+                                                         {!cellBloqueada&&isItemFixoDirecao(col.itemIdx)&&(
+                                                           <div className="absolute opacity-0 group-hover/cell:opacity-100 -top-8 left-1/2 transform -translate-x-1/2 bg-cyan-700 text-white text-[10px] px-2 py-1 rounded z-50 whitespace-nowrap">
+                                                             Digite 1234 para ausente
+                                                           </div>
+                                                         )}
+                                                         {/* Tooltip: max val em células normais ou extra */}
+                                                         {!cellBloqueada&&!isItemFixoDirecao(col.itemIdx)&&(
+                                                           <div className="absolute opacity-0 group-hover/cell:opacity-100 -top-8 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white text-[10px] px-2 py-1 rounded z-50 whitespace-nowrap">
+                                                             {isExtraCol ? `★ Extra (Max: ${col.maxVal})` : `Max: ${col.maxVal}`}
+                                                           </div>
+                                                         )}
                                                       </>)}
                                                  </td>
                                              )})}

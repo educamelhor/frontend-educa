@@ -102,6 +102,18 @@ export default function Avaliacoes() {
   // Modal: plano ainda não aprovado (status ENVIADO) — bloqueia lançamento
   const [modalPlanoPendente, setModalPlanoPendente] = useState(false);
 
+  // ── Recuperação Contínua (RC) e Compensatória (RCp) ──
+  const [rcAtivo, setRcAtivo] = useState({}); // { [itemIdx]: boolean }
+  const [rcpAtivo, setRcpAtivo] = useState({}); // { [itemIdx]: boolean }
+
+  const toggleRC = (itemIdx) => {
+    setRcAtivo(prev => ({ ...prev, [itemIdx]: !prev[itemIdx] }));
+  };
+
+  const toggleRCp = (itemIdx) => {
+    setRcpAtivo(prev => ({ ...prev, [itemIdx]: !prev[itemIdx] }));
+  };
+
   // Modal: editar data de um item de avaliação no cabeçalho do diário
   const [modalDataItem, setModalDataItem] = useState(null); // null | { itemId, itemIdx, atividade, dataAtual }
   const [modalAEE, setModalAEE] = useState(null); // null | { item, itemIdx }
@@ -300,23 +312,46 @@ export default function Avaliacoes() {
             params: { turma_id: turmaSelecionada }
           });
           if (resNotas.data?.ok) {
+            const notasCarregadas = resNotas.data.notas || {};
             const coresCarregadas = resNotas.data.cores || {};
-            setNotas(resNotas.data.notas || {});
+            setNotas(notasCarregadas);
             setCoresCelulas(coresCarregadas);
             setAlunosComGabarito(new Set(resNotas.data.alunosComGabarito || []));
             // Popular ausentesSet: células marcadas com cor 'ausente'
             setAusentesSet(new Set(Object.keys(coresCarregadas).filter(k => coresCarregadas[k] === 'ausente')));
+
+            // Detectar automaticamente quais colunas possuem notas de RC (opIdx = 1) ou RCp (opIdx = 2) salvas
+            const rcDetectado = {};
+            const rcpDetectado = {};
+            Object.keys(notasCarregadas).forEach(key => {
+              const parts = key.split('_');
+              if (parts.length >= 3) {
+                const itemIdx = parseInt(parts[1], 10);
+                const opIdx = parseInt(parts[2], 10);
+                const val = notasCarregadas[key];
+                if (val !== undefined && val !== null && val !== '') {
+                  if (opIdx === 1) rcDetectado[itemIdx] = true;
+                  if (opIdx === 2) rcpDetectado[itemIdx] = true;
+                }
+              }
+            });
+            setRcAtivo(rcDetectado);
+            setRcpAtivo(rcpDetectado);
           } else {
             setNotas({});
             setCoresCelulas({});
             setAlunosComGabarito(new Set());
             setAusentesSet(new Set());
+            setRcAtivo({});
+            setRcpAtivo({});
           }
         } catch {
           setNotas({});
           setCoresCelulas({});
           setAlunosComGabarito(new Set());
           setAusentesSet(new Set());
+          setRcAtivo({});
+          setRcpAtivo({});
         }
 
         // 6) Verificar status de fechamento do diário
@@ -507,10 +542,35 @@ export default function Avaliacoes() {
 
     const arrItens = Array.isArray(plano.itens) ? plano.itens : JSON.parse(plano.itens || "[]");
     arrItens.forEach((item, itemIdx) => {
-      const freq = Number(item.oportunidades) || 1;
-      for (let opIdx = 0; opIdx < freq; opIdx++) {
-        const val = notas[getNotaKey(alunoId, itemIdx, opIdx)];
-        if (val !== undefined && !isNaN(Number(val))) total += Number(val);
+      // Prova Bimestral padronizada (fixo_direcao): pega nota direta opIdx = 0
+      if (item.fixo_direcao) {
+        const val = notas[getNotaKey(alunoId, itemIdx, 0)];
+        if (val !== undefined && val !== null && val !== "" && !isNaN(Number(val))) {
+          total += Number(val);
+        }
+        return;
+      }
+
+      // Para itens normais:
+      // Nota original (opIdx = 0)
+      const valOrig = notas[getNotaKey(alunoId, itemIdx, 0)];
+      const numOrig = (valOrig !== undefined && valOrig !== null && valOrig !== "" && !isNaN(Number(valOrig)))
+        ? Number(valOrig)
+        : null;
+
+      // Nota RC (opIdx = 1)
+      const valRC = notas[getNotaKey(alunoId, itemIdx, 1)];
+      const numRC = (valRC !== undefined && valRC !== null && valRC !== "" && !isNaN(Number(valRC)))
+        ? Number(valRC)
+        : null;
+
+      // Se há nota de RC lançada, prevalece a maior entre ela e a original
+      if (numRC !== null && numOrig !== null) {
+        total += Math.max(numOrig, numRC);
+      } else if (numRC !== null) {
+        total += numRC;
+      } else if (numOrig !== null) {
+        total += numOrig;
       }
     });
     // Padrão EDUCADF: 2 casas decimais (ex: 3.00, 4.50, 10.00)
@@ -1412,17 +1472,20 @@ export default function Avaliacoes() {
                                          ? new Date(dataExibir + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })
                                          : null;
                                        const podeEditar = !diarioFechado;
+                                       const isRcAtivo = !!rcAtivo[idx];
+                                       const isRcpAtivo = !!rcpAtivo[idx];
+
                                        const btnData = (
                                          <button
                                            onClick={() => { if (!podeEditar) return; setDataEditTemp(dataExibir || ""); setModalDataItem({ itemId: item.id, itemIdx: idx, atividade: item.atividade, dataAtual: dataExibir }); }}
                                            title={podeEditar ? "Clique para definir a data" : "Diário fechado"}
-                                           style={{ marginTop: 3, display: "flex", alignItems: "center", justifyContent: "center", gap: 3, fontSize: "0.62rem", fontWeight: 700, color: dataFormatada ? "#1d4ed8" : "#94a3b8", background: dataFormatada ? "rgba(59,130,246,0.1)" : "rgba(148,163,184,0.1)", border: "1px dashed " + (dataFormatada ? "rgba(59,130,246,0.4)" : "rgba(148,163,184,0.4)"), borderRadius: "0.3rem", padding: "1px 5px", cursor: podeEditar ? "pointer" : "default", width: "100%", transition: "all 0.15s" }}
+                                           style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 3, fontSize: "0.62rem", fontWeight: 700, color: dataFormatada ? "#1d4ed8" : "#94a3b8", background: dataFormatada ? "rgba(59,130,246,0.1)" : "rgba(148,163,184,0.1)", border: "1px dashed " + (dataFormatada ? "rgba(59,130,246,0.4)" : "rgba(148,163,184,0.4)"), borderRadius: "0.3rem", padding: "1px 5px", cursor: podeEditar ? "pointer" : "default", width: "100%", transition: "all 0.15s" }}
                                          >
                                            {"\uD83D\uDCC5"} {dataFormatada || "+ data"}
                                          </button>
                                        );
                                        return (
-                                         <th key={idx} colSpan={Number(item.oportunidades) || 1} className="px-4 py-2 text-center text-[11px] font-black uppercase tracking-wider text-indigo-800 border-b border-r border-indigo-100 bg-indigo-50/50">
+                                         <th key={idx} colSpan={Number(item.oportunidades) || 1} className="px-3 py-2 text-center text-[11px] font-black uppercase tracking-wider text-indigo-800 border-b border-r border-indigo-100 bg-indigo-50/50">
                                            {item.atividade}
                                            <div className="text-[10px] text-indigo-500 font-semibold lowercase mt-0.5">
                                              (Max: {item.nota_total} pts)
@@ -1441,7 +1504,52 @@ export default function Avaliacoes() {
                                                )}
                                              </div>
                                            ) : (
-                                             btnData
+                                             <div className="flex flex-col items-center justify-center gap-1 mt-1 w-full">
+                                               {btnData}
+                                               {!diarioFechado && (
+                                                 <div className="flex items-center justify-center gap-1 w-full mt-0.5">
+                                                   {/* Botão Editar Data (ícone lápis) */}
+                                                   <button
+                                                     onClick={() => {
+                                                       if (!podeEditar) return;
+                                                       setDataEditTemp(dataExibir || "");
+                                                       setModalDataItem({ itemId: item.id, itemIdx: idx, atividade: item.atividade, dataAtual: dataExibir });
+                                                     }}
+                                                     title="Editar data da avaliação"
+                                                     className="px-1.5 py-0.5 rounded border transition-all text-slate-500 hover:text-indigo-600 bg-white hover:bg-slate-50 border-slate-300 shadow-2xs"
+                                                     style={{ fontSize: "9px", lineHeight: 1.1 }}
+                                                   >
+                                                     ✏️
+                                                   </button>
+
+                                                   {/* Botão RC (Recuperação Contínua) */}
+                                                   <button
+                                                     onClick={() => toggleRC(idx)}
+                                                     title={isRcAtivo ? "Ocultar Recuperação Contínua (RC)" : "Ativar Recuperação Contínua (RC)"}
+                                                     className={`px-2 py-0.5 rounded text-[10px] font-black transition-all border shadow-2xs cursor-pointer ${
+                                                       isRcAtivo
+                                                         ? "bg-cyan-600 text-white border-cyan-600 ring-1 ring-cyan-400"
+                                                         : "bg-white text-cyan-700 border-cyan-300 hover:bg-cyan-50"
+                                                     }`}
+                                                   >
+                                                     RC
+                                                   </button>
+
+                                                   {/* Botão RCp (Recuperação Compensatória) */}
+                                                   <button
+                                                     onClick={() => toggleRCp(idx)}
+                                                     title={isRcpAtivo ? "Ocultar Recuperação Compensatória (RCp)" : "Ativar Recuperação Compensatória (RCp)"}
+                                                     className={`px-1.5 py-0.5 rounded text-[10px] font-black transition-all border shadow-2xs cursor-pointer ${
+                                                       isRcpAtivo
+                                                         ? "bg-sky-700 text-white border-sky-700 ring-1 ring-sky-400"
+                                                         : "bg-white text-sky-700 border-sky-300 hover:bg-sky-50"
+                                                     }`}
+                                                   >
+                                                     RCp
+                                                   </button>
+                                                 </div>
+                                               )}
+                                             </div>
                                            )}
                                          </th>
                                        );
@@ -1451,14 +1559,25 @@ export default function Avaliacoes() {
                                 </tr>
                                 <tr>
                                     {/* CABEÇALHO 2 - Oportunidades detalhadas */}
-                                    {columns.map((col, idx) => (
-                                        <th key={`sub_${idx}`} className="px-2 py-2 text-center text-xs font-bold border-b border-r border-slate-200 text-slate-500 min-w-[80px]">
+                                    {columns.map((col, idx) => {
+                                        const isRcCol = !isItemFixoDirecao(col.itemIdx) && !!rcAtivo[col.itemIdx];
+                                        return (
+                                        <th key={`sub_${idx}`} className={`px-2 py-2 text-center text-xs font-bold border-b border-r border-slate-200 text-slate-500 transition-all ${isRcCol ? "min-w-[170px]" : "min-w-[80px]"}`}>
                                             <div className="flex flex-col items-center justify-center">
-                                               <span title={`Valor máximo para este item: ${col.maxVal}`}>{col.label}</span>
-                                               {col.freqTotal > 1 && <span className="text-[10px] text-slate-400 font-normal">v. {col.maxVal.toFixed(1)}</span>}
+                                               {isRcCol ? (
+                                                 <div className="flex items-center justify-center gap-2 text-[11px] font-bold text-cyan-800">
+                                                   <span>Nota</span>
+                                                   <span className="text-[9px] text-cyan-600 font-normal">/</span>
+                                                   <span className="text-[10px] text-cyan-700 font-black">RC</span>
+                                                 </div>
+                                               ) : (
+                                                 <span title={`Valor máximo para este item: ${col.maxVal}`}>{col.label}</span>
+                                               )}
+                                               {col.freqTotal > 1 && !isRcCol && <span className="text-[10px] text-slate-400 font-normal">v. {col.maxVal.toFixed(1)}</span>}
                                             </div>
                                         </th>
-                                    ))}
+                                        );
+                                    })}
                                 </tr>
                             </thead>
                             <tbody>
@@ -1495,7 +1614,7 @@ export default function Avaliacoes() {
                                                 if (isGabaritoVazio && tempGabarito[key] !== undefined) {
                                                   // Célula de gabarito vazia: exibe o que o professor está digitando
                                                   displayVal = tempGabarito[key];
-                                                } else if (!isAusente && val !== undefined) {
+                                                } else if (!isAusente && val !== undefined && val !== null && val !== "") {
                                                   if (isFocused) {
                                                     displayVal = String(val).replace(".", ",");
                                                   } else {
@@ -1511,6 +1630,22 @@ export default function Avaliacoes() {
                                                    cor === "green" ? "bg-green-200 text-green-900" :
                                                    "bg-transparent text-indigo-900";
 
+                                                const isRcAtivoCol = !isItemFixoDirecao(col.itemIdx) && !!rcAtivo[col.itemIdx];
+                                                const keyRC = getNotaKey(aluno.id, col.itemIdx, 1);
+                                                const valRC = notas[keyRC];
+                                                const isFocusedRC = focusedKey === keyRC;
+                                                const isAusenteRC = ausentesSet.has(keyRC);
+
+                                                let displayValRC = "";
+                                                if (!isAusenteRC && valRC !== undefined && valRC !== null && valRC !== "") {
+                                                  if (isFocusedRC) {
+                                                    displayValRC = String(valRC).replace(".", ",");
+                                                  } else {
+                                                    const numRC = Number(valRC);
+                                                    displayValRC = isNaN(numRC) ? "" : numRC.toFixed(2).replace(".", ",");
+                                                  }
+                                                }
+
                                                 return (
                                                 <td
                                                    key={`cell_${i}`}
@@ -1523,6 +1658,50 @@ export default function Avaliacoes() {
                                                             onClick={() => { if (!cellBloqueada) { setAusentesSet(prev=>{const s=new Set(prev);s.delete(key);return s;}); setCoresCelulas(prev=>{const c={...prev};delete c[key];return c;}); setNotas(prev=>{const n={...prev};delete n[key];return n;}); } }}>
                                                          <span className="text-red-600 font-black text-lg leading-none">X</span>
                                                          <span className="text-red-400 text-[9px] font-bold mt-0.5">ausente</span>
+                                                       </div>
+                                                     ) : isRcAtivoCol ? (
+                                                       /* Modo RC Ativo: Dual Input [ Nota Original ] [ RC ] [ Nota RC ] */
+                                                       <div className="flex items-center justify-center gap-1.5 px-1 py-0.5">
+                                                         {/* Campo 1: Nota Original */}
+                                                         <div className="flex-1 min-w-[52px] relative">
+                                                           <input
+                                                             type="text"
+                                                             inputMode="decimal"
+                                                             value={displayVal}
+                                                             onChange={(e) => handleNotaChange(aluno.id, col.itemIdx, col.opIdx, col.maxVal, e.target.value)}
+                                                             onFocus={() => setFocusedKey(key)}
+                                                             onBlur={() => handleNotaBlur(aluno.id, col.itemIdx, col.opIdx, col.maxVal)}
+                                                             readOnly={cellBloqueada}
+                                                             tabIndex={cellBloqueada ? -1 : 0}
+                                                             placeholder="-"
+                                                             title={`Nota original (Max: ${col.maxVal})`}
+                                                             className={`w-full text-center py-2 text-xs font-bold border border-slate-200 rounded-lg outline-none transition-all shadow-2xs focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400 ${bgClass}`}
+                                                           />
+                                                         </div>
+
+                                                         {/* Separador RC */}
+                                                         <span className="text-[9px] font-black text-cyan-700 bg-cyan-100/80 border border-cyan-300 px-1 py-1 rounded select-none shadow-2xs">
+                                                           RC
+                                                         </span>
+
+                                                         {/* Campo 2: Nota RC */}
+                                                         <div className="flex-1 min-w-[52px] relative">
+                                                           <input
+                                                             type="text"
+                                                             inputMode="decimal"
+                                                             value={displayValRC}
+                                                             onChange={(e) => handleNotaChange(aluno.id, col.itemIdx, 1, col.maxVal, e.target.value)}
+                                                             onFocus={() => setFocusedKey(keyRC)}
+                                                             onBlur={() => handleNotaBlur(aluno.id, col.itemIdx, 1, col.maxVal)}
+                                                             readOnly={diarioFechado}
+                                                             tabIndex={diarioFechado ? -1 : 0}
+                                                             placeholder="-"
+                                                             title={`Nota de Recuperação Contínua (Max: ${col.maxVal})`}
+                                                             className={`w-full text-center py-2 text-xs font-bold border border-cyan-200 rounded-lg outline-none transition-all shadow-2xs focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 bg-cyan-50/50 text-cyan-900 ${
+                                                               isAusenteRC ? "bg-red-50 text-red-700" : ""
+                                                             }`}
+                                                           />
+                                                         </div>
                                                        </div>
                                                      ) : (<>
                                                        <input type="text" inputMode="decimal" value={displayVal}

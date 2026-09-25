@@ -14,6 +14,7 @@ import {
   PlusCircleIcon,
   XCircleIcon,
   AcademicCapIcon,
+  ArrowPathRoundedSquareIcon,
 } from "@heroicons/react/24/solid";
 import { FiTrash2 } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
@@ -52,6 +53,7 @@ export default function ProfessorTable({
   onEdit,
   onAdicionarVinculo,
   onRemoverVinculo,
+  onSubstituir,
 }) {
   const navigate = useNavigate();
   const [expanded, setExpanded] = useState(new Set());
@@ -169,6 +171,18 @@ export default function ProfessorTable({
                   >
                     <PlusCircleIcon className="w-3.5 h-3.5" />
                     Vínculo
+                  </button>
+                )}
+
+                {/* Substituir Regência */}
+                {onSubstituir && (
+                  <button
+                    title="Substituir Regência (Transferir Turmas)"
+                    onClick={() => onSubstituir(p)}
+                    className="flex items-center gap-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs px-2.5 py-1.5 rounded-xl border border-blue-200 transition-all hover:shadow-sm"
+                  >
+                    <ArrowPathRoundedSquareIcon className="w-3.5 h-3.5" />
+                    Substituir
                   </button>
                 )}
 

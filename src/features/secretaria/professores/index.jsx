@@ -15,6 +15,7 @@ import Input from "../../../components/ui/Input";
 import Modal from "../../../components/ui/Modal";
 import FeedbackPanel from "../../../components/ui/FeedbackPanel";
 import ModalExcluirOuInativar from "./ModalExcluirOuInativar";
+import ModalSubstituicaoRegencia from "./ModalSubstituicaoRegencia";
 import { useProfessores } from "./useProfessores";
 import ProfessorTable from "./ProfessorTable";
 import ProfessorForm from "./ProfessorForm";
@@ -35,9 +36,24 @@ export default function Professores() {
   const [professorSelecionado, setProfessorSelecionado] = useState(null);
   const [mensagemSucesso, setMensagemSucesso] = useState("");
 
+  // Substituição de Regência
+  const [isSubstituicaoOpen, setIsSubstituicaoOpen] = useState(false);
+  const [professorParaSubstituir, setProfessorParaSubstituir] = useState(null);
+
   // Exclusão / Inativação
   const [isExcluirOpen, setIsExcluirOpen] = useState(false);
   const [professorParaExcluir, setProfessorParaExcluir] = useState(null);
+
+  const abrirSubstituicao = (professor) => {
+    setProfessorParaSubstituir(professor);
+    setIsSubstituicaoOpen(true);
+  };
+
+  const handleSubstituicaoSucesso = (res) => {
+    setMensagemSucesso(`✅ ${res.message || "Substituição de regência realizada com sucesso!"}`);
+    reload();
+    setTimeout(() => setMensagemSucesso(""), 4000);
+  };
 
   // VinculoForm — adicionar vínculo a professor existente
   const [isVinculoOpen, setIsVinculoOpen] = useState(false);
@@ -321,6 +337,7 @@ export default function Professores() {
         onEdit={abrirEdicao}
         onAdicionarVinculo={abrirVinculo}
         onRemoverVinculo={handleRemoverVinculo}
+        onSubstituir={abrirSubstituicao}
       />
 
       {/* Modal: Form Premium */}
@@ -352,7 +369,19 @@ export default function Professores() {
         aluno={professorParaExcluir || {}}
         onDelete={() => handleConfirmExcluir("excluir")}
         onInactivate={() => handleConfirmExcluir("inativar")}
+        onSubstituir={abrirSubstituicao}
       />
+
+      {/* Modal: Substituição de Regência */}
+      {isSubstituicaoOpen && (
+        <ModalSubstituicaoRegencia
+          open={isSubstituicaoOpen}
+          onClose={() => setIsSubstituicaoOpen(false)}
+          professorOrigem={professorParaSubstituir}
+          professores={professores}
+          onSuccess={handleSubstituicaoSucesso}
+        />
+      )}
 
       {/* Modal: Exclusão em Lote */}
       {isLoteOpen && (

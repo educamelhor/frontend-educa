@@ -9,7 +9,9 @@
 // - Transição slide-in suave
 // ============================================================================
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { ArrowPathRoundedSquareIcon } from "@heroicons/react/24/solid";
+import api from "../../../services/api";
 
 export default function ModalExcluirOuInativar({
   open,
@@ -17,9 +19,22 @@ export default function ModalExcluirOuInativar({
   aluno: professor,
   onDelete,
   onInactivate,
+  onSubstituir,
 }) {
   const [step, setStep] = useState("choice"); // "choice" | "confirmDelete" | "confirmInactivate"
   const [processing, setProcessing] = useState(false);
+  const [modulacoesCount, setModulacoesCount] = useState(0);
+
+  useEffect(() => {
+    if (open && professor?.id) {
+      api
+        .get(`/api/professores/${professor.id}/modulacoes`)
+        .then((res) => setModulacoesCount(res.data?.modulacoes?.length || 0))
+        .catch(() => setModulacoesCount(0));
+    } else {
+      setModulacoesCount(0);
+    }
+  }, [open, professor]);
 
   function fecharTudo() {
     if (processing) return;
@@ -254,23 +269,74 @@ export default function ModalExcluirOuInativar({
           )}
 
           {isInactivate && (
-            <div
-              style={{
-                marginTop: 14,
-                padding: "10px 14px",
-                borderRadius: 10,
-                background: "#fffbeb",
-                border: "1px solid #fde68a",
-                display: "flex",
-                alignItems: "flex-start",
-                gap: 8,
-              }}
-            >
-              <span style={{ fontSize: 16, lineHeight: "20px" }}>💡</span>
-              <p style={{ color: "#92400e", fontSize: 12, margin: 0, lineHeight: 1.5 }}>
-                O professor será <strong>ocultado</strong> das listas, mas seu registro permanecerá no
-                histórico. Poderá ser reativado futuramente.
-              </p>
+            <div style={{ marginTop: 14 }} className="space-y-3">
+              {modulacoesCount > 0 && (
+                <div
+                  style={{
+                    padding: "12px 14px",
+                    borderRadius: 12,
+                    background: "#eff6ff",
+                    border: "1px solid #bfdbfe",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                    <span style={{ fontSize: 18, lineHeight: 1 }}>⚠️</span>
+                    <div style={{ fontSize: 13, color: "#1e3a8a" }}>
+                      <p style={{ fontWeight: 700, margin: 0 }}>
+                        Este professor possui {modulacoesCount} turma(s) sob sua regência.
+                      </p>
+                      <p style={{ margin: "4px 0 0", color: "#1d4ed8", fontSize: 12, lineHeight: 1.4 }}>
+                        Deseja transferir as turmas para um professor substituto agora para não interromper os diários e planos?
+                      </p>
+                      {onSubstituir && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            fecharTudo();
+                            onSubstituir(professor);
+                          }}
+                          style={{
+                            marginTop: 10,
+                            padding: "6px 14px",
+                            borderRadius: 8,
+                            background: "#2563eb",
+                            color: "#fff",
+                            fontWeight: 700,
+                            fontSize: 12,
+                            border: "none",
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            boxShadow: "0 2px 6px rgba(37,99,235,0.3)",
+                          }}
+                        >
+                          <ArrowPathRoundedSquareIcon style={{ width: 14, height: 14 }} />
+                          Substituir Regência Agora
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div
+                style={{
+                  padding: "10px 14px",
+                  borderRadius: 10,
+                  background: "#fffbeb",
+                  border: "1px solid #fde68a",
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 8,
+                }}
+              >
+                <span style={{ fontSize: 16, lineHeight: "20px" }}>💡</span>
+                <p style={{ color: "#92400e", fontSize: 12, margin: 0, lineHeight: 1.5 }}>
+                  O professor será <strong>ocultado</strong> das listas, mas seu registro permanecerá no
+                  histórico. Poderá ser reativado futuramente.
+                </p>
+              </div>
             </div>
           )}
         </div>

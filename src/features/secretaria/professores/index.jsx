@@ -167,9 +167,9 @@ export default function Professores() {
     setIsVinculoOpen(true);
   };
 
-  const handleSalvarVinculo = async ({ turno, disciplina_id, aulas }) => {
+  const handleSalvarVinculo = async ({ turno, disciplina_id, aulas, semestre }) => {
     try {
-      await api.post(`/api/professores/${professorParaVinculo.id}/vinculos`, { turno, disciplina_id, aulas });
+      await api.post(`/api/professores/${professorParaVinculo.id}/vinculos`, { turno, disciplina_id, aulas, semestre });
       setMensagemSucesso("✅ Vínculo adicionado com sucesso!");
       reload();
       setTimeout(() => setMensagemSucesso(""), 3000);

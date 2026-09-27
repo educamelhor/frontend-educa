@@ -108,7 +108,7 @@ function DisciplinaModal({ open, disciplinas, selectedId, onSelect, onClose }) {
 
 // ─── Componente principal ──────────────────────────────────────
 export default function VinculoForm({ open, onClose, onSalvar, professor }) {
-  const [form, setForm] = useState({ turno: "", disciplina_id: "", aulas: 2 });
+  const [form, setForm] = useState({ turno: "", disciplina_id: "", aulas: 2, semestre: 0 });
   const [erros, setErros] = useState({});
   const [enviando, setEnviando] = useState(false);
   const [disciplinas, setDisciplinas] = useState([]);
@@ -122,7 +122,7 @@ export default function VinculoForm({ open, onClose, onSalvar, professor }) {
 
   useEffect(() => {
     if (!open) return;
-    setForm({ turno: "", disciplina_id: "", aulas: 2 });
+    setForm({ turno: "", disciplina_id: "", aulas: 2, semestre: 0 });
     setErros({});
     const token = localStorage.getItem("token");
     if (!token) return;
@@ -151,7 +151,12 @@ export default function VinculoForm({ open, onClose, onSalvar, professor }) {
     const novosErros = validar();
     if (Object.keys(novosErros).length) { setErros(novosErros); return; }
     setEnviando(true);
-    const ok = await onSalvar({ turno: form.turno, disciplina_id: Number(form.disciplina_id), aulas: Number(form.aulas) });
+    const ok = await onSalvar({
+      turno: form.turno,
+      disciplina_id: Number(form.disciplina_id),
+      aulas: Number(form.aulas),
+      semestre: Number(form.semestre),
+    });
     setEnviando(false);
     if (ok) onClose();
   };
@@ -199,6 +204,22 @@ export default function VinculoForm({ open, onClose, onSalvar, professor }) {
               {turnos.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
             {erros.turno && <p className="text-red-500 text-xs mt-1 ml-1 italic">{erros.turno}</p>}
+          </div>
+
+          {/* Regime / Semestre */}
+          <div className="space-y-1">
+            <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700 ml-1">
+              🗓️ Regime / Semestre do Vínculo
+            </label>
+            <select
+              value={form.semestre}
+              onChange={e => setForm(p => ({ ...p, semestre: Number(e.target.value) }))}
+              className="w-full h-11 border border-gray-200 rounded-xl bg-white shadow-sm focus:ring-2 focus:ring-emerald-500 focus:outline-none px-3 font-medium text-gray-700"
+            >
+              <option value={0}>🔄 Anual / Ambos os Semestres</option>
+              <option value={1}>🗓️ 1º Semestre</option>
+              <option value={2}>🗓️ 2º Semestre</option>
+            </select>
           </div>
 
           {/* Disciplina */}

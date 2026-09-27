@@ -66,9 +66,9 @@ function normalizeTurmas(raw) {
         t?.periodo ??
         null;
 
-      const ano = t?.ano ?? t?.ano_letivo ?? t?.anoLetivo ?? null;
+      const regime = t?.regime ?? null;
 
-      return id && nome ? { id, nome: String(nome), turno, ano } : null;
+      return id && nome ? { id, nome: String(nome), turno, ano, regime } : null;
     })
     .filter(Boolean);
 
@@ -1754,11 +1754,16 @@ export default function Modulacao() {
                     className="p-1 border text-blue-900 font-semibold text-center sticky top-0 z-40 bg-gray-100 min-w-[40px]"
                   >
                     <div
-                      className="mx-auto h-32 flex items-center justify-center whitespace-nowrap"
+                      className="mx-auto h-32 flex items-center justify-center whitespace-nowrap gap-1"
                       style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
-                      title={turma.nome}
+                      title={`${turma.nome}${turma.regime === "semestral" ? " [SEMESTRAL]" : ""}`}
                     >
-                      {turma.nome}
+                      {turma.regime === "semestral" && (
+                        <span className="text-[9px] bg-purple-100 text-purple-800 font-bold px-1 rounded border border-purple-200 uppercase tracking-widest">
+                          [SEMESTRAL]
+                        </span>
+                      )}
+                      <span>{turma.nome}</span>
                     </div>
                   </th>
                 ))}

@@ -45,6 +45,29 @@ function TurnoTag({ turno }) {
   );
 }
 
+function SemestreTag({ semestre }) {
+  const s = Number(semestre);
+  if (s === 1) {
+    return (
+      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-cyan-100 text-cyan-800 border border-cyan-200 uppercase tracking-wider" title="1º Semestre">
+        1º SEM
+      </span>
+    );
+  }
+  if (s === 2) {
+    return (
+      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200 uppercase tracking-wider" title="2º Semestre">
+        2º SEM
+      </span>
+    );
+  }
+  return (
+    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200 uppercase tracking-wider" title="Anual / Ambos os Semestres">
+      ANUAL
+    </span>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────
 export default function ProfessorTable({
   professores = [],
@@ -130,6 +153,7 @@ export default function ProfessorTable({
                       {(isExpanded ? vinculos : vinculos.slice(0, 3)).map((v) => (
                         <div key={v.id ?? `${v.turno}-${v.disciplina_id}`} className="flex items-center gap-1 bg-blue-50 border border-blue-100 rounded-lg px-2 py-0.5 group">
                           <TurnoTag turno={v.turno} />
+                          <SemestreTag semestre={v.semestre} />
                           <span className="text-[11px] font-semibold text-blue-700 truncate max-w-[120px]">
                             {(v.disciplina_nome || "—").toUpperCase()}
                           </span>

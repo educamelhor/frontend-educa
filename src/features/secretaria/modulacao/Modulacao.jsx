@@ -66,6 +66,7 @@ function normalizeTurmas(raw) {
         t?.periodo ??
         null;
 
+      const ano = t?.ano ?? t?.ano_letivo ?? t?.anoLetivo ?? null;
       const regime = t?.regime ?? null;
 
       return id && nome ? { id, nome: String(nome), turno, ano, regime } : null;

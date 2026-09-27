@@ -1714,7 +1714,7 @@ export default function Modulacao() {
 
       {/* Tabela principal */}
       {turnoSelecionado && (
-        <div className="relative overflow-x-auto rounded border shadow bg-white">
+        <div className="relative overflow-auto max-h-[calc(100vh-210px)] min-h-[380px] rounded-2xl border border-gray-200 shadow-md bg-white">
           {/* Aviso de turmas (quando nenhuma for encontrada) */}
           {turmasAviso && (
             <div className="px-3 py-2 text-sm text-amber-800 bg-amber-50 border-b border-amber-200">
@@ -1725,16 +1725,16 @@ export default function Modulacao() {
           {/* IMPORTANTE: table-fixed para respeitar larguras e evitar atravessamento */}
           <table className="min-w-[1400px] w-full border-separate border-spacing-0 table-fixed">
 
-            <thead className="bg-gray-100 shadow-sm">{/* <- sem sticky aqui */}
+            <thead className="bg-gray-100 shadow-sm sticky top-0 z-40">
               <tr>
                 {/* Professor (coluna 1) */}
-                <th className="py-2 px-4 border text-blue-900 font-semibold text-center sticky top-0 left-0 z-50 bg-gray-100 w-[260px]">
+                <th className="py-2 px-4 border text-blue-900 font-semibold text-center sticky top-0 left-0 z-50 bg-gray-100 w-[260px] border-b-2 border-b-blue-400">
                   Professor
                 </th>
 
                 {/* Disciplina (coluna 2) */}
                 <th
-                  className="py-2 px-4 border text-blue-900 font-semibold text-center sticky top-0 z-50 bg-gray-100 w-[160px]"
+                  className="py-2 px-4 border text-blue-900 font-semibold text-center sticky top-0 z-50 bg-gray-100 w-[160px] border-b-2 border-b-blue-400"
                   style={{ left: 260 }} // 260 = largura da 1ª coluna
                 >
                   Disciplina
@@ -1742,35 +1742,57 @@ export default function Modulacao() {
 
                 {/* Aulas (coluna 3) */}
                 <th
-                  className="py-2 px-4 border text-blue-900 font-semibold text-center sticky top-0 z-50 bg-gray-100 w-[100px]"
+                  className="py-2 px-4 border text-blue-900 font-semibold text-center sticky top-0 z-50 bg-gray-100 w-[100px] border-b-2 border-b-blue-400"
                   style={{ left: 260 + 160 }} // 420 = 260 + 160
                 >
                   Aulas
                 </th>
 
                 {/* Colunas das turmas (1A…1T, 2A…2Q, etc.) */}
-                {turmasTurno.map((turma) => (
-                  <th
-                    key={turma.id}
-                    className="p-1 border text-blue-900 font-semibold text-center sticky top-0 z-40 bg-gray-100 min-w-[40px]"
-                  >
-                    <div
-                      className="mx-auto h-32 flex items-center justify-center whitespace-nowrap gap-1"
-                      style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
-                      title={`${turma.nome}${turma.regime === "semestral" ? " [SEMESTRAL]" : ""}`}
+                {turmasTurno.map((turma) => {
+                  const isSem = turma.regime === "semestral";
+                  return (
+                    <th
+                      key={turma.id}
+                      className={`p-1 border text-center sticky top-0 z-40 min-w-[42px] transition-colors select-none ${
+                        isSem
+                          ? "bg-purple-50 text-purple-950 border-purple-200 border-b-2 border-b-purple-500 hover:bg-purple-100/70"
+                          : "bg-gray-100 text-blue-900 border-gray-200 border-b-2 border-b-blue-400 hover:bg-gray-200/70"
+                      }`}
+                      title={`${turma.nome} — ${isSem ? "Regime Semestral" : "Regime Anual"}`}
                     >
-                      {turma.regime === "semestral" && (
-                        <span className="text-[9px] bg-purple-100 text-purple-800 font-bold px-1 rounded border border-purple-200 uppercase tracking-widest">
-                          [SEMESTRAL]
-                        </span>
-                      )}
-                      <span>{turma.nome}</span>
-                    </div>
-                  </th>
-                ))}
+                      <div className="flex flex-col items-center justify-between h-28 py-1">
+                        {/* Indicador de Regime moderno e compacto */}
+                        {isSem ? (
+                          <span
+                            className="text-[8px] font-black px-1.5 py-0.5 rounded-full bg-purple-600 text-white shadow-xs tracking-wider uppercase leading-none"
+                            title="Regime Semestral"
+                          >
+                            SEM
+                          </span>
+                        ) : (
+                          <span
+                            className="text-[8px] font-bold text-gray-400 px-0.5 py-0.5 uppercase tracking-wider leading-none"
+                            title="Regime Anual"
+                          >
+                            ANU
+                          </span>
+                        )}
+
+                        {/* Nome da turma na vertical (perfeitamente legível, sem cortes) */}
+                        <div
+                          className="mx-auto flex items-center justify-center whitespace-nowrap text-xs font-bold tracking-tight py-1"
+                          style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
+                        >
+                          {turma.nome}
+                        </div>
+                      </div>
+                    </th>
+                  );
+                })}
 
                 {/* Ações (fica no mesmo cabeçalho, com largura fixa) */}
-                <th className="py-2 px-4 border text-blue-900 font-semibold text-center sticky top-0 z-40 bg-gray-100 w-[140px] min-w-[140px] whitespace-nowrap">
+                <th className="py-2 px-4 border text-blue-900 font-semibold text-center sticky top-0 z-40 bg-gray-100 w-[140px] min-w-[140px] whitespace-nowrap border-b-2 border-b-blue-400">
                   Ações
                 </th>
               </tr>
@@ -1809,13 +1831,13 @@ export default function Modulacao() {
                   return (
                     <tr key={prof.rowKey}>
                       {/* Professor */}
-                      <td className="py-2 px-4 border sticky left-0 z-40 bg-white w-[260px]">
+                      <td className="py-2 px-4 border sticky left-0 z-20 bg-white w-[260px]">
                         {prof.nome}
                       </td>
 
                       {/* Disciplina */}
                       <td
-                        className="py-2 px-4 border sticky z-40 bg-white w-[160px]"
+                        className="py-2 px-4 border sticky z-20 bg-white w-[160px]"
                         style={{ left: 260 }}
                       >
                         {prof.disciplina_nome || "—"}
@@ -1823,7 +1845,7 @@ export default function Modulacao() {
 
                       {/* Aulas (restante dinâmico) */}
                       <td
-                        className="py-2 px-4 border text-center sticky z-40 bg-white w-[100px]"
+                        className="py-2 px-4 border text-center sticky z-20 bg-white w-[100px]"
                         style={{ left: 260 + 160 }}
                       >
                         <span
@@ -1859,7 +1881,12 @@ export default function Modulacao() {
                           : `Total: ${r.total} • Usadas: ${r.usadas} • Restante: ${restanteAtual} • Esta turma: ${cargaTurma} aula(s)`;
 
                         return (
-                          <td key={turma.id} className="py-2 px-4 border">
+                          <td
+                            key={turma.id}
+                            className={`py-2 px-4 border transition-colors ${
+                              turma.regime === "semestral" ? "bg-purple-50/20 hover:bg-purple-100/30" : "hover:bg-blue-50/20"
+                            }`}
+                          >
                             <div className="flex justify-center">
                               <input
                                 type="checkbox"

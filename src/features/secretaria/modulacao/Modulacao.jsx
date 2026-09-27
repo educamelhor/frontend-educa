@@ -1714,7 +1714,7 @@ export default function Modulacao() {
 
       {/* Tabela principal */}
       {turnoSelecionado && (
-        <div className="relative overflow-auto max-h-[calc(100vh-210px)] min-h-[380px] rounded-2xl border border-gray-200 shadow-md bg-white">
+        <div className="relative overflow-x-auto rounded-2xl border border-gray-200 shadow-md bg-white">
           {/* Aviso de turmas (quando nenhuma for encontrada) */}
           {turmasAviso && (
             <div className="px-3 py-2 text-sm text-amber-800 bg-amber-50 border-b border-amber-200">

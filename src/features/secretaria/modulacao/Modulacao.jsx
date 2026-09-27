@@ -1714,7 +1714,7 @@ export default function Modulacao() {
 
       {/* Tabela principal */}
       {turnoSelecionado && (
-        <div className="relative overflow-x-auto rounded-2xl border border-gray-200 shadow-md bg-white">
+        <div className="relative overflow-auto max-h-[calc(100vh-230px)] min-h-[380px] rounded-2xl border border-gray-200 shadow-md bg-white">
           {/* Aviso de turmas (quando nenhuma for encontrada) */}
           {turmasAviso && (
             <div className="px-3 py-2 text-sm text-amber-800 bg-amber-50 border-b border-amber-200">
@@ -1792,7 +1792,7 @@ export default function Modulacao() {
                 })}
 
                 {/* Ações (fica no mesmo cabeçalho, com largura fixa) */}
-                <th className="py-2 px-4 border text-blue-900 font-semibold text-center sticky top-0 z-40 bg-gray-100 w-[140px] min-w-[140px] whitespace-nowrap border-b-2 border-b-blue-400">
+                <th className="py-2 px-4 border text-blue-900 font-semibold text-center sticky top-0 z-40 bg-gray-100 w-[150px] min-w-[150px] whitespace-nowrap border-b-2 border-b-blue-400">
                   Ações
                 </th>
               </tr>
@@ -1916,7 +1916,7 @@ export default function Modulacao() {
                       })}
 
                       {/* Ações */}
-                      <td className="py-2 px-4 border text-center w-[140px] whitespace-nowrap">
+                      <td className="py-2 px-4 border text-center w-[150px] min-w-[150px] whitespace-nowrap">
                         <button
                           type="button"
                           onClick={() => abrirRemoverLinha(prof)}

@@ -127,14 +127,17 @@ export default function Avaliacoes() {
 
     // Regra 5: Se o professor acionar o botão RCp e não tiver nenhum campo / aluno com código 1234,
     // um modal premium renderiza informando que nenhum aluno deixou de realizar essa atividade.
+    const arrItensPlan = Array.isArray(plano?.itens) ? plano.itens : JSON.parse(plano?.itens || "[]");
+    const freqItem = Number(arrItensPlan[itemIdx]?.oportunidades) || 1;
     const temAlunoAusente = alunos.some(aluno => {
-      const key = getNotaKey(aluno.id, itemIdx, 0);
-      return ausentesSet.has(key);
+      for (let opIdx = 0; opIdx < freqItem; opIdx++) {
+        if (ausentesSet.has(getNotaKey(aluno.id, itemIdx, opIdx))) return true;
+      }
+      return false;
     });
 
     if (!temAlunoAusente) {
-      const arrItens = Array.isArray(plano?.itens) ? plano.itens : JSON.parse(plano?.itens || "[]");
-      const itemNome = arrItens[itemIdx]?.atividade || `Atividade #${itemIdx + 1}`;
+      const itemNome = arrItensPlan[itemIdx]?.atividade || `Atividade #${itemIdx + 1}`;
       setModalAvisoRCp({ itemIdx, atividade: itemNome });
       return;
     }
@@ -350,9 +353,10 @@ export default function Avaliacoes() {
             // Popular ausentesSet: células marcadas com cor 'ausente'
             setAusentesSet(new Set(Object.keys(coresCarregadas).filter(k => coresCarregadas[k] === 'ausente')));
 
-            // Detectar automaticamente quais colunas possuem notas de RC (opIdx = 1) ou RCp (opIdx = 2) salvas
+            // Detectar automaticamente quais colunas possuem notas de RC ou RCp salvas
             const rcDetectado = {};
             const rcpDetectado = {};
+            const arrItensGrid = Array.isArray(planoCompleto.itens) ? planoCompleto.itens : JSON.parse(planoCompleto.itens || "[]");
             Object.keys(notasCarregadas).forEach(key => {
               const parts = key.split('_');
               if (parts.length >= 3) {
@@ -360,8 +364,14 @@ export default function Avaliacoes() {
                 const opIdx = parseInt(parts[2], 10);
                 const val = notasCarregadas[key];
                 if (val !== undefined && val !== null && val !== '') {
-                  if (opIdx === 1) rcDetectado[itemIdx] = true;
-                  if (opIdx === 2) rcpDetectado[itemIdx] = true;
+                  const freq = Number(arrItensGrid[itemIdx]?.oportunidades) || 1;
+                  if (freq > 1) {
+                    if (opIdx >= 100 && opIdx < 200) rcDetectado[itemIdx] = true;
+                    if (opIdx >= 200 && opIdx < 300) rcpDetectado[itemIdx] = true;
+                  } else {
+                    if (opIdx === 1 || (opIdx >= 100 && opIdx < 200)) rcDetectado[itemIdx] = true;
+                    if (opIdx === 2 || (opIdx >= 200 && opIdx < 300)) rcpDetectado[itemIdx] = true;
+                  }
                 }
               }
             });
@@ -419,6 +429,22 @@ export default function Avaliacoes() {
   // Funções de Cálculo e Handlers
   // ---------------------------
   const getNotaKey = (alunoId, itemIdx, opIdx) => `${alunoId}_${itemIdx}_${opIdx}`;
+
+  // Para itens com 1 oportunidade (compatibilidade retroativa): RC = 1, RCp = 2
+  // Para itens com múltiplas oportunidades (subdivisões):
+  //   Normal: subIdx (0, 1, 2, ...)
+  //   RC: 100 + subIdx (100, 101, 102, ...)
+  //   RCp: 200 + subIdx (200, 201, 202, ...)
+  const getRcOpIdx = (opIdx, freqTotal) => (freqTotal > 1 ? 100 + opIdx : 1);
+  const getRcpOpIdx = (opIdx, freqTotal) => (freqTotal > 1 ? 200 + opIdx : 2);
+
+  const getKeyRC = (alunoId, itemIdx, opIdx, freqTotal) => {
+    return getNotaKey(alunoId, itemIdx, getRcOpIdx(opIdx, freqTotal));
+  };
+
+  const getKeyRCp = (alunoId, itemIdx, opIdx, freqTotal) => {
+    return getNotaKey(alunoId, itemIdx, getRcpOpIdx(opIdx, freqTotal));
+  };
 
   // Verifica se um item específico é do tipo fixo_direcao (Prova Bimestral)
   const isItemFixoDirecao = (itemIdx) => {
@@ -599,40 +625,45 @@ export default function Avaliacoes() {
         return;
       }
 
-      // Para itens normais:
-      const keyOrig = getNotaKey(alunoId, itemIdx, 0);
-      const isAusente = ausentesSet.has(keyOrig);
+      // Para itens normais: percorre cada oportunidade / subdivisão do item
+      const freq = Number(item.oportunidades) || 1;
+      for (let opIdx = 0; opIdx < freq; opIdx++) {
+        const keyOrig = getNotaKey(alunoId, itemIdx, opIdx);
+        const isAusente = ausentesSet.has(keyOrig);
 
-      // Nota original (opIdx = 0)
-      const valOrig = notas[keyOrig];
-      const numOrig = (!isAusente && valOrig !== undefined && valOrig !== null && valOrig !== "" && !isNaN(Number(valOrig)))
-        ? Number(valOrig)
-        : null;
+        // Nota original (subdivisão opIdx)
+        const valOrig = notas[keyOrig];
+        const numOrig = (!isAusente && valOrig !== undefined && valOrig !== null && valOrig !== "" && !isNaN(Number(valOrig)))
+          ? Number(valOrig)
+          : null;
 
-      // Nota RC (opIdx = 1)
-      const valRC = notas[getNotaKey(alunoId, itemIdx, 1)];
-      const numRC = (valRC !== undefined && valRC !== null && valRC !== "" && !isNaN(Number(valRC)))
-        ? Number(valRC)
-        : null;
+        // Nota RC (subdivisão opIdx)
+        const keyRC = getKeyRC(alunoId, itemIdx, opIdx, freq);
+        const valRC = notas[keyRC] ?? (freq === 1 ? notas[getNotaKey(alunoId, itemIdx, 100)] : undefined);
+        const numRC = (valRC !== undefined && valRC !== null && valRC !== "" && !isNaN(Number(valRC)))
+          ? Number(valRC)
+          : null;
 
-      // Nota RCp (opIdx = 2) - Recuperação Compensatória para ausentes
-      const valRCp = notas[getNotaKey(alunoId, itemIdx, 2)];
-      const numRCp = (valRCp !== undefined && valRCp !== null && valRCp !== "" && !isNaN(Number(valRCp)))
-        ? Number(valRCp)
-        : null;
+        // Nota RCp (subdivisão opIdx) - Recuperação Compensatória para ausentes
+        const keyRCp = getKeyRCp(alunoId, itemIdx, opIdx, freq);
+        const valRCp = notas[keyRCp] ?? (freq === 1 ? notas[getNotaKey(alunoId, itemIdx, 200)] : undefined);
+        const numRCp = (valRCp !== undefined && valRCp !== null && valRCp !== "" && !isNaN(Number(valRCp)))
+          ? Number(valRCp)
+          : null;
 
-      // Se o aluno estava ausente e realizou RCp:
-      if (isAusente) {
-        if (numRCp !== null) {
-          totalRegular += numRCp;
+        // Se o aluno estava ausente nesta subdivisão e realizou RCp:
+        if (isAusente) {
+          if (numRCp !== null) {
+            totalRegular += numRCp;
+          }
+          continue;
         }
-        return;
-      }
 
-      // Se o aluno não estava ausente: prevalece a maior nota entre original, RC e RCp
-      const candidatos = [numOrig, numRC, numRCp].filter(n => n !== null);
-      if (candidatos.length > 0) {
-        totalRegular += Math.max(...candidatos);
+        // Se o aluno não estava ausente: prevalece a maior nota entre original, RC e RCp
+        const candidatos = [numOrig, numRC, numRCp].filter(n => n !== null);
+        if (candidatos.length > 0) {
+          totalRegular += Math.max(...candidatos);
+        }
       }
     });
 
@@ -1782,13 +1813,13 @@ export default function Avaliacoes() {
                                              <div className="flex flex-col items-center justify-center">
                                                 {isRcCol ? (
                                                   <div className="flex items-center justify-center gap-2 text-[11px] font-bold text-cyan-800">
-                                                    <span>Nota</span>
+                                                    <span>{col.freqTotal > 1 ? `#${col.opIdx + 1}` : "Nota"}</span>
                                                     <span className="text-[9px] text-cyan-600 font-normal">/</span>
                                                     <span className="text-[10px] text-cyan-700 font-black">RC</span>
                                                   </div>
                                                 ) : isRcpCol ? (
                                                   <div className="flex items-center justify-center gap-2 text-[11px] font-bold text-sky-800">
-                                                    <span>Nota</span>
+                                                    <span>{col.freqTotal > 1 ? `#${col.opIdx + 1}` : "Nota"}</span>
                                                     <span className="text-[9px] text-sky-600 font-normal">/</span>
                                                     <span className="text-[10px] text-sky-700 font-black">RCp</span>
                                                   </div>
@@ -1858,8 +1889,9 @@ export default function Avaliacoes() {
 
                                                   const isExtraCol = !!col.ponto_extra;
                                                   const isRcAtivoCol = !isExtraCol && !isItemFixoDirecao(col.itemIdx) && !!rcAtivo[col.itemIdx];
-                                                  const keyRC = getNotaKey(aluno.id, col.itemIdx, 1);
-                                                  const valRC = notas[keyRC];
+                                                  const rcOpIdx = getRcOpIdx(col.opIdx, col.freqTotal);
+                                                   const keyRC = getKeyRC(aluno.id, col.itemIdx, col.opIdx, col.freqTotal);
+                                                  const valRC = notas[keyRC] ?? (col.freqTotal === 1 ? notas[getNotaKey(aluno.id, col.itemIdx, 100)] : undefined);
                                                   const isFocusedRC = focusedKey === keyRC;
                                                   const isAusenteRC = ausentesSet.has(keyRC);
 
@@ -1874,8 +1906,9 @@ export default function Avaliacoes() {
                                                   }
 
                                                   const isRcpAtivoCol = !isExtraCol && !isItemFixoDirecao(col.itemIdx) && !isRcAtivoCol && !!rcpAtivo[col.itemIdx];
-                                                  const keyRCp = getNotaKey(aluno.id, col.itemIdx, 2);
-                                                  const valRCp = notas[keyRCp];
+                                                  const rcpOpIdx = getRcpOpIdx(col.opIdx, col.freqTotal);
+                                                   const keyRCp = getKeyRCp(aluno.id, col.itemIdx, col.opIdx, col.freqTotal);
+                                                  const valRCp = notas[keyRCp] ?? (col.freqTotal === 1 ? notas[getNotaKey(aluno.id, col.itemIdx, 200)] : undefined);
                                                   const isFocusedRCp = focusedKey === keyRCp;
                                                   const isAusenteRCp = ausentesSet.has(keyRCp);
 
@@ -1930,9 +1963,9 @@ export default function Avaliacoes() {
                                                                 type="text"
                                                                 inputMode="decimal"
                                                                 value={displayValRCp}
-                                                                onChange={(e) => handleNotaChange(aluno.id, col.itemIdx, 2, col.maxVal, e.target.value)}
+                                                                onChange={(e) => handleNotaChange(aluno.id, col.itemIdx, rcpOpIdx, col.maxVal, e.target.value)}
                                                                 onFocus={() => setFocusedKey(keyRCp)}
-                                                                onBlur={() => handleNotaBlur(aluno.id, col.itemIdx, 2, col.maxVal)}
+                                                                onBlur={() => handleNotaBlur(aluno.id, col.itemIdx, rcpOpIdx, col.maxVal)}
                                                                 readOnly={diarioFechado}
                                                                 tabIndex={diarioFechado ? -1 : 0}
                                                                 placeholder="-"
@@ -2041,9 +2074,9 @@ export default function Avaliacoes() {
                                                               type="text"
                                                               inputMode="decimal"
                                                               value={displayValRC}
-                                                              onChange={(e) => handleNotaChange(aluno.id, col.itemIdx, 1, col.maxVal, e.target.value)}
+                                                              onChange={(e) => handleNotaChange(aluno.id, col.itemIdx, rcOpIdx, col.maxVal, e.target.value)}
                                                               onFocus={() => setFocusedKey(keyRC)}
-                                                              onBlur={() => handleNotaBlur(aluno.id, col.itemIdx, 1, col.maxVal)}
+                                                              onBlur={() => handleNotaBlur(aluno.id, col.itemIdx, rcOpIdx, col.maxVal)}
                                                               readOnly={diarioFechado}
                                                               tabIndex={diarioFechado ? -1 : 0}
                                                               placeholder="-"

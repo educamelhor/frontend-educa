@@ -1754,10 +1754,10 @@ export default function Modulacao() {
                   return (
                     <th
                       key={turma.id}
-                      className={`p-1 border text-center sticky top-0 z-40 min-w-[42px] transition-colors select-none ${
+                      className={`p-1 border text-center sticky top-0 z-40 min-w-[44px] transition-colors select-none ${
                         isSem
                           ? "bg-purple-50 text-purple-950 border-purple-200 border-b-2 border-b-purple-500 hover:bg-purple-100/70"
-                          : "bg-gray-100 text-blue-900 border-gray-200 border-b-2 border-b-blue-400 hover:bg-gray-200/70"
+                          : "bg-gray-100 text-blue-900 border-gray-200 border-b-2 border-b-blue-500 hover:bg-gray-200/70"
                       }`}
                       title={`${turma.nome} — ${isSem ? "Regime Semestral" : "Regime Anual"}`}
                     >
@@ -1765,17 +1765,17 @@ export default function Modulacao() {
                         {/* Indicador de Regime moderno e compacto */}
                         {isSem ? (
                           <span
-                            className="text-[8px] font-black px-1.5 py-0.5 rounded-full bg-purple-600 text-white shadow-xs tracking-wider uppercase leading-none"
+                            className="text-[8px] font-black px-1.5 py-0.5 rounded-full bg-purple-600 text-white shadow-xs tracking-wider uppercase leading-none whitespace-nowrap"
                             title="Regime Semestral"
                           >
                             SEM
                           </span>
                         ) : (
                           <span
-                            className="text-[8px] font-bold text-gray-400 px-0.5 py-0.5 uppercase tracking-wider leading-none"
+                            className="text-[7.5px] font-black px-1.5 py-0.5 rounded-full bg-blue-600 text-white shadow-xs tracking-tight uppercase leading-none whitespace-nowrap"
                             title="Regime Anual"
                           >
-                            ANU
+                            ANUAL
                           </span>
                         )}
 

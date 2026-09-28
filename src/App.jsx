@@ -83,6 +83,8 @@ import PlataformaGovernanca from "./features/plataforma/PlataformaGovernanca.jsx
 import PlataformaDashboard from "./features/plataforma/PlataformaDashboard.jsx";
 import PlataformaModulos from "./features/plataforma/PlataformaModulos.jsx";
 import BancoMaster from "./features/plataforma/BancoMaster.jsx";
+import MobileResponsaveisDashboard from "./features/plataforma/mobile/MobileResponsaveisDashboard.jsx";
+import MobileEstudantesDashboard from "./features/plataforma/mobile/MobileEstudantesDashboard.jsx";
 import BoletimTurmas from "./features/impressao/BoletimTurmas";
 import ListasImpressao from "./features/impressao/ListasImpressao";
 import DocumentosImpressao from "./features/impressao/DocumentosImpressao";
@@ -346,6 +348,8 @@ export default function App() {
           <Route path="/plataforma/auditoria-rbac" element={<RequireCeo><PlataformaAuditoriaRBAC /></RequireCeo>} />
           <Route path="/plataforma/usage"          element={<RequireCeo><PlataformaUsageInsights /></RequireCeo>} />
           <Route path="/plataforma/usage/:id"      element={<RequireCeo><UsageEscolaDetalhe /></RequireCeo>} />
+          <Route path="/plataforma/mobile/responsaveis" element={<RequireCeo><MobileResponsaveisDashboard /></RequireCeo>} />
+          <Route path="/plataforma/mobile/estudantes"   element={<RequireCeo><MobileEstudantesDashboard /></RequireCeo>} />
           <Route path="/plataforma/suporte"        element={<RequireCeo><PlataformaSuporte /></RequireCeo>} />
           <Route path="/plataforma/governanca"     element={<RequireCeo><PlataformaGovernanca /></RequireCeo>} />
           <Route path="/plataforma/banco-master"   element={<RequireCeo><BancoMaster /></RequireCeo>} />

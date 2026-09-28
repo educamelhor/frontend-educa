@@ -32,6 +32,7 @@ import {
   CalendarDaysIcon,
   PlusCircleIcon,
   SparklesIcon,
+  DevicePhoneMobileIcon,
 } from '@heroicons/react/24/outline';
 import {
   PERFIS_MILITARES_SET,
@@ -274,6 +275,7 @@ export default function Sidebar({ isOpen, onClose }) {
     else if (p.startsWith('/frequencia')) setOpenGroup('frequencia');
     else if (p.startsWith('/monitoramento')) setOpenGroup('monitoramento');
     else if (p.startsWith('/direcao')) setOpenGroup('direcao');
+    else if (p.startsWith('/plataforma/mobile')) setOpenGroup('mobile');
     else if (p.startsWith('/plataforma')) setOpenGroup('plataforma');
     else if (p.startsWith('/gabarito')) setOpenGroup('gabarito');
     else if (p.startsWith('/agente-educa')) setOpenGroup('agente-educa');
@@ -426,6 +428,58 @@ export default function Sidebar({ isOpen, onClose }) {
                 letterSpacing: '0.5px',
               }}>NOVO</span>
             </Link>
+
+            {/* ─── GRUPO: EDUCA MOBILE (submenus) ─── */}
+            <button
+              className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 transition"
+              onClick={() => setOpenGroup(openGroup === 'mobile' ? null : 'mobile')}
+              type="button"
+              style={{
+                marginTop: 4,
+                background: (openGroup === 'mobile' || isActive('/plataforma/mobile'))
+                  ? 'linear-gradient(90deg, rgba(2,132,199,0.18), transparent)'
+                  : undefined,
+              }}
+            >
+              <DevicePhoneMobileIcon className="h-5 w-5 mr-2" style={{ color: (openGroup === 'mobile' || isActive('/plataforma/mobile')) ? '#38bdf8' : undefined }} />
+              <span className="flex-1 text-left" style={{ fontWeight: 600 }}>EDUCA MOBILE</span>
+              <span style={{
+                fontSize: '0.55rem',
+                fontWeight: 800,
+                background: 'linear-gradient(135deg, #0284c7, #38bdf8)',
+                color: '#fff',
+                padding: '2px 6px',
+                borderRadius: '8px',
+                letterSpacing: '0.5px',
+                marginRight: 6,
+              }}>APP</span>
+              {openGroup === 'mobile' ? (
+                <ChevronDownIcon className="h-4 w-4" />
+              ) : (
+                <ChevronRightIcon className="h-4 w-4" />
+              )}
+            </button>
+
+            {openGroup === 'mobile' && (
+              <ul className="ml-4 mb-2">
+                <li>
+                  <Link
+                    to="/plataforma/mobile/responsaveis"
+                    className={getSubmenuLinkClasses('/plataforma/mobile/responsaveis', true)}
+                  >
+                    <UserGroupIcon className="h-5 w-5 mr-2" /> Responsáveis
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/plataforma/mobile/estudantes"
+                    className={getSubmenuLinkClasses('/plataforma/mobile/estudantes', true)}
+                  >
+                    <AcademicCapIcon className="h-5 w-5 mr-2" /> Estudantes
+                  </Link>
+                </li>
+              </ul>
+            )}
 
             {/* LINK: Plataforma - Auditoria RBAC */}
             <Link to="/plataforma/auditoria-rbac" className={getMainLinkClasses('/plataforma/auditoria-rbac')}>

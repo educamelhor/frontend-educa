@@ -394,9 +394,9 @@ export default function AgenteNotas() {
   };
 
   const pollarNotas = async (plano, startTime) => {
-    const MAX = 25; // 25 × 30s = 12.5 min
+    const MAX = 120; // 120 × 5s = 10 min
     for (let i = 0; i < MAX; i++) {
-      await new Promise(r => setTimeout(r, 30000));
+      await new Promise(r => setTimeout(r, 5000));
       try {
         const check = await api.get(`/avaliacoes/${plano.id}`);
         const d = check.data || {};
@@ -416,7 +416,7 @@ export default function AgenteNotas() {
           setExportandoId(null);
           return;
         }
-        if (!d.agente_executando_desde && i >= 1) {
+        if (!d.agente_executando_desde && i >= 2) {
           const erroMsg = traduzirErroAgente(d.agente_ultimo_erro);
           setModalResultado({ tipo: 'erro', titulo: 'Exportação falhou', texto: erroMsg });
           setPlanos(prev => prev.map(p => p.id === plano.id ? { ...p, agente_executando_desde: null } : p));

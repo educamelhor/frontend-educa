@@ -372,12 +372,12 @@ export default function AgentePlanos() {
   };
 
   const pollarEstrutura = async (plano, startTime) => {
-    const MAX = 25; // 25 × 30s = 12.5 min
+    const MAX = 120; // 120 × 5s = 10 min
     const itens = Array.isArray(plano.itens) ? plano.itens : JSON.parse(plano.itens || '[]');
     const bimestral = itens.find(i => i.fixo_direcao);
 
     for (let i = 0; i < MAX; i++) {
-      await new Promise(r => setTimeout(r, 30000));
+      await new Promise(r => setTimeout(r, 5000));
       try {
         const check = await api.get(`/avaliacoes/${plano.id}`);
         const d = check.data || {};
@@ -400,7 +400,7 @@ export default function AgentePlanos() {
           return;
         }
         // Lock limpo sem sucesso = falhou
-        if (!d.agente_executando_desde && i >= 1) {
+        if (!d.agente_executando_desde && i >= 2) {
           const erroMsg = traduzirErroAgente(d.agente_ultimo_erro);
           abrirModalResultado('erro', 'Exportação falhou', erroMsg);
           setPlanos(prev => prev.map(p => p.id === plano.id ? { ...p, agente_executando_desde: null } : p));

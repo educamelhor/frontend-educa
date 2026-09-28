@@ -5,6 +5,7 @@ import ModalFichaAluno from "./ModalFichaAluno";
 import ModalZoomFoto from "./ModalZoomFoto";
 import ModalRegistroConselhoPedagogico from "./ModalRegistroConselhoPedagogico";
 import ModalMapaNotaPedagogico from "./ModalMapaNota";
+import ModalMediaAnualPedagogico from "./ModalMediaAnual";
 import {
   EyeIcon,
   DocumentTextIcon,
@@ -63,6 +64,9 @@ export default function ConselhoClasse() {
 
   // Mapa de Nota
   const [modalMapaNotaOpen, setModalMapaNotaOpen] = useState(false);
+
+  // Média Anual
+  const [modalMediaAnualOpen, setModalMediaAnualOpen] = useState(false);
 
   function abrirModalBoletim(codigo) {
     setCodigoAlunoBoletim(codigo);
@@ -251,6 +255,28 @@ export default function ConselhoClasse() {
             >
               📊 MAPA DE NOTA
             </button>
+            <button
+              onClick={() => setModalMediaAnualOpen(true)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "6px 14px",
+                borderRadius: "8px",
+                fontWeight: 700,
+                fontSize: "0.8rem",
+                cursor: "pointer",
+                border: "2px solid #3b82f6",
+                backgroundColor: "#eff6ff",
+                color: "#1d4ed8",
+                transition: "all 0.15s",
+                boxShadow: "0 2px 6px rgba(59,130,246,0.15)",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.backgroundColor = "#3b82f6"; e.currentTarget.style.color = "#fff"; }}
+              onMouseLeave={e => { e.currentTarget.style.backgroundColor = "#eff6ff"; e.currentTarget.style.color = "#1d4ed8"; }}
+            >
+              📈 MÉDIA ANUAL
+            </button>
           </div>
 
           {loadingAlunos ? (
@@ -375,6 +401,14 @@ export default function ConselhoClasse() {
           turma={turmaSelecionada}
           anoLetivo={anoLetivo}
           onClose={() => setModalMapaNotaOpen(false)}
+        />
+      )}
+
+      {modalMediaAnualOpen && turmaSelecionada && (
+        <ModalMediaAnualPedagogico
+          turma={turmaSelecionada}
+          anoLetivo={anoLetivo}
+          onClose={() => setModalMediaAnualOpen(false)}
         />
       )}
     </div>

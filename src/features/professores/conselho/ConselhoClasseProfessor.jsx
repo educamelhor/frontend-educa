@@ -20,6 +20,7 @@ import ModalZoomFoto from "../../pedagogico/conselho/ModalZoomFoto";
 import ModalRegistroConselhoProfessor from "./ModalRegistroConselhoProfessor";
 import ModalFichaAlunoProfessor from "./ModalFichaAlunoProfessor";
 import ModalMapaNota from "./ModalMapaNota";
+import ModalMediaAnual from "./ModalMediaAnual";
 import { EyeIcon, DocumentTextIcon, IdentificationIcon } from "@heroicons/react/24/outline";
 import { getFotoURL } from "../../../utils/foto";
 
@@ -65,6 +66,9 @@ export default function ConselhoClasseProfessor() {
 
   // Mapa de Nota — visão consolidada de toda a turma
   const [modalMapaNotaOpen, setModalMapaNotaOpen] = useState(false);
+
+  // Média Anual — média acumulada das disciplinas anuais
+  const [modalMediaAnualOpen, setModalMediaAnualOpen] = useState(false);
 
   // Cache-buster para fotos
   const [fotoStamp] = useState(Date.now());
@@ -247,30 +251,56 @@ export default function ConselhoClasseProfessor() {
             <h2 className="text-2xl font-semibold text-blue-800">
               Alunos da Turma {turmaSelecionada.nome || turmaSelecionada.turma}
             </h2>
-            <button
-              onClick={() => setModalMapaNotaOpen(true)}
-              title="Ver mapa consolidado de todas as notas da turma"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "8px 16px",
-                borderRadius: "8px",
-                background: "linear-gradient(135deg, #1e3a8a, #3b82f6)",
-                color: "#fff",
-                border: "none",
-                cursor: "pointer",
-                fontWeight: 800,
-                fontSize: "0.82rem",
-                boxShadow: "0 4px 14px rgba(59,130,246,0.35)",
-                transition: "all 0.2s",
-                letterSpacing: "0.04em",
-              }}
-              onMouseEnter={e => e.currentTarget.style.transform = "translateY(-1px)"}
-              onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
-            >
-              🗺️ MAPA DE NOTA
-            </button>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <button
+                onClick={() => setModalMapaNotaOpen(true)}
+                title="Ver mapa consolidado de todas as notas da turma"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "8px 16px",
+                  borderRadius: "8px",
+                  background: "linear-gradient(135deg, #1e3a8a, #3b82f6)",
+                  color: "#fff",
+                  border: "none",
+                  cursor: "pointer",
+                  fontWeight: 800,
+                  fontSize: "0.82rem",
+                  boxShadow: "0 4px 14px rgba(59,130,246,0.35)",
+                  transition: "all 0.2s",
+                  letterSpacing: "0.04em",
+                }}
+                onMouseEnter={e => e.currentTarget.style.transform = "translateY(-1px)"}
+                onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
+              >
+                🗺️ MAPA DE NOTA
+              </button>
+              <button
+                onClick={() => setModalMediaAnualOpen(true)}
+                title="Ver média anual acumulada de todas as disciplinas da turma"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "8px 16px",
+                  borderRadius: "8px",
+                  background: "linear-gradient(135deg, #1e3a8a, #3b82f6)",
+                  color: "#fff",
+                  border: "none",
+                  cursor: "pointer",
+                  fontWeight: 800,
+                  fontSize: "0.82rem",
+                  boxShadow: "0 4px 14px rgba(59,130,246,0.35)",
+                  transition: "all 0.2s",
+                  letterSpacing: "0.04em",
+                }}
+                onMouseEnter={e => e.currentTarget.style.transform = "translateY(-1px)"}
+                onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
+              >
+                📈 MÉDIA ANUAL
+              </button>
+            </div>
           </div>
 
           {/* Aviso de governança */}
@@ -365,6 +395,15 @@ export default function ConselhoClasseProfessor() {
           turma={turmaSelecionada}
           anoLetivo={anoLetivo}
           onClose={() => setModalMapaNotaOpen(false)}
+        />
+      )}
+
+      {/* Modal: Média Anual */}
+      {modalMediaAnualOpen && (
+        <ModalMediaAnual
+          turma={turmaSelecionada}
+          anoLetivo={anoLetivo}
+          onClose={() => setModalMediaAnualOpen(false)}
         />
       )}
 

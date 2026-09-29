@@ -1,19 +1,13 @@
 // src/features/plataforma/mobile/MobileEstudantesDashboard.jsx
 // ============================================================================
 // CEO Dashboard — Telemetria & Analytics do EDUCA MOBILE (Estudantes)
-// Monitoramento executivo de engajamento dos alunos por escola
+// Master-Detail Interativo: Seleção por Apelido da Escola + Telemetria Detalhada
 // ============================================================================
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import api from "../../../services/api";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const fmtNum = (n) => Number(n || 0).toLocaleString("pt-BR");
-const fmtDate = (d) => {
-  if (!d) return "—";
-  const dt = new Date(d);
-  return dt.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
-};
 
 // ── Mock data de alta fidelidade para estudantes ─────────────────────────────
 const MOCK_ESCOLAS_ESTUDANTES = [
@@ -33,10 +27,21 @@ const MOCK_ESCOLAS_ESTUDANTES = [
     android_pct: 78,
     ios_pct: 22,
     top_cards: [
-      { label: "Carteirinha Digital", pct: 44, color: "#a855f7" },
-      { label: "Boletim", pct: 34, color: "#38bdf8" },
-      { label: "Conteúdos", pct: 15, color: "#10b981" },
+      { label: "Carteirinha Digital", cliques: 4928, pct: 44, color: "#a855f7" },
+      { label: "Boletim Escolar", cliques: 3808, pct: 34, color: "#38bdf8" },
+      { label: "Conteúdos das Aulas", cliques: 1680, pct: 15, color: "#10b981" },
+      { label: "Horários de Aulas", cliques: 784, pct: 7, color: "#f59e0b" },
     ],
+    historico_7d: [
+      { dia: "Seg", total: 410 },
+      { dia: "Ter", total: 435 },
+      { dia: "Qua", total: 390 },
+      { dia: "Qui", total: 445 },
+      { dia: "Sex", total: 420 },
+      { dia: "Sáb", total: 170 },
+      { dia: "Dom", total: 380 },
+    ],
+    pico_horario: "06:45 - 07:30 e 12:15 - 13:00 (Entrada / Saída)",
     ultimo_acesso: "Hoje às 20:14",
   },
   {
@@ -55,10 +60,21 @@ const MOCK_ESCOLAS_ESTUDANTES = [
     android_pct: 74,
     ios_pct: 26,
     top_cards: [
-      { label: "Carteirinha Digital", pct: 40, color: "#a855f7" },
-      { label: "Horários", pct: 32, color: "#f59e0b" },
-      { label: "Boletim", pct: 21, color: "#38bdf8" },
+      { label: "Carteirinha Digital", cliques: 2368, pct: 40, color: "#a855f7" },
+      { label: "Horários de Aulas", cliques: 1894, pct: 32, color: "#f59e0b" },
+      { label: "Boletim Escolar", cliques: 1243, pct: 21, color: "#38bdf8" },
+      { label: "Conteúdos & Tarefas", cliques: 415, pct: 7, color: "#10b981" },
     ],
+    historico_7d: [
+      { dia: "Seg", total: 215 },
+      { dia: "Ter", total: 230 },
+      { dia: "Qua", total: 205 },
+      { dia: "Qui", total: 240 },
+      { dia: "Sex", total: 220 },
+      { dia: "Sáb", total: 85 },
+      { dia: "Dom", total: 195 },
+    ],
+    pico_horario: "07:00 - 07:45 e 17:15 - 18:00 (Integral)",
     ultimo_acesso: "Hoje às 19:35",
   },
   {
@@ -77,10 +93,21 @@ const MOCK_ESCOLAS_ESTUDANTES = [
     android_pct: 82,
     ios_pct: 18,
     top_cards: [
-      { label: "Carteirinha Digital", pct: 46, color: "#a855f7" },
-      { label: "Boletim", pct: 31, color: "#38bdf8" },
-      { label: "Registros", pct: 16, color: "#818cf8" },
+      { label: "Carteirinha Digital", cliques: 7084, pct: 46, color: "#a855f7" },
+      { label: "Boletim Escolar", cliques: 4774, pct: 31, color: "#38bdf8" },
+      { label: "Registros Disciplinares", cliques: 2464, pct: 16, color: "#818cf8" },
+      { label: "Horários & Avisos", cliques: 1078, pct: 7, color: "#f59e0b" },
     ],
+    historico_7d: [
+      { dia: "Seg", total: 580 },
+      { dia: "Ter", total: 610 },
+      { dia: "Qua", total: 565 },
+      { dia: "Qui", total: 630 },
+      { dia: "Sex", total: 590 },
+      { dia: "Sáb", total: 333 },
+      { dia: "Dom", total: 512 },
+    ],
+    pico_horario: "06:40 - 07:25 e 12:00 - 13:10 (Formação CCMDF)",
     ultimo_acesso: "Hoje às 20:25",
   },
   {
@@ -99,10 +126,21 @@ const MOCK_ESCOLAS_ESTUDANTES = [
     android_pct: 69,
     ios_pct: 31,
     top_cards: [
-      { label: "Carteirinha Digital", pct: 48, color: "#a855f7" },
-      { label: "Boletim", pct: 28, color: "#38bdf8" },
-      { label: "Biblioteca", pct: 17, color: "#ec4899" },
+      { label: "Carteirinha Digital", cliques: 3288, pct: 48, color: "#a855f7" },
+      { label: "Boletim Escolar", cliques: 1918, pct: 28, color: "#38bdf8" },
+      { label: "Biblioteca & Livros", cliques: 1164, pct: 17, color: "#ec4899" },
+      { label: "Notícias & Eventos", cliques: 480, pct: 7, color: "#38bdf8" },
     ],
+    historico_7d: [
+      { dia: "Seg", total: 250 },
+      { dia: "Ter", total: 275 },
+      { dia: "Qua", total: 245 },
+      { dia: "Qui", total: 280 },
+      { dia: "Sex", total: 260 },
+      { dia: "Sáb", total: 110 },
+      { dia: "Dom", total: 220 },
+    ],
+    pico_horario: "07:15 - 08:00 e 12:45 - 13:30 (Troca de turno)",
     ultimo_acesso: "Hoje às 18:50",
   },
   {
@@ -121,10 +159,21 @@ const MOCK_ESCOLAS_ESTUDANTES = [
     android_pct: 64,
     ios_pct: 36,
     top_cards: [
-      { label: "Carteirinha Digital", pct: 41, color: "#a855f7" },
-      { label: "Boletim", pct: 35, color: "#38bdf8" },
-      { label: "Conteúdos", pct: 18, color: "#10b981" },
+      { label: "Carteirinha Digital", cliques: 2099, pct: 41, color: "#a855f7" },
+      { label: "Boletim Escolar", cliques: 1792, pct: 35, color: "#38bdf8" },
+      { label: "Conteúdos & Aulas", cliques: 922, pct: 18, color: "#10b981" },
+      { label: "Registros Disciplinares", cliques: 307, pct: 6, color: "#818cf8" },
     ],
+    historico_7d: [
+      { dia: "Seg", total: 185 },
+      { dia: "Ter", total: 195 },
+      { dia: "Qua", total: 180 },
+      { dia: "Qui", total: 210 },
+      { dia: "Sex", total: 190 },
+      { dia: "Sáb", total: 90 },
+      { dia: "Dom", total: 160 },
+    ],
+    pico_horario: "07:00 - 07:30 e 12:20 - 13:00 (Entrada e Saída)",
     ultimo_acesso: "Hoje às 19:40",
   },
   {
@@ -143,10 +192,21 @@ const MOCK_ESCOLAS_ESTUDANTES = [
     android_pct: 84,
     ios_pct: 16,
     top_cards: [
-      { label: "Carteirinha Digital", pct: 50, color: "#a855f7" },
-      { label: "Boletim", pct: 29, color: "#38bdf8" },
-      { label: "Notícias", pct: 14, color: "#38bdf8" },
+      { label: "Carteirinha Digital", cliques: 6050, pct: 50, color: "#a855f7" },
+      { label: "Boletim Escolar", cliques: 3509, pct: 29, color: "#38bdf8" },
+      { label: "Horários de Aulas", cliques: 1694, pct: 14, color: "#f59e0b" },
+      { label: "Notícias & Grêmio", cliques: 847, pct: 7, color: "#34d399" },
     ],
+    historico_7d: [
+      { dia: "Seg", total: 430 },
+      { dia: "Ter", total: 460 },
+      { dia: "Qua", total: 415 },
+      { dia: "Qui", total: 470 },
+      { dia: "Sex", total: 440 },
+      { dia: "Sáb", total: 230 },
+      { dia: "Dom", total: 395 },
+    ],
+    pico_horario: "12:30 - 13:30 e 18:00 - 19:00 (Médio Noturno)",
     ultimo_acesso: "Hoje às 17:15",
   },
   {
@@ -165,10 +225,21 @@ const MOCK_ESCOLAS_ESTUDANTES = [
     android_pct: 77,
     ios_pct: 23,
     top_cards: [
-      { label: "Carteirinha Digital", pct: 45, color: "#a855f7" },
-      { label: "Boletim", pct: 32, color: "#38bdf8" },
-      { label: "Horários", pct: 16, color: "#f59e0b" },
+      { label: "Carteirinha Digital", cliques: 2808, pct: 45, color: "#a855f7" },
+      { label: "Boletim Escolar", cliques: 1997, pct: 32, color: "#38bdf8" },
+      { label: "Horários de Aulas", cliques: 998, pct: 16, color: "#f59e0b" },
+      { label: "Biblioteca", cliques: 437, pct: 7, color: "#ec4899" },
     ],
+    historico_7d: [
+      { dia: "Seg", total: 220 },
+      { dia: "Ter", total: 245 },
+      { dia: "Qua", total: 225 },
+      { dia: "Qui", total: 255 },
+      { dia: "Sex", total: 235 },
+      { dia: "Sáb", total: 105 },
+      { dia: "Dom", total: 205 },
+    ],
+    pico_horario: "07:00 - 07:40 e 12:20 - 13:00 (Entrada/Saída)",
     ultimo_acesso: "Hoje às 19:00",
   },
   {
@@ -187,27 +258,34 @@ const MOCK_ESCOLAS_ESTUDANTES = [
     android_pct: 81,
     ios_pct: 19,
     top_cards: [
-      { label: "Carteirinha Digital", pct: 47, color: "#a855f7" },
-      { label: "Boletim", pct: 33, color: "#38bdf8" },
-      { label: "Biblioteca", pct: 13, color: "#ec4899" },
+      { label: "Carteirinha Digital", cliques: 4202, pct: 47, color: "#a855f7" },
+      { label: "Boletim Escolar", cliques: 2950, pct: 33, color: "#38bdf8" },
+      { label: "Biblioteca & Livros", cliques: 1162, pct: 13, color: "#ec4899" },
+      { label: "Registros Disciplinares", cliques: 626, pct: 7, color: "#818cf8" },
     ],
+    historico_7d: [
+      { dia: "Seg", total: 325 },
+      { dia: "Ter", total: 345 },
+      { dia: "Qua", total: 310 },
+      { dia: "Qui", total: 360 },
+      { dia: "Sex", total: 330 },
+      { dia: "Sáb", total: 190 },
+      { dia: "Dom", total: 290 },
+    ],
+    pico_horario: "06:45 - 07:30 e 12:15 - 13:00 (Troca de turno)",
     ultimo_acesso: "Hoje às 18:45",
   },
 ];
 
 export default function MobileEstudantesDashboard() {
-  const navigate = useNavigate();
   const [escolas, setEscolas] = useState(MOCK_ESCOLAS_ESTUDANTES);
-  const [loading, setLoading] = useState(false);
+  const [escolaSelecionada, setEscolaSelecionada] = useState(null);
   const [busca, setBusca] = useState("");
-  const [filtroTipo, setFiltroTipo] = useState("TODOS");
-  const [sortBy, setSortBy] = useState("acessos_30d");
 
   // Carrega escolas reais da API e complementa com dados analíticos
   useEffect(() => {
     async function loadData() {
       try {
-        setLoading(true);
         const { data } = await api.get("/api/plataforma/usage/escolas");
         const listaApi = Array.isArray(data?.escolas) ? data.escolas : [];
         if (listaApi.length > 0) {
@@ -230,6 +308,8 @@ export default function MobileEstudantesDashboard() {
               android_pct: mock.android_pct,
               ios_pct: mock.ios_pct,
               top_cards: mock.top_cards,
+              historico_7d: mock.historico_7d,
+              pico_horario: mock.pico_horario,
               ultimo_acesso: mock.ultimo_acesso,
             };
           });
@@ -237,44 +317,43 @@ export default function MobileEstudantesDashboard() {
         }
       } catch (err) {
         console.warn("[MobileEstudantes] Usando mock completo de telemetria:", err);
-      } finally {
-        setLoading(false);
       }
     }
     loadData();
   }, []);
 
-  // Filtragem e ordenação
-  const escolasFiltradas = escolas
-    .filter((e) => {
-      const q = busca.toLowerCase();
-      const matchBusca =
-        !q ||
-        e.nome.toLowerCase().includes(q) ||
-        (e.apelido && e.apelido.toLowerCase().includes(q)) ||
-        (e.cidade && e.cidade.toLowerCase().includes(q));
+  // Filtragem de escolas
+  const escolasFiltradas = escolas.filter((e) => {
+    const q = busca.toLowerCase();
+    return !q || e.nome.toLowerCase().includes(q) || (e.apelido && e.apelido.toLowerCase().includes(q));
+  });
 
-      const matchTipo =
-        filtroTipo === "TODOS" ||
-        (filtroTipo === "CCMDF" && (e.tipo?.includes("CCMDF") || e.nome.includes("CCM"))) ||
-        (filtroTipo === "REGULAR" && !e.tipo?.includes("CCMDF") && !e.nome.includes("CCM"));
+  // Métricas do Topo: Globais vs Específicas da Escola Selecionada
+  const isIndividual = escolaSelecionada !== null;
+  const escolaAtiva = isIndividual ? escolaSelecionada : null;
 
-      return matchBusca && matchTipo;
-    })
-    .sort((a, b) => {
-      if (sortBy === "nome") return a.nome.localeCompare(b.nome);
-      if (sortBy === "alunos") return b.alunos_app - a.alunos_app;
-      return b.acessos_30d - a.acessos_30d;
-    });
+  const totalUsuariosExibicao = isIndividual
+    ? escolaAtiva.alunos_app
+    : escolas.reduce((acc, e) => acc + (e.alunos_app || 0), 0);
 
-  // Métricas consolidadas
-  const totalEscolas = escolas.length;
-  const totalAlunosBase = escolas.reduce((acc, e) => acc + (e.total_alunos || 0), 0);
-  const totalAlunosApp = escolas.reduce((acc, e) => acc + (e.alunos_app || 0), 0);
-  const totalAcessosHoje = escolas.reduce((acc, e) => acc + (e.acessos_hoje || 0), 0);
-  const totalAcessos7d = escolas.reduce((acc, e) => acc + (e.acessos_7d || 0), 0);
-  const totalAcessos30d = escolas.reduce((acc, e) => acc + (e.acessos_30d || 0), 0);
-  const taxaAdesaoGeral = totalAlunosBase > 0 ? Math.round((totalAlunosApp / totalAlunosBase) * 100) : 0;
+  const totalMatriculadosExibicao = isIndividual
+    ? escolaAtiva.total_alunos
+    : escolas.reduce((acc, e) => acc + (e.total_alunos || 0), 0);
+
+  const acessosHojeExibicao = isIndividual
+    ? escolaAtiva.acessos_hoje
+    : escolas.reduce((acc, e) => acc + (e.acessos_hoje || 0), 0);
+
+  const acessos7dExibicao = isIndividual
+    ? escolaAtiva.acessos_7d
+    : escolas.reduce((acc, e) => acc + (e.acessos_7d || 0), 0);
+
+  const acessos30dExibicao = isIndividual
+    ? escolaAtiva.acessos_30d
+    : escolas.reduce((acc, e) => acc + (e.acessos_30d || 0), 0);
+
+  const androidPctExibicao = isIndividual ? escolaAtiva.android_pct : 78;
+  const iosPctExibicao = isIndividual ? escolaAtiva.ios_pct : 22;
 
   return (
     <div style={{
@@ -284,7 +363,7 @@ export default function MobileEstudantesDashboard() {
       padding: "28px 36px 64px",
       fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
     }}>
-      {/* ── Topo com Branding & Atualização ── */}
+      {/* ── Topo com Branding & Alternador ── */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
@@ -305,406 +384,451 @@ export default function MobileEstudantesDashboard() {
             Telemetria: Estudantes
           </h1>
           <p style={{ margin: "6px 0 0", color: "#94a3b8", fontSize: "0.95rem" }}>
-            Monitoramento de engajamento, carteirinha digital, frequência e rotina dos alunos no app.
+            {isIndividual
+              ? `Visualizando telemetria individual da unidade: ${escolaAtiva.nome}`
+              : "Visão consolidada do aplicativo dos alunos. Clique em uma escola abaixo para detalhar seus acessos."}
           </p>
         </div>
 
-        <button
-          onClick={() => window.location.reload()}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "10px 18px",
-            background: "rgba(255,255,255,0.06)",
-            border: "1px solid rgba(255,255,255,0.12)",
-            borderRadius: 10,
-            color: "#f8fafc",
-            fontSize: "0.85rem",
-            fontWeight: 600,
-            cursor: "pointer",
-            transition: "all 0.2s",
-          }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.12)")}
-          onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.06)")}
-        >
-          🔄 Atualizar Dados
-        </button>
+        {isIndividual && (
+          <button
+            onClick={() => setEscolaSelecionada(null)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "10px 18px",
+              background: "rgba(168,85,247,0.15)",
+              border: "1px solid rgba(168,85,247,0.4)",
+              borderRadius: 10,
+              color: "#c084fc",
+              fontSize: "0.85rem",
+              fontWeight: 700,
+              cursor: "pointer",
+              transition: "all 0.2s",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(168,85,247,0.25)")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(168,85,247,0.15)")}
+          >
+            ✕ Voltar para Visão Consolidada
+          </button>
+        )}
       </div>
 
-      {/* ── Banner Executivo de KPIs ── */}
+      {/* ── Banner de Cards no Topo (Específico da Escola Selecionada ou Geral) ── */}
       <div style={{
-        background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 60%, #0f172a 100%)",
-        border: "1px solid rgba(168,85,247,0.25)",
+        background: isIndividual
+          ? "linear-gradient(135deg, #0f172a 0%, #581c87 70%, #0f172a 100%)"
+          : "linear-gradient(135deg, #0f172a 0%, #1e1b4b 60%, #0f172a 100%)",
+        border: isIndividual ? "1px solid rgba(168,85,247,0.45)" : "1px solid rgba(168,85,247,0.25)",
         borderRadius: 20,
         padding: "24px 30px",
         marginBottom: 32,
-        boxShadow: "0 20px 40px rgba(0,0,0,0.4)",
+        boxShadow: isIndividual ? "0 20px 45px rgba(124,58,237,0.3)" : "0 20px 40px rgba(0,0,0,0.4)",
+        transition: "all 0.3s ease",
       }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <span style={{ fontSize: "1.4rem" }}>🎓</span>
-            <span style={{ fontWeight: 700, fontSize: "1.1rem", color: "#e2e8f0" }}>Indicadores Consolidados dos Estudantes</span>
+            <span style={{ fontSize: "1.4rem" }}>{isIndividual ? "🎓" : "📱"}</span>
+            <span style={{ fontWeight: 800, fontSize: "1.15rem", color: "#e2e8f0" }}>
+              {isIndividual ? `Métricas de Acesso — ${escolaAtiva.apelido}` : "Indicadores Consolidados dos Estudantes"}
+            </span>
+            {isIndividual && (
+              <span style={{
+                fontSize: "0.72rem",
+                fontWeight: 800,
+                color: "#c084fc",
+                background: "rgba(15,23,42,0.8)",
+                padding: "3px 10px",
+                borderRadius: 12,
+                border: "1px solid rgba(168,85,247,0.4)",
+              }}>
+                UNIDADE ATIVA
+              </span>
+            )}
           </div>
           <div style={{
             fontSize: "0.8rem",
-            color: "#c084fc",
-            background: "rgba(168,85,247,0.15)",
-            padding: "4px 12px",
+            color: isIndividual ? "#e9d5ff" : "#c084fc",
+            background: "rgba(15,23,42,0.6)",
+            padding: "5px 14px",
             borderRadius: 20,
-            border: "1px solid rgba(168,85,247,0.3)",
+            border: "1px solid rgba(255,255,255,0.1)",
           }}>
-            ⚡ Taxa de Adoção dos Alunos: <b>{taxaAdesaoGeral}%</b>
+            {isIndividual ? `📍 ${escolaAtiva.cidade}/${escolaAtiva.estado}` : `🏫 ${escolas.length} Escolas Integradas`}
           </div>
         </div>
 
-        {/* Grid de KPIs no Topo */}
+        {/* Grid de Cards no Topo */}
         <div style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))",
           gap: 16,
         }}>
-          {/* Card 1 */}
+          {/* Card: Total Estudantes com App */}
           <div style={{
-            background: "rgba(15,23,42,0.6)",
+            background: "rgba(15,23,42,0.65)",
             border: "1px solid rgba(255,255,255,0.08)",
             borderRadius: 14,
             padding: "16px 20px",
           }}>
-            <div style={{ fontSize: "0.8rem", color: "#94a3b8", fontWeight: 600 }}>ESCOLAS MONITORADAS</div>
-            <div style={{ fontSize: "1.85rem", fontWeight: 900, color: "#38bdf8", marginTop: 4 }}>
-              {fmtNum(totalEscolas)}
-            </div>
-            <div style={{ fontSize: "0.75rem", color: "#64748b", marginTop: 4 }}>100% com telemetria ativa</div>
-          </div>
-
-          {/* Card 2 */}
-          <div style={{
-            background: "rgba(15,23,42,0.6)",
-            border: "1px solid rgba(255,255,255,0.08)",
-            borderRadius: 14,
-            padding: "16px 20px",
-          }}>
-            <div style={{ fontSize: "0.8rem", color: "#94a3b8", fontWeight: 600 }}>ALUNOS COM APP ATIVO</div>
+            <div style={{ fontSize: "0.78rem", color: "#94a3b8", fontWeight: 700 }}>ALUNOS COM APP ATIVO</div>
             <div style={{ fontSize: "1.85rem", fontWeight: 900, color: "#a855f7", marginTop: 4 }}>
-              {fmtNum(totalAlunosApp)}
+              {fmtNum(totalUsuariosExibicao)}
             </div>
-            <div style={{ fontSize: "0.75rem", color: "#64748b", marginTop: 4 }}>de {fmtNum(totalAlunosBase)} matriculados</div>
+            <div style={{ fontSize: "0.72rem", color: "#64748b", marginTop: 4 }}>
+              {isIndividual ? `de ${fmtNum(escolaAtiva.total_alunos)} matriculados` : `de ${fmtNum(totalMatriculadosExibicao)} matriculados`}
+            </div>
           </div>
 
-          {/* Card 3 */}
+          {/* Card: Acessos Hoje */}
           <div style={{
-            background: "rgba(15,23,42,0.6)",
+            background: "rgba(15,23,42,0.65)",
             border: "1px solid rgba(255,255,255,0.08)",
             borderRadius: 14,
             padding: "16px 20px",
           }}>
-            <div style={{ fontSize: "0.8rem", color: "#94a3b8", fontWeight: 600 }}>ACESSOS HOJE</div>
+            <div style={{ fontSize: "0.78rem", color: "#94a3b8", fontWeight: 700 }}>ACESSOS HOJE</div>
             <div style={{ fontSize: "1.85rem", fontWeight: 900, color: "#f59e0b", marginTop: 4 }}>
-              {fmtNum(totalAcessosHoje)}
+              {fmtNum(acessosHojeExibicao)}
             </div>
-            <div style={{ fontSize: "0.75rem", color: "#64748b", marginTop: 4 }}>Pico na entrada e saída escolar</div>
+            <div style={{ fontSize: "0.72rem", color: "#64748b", marginTop: 4 }}>
+              {isIndividual ? `Pico: ${escolaAtiva.pico_horario}` : "Pico na entrada e saída"}
+            </div>
           </div>
 
-          {/* Card 4 */}
+          {/* Card: Acessos 7 Dias */}
           <div style={{
-            background: "rgba(15,23,42,0.6)",
+            background: "rgba(15,23,42,0.65)",
             border: "1px solid rgba(255,255,255,0.08)",
             borderRadius: 14,
             padding: "16px 20px",
           }}>
-            <div style={{ fontSize: "0.8rem", color: "#94a3b8", fontWeight: 600 }}>ACESSOS (7 DIAS)</div>
+            <div style={{ fontSize: "0.78rem", color: "#94a3b8", fontWeight: 700 }}>ACESSOS (7 DIAS)</div>
             <div style={{ fontSize: "1.85rem", fontWeight: 900, color: "#34d399", marginTop: 4 }}>
-              {fmtNum(totalAcessos7d)}
+              {fmtNum(acessos7dExibicao)}
             </div>
-            <div style={{ fontSize: "0.75rem", color: "#64748b", marginTop: 4 }}>Média 5.8 acessos/aluno</div>
+            <div style={{ fontSize: "0.72rem", color: "#64748b", marginTop: 4 }}>Frequência semanal</div>
           </div>
 
-          {/* Card 5 */}
+          {/* Card: Acessos 30 Dias */}
           <div style={{
-            background: "rgba(15,23,42,0.6)",
+            background: "rgba(15,23,42,0.65)",
             border: "1px solid rgba(255,255,255,0.08)",
             borderRadius: 14,
             padding: "16px 20px",
           }}>
-            <div style={{ fontSize: "0.8rem", color: "#94a3b8", fontWeight: 600 }}>ACESSOS (30 DIAS)</div>
+            <div style={{ fontSize: "0.78rem", color: "#94a3b8", fontWeight: 700 }}>ACESSOS (30 DIAS)</div>
             <div style={{ fontSize: "1.85rem", fontWeight: 900, color: "#ec4899", marginTop: 4 }}>
-              {fmtNum(totalAcessos30d)}
+              {fmtNum(acessos30dExibicao)}
             </div>
-            <div style={{ fontSize: "0.75rem", color: "#64748b", marginTop: 4 }}>Frequente e recorrente</div>
+            <div style={{ fontSize: "0.72rem", color: "#64748b", marginTop: 4 }}>Engajamento mensal</div>
           </div>
 
-          {/* Card 6 */}
+          {/* Card: Dispositivos */}
           <div style={{
-            background: "rgba(15,23,42,0.6)",
+            background: "rgba(15,23,42,0.65)",
             border: "1px solid rgba(255,255,255,0.08)",
             borderRadius: 14,
             padding: "16px 20px",
           }}>
-            <div style={{ fontSize: "0.8rem", color: "#94a3b8", fontWeight: 600 }}>DISPOSITIVOS</div>
-            <div style={{ fontSize: "1.3rem", fontWeight: 900, color: "#818cf8", marginTop: 8 }}>
-              🤖 76% <span style={{ fontSize: "0.85rem", color: "#94a3b8" }}>/</span> 🍎 24%
+            <div style={{ fontSize: "0.78rem", color: "#94a3b8", fontWeight: 700 }}>DISPOSITIVOS</div>
+            <div style={{ fontSize: "1.3rem", fontWeight: 900, color: "#818cf8", marginTop: 6 }}>
+              🤖 {androidPctExibicao}% <span style={{ fontSize: "0.85rem", color: "#94a3b8" }}>/</span> 🍎 {iosPctExibicao}%
             </div>
-            <div style={{ fontSize: "0.75rem", color: "#64748b", marginTop: 6 }}>Alta retenção no iOS</div>
+            <div style={{ fontSize: "0.72rem", color: "#64748b", marginTop: 6 }}>Android vs iOS</div>
           </div>
         </div>
       </div>
 
-      {/* ── Barra de Filtros & Busca ── */}
-      <div style={{
-        display: "flex",
-        flexWrap: "wrap",
-        justifyContent: "space-between",
-        alignItems: "center",
-        gap: 16,
-        marginBottom: 24,
-      }}>
-        {/* Campo de Busca */}
-        <div style={{ position: "relative", flex: "1 1 320px", maxWidth: 420 }}>
-          <input
-            type="text"
-            placeholder="Buscar escola por nome ou apelido..."
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "12px 16px 12px 42px",
-              background: "rgba(30,41,59,0.7)",
-              border: "1px solid rgba(255,255,255,0.1)",
-              borderRadius: 12,
-              color: "#fff",
-              fontSize: "0.9rem",
-              outline: "none",
-              boxSizing: "border-box",
-            }}
-          />
-          <span style={{ position: "absolute", left: 14, top: 12, color: "#64748b", fontSize: "1rem" }}>🔍</span>
+      {/* ── SEÇÃO 1: Seletor de Escolas (Cards no Corpo com APELIDO + QUANTIDADE) ── */}
+      <div style={{ marginBottom: 32 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+          <div>
+            <h2 style={{ fontSize: "1.15rem", fontWeight: 800, color: "#fff", margin: 0 }}>
+              Unidades Escolares
+            </h2>
+            <p style={{ margin: "2px 0 0", color: "#64748b", fontSize: "0.82rem" }}>
+              Clique no card de uma escola para carregar seus dados detalhados.
+            </p>
+          </div>
+
+          {/* Campo de Busca Rápida */}
+          <div style={{ position: "relative", width: 280 }}>
+            <input
+              type="text"
+              placeholder="Buscar apelido ou escola..."
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "8px 12px 8px 34px",
+                background: "rgba(30,41,59,0.7)",
+                border: "1px solid rgba(255,255,255,0.1)",
+                borderRadius: 10,
+                color: "#fff",
+                fontSize: "0.82rem",
+                outline: "none",
+                boxSizing: "border-box",
+              }}
+            />
+            <span style={{ position: "absolute", left: 10, top: 8, color: "#64748b", fontSize: "0.85rem" }}>🔍</span>
+          </div>
         </div>
 
-        {/* Filtros em Pílulas */}
-        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          <div style={{ display: "flex", background: "rgba(30,41,59,0.7)", borderRadius: 10, padding: 3, border: "1px solid rgba(255,255,255,0.08)" }}>
-            {["TODOS", "CCMDF", "REGULAR"].map((tipo) => (
-              <button
-                key={tipo}
-                onClick={() => setFiltroTipo(tipo)}
+        {/* Grid de Cards Compactos: Apelido + Quantidade de Usuários */}
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))",
+          gap: 14,
+        }}>
+          {escolasFiltradas.map((escola) => {
+            const isSelected = escolaSelecionada?.id === escola.id;
+
+            return (
+              <div
+                key={escola.id}
+                onClick={() => setEscolaSelecionada(escola)}
                 style={{
-                  padding: "6px 14px",
-                  borderRadius: 8,
-                  fontSize: "0.78rem",
-                  fontWeight: 700,
-                  border: "none",
+                  background: isSelected
+                    ? "linear-gradient(145deg, #6b21a8 0%, #4c1d95 100%)"
+                    : "linear-gradient(145deg, #131c2e 0%, #0d1522 100%)",
+                  border: isSelected ? "2px solid #a855f7" : "1px solid rgba(255,255,255,0.08)",
+                  borderRadius: 14,
+                  padding: "16px 18px",
                   cursor: "pointer",
-                  background: filtroTipo === tipo ? "linear-gradient(135deg, #7c3aed, #a855f7)" : "transparent",
-                  color: filtroTipo === tipo ? "#fff" : "#94a3b8",
-                  transition: "all 0.2s",
+                  transition: "all 0.2s cubic-bezier(0.4,0,0.2,1)",
+                  boxShadow: isSelected
+                    ? "0 0 20px rgba(168,85,247,0.35)"
+                    : "0 4px 12px rgba(0,0,0,0.2)",
+                  transform: isSelected ? "scale(1.02)" : "none",
+                }}
+                onMouseEnter={(e) => {
+                  if (!isSelected) {
+                    e.currentTarget.style.borderColor = "rgba(168,85,247,0.4)";
+                    e.currentTarget.style.transform = "translateY(-3px)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isSelected) {
+                    e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)";
+                    e.currentTarget.style.transform = "none";
+                  }
                 }}
               >
-                {tipo}
-              </button>
-            ))}
-          </div>
+                {/* Apelido da Escola em Destaque */}
+                <div style={{
+                  fontSize: "1rem",
+                  fontWeight: 900,
+                  color: isSelected ? "#fff" : "#f1f5f9",
+                  letterSpacing: "-0.2px",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}>
+                  {escola.apelido || escola.nome}
+                </div>
 
-          {/* Ordenação */}
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            style={{
-              padding: "8px 14px",
-              background: "rgba(30,41,59,0.7)",
-              border: "1px solid rgba(255,255,255,0.1)",
-              borderRadius: 10,
-              color: "#e2e8f0",
-              fontSize: "0.82rem",
-              fontWeight: 600,
-              cursor: "pointer",
-              outline: "none",
-            }}
-          >
-            <option value="acessos_30d">Mais Acessos (30D)</option>
-            <option value="alunos">Mais Alunos Ativos</option>
-            <option value="nome">Nome da Escola (A-Z)</option>
-          </select>
+                {/* Quantidade de Usuários abaixo do Apelido */}
+                <div style={{
+                  fontSize: "0.85rem",
+                  fontWeight: 700,
+                  color: isSelected ? "#e9d5ff" : "#c084fc",
+                  marginTop: 6,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}>
+                  <span>🎓</span>
+                  <span>{fmtNum(escola.alunos_app)} alunos ativos</span>
+                </div>
+
+                {/* Indicador de Status/Seleção */}
+                <div style={{
+                  marginTop: 10,
+                  fontSize: "0.68rem",
+                  color: isSelected ? "#f3e8ff" : "#64748b",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}>
+                  <span>{isSelected ? "● SELECIONADA" : "Clique para ver"}</span>
+                  <span style={{ opacity: 0.7 }}>ID #{escola.id}</span>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      {/* ── Grid de Cards por Escola ── */}
-      <div style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))",
-        gap: 22,
-      }}>
-        {escolasFiltradas.map((escola) => {
-          const pctAdesao = Math.round((escola.alunos_app / escola.total_alunos) * 100);
+      {/* ── SEÇÃO 2: Painel Principal com Informações Detalhadas da Escola Selecionada ── */}
+      {isIndividual ? (
+        <div style={{
+          background: "linear-gradient(145deg, #131c2e 0%, #0d1522 100%)",
+          border: "1px solid rgba(168,85,247,0.25)",
+          borderRadius: 20,
+          padding: "28px 32px",
+          boxShadow: "0 15px 35px rgba(0,0,0,0.35)",
+        }}>
+          {/* Header do Detalhamento */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 24 }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+                <span style={{ fontSize: "1.4rem" }}>📊</span>
+                <h2 style={{ fontSize: "1.35rem", fontWeight: 800, color: "#fff", margin: 0 }}>
+                  Telemetria Completa: {escolaAtiva.nome}
+                </h2>
+              </div>
+              <div style={{ fontSize: "0.85rem", color: "#64748b" }}>
+                Apelido: <b style={{ color: "#c084fc" }}>{escolaAtiva.apelido}</b> • {escolaAtiva.cidade}/{escolaAtiva.estado} • Último acesso registrado: <b style={{ color: "#f8fafc" }}>{escolaAtiva.ultimo_acesso}</b>
+              </div>
+            </div>
 
-          return (
-            <div
-              key={escola.id}
-              style={{
-                background: "linear-gradient(145deg, #131c2e 0%, #0d1522 100%)",
-                border: "1px solid rgba(168,85,247,0.22)",
-                borderRadius: 18,
-                padding: "22px 24px",
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "space-between",
-                boxShadow: "0 10px 25px rgba(0,0,0,0.3)",
-                transition: "all 0.25s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = "translateY(-4px)";
-                e.currentTarget.style.borderColor = "rgba(168,85,247,0.5)";
-                e.currentTarget.style.boxShadow = "0 16px 32px rgba(124,58,237,0.22)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "none";
-                e.currentTarget.style.borderColor = "rgba(168,85,247,0.22)";
-                e.currentTarget.style.boxShadow = "0 10px 25px rgba(0,0,0,0.3)";
-              }}
-            >
-              <div>
-                {/* Header do Card */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                    {escola.tipo?.map((t) => (
-                      <span
-                        key={t}
-                        style={{
-                          fontSize: "0.65rem",
-                          fontWeight: 800,
-                          background: t === "CCMDF" ? "rgba(234,179,8,0.15)" : "rgba(168,85,247,0.15)",
-                          color: t === "CCMDF" ? "#eab308" : "#c084fc",
-                          border: `1px solid ${t === "CCMDF" ? "rgba(234,179,8,0.3)" : "rgba(168,85,247,0.3)"}`,
-                          padding: "2px 8px",
-                          borderRadius: 6,
-                        }}
-                      >
-                        {t}
-                      </span>
-                    ))}
-                  </div>
-
-                  <span style={{
-                    fontSize: "0.65rem",
+            <div style={{ display: "flex", gap: 8 }}>
+              {escolaAtiva.tipo?.map((t) => (
+                <span
+                  key={t}
+                  style={{
+                    fontSize: "0.72rem",
                     fontWeight: 800,
-                    color: "#10b981",
-                    background: "rgba(16,185,129,0.12)",
-                    border: "1px solid rgba(16,185,129,0.25)",
-                    padding: "2px 8px",
-                    borderRadius: 6,
-                    textTransform: "uppercase",
-                  }}>
-                    ● {escola.status}
-                  </span>
-                </div>
+                    background: t === "CCMDF" ? "rgba(234,179,8,0.15)" : "rgba(168,85,247,0.15)",
+                    color: t === "CCMDF" ? "#eab308" : "#c084fc",
+                    border: `1px solid ${t === "CCMDF" ? "rgba(234,179,8,0.3)" : "rgba(168,85,247,0.3)"}`,
+                    padding: "4px 10px",
+                    borderRadius: 8,
+                  }}
+                >
+                  {t}
+                </span>
+              ))}
+            </div>
+          </div>
 
-                {/* Título da Escola */}
-                <h3 style={{ fontSize: "1.1rem", fontWeight: 800, color: "#fff", margin: "0 0 4px", lineHeight: 1.3 }}>
-                  {escola.nome}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+            {/* Bloco 1: Funcionalidades Mais Acessadas no App (Ranking de Cards dos Alunos) */}
+            <div style={{
+              background: "rgba(15,23,42,0.6)",
+              border: "1px solid rgba(255,255,255,0.06)",
+              borderRadius: 16,
+              padding: "22px 24px",
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+                <h3 style={{ fontSize: "1rem", fontWeight: 800, color: "#fff", margin: 0 }}>
+                  🔥 Módulos Mais Acessados pelos Estudantes
                 </h3>
-                <div style={{ fontSize: "0.8rem", color: "#64748b", marginBottom: 18 }}>
-                  ID #{escola.id} • {escola.cidade}/{escola.estado}
-                </div>
+                <span style={{ fontSize: "0.75rem", color: "#64748b" }}>Total cliques no período</span>
+              </div>
 
-                {/* Barra de Adoção do App pelos Alunos */}
-                <div style={{ marginBottom: 18, background: "rgba(255,255,255,0.03)", padding: 12, borderRadius: 12 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", marginBottom: 6 }}>
-                    <span style={{ color: "#94a3b8" }}>Adoção do App pelos Alunos:</span>
-                    <span style={{ fontWeight: 800, color: "#c084fc" }}>{pctAdesao}% ({fmtNum(escola.alunos_app)}/{fmtNum(escola.total_alunos)})</span>
-                  </div>
-                  <div style={{ width: "100%", height: 6, background: "rgba(255,255,255,0.08)", borderRadius: 3, overflow: "hidden" }}>
-                    <div style={{
-                      width: `${pctAdesao}%`,
-                      height: "100%",
-                      background: "linear-gradient(90deg, #7c3aed, #a855f7)",
-                      borderRadius: 3,
-                    }} />
-                  </div>
-                </div>
-
-                {/* Métricas de Acessos */}
-                <div style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr 1fr",
-                  gap: 8,
-                  marginBottom: 16,
-                  textAlign: "center",
-                }}>
-                  <div style={{ background: "rgba(15,23,42,0.5)", padding: "10px 6px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.05)" }}>
-                    <div style={{ fontSize: "0.68rem", color: "#94a3b8", fontWeight: 600 }}>HOJE</div>
-                    <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "#f59e0b", marginTop: 2 }}>{fmtNum(escola.acessos_hoje)}</div>
-                  </div>
-                  <div style={{ background: "rgba(15,23,42,0.5)", padding: "10px 6px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.05)" }}>
-                    <div style={{ fontSize: "0.68rem", color: "#94a3b8", fontWeight: 600 }}>7 DIAS</div>
-                    <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "#34d399", marginTop: 2 }}>{fmtNum(escola.acessos_7d)}</div>
-                  </div>
-                  <div style={{ background: "rgba(15,23,42,0.5)", padding: "10px 6px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.05)" }}>
-                    <div style={{ fontSize: "0.68rem", color: "#94a3b8", fontWeight: 600 }}>30 DIAS</div>
-                    <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "#a855f7", marginTop: 2 }}>{fmtNum(escola.acessos_30d)}</div>
-                  </div>
-                </div>
-
-                {/* Top Funcionalidades dos Alunos */}
-                <div style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8", marginBottom: 6 }}>
-                    🔥 Mais Acessados pelos Alunos:
-                  </div>
-                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                    {escola.top_cards?.map((card, cidx) => (
-                      <span
-                        key={cidx}
-                        style={{
-                          fontSize: "0.72rem",
-                          fontWeight: 600,
-                          color: card.color,
-                          background: "rgba(15,23,42,0.7)",
-                          border: `1px solid ${card.color}35`,
-                          padding: "3px 8px",
-                          borderRadius: 8,
-                        }}
-                      >
-                        {card.label} <b style={{ opacity: 0.8 }}>({card.pct}%)</b>
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                {escolaAtiva.top_cards?.map((card, cidx) => (
+                  <div key={cidx}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", marginBottom: 5 }}>
+                      <span style={{ fontWeight: 600, color: "#e2e8f0" }}>{card.label}</span>
+                      <span style={{ fontWeight: 800, color: card.color }}>
+                        {card.pct}% <span style={{ color: "#64748b", fontWeight: 500, fontSize: "0.75rem" }}>({fmtNum(card.cliques)} cliques)</span>
                       </span>
-                    ))}
+                    </div>
+                    <div style={{ width: "100%", height: 8, background: "rgba(255,255,255,0.06)", borderRadius: 4, overflow: "hidden" }}>
+                      <div style={{
+                        width: `${card.pct}%`,
+                        height: "100%",
+                        background: card.color,
+                        borderRadius: 4,
+                      }} />
+                    </div>
                   </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Bloco 2: Histórico de Acessos Recentes & Dispositivos */}
+            <div style={{
+              background: "rgba(15,23,42,0.6)",
+              border: "1px solid rgba(255,255,255,0.06)",
+              borderRadius: 16,
+              padding: "22px 24px",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
+            }}>
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+                  <h3 style={{ fontSize: "1rem", fontWeight: 800, color: "#fff", margin: 0 }}>
+                    📅 Acessos Diários nos Últimos 7 Dias
+                  </h3>
+                  <span style={{ fontSize: "0.75rem", color: "#c084fc", fontWeight: 700 }}>Total: {fmtNum(escolaAtiva.acessos_7d)}</span>
+                </div>
+
+                {/* Mini Gráfico de Barras */}
+                <div style={{
+                  display: "flex",
+                  alignItems: "flex-end",
+                  justifyContent: "space-between",
+                  height: 110,
+                  padding: "0 8px 10px",
+                  borderBottom: "1px solid rgba(255,255,255,0.08)",
+                  gap: 10,
+                }}>
+                  {escolaAtiva.historico_7d?.map((h, hidx) => {
+                    const maxVal = Math.max(...escolaAtiva.historico_7d.map((x) => x.total), 1);
+                    const barHeight = Math.round((h.total / maxVal) * 90);
+
+                    return (
+                      <div key={hidx} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+                        <span style={{ fontSize: "0.68rem", fontWeight: 700, color: "#94a3b8" }}>{h.total}</span>
+                        <div style={{
+                          width: "100%",
+                          maxWidth: 24,
+                          height: `${barHeight}px`,
+                          background: hidx === 6 ? "linear-gradient(180deg, #c084fc, #7c3aed)" : "rgba(168,85,247,0.35)",
+                          borderRadius: "4px 4px 0 0",
+                          transition: "all 0.3s",
+                        }} />
+                        <span style={{ fontSize: "0.7rem", color: "#64748b" }}>{h.dia}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* Rodapé do Card */}
+              {/* Informações Complementares */}
               <div style={{
-                marginTop: 14,
-                paddingTop: 14,
-                borderTop: "1px solid rgba(255,255,255,0.08)",
+                marginTop: 16,
+                padding: 12,
+                borderRadius: 12,
+                background: "rgba(255,255,255,0.03)",
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
               }}>
-                <div style={{ fontSize: "0.72rem", color: "#64748b" }}>
-                  🕒 Último: {escola.ultimo_acesso}
+                <div style={{ fontSize: "0.8rem", color: "#94a3b8" }}>
+                  ⏰ Horário de Maior Uso: <b style={{ color: "#f8fafc" }}>{escolaAtiva.pico_horario}</b>
                 </div>
-
-                <button
-                  style={{
-                    background: "transparent",
-                    border: "none",
-                    color: "#c084fc",
-                    fontSize: "0.8rem",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 4,
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = "#d8b4fe")}
-                  onMouseLeave={(e) => (e.currentTarget.style.color = "#c084fc")}
-                >
-                  Ver Detalhes →
-                </button>
+                <div style={{ fontSize: "0.8rem", color: "#94a3b8" }}>
+                  📱 Sistemas: 🤖 <b>{escolaAtiva.android_pct}% Android</b> · 🍎 <b>{escolaAtiva.ios_pct}% iOS</b>
+                </div>
               </div>
             </div>
-          );
-        })}
-      </div>
+          </div>
+        </div>
+      ) : (
+        <div style={{
+          background: "rgba(15,23,42,0.4)",
+          border: "1px dashed rgba(255,255,255,0.12)",
+          borderRadius: 18,
+          padding: "36px",
+          textAlign: "center",
+          color: "#94a3b8",
+        }}>
+          <div style={{ fontSize: "2rem", marginBottom: 8 }}>👆</div>
+          <div style={{ fontSize: "1.05rem", fontWeight: 700, color: "#e2e8f0" }}>
+            Selecione uma escola acima para ver os acessos detalhados
+          </div>
+          <div style={{ fontSize: "0.85rem", color: "#64748b", marginTop: 4 }}>
+            Você poderá visualizar os módulos mais clicados pelos estudantes (Carteirinha, Boletim, Horários), gráfico de 7 dias e picos de uso.
+          </div>
+        </div>
+      )}
     </div>
   );
 }

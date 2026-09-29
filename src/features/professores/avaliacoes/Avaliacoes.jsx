@@ -520,6 +520,7 @@ export default function Avaliacoes() {
 
     if (rawAllowComma === "" || rawAllowComma === ".") {
       setNotas(prev => { const n = { ...prev }; delete n[key]; return n; });
+      setCoresCelulas(prev => { const c = { ...prev }; delete c[key]; return c; });
       return;
     }
 
@@ -553,6 +554,7 @@ export default function Avaliacoes() {
     if (isNaN(numVal)) {
       // valor inválido → remove
       setNotas(prev => { const n = { ...prev }; delete n[key]; return n; });
+      setCoresCelulas(prev => { const c = { ...prev }; delete c[key]; return c; });
       return;
     }
     if (numVal > maxVal) numVal = maxVal;
@@ -690,7 +692,7 @@ export default function Avaliacoes() {
         cores: coresCelulas,
       });
       if (resp.data?.ok) {
-        showMsg("success", `Diário salvo com sucesso! (${resp.data.total} notas)`);
+        showMsg("success", resp.data?.message || `Diário salvo com sucesso! (${resp.data.total} notas)`);
       } else {
         showMsg("error", resp.data?.error || "Erro ao salvar.");
       }

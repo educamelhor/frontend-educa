@@ -150,10 +150,13 @@ export default function ListaDisciplinas() {
   const matchesDisciplina = (d) => {
     if (!term) return true;
     const nome   = normalize(d.disciplina ?? d.nome ?? '');
+    const abrev  = normalize(d.abreviatura ?? '');
     const etapa  = normalize(d.etapa ?? '');
     const turno  = normalize(d.turno ?? '');
     // Verifica nome direto
     if (nome.includes(term)) return true;
+    // Verifica abreviatura
+    if (abrev.includes(term)) return true;
     // Verifica etapa (valor bruto + aliases)
     if (etapa.includes(term)) return true;
     if (ETAPA_ALIASES[term] && etapa.includes(ETAPA_ALIASES[term])) return true;
@@ -341,7 +344,7 @@ export default function ListaDisciplinas() {
 
             <input
               type="text"
-              placeholder="🔍 Disciplina, Etapa ou Turno..."
+              placeholder="🔍 Disciplina, Abreviatura, Etapa ou Turno..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               className="border rounded p-2 w-80 placeholder-gray-500"
@@ -365,6 +368,7 @@ export default function ListaDisciplinas() {
               <thead className="bg-blue-100">
                 <tr>
                   <th className="p-2 border text-center font-medium text-blue-900">Disciplina</th>
+                  <th className="p-2 border text-center font-medium text-blue-900">Abreviatura</th>
                   <th className="p-2 border text-center font-medium text-blue-900">Etapa</th>
                   <th className="p-2 border text-center font-medium text-blue-900">Turno</th>
                   <th className="p-2 border text-center font-medium text-blue-900">Carga</th>
@@ -376,7 +380,16 @@ export default function ListaDisciplinas() {
                   .filter(matchesDisciplina)
                   .map(d => (
                     <tr key={d.id} className="hover:bg-blue-50">
-                      <td className="p-2 border text-center uppercase">{d.disciplina}</td>
+                      <td className="p-2 border text-center uppercase font-medium">{d.disciplina}</td>
+                      <td className="p-2 border text-center">
+                        {d.abreviatura ? (
+                          <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-300">
+                            {d.abreviatura}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 font-medium">-</span>
+                        )}
+                      </td>
                       <td className="p-2 border text-center">
                         <EtapaBadge etapa={d.etapa} />
                       </td>

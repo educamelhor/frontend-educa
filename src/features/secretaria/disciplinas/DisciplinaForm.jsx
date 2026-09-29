@@ -33,7 +33,7 @@ const TURNO_COLORS = {
 };
 
 export default function DisciplinaForm({ open, onClose, onSubmit, disciplina }) {
-  const [form, setForm] = useState({ nome: '', carga: '', etapa: 'FUNDAMENTAL', turno: 'INTEGRAL' });
+  const [form, setForm] = useState({ nome: '', abreviatura: '', carga: '', etapa: 'FUNDAMENTAL', turno: 'INTEGRAL' });
   const [errors, setErrors] = useState({});
   const [sending, setSending] = useState(false);
 
@@ -43,12 +43,13 @@ export default function DisciplinaForm({ open, onClose, onSubmit, disciplina }) 
       setForm({
         id: disciplina.id ?? null,
         nome: disciplina.nome ?? disciplina.disciplina ?? '',
+        abreviatura: disciplina.abreviatura ?? '',
         carga: disciplina.carga ?? '',
         etapa: disciplina.etapa ?? 'FUNDAMENTAL',
         turno: disciplina.turno ?? 'INTEGRAL',
       });
     } else {
-      setForm({ id: null, nome: '', carga: '', etapa: 'FUNDAMENTAL', turno: 'INTEGRAL' });
+      setForm({ id: null, nome: '', abreviatura: '', carga: '', etapa: 'FUNDAMENTAL', turno: 'INTEGRAL' });
       setErrors({});
     }
   }, [open, disciplina]);
@@ -167,21 +168,44 @@ export default function DisciplinaForm({ open, onClose, onSubmit, disciplina }) 
           {/* ── Corpo ─────────────────────────────────────────────────────── */}
           <div style={{ padding: '22px 28px 8px' }}>
 
-            {/* Campo: Disciplina */}
-            <div style={{ marginBottom: 16 }}>
-              <label style={{ display:'block', marginBottom:6, fontSize:13, fontWeight:600, color:'#374151', textTransform:'uppercase', letterSpacing:'0.5px' }}>
-                Disciplina
-              </label>
-              <input
-                name="nome"
-                value={form.nome}
-                onChange={handleChange}
-                placeholder="Ex: Português"
-                style={fieldStyle(errors.nome)}
-                onFocus={onFocusStyle}
-                onBlur={onBlurStyle(errors.nome)}
-              />
-              {errors.nome && <p style={{ margin:'4px 0 0', fontSize:12, color:'#ef4444' }}>⚠ {errors.nome}</p>}
+            {/* Disciplina + Abreviatura lado a lado */}
+            <div style={{ display:'grid', gridTemplateColumns:'1.8fr 1.2fr', gap:14, marginBottom:16 }}>
+              {/* Campo: Disciplina */}
+              <div>
+                <label style={{ display:'block', marginBottom:6, fontSize:13, fontWeight:600, color:'#374151', textTransform:'uppercase', letterSpacing:'0.5px' }}>
+                  Disciplina
+                </label>
+                <input
+                  name="nome"
+                  value={form.nome}
+                  onChange={handleChange}
+                  placeholder="Ex: Português"
+                  style={fieldStyle(errors.nome)}
+                  onFocus={onFocusStyle}
+                  onBlur={onBlurStyle(errors.nome)}
+                />
+                {errors.nome && <p style={{ margin:'4px 0 0', fontSize:12, color:'#ef4444' }}>⚠ {errors.nome}</p>}
+              </div>
+
+              {/* Campo: Abreviatura */}
+              <div>
+                <label style={{ display:'block', marginBottom:6, fontSize:13, fontWeight:600, color:'#374151', textTransform:'uppercase', letterSpacing:'0.5px' }}>
+                  Abreviatura <span style={{ fontSize:11, color:'#9ca3af', fontWeight:400, textTransform:'none' }}>(opcional)</span>
+                </label>
+                <input
+                  name="abreviatura"
+                  value={form.abreviatura}
+                  onChange={e => {
+                    const val = e.target.value.toUpperCase();
+                    setForm(f => ({ ...f, abreviatura: val }));
+                  }}
+                  placeholder="Ex: PORT"
+                  maxLength={15}
+                  style={fieldStyle(false)}
+                  onFocus={onFocusStyle}
+                  onBlur={onBlurStyle(false)}
+                />
+              </div>
             </div>
 
             {/* Etapa + Turno lado a lado */}
@@ -235,8 +259,16 @@ export default function DisciplinaForm({ open, onClose, onSubmit, disciplina }) 
             </div>
 
             {/* Preview badges */}
-            {(form.etapa || form.turno) && (
+            {(form.etapa || form.turno || form.abreviatura) && (
               <div style={{ display:'flex', flexWrap:'wrap', alignItems:'center', gap:6, marginBottom:14 }}>
+                {form.abreviatura && (
+                  <span style={{
+                    display:'inline-block', padding:'3px 10px', borderRadius:20, fontSize:12, fontWeight:700,
+                    background: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1',
+                  }}>
+                    {form.abreviatura.trim()}
+                  </span>
+                )}
                 {form.etapa && (
                   <span style={{
                     display:'inline-block', padding:'3px 10px', borderRadius:20, fontSize:12, fontWeight:600,

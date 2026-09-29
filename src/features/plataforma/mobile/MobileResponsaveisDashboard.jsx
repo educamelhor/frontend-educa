@@ -517,7 +517,11 @@ export default function MobileResponsaveisDashboard() {
           }}>
             <div style={{ fontSize: "0.78rem", color: "#94a3b8", fontWeight: 700 }}>DISPOSITIVOS</div>
             <div style={{ fontSize: "1.3rem", fontWeight: 900, color: "#60a5fa", marginTop: 6 }}>
-              🤖 {androidPctExibicao}% <span style={{ fontSize: "0.85rem", color: "#94a3b8" }}>/</span> 🍎 {iosPctExibicao}%
+              {androidPctExibicao !== null && iosPctExibicao !== null ? (
+                <>🤖 {androidPctExibicao}% <span style={{ fontSize: "0.85rem", color: "#94a3b8" }}>/</span> 🍎 {iosPctExibicao}%</>
+              ) : (
+                <span style={{ fontSize: "0.95rem", color: "#64748b", fontWeight: 600 }}>Aguardando acessos</span>
+              )}
             </div>
             <div style={{ fontSize: "0.72rem", color: "#64748b", marginTop: 6 }}>Android vs iOS</div>
           </div>
@@ -702,26 +706,44 @@ export default function MobileResponsaveisDashboard() {
                 <span style={{ fontSize: "0.75rem", color: "#64748b" }}>Total cliques no período</span>
               </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                {escolaAtiva.top_cards?.map((card, cidx) => (
-                  <div key={cidx}>
-                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", marginBottom: 5 }}>
-                      <span style={{ fontWeight: 600, color: "#e2e8f0" }}>{card.label}</span>
-                      <span style={{ fontWeight: 800, color: card.color }}>
-                        {card.pct}% <span style={{ color: "#64748b", fontWeight: 500, fontSize: "0.75rem" }}>({fmtNum(card.cliques)} cliques)</span>
-                      </span>
+              {escolaAtiva.top_cards && escolaAtiva.top_cards.length > 0 && escolaAtiva.top_cards.some((c) => c.cliques > 0) ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  {escolaAtiva.top_cards.map((card, cidx) => (
+                    <div key={cidx}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.85rem", marginBottom: 5 }}>
+                        <span style={{ fontWeight: 600, color: "#e2e8f0" }}>{card.label}</span>
+                        <span style={{ fontWeight: 800, color: card.color }}>
+                          {card.pct}% <span style={{ color: "#64748b", fontWeight: 500, fontSize: "0.75rem" }}>({fmtNum(card.cliques)} cliques)</span>
+                        </span>
+                      </div>
+                      <div style={{ width: "100%", height: 8, background: "rgba(255,255,255,0.06)", borderRadius: 4, overflow: "hidden" }}>
+                        <div style={{
+                          width: `${card.pct}%`,
+                          height: "100%",
+                          background: card.color,
+                          borderRadius: 4,
+                        }} />
+                      </div>
                     </div>
-                    <div style={{ width: "100%", height: 8, background: "rgba(255,255,255,0.06)", borderRadius: 4, overflow: "hidden" }}>
-                      <div style={{
-                        width: `${card.pct}%`,
-                        height: "100%",
-                        background: card.color,
-                        borderRadius: 4,
-                      }} />
-                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{
+                  padding: "36px 16px",
+                  textAlign: "center",
+                  background: "rgba(255,255,255,0.02)",
+                  borderRadius: 12,
+                  border: "1px dashed rgba(255,255,255,0.08)",
+                }}>
+                  <div style={{ fontSize: "1.8rem", marginBottom: 8 }}>📲</div>
+                  <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "#cbd5e1" }}>
+                    Aguardando primeiros acessos no app
                   </div>
-                ))}
-              </div>
+                  <div style={{ fontSize: "0.8rem", color: "#64748b", marginTop: 6, lineHeight: 1.4, maxWidth: 360, margin: "6px auto 0" }}>
+                    Nenhum clique registrado nesta unidade ainda. Os módulos mais acessados aparecerão aqui em tempo real assim que os pais utilizarem o aplicativo.
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Bloco 2: Histórico de Acessos Recentes & Dispositivos */}
@@ -785,10 +807,14 @@ export default function MobileResponsaveisDashboard() {
                 alignItems: "center",
               }}>
                 <div style={{ fontSize: "0.8rem", color: "#94a3b8" }}>
-                  ⏰ Horário de Maior Uso: <b style={{ color: "#f8fafc" }}>{escolaAtiva.pico_horario}</b>
+                  ⏰ Horário de Maior Uso: <b style={{ color: "#f8fafc" }}>{escolaAtiva.pico_horario || "Aguardando primeiros acessos"}</b>
                 </div>
                 <div style={{ fontSize: "0.8rem", color: "#94a3b8" }}>
-                  📱 Sistemas: 🤖 <b>{escolaAtiva.android_pct}% Android</b> · 🍎 <b>{escolaAtiva.ios_pct}% iOS</b>
+                  {escolaAtiva.android_pct !== null && escolaAtiva.ios_pct !== null ? (
+                    <>📱 Sistemas: 🤖 <b>{escolaAtiva.android_pct}% Android</b> · 🍎 <b>{escolaAtiva.ios_pct}% iOS</b></>
+                  ) : (
+                    <span>📱 Sistemas: <b style={{ color: "#64748b" }}>Aguardando registros</b></span>
+                  )}
                 </div>
               </div>
             </div>

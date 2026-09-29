@@ -39,6 +39,22 @@ export default function GabaritoResultados() {
   const [gabLoading, setGabLoading] = useState(false);
   const [gabErro, setGabErro] = useState("");
 
+  // ─── Modal: Anular Gabarito (Cola / Fraude) ───
+  const [anularModal, setAnularModal] = useState(null); // resultado selecionado
+  const [anularMotivo, setAnularMotivo] = useState("Cola / Fraude durante a prova");
+  const [anularMotivoCustom, setAnularMotivoCustom] = useState("");
+  const [anularObs, setAnularObs] = useState("");
+  const [anularCriarOcorrencia, setAnularCriarOcorrencia] = useState(true);
+  const [anularSalvando, setAnularSalvando] = useState(false);
+  const [anularErro, setAnularErro] = useState("");
+
+  // ─── Modal: Detalhes da Anulação ───
+  const [detalhesAnulacaoModal, setDetalhesAnulacaoModal] = useState(null);
+
+  // ─── Modal: Confirmar Desfazer Anulação ───
+  const [desfazerModal, setDesfazerModal] = useState(null);
+  const [desfazerSalvando, setDesfazerSalvando] = useState(false);
+
   // ─── Carregar resumo das avaliações ───
   useEffect(() => {
     (async () => {
@@ -70,21 +86,24 @@ export default function GabaritoResultados() {
   // ─── Métricas ───
   const metricas = useMemo(() => {
     if (resultados.length === 0) {
-      return { total: 0, mediaAcertos: 0, mediaNota: 0, melhorNota: 0, piorNota: 0, aprovados: 0, reprovados: 0, pctAproveitamento: 0 };
+      return { total: 0, mediaAcertos: 0, mediaNota: 0, melhorNota: 0, piorNota: 0, aprovados: 0, reprovados: 0, anulados: 0, pctAproveitamento: 0 };
     }
-    const notas = resultados.map(r => Number(r.nota) || 0);
-    const acertos = resultados.map(r => Number(r.acertos) || 0);
+    const regulares = resultados.filter(r => r.status !== 'anulado');
+    const notas = (regulares.length > 0 ? regulares : resultados).map(r => Number(r.nota) || 0);
+    const acertos = (regulares.length > 0 ? regulares : resultados).map(r => Number(r.acertos) || 0);
     const totalQ = Number(resultados[0]?.total_questoes) || 1;
     const aprovados = acertos.filter(a => (a / totalQ) * 100 >= 60).length;
+    const anulados = resultados.filter(r => r.status === 'anulado').length;
     return {
       total: resultados.length,
-      mediaAcertos: (acertos.reduce((a, b) => a + b, 0) / acertos.length).toFixed(1),
-      mediaNota: (notas.reduce((a, b) => a + b, 0) / notas.length).toFixed(1),
-      melhorNota: Math.max(...notas).toFixed(1),
-      piorNota: Math.min(...notas).toFixed(1),
+      anulados,
+      mediaAcertos: acertos.length > 0 ? (acertos.reduce((a, b) => a + b, 0) / acertos.length).toFixed(1) : "0.0",
+      mediaNota: notas.length > 0 ? (notas.reduce((a, b) => a + b, 0) / notas.length).toFixed(1) : "0.0",
+      melhorNota: notas.length > 0 ? Math.max(...notas).toFixed(1) : "0.0",
+      piorNota: notas.length > 0 ? Math.min(...notas).toFixed(1) : "0.0",
       aprovados,
-      reprovados: resultados.length - aprovados,
-      pctAproveitamento: ((aprovados / resultados.length) * 100).toFixed(0),
+      reprovados: (regulares.length > 0 ? regulares.length : resultados.length) - aprovados,
+      pctAproveitamento: regulares.length > 0 ? ((aprovados / regulares.length) * 100).toFixed(0) : "0",
     };
   }, [resultados]);
 
@@ -194,6 +213,77 @@ export default function GabaritoResultados() {
   function fecharGabModal() {
     if (gabImgUrl) URL.revokeObjectURL(gabImgUrl);
     setGabModal(null); setGabImgUrl(null); setGabErro("");
+  }
+
+  // ─── Modal de Anulação (Cola) ───
+  function abrirAnularModal(r) {
+    setAnularModal(r);
+    setAnularMotivo("Cola / Fraude durante a prova");
+    setAnularMotivoCustom("");
+    setAnularObs("");
+    setAnularCriarOcorrencia(true);
+    setAnularErro("");
+  }
+
+  async function confirmarAnulacao() {
+    if (!anularModal) return;
+    const motivoFinal = anularMotivo === "Outro motivo" ? (anularMotivoCustom.trim() || "Infração durante avaliação") : anularMotivo;
+    setAnularSalvando(true);
+    setAnularErro("");
+    try {
+      const resp = await api.patch(`/api/gabaritos/respostas/${anularModal.id}/anular`, {
+        motivo: motivoFinal,
+        observacao: anularObs,
+        criar_ocorrencia: anularCriarOcorrencia,
+      });
+      if (resp.data.ok) {
+        setResultados(prev => prev.map(r =>
+          r.id === anularModal.id ? {
+            ...r,
+            status: "anulado",
+            nota: 0.00,
+            acertos: 0,
+            motivo_anulacao: motivoFinal,
+            anulado_em: new Date().toISOString(),
+            anulado_observacao: anularObs,
+            nota_original: resp.data.nota_original,
+            acertos_original: resp.data.acertos_original,
+          } : r
+        ));
+        setAnularModal(null);
+      }
+    } catch (err) {
+      setAnularErro(err.response?.data?.error || "Erro ao anular gabarito.");
+    }
+    setAnularSalvando(false);
+  }
+
+  async function confirmarDesfazerAnulacao(r) {
+    if (!r) return;
+    setDesfazerSalvando(true);
+    try {
+      const resp = await api.patch(`/api/gabaritos/respostas/${r.id}/desfazer-anulacao`);
+      if (resp.data.ok) {
+        setResultados(prev => prev.map(item =>
+          item.id === r.id ? {
+            ...item,
+            status: "regular",
+            nota: resp.data.nota,
+            acertos: resp.data.acertos,
+            motivo_anulacao: null,
+            anulado_em: null,
+            anulado_observacao: null,
+            nota_original: null,
+            acertos_original: null,
+          } : item
+        ));
+        setDesfazerModal(null);
+        setDetalhesAnulacaoModal(null);
+      }
+    } catch (err) {
+      alert(err.response?.data?.error || "Erro ao reverter anulação.");
+    }
+    setDesfazerSalvando(false);
   }
 
   // ─── Cor dinâmica ───
@@ -411,6 +501,15 @@ export default function GabaritoResultados() {
                   </div>
                   <div className="gab-stat-sub">{metricas.aprovados} aprovados · {metricas.reprovados} em recuperação</div>
                 </div>
+                {metricas.anulados > 0 && (
+                  <div className="gab-stat-card red gab-kpi-animate" style={{ animationDelay: "0.4s", border: "1px solid rgba(239,68,68,0.35)", background: "rgba(239,68,68,0.06)" }}>
+                    <div className="gab-stat-label" style={{ color: "#f87171" }}>Anulados (Cola)</div>
+                    <div className="gab-stat-value" style={{ color: "#ef4444" }}>
+                      {metricas.anulados}
+                    </div>
+                    <div className="gab-stat-sub" style={{ color: "rgba(248,113,113,0.8)" }}>nota zerada por infração</div>
+                  </div>
+                )}
               </div>
 
               {/* ─── Gráfico: Acertos por Questão ─── */}
@@ -544,43 +643,121 @@ export default function GabaritoResultados() {
                     </thead>
                     <tbody>
                       {resultadosFiltrados.map((r, idx) => {
+                        const isAnulado = r.status === "anulado";
                         const pctAcerto = Number(r.total_questoes) > 0 ? (Number(r.acertos) / Number(r.total_questoes)) * 100 : 0;
                         return (
-                          <tr key={r.id || idx}>
-                            <td style={{ textAlign: "center", color: "var(--gab-text-muted)", fontSize: "0.75rem" }}>{idx + 1}</td>
+                          <tr key={r.id || idx} style={isAnulado ? { background: "rgba(239,68,68,0.04)" } : undefined}>
+                            <td style={{ textAlign: "center", color: isAnulado ? "#f87171" : "var(--gab-text-muted)", fontSize: "0.75rem", fontWeight: isAnulado ? 700 : 400 }}>{idx + 1}</td>
                             <td style={{ textAlign: "left", fontFamily: "var(--gab-font-display)", fontSize: "0.8rem" }}>{r.codigo_aluno}</td>
                             <td style={{ textAlign: "left", fontWeight: 600 }}>
                               {r.nome_aluno || "—"}
+                              {isAnulado ? (
+                                <span style={{ marginLeft: 6, fontSize: "0.62rem", padding: "1px 6px", borderRadius: 4, background: "rgba(239,68,68,0.18)", color: "#f87171", border: "1px solid rgba(239,68,68,0.3)", fontWeight: 800 }}>
+                                  🚫 ANULADO
+                                </span>
+                              ) : null}
                               {r.nota_manual ? <span style={{ marginLeft: 5, fontSize: "0.6rem", padding: "1px 5px", borderRadius: 4, background: "rgba(139,92,246,0.15)", color: "#a78bfa", border: "1px solid rgba(139,92,246,0.2)", fontWeight: 700 }}>MANUAL</span> : null}
                             </td>
                             <td>{r.turma_nome || "—"}</td>
-                            <td><span className="gab-font-mono">{r.acertos}/{r.total_questoes}</span></td>
                             <td>
-                              <span className={`gab-nota-badge ${getColorClass(pctAcerto)}`} style={{ padding: "4px 10px", fontSize: "0.85rem" }}>
-                                {Number(r.nota || 0).toFixed(1)}
-                              </span>
+                              {isAnulado ? (
+                                <div>
+                                  <span className="gab-font-mono" style={{ textDecoration: "line-through", color: "rgba(148,163,184,0.6)", fontSize: "0.75rem" }}>
+                                    {r.acertos_original != null ? r.acertos_original : r.acertos}/{r.total_questoes}
+                                  </span>
+                                  <div style={{ fontSize: "0.68rem", color: "#f87171", fontWeight: 700 }}>0 acertos</div>
+                                </div>
+                              ) : (
+                                <span className="gab-font-mono">{r.acertos}/{r.total_questoes}</span>
+                              )}
                             </td>
                             <td>
-                              {pctAcerto >= 60
-                                ? <span className="gab-text-green" style={{ fontWeight: 600, fontSize: "0.8rem" }}>✓ Aprovado</span>
-                                : <span className="gab-text-red" style={{ fontWeight: 600, fontSize: "0.8rem" }}>Recuperação</span>
-                              }
+                              {isAnulado ? (
+                                <div>
+                                  <span className="gab-nota-badge baixa" style={{ padding: "4px 10px", fontSize: "0.85rem", background: "rgba(239,68,68,0.2)", color: "#f87171", border: "1px solid rgba(239,68,68,0.4)" }} title={r.nota_original != null ? `Nota original antes da anulação: ${Number(r.nota_original).toFixed(1)}` : "Anulado"}>
+                                    0.0
+                                  </span>
+                                  {r.nota_original != null && (
+                                    <div style={{ fontSize: "0.65rem", color: "rgba(148,163,184,0.7)", marginTop: 2 }}>
+                                      Orig: <span style={{ textDecoration: "line-through" }}>{Number(r.nota_original).toFixed(1)}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className={`gab-nota-badge ${getColorClass(pctAcerto)}`} style={{ padding: "4px 10px", fontSize: "0.85rem" }}>
+                                  {Number(r.nota || 0).toFixed(1)}
+                                </span>
+                              )}
+                            </td>
+                            <td>
+                              {isAnulado ? (
+                                <span
+                                  style={{ color: "#f87171", fontWeight: 700, fontSize: "0.75rem", display: "inline-flex", alignItems: "center", gap: 3, cursor: "pointer" }}
+                                  title={`Motivo: ${r.motivo_anulacao || "Cola / Fraude"}\nClique para ver detalhes`}
+                                  onClick={() => setDetalhesAnulacaoModal(r)}
+                                >
+                                  🚫 {r.motivo_anulacao ? (r.motivo_anulacao.length > 18 ? r.motivo_anulacao.slice(0, 16) + '...' : r.motivo_anulacao) : "Anulado (Cola)"}
+                                </span>
+                              ) : pctAcerto >= 60 ? (
+                                <span className="gab-text-green" style={{ fontWeight: 600, fontSize: "0.8rem" }}>✓ Aprovado</span>
+                              ) : (
+                                <span className="gab-text-red" style={{ fontWeight: 600, fontSize: "0.8rem" }}>Recuperação</span>
+                              )}
                             </td>
                             {isGestao && (
                               <td style={{ textAlign: "center" }}>
                                 <div style={{ display: "flex", gap: 6, justifyContent: "center" }}>
-                                  {/* Editar nota */}
-                                  <button
-                                    title="Editar nota"
-                                    onClick={() => abrirEditModal(r)}
-                                    style={{ width: 30, height: 30, borderRadius: 7, border: "none", cursor: "pointer", background: "rgba(139,92,246,0.12)", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.18s" }}
-                                    onMouseEnter={e => e.currentTarget.style.background = "rgba(139,92,246,0.28)"}
-                                    onMouseLeave={e => e.currentTarget.style.background = "rgba(139,92,246,0.12)"}
-                                  >
-                                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#a78bfa" strokeWidth={2}>
-                                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
-                                    </svg>
-                                  </button>
+                                  {isAnulado ? (
+                                    <>
+                                      {/* Ver detalhes anulação */}
+                                      <button
+                                        title="Ver detalhes da anulação"
+                                        onClick={() => setDetalhesAnulacaoModal(r)}
+                                        style={{ width: 30, height: 30, borderRadius: 7, border: "none", cursor: "pointer", background: "rgba(239,68,68,0.12)", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.18s" }}
+                                        onMouseEnter={e => e.currentTarget.style.background = "rgba(239,68,68,0.25)"}
+                                        onMouseLeave={e => e.currentTarget.style.background = "rgba(239,68,68,0.12)"}
+                                      >
+                                        <span style={{ fontSize: "0.85rem" }}>ℹ️</span>
+                                      </button>
+                                      {/* Desfazer anulação */}
+                                      <button
+                                        title="Reverter anulação (restaurar nota)"
+                                        onClick={() => setDesfazerModal(r)}
+                                        style={{ width: 30, height: 30, borderRadius: 7, border: "none", cursor: "pointer", background: "rgba(16,185,129,0.12)", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.18s" }}
+                                        onMouseEnter={e => e.currentTarget.style.background = "rgba(16,185,129,0.25)"}
+                                        onMouseLeave={e => e.currentTarget.style.background = "rgba(16,185,129,0.12)"}
+                                      >
+                                        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#10b981" strokeWidth={2.2}>
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                                        </svg>
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      {/* Editar nota */}
+                                      <button
+                                        title="Editar nota"
+                                        onClick={() => abrirEditModal(r)}
+                                        style={{ width: 30, height: 30, borderRadius: 7, border: "none", cursor: "pointer", background: "rgba(139,92,246,0.12)", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.18s" }}
+                                        onMouseEnter={e => e.currentTarget.style.background = "rgba(139,92,246,0.28)"}
+                                        onMouseLeave={e => e.currentTarget.style.background = "rgba(139,92,246,0.12)"}
+                                      >
+                                        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#a78bfa" strokeWidth={2}>
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+                                        </svg>
+                                      </button>
+                                      {/* Anular Gabarito (Cola / Infração) */}
+                                      <button
+                                        title="Anular Gabarito (Pegou colando / Fraude)"
+                                        onClick={() => abrirAnularModal(r)}
+                                        style={{ width: 30, height: 30, borderRadius: 7, border: "none", cursor: "pointer", background: "rgba(239,68,68,0.1)", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.18s" }}
+                                        onMouseEnter={e => e.currentTarget.style.background = "rgba(239,68,68,0.25)"}
+                                        onMouseLeave={e => e.currentTarget.style.background = "rgba(239,68,68,0.1)"}
+                                      >
+                                        <span style={{ fontSize: "0.85rem" }}>🚫</span>
+                                      </button>
+                                    </>
+                                  )}
                                   {/* Ver gabarito */}
                                   <button
                                     title="Ver gabarito escaneado"
@@ -699,6 +876,259 @@ export default function GabaritoResultados() {
               {gabImgUrl && !gabLoading && (
                 <img src={gabImgUrl} alt="Gabarito escaneado" style={{ maxWidth: "100%", borderRadius: 10, boxShadow: "0 4px 24px rgba(0,0,0,0.4)" }} draggable={false} />
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════ */}
+      {/* MODAL: ANULAR GABARITO (COLA / FRAUDE)            */}
+      {/* ═══════════════════════════════════════════════════ */}
+      {anularModal && (
+        <div onClick={() => setAnularModal(null)} style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(10px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 500, borderRadius: 18, background: "linear-gradient(145deg,#1c1524,#130e1c)", border: "1px solid rgba(239,68,68,0.35)", boxShadow: "0 32px 80px rgba(0,0,0,0.7), 0 0 60px rgba(239,68,68,0.12)", overflow: "hidden" }}>
+            {/* Header */}
+            <div style={{ padding: "18px 22px", background: "linear-gradient(135deg,rgba(239,68,68,0.12),rgba(239,68,68,0.03))", borderBottom: "1px solid rgba(255,255,255,0.06)", display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.2rem" }}>🚫</div>
+              <div>
+                <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "#f87171" }}>Anular Gabarito (Cola / Infração)</div>
+                <div style={{ fontSize: "0.72rem", color: "rgba(148,163,184,0.8)", marginTop: 1 }}>
+                  {anularModal.nome_aluno} {anularModal.codigo_aluno ? `(RE: ${anularModal.codigo_aluno})` : ""} · {anularModal.turma_nome || ""}
+                </div>
+              </div>
+              <button onClick={() => setAnularModal(null)} style={{ marginLeft: "auto", width: 32, height: 32, borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "rgba(148,163,184,0.8)", fontSize: "1rem", cursor: "pointer" }}>✕</button>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: "20px 22px", display: "flex", flexDirection: "column", gap: 16 }}>
+              {/* Alerta de consequência */}
+              <div style={{ padding: "12px 14px", borderRadius: 10, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", display: "flex", gap: 10 }}>
+                <span style={{ fontSize: "1.1rem" }}>⚠️</span>
+                <div style={{ fontSize: "0.75rem", color: "rgba(248,113,113,0.9)", lineHeight: 1.45 }}>
+                  A nota deste aluno será alterada para <strong>0.00</strong> e o gabarito marcado como <strong>ANULADO</strong>.
+                  A nota original (<strong>{Number(anularModal.nota || 0).toFixed(1)}</strong>) será preservada no histórico e poderá ser restaurada a qualquer momento.
+                </div>
+              </div>
+
+              {/* Motivo da anulação */}
+              <div>
+                <div style={{ fontSize: "0.75rem", color: "rgba(148,163,184,0.9)", marginBottom: 8, fontWeight: 700 }}>
+                  MOTIVO DA ANULAÇÃO
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {[
+                    "Cola / Fraude durante a prova",
+                    "Uso / Porte de celular ou aparelho eletrônico",
+                    "Comunicação indevida entre alunos",
+                    "Recusa de entrega ou rasura proposital",
+                    "Outro motivo",
+                  ].map((m) => (
+                    <label
+                      key={m}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderRadius: 8,
+                        background: anularMotivo === m ? "rgba(239,68,68,0.12)" : "rgba(255,255,255,0.03)",
+                        border: `1px solid ${anularMotivo === m ? "rgba(239,68,68,0.35)" : "rgba(255,255,255,0.06)"}`,
+                        cursor: "pointer", transition: "all 0.15s", fontSize: "0.8rem", color: anularMotivo === m ? "#fca5a5" : "#cbd5e1",
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="motivo_anulacao"
+                        checked={anularMotivo === m}
+                        onChange={() => setAnularMotivo(m)}
+                        style={{ accentColor: "#ef4444" }}
+                      />
+                      {m}
+                    </label>
+                  ))}
+                </div>
+
+                {anularMotivo === "Outro motivo" && (
+                  <input
+                    type="text"
+                    placeholder="Descreva o motivo da anulação..."
+                    value={anularMotivoCustom}
+                    onChange={e => setAnularMotivoCustom(e.target.value)}
+                    style={{ marginTop: 8, width: "100%", padding: "9px 12px", borderRadius: 8, border: "1px solid rgba(239,68,68,0.3)", background: "rgba(239,68,68,0.05)", color: "#e2e8f0", fontSize: "0.82rem", outline: "none", boxSizing: "border-box" }}
+                  />
+                )}
+              </div>
+
+              {/* Observações adicionais */}
+              <div>
+                <div style={{ fontSize: "0.75rem", color: "rgba(148,163,184,0.9)", marginBottom: 6, fontWeight: 700 }}>
+                  DETALHES / OBSERVAÇÕES (OPCIONAL)
+                </div>
+                <textarea
+                  rows={2}
+                  placeholder="Ex: Aluno flagrado com anotações na borracha durante a aplicação da prova..."
+                  value={anularObs}
+                  onChange={e => setAnularObs(e.target.value)}
+                  style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)", color: "#e2e8f0", fontSize: "0.8rem", resize: "vertical", outline: "none", boxSizing: "border-box" }}
+                />
+              </div>
+
+              {/* Checkbox para criar ocorrência disciplinar */}
+              <label style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 8, background: "rgba(139,92,246,0.06)", border: "1px solid rgba(139,92,246,0.2)", cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={anularCriarOcorrencia}
+                  onChange={e => setAnularCriarOcorrencia(e.target.checked)}
+                  style={{ accentColor: "#8b5cf6", width: 16, height: 16 }}
+                />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "#c4b5fd" }}>Registrar ocorrência disciplinar</div>
+                  <div style={{ fontSize: "0.68rem", color: "rgba(148,163,184,0.7)" }}>Cria automaticamente um registro de indisciplina na ficha escolar do aluno</div>
+                </div>
+              </label>
+
+              {anularErro && (
+                <div style={{ padding: "8px 12px", borderRadius: 8, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)", color: "#f87171", fontSize: "0.8rem" }}>
+                  {anularErro}
+                </div>
+              )}
+
+              {/* Botões */}
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
+                <button
+                  onClick={() => setAnularModal(null)}
+                  style={{ padding: "9px 18px", borderRadius: 9, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.04)", color: "rgba(148,163,184,0.8)", cursor: "pointer", fontSize: "0.82rem" }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmarAnulacao}
+                  disabled={anularSalvando}
+                  style={{
+                    padding: "9px 22px", borderRadius: 9, border: "none",
+                    background: anularSalvando ? "rgba(239,68,68,0.4)" : "linear-gradient(135deg,#ef4444,#dc2626)",
+                    color: "#fff", fontWeight: 700, cursor: anularSalvando ? "not-allowed" : "pointer", fontSize: "0.85rem",
+                    boxShadow: "0 4px 14px rgba(239,68,68,0.3)",
+                  }}
+                >
+                  {anularSalvando ? "Anulando..." : "🚫 Confirmar Anulação"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════ */}
+      {/* MODAL: DETALHES DA ANULAÇÃO                       */}
+      {/* ═══════════════════════════════════════════════════ */}
+      {detalhesAnulacaoModal && (
+        <div onClick={() => setDetalhesAnulacaoModal(null)} style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(10px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 460, borderRadius: 18, background: "linear-gradient(145deg,#1c1524,#130e1c)", border: "1px solid rgba(239,68,68,0.35)", boxShadow: "0 32px 80px rgba(0,0,0,0.7)", overflow: "hidden" }}>
+            <div style={{ padding: "18px 22px", background: "linear-gradient(135deg,rgba(239,68,68,0.12),rgba(239,68,68,0.03))", borderBottom: "1px solid rgba(255,255,255,0.06)", display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.1rem" }}>ℹ️</div>
+              <div>
+                <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "#f87171" }}>Detalhes da Anulação</div>
+                <div style={{ fontSize: "0.72rem", color: "rgba(148,163,184,0.8)", marginTop: 1 }}>{detalhesAnulacaoModal.nome_aluno}</div>
+              </div>
+              <button onClick={() => setDetalhesAnulacaoModal(null)} style={{ marginLeft: "auto", width: 32, height: 32, borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "rgba(148,163,184,0.8)", fontSize: "1rem", cursor: "pointer" }}>✕</button>
+            </div>
+            <div style={{ padding: "20px 22px", display: "flex", flexDirection: "column", gap: 14 }}>
+              <div style={{ padding: "12px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                <div style={{ fontSize: "0.7rem", color: "rgba(148,163,184,0.7)", textTransform: "uppercase", fontWeight: 700 }}>Motivo</div>
+                <div style={{ fontSize: "0.9rem", color: "#fca5a5", fontWeight: 700, marginTop: 3 }}>
+                  {detalhesAnulacaoModal.motivo_anulacao || "Cola / Fraude durante a prova"}
+                </div>
+              </div>
+
+              {detalhesAnulacaoModal.anulado_observacao && (
+                <div style={{ padding: "12px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                  <div style={{ fontSize: "0.7rem", color: "rgba(148,163,184,0.7)", textTransform: "uppercase", fontWeight: 700 }}>Observações</div>
+                  <div style={{ fontSize: "0.82rem", color: "#cbd5e1", marginTop: 3, whiteSpace: "pre-wrap" }}>
+                    {detalhesAnulacaoModal.anulado_observacao}
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                <div style={{ padding: "12px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                  <div style={{ fontSize: "0.68rem", color: "rgba(148,163,184,0.7)", textTransform: "uppercase", fontWeight: 700 }}>Registrado por</div>
+                  <div style={{ fontSize: "0.82rem", color: "#e2e8f0", fontWeight: 600, marginTop: 3 }}>
+                    {detalhesAnulacaoModal.anulado_por_nome || "Coordenação"}
+                  </div>
+                </div>
+                <div style={{ padding: "12px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                  <div style={{ fontSize: "0.68rem", color: "rgba(148,163,184,0.7)", textTransform: "uppercase", fontWeight: 700 }}>Nota Original</div>
+                  <div style={{ fontSize: "0.95rem", color: "#34d399", fontWeight: 800, marginTop: 3 }}>
+                    {detalhesAnulacaoModal.nota_original != null ? Number(detalhesAnulacaoModal.nota_original).toFixed(1) : "—"}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 8 }}>
+                <button
+                  onClick={() => setDetalhesAnulacaoModal(null)}
+                  style={{ padding: "9px 18px", borderRadius: 9, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.04)", color: "rgba(148,163,184,0.8)", cursor: "pointer", fontSize: "0.82rem" }}
+                >
+                  Fechar
+                </button>
+                {isGestao && (
+                  <button
+                    onClick={() => {
+                      const al = detalhesAnulacaoModal;
+                      setDetalhesAnulacaoModal(null);
+                      setDesfazerModal(al);
+                    }}
+                    style={{ padding: "9px 20px", borderRadius: 9, border: "none", background: "linear-gradient(135deg,#10b981,#059669)", color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: "0.85rem", display: "flex", alignItems: "center", gap: 6 }}
+                  >
+                    🔄 Reverter Anulação
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════ */}
+      {/* MODAL: CONFIRMAR DESFAZER ANULAÇÃO                */}
+      {/* ═══════════════════════════════════════════════════ */}
+      {desfazerModal && (
+        <div onClick={() => setDesfazerModal(null)} style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(10px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 440, borderRadius: 18, background: "linear-gradient(145deg,#15201d,#0e1614)", border: "1px solid rgba(16,185,129,0.35)", boxShadow: "0 32px 80px rgba(0,0,0,0.7), 0 0 60px rgba(16,185,129,0.1)", overflow: "hidden" }}>
+            <div style={{ padding: "18px 22px", background: "linear-gradient(135deg,rgba(16,185,129,0.12),rgba(16,185,129,0.03))", borderBottom: "1px solid rgba(255,255,255,0.06)", display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(16,185,129,0.15)", border: "1px solid rgba(16,185,129,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.1rem" }}>🔄</div>
+              <div>
+                <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "#34d399" }}>Reverter Anulação</div>
+                <div style={{ fontSize: "0.72rem", color: "rgba(148,163,184,0.8)", marginTop: 1 }}>{desfazerModal.nome_aluno}</div>
+              </div>
+              <button onClick={() => setDesfazerModal(null)} style={{ marginLeft: "auto", width: 32, height: 32, borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "rgba(148,163,184,0.8)", fontSize: "1rem", cursor: "pointer" }}>✕</button>
+            </div>
+            <div style={{ padding: "20px 22px", display: "flex", flexDirection: "column", gap: 14 }}>
+              <div style={{ fontSize: "0.85rem", color: "#e2e8f0", lineHeight: 1.5 }}>
+                Deseja restaurar a nota deste aluno para o valor original?
+              </div>
+              <div style={{ padding: "12px 14px", borderRadius: 10, background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.25)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <span style={{ fontSize: "0.8rem", color: "rgba(148,163,184,0.9)" }}>Nota a ser restaurada:</span>
+                <span style={{ fontSize: "1.2rem", fontWeight: 800, color: "#34d399" }}>
+                  {desfazerModal.nota_original != null ? Number(desfazerModal.nota_original).toFixed(1) : "0.0"} pts
+                </span>
+              </div>
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
+                <button
+                  onClick={() => setDesfazerModal(null)}
+                  style={{ padding: "9px 18px", borderRadius: 9, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.04)", color: "rgba(148,163,184,0.8)", cursor: "pointer", fontSize: "0.82rem" }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => confirmarDesfazerAnulacao(desfazerModal)}
+                  disabled={desfazerSalvando}
+                  style={{
+                    padding: "9px 22px", borderRadius: 9, border: "none",
+                    background: desfazerSalvando ? "rgba(16,185,129,0.3)" : "linear-gradient(135deg,#10b981,#059669)",
+                    color: "#fff", fontWeight: 700, cursor: desfazerSalvando ? "not-allowed" : "pointer", fontSize: "0.85rem",
+                  }}
+                >
+                  {desfazerSalvando ? "Restaurando..." : "✓ Confirmar e Restaurar"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

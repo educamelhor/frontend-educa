@@ -243,11 +243,109 @@ export default function GabaritoCorrigirProfessor() {
   // avaliacao_id -> { liberado_correcao, turma_nome }
   const [lotesLiberados, setLotesLiberados] = useState({});
 
+  // ─── Modal: Anular Gabarito (Cola / Infração) ───
+  const [anularModalProf, setAnularModalProf] = useState(null);
+  const [anularMotivoProf, setAnularMotivoProf] = useState("Cola / Fraude durante a prova");
+  const [anularMotivoCustomProf, setAnularMotivoCustomProf] = useState("");
+  const [anularObsProf, setAnularObsProf] = useState("");
+  const [anularCriarOcorrenciaProf, setAnularCriarOcorrenciaProf] = useState(true);
+  const [anularSalvandoProf, setAnularSalvandoProf] = useState(false);
+
+  // ─── Modal: Desfazer Anulação ───
+  const [desfazerModalProf, setDesfazerModalProf] = useState(null);
+  const [desfazerSalvandoProf, setDesfazerSalvandoProf] = useState(false);
+
   // ─── Toast ───
   const [toast, setToast] = useState(null);
   function showToast(msg, type = "success") {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3500);
+  }
+
+  function abrirAnularModalProf(arq) {
+    setAnularModalProf(arq);
+    setAnularMotivoProf("Cola / Fraude durante a prova");
+    setAnularMotivoCustomProf("");
+    setAnularObsProf("");
+    setAnularCriarOcorrenciaProf(true);
+  }
+
+  async function confirmarAnulacaoProf() {
+    if (!anularModalProf) return;
+    const motivoFinal = anularMotivoProf === "Outro motivo" ? (anularMotivoCustomProf.trim() || "Infração durante avaliação") : anularMotivoProf;
+    setAnularSalvandoProf(true);
+    try {
+      const resp = await api.patch(`/api/gabarito-lotes/arquivos/${anularModalProf.id}/anular`, {
+        motivo: motivoFinal,
+        observacao: anularObsProf,
+        criar_ocorrencia: anularCriarOcorrenciaProf,
+      });
+      if (resp.data.ok) {
+        showToast("Gabarito anulado por infração.", "success");
+        setAlunos(prev => prev.map(a =>
+          a.id === anularModalProf.id ? {
+            ...a,
+            status: "anulado",
+            nota: 0.00,
+            motivo_anulacao: motivoFinal,
+            anulado_em: new Date().toISOString(),
+            anulado_observacao: anularObsProf,
+          } : a
+        ));
+        if (arquivoSelecionado?.id === anularModalProf.id) {
+          setArquivoSelecionado(prev => ({
+            ...prev,
+            status: "anulado",
+            nota: 0.00,
+            motivo_anulacao: motivoFinal,
+            anulado_em: new Date().toISOString(),
+            anulado_observacao: anularObsProf,
+          }));
+        }
+        setAnularModalProf(null);
+      }
+    } catch (err) {
+      console.error("Erro ao anular gabarito:", err);
+      showToast(err.response?.data?.error || "Erro ao anular gabarito.", "error");
+    }
+    setAnularSalvandoProf(false);
+  }
+
+  async function confirmarDesfazerProf() {
+    if (!desfazerModalProf) return;
+    setDesfazerSalvandoProf(true);
+    try {
+      const resp = await api.patch(`/api/gabarito-lotes/arquivos/${desfazerModalProf.id}/anular`, {
+        desfazer: true,
+      });
+      if (resp.data.ok) {
+        showToast("Anulação revertida com sucesso.", "success");
+        const novoStatus = resp.data.status || "corrigido";
+        setAlunos(prev => prev.map(a =>
+          a.id === desfazerModalProf.id ? {
+            ...a,
+            status: novoStatus,
+            motivo_anulacao: null,
+            anulado_em: null,
+            anulado_observacao: null,
+          } : a
+        ));
+        if (arquivoSelecionado?.id === desfazerModalProf.id) {
+          setArquivoSelecionado(prev => ({
+            ...prev,
+            status: novoStatus,
+            motivo_anulacao: null,
+            anulado_em: null,
+            anulado_observacao: null,
+          }));
+        }
+        setDesfazerModalProf(null);
+      }
+    } catch (err) {
+      console.error("Erro ao reverter anulação:", err);
+      showToast(err.response?.data?.error || "Erro ao reverter anulação.", "error");
+    }
+    setDesfazerSalvandoProf(false);
   }
 
   // ─── Abrir modal de ajuste manual ───
@@ -867,6 +965,7 @@ export default function GabaritoCorrigirProfessor() {
                         <div style={{ padding: "8px 10px", maxHeight: 420, overflowY: "auto" }}>
                           {alunos.map((arq, idx) => {
                             const isCorrigido = arq.status === "corrigido";
+                            const isAnulado = arq.status === "anulado";
                             const isAtivo = arquivoSelecionado?.id === arq.id;
 
                             return (
@@ -877,19 +976,23 @@ export default function GabaritoCorrigirProfessor() {
                                   padding: "10px 14px", borderRadius: 10, marginBottom: 2,
                                   background: isAtivo
                                     ? "rgba(6,182,212,0.08)"
+                                    : isAnulado
+                                    ? "rgba(239,68,68,0.04)"
                                     : isCorrigido ? "rgba(16,185,129,0.03)" : "transparent",
-                                  border: `1px solid ${isAtivo ? "rgba(6,182,212,0.3)" : "rgba(255,255,255,0.03)"}`,
+                                  border: `1px solid ${isAtivo ? "rgba(6,182,212,0.3)" : isAnulado ? "rgba(239,68,68,0.2)" : "rgba(255,255,255,0.03)"}`,
                                   transition: "all 0.15s",
                                 }}
                               >
                                 {/* Número */}
                                 <div style={{
                                   width: 30, height: 30, borderRadius: 8, flexShrink: 0,
-                                  background: isCorrigido ? "rgba(16,185,129,0.1)" : "rgba(255,255,255,0.04)",
-                                  border: `1px solid ${isCorrigido ? "rgba(16,185,129,0.2)" : "rgba(255,255,255,0.06)"}`,
+                                  background: isAnulado
+                                    ? "rgba(239,68,68,0.12)"
+                                    : isCorrigido ? "rgba(16,185,129,0.1)" : "rgba(255,255,255,0.04)",
+                                  border: `1px solid ${isAnulado ? "rgba(239,68,68,0.3)" : isCorrigido ? "rgba(16,185,129,0.2)" : "rgba(255,255,255,0.06)"}`,
                                   display: "flex", alignItems: "center", justifyContent: "center",
                                   fontSize: "0.72rem", fontWeight: 800,
-                                  color: isCorrigido ? "#34d399" : "var(--gab-text-muted)",
+                                  color: isAnulado ? "#f87171" : isCorrigido ? "#34d399" : "var(--gab-text-muted)",
                                 }}>
                                   {idx + 1}
                                 </div>
@@ -899,11 +1002,22 @@ export default function GabaritoCorrigirProfessor() {
                                   <div
                                     style={{
                                       fontSize: "0.82rem", fontWeight: 700,
-                                      color: pareceNomeArquivo(arq.nome_aluno) ? "var(--gab-amber-light, #f59e0b)" : "var(--gab-text-primary)",
+                                      color: isAnulado ? "#fca5a5" : pareceNomeArquivo(arq.nome_aluno) ? "var(--gab-amber-light, #f59e0b)" : "var(--gab-text-primary)",
                                       whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                                     }}
                                   >
-                                    {pareceNomeArquivo(arq.nome_aluno) ? (
+                                    {isAnulado ? (
+                                      <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                                        <span style={{
+                                          fontSize: "0.58rem", padding: "1px 5px", borderRadius: 4,
+                                          background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)",
+                                          color: "#f87171", fontWeight: 800, flexShrink: 0,
+                                        }}>🚫 ANULADO</span>
+                                        <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+                                          {arq.nome_aluno || arq.arquivo_nome}
+                                        </span>
+                                      </span>
+                                    ) : pareceNomeArquivo(arq.nome_aluno) ? (
                                       <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
                                         <span style={{
                                           fontSize: "0.6rem", padding: "1px 5px", borderRadius: 4,
@@ -920,7 +1034,7 @@ export default function GabaritoCorrigirProfessor() {
                                   </div>
                                   {arq.codigo_aluno && !pareceNomeArquivo(arq.nome_aluno) ? (
                                     <div style={{ fontSize: "0.65rem", color: "var(--gab-text-muted)", marginTop: 1 }}>
-                                      RE: {arq.codigo_aluno}
+                                      RE: {arq.codigo_aluno} {isAnulado && arq.motivo_anulacao ? `· ${arq.motivo_anulacao}` : ""}
                                     </div>
                                   ) : pareceNomeArquivo(arq.nome_aluno) ? (
                                     <div
@@ -935,7 +1049,29 @@ export default function GabaritoCorrigirProfessor() {
                                 </div>
 
                                 {/* Nota ou Botão */}
-                                {isCorrigido ? (
+                                {isAnulado ? (
+                                  <div
+                                    style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}
+                                    onClick={(e) => { e.stopPropagation(); verCorrecaoSalva(arq); }}
+                                    title={`Anulado por: ${arq.motivo_anulacao || "Cola"}. Clique para ver o gabarito`}
+                                  >
+                                    <span style={{
+                                      fontSize: "0.82rem", fontWeight: 800, color: "#f87171",
+                                      padding: "2px 8px", borderRadius: 8,
+                                      background: "rgba(239,68,68,0.1)",
+                                    }}>
+                                      0.0
+                                    </span>
+                                    <span style={{
+                                      padding: "4px 8px", borderRadius: 8, fontSize: "0.62rem", fontWeight: 700,
+                                      background: "rgba(239,68,68,0.12)", color: "#f87171",
+                                      border: "1px solid rgba(239,68,68,0.25)",
+                                      transition: "all 0.15s",
+                                    }}>
+                                      🚫 Anulado
+                                    </span>
+                                  </div>
+                                ) : isCorrigido ? (
                                   <div
                                     style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}
                                     onClick={(e) => { e.stopPropagation(); verCorrecaoSalva(arq); }}
@@ -1079,25 +1215,64 @@ export default function GabaritoCorrigirProfessor() {
           {/* Resultado da correção */}
           {correcao && !correcao._error && arquivoSelecionado && (
             <>
+              {/* Banner de Gabarito Anulado */}
+              {arquivoSelecionado.status === "anulado" && (
+                <div style={{
+                  padding: "16px 20px", borderRadius: 14,
+                  background: "linear-gradient(135deg, rgba(239,68,68,0.18), rgba(239,68,68,0.06))",
+                  border: "1px solid rgba(239,68,68,0.35)",
+                  display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12,
+                  animation: "gab-slide-up 0.25s ease-out"
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <div style={{ width: 40, height: 40, borderRadius: 10, background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.2rem" }}>🚫</div>
+                    <div>
+                      <div style={{ fontSize: "0.95rem", fontWeight: 800, color: "#f87171" }}>
+                        GABARITO ANULADO — {arquivoSelecionado.motivo_anulacao || "COLA / FRAUDE"}
+                      </div>
+                      <div style={{ fontSize: "0.72rem", color: "rgba(248,113,113,0.85)", marginTop: 2 }}>
+                        {arquivoSelecionado.anulado_por_nome ? `Registrado por: ${arquivoSelecionado.anulado_por_nome}` : "Registrado pela equipe escolar"}
+                        {arquivoSelecionado.anulado_em ? ` em ${new Date(arquivoSelecionado.anulado_em).toLocaleString('pt-BR')}` : ""}
+                        {arquivoSelecionado.anulado_observacao ? ` · Obs: ${arquivoSelecionado.anulado_observacao}` : ""}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setDesfazerModalProf(arquivoSelecionado)}
+                    style={{
+                      padding: "8px 16px", borderRadius: 8, fontSize: "0.75rem", fontWeight: 700,
+                      background: "rgba(16,185,129,0.12)", color: "#34d399", border: "1px solid rgba(16,185,129,0.25)",
+                      cursor: "pointer", display: "flex", alignItems: "center", gap: 6, transition: "all 0.2s"
+                    }}
+                  >
+                    🔄 Reverter Anulação
+                  </button>
+                </div>
+              )}
+
               {/* Header do aluno */}
               <div className="gab-card" style={{ padding: "16px 24px", animation: "gab-slide-up 0.3s ease-out" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                   <div style={{
                     width: 42, height: 42, borderRadius: 12,
-                    background: pareceNomeArquivo(arquivoSelecionado.nome_aluno)
+                    background: arquivoSelecionado.status === "anulado"
+                      ? "linear-gradient(135deg, #ef4444, #b91c1c)"
+                      : pareceNomeArquivo(arquivoSelecionado.nome_aluno)
                       ? "linear-gradient(135deg, #f59e0b, #d97706)"
                       : "linear-gradient(135deg, #06b6d4, #8b5cf6)",
                     display: "flex", alignItems: "center", justifyContent: "center",
                     fontSize: "1.1rem", fontWeight: 800, color: "#fff",
                   }}>
-                    {pareceNomeArquivo(arquivoSelecionado.nome_aluno)
+                    {arquivoSelecionado.status === "anulado"
+                      ? "🚫"
+                      : pareceNomeArquivo(arquivoSelecionado.nome_aluno)
                       ? "?"
                       : (arquivoSelecionado.nome_aluno || "?").charAt(0).toUpperCase()}
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{
                       fontSize: "0.95rem", fontWeight: 700,
-                      color: pareceNomeArquivo(arquivoSelecionado.nome_aluno) ? "var(--gab-amber-light, #f59e0b)" : "var(--gab-text-primary)",
+                      color: arquivoSelecionado.status === "anulado" ? "#fca5a5" : pareceNomeArquivo(arquivoSelecionado.nome_aluno) ? "var(--gab-amber-light, #f59e0b)" : "var(--gab-text-primary)",
                     }}>
                       {pareceNomeArquivo(arquivoSelecionado.nome_aluno)
                         ? (arquivoSelecionado.nome_aluno || arquivoSelecionado.arquivo_nome || "Aluno não identificado")
@@ -1132,25 +1307,63 @@ export default function GabaritoCorrigirProfessor() {
               <div className="gab-card" style={{ animation: "gab-slide-up 0.4s ease-out" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                    <div className={`gab-nota-badge ${correcao.acertos / correcao.totalQuestoes >= 0.7 ? "alta" : correcao.acertos / correcao.totalQuestoes >= 0.4 ? "media" : "baixa"}`}>
-                      {correcao.nota.toFixed(1).replace(".", ",")}
+                    <div
+                      className={`gab-nota-badge ${arquivoSelecionado.status === "anulado" ? "baixa" : correcao.acertos / correcao.totalQuestoes >= 0.7 ? "alta" : correcao.acertos / correcao.totalQuestoes >= 0.4 ? "media" : "baixa"}`}
+                      style={arquivoSelecionado.status === "anulado" ? { background: "rgba(239,68,68,0.2)", color: "#f87171", border: "1px solid rgba(239,68,68,0.4)" } : undefined}
+                    >
+                      {arquivoSelecionado.status === "anulado" ? "0,0" : correcao.nota.toFixed(1).replace(".", ",")}
                     </div>
                     <div>
-                      <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--gab-text-primary)" }}>
-                        {correcao.acertos} de {correcao.totalQuestoes} acertos
+                      <div style={{ fontSize: "0.85rem", fontWeight: 700, color: arquivoSelecionado.status === "anulado" ? "#f87171" : "var(--gab-text-primary)" }}>
+                        {arquivoSelecionado.status === "anulado" ? (
+                          <>
+                            <span style={{ textDecoration: "line-through", color: "var(--gab-text-muted)", marginRight: 6 }}>
+                              {correcao.acertos} de {correcao.totalQuestoes} acertos
+                            </span>
+                            <span>(0 acertos válidos)</span>
+                          </>
+                        ) : (
+                          `${correcao.acertos} de ${correcao.totalQuestoes} acertos`
+                        )}
                       </div>
                       <div style={{ fontSize: "0.75rem", color: "var(--gab-text-muted)" }}>
-                        {((correcao.acertos / correcao.totalQuestoes) * 100).toFixed(0)}% de aproveitamento
+                        {arquivoSelecionado.status === "anulado" ? "Gabarito desconsiderado por cola/infração" : `${((correcao.acertos / correcao.totalQuestoes) * 100).toFixed(0)}% de aproveitamento`}
                       </div>
                     </div>
                   </div>
-                  <span style={{
-                    padding: "6px 16px", borderRadius: 8, fontSize: "0.72rem", fontWeight: 700,
-                    background: "rgba(16,185,129,0.1)", color: "#34d399",
-                    border: "1px solid rgba(16,185,129,0.2)",
-                  }}>
-                    ✓ Salvo automaticamente
-                  </span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    {arquivoSelecionado.status === "anulado" ? (
+                      <span style={{
+                        padding: "6px 14px", borderRadius: 8, fontSize: "0.72rem", fontWeight: 700,
+                        background: "rgba(239,68,68,0.15)", color: "#f87171",
+                        border: "1px solid rgba(239,68,68,0.3)",
+                      }}>
+                        🚫 Anulado
+                      </span>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => abrirAnularModalProf(arquivoSelecionado)}
+                          style={{
+                            padding: "6px 14px", borderRadius: 8, fontSize: "0.72rem", fontWeight: 700,
+                            background: "rgba(239,68,68,0.1)", color: "#f87171",
+                            border: "1px solid rgba(239,68,68,0.25)",
+                            cursor: "pointer", transition: "all 0.2s", display: "flex", alignItems: "center", gap: 4,
+                          }}
+                          title="Registrar que o aluno foi pego colando e anular gabarito"
+                        >
+                          🚫 Anular (Cola)
+                        </button>
+                        <span style={{
+                          padding: "6px 16px", borderRadius: 8, fontSize: "0.72rem", fontWeight: 700,
+                          background: "rgba(16,185,129,0.1)", color: "#34d399",
+                          border: "1px solid rgba(16,185,129,0.2)",
+                        }}>
+                          ✓ Salvo automaticamente
+                        </span>
+                      </>
+                    )}
+                  </div>
                 </div>
 
                 {/* Barra de progresso */}
@@ -1509,6 +1722,172 @@ export default function GabaritoCorrigirProfessor() {
                   </>
                 )}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ MODAL: Anular Gabarito (Cola / Fraude) — Professor ═══ */}
+      {anularModalProf && (
+        <div onClick={() => setAnularModalProf(null)} style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(10px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 500, borderRadius: 18, background: "linear-gradient(145deg,#1c1524,#130e1c)", border: "1px solid rgba(239,68,68,0.35)", boxShadow: "0 32px 80px rgba(0,0,0,0.7), 0 0 60px rgba(239,68,68,0.12)", overflow: "hidden" }}>
+            {/* Header */}
+            <div style={{ padding: "18px 22px", background: "linear-gradient(135deg,rgba(239,68,68,0.12),rgba(239,68,68,0.03))", borderBottom: "1px solid rgba(255,255,255,0.06)", display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.2rem" }}>🚫</div>
+              <div>
+                <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "#f87171" }}>Anular Gabarito (Cola / Infração)</div>
+                <div style={{ fontSize: "0.72rem", color: "rgba(148,163,184,0.8)", marginTop: 1 }}>
+                  {anularModalProf.nome_aluno || anularModalProf.arquivo_nome} {anularModalProf.codigo_aluno ? `(RE: ${anularModalProf.codigo_aluno})` : ""}
+                </div>
+              </div>
+              <button onClick={() => setAnularModalProf(null)} style={{ marginLeft: "auto", width: 32, height: 32, borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "rgba(148,163,184,0.8)", fontSize: "1rem", cursor: "pointer" }}>✕</button>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: "20px 22px", display: "flex", flexDirection: "column", gap: 16 }}>
+              {/* Alerta */}
+              <div style={{ padding: "12px 14px", borderRadius: 10, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", display: "flex", gap: 10 }}>
+                <span style={{ fontSize: "1.1rem" }}>⚠️</span>
+                <div style={{ fontSize: "0.75rem", color: "rgba(248,113,113,0.9)", lineHeight: 1.45 }}>
+                  A nota deste aluno será alterada para <strong>0.00</strong> e o gabarito marcado como <strong>ANULADO</strong>.
+                  A nota corrigida permanecerá salva no sistema e poderá ser reestabelecida a qualquer momento.
+                </div>
+              </div>
+
+              {/* Motivos */}
+              <div>
+                <div style={{ fontSize: "0.75rem", color: "rgba(148,163,184,0.9)", marginBottom: 8, fontWeight: 700 }}>
+                  MOTIVO DA ANULAÇÃO
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {[
+                    "Cola / Fraude durante a prova",
+                    "Uso / Porte de celular ou aparelho eletrônico",
+                    "Comunicação indevida entre alunos",
+                    "Recusa de entrega ou rasura proposital",
+                    "Outro motivo",
+                  ].map((m) => (
+                    <label
+                      key={m}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderRadius: 8,
+                        background: anularMotivoProf === m ? "rgba(239,68,68,0.12)" : "rgba(255,255,255,0.03)",
+                        border: `1px solid ${anularMotivoProf === m ? "rgba(239,68,68,0.35)" : "rgba(255,255,255,0.06)"}`,
+                        cursor: "pointer", transition: "all 0.15s", fontSize: "0.8rem", color: anularMotivoProf === m ? "#fca5a5" : "#cbd5e1",
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="motivo_anulacao_prof"
+                        checked={anularMotivoProf === m}
+                        onChange={() => setAnularMotivoProf(m)}
+                        style={{ accentColor: "#ef4444" }}
+                      />
+                      {m}
+                    </label>
+                  ))}
+                </div>
+
+                {anularMotivoProf === "Outro motivo" && (
+                  <input
+                    type="text"
+                    placeholder="Descreva o motivo da anulação..."
+                    value={anularMotivoCustomProf}
+                    onChange={e => setAnularMotivoCustomProf(e.target.value)}
+                    style={{ marginTop: 8, width: "100%", padding: "9px 12px", borderRadius: 8, border: "1px solid rgba(239,68,68,0.3)", background: "rgba(239,68,68,0.05)", color: "#e2e8f0", fontSize: "0.82rem", outline: "none", boxSizing: "border-box" }}
+                  />
+                )}
+              </div>
+
+              {/* Observações */}
+              <div>
+                <div style={{ fontSize: "0.75rem", color: "rgba(148,163,184,0.9)", marginBottom: 6, fontWeight: 700 }}>
+                  OBSERVAÇÕES (OPCIONAL)
+                </div>
+                <textarea
+                  rows={2}
+                  placeholder="Ex: Aluno flagrado utilizando consulta irregular durante a prova..."
+                  value={anularObsProf}
+                  onChange={e => setAnularObsProf(e.target.value)}
+                  style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)", color: "#e2e8f0", fontSize: "0.8rem", resize: "vertical", outline: "none", boxSizing: "border-box" }}
+                />
+              </div>
+
+              {/* Checkbox para criar ocorrência disciplinar */}
+              <label style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 8, background: "rgba(139,92,246,0.06)", border: "1px solid rgba(139,92,246,0.2)", cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={anularCriarOcorrenciaProf}
+                  onChange={e => setAnularCriarOcorrenciaProf(e.target.checked)}
+                  style={{ accentColor: "#8b5cf6", width: 16, height: 16 }}
+                />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "#c4b5fd" }}>Registrar ocorrência disciplinar</div>
+                  <div style={{ fontSize: "0.68rem", color: "rgba(148,163,184,0.7)" }}>Cria automaticamente um registro de infração na ficha do aluno</div>
+                </div>
+              </label>
+
+              {/* Botões */}
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
+                <button
+                  onClick={() => setAnularModalProf(null)}
+                  style={{ padding: "9px 18px", borderRadius: 9, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.04)", color: "rgba(148,163,184,0.8)", cursor: "pointer", fontSize: "0.82rem" }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmarAnulacaoProf}
+                  disabled={anularSalvandoProf}
+                  style={{
+                    padding: "9px 22px", borderRadius: 9, border: "none",
+                    background: anularSalvandoProf ? "rgba(239,68,68,0.4)" : "linear-gradient(135deg,#ef4444,#dc2626)",
+                    color: "#fff", fontWeight: 700, cursor: anularSalvandoProf ? "not-allowed" : "pointer", fontSize: "0.85rem",
+                    boxShadow: "0 4px 14px rgba(239,68,68,0.3)",
+                  }}
+                >
+                  {anularSalvandoProf ? "Anulando..." : "🚫 Confirmar Anulação"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ MODAL: Reverter Anulação — Professor ═══ */}
+      {desfazerModalProf && (
+        <div onClick={() => setDesfazerModalProf(null)} style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(10px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 440, borderRadius: 18, background: "linear-gradient(145deg,#15201d,#0e1614)", border: "1px solid rgba(16,185,129,0.35)", boxShadow: "0 32px 80px rgba(0,0,0,0.7), 0 0 60px rgba(16,185,129,0.1)", overflow: "hidden" }}>
+            <div style={{ padding: "18px 22px", background: "linear-gradient(135deg,rgba(16,185,129,0.12),rgba(16,185,129,0.03))", borderBottom: "1px solid rgba(255,255,255,0.06)", display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(16,185,129,0.15)", border: "1px solid rgba(16,185,129,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.1rem" }}>🔄</div>
+              <div>
+                <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "#34d399" }}>Reverter Anulação</div>
+                <div style={{ fontSize: "0.72rem", color: "rgba(148,163,184,0.8)", marginTop: 1 }}>{desfazerModalProf.nome_aluno || desfazerModalProf.arquivo_nome}</div>
+              </div>
+              <button onClick={() => setDesfazerModalProf(null)} style={{ marginLeft: "auto", width: 32, height: 32, borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "rgba(148,163,184,0.8)", fontSize: "1rem", cursor: "pointer" }}>✕</button>
+            </div>
+            <div style={{ padding: "20px 22px", display: "flex", flexDirection: "column", gap: 14 }}>
+              <div style={{ fontSize: "0.85rem", color: "#e2e8f0", lineHeight: 1.5 }}>
+                Deseja reverter a anulação deste gabarito e restaurar o status de correção do aluno?
+              </div>
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
+                <button
+                  onClick={() => setDesfazerModalProf(null)}
+                  style={{ padding: "9px 18px", borderRadius: 9, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.04)", color: "rgba(148,163,184,0.8)", cursor: "pointer", fontSize: "0.82rem" }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmarDesfazerProf}
+                  disabled={desfazerSalvandoProf}
+                  style={{
+                    padding: "9px 22px", borderRadius: 9, border: "none",
+                    background: desfazerSalvandoProf ? "rgba(16,185,129,0.3)" : "linear-gradient(135deg,#10b981,#059669)",
+                    color: "#fff", fontWeight: 700, cursor: desfazerSalvandoProf ? "not-allowed" : "pointer", fontSize: "0.85rem",
+                  }}
+                >
+                  {desfazerSalvandoProf ? "Restaurando..." : "✓ Confirmar e Reverter"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

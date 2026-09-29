@@ -105,6 +105,18 @@ export default function GabaritoCorrigirLote() {
   const [liberarModal, setLiberarModal] = useState(null);   // { lote, acao: "liberar"|"bloquear" }
   const [liberandoLoteId, setLiberandoLoteId] = useState(null);
 
+  // ─── Anulação de Gabarito por Cola / Infração (Lote / Coordenador) ───
+  const [anularLoteModal, setAnularLoteModal] = useState(null);
+  const [anularMotivoLote, setAnularMotivoLote] = useState("Cola / Fraude durante a prova");
+  const [anularMotivoCustomLote, setAnularMotivoCustomLote] = useState("");
+  const [anularObsLote, setAnularObsLote] = useState("");
+  const [anularCriarOcorrenciaLote, setAnularCriarOcorrenciaLote] = useState(true);
+  const [anularSalvandoLote, setAnularSalvandoLote] = useState(false);
+
+  // ─── Modal: Desfazer Anulação (Lote) ───
+  const [desfazerLoteModal, setDesfazerLoteModal] = useState(null);
+  const [desfazerSalvandoLote, setDesfazerSalvandoLote] = useState(false);
+
 
   // ─── Cancelamento de Questão em Lote (coordenador/diretor) ───
   const [cancelQuestaoModal, setCancelQuestaoModal] = useState(false);   // modal aberto?
@@ -762,6 +774,120 @@ export default function GabaritoCorrigirLote() {
     setDeletingArquivoId(null);
   }
 
+  // ─── Anulação de Gabarito por Cola / Fraude ───
+  function abrirAnularLoteModal(arq) {
+    setAnularLoteModal(arq);
+    setAnularMotivoLote("Cola / Fraude durante a prova");
+    setAnularMotivoCustomLote("");
+    setAnularObsLote("");
+    setAnularCriarOcorrenciaLote(true);
+  }
+
+  async function confirmarAnulacaoLote() {
+    if (!anularLoteModal) return;
+    const motivoFinal = anularMotivoLote === "Outro motivo" ? (anularMotivoCustomLote.trim() || "Infração durante avaliação") : anularMotivoLote;
+    setAnularSalvandoLote(true);
+    try {
+      const resp = await api.patch(`/api/gabarito-lotes/arquivos/${anularLoteModal.id}/anular`, {
+        motivo: motivoFinal,
+        observacao: anularObsLote,
+        criar_ocorrencia: anularCriarOcorrenciaLote,
+      });
+      if (resp.data.ok) {
+        showToast("Gabarito anulado por infração.", "success");
+        setModalAlunosData(prev => prev.map(a =>
+          a.id === anularLoteModal.id ? {
+            ...a,
+            status: "anulado",
+            nota: 0.00,
+            motivo_anulacao: motivoFinal,
+            anulado_em: new Date().toISOString(),
+            anulado_observacao: anularObsLote,
+          } : a
+        ));
+        setArquivos(prev => prev.map(a =>
+          a.id === anularLoteModal.id ? {
+            ...a,
+            status: "anulado",
+            nota: 0.00,
+            motivo_anulacao: motivoFinal,
+            anulado_em: new Date().toISOString(),
+            anulado_observacao: anularObsLote,
+          } : a
+        ));
+        if (arquivoSelecionado?.id === anularLoteModal.id) {
+          setArquivoSelecionado(prev => ({
+            ...prev,
+            status: "anulado",
+            nota: 0.00,
+            motivo_anulacao: motivoFinal,
+            anulado_em: new Date().toISOString(),
+            anulado_observacao: anularObsLote,
+          }));
+        }
+        if (avaliacaoAtiva) {
+          carregarLotes(avaliacaoAtiva.id);
+          verificarStatusImportacao(avaliacaoAtiva.id);
+        }
+        setAnularLoteModal(null);
+      }
+    } catch (err) {
+      console.error("Erro ao anular gabarito:", err);
+      showToast(err.response?.data?.error || "Erro ao anular gabarito.", "error");
+    }
+    setAnularSalvandoLote(false);
+  }
+
+  async function confirmarDesfazerLote() {
+    if (!desfazerLoteModal) return;
+    setDesfazerSalvandoLote(true);
+    try {
+      const resp = await api.patch(`/api/gabarito-lotes/arquivos/${desfazerLoteModal.id}/anular`, {
+        desfazer: true,
+      });
+      if (resp.data.ok) {
+        showToast("Anulação revertida com sucesso.", "success");
+        const novoStatus = resp.data.status || (desfazerLoteModal.respostas_aluno ? "corrigido" : "identificado");
+        setModalAlunosData(prev => prev.map(a =>
+          a.id === desfazerLoteModal.id ? {
+            ...a,
+            status: novoStatus,
+            motivo_anulacao: null,
+            anulado_em: null,
+            anulado_observacao: null,
+          } : a
+        ));
+        setArquivos(prev => prev.map(a =>
+          a.id === desfazerLoteModal.id ? {
+            ...a,
+            status: novoStatus,
+            motivo_anulacao: null,
+            anulado_em: null,
+            anulado_observacao: null,
+          } : a
+        ));
+        if (arquivoSelecionado?.id === desfazerLoteModal.id) {
+          setArquivoSelecionado(prev => ({
+            ...prev,
+            status: novoStatus,
+            motivo_anulacao: null,
+            anulado_em: null,
+            anulado_observacao: null,
+          }));
+        }
+        if (avaliacaoAtiva) {
+          carregarLotes(avaliacaoAtiva.id);
+          verificarStatusImportacao(avaliacaoAtiva.id);
+        }
+        setDesfazerLoteModal(null);
+      }
+    } catch (err) {
+      console.error("Erro ao desfazer anulação:", err);
+      showToast(err.response?.data?.error || "Erro ao desfazer anulação.", "error");
+    }
+    setDesfazerSalvandoLote(false);
+  }
+
   // ─── Liberar / Bloquear turma para re-correção ───
   async function alternarLiberacao(lote, acao) {
     setLiberandoLoteId(lote.id);
@@ -855,6 +981,7 @@ export default function GabaritoCorrigirLote() {
       case "corrigido": return "✅";
       case "identificado": return "🔵";
       case "erro": return "❌";
+      case "anulado": return "🚫";
       default: return "⏳";
     }
   }
@@ -864,6 +991,7 @@ export default function GabaritoCorrigirLote() {
       case "corrigido": return "Corrigido";
       case "identificado": return "Pronto";
       case "erro": return "Erro";
+      case "anulado": return "Anulado";
       default: return "Processando";
     }
   }
@@ -1977,6 +2105,14 @@ export default function GabaritoCorrigirLote() {
                       {arq.codigo_aluno ? `RE: ${arq.codigo_aluno}` : statusLabel(arq.status)}
                     </div>
                   </div>
+                  {arq.status === "anulado" && (
+                    <div style={{
+                      padding: "2px 8px", borderRadius: 8, fontSize: "0.75rem", fontWeight: 700,
+                      background: "rgba(239,68,68,0.15)", color: "#f87171", textDecoration: "line-through"
+                    }}>
+                      0.0
+                    </div>
+                  )}
                   {arq.status === "corrigido" && arq.nota != null && (
                     <div style={{
                       padding: "2px 10px", borderRadius: 8, fontSize: "0.8rem", fontWeight: 700,
@@ -2010,17 +2146,54 @@ export default function GabaritoCorrigirLote() {
 
             {correcao && arquivoSelecionado && (
               <>
+                {/* Banner de Gabarito Anulado */}
+                {arquivoSelecionado.status === "anulado" && (
+                  <div style={{
+                    padding: "14px 18px", borderRadius: 12, marginBottom: 16,
+                    background: "linear-gradient(135deg, rgba(239,68,68,0.15), rgba(220,38,38,0.08))",
+                    border: "1px solid rgba(239,68,68,0.35)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <span style={{ fontSize: "1.4rem" }}>🚫</span>
+                      <div>
+                        <div style={{ fontSize: "0.9rem", fontWeight: 700, color: "#f87171" }}>
+                          Gabarito Anulado por Fraude / Infração
+                        </div>
+                        <div style={{ fontSize: "0.76rem", color: "rgba(248,113,113,0.85)", marginTop: 2 }}>
+                          Motivo: <strong>{arquivoSelecionado.motivo_anulacao || "Cola / Fraude durante a prova"}</strong>
+                          {arquivoSelecionado.anulado_observacao ? ` — ${arquivoSelecionado.anulado_observacao}` : ""}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setDesfazerLoteModal(arquivoSelecionado)}
+                      style={{
+                        padding: "6px 14px", borderRadius: 8, fontSize: "0.75rem", fontWeight: 700,
+                        background: "rgba(99,102,241,0.2)", border: "1px solid rgba(99,102,241,0.4)",
+                        color: "#c7d2fe", cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
+                        whiteSpace: "nowrap"
+                      }}
+                    >
+                      ↩ Reverter Anulação
+                    </button>
+                  </div>
+                )}
+
                 {/* Card: Nota e Resumo */}
                 <div className="gab-card" style={{ animation: "gabSlideIn 0.4s ease-out" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
                       <div style={{
                         width: 56, height: 56, borderRadius: "50%",
-                        background: `linear-gradient(135deg, ${correcao.nota / correcao.notaTotal >= 0.6 ? "#10b981, #059669" : "#ef4444, #dc2626"})`,
+                        background: arquivoSelecionado.status === "anulado"
+                          ? "linear-gradient(135deg, #ef4444, #b91c1c)"
+                          : `linear-gradient(135deg, ${correcao.nota / correcao.notaTotal >= 0.6 ? "#10b981, #059669" : "#ef4444, #dc2626"})`,
                         display: "flex", alignItems: "center", justifyContent: "center",
                         fontSize: "1.2rem", fontWeight: 800, color: "white",
+                        textDecoration: arquivoSelecionado.status === "anulado" ? "line-through" : "none",
                       }}>
-                        {correcao.nota.toFixed(1)}
+                        {arquivoSelecionado.status === "anulado" ? "0.0" : correcao.nota.toFixed(1)}
                       </div>
                       <div>
                         <div style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--gab-text-primary)" }}>
@@ -2032,12 +2205,37 @@ export default function GabaritoCorrigirLote() {
                         </div>
                       </div>
                     </div>
-                    <div style={{
-                      padding: "6px 16px", borderRadius: 10, fontSize: "0.8rem", fontWeight: 700,
-                      background: correcao.nota / correcao.notaTotal >= 0.6 ? "rgba(16,185,129,0.1)" : "rgba(239,68,68,0.1)",
-                      color: correcao.nota / correcao.notaTotal >= 0.6 ? "var(--gab-green-light)" : "var(--gab-red-light, #ef4444)",
-                    }}>
-                      {correcao.nota / correcao.notaTotal >= 0.6 ? "✓ Aprovado" : "Recuperação"}
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      {arquivoSelecionado.status === "anulado" ? (
+                        <div style={{
+                          padding: "6px 14px", borderRadius: 10, fontSize: "0.8rem", fontWeight: 700,
+                          background: "rgba(239,68,68,0.18)", color: "#f87171", border: "1px solid rgba(239,68,68,0.35)"
+                        }}>
+                          🚫 Anulado
+                        </div>
+                      ) : (
+                        <>
+                          <div style={{
+                            padding: "6px 16px", borderRadius: 10, fontSize: "0.8rem", fontWeight: 700,
+                            background: correcao.nota / correcao.notaTotal >= 0.6 ? "rgba(16,185,129,0.1)" : "rgba(239,68,68,0.1)",
+                            color: correcao.nota / correcao.notaTotal >= 0.6 ? "var(--gab-green-light)" : "var(--gab-red-light, #ef4444)",
+                          }}>
+                            {correcao.nota / correcao.notaTotal >= 0.6 ? "✓ Aprovado" : "Recuperação"}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => abrirAnularLoteModal(arquivoSelecionado)}
+                            title="Anular prova por cola / infração"
+                            style={{
+                              padding: "6px 12px", borderRadius: 8, fontSize: "0.75rem", fontWeight: 700,
+                              background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)",
+                              color: "#f87171", cursor: "pointer", display: "flex", alignItems: "center", gap: 4
+                            }}
+                          >
+                            🚫 Anular (Cola)
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -2332,10 +2530,12 @@ export default function GabaritoCorrigirLote() {
                       const corr = modalAlunosData.filter(a => a.status === "corrigido").length;
                       const ident = modalAlunosData.filter(a => a.status === "identificado").length;
                       const pend = modalAlunosData.filter(a => a.status === "pendente").length;
+                      const anul = modalAlunosData.filter(a => a.status === "anulado").length;
                       const parts = [`${total} gabarito${total !== 1 ? "s" : ""}`];
                       if (ident > 0) parts.push(`${ident} identificado${ident !== 1 ? "s" : ""}`);
                       if (corr > 0) parts.push(`${corr} corrigido${corr !== 1 ? "s" : ""}`);
                       if (pend > 0) parts.push(`${pend} pendente${pend !== 1 ? "s" : ""}`);
+                      if (anul > 0) parts.push(`${anul} anulado${anul !== 1 ? "s" : ""}`);
                       return parts.join(" · ");
                     })()}
                   </div>
@@ -2425,11 +2625,13 @@ export default function GabaritoCorrigirLote() {
                 // Dedup por id antes de renderizar (evita duplicação ao re-abrir lote com arquivos novos)
                 Array.from(new Map(modalAlunosData.map(a => [a.id, a])).values()).map((arq, idx) => {
                   const naoIdentificado = pareceNomeArquivo(arq.nome_aluno);
+                  const isAnulado = arq.status === "anulado";
                   const statusMap = {
                     corrigido: { label: "Corrigido", bg: "rgba(16,185,129,0.12)", color: "#34d399", border: "rgba(16,185,129,0.25)" },
                     identificado: { label: "Identificado", bg: "rgba(6,182,212,0.1)", color: "#22d3ee", border: "rgba(6,182,212,0.2)" },
                     pendente: { label: "Pendente", bg: "rgba(245,158,11,0.1)", color: "#fbbf24", border: "rgba(245,158,11,0.2)" },
                     erro: { label: "Erro", bg: "rgba(239,68,68,0.1)", color: "#f87171", border: "rgba(239,68,68,0.2)" },
+                    anulado: { label: "🚫 Anulado", bg: "rgba(239,68,68,0.15)", color: "#f87171", border: "rgba(239,68,68,0.3)" },
                   };
                   const st = statusMap[arq.status] || statusMap.pendente;
                   const isPreviewAtivo = previewArquivo?.id === arq.id;
@@ -2441,19 +2643,23 @@ export default function GabaritoCorrigirLote() {
                         display: "flex", alignItems: "center", gap: 14,
                         padding: "12px 16px", borderRadius: 12,
                         borderBottom: "1px solid rgba(255,255,255,0.03)",
-                        background: isPreviewAtivo ? "rgba(245,158,11,0.06)" : "transparent",
-                        border: isPreviewAtivo ? "1px solid rgba(245,158,11,0.2)" : "1px solid transparent",
+                        background: isAnulado
+                          ? "rgba(239,68,68,0.04)"
+                          : isPreviewAtivo ? "rgba(245,158,11,0.06)" : "transparent",
+                        border: isAnulado
+                          ? "1px solid rgba(239,68,68,0.2)"
+                          : isPreviewAtivo ? "1px solid rgba(245,158,11,0.2)" : "1px solid transparent",
                         transition: "all 0.2s",
                       }}
                     >
                       {/* Número */}
                       <div style={{
                         width: 32, height: 32, borderRadius: 10, flexShrink: 0,
-                        background: arq.status === "corrigido" ? "rgba(16,185,129,0.1)" : "rgba(255,255,255,0.04)",
-                        border: `1px solid ${arq.status === "corrigido" ? "rgba(16,185,129,0.2)" : "rgba(255,255,255,0.06)"}`,
+                        background: isAnulado ? "rgba(239,68,68,0.12)" : arq.status === "corrigido" ? "rgba(16,185,129,0.1)" : "rgba(255,255,255,0.04)",
+                        border: `1px solid ${isAnulado ? "rgba(239,68,68,0.3)" : arq.status === "corrigido" ? "rgba(16,185,129,0.2)" : "rgba(255,255,255,0.06)"}`,
                         display: "flex", alignItems: "center", justifyContent: "center",
                         fontSize: "0.75rem", fontWeight: 800,
-                        color: arq.status === "corrigido" ? "#34d399" : "var(--gab-text-muted)",
+                        color: isAnulado ? "#f87171" : arq.status === "corrigido" ? "#34d399" : "var(--gab-text-muted)",
                       }}>
                         {idx + 1}
                       </div>
@@ -2463,7 +2669,7 @@ export default function GabaritoCorrigirLote() {
                         <div
                           style={{
                             fontSize: "0.85rem", fontWeight: 700,
-                            color: naoIdentificado ? "var(--gab-amber-light, #f59e0b)" : "var(--gab-text-primary)",
+                            color: isAnulado ? "#fca5a5" : naoIdentificado ? "var(--gab-amber-light, #f59e0b)" : "var(--gab-text-primary)",
                             whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                           }}
                         >
@@ -2482,7 +2688,11 @@ export default function GabaritoCorrigirLote() {
                             arq.nome_aluno || arq.arquivo_nome || "Aluno não identificado"
                           )}
                         </div>
-                        {arq.codigo_aluno && !naoIdentificado ? (
+                        {isAnulado ? (
+                          <div style={{ fontSize: "0.68rem", color: "#f87171", marginTop: 2, display: "flex", alignItems: "center", gap: 4 }}>
+                            <span>🚫 {arq.motivo_anulacao || "Gabarito Anulado por Fraude"}</span>
+                          </div>
+                        ) : arq.codigo_aluno && !naoIdentificado ? (
                           <div style={{ fontSize: "0.7rem", color: "var(--gab-text-muted)", marginTop: 1 }}>
                             RE: {arq.codigo_aluno}
                           </div>
@@ -2500,8 +2710,14 @@ export default function GabaritoCorrigirLote() {
                         ) : null}
                       </div>
 
-                      {/* Nota (se corrigido) */}
-                      {arq.status === "corrigido" && arq.nota != null && (
+                      {/* Nota (se anulado ou corrigido) */}
+                      {isAnulado ? (
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginRight: 4 }}>
+                          <div style={{ fontSize: "0.82rem", fontWeight: 800, color: "#f87171", textDecoration: "line-through" }}>
+                            0.0
+                          </div>
+                        </div>
+                      ) : arq.status === "corrigido" && arq.nota != null ? (
                         <div style={{ display: "flex", alignItems: "center", gap: 6, marginRight: 4 }}>
                           <div style={{ fontSize: "0.82rem", fontWeight: 800, color: "#34d399" }}>
                             {Number(arq.nota).toFixed(1)}
@@ -2526,7 +2742,7 @@ export default function GabaritoCorrigirLote() {
                           </button>
                           )}
                         </div>
-                      )}
+                      ) : null}
 
                       {/* Badge: Visualizar (para não identificados) ou status normal */}
                       {naoIdentificado && (arq.status === "identificado" || arq.status === "pendente" || arq.status === "erro") ? (
@@ -2557,6 +2773,35 @@ export default function GabaritoCorrigirLote() {
                           {st.label}
                         </span>
                       )}
+
+                      {/* Botão Anular / Reverter Cola */}
+                      {isAnulado ? (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setDesfazerLoteModal(arq); }}
+                          title="Reverter anulação deste gabarito"
+                          style={{
+                            padding: "4px 9px", borderRadius: 8, fontSize: "0.68rem", fontWeight: 700,
+                            background: "rgba(99,102,241,0.15)", color: "#a5b4fc", border: "1px solid rgba(99,102,241,0.3)",
+                            cursor: "pointer", transition: "all 0.2s", display: "flex", alignItems: "center", gap: 4,
+                            whiteSpace: "nowrap"
+                          }}
+                        >
+                          ↩ Reverter
+                        </button>
+                      ) : ["corrigido", "identificado"].includes(arq.status) && !naoIdentificado ? (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); abrirAnularLoteModal(arq); }}
+                          title="Anular prova por cola / fraude"
+                          style={{
+                            padding: "4px 8px", borderRadius: 8, fontSize: "0.68rem", fontWeight: 700,
+                            background: "rgba(239,68,68,0.1)", color: "#f87171", border: "1px solid rgba(239,68,68,0.25)",
+                            cursor: "pointer", transition: "all 0.2s", display: "flex", alignItems: "center", gap: 4,
+                            whiteSpace: "nowrap"
+                          }}
+                        >
+                          🚫 Anular
+                        </button>
+                      ) : null}
 
                       {/* Botão excluir arquivo */}
                       <button
@@ -3971,6 +4216,176 @@ export default function GabaritoCorrigirLote() {
                   <>⚠ Confirmar Cancelamento</>
                 )}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ MODAL: Anular Gabarito (Cola / Infração) — Lote / Coordenador ═══ */}
+      {anularLoteModal && (
+        <div onClick={() => setAnularLoteModal(null)} style={{ position: "fixed", inset: 0, zIndex: 10002, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(10px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 500, borderRadius: 18, background: "linear-gradient(145deg,#1c1524,#130e1c)", border: "1px solid rgba(239,68,68,0.35)", boxShadow: "0 32px 80px rgba(0,0,0,0.7), 0 0 60px rgba(239,68,68,0.12)", overflow: "hidden" }}>
+            {/* Header */}
+            <div style={{ padding: "18px 22px", background: "linear-gradient(135deg,rgba(239,68,68,0.12),rgba(239,68,68,0.03))", borderBottom: "1px solid rgba(255,255,255,0.06)", display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.2rem" }}>🚫</div>
+              <div>
+                <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "#f87171" }}>Anular Gabarito (Cola / Infração)</div>
+                <div style={{ fontSize: "0.72rem", color: "rgba(148,163,184,0.8)", marginTop: 1 }}>
+                  {anularLoteModal.nome_aluno || anularLoteModal.arquivo_nome} {anularLoteModal.codigo_aluno ? `(RE: ${anularLoteModal.codigo_aluno})` : ""}
+                </div>
+              </div>
+              <button onClick={() => setAnularLoteModal(null)} style={{ marginLeft: "auto", width: 32, height: 32, borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "rgba(148,163,184,0.8)", fontSize: "1rem", cursor: "pointer" }}>✕</button>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: "20px 22px", display: "flex", flexDirection: "column", gap: 16 }}>
+              {/* Alerta */}
+              <div style={{ padding: "12px 14px", borderRadius: 10, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", display: "flex", gap: 10 }}>
+                <span style={{ fontSize: "1.1rem" }}>⚠️</span>
+                <div style={{ fontSize: "0.75rem", color: "rgba(248,113,113,0.9)", lineHeight: 1.45 }}>
+                  A nota deste aluno será alterada para <strong>0.00</strong> e o gabarito marcado como <strong>ANULADO</strong>.
+                  A nota corrigida permanecerá salva no sistema e poderá ser reestabelecida a qualquer momento.
+                </div>
+              </div>
+
+              {/* Motivos */}
+              <div>
+                <div style={{ fontSize: "0.75rem", color: "rgba(148,163,184,0.9)", marginBottom: 8, fontWeight: 700 }}>
+                  MOTIVO DA ANULAÇÃO
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {[
+                    "Cola / Fraude durante a prova",
+                    "Uso / Porte de celular ou aparelho eletrônico",
+                    "Comunicação indevida entre alunos",
+                    "Recusa de entrega ou rasura proposital",
+                    "Outro motivo",
+                  ].map((m) => (
+                    <label
+                      key={m}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderRadius: 8,
+                        background: anularMotivoLote === m ? "rgba(239,68,68,0.12)" : "rgba(255,255,255,0.03)",
+                        border: `1px solid ${anularMotivoLote === m ? "rgba(239,68,68,0.35)" : "rgba(255,255,255,0.06)"}`,
+                        cursor: "pointer", transition: "all 0.15s", fontSize: "0.8rem", color: anularMotivoLote === m ? "#fca5a5" : "#cbd5e1",
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="motivo_anulacao_lote"
+                        checked={anularMotivoLote === m}
+                        onChange={() => setAnularMotivoLote(m)}
+                        style={{ accentColor: "#ef4444" }}
+                      />
+                      {m}
+                    </label>
+                  ))}
+                </div>
+
+                {anularMotivoLote === "Outro motivo" && (
+                  <input
+                    type="text"
+                    placeholder="Descreva o motivo da anulação..."
+                    value={anularMotivoCustomLote}
+                    onChange={e => setAnularMotivoCustomLote(e.target.value)}
+                    style={{ marginTop: 8, width: "100%", padding: "9px 12px", borderRadius: 8, border: "1px solid rgba(239,68,68,0.3)", background: "rgba(239,68,68,0.05)", color: "#e2e8f0", fontSize: "0.82rem", outline: "none", boxSizing: "border-box" }}
+                  />
+                )}
+              </div>
+
+              {/* Observações */}
+              <div>
+                <div style={{ fontSize: "0.75rem", color: "rgba(148,163,184,0.9)", marginBottom: 6, fontWeight: 700 }}>
+                  OBSERVAÇÕES (OPCIONAL)
+                </div>
+                <textarea
+                  rows={2}
+                  placeholder="Ex: Aluno flagrado utilizando consulta irregular durante a prova..."
+                  value={anularObsLote}
+                  onChange={e => setAnularObsLote(e.target.value)}
+                  style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)", color: "#e2e8f0", fontSize: "0.8rem", resize: "vertical", outline: "none", boxSizing: "border-box" }}
+                />
+              </div>
+
+              {/* Checkbox para criar ocorrência disciplinar */}
+              <label style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 8, background: "rgba(139,92,246,0.06)", border: "1px solid rgba(139,92,246,0.2)", cursor: "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={anularCriarOcorrenciaLote}
+                  onChange={e => setAnularCriarOcorrenciaLote(e.target.checked)}
+                  style={{ accentColor: "#8b5cf6", width: 16, height: 16 }}
+                />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: "0.78rem", fontWeight: 700, color: "#c4b5fd" }}>Registrar ocorrência disciplinar</div>
+                  <div style={{ fontSize: "0.68rem", color: "rgba(148,163,184,0.7)" }}>Cria automaticamente um registro de infração na ficha do aluno</div>
+                </div>
+              </label>
+
+              {/* Botões */}
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
+                <button
+                  type="button"
+                  onClick={() => setAnularLoteModal(null)}
+                  style={{ padding: "9px 18px", borderRadius: 9, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.04)", color: "rgba(148,163,184,0.8)", cursor: "pointer", fontSize: "0.82rem" }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmarAnulacaoLote}
+                  disabled={anularSalvandoLote}
+                  style={{
+                    padding: "9px 22px", borderRadius: 9, border: "none",
+                    background: anularSalvandoLote ? "rgba(239,68,68,0.4)" : "linear-gradient(135deg,#ef4444,#dc2626)",
+                    color: "#fff", fontWeight: 700, cursor: anularSalvandoLote ? "not-allowed" : "pointer", fontSize: "0.85rem",
+                    boxShadow: "0 4px 14px rgba(239,68,68,0.3)",
+                  }}
+                >
+                  {anularSalvandoLote ? "Anulando..." : "🚫 Confirmar Anulação"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ MODAL: Reverter Anulação — Lote / Coordenador ═══ */}
+      {desfazerLoteModal && (
+        <div onClick={() => setDesfazerLoteModal(null)} style={{ position: "fixed", inset: 0, zIndex: 10002, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(10px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: "100%", maxWidth: 440, borderRadius: 18, background: "linear-gradient(145deg,#15201d,#0e1614)", border: "1px solid rgba(16,185,129,0.35)", boxShadow: "0 32px 80px rgba(0,0,0,0.7), 0 0 60px rgba(16,185,129,0.1)", overflow: "hidden" }}>
+            <div style={{ padding: "18px 22px", background: "linear-gradient(135deg,rgba(16,185,129,0.12),rgba(16,185,129,0.03))", borderBottom: "1px solid rgba(255,255,255,0.06)", display: "flex", alignItems: "center", gap: 12 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: "rgba(16,185,129,0.15)", border: "1px solid rgba(16,185,129,0.3)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.1rem" }}>🔄</div>
+              <div>
+                <div style={{ fontSize: "0.95rem", fontWeight: 700, color: "#34d399" }}>Reverter Anulação</div>
+                <div style={{ fontSize: "0.72rem", color: "rgba(148,163,184,0.8)", marginTop: 1 }}>{desfazerLoteModal.nome_aluno || desfazerLoteModal.arquivo_nome}</div>
+              </div>
+              <button onClick={() => setDesfazerLoteModal(null)} style={{ marginLeft: "auto", width: 32, height: 32, borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "rgba(148,163,184,0.8)", fontSize: "1rem", cursor: "pointer" }}>✕</button>
+            </div>
+            <div style={{ padding: "20px 22px", display: "flex", flexDirection: "column", gap: 14 }}>
+              <div style={{ fontSize: "0.85rem", color: "#e2e8f0", lineHeight: 1.5 }}>
+                Deseja reverter a anulação deste gabarito e restaurar o status de correção do aluno?
+              </div>
+              <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 4 }}>
+                <button
+                  type="button"
+                  onClick={() => setDesfazerLoteModal(null)}
+                  style={{ padding: "9px 18px", borderRadius: 9, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.04)", color: "rgba(148,163,184,0.8)", cursor: "pointer", fontSize: "0.82rem" }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmarDesfazerLote}
+                  disabled={desfazerSalvandoLote}
+                  style={{
+                    padding: "9px 22px", borderRadius: 9, border: "none",
+                    background: desfazerSalvandoLote ? "rgba(16,185,129,0.3)" : "linear-gradient(135deg,#10b981,#059669)",
+                    color: "#fff", fontWeight: 700, cursor: desfazerSalvandoLote ? "not-allowed" : "pointer", fontSize: "0.85rem",
+                  }}
+                >
+                  {desfazerSalvandoLote ? "Restaurando..." : "✓ Confirmar e Reverter"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -281,41 +281,25 @@ export default function MobileResponsaveisDashboard() {
   const [escolas, setEscolas] = useState(MOCK_ESCOLAS_RESPONSAVEIS);
   const [escolaSelecionada, setEscolaSelecionada] = useState(null);
   const [busca, setBusca] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [kpisGlobais, setKpisGlobais] = useState(null);
 
-  // Carrega escolas da API e enriquece com dados analíticos
+  // Carrega telemetria real do backend
   useEffect(() => {
     async function loadData() {
       try {
-        const { data } = await api.get("/api/plataforma/usage/escolas");
-        const listaApi = Array.isArray(data?.escolas) ? data.escolas : [];
-        if (listaApi.length > 0) {
-          const merged = listaApi.map((e, idx) => {
-            const mock = MOCK_ESCOLAS_RESPONSAVEIS[idx % MOCK_ESCOLAS_RESPONSAVEIS.length];
-            return {
-              id: e.id,
-              nome: e.nome,
-              apelido: e.apelido || mock.apelido,
-              cidade: e.cidade || "DF",
-              estado: e.estado || "DF",
-              tipo: Array.isArray(e.tipo) ? e.tipo : typeof e.tipo === "string" ? JSON.parse(e.tipo || "[]") : mock.tipo,
-              status: e.status || "ativa",
-              total_responsaveis: Math.max(e.total_alunos || 0, mock.total_responsaveis),
-              responsaveis_app: Math.round(Math.max(e.total_alunos || 0, mock.total_responsaveis) * 0.78),
-              acessos_hoje: Math.max(Math.round((e.acessos_24h || 10) * 1.4), mock.acessos_hoje),
-              acessos_7d: Math.max((e.acessos_7d || 50) * 2, mock.acessos_7d),
-              acessos_30d: Math.max((e.acessos_30d || 200) * 2, mock.acessos_30d),
-              android_pct: mock.android_pct,
-              ios_pct: mock.ios_pct,
-              top_cards: mock.top_cards,
-              historico_7d: mock.historico_7d,
-              pico_horario: mock.pico_horario,
-              ultimo_acesso: mock.ultimo_acesso,
-            };
-          });
-          setEscolas(merged);
+        setLoading(true);
+        const { data } = await api.get("/api/plataforma/telemetria/overview?perfil=RESPONSAVEL");
+        if (data?.ok && Array.isArray(data.escolas) && data.escolas.length > 0) {
+          setEscolas(data.escolas);
+          if (data.kpis_globais) {
+            setKpisGlobais(data.kpis_globais);
+          }
         }
       } catch (err) {
-        console.warn("[MobileResponsaveis] Usando mock completo de telemetria:", err);
+        console.warn("[MobileResponsaveis] Erro ao carregar telemetria da API, mantendo dados carregados:", err);
+      } finally {
+        setLoading(false);
       }
     }
     loadData();
@@ -333,22 +317,26 @@ export default function MobileResponsaveisDashboard() {
 
   const totalUsuariosExibicao = isIndividual
     ? escolaAtiva.responsaveis_app
-    : escolas.reduce((acc, e) => acc + (e.responsaveis_app || 0), 0);
+    : (kpisGlobais?.total_usuarios_app ?? escolas.reduce((acc, e) => acc + (e.responsaveis_app || 0), 0));
+
+  const totalBaseExibicao = isIndividual
+    ? escolaAtiva.total_responsaveis
+    : (kpisGlobais?.total_usuarios_base ?? escolas.reduce((acc, e) => acc + (e.total_responsaveis || 0), 0));
 
   const acessosHojeExibicao = isIndividual
     ? escolaAtiva.acessos_hoje
-    : escolas.reduce((acc, e) => acc + (e.acessos_hoje || 0), 0);
+    : (kpisGlobais?.acessos_hoje ?? escolas.reduce((acc, e) => acc + (e.acessos_hoje || 0), 0));
 
   const acessos7dExibicao = isIndividual
     ? escolaAtiva.acessos_7d
-    : escolas.reduce((acc, e) => acc + (e.acessos_7d || 0), 0);
+    : (kpisGlobais?.acessos_7d ?? escolas.reduce((acc, e) => acc + (e.acessos_7d || 0), 0));
 
   const acessos30dExibicao = isIndividual
     ? escolaAtiva.acessos_30d
-    : escolas.reduce((acc, e) => acc + (e.acessos_30d || 0), 0);
+    : (kpisGlobais?.acessos_30d ?? escolas.reduce((acc, e) => acc + (e.acessos_30d || 0), 0));
 
-  const androidPctExibicao = isIndividual ? escolaAtiva.android_pct : 82;
-  const iosPctExibicao = isIndividual ? escolaAtiva.ios_pct : 18;
+  const androidPctExibicao = isIndividual ? escolaAtiva.android_pct : (kpisGlobais?.android_pct ?? 82);
+  const iosPctExibicao = isIndividual ? escolaAtiva.ios_pct : (kpisGlobais?.ios_pct ?? 18);
 
   return (
     <div style={{

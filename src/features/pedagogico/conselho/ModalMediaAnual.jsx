@@ -227,11 +227,12 @@ export default function ModalMediaAnualPedagogico({ turma, anoLetivo, onClose })
                     {disciplinas.map(disc => (
                       <th
                         key={disc.id}
+                        title={disc.nome}
                         style={{
                           padding: "10px 8px",
                           textAlign: "center",
                           fontWeight: 700,
-                          minWidth: 90,
+                          minWidth: 80,
                           borderRight: "1px solid rgba(255,255,255,0.12)",
                           whiteSpace: "nowrap",
                           overflow: "hidden",
@@ -240,7 +241,7 @@ export default function ModalMediaAnualPedagogico({ turma, anoLetivo, onClose })
                           fontSize: "0.7rem",
                         }}
                       >
-                        {disc.nome}
+                        {disc.abreviatura || disc.nome}
                       </th>
                     ))}
                   </tr>

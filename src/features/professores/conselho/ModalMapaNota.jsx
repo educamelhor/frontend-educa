@@ -317,12 +317,12 @@ export default function ModalMapaNota({ turma, anoLetivo, onClose }) {
                   {disciplinas.map(disc => (
                     <th
                       key={disc.id}
-                      title={disc.minha ? `Sua disciplina — clique nas notas verdes para sinalizar` : disc.nome}
+                      title={disc.minha ? `Sua disciplina: ${disc.nome} — clique nas notas verdes para sinalizar` : disc.nome}
                       style={{
                         padding: "10px 8px",
                         textAlign: "center",
                         fontWeight: 700,
-                        minWidth: 90,
+                        minWidth: 80,
                         borderRight: "1px solid rgba(255,255,255,0.12)",
                         whiteSpace: "nowrap",
                         overflow: "hidden",
@@ -333,7 +333,7 @@ export default function ModalMapaNota({ turma, anoLetivo, onClose }) {
                         position: "relative",
                       }}
                     >
-                      {disc.nome}
+                      {disc.abreviatura || disc.nome}
                       {disc.minha && (
                         <span style={{
                           display: "block", fontSize: "0.55rem", color: "#fde68a",

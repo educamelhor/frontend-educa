@@ -4,26 +4,49 @@
 //
 // Exibe a média anual acumulada de cada aluno por disciplina (disciplinas anuais).
 // Cálculo: Soma de todas as notas lançadas no ano dividida por 4.
+// Suporta alternância para "Pontos Faltantes" para atingir a média mínima de 5,00.
 // Somente leitura.
 // ============================================================================
 
 import React, { useState, useEffect, useCallback } from "react";
 import api from "../../../services/api";
 
-// ── Cor da célula de média ──────────────────────────────────────────────────
-function corCelula(media) {
+// ── Cor da célula de média anual ─────────────────────────────────────────────
+function corCelulaMedia(media) {
   if (media === null || media === undefined) return { bg: "#f8fafc", text: "#94a3b8", border: "#e2e8f0" };
   if (media >= 7)  return { bg: "#dcfce7", text: "#15803d", border: "#86efac" }; // verde (destaque)
   if (media < 5)   return { bg: "#fee2e2", text: "#b91c1c", border: "#fca5a5" }; // vermelho (atenção)
   return { bg: "#f8fafc", text: "#374151", border: "#e2e8f0" }; // neutro (5.0 a 6.9)
 }
 
+// ── Cálculo e cor de pontos faltantes para atingir média 5,0 ─────────────────
+// Meta anual = 20,0 pontos acumulados (5,0 × 4 bimestres)
+function calcularPontosFaltantes(media, soma) {
+  if (media === null || media === undefined) return null;
+  if (media >= 5.0) return 0; // Meta anual atingida
+  const somaAtual = soma !== undefined && soma !== null ? soma : (media * 4);
+  const faltam = Math.max(0, 20.0 - somaAtual);
+  return Number(faltam.toFixed(1));
+}
+
+function corCelulaPontos(pontosFaltantes, media) {
+  if (media === null || media === undefined) {
+    return { bg: "#f8fafc", text: "#94a3b8", border: "#e2e8f0" };
+  }
+  if (pontosFaltantes === 0) {
+    return { bg: "#dcfce7", text: "#15803d", border: "#86efac" }; // verde (meta atingida)
+  }
+  return { bg: "#fee2e2", text: "#b91c1c", border: "#fca5a5" }; // vermelho (faltam pontos)
+}
+
 export default function ModalMediaAnualPedagogico({ turma, anoLetivo, onClose }) {
-  const [loading, setLoading]         = useState(false);
-  const [alunos, setAlunos]           = useState([]);
-  const [disciplinas, setDisciplinas] = useState([]);
-  const [medias, setMedias]           = useState({});
-  const [erro, setErro]               = useState(null);
+  const [loading, setLoading]                         = useState(false);
+  const [modoPontosFaltantes, setModoPontosFaltantes] = useState(false);
+  const [alunos, setAlunos]                           = useState([]);
+  const [disciplinas, setDisciplinas]                 = useState([]);
+  const [medias, setMedias]                           = useState({});
+  const [somas, setSomas]                             = useState({});
+  const [erro, setErro]                               = useState(null);
 
   const carregar = useCallback(async () => {
     if (!turma?.id) return;
@@ -37,6 +60,7 @@ export default function ModalMediaAnualPedagogico({ turma, anoLetivo, onClose })
         setAlunos(data.alunos || []);
         setDisciplinas(data.disciplinas || []);
         setMedias(data.medias || {});
+        setSomas(data.somas || {});
       } else {
         setErro("Não foi possível carregar a média anual.");
       }
@@ -95,18 +119,43 @@ export default function ModalMediaAnualPedagogico({ turma, anoLetivo, onClose })
           }}>
             <div>
               <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "#bfdbfe", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-                Média Anual
+                {modoPontosFaltantes ? "Pontos Faltantes (Meta 5,0)" : "Média Anual"}
               </div>
               <h2 style={{ margin: 0, color: "#fff", fontSize: "1.35rem", fontWeight: 800 }}>
                 Turma {turmaNome}
               </h2>
               <div style={{ fontSize: "0.78rem", color: "#93c5fd", marginTop: 2 }}>
-                Média acumulada (Soma dos bimestres ÷ 4) · Ano Letivo {anoLetivo}
+                {modoPontosFaltantes
+                  ? `Pontos faltantes para média 5,0 (Meta anual: 20 pontos) · Ano Letivo ${anoLetivo}`
+                  : `Média acumulada (Soma dos bimestres ÷ 4) · Ano Letivo ${anoLetivo}`}
               </div>
             </div>
 
             {/* Ações cabeçalho */}
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              {/* Botão Alternar: Média Anual <-> Pontos Faltantes */}
+              <button
+                onClick={() => setModoPontosFaltantes(prev => !prev)}
+                style={{
+                  background: modoPontosFaltantes ? "#ffffff" : "rgba(255,255,255,0.15)",
+                  border: modoPontosFaltantes ? "2px solid #ffffff" : "1px solid rgba(255,255,255,0.3)",
+                  borderRadius: "8px",
+                  color: modoPontosFaltantes ? "#1e3a8a" : "#fff",
+                  fontSize: "0.8rem",
+                  fontWeight: 800,
+                  padding: "6px 14px",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  cursor: "pointer",
+                  transition: "all 0.15s",
+                  boxShadow: modoPontosFaltantes ? "0 2px 8px rgba(0,0,0,0.18)" : "none",
+                }}
+                title={modoPontosFaltantes ? "Voltar para cálculo de Média Anual" : "Calcular pontos faltantes para atingir a média mínima (5,0)"}
+              >
+                {modoPontosFaltantes ? "📈 Média Anual" : "🎯 Pontos faltantes"}
+              </button>
+
               <button
                 onClick={carregar}
                 disabled={loading}
@@ -162,21 +211,38 @@ export default function ModalMediaAnualPedagogico({ turma, anoLetivo, onClose })
             flexWrap: "wrap",
             alignItems: "center",
           }}>
-            {[
-              { cor: "#dcfce7", borda: "#86efac", texto: "#15803d", label: "Média ≥ 7,0 — destaque" },
-              { cor: "#fee2e2", borda: "#fca5a5", texto: "#b91c1c", label: "Média < 5,0 — atenção" },
-              { cor: "#f8fafc", borda: "#e2e8f0", texto: "#374151", label: "5,0 ≤ Média < 7,0 — regular" },
-            ].map(({ cor, borda, texto, label }) => (
-              <div key={label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{
-                  display: "inline-block", width: 16, height: 16, borderRadius: 4,
-                  backgroundColor: cor, border: `2px solid ${borda}`,
-                }} />
-                <span style={{ fontSize: "0.7rem", color: "#475569", fontWeight: 600 }}>{label}</span>
-              </div>
-            ))}
+            {modoPontosFaltantes ? (
+              [
+                { cor: "#dcfce7", borda: "#86efac", texto: "#15803d", label: "✓ Meta atingida (Média ≥ 5,0)" },
+                { cor: "#fee2e2", borda: "#fca5a5", texto: "#b91c1c", label: "Pontos faltantes para média 5,0" },
+              ].map(({ cor, borda, texto, label }) => (
+                <div key={label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{
+                    display: "inline-block", width: 16, height: 16, borderRadius: 4,
+                    backgroundColor: cor, border: `2px solid ${borda}`,
+                  }} />
+                  <span style={{ fontSize: "0.7rem", color: "#475569", fontWeight: 600 }}>{label}</span>
+                </div>
+              ))
+            ) : (
+              [
+                { cor: "#dcfce7", borda: "#86efac", texto: "#15803d", label: "Média ≥ 7,0 — destaque" },
+                { cor: "#fee2e2", borda: "#fca5a5", texto: "#b91c1c", label: "Média < 5,0 — atenção" },
+                { cor: "#f8fafc", borda: "#e2e8f0", texto: "#374151", label: "5,0 ≤ Média < 7,0 — regular" },
+              ].map(({ cor, borda, texto, label }) => (
+                <div key={label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{
+                    display: "inline-block", width: 16, height: 16, borderRadius: 4,
+                    backgroundColor: cor, border: `2px solid ${borda}`,
+                  }} />
+                  <span style={{ fontSize: "0.7rem", color: "#475569", fontWeight: 600 }}>{label}</span>
+                </div>
+              ))
+            )}
             <span style={{ fontSize: "0.68rem", color: "#94a3b8", marginLeft: "auto", fontStyle: "italic" }}>
-              📈 Disciplinas anuais · Cálculo contínuo (Soma das notas lançadas ÷ 4)
+              {modoPontosFaltantes
+                ? "🎯 Meta anual: 20 pontos acumulados (5,0 × 4 bimestres)"
+                : "📈 Disciplinas anuais · Cálculo contínuo (Soma das notas lançadas ÷ 4)"}
             </span>
           </div>
 
@@ -185,7 +251,9 @@ export default function ModalMediaAnualPedagogico({ turma, anoLetivo, onClose })
             {loading ? (
               <div style={{ padding: 60, textAlign: "center", color: "#64748b" }}>
                 <div style={{ fontSize: "2rem", marginBottom: 12 }}>⏳</div>
-                <div style={{ fontWeight: 600 }}>Calculando médias anuais...</div>
+                <div style={{ fontWeight: 600 }}>
+                  {modoPontosFaltantes ? "Calculando pontos faltantes..." : "Calculando médias anuais..."}
+                </div>
               </div>
             ) : erro ? (
               <div style={{ padding: 40, textAlign: "center", color: "#b91c1c" }}>
@@ -292,19 +360,32 @@ export default function ModalMediaAnualPedagogico({ turma, anoLetivo, onClose })
                           {aluno.nome}
                         </td>
 
-                        {/* Células de média por disciplina */}
+                        {/* Células: Média Anual OU Pontos Faltantes */}
                         {disciplinas.map(disc => {
-                          const media = medias[`${aluno.id}_${disc.id}`];
-                          const cor = corCelula(media);
+                          const key = `${aluno.id}_${disc.id}`;
+                          const media = medias[key];
+                          const soma = somas[key];
+                          const pontosFaltantes = calcularPontosFaltantes(media, soma);
+
+                          const cor = modoPontosFaltantes
+                            ? corCelulaPontos(pontosFaltantes, media)
+                            : corCelulaMedia(media);
+
+                          let title = "Sem notas lançadas";
+                          if (media !== undefined && media !== null) {
+                            if (modoPontosFaltantes) {
+                              title = pontosFaltantes === 0
+                                ? `Meta atingida! Média atual: ${media.toFixed(1)}`
+                                : `Faltam ${pontosFaltantes.toFixed(1)} pontos para atingir média 5,0 (Média atual: ${media.toFixed(1)})`;
+                            } else {
+                              title = `Média Anual: ${media.toFixed(1)}`;
+                            }
+                          }
 
                           return (
                             <td
                               key={disc.id}
-                              title={
-                                media === undefined || media === null
-                                  ? "Sem notas lançadas"
-                                  : `Média Anual: ${media.toFixed(1)}`
-                              }
+                              title={title}
                               style={{
                                 padding: "7px 6px",
                                 textAlign: "center",
@@ -318,7 +399,17 @@ export default function ModalMediaAnualPedagogico({ turma, anoLetivo, onClose })
                               }}
                             >
                               {media !== undefined && media !== null ? (
-                                media.toFixed(1)
+                                modoPontosFaltantes ? (
+                                  pontosFaltantes === 0 ? (
+                                    <span style={{ fontSize: "1.05rem", fontWeight: 900, color: "#15803d", lineHeight: 1 }}>
+                                      ✓
+                                    </span>
+                                  ) : (
+                                    pontosFaltantes.toFixed(1)
+                                  )
+                                ) : (
+                                  media.toFixed(1)
+                                )
                               ) : (
                                 <span style={{ color: "#cbd5e1", fontSize: "0.7rem" }}>—</span>
                               )}

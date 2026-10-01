@@ -21,6 +21,55 @@ const TURNO_STYLE = {
   NOTURNO:    { background: '#1e1b4b', color: '#c7d2fe', border: '1px solid #4338ca' },
 };
 
+// ── Padrão Oficial SEEDF (EDUCADF) ───────────────────────────────────────────
+const SEEDF_PADRAO_OPCOES = [
+  'LÍNGUA PORTUGUESA',
+  'MATEMÁTICA',
+  'CIÊNCIAS NATURAIS',
+  'HISTÓRIA',
+  'GEOGRAFIA',
+  'ARTES',
+  'EDUCAÇÃO FÍSICA',
+  'LEM/INGLÊS',
+  'LEM/ESPANHOL',
+  'PARTE DIVERSIFICADA I',
+  'PARTE DIVERSIFICADA II',
+  'PARTE DIVERSIFICADA III',
+  'ENSINO RELIGIOSO',
+  'BIOLOGIA',
+  'FÍSICA',
+  'QUÍMICA',
+  'FILOSOFIA',
+  'SOCIOLOGIA'
+];
+
+const sugerirPadraoOficial = (nomeLocal) => {
+  const n = (nomeLocal || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase().trim();
+
+  if (/PORTUGU/i.test(n)) return 'LÍNGUA PORTUGUESA';
+  if (/MATEM/i.test(n)) return 'MATEMÁTICA';
+  if (/CIEN/i.test(n)) return 'CIÊNCIAS NATURAIS';
+  if (/HIST/i.test(n)) return 'HISTÓRIA';
+  if (/GEOG/i.test(n)) return 'GEOGRAFIA';
+  if (/ARTE/i.test(n)) return 'ARTES';
+  if (/FISIC/i.test(n) && (/ED/i.test(n) || /EDUC/i.test(n))) return 'EDUCAÇÃO FÍSICA';
+  if (/INGL/i.test(n)) return 'LEM/INGLÊS';
+  if (/ESPAN/i.test(n)) return 'LEM/ESPANHOL';
+  if (/RELIG/i.test(n)) return 'ENSINO RELIGIOSO';
+  if (/BIOL/i.test(n)) return 'BIOLOGIA';
+  if (/QUIM/i.test(n)) return 'QUÍMICA';
+  if (/FILOS/i.test(n)) return 'FILOSOFIA';
+  if (/SOCIO/i.test(n)) return 'SOCIOLOGIA';
+  if (/(?:DIVERSIFICAD|PRATICA)/i.test(n)) {
+    if (/(?:III|3)/i.test(n)) return 'PARTE DIVERSIFICADA III';
+    if (/(?:II|2)/i.test(n)) return 'PARTE DIVERSIFICADA II';
+    if (/(?:I|1)/i.test(n)) return 'PARTE DIVERSIFICADA I';
+  }
+  return '';
+};
+
 function EtapaBadge({ etapa }) {
   const st = ETAPA_STYLE[etapa?.toUpperCase()] || ETAPA_STYLE.GERAL;
   const label = etapa
@@ -112,6 +161,28 @@ export default function ListaDisciplinas() {
       alert("❌ Erro ao salvar normalização de disciplinas.");
     } finally {
       setSavingNormalization(false);
+    }
+  };
+
+  // Sugere preenchimento automático das correspondências padrão da SEEDF
+  const handleAutoPreencherSugestoes = () => {
+    let alterados = 0;
+    setNormalizationMap(prev => {
+      const updated = { ...prev };
+      disciplinas.forEach(d => {
+        if (!updated[d.id] || updated[d.id].trim() === '') {
+          const sug = sugerirPadraoOficial(d.disciplina || d.nome);
+          if (sug) {
+            updated[d.id] = sug;
+            alterados++;
+          }
+        }
+      });
+      return updated;
+    });
+    if (alterados > 0) {
+      setSuccessMessage(`⚡ ${alterados} disciplina(s) preenchida(s) com correspondências da SEEDF!`);
+      setTimeout(() => setSuccessMessage(''), 3500);
     }
   };
 
@@ -380,7 +451,14 @@ export default function ListaDisciplinas() {
                   .filter(matchesDisciplina)
                   .map(d => (
                     <tr key={d.id} className="hover:bg-blue-50">
-                      <td className="p-2 border text-center uppercase font-medium">{d.disciplina}</td>
+                      <td className="p-2 border text-center uppercase font-medium">
+                        {d.disciplina}
+                        {d.nome_oficial && (
+                          <span className="block text-[11px] text-emerald-600 font-semibold tracking-normal normal-case">
+                            EDUCADF: {d.nome_oficial}
+                          </span>
+                        )}
+                      </td>
                       <td className="p-2 border text-center">
                         {d.abreviatura ? (
                           <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-300">
@@ -587,7 +665,7 @@ export default function ListaDisciplinas() {
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
         }}>
           <div style={{
-            background: '#fff', borderRadius: 16, maxWidth: 640, width: '100%',
+            background: '#fff', borderRadius: 16, maxWidth: 680, width: '100%',
             boxShadow: '0 24px 60px rgba(0,0,0,0.22)',
             overflow: 'hidden',
           }}>
@@ -598,59 +676,125 @@ export default function ListaDisciplinas() {
               display: 'flex', alignItems: 'center',
               justifyContent: 'space-between',
             }}>
-              <h3 style={{ margin: 0, color: '#fff', fontSize: 16, fontBold: 700 }}>
-                Mapeamento Global de Disciplinas
-              </h3>
+              <div>
+                <h3 style={{ margin: 0, color: '#fff', fontSize: 16, fontWeight: 700 }}>
+                  Mapeamento Global de Disciplinas
+                </h3>
+                <p style={{ margin: 0, color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 2 }}>
+                  Integração bilateral entre EDUCA.MELHOR e o portal/boletim EDUCADF
+                </p>
+              </div>
               <button
                 onClick={() => setIsNormalizationOpen(false)}
                 style={{
                   border: 'none', background: 'none', color: '#fff',
-                  fontSize: 20, cursor: 'pointer', fontWeight: 'bold'
+                  fontSize: 22, cursor: 'pointer', fontWeight: 'bold'
                 }}
               >
                 ×
               </button>
             </div>
 
+            {/* Sub-header com estatísticas e botão de sugestão automática */}
+            <div style={{ padding: '12px 24px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+              <div style={{ fontSize: 12, color: '#475569' }}>
+                <span className="font-bold text-gray-800">
+                  {disciplinas.filter(d => (normalizationMap[d.id] || "").trim() !== '').length} de {disciplinas.length}
+                </span> disciplinas mapeadas
+              </div>
+              <button
+                type="button"
+                onClick={handleAutoPreencherSugestoes}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-300 rounded-lg hover:bg-emerald-100 transition shadow-sm cursor-pointer"
+                title="Preenche automaticamente as correspondências padrão da SEEDF"
+              >
+                ⚡ Sugerir Padrão SEEDF
+              </button>
+            </div>
+
             {/* Corpo */}
-            <div style={{ padding: '20px 24px', maxHeight: 380, overflowY: 'auto' }}>
-              <p style={{ margin: '0 0 16px', fontSize: 12, color: '#6b7280', lineHeight: 1.6 }}>
-                Mapeie o nome de cada disciplina local do <strong>EDUCA.MELHOR</strong> para a nomenclatura padrão correspondente no <strong>EDUCADF</strong>. Esses valores serão usados por todos os módulos do sistema de forma canônica.
+            <div style={{ padding: '16px 24px', maxHeight: 380, overflowY: 'auto' }}>
+              <p style={{ margin: '0 0 14px', fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
+                Mapeie o nome de cada disciplina local para a nomenclatura oficial do <strong>EDUCADF</strong>. Este mapeamento é <strong>bilateral</strong>: orienta o Robô no preenchimento do portal e na importação autônoma de boletins (PDF).
               </p>
 
               <div className="border border-gray-200 rounded-xl divide-y divide-gray-100 overflow-hidden bg-white">
-                {disciplinas.map((d) => (
-                  <div key={d.id} className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-gray-50/50 transition-colors">
-                    <div>
-                      <span className="text-[10px] font-bold text-gray-400 block">NOME LOCAL (EDUCA.MELHOR)</span>
-                      <span className="text-sm font-bold text-gray-800 uppercase">{d.disciplina}</span>
+                {disciplinas.map((d) => {
+                  const valorAtual = normalizationMap[d.id] || "";
+                  const estaMapeada = valorAtual.trim() !== "";
+                  const sug = sugerirPadraoOficial(d.disciplina || d.nome);
+                  return (
+                    <div key={d.id} className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-gray-50/50 transition-colors">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-[10px] font-bold text-gray-400">NOME LOCAL (EDUCA.MELHOR)</span>
+                          {estaMapeada ? (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                              ✓ Mapeado
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                              Pendente
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-sm font-bold text-gray-800 uppercase block">{d.disciplina || d.nome}</span>
+                        {!estaMapeada && sug && (
+                          <button
+                            type="button"
+                            onClick={() => setNormalizationMap(prev => ({ ...prev, [d.id]: sug }))}
+                            className="mt-1 text-[11px] text-blue-600 hover:text-blue-800 font-medium inline-flex items-center gap-1 cursor-pointer"
+                          >
+                            💡 Sugestão: <u>{sug}</u>
+                          </button>
+                        )}
+                      </div>
+                      <div className="flex flex-col gap-1 sm:w-1/2">
+                        <span className="text-[10px] font-bold text-emerald-600">PADRÃO OFICIAL (EDUCADF)</span>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            list="seedf-disciplinas-opcoes"
+                            value={valorAtual}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setNormalizationMap(prev => ({ ...prev, [d.id]: val }));
+                            }}
+                            placeholder="Ex: LÍNGUA PORTUGUESA"
+                            className="rounded-lg border border-gray-200 p-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 w-full"
+                          />
+                          {valorAtual && (
+                            <button
+                              type="button"
+                              onClick={() => setNormalizationMap(prev => ({ ...prev, [d.id]: "" }))}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs px-1"
+                              title="Limpar"
+                            >
+                              ×
+                            </button>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex flex-col gap-1 sm:w-1/2">
-                      <span className="text-[10px] font-bold text-emerald-600">PADRÃO OFICIAL (EDUCADF)</span>
-                      <input
-                        type="text"
-                        value={normalizationMap[d.id] || ""}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setNormalizationMap(prev => ({ ...prev, [d.id]: val }));
-                        }}
-                        placeholder="Ex: Língua Portuguesa"
-                        className="rounded-lg border border-gray-200 p-2 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 w-full"
-                      />
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
                 {disciplinas.length === 0 && (
                   <div className="p-6 text-center text-gray-400 text-sm">
                     Nenhuma disciplina cadastrada.
                   </div>
                 )}
               </div>
+
+              <datalist id="seedf-disciplinas-opcoes">
+                {SEEDF_PADRAO_OPCOES.map(opt => (
+                  <option key={opt} value={opt} />
+                ))}
+              </datalist>
             </div>
 
             {/* Rodapé */}
             <div style={{
-              padding: '12px 24px 20px',
+              padding: '12px 24px 18px',
               display: 'flex', justifyContent: 'flex-end', gap: 10,
               borderTop: '1px solid #f0f0f0',
             }}>

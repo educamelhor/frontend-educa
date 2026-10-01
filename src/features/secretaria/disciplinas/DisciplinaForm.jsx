@@ -33,7 +33,7 @@ const TURNO_COLORS = {
 };
 
 export default function DisciplinaForm({ open, onClose, onSubmit, disciplina }) {
-  const [form, setForm] = useState({ nome: '', abreviatura: '', carga: '', etapa: 'FUNDAMENTAL', turno: 'INTEGRAL' });
+  const [form, setForm] = useState({ nome: '', abreviatura: '', nome_oficial: '', carga: '', etapa: 'FUNDAMENTAL', turno: 'INTEGRAL' });
   const [errors, setErrors] = useState({});
   const [sending, setSending] = useState(false);
 
@@ -44,12 +44,13 @@ export default function DisciplinaForm({ open, onClose, onSubmit, disciplina }) 
         id: disciplina.id ?? null,
         nome: disciplina.nome ?? disciplina.disciplina ?? '',
         abreviatura: disciplina.abreviatura ?? '',
+        nome_oficial: disciplina.nome_oficial ?? '',
         carga: disciplina.carga ?? '',
         etapa: disciplina.etapa ?? 'FUNDAMENTAL',
         turno: disciplina.turno ?? 'INTEGRAL',
       });
     } else {
-      setForm({ id: null, nome: '', abreviatura: '', carga: '', etapa: 'FUNDAMENTAL', turno: 'INTEGRAL' });
+      setForm({ id: null, nome: '', abreviatura: '', nome_oficial: '', carga: '', etapa: 'FUNDAMENTAL', turno: 'INTEGRAL' });
       setErrors({});
     }
   }, [open, disciplina]);
@@ -293,28 +294,69 @@ export default function DisciplinaForm({ open, onClose, onSubmit, disciplina }) 
               </div>
             )}
 
-            {/* Campo: Carga Horária */}
-            <div style={{ marginBottom: 8 }}>
-              <label style={{ display:'block', marginBottom:6, fontSize:13, fontWeight:600, color:'#374151', textTransform:'uppercase', letterSpacing:'0.5px' }}>
-                Carga Semanal (aulas)
-              </label>
-              <div style={{ position:'relative' }}>
-                <input
-                  name="carga"
-                  type="number"
-                  min="1"
-                  max="30"
-                  value={form.carga}
-                  onChange={handleChange}
-                  placeholder="Ex: 5"
-                  style={{ ...fieldStyle(errors.carga), paddingRight:50 }}
-                  onFocus={onFocusStyle}
-                  onBlur={onBlurStyle(errors.carga)}
-                />
-                <span style={{ position:'absolute', right:14, top:'50%', transform:'translateY(-50%)', fontSize:12, color:'#9ca3af', fontWeight:500 }}>aulas</span>
+            {/* Carga Horária + Padrão Oficial EDUCADF */}
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1.6fr', gap:14, marginBottom: 8 }}>
+              {/* Campo: Carga Horária */}
+              <div>
+                <label style={{ display:'block', marginBottom:6, fontSize:13, fontWeight:600, color:'#374151', textTransform:'uppercase', letterSpacing:'0.5px' }}>
+                  Carga (aulas)
+                </label>
+                <div style={{ position:'relative' }}>
+                  <input
+                    name="carga"
+                    type="number"
+                    min="1"
+                    max="30"
+                    value={form.carga}
+                    onChange={handleChange}
+                    placeholder="Ex: 5"
+                    style={{ ...fieldStyle(errors.carga), paddingRight:50 }}
+                    onFocus={onFocusStyle}
+                    onBlur={onBlurStyle(errors.carga)}
+                  />
+                  <span style={{ position:'absolute', right:14, top:'50%', transform:'translateY(-50%)', fontSize:12, color:'#9ca3af', fontWeight:500 }}>aulas</span>
+                </div>
+                {errors.carga && <p style={{ margin:'4px 0 0', fontSize:12, color:'#ef4444' }}>⚠ {errors.carga}</p>}
               </div>
-              {errors.carga && <p style={{ margin:'4px 0 0', fontSize:12, color:'#ef4444' }}>⚠ {errors.carga}</p>}
+
+              {/* Campo: Padrão Oficial EDUCADF */}
+              <div>
+                <label style={{ display:'block', marginBottom:6, fontSize:13, fontWeight:600, color:'#059669', textTransform:'uppercase', letterSpacing:'0.5px' }}>
+                  Padrão Oficial <span style={{ fontSize:11, color:'#9ca3af', fontWeight:400, textTransform:'none' }}>(EDUCADF)</span>
+                </label>
+                <input
+                  name="nome_oficial"
+                  list="seedf-disciplinas-form-list"
+                  value={form.nome_oficial}
+                  onChange={handleChange}
+                  placeholder="Ex: LÍNGUA PORTUGUESA"
+                  style={fieldStyle(false)}
+                  onFocus={onFocusStyle}
+                  onBlur={onBlurStyle(false)}
+                />
+              </div>
             </div>
+
+            <datalist id="seedf-disciplinas-form-list">
+              <option value="LÍNGUA PORTUGUESA" />
+              <option value="MATEMÁTICA" />
+              <option value="CIÊNCIAS NATURAIS" />
+              <option value="HISTÓRIA" />
+              <option value="GEOGRAFIA" />
+              <option value="ARTES" />
+              <option value="EDUCAÇÃO FÍSICA" />
+              <option value="LEM/INGLÊS" />
+              <option value="LEM/ESPANHOL" />
+              <option value="PARTE DIVERSIFICADA I" />
+              <option value="PARTE DIVERSIFICADA II" />
+              <option value="PARTE DIVERSIFICADA III" />
+              <option value="ENSINO RELIGIOSO" />
+              <option value="BIOLOGIA" />
+              <option value="FÍSICA" />
+              <option value="QUÍMICA" />
+              <option value="FILOSOFIA" />
+              <option value="SOCIOLOGIA" />
+            </datalist>
           </div>
 
           {/* ── Rodapé ────────────────────────────────────────────────────── */}

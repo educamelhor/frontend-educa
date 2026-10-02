@@ -189,9 +189,16 @@ export default function Governanca() {
       });
       const data = await res.json();
       if (data.ok) {
-        setConfigsPorCategoria(data.configuracoes || {});
+        const raw = data.configuracoes || {};
+        const merged = {};
+        for (const [k, list] of Object.entries(raw)) {
+          const kLower = String(k).toLowerCase().trim();
+          if (!merged[kLower]) merged[kLower] = [];
+          merged[kLower].push(...list);
+        }
+        setConfigsPorCategoria(merged);
         // Expand all by default on first load
-        setExpandedCats(new Set(Object.keys(data.configuracoes || {})));
+        setExpandedCats(new Set(Object.keys(merged)));
       } else {
         showToast(data.message || "Erro ao carregar configurações", "error");
       }
@@ -776,7 +783,8 @@ export default function Governanca() {
         /* ── CATEGORIAS ── */
         <div style={styles.grid}>
           {orderedCats.map((cat) => {
-            const meta = CATEGORY_META[cat] || {
+            const catLower = String(cat).toLowerCase().trim();
+            const meta = CATEGORY_META[catLower] || {
               label: cat.charAt(0).toUpperCase() + cat.slice(1),
               icon: CATEGORY_META.geral.icon,
               gradient: CATEGORY_META.geral.gradient,
@@ -784,6 +792,7 @@ export default function Governanca() {
             };
             const isExpanded = expandedCats.has(cat);
             const items = configsPorCategoria[cat] || [];
+            const displayCount = items.filter((cfg) => cfg.chave !== "escola.avaliacao_padrao_bimestral.excecoes" && !cfg.chave.startsWith("boletim.app.liberar_")).length;
 
             return (
               <div key={cat} style={styles.categoryCard}>
@@ -804,7 +813,7 @@ export default function Governanca() {
                   <div style={{ flex: 1, textAlign: "left" }}>
                     <div style={styles.categoryName}>{meta.label}</div>
                     <div style={styles.categoryCount}>
-                      {items.length} {items.length === 1 ? "configuração" : "configurações"}
+                      {displayCount} {displayCount === 1 ? "configuração" : "configurações"}
                     </div>
                   </div>
                   <svg
@@ -842,7 +851,7 @@ export default function Governanca() {
                       ))}
 
                     {/* Banner customizado Liberar Notas no App (Etapa 1 Governança) */}
-                    {cat === "boletim" && (
+                    {catLower === "boletim" && (
                       <BoletimAppBanner
                         items={items}
                         pendingChanges={pendingChanges}

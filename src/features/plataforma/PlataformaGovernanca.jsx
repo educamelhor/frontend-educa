@@ -5,6 +5,7 @@
 // ============================================================================
 import React, { useState, useEffect, useCallback } from "react";
 import api from "../../services/api";
+import CeoGovernancaBoletim from "./CeoGovernancaBoletim";
 
 const CORES_OPCOES = [
   { value: "#6366f1", label: "Indigo" },
@@ -241,6 +242,9 @@ export default function PlataformaGovernanca() {
           </div>
         </div>
       </div>
+
+      {/* ═══ GOVERNANÇA CENTRAL DE PRAZOS BIMESTRAIS (BOLETIM APP MOBILE) ═══ */}
+      <CeoGovernancaBoletim onMessage={showMsg} />
 
       {/* Action bar */}
       <div className="flex items-center justify-between mb-5">

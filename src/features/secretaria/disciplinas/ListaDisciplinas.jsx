@@ -125,6 +125,7 @@ export default function ListaDisciplinas() {
   // similarModal = { dadosPendentes, nomeExistente, mensagem } | null
 
   // Normalização / Mapeamento
+  const [normEtapaFiltro, setNormEtapaFiltro] = useState('TODOS');
   const [isNormalizationOpen, setIsNormalizationOpen] = useState(false);
   const [normalizationMap, setNormalizationMap] = useState({});
   const [savingNormalization, setSavingNormalization] = useState(false);
@@ -685,7 +686,7 @@ export default function ListaDisciplinas() {
                 </p>
               </div>
               <button
-                onClick={() => setIsNormalizationOpen(false)}
+                onClick={() => { setIsNormalizationOpen(false); setNormEtapaFiltro('TODOS'); }}
                 style={{
                   border: 'none', background: 'none', color: '#fff',
                   fontSize: 22, cursor: 'pointer', fontWeight: 'bold'
@@ -695,22 +696,77 @@ export default function ListaDisciplinas() {
               </button>
             </div>
 
-            {/* Sub-header com estatísticas e botão de sugestão automática */}
-            <div style={{ padding: '12px 24px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
-              <div style={{ fontSize: 12, color: '#475569' }}>
-                <span className="font-bold text-gray-800">
-                  {disciplinas.filter(d => (normalizationMap[d.id] || "").trim() !== '').length} de {disciplinas.length}
-                </span> disciplinas mapeadas
+            {/* Sub-header com abas de etapa + estatísticas + botão */}
+            <div style={{ padding: '12px 24px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+              {/* Abas de etapa */}
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+                {['TODOS', 'FUNDAMENTAL', 'MÉDIO', 'GERAL', 'INFANTIL'].map(etapa => {
+                  const count = etapa === 'TODOS'
+                    ? disciplinas.length
+                    : disciplinas.filter(d => (d.etapa || 'GERAL').toUpperCase() === etapa).length;
+                  const mapeados = etapa === 'TODOS'
+                    ? disciplinas.filter(d => (normalizationMap[d.id] || '').trim() !== '').length
+                    : disciplinas.filter(d => (d.etapa || 'GERAL').toUpperCase() === etapa && (normalizationMap[d.id] || '').trim() !== '').length;
+                  if (count === 0 && etapa !== 'TODOS') return null;
+                  const isActive = normEtapaFiltro === etapa;
+                  const ETAPA_ABA_COLORS = {
+                    TODOS: { active: '#1e40af', bg: '#eff6ff', border: '#3b82f6' },
+                    FUNDAMENTAL: { active: '#15803d', bg: '#f0fdf4', border: '#86efac' },
+                    'MÉDIO': { active: '#92400e', bg: '#fffbeb', border: '#fcd34d' },
+                    GERAL: { active: '#6b7280', bg: '#f3f4f6', border: '#d1d5db' },
+                    INFANTIL: { active: '#0369a1', bg: '#e0f2fe', border: '#7dd3fc' },
+                  };
+                  const cor = ETAPA_ABA_COLORS[etapa] || ETAPA_ABA_COLORS.GERAL;
+                  return (
+                    <button
+                      key={etapa}
+                      onClick={() => setNormEtapaFiltro(etapa)}
+                      style={{
+                        padding: '4px 12px',
+                        borderRadius: 20,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        border: `1.5px solid ${isActive ? cor.active : cor.border}`,
+                        background: isActive ? cor.active : cor.bg,
+                        color: isActive ? '#fff' : cor.active,
+                        transition: 'all 0.15s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 4,
+                      }}
+                    >
+                      {etapa === 'TODOS' ? 'Todos' : etapa.charAt(0) + etapa.slice(1).toLowerCase()}
+                      <span style={{
+                        background: isActive ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.08)',
+                        borderRadius: 10,
+                        padding: '0 5px',
+                        fontSize: 10,
+                      }}>
+                        {mapeados}/{count}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
-              <button
-                type="button"
-                onClick={handleAutoPreencherSugestoes}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-300 rounded-lg hover:bg-emerald-100 transition shadow-sm cursor-pointer"
-                title="Preenche automaticamente as correspondências padrão da SEEDF"
-              >
-                ⚡ Sugerir Padrão SEEDF
-              </button>
+              {/* Estatísticas globais + botão sugestão */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                <div style={{ fontSize: 11, color: '#475569' }}>
+                  <span style={{ fontWeight: 700, color: '#1e293b' }}>
+                    {disciplinas.filter(d => (normalizationMap[d.id] || '').trim() !== '').length} de {disciplinas.length}
+                  </span>{' '}disciplinas mapeadas no total
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAutoPreencherSugestoes}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-300 rounded-lg hover:bg-emerald-100 transition shadow-sm cursor-pointer"
+                  title="Preenche automaticamente as correspondências padrão da SEEDF"
+                >
+                  ⚡ Sugerir Padrão SEEDF
+                </button>
+              </div>
             </div>
+
 
             {/* Corpo */}
             <div style={{ padding: '16px 24px', maxHeight: 380, overflowY: 'auto' }}>
@@ -719,7 +775,9 @@ export default function ListaDisciplinas() {
               </p>
 
               <div className="border border-gray-200 rounded-xl divide-y divide-gray-100 overflow-hidden bg-white">
-                {disciplinas.map((d) => {
+                {disciplinas
+                  .filter(d => normEtapaFiltro === 'TODOS' || (d.etapa || 'GERAL').toUpperCase() === normEtapaFiltro)
+                  .map((d) => {
                   const valorAtual = normalizationMap[d.id] || "";
                   const estaMapeada = valorAtual.trim() !== "";
                   const sug = sugerirPadraoOficial(d.disciplina || d.nome);
@@ -739,6 +797,15 @@ export default function ListaDisciplinas() {
                           )}
                         </div>
                         <span className="text-sm font-bold text-gray-800 uppercase block">{d.disciplina || d.nome}</span>
+                        <div style={{ display: 'flex', gap: 4, marginTop: 3, flexWrap: 'wrap' }}>
+                          {d.etapa && <EtapaBadge etapa={d.etapa} />}
+                          {d.turno && <TurnoBadge turno={d.turno} />}
+                          {d.abreviatura && (
+                            <span style={{ background: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1', display: 'inline-block', padding: '2px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700 }}>
+                              {d.abreviatura}
+                            </span>
+                          )}
+                        </div>
                         {!estaMapeada && sug && (
                           <button
                             type="button"
@@ -799,7 +866,7 @@ export default function ListaDisciplinas() {
               borderTop: '1px solid #f0f0f0',
             }}>
               <button
-                onClick={() => setIsNormalizationOpen(false)}
+                onClick={() => { setIsNormalizationOpen(false); setNormEtapaFiltro('TODOS'); }}
                 disabled={savingNormalization}
                 style={{
                   padding: '9px 20px', border: '1.5px solid #d1d5db',

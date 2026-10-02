@@ -16,6 +16,15 @@ const TURNOS = [
   { value: 'NOTURNO',    label: 'Noturno' },
 ];
 
+const TIPOS = [
+  { value: 'REGULAR',             label: 'Regular (Base Nacional)' },
+  { value: 'PARTE_DIVERSIFICADA', label: 'Parte Diversificada (PD1/PD2/PD3)' },
+  { value: 'IFA',                 label: 'IFA — Itinerário Formativo' },
+  { value: 'PCA',                 label: 'PCA — Projeto de Contemplação de Área' },
+  { value: 'ELETIVA',             label: 'Eletiva / Optativa' },
+  { value: 'PROJETO',             label: 'Projeto Interdisciplinar' },
+];
+
 // ─── Paletas de cores ────────────────────────────────────────────────────────
 const ETAPA_COLORS = {
   INFANTIL:    { bg: '#e0f2fe', color: '#0369a1', border: '#7dd3fc' },
@@ -33,7 +42,7 @@ const TURNO_COLORS = {
 };
 
 export default function DisciplinaForm({ open, onClose, onSubmit, disciplina }) {
-  const [form, setForm] = useState({ nome: '', abreviatura: '', nome_oficial: '', carga: '', etapa: 'FUNDAMENTAL', turno: 'INTEGRAL' });
+  const [form, setForm] = useState({ nome: '', abreviatura: '', nome_oficial: '', carga: '', etapa: 'FUNDAMENTAL', turno: 'INTEGRAL', tipo: 'REGULAR' });
   const [errors, setErrors] = useState({});
   const [sending, setSending] = useState(false);
 
@@ -48,9 +57,10 @@ export default function DisciplinaForm({ open, onClose, onSubmit, disciplina }) 
         carga: disciplina.carga ?? '',
         etapa: disciplina.etapa ?? 'FUNDAMENTAL',
         turno: disciplina.turno ?? 'INTEGRAL',
+        tipo: disciplina.tipo ?? 'REGULAR',
       });
     } else {
-      setForm({ id: null, nome: '', abreviatura: '', nome_oficial: '', carga: '', etapa: 'FUNDAMENTAL', turno: 'INTEGRAL' });
+      setForm({ id: null, nome: '', abreviatura: '', nome_oficial: '', carga: '', etapa: 'FUNDAMENTAL', turno: 'INTEGRAL', tipo: 'REGULAR' });
       setErrors({});
     }
   }, [open, disciplina]);
@@ -293,6 +303,35 @@ export default function DisciplinaForm({ open, onClose, onSubmit, disciplina }) 
                 )}
               </div>
             )}
+
+            {/* Campo: Tipo de Disciplina */}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display:'block', marginBottom:6, fontSize:13, fontWeight:600, color:'#374151', textTransform:'uppercase', letterSpacing:'0.5px' }}>
+                Tipo <span style={{ fontSize:10, color:'#9ca3af', fontWeight:400, textTransform:'none' }}>(categorização)</span>
+              </label>
+              <div style={{ position:'relative' }}>
+                <select
+                  name="tipo"
+                  value={form.tipo || 'REGULAR'}
+                  onChange={handleChange}
+                  style={{ ...fieldStyle(false), paddingRight:34, appearance:'none', cursor:'pointer' }}
+                  onFocus={onFocusStyle}
+                  onBlur={onBlurStyle(false)}
+                >
+                  {TIPOS.map(op => (
+                    <option key={op.value} value={op.value}>{op.label}</option>
+                  ))}
+                </select>
+                <span style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', pointerEvents:'none', color:'#6b7280', fontSize:11 }}>▼</span>
+              </div>
+              {(form.tipo === 'IFA' || form.tipo === 'PCA') && (
+                <div style={{ marginTop:8, padding:'8px 12px', background:'#eff6ff', border:'1px solid #93c5fd', borderRadius:8 }}>
+                  <p style={{ margin:0, fontSize:12, color:'#1d4ed8' }}>
+                    💡 Para {form.tipo}s, use o nome completo no campo Disciplina acima (ex: "{form.tipo === 'IFA' ? 'IFA - PRODUÇÃO TEXTUAL E COMUNICAÇÃO' : 'PCA - PROJETO INTERDISCIPLINAR DE CIÊNCIAS'}").
+                  </p>
+                </div>
+              )}
+            </div>
 
             {/* Carga Horária + Padrão Oficial EDUCADF */}
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1.6fr', gap:14, marginBottom: 8 }}>

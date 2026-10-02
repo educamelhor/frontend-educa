@@ -143,6 +143,10 @@ export default function Governanca() {
   const [selectedExceptions, setSelectedExceptions] = useState([]);
   const [excSearch, setExcSearch] = useState("");
 
+  // ── Estados para Liberar Notas no App (Governança CEO + Direção) ──
+  const [datasLimiteCeo, setDatasLimiteCeo] = useState({ "1": null, "2": null, "3": null, "4": null });
+  const [premiumModalData, setPremiumModalData] = useState(null);
+
   const escolaId = localStorage.getItem("escola_id");
   const token = localStorage.getItem("token");
   const perfil = String(localStorage.getItem("perfil") || "").toLowerCase();
@@ -198,6 +202,25 @@ export default function Governanca() {
     }
   }, [escolaId, token, perfil]);
 
+  // ── Fetch datas limite CEO para liberação no App ──
+  const fetchBoletimAppConfig = useCallback(async () => {
+    try {
+      const res = await fetch(`${API}/api/governanca/boletim-app-config?escola_id=${escolaId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "x-escola-id": escolaId,
+          "x-perfil": perfil,
+        },
+      });
+      const data = await res.json();
+      if (data.ok && data.datas_limite_ceo) {
+        setDatasLimiteCeo(data.datas_limite_ceo);
+      }
+    } catch (err) {
+      console.warn("Erro ao buscar datas limite CEO:", err);
+    }
+  }, [escolaId, token, perfil]);
+
   // ── Fetch disciplinas da escola ──
   const fetchDisciplinas = useCallback(async () => {
     try {
@@ -220,9 +243,10 @@ export default function Governanca() {
   useEffect(() => {
     if (escolaId && token) {
       fetchConfigs();
+      fetchBoletimAppConfig();
       fetchDisciplinas();
     }
-  }, [fetchConfigs, fetchDisciplinas, escolaId, token]);
+  }, [fetchConfigs, fetchBoletimAppConfig, fetchDisciplinas, escolaId, token]);
 
   // ✅ [GOVERNANÇA v2] Fetch perfis que este diretor pode gerenciar
   const fetchMeusPerfis = useCallback(async () => {
@@ -805,7 +829,7 @@ export default function Governanca() {
                 {isExpanded && (
                   <div style={styles.itemsList}>
                     {items
-                      .filter((cfg) => cfg.chave !== "escola.avaliacao_padrao_bimestral.excecoes")
+                      .filter((cfg) => cfg.chave !== "escola.avaliacao_padrao_bimestral.excecoes" && !cfg.chave.startsWith("boletim.app.liberar_"))
                       .map((cfg) => (
                         <ConfigItem
                           key={cfg.id}
@@ -816,6 +840,17 @@ export default function Governanca() {
                           onOpenExceptions={handleOpenExceptionsModal}
                         />
                       ))}
+
+                    {/* Banner customizado Liberar Notas no App (Etapa 1 Governança) */}
+                    {cat === "boletim" && (
+                      <BoletimAppBanner
+                        items={items}
+                        pendingChanges={pendingChanges}
+                        onChange={handleChange}
+                        datasLimiteCeo={datasLimiteCeo}
+                        onTriggerPremiumModal={(bim, dLim) => setPremiumModalData({ open: true, bimestre: bim, dataLimite: dLim })}
+                      />
+                    )}
                   </div>
                 )}
               </div>
@@ -1034,8 +1069,367 @@ export default function Governanca() {
           </div>
         </div>
       )}
+
+      {/* ── MODAL PREMIUM DE AVISO DE BLOQUEIO EXPIRADO (GOVERNANÇA CEO) ── */}
+      <PremiumBlockModal
+        modalData={premiumModalData}
+        onClose={() => setPremiumModalData(null)}
+      />
         </>
       )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BOLETIM APP BANNER — Painel de liberação por bimestre
+// ═══════════════════════════════════════════════════════════════
+function BoletimAppBanner({ items, pendingChanges, onChange, datasLimiteCeo, onTriggerPremiumModal }) {
+  const bimestres = [1, 2, 3, 4];
+  const hojeStr = new Date().toISOString().split("T")[0];
+
+  return (
+    <div style={{
+      margin: "16px 20px 20px",
+      padding: "20px",
+      borderRadius: "14px",
+      background: "linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%)",
+      border: "1.5px solid #c7d2fe",
+      boxShadow: "0 4px 14px rgba(99, 102, 241, 0.08)",
+    }}>
+      {/* Header do Banner */}
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 16 }}>
+        <div style={{
+          width: 40,
+          height: 40,
+          borderRadius: 12,
+          background: "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
+          color: "#fff",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 20,
+          flexShrink: 0,
+          boxShadow: "0 4px 10px rgba(99, 102, 241, 0.25)",
+        }}>
+          📱
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 700, fontSize: 16, color: "#1e1b4b" }}>
+            Liberar Notas no App (Educa Mobile)
+          </div>
+          <div style={{ fontSize: 12.5, color: "#475569", marginTop: 2, lineHeight: 1.4 }}>
+            Gerencie o bloqueio ou a liberação da consulta ao boletim bimestral dos alunos pelo aplicativo mobile.
+          </div>
+        </div>
+      </div>
+
+      {/* Alerta Informativo Importante */}
+      <div style={{
+        padding: "10px 14px",
+        borderRadius: "10px",
+        backgroundColor: "#e0e7ff",
+        borderLeft: "4px solid #6366f1",
+        color: "#3730a3",
+        fontSize: 12,
+        fontWeight: 600,
+        marginBottom: 16,
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+      }}>
+        <span>ℹ️</span>
+        <span>A visualização do boletim pelo <strong>portal web</strong> nunca é afetada por estas configurações.</span>
+      </div>
+
+      {/* Grid com os 4 Bimestres */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 12 }}>
+        {bimestres.map((bim) => {
+          const key = `boletim.app.liberar_${bim}bimestre`;
+          const cfg = items.find((i) => i.chave === key);
+          const isPending = cfg && pendingChanges[cfg.id] !== undefined;
+          const valAtual = cfg ? (isPending ? String(pendingChanges[cfg.id]) : String(cfg.valor)) : "1";
+          const isLiberado = valAtual === "1" || valAtual === "true";
+
+          const dLim = datasLimiteCeo ? datasLimiteCeo[String(bim)] : null;
+          const ceoExpirou = Boolean(dLim && hojeStr >= dLim);
+
+          const handleToggleClick = () => {
+            if (!cfg) return;
+            // Se o prazo do CEO venceu e a pessoa clica no toggle (ou tenta bloquear)
+            if (ceoExpirou || (isLiberado && dLim && hojeStr >= dLim)) {
+              onTriggerPremiumModal(bim, dLim);
+              return;
+            }
+            // Toggle normal se dentro do prazo
+            onChange(cfg.id, isLiberado ? "0" : "1");
+          };
+
+          return (
+            <div
+              key={bim}
+              style={{
+                background: ceoExpirou
+                  ? "linear-gradient(135deg, #fffbe6 0%, #fef3c7 100%)"
+                  : "#fff",
+                border: ceoExpirou
+                  ? "1.5px solid #f59e0b"
+                  : isLiberado
+                  ? "1.5px solid #cbd5e1"
+                  : "1.5px solid #fca5a5",
+                borderRadius: "12px",
+                padding: "12px 14px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 10,
+                boxShadow: isPending ? "0 0 0 2px #6366f1" : "0 1px 3px rgba(0,0,0,0.05)",
+                transition: "all 0.2s ease",
+              }}
+            >
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontWeight: 700, fontSize: 14, color: "#1e293b" }}>
+                  {bim}º Bimestre
+                </span>
+
+                {/* Switch Toggle */}
+                <button
+                  type="button"
+                  onClick={handleToggleClick}
+                  style={{
+                    width: 44,
+                    height: 24,
+                    borderRadius: 12,
+                    border: "none",
+                    cursor: ceoExpirou ? "not-allowed" : "pointer",
+                    position: "relative",
+                    background: (ceoExpirou || isLiberado)
+                      ? "linear-gradient(135deg, #10b981, #059669)"
+                      : "#e2e8f0",
+                    transition: "background .2s ease",
+                    opacity: ceoExpirou ? 0.85 : 1,
+                  }}
+                  title={
+                    ceoExpirou
+                      ? "Prazo limite do CEO atingido — boletim liberado permanentemente"
+                      : isLiberado
+                      ? "Liberado — clique para bloquear"
+                      : "Bloqueado — clique para liberar"
+                  }
+                >
+                  <div
+                    style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: "50%",
+                      background: "#fff",
+                      position: "absolute",
+                      top: 2,
+                      transform: (ceoExpirou || isLiberado) ? "translateX(20px)" : "translateX(2px)",
+                      transition: "transform .2s ease",
+                      boxShadow: "0 1px 4px rgba(0,0,0,0.2)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 10,
+                    }}
+                  >
+                    {ceoExpirou ? "🔒" : isLiberado ? "✓" : ""}
+                  </div>
+                </button>
+              </div>
+
+              {/* Status Badge */}
+              <div>
+                {ceoExpirou ? (
+                  <div style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: "#b45309",
+                    background: "rgba(245, 158, 11, 0.15)",
+                    padding: "3px 8px",
+                    borderRadius: 6,
+                  }}>
+                    <span>👑 Liberado pelo CEO</span>
+                  </div>
+                ) : isLiberado ? (
+                  <div style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: "#047857",
+                    background: "rgba(16, 185, 129, 0.1)",
+                    padding: "3px 8px",
+                    borderRadius: 6,
+                  }}>
+                    <span>🔓 Liberado no App</span>
+                  </div>
+                ) : (
+                  <div style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: "#b91c1c",
+                    background: "rgba(239, 68, 68, 0.1)",
+                    padding: "3px 8px",
+                    borderRadius: 6,
+                  }}>
+                    <span>🔒 Bloqueado no App</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PREMIUM BLOCK MODAL — Modal exibido quando o prazo CEO expirou
+// ═══════════════════════════════════════════════════════════════
+function PremiumBlockModal({ modalData, onClose }) {
+  if (!modalData || !modalData.open) return null;
+
+  const { bimestre, dataLimite } = modalData;
+
+  let dataFormatada = "";
+  if (dataLimite) {
+    const partes = String(dataLimite).split("-");
+    if (partes.length === 3) {
+      dataFormatada = `${partes[2]}/${partes[1]}/${partes[0]}`;
+    } else {
+      dataFormatada = String(dataLimite);
+    }
+  }
+
+  return (
+    <div style={{
+      position: "fixed",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: "rgba(15, 23, 42, 0.75)",
+      backdropFilter: "blur(6px)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 10000,
+      animation: "fadeIn 0.25s ease",
+      padding: 16,
+    }}>
+      <div style={{
+        background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)",
+        borderRadius: 24,
+        width: "100%",
+        maxWidth: 500,
+        padding: "32px 28px",
+        boxShadow: "0 25px 50px -12px rgba(245, 158, 11, 0.25), 0 0 0 2px #f59e0b",
+        color: "#fff",
+        textAlign: "center",
+        animation: "scaleIn 0.25s ease",
+        position: "relative",
+      }}>
+        {/* Ícone Dourado Premium */}
+        <div style={{
+          width: 68,
+          height: 68,
+          borderRadius: "50%",
+          background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          margin: "0 auto 20px",
+          fontSize: 32,
+          boxShadow: "0 0 25px rgba(245, 158, 11, 0.5)",
+        }}>
+          👑
+        </div>
+
+        {/* Badge CEO */}
+        <div style={{
+          display: "inline-block",
+          fontSize: 11,
+          fontWeight: 800,
+          letterSpacing: 1.5,
+          textTransform: "uppercase",
+          color: "#fef08a",
+          background: "rgba(245, 158, 11, 0.2)",
+          padding: "5px 14px",
+          borderRadius: 20,
+          border: "1px solid rgba(245, 158, 11, 0.4)",
+          marginBottom: 14,
+        }}>
+          Governança Superior CEO — Prazo Encerrado
+        </div>
+
+        {/* Título */}
+        <h3 style={{
+          fontSize: 20,
+          fontWeight: 800,
+          color: "#fff",
+          margin: "0 0 12px",
+          lineHeight: 1.3,
+        }}>
+          Não é mais possível bloquear o {bimestre}º Bimestre
+        </h3>
+
+        {/* Texto descritivo */}
+        <p style={{
+          fontSize: 14,
+          color: "#cbd5e1",
+          lineHeight: 1.6,
+          margin: "0 0 20px",
+        }}>
+          O prazo limite estabelecido pela Direção Geral (CEO) para este bimestre
+          {dataFormatada ? ` (${dataFormatada})` : ""} foi atingido.
+          A partir desta data, o boletim é <strong style={{ color: "#fef08a" }}>liberado automaticamente</strong> no
+          App EDUCA MOBILE para estudantes e responsáveis.
+        </p>
+
+        {/* Box Informativo Web */}
+        <div style={{
+          background: "rgba(255, 255, 255, 0.07)",
+          borderRadius: 12,
+          padding: "12px 16px",
+          fontSize: 12.5,
+          color: "#93c5fd",
+          textAlign: "left",
+          marginBottom: 24,
+          borderLeft: "3px solid #3b82f6",
+        }}>
+          💡 <strong>Observação:</strong> A consulta ao boletim pelo portal web permanece sempre liberada e não sofre restrições.
+        </div>
+
+        {/* Botão Entendido */}
+        <button
+          type="button"
+          onClick={onClose}
+          style={{
+            width: "100%",
+            padding: "14px",
+            borderRadius: 12,
+            border: "none",
+            background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+            color: "#0f172a",
+            fontWeight: 800,
+            fontSize: 15,
+            cursor: "pointer",
+            boxShadow: "0 8px 20px rgba(245, 158, 11, 0.4)",
+            transition: "transform 0.15s ease",
+          }}
+        >
+          Entendido
+        </button>
+      </div>
     </div>
   );
 }

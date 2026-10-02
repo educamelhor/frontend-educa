@@ -5,7 +5,7 @@
 // - Aba 2: Acompanhamento de Lançamentos (Nova feature real com dados do backend)
 // ============================================================================
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import api from "../../../services/api";
 import {
   FunnelIcon,
@@ -149,9 +149,12 @@ export default function BoletimEdicao() {
   }, []);
 
   // ---------------------------------------------------------------------------
-  // Carregar dados de Acompanhamento
+  // Carregar dados de Acompanhamento (com proteção contra race conditions)
   // ---------------------------------------------------------------------------
+  const reqIdRef = useRef(0);
+
   const fetchAcompanhamento = async () => {
+    const currentReqId = ++reqIdRef.current;
     setLoadingAcomp(true);
     try {
       const res = await api.get("/api/secretaria/relatorios/acompanhamento-notas", {
@@ -163,12 +166,18 @@ export default function BoletimEdicao() {
           turma_id: filtroTurma,
         }
       });
-      setDadosAcomp(res.data?.dados || []);
+      if (currentReqId === reqIdRef.current) {
+        setDadosAcomp(res.data?.dados || []);
+      }
     } catch (err) {
-      console.error("Erro ao buscar dados do acompanhamento:", err);
-      setDadosAcomp([]);
+      if (currentReqId === reqIdRef.current) {
+        console.error("Erro ao buscar dados do acompanhamento:", err);
+        setDadosAcomp([]);
+      }
     } finally {
-      setLoadingAcomp(false);
+      if (currentReqId === reqIdRef.current) {
+        setLoadingAcomp(false);
+      }
     }
   };
 

@@ -92,6 +92,33 @@ function TurnoBadge({ turno }) {
   );
 }
 
+const TIPO_STYLE = {
+  REGULAR:             { label: 'Regular', bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' },
+  PARTE_DIVERSIFICADA: { label: 'Parte Diversificada', bg: '#fdf4ff', color: '#a21caf', border: '#f5d0fe' },
+  IFA:                 { label: 'IFA', bg: '#fef3c7', color: '#b45309', border: '#fde68a' },
+  PCA:                 { label: 'PCA', bg: '#f0fdf4', color: '#15803d', border: '#bbf7d0' },
+  ELETIVA:             { label: 'Eletiva', bg: '#ecfeff', color: '#0e7490', border: '#a5f3fc' },
+  PROJETO:             { label: 'Projeto', bg: '#f5f3ff', color: '#6d28d9', border: '#ddd6fe' },
+};
+
+function TipoBadge({ tipo }) {
+  const conf = TIPO_STYLE[tipo] || TIPO_STYLE.REGULAR;
+  return (
+    <span style={{
+      display: 'inline-block',
+      padding: '2px 8px',
+      borderRadius: 12,
+      fontSize: 11,
+      fontWeight: 600,
+      background: conf.bg,
+      color: conf.color,
+      border: `1px solid ${conf.border}`
+    }}>
+      {conf.label}
+    </span>
+  );
+}
+
 // ── Helpers de comparação de nomes ───────────────────────────────────────────
 function normalizeStr(str = '') {
   return str.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().replace(/[\s_\-]/g, '');
@@ -221,21 +248,11 @@ export default function ListaDisciplinas() {
 
   const matchesDisciplina = (d) => {
     if (!term) return true;
-    const nome   = normalize(d.disciplina ?? d.nome ?? '');
-    const abrev  = normalize(d.abreviatura ?? '');
-    const etapa  = normalize(d.etapa ?? '');
-    const turno  = normalize(d.turno ?? '');
-    // Verifica nome direto
-    if (nome.includes(term)) return true;
-    // Verifica abreviatura
-    if (abrev.includes(term)) return true;
-    // Verifica etapa (valor bruto + aliases)
-    if (etapa.includes(term)) return true;
-    if (ETAPA_ALIASES[term] && etapa.includes(ETAPA_ALIASES[term])) return true;
-    // Verifica turno (valor bruto + aliases)
-    if (turno.includes(term)) return true;
-    if (TURNO_ALIASES[term] && turno.includes(TURNO_ALIASES[term])) return true;
-    return false;
+    const nome    = normalize(d.disciplina ?? d.nome ?? '');
+    const abrev   = normalize(d.abreviatura ?? '');
+    const tipo    = normalize(d.tipo ?? '');
+    const oficial = normalize(d.nome_oficial ?? '');
+    return nome.includes(term) || abrev.includes(term) || tipo.includes(term) || oficial.includes(term);
   };
 
 // ─────────────────────────────────────────────────────────────
@@ -261,59 +278,26 @@ export default function ListaDisciplinas() {
     try {
       const nomeOriginal = dados.nome ?? dados.disciplina ?? '';
       const nomeNovo     = normalizeStr(nomeOriginal);
-      const etapaNova    = (dados.etapa  ?? 'GERAL').toUpperCase();
-      const turnoNovo    = (dados.turno  ?? 'INTEGRAL').toUpperCase();
 
       for (const d of disciplinas) {
         if (dados.id && d.id === dados.id) continue;
 
-        const nomeExistente  = normalizeStr(d.nome ?? d.disciplina ?? '');
-        const etapaExistente = (d.etapa  ?? 'GERAL').toUpperCase();
-        const turnoExistente = (d.turno  ?? 'INTEGRAL').toUpperCase();
+        const nomeExistente = normalizeStr(d.nome ?? d.disciplina ?? '');
 
-        if (etapaNova !== etapaExistente || turnoNovo !== turnoExistente) continue;
-
-        // Regra 1: nome EXATAMENTE igual → bloqueia + sugere numeração
+        // Regra 1: nome EXATAMENTE igual na mesma escola → bloqueia
         if (nomeNovo === nomeExistente) {
-          const base   = nomeOriginal.trim().replace(/\d+$/, '');
-          const usados = disciplinas
-            .filter(x => normalizeStr(x.nome ?? x.disciplina ?? '').replace(/\d+$/, '') === normalizeStr(base)
-              && (x.etapa  ?? 'GERAL').toUpperCase()     === etapaNova
-              && (x.turno  ?? 'INTEGRAL').toUpperCase()  === turnoNovo)
-            .map(x => parseInt((x.nome ?? x.disciplina ?? '').match(/\d+$/)?.[0] ?? '0', 10))
-            .filter(n => n > 0);
-          const proximo = usados.length ? Math.max(...usados) + 1 : 1;
           setSimilarModal({
             tipo: 'exato',
             dadosPendentes: null,
             nomeExistente: d.nome || d.disciplina,
-            sugestao: `${base.trim()}${proximo}`,
-            mensagem: `Já existe "${d.nome || d.disciplina}" nesta etapa e turno.`,
+            sugestao: null,
+            mensagem: `Já existe a disciplina "${d.nome || d.disciplina}" cadastrada nesta escola.`,
           });
           setLoading(false);
           return false;
         }
 
-        // Regra 2: mesma base + mesmo número (ex: PCA1 == PCA1) → bloqueia
-        const baseNovo      = nomeNovo.replace(/\d+$/, '');
-        const baseExistente = nomeExistente.replace(/\d+$/, '');
-        if (baseNovo === baseExistente) {
-          const numNovo  = nomeNovo.match(/\d+$/)?.[0];
-          const numExist = nomeExistente.match(/\d+$/)?.[0];
-          if (numNovo && numNovo === numExist) {
-            setSimilarModal({
-              tipo: 'exato',
-              dadosPendentes: null,
-              nomeExistente: d.nome || d.disciplina,
-              sugestao: null,
-              mensagem: `Já existe "${d.nome || d.disciplina}" com o mesmo número nesta etapa e turno.`,
-            });
-            setLoading(false);
-            return false;
-          }
-        }
-
-        // Regra 3: nome similar (Levenshtein ≤ 2) → abre modal de confirmação
+        // Regra 2: nome similar (Levenshtein ≤ 2) → abre modal de confirmação
         const dist = levenshtein(nomeNovo, nomeExistente);
         if (dist > 0 && dist <= 2) {
           setSimilarModal({
@@ -321,7 +305,7 @@ export default function ListaDisciplinas() {
             dadosPendentes: dados,
             nomeExistente: d.nome || d.disciplina,
             sugestao: null,
-            mensagem: `O nome "${nomeOriginal.trim()}" é muito parecido com "${d.nome || d.disciplina}" (mesma etapa/turno).`,
+            mensagem: `O nome "${nomeOriginal.trim()}" é muito parecido com "${d.nome || d.disciplina}". Deseja continuar?`,
           });
           setLoading(false);
           return false;
@@ -416,7 +400,7 @@ export default function ListaDisciplinas() {
 
             <input
               type="text"
-              placeholder="🔍 Disciplina, Abreviatura, Etapa ou Turno..."
+              placeholder="🔍 Buscar por disciplina, abreviatura ou padrão..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               className="border rounded p-2 w-80 placeholder-gray-500"
@@ -439,44 +423,43 @@ export default function ListaDisciplinas() {
             <table className="w-full border-collapse mt-4">
               <thead className="bg-blue-100">
                 <tr>
-                  <th className="p-2 border text-center font-medium text-blue-900">Disciplina</th>
-                  <th className="p-2 border text-center font-medium text-blue-900">Abreviatura</th>
-                  <th className="p-2 border text-center font-medium text-blue-900">Etapa</th>
-                  <th className="p-2 border text-center font-medium text-blue-900">Turno</th>
-                  <th className="p-2 border text-center font-medium text-blue-900">Carga</th>
-                  <th className="p-2 border text-center font-medium text-blue-900">Ações</th>
+                  <th className="p-2.5 border text-center font-semibold text-blue-950">Disciplina</th>
+                  <th className="p-2.5 border text-center font-semibold text-blue-950">Abreviatura</th>
+                  <th className="p-2.5 border text-center font-semibold text-blue-950">Tipo</th>
+                  <th className="p-2.5 border text-center font-semibold text-blue-950">Padrão Oficial (EDUCADF)</th>
+                  <th className="p-2.5 border text-center font-semibold text-blue-950">Ações</th>
                 </tr>
               </thead>
               <tbody>
                 {disciplinas
                   .filter(matchesDisciplina)
                   .map(d => (
-                    <tr key={d.id} className="hover:bg-blue-50">
-                      <td className="p-2 border text-center uppercase font-medium">
-                        {d.disciplina}
-                        {d.nome_oficial && (
-                          <span className="block text-[11px] text-emerald-600 font-semibold tracking-normal normal-case">
-                            EDUCADF: {d.nome_oficial}
-                          </span>
-                        )}
+                    <tr key={d.id} className="hover:bg-blue-50 transition-colors">
+                      <td className="p-2.5 border text-center uppercase font-bold text-slate-800">
+                        {d.disciplina || d.nome}
                       </td>
-                      <td className="p-2 border text-center">
+                      <td className="p-2.5 border text-center">
                         {d.abreviatura ? (
                           <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-300">
                             {d.abreviatura}
                           </span>
                         ) : (
-                          <span className="text-slate-400 font-medium">-</span>
+                          <span className="text-slate-400 font-medium text-xs">-</span>
                         )}
                       </td>
-                      <td className="p-2 border text-center">
-                        <EtapaBadge etapa={d.etapa} />
+                      <td className="p-2.5 border text-center">
+                        <TipoBadge tipo={d.tipo} />
                       </td>
-                      <td className="p-2 border text-center">
-                        <TurnoBadge turno={d.turno} />
+                      <td className="p-2.5 border text-center">
+                        {d.nome_oficial ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            ✓ {d.nome_oficial}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 text-xs italic">Não mapeado</span>
+                        )}
                       </td>
-                      <td className="p-2 border text-center">{d.carga}</td>
-                      <td className="p-2 border text-center space-x-2">
+                      <td className="p-2.5 border text-center space-x-2">
                         <button
                           onClick={() => {
                             setEditingDisciplina(d);
@@ -485,7 +468,7 @@ export default function ListaDisciplinas() {
                           className="text-blue-600 hover:text-blue-800"
                           title="Editar"
                         >
-                          <PencilSquareIcon className="w-5 h-5" />
+                          <PencilSquareIcon className="w-5 h-5 inline" />
                         </button>
 
                         <button
@@ -493,7 +476,7 @@ export default function ListaDisciplinas() {
                           className="text-red-600 hover:text-red-800"
                           title="Excluir"
                         >
-                          <TrashIcon className="w-5 h-5" />
+                          <TrashIcon className="w-5 h-5 inline" />
                         </button>
                       </td>
                     </tr>
@@ -531,10 +514,7 @@ export default function ListaDisciplinas() {
                 <h3 className="text-lg font-semibold">Confirmação</h3>
                 <p>
                   Tem certeza que deseja excluir a disciplina{" "}
-                  <strong>{toDeleteDisciplina?.disciplina}</strong>
-                  {(toDeleteDisciplina?.etapa || toDeleteDisciplina?.turno) && (
-                    <> (<EtapaBadge etapa={toDeleteDisciplina.etapa} /> <TurnoBadge turno={toDeleteDisciplina.turno} />)</>
-                  )}
+                  <strong>{toDeleteDisciplina?.disciplina || toDeleteDisciplina?.nome}</strong>
                   ?
                 </p>
                 <div className="flex justify-end space-x-2">

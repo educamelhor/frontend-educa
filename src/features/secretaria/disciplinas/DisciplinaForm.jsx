@@ -1,21 +1,5 @@
 import React, { useState, useEffect } from 'react';
 
-// Opções de etapa (mesmo padrão de TurmaForm)
-const ETAPAS = [
-  { value: 'INFANTIL',    label: 'Infantil' },
-  { value: 'FUNDAMENTAL', label: 'Fundamental' },
-  { value: 'MÉDIO',       label: 'Médio' },
-  { value: 'GERAL',       label: 'Geral (todas as etapas)' },
-];
-
-const TURNOS = [
-  { value: 'DIURNO',     label: 'Diurno' },
-  { value: 'INTEGRAL',   label: 'Integral (Mat. + Vesp.)' },
-  { value: 'MATUTINO',   label: 'Matutino' },
-  { value: 'VESPERTINO', label: 'Vespertino' },
-  { value: 'NOTURNO',    label: 'Noturno' },
-];
-
 const TIPOS = [
   { value: 'REGULAR',             label: 'Regular (Base Nacional)' },
   { value: 'PARTE_DIVERSIFICADA', label: 'Parte Diversificada (PD1/PD2/PD3)' },
@@ -25,24 +9,16 @@ const TIPOS = [
   { value: 'PROJETO',             label: 'Projeto Interdisciplinar' },
 ];
 
-// ─── Paletas de cores ────────────────────────────────────────────────────────
-const ETAPA_COLORS = {
-  INFANTIL:    { bg: '#e0f2fe', color: '#0369a1', border: '#7dd3fc' },
-  FUNDAMENTAL: { bg: '#dcfce7', color: '#15803d', border: '#86efac' },
-  'MÉDIO':     { bg: '#fef3c7', color: '#92400e', border: '#fcd34d' },
-  GERAL:       { bg: '#f3f4f6', color: '#6b7280', border: '#d1d5db' },
-};
-
-const TURNO_COLORS = {
-  DIURNO:     { bg: '#f0f9ff', color: '#0369a1', border: '#7dd3fc' },
-  INTEGRAL:   { bg: '#fffbeb', color: '#b45309', border: '#fcd34d' },
-  MATUTINO:   { bg: '#ecfdf5', color: '#047857', border: '#6ee7b7' },
-  VESPERTINO: { bg: '#eff6ff', color: '#1d4ed8', border: '#93c5fd' },
-  NOTURNO:    { bg: '#1e1b4b', color: '#c7d2fe', border: '#4338ca' },
-};
-
 export default function DisciplinaForm({ open, onClose, onSubmit, disciplina }) {
-  const [form, setForm] = useState({ nome: '', abreviatura: '', nome_oficial: '', carga: '', etapa: 'FUNDAMENTAL', turno: 'INTEGRAL', tipo: 'REGULAR' });
+  const [form, setForm] = useState({
+    nome: '',
+    abreviatura: '',
+    nome_oficial: '',
+    tipo: 'REGULAR',
+    carga: 1,
+    etapa: 'GERAL',
+    turno: 'INTEGRAL'
+  });
   const [errors, setErrors] = useState({});
   const [sending, setSending] = useState(false);
 
@@ -54,13 +30,22 @@ export default function DisciplinaForm({ open, onClose, onSubmit, disciplina }) 
         nome: disciplina.nome ?? disciplina.disciplina ?? '',
         abreviatura: disciplina.abreviatura ?? '',
         nome_oficial: disciplina.nome_oficial ?? '',
-        carga: disciplina.carga ?? '',
-        etapa: disciplina.etapa ?? 'FUNDAMENTAL',
-        turno: disciplina.turno ?? 'INTEGRAL',
         tipo: disciplina.tipo ?? 'REGULAR',
+        carga: disciplina.carga ?? 1,
+        etapa: disciplina.etapa ?? 'GERAL',
+        turno: disciplina.turno ?? 'INTEGRAL',
       });
     } else {
-      setForm({ id: null, nome: '', abreviatura: '', nome_oficial: '', carga: '', etapa: 'FUNDAMENTAL', turno: 'INTEGRAL', tipo: 'REGULAR' });
+      setForm({
+        id: null,
+        nome: '',
+        abreviatura: '',
+        nome_oficial: '',
+        tipo: 'REGULAR',
+        carga: 1,
+        etapa: 'GERAL',
+        turno: 'INTEGRAL'
+      });
       setErrors({});
     }
   }, [open, disciplina]);
@@ -73,10 +58,7 @@ export default function DisciplinaForm({ open, onClose, onSubmit, disciplina }) 
 
   const validate = () => {
     const errs = {};
-    if (!form.nome.trim()) errs.nome  = 'Nome é obrigatório';
-    if (!form.carga)        errs.carga = 'Carga é obrigatória';
-    if (!form.etapa)        errs.etapa = 'Etapa é obrigatória';
-    if (!form.turno)        errs.turno = 'Turno é obrigatório';
+    if (!form.nome.trim()) errs.nome = 'Nome da disciplina é obrigatório';
     return errs;
   };
 
@@ -92,11 +74,8 @@ export default function DisciplinaForm({ open, onClose, onSubmit, disciplina }) 
 
   if (!open) return null;
 
-  const etapaCor = ETAPA_COLORS[form.etapa] || ETAPA_COLORS.GERAL;
-  const turnoCor = TURNO_COLORS[form.turno] || TURNO_COLORS.INTEGRAL;
-  const isEdit   = !!form.id;
+  const isEdit = !!form.id;
 
-  // Estilos de campo reutilizável
   const fieldStyle = hasError => ({
     width: '100%',
     padding: '11px 14px',
@@ -170,7 +149,7 @@ export default function DisciplinaForm({ open, onClose, onSubmit, disciplina }) 
                   {isEdit ? 'Editar Disciplina' : 'Nova Disciplina'}
                 </h2>
                 <p style={{ margin:0, color:'rgba(255,255,255,0.75)', fontSize:13, marginTop:2 }}>
-                  {isEdit ? 'Altere os dados abaixo' : 'Preencha os dados da disciplina'}
+                  Catálogo Único de Disciplinas da Escola
                 </p>
               </div>
             </div>
@@ -184,7 +163,7 @@ export default function DisciplinaForm({ open, onClose, onSubmit, disciplina }) 
               {/* Campo: Disciplina */}
               <div>
                 <label style={{ display:'block', marginBottom:6, fontSize:13, fontWeight:600, color:'#374151', textTransform:'uppercase', letterSpacing:'0.5px' }}>
-                  Disciplina
+                  Disciplina <span style={{ color:'#ef4444' }}>*</span>
                 </label>
                 <input
                   name="nome"
@@ -219,91 +198,6 @@ export default function DisciplinaForm({ open, onClose, onSubmit, disciplina }) 
               </div>
             </div>
 
-            {/* Etapa + Turno lado a lado */}
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginBottom:16 }}>
-
-              {/* Campo: Etapa */}
-              <div>
-                <label style={{ display:'block', marginBottom:6, fontSize:13, fontWeight:600, color:'#374151', textTransform:'uppercase', letterSpacing:'0.5px' }}>
-                  Etapa
-                </label>
-                <div style={{ position:'relative' }}>
-                  <select
-                    name="etapa"
-                    value={form.etapa}
-                    onChange={handleChange}
-                    style={{ ...fieldStyle(errors.etapa), paddingRight:34, appearance:'none', cursor:'pointer' }}
-                    onFocus={onFocusStyle}
-                    onBlur={onBlurStyle(errors.etapa)}
-                  >
-                    {ETAPAS.map(op => (
-                      <option key={op.value} value={op.value}>{op.label}</option>
-                    ))}
-                  </select>
-                  <span style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', pointerEvents:'none', color:'#6b7280', fontSize:11 }}>▼</span>
-                </div>
-                {errors.etapa && <p style={{ margin:'4px 0 0', fontSize:12, color:'#ef4444' }}>⚠ {errors.etapa}</p>}
-              </div>
-
-              {/* Campo: Turno */}
-              <div>
-                <label style={{ display:'block', marginBottom:6, fontSize:13, fontWeight:600, color:'#374151', textTransform:'uppercase', letterSpacing:'0.5px' }}>
-                  Turno
-                </label>
-                <div style={{ position:'relative' }}>
-                  <select
-                    name="turno"
-                    value={form.turno}
-                    onChange={handleChange}
-                    style={{ ...fieldStyle(errors.turno), paddingRight:34, appearance:'none', cursor:'pointer' }}
-                    onFocus={onFocusStyle}
-                    onBlur={onBlurStyle(errors.turno)}
-                  >
-                    {TURNOS.map(op => (
-                      <option key={op.value} value={op.value}>{op.label}</option>
-                    ))}
-                  </select>
-                  <span style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', pointerEvents:'none', color:'#6b7280', fontSize:11 }}>▼</span>
-                </div>
-                {errors.turno && <p style={{ margin:'4px 0 0', fontSize:12, color:'#ef4444' }}>⚠ {errors.turno}</p>}
-              </div>
-            </div>
-
-            {/* Preview badges */}
-            {(form.etapa || form.turno || form.abreviatura) && (
-              <div style={{ display:'flex', flexWrap:'wrap', alignItems:'center', gap:6, marginBottom:14 }}>
-                {form.abreviatura && (
-                  <span style={{
-                    display:'inline-block', padding:'3px 10px', borderRadius:20, fontSize:12, fontWeight:700,
-                    background: '#f1f5f9', color: '#334155', border: '1px solid #cbd5e1',
-                  }}>
-                    {form.abreviatura.trim()}
-                  </span>
-                )}
-                {form.etapa && (
-                  <span style={{
-                    display:'inline-block', padding:'3px 10px', borderRadius:20, fontSize:12, fontWeight:600,
-                    background: etapaCor.bg, color: etapaCor.color, border: `1px solid ${etapaCor.border}`,
-                  }}>
-                    {ETAPAS.find(e => e.value === form.etapa)?.label.split(' ')[0]}
-                  </span>
-                )}
-                {form.turno && (
-                  <span style={{
-                    display:'inline-block', padding:'3px 10px', borderRadius:20, fontSize:12, fontWeight:600,
-                    background: turnoCor.bg, color: turnoCor.color, border: `1px solid ${turnoCor.border}`,
-                  }}>
-                    {TURNOS.find(t => t.value === form.turno)?.label}
-                  </span>
-                )}
-                {form.nome && (
-                  <span style={{ fontSize:12, color:'#6b7280' }}>
-                    → boletim: <strong>"{form.nome.trim()}"</strong>
-                  </span>
-                )}
-              </div>
-            )}
-
             {/* Campo: Tipo de Disciplina */}
             <div style={{ marginBottom: 16 }}>
               <label style={{ display:'block', marginBottom:6, fontSize:13, fontWeight:600, color:'#374151', textTransform:'uppercase', letterSpacing:'0.5px' }}>
@@ -333,69 +227,57 @@ export default function DisciplinaForm({ open, onClose, onSubmit, disciplina }) 
               )}
             </div>
 
-            {/* Carga Horária + Padrão Oficial EDUCADF */}
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1.6fr', gap:14, marginBottom: 8 }}>
-              {/* Campo: Carga Horária */}
-              <div>
-                <label style={{ display:'block', marginBottom:6, fontSize:13, fontWeight:600, color:'#374151', textTransform:'uppercase', letterSpacing:'0.5px' }}>
-                  Carga (aulas)
-                </label>
-                <div style={{ position:'relative' }}>
-                  <input
-                    name="carga"
-                    type="number"
-                    min="1"
-                    max="30"
-                    value={form.carga}
-                    onChange={handleChange}
-                    placeholder="Ex: 5"
-                    style={{ ...fieldStyle(errors.carga), paddingRight:50 }}
-                    onFocus={onFocusStyle}
-                    onBlur={onBlurStyle(errors.carga)}
-                  />
-                  <span style={{ position:'absolute', right:14, top:'50%', transform:'translateY(-50%)', fontSize:12, color:'#9ca3af', fontWeight:500 }}>aulas</span>
-                </div>
-                {errors.carga && <p style={{ margin:'4px 0 0', fontSize:12, color:'#ef4444' }}>⚠ {errors.carga}</p>}
-              </div>
-
-              {/* Campo: Padrão Oficial EDUCADF */}
-              <div>
-                <label style={{ display:'block', marginBottom:6, fontSize:13, fontWeight:600, color:'#059669', textTransform:'uppercase', letterSpacing:'0.5px' }}>
-                  Padrão Oficial <span style={{ fontSize:11, color:'#9ca3af', fontWeight:400, textTransform:'none' }}>(EDUCADF)</span>
-                </label>
-                <input
-                  name="nome_oficial"
-                  list="seedf-disciplinas-form-list"
-                  value={form.nome_oficial}
-                  onChange={handleChange}
-                  placeholder="Ex: LÍNGUA PORTUGUESA"
-                  style={fieldStyle(false)}
-                  onFocus={onFocusStyle}
-                  onBlur={onBlurStyle(false)}
-                />
-              </div>
+            {/* Campo: Padrão Oficial EDUCADF */}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display:'block', marginBottom:6, fontSize:13, fontWeight:600, color:'#059669', textTransform:'uppercase', letterSpacing:'0.5px' }}>
+                Padrão Oficial <span style={{ fontSize:11, color:'#9ca3af', fontWeight:400, textTransform:'none' }}>(Mapeamento EDUCADF)</span>
+              </label>
+              <input
+                name="nome_oficial"
+                list="seedf-disciplinas-form-list"
+                value={form.nome_oficial}
+                onChange={handleChange}
+                placeholder="Ex: LÍNGUA PORTUGUESA"
+                style={fieldStyle(false)}
+                onFocus={onFocusStyle}
+                onBlur={onBlurStyle(false)}
+              />
+              <datalist id="seedf-disciplinas-form-list">
+                <option value="LÍNGUA PORTUGUESA" />
+                <option value="MATEMÁTICA" />
+                <option value="CIÊNCIAS NATURAIS" />
+                <option value="HISTÓRIA" />
+                <option value="GEOGRAFIA" />
+                <option value="ARTES" />
+                <option value="EDUCAÇÃO FÍSICA" />
+                <option value="LEM/INGLÊS" />
+                <option value="LEM/ESPANHOL" />
+                <option value="PARTE DIVERSIFICADA I" />
+                <option value="PARTE DIVERSIFICADA II" />
+                <option value="PARTE DIVERSIFICADA III" />
+                <option value="ENSINO RELIGIOSO" />
+                <option value="BIOLOGIA" />
+                <option value="FÍSICA" />
+                <option value="QUÍMICA" />
+                <option value="FILOSOFIA" />
+                <option value="SOCIOLOGIA" />
+              </datalist>
             </div>
 
-            <datalist id="seedf-disciplinas-form-list">
-              <option value="LÍNGUA PORTUGUESA" />
-              <option value="MATEMÁTICA" />
-              <option value="CIÊNCIAS NATURAIS" />
-              <option value="HISTÓRIA" />
-              <option value="GEOGRAFIA" />
-              <option value="ARTES" />
-              <option value="EDUCAÇÃO FÍSICA" />
-              <option value="LEM/INGLÊS" />
-              <option value="LEM/ESPANHOL" />
-              <option value="PARTE DIVERSIFICADA I" />
-              <option value="PARTE DIVERSIFICADA II" />
-              <option value="PARTE DIVERSIFICADA III" />
-              <option value="ENSINO RELIGIOSO" />
-              <option value="BIOLOGIA" />
-              <option value="FÍSICA" />
-              <option value="QUÍMICA" />
-              <option value="FILOSOFIA" />
-              <option value="SOCIOLOGIA" />
-            </datalist>
+            {/* Banner explicativo de modelo limpo */}
+            <div style={{
+              padding: '10px 14px',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              borderRadius: 10,
+              marginBottom: 10,
+              fontSize: 12,
+              color: '#64748b',
+              lineHeight: 1.5
+            }}>
+              💡 <strong>Estrutura:</strong> A <em>Etapa</em> e o <em>Turno</em> estão vinculados às <strong>Turmas</strong>. A <em>Carga Horária Semanal</em> é definida de forma autônoma para cada turma no submenu <strong>Cargas Horárias</strong>.
+            </div>
+
           </div>
 
           {/* ── Rodapé ────────────────────────────────────────────────────── */}

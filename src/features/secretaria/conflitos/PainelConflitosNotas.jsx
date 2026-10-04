@@ -7,14 +7,17 @@ export default function PainelConflitosNotas() {
   const [loading, setLoading] = useState(true);
   const [statusFiltro, setStatusFiltro] = useState('ABERTO');
   const [resolvendoId, setResolvendoId] = useState(null);
+  const [erro, setErro] = useState(null);
 
   const fetchConflitos = async () => {
     try {
       setLoading(true);
+      setErro(null);
       const res = await api.get(`/migracao-conflitos?status=${statusFiltro}`);
-      setConflitos(res.data);
+      setConflitos(res.data || []);
     } catch (err) {
       console.error('Erro ao buscar conflitos de notas:', err);
+      setErro(err.response?.data?.message || 'Erro ao carregar conflitos do servidor.');
     } finally {
       setLoading(false);
     }
@@ -80,6 +83,12 @@ export default function PainelConflitosNotas() {
           ))}
         </div>
       </div>
+
+      {erro && (
+        <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', color: '#991b1b', padding: '12px 16px', borderRadius: '8px', fontSize: '14px', marginBottom: '20px' }}>
+          <strong>Aviso:</strong> {erro}
+        </div>
+      )}
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: '60px', color: '#64748b' }}>Carregando fila de conflitos...</div>

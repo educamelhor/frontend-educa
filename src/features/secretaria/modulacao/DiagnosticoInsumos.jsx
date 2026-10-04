@@ -38,7 +38,7 @@ function exportToCSV(filename, rows) {
   URL.revokeObjectURL(url);
 }
 
-export default function DiagnosticoInsumos({ turnoInicial = "" }) {
+export default function DiagnosticoInsumos({ turnoInicial = "", semestreInicial = 1 }) {
   const navigate = useNavigate();
 
   // ─────────────────────────────────────────────────────────────
@@ -46,6 +46,7 @@ export default function DiagnosticoInsumos({ turnoInicial = "" }) {
   // ─────────────────────────────────────────────────────────────
   const [turnos, setTurnos] = useState([]);
   const [turno, setTurno] = useState(turnoInicial || "");
+  const [semestre, setSemestre] = useState(semestreInicial || 1);
   const [carregandoTurnos, setCarregandoTurnos] = useState(false);
   const [erroTurnos, setErroTurnos] = useState("");
 
@@ -77,18 +78,18 @@ export default function DiagnosticoInsumos({ turnoInicial = "" }) {
   }, []);
 
   useEffect(() => {
-    if (turno) carregarDiagnostico(turno);
-  }, [turno]);
+    if (turno) carregarDiagnostico(turno, semestre);
+  }, [turno, semestre]);
 
   // ─────────────────────────────────────────────────────────────
   // Buscar Diagnóstico
   // ─────────────────────────────────────────────────────────────
-  async function carregarDiagnostico(turnoSelecionado) {
+  async function carregarDiagnostico(turnoSelecionado, sem = semestre) {
     try {
       setLoadingDiag(true);
       setErroDiag("");
       const { data } = await api.get("/api/modulacao/diagnostico", {
-        params: { turno: turnoSelecionado },
+        params: { turno: turnoSelecionado, semestre: sem },
       });
       setResumo(Array.isArray(data?.resumo_por_disciplina) ? data.resumo_por_disciplina : []);
       setDetalhe(Array.isArray(data?.detalhe_por_turma) ? data.detalhe_por_turma : []);
@@ -168,20 +169,48 @@ export default function DiagnosticoInsumos({ turnoInicial = "" }) {
         <div className="flex flex-col gap-4">
           {/* Linha 1: Turno + estado de carregamento */}
           <div className="flex flex-col md:flex-row gap-3 items-start md:items-center justify-between">
-            <div className="flex items-center gap-3">
-              <label className="font-semibold text-blue-900">Turno:</label>
-              <select
-                className="border rounded px-3 py-2"
-                value={turno}
-                onChange={(e) => setTurno(e.target.value)}
-              >
-                <option value="">Selecione…</option>
-                {turnos.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
+            <div className="flex items-center gap-4 flex-wrap">
+              <div className="flex items-center gap-2">
+                <label className="font-semibold text-blue-900 text-sm">Turno:</label>
+                <select
+                  className="border rounded-xl px-3 py-1.5 text-sm font-medium"
+                  value={turno}
+                  onChange={(e) => setTurno(e.target.value)}
+                >
+                  <option value="">Selecione…</option>
+                  {turnos.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Seletor de Semestre */}
+              <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setSemestre(1)}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    semestre === 1
+                      ? "bg-blue-600 text-white shadow-xs"
+                      : "text-slate-600 hover:text-blue-700"
+                  }`}
+                >
+                  1º Semestre
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSemestre(2)}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    semestre === 2
+                      ? "bg-blue-600 text-white shadow-xs"
+                      : "text-slate-600 hover:text-blue-700"
+                  }`}
+                >
+                  2º Semestre
+                </button>
+              </div>
             </div>
 
             <div className="text-sm text-gray-600">

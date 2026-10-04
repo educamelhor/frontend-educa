@@ -8,7 +8,7 @@ import React, { useEffect, useRef } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import DiagnosticoInsumos from "./DiagnosticoInsumos";
 
-export default function ModalDiagnosticoInsumos({ open, turnoInicial, onClose }) {
+export default function ModalDiagnosticoInsumos({ open, turnoInicial, semestreInicial = 1, onClose }) {
   const dialogRef = useRef(null);
 
   useEffect(() => {
@@ -67,7 +67,7 @@ export default function ModalDiagnosticoInsumos({ open, turnoInicial, onClose })
 
         {/* Conteúdo do diagnóstico dentro do modal */}
         <div className="w-full h-full overflow-auto p-4 bg-blue-50">
-          <DiagnosticoInsumos turnoInicial={turnoInicial} />
+          <DiagnosticoInsumos turnoInicial={turnoInicial} semestreInicial={semestreInicial} />
         </div>
       </div>
     </div>

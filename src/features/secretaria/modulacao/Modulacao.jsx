@@ -10,8 +10,17 @@
 // ============================================================================
 
 import React, { useEffect, useMemo, useState, useRef } from "react";
+import ReactDOM from "react-dom";
 import api from "../../../services/api";
-import { ChevronDownIcon, UserPlusIcon, ClockIcon, DocumentTextIcon } from "@heroicons/react/24/outline";
+import {
+  ChevronDownIcon,
+  UserPlusIcon,
+  ClockIcon,
+  DocumentTextIcon,
+  XMarkIcon,
+  MagnifyingGlassIcon,
+  CheckIcon,
+} from "@heroicons/react/24/outline";
 import ModalDiagnosticoInsumos from "./ModalDiagnosticoInsumos"; // ← modal pronto
 
 // ============================================================================
@@ -132,6 +141,7 @@ function filtraPorTurno(lista, turnoAlvo) {
 export default function Modulacao() {
   // Turno e dados
   const [turnoSelecionado, setTurnoSelecionado] = useState("");
+  const [semestreSelecionado, setSemestreSelecionado] = useState(1); // 1 = 1º Semestre, 2 = 2º Semestre
   const [turmasTurno, setTurmasTurno] = useState([]);
   const [turmasAviso, setTurmasAviso] = useState("");
 
@@ -212,6 +222,16 @@ export default function Modulacao() {
     return () => window.removeEventListener("keydown", onKey);
   }, [toast]);
 
+  // Fecha picker de professor por ESC
+  useEffect(() => {
+    if (!abrirPickerProf) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") setAbrirPickerProf(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [abrirPickerProf]);
+
   // Cleanup geral (ao desmontar)
   useEffect(() => {
     return () => {
@@ -258,6 +278,7 @@ export default function Modulacao() {
         turma_id: getTurmaId(a),
         turma_nome: getTurmaNome(a),
         turno: a.turno ?? a?.turma?.turno ?? a?.turno_nome ?? null,
+        semestre: Number(a.semestre ?? 1),
       }))
       .filter((x) => x.professor_id && x.turma_id && x.disciplina_id);
   }
@@ -300,8 +321,11 @@ export default function Modulacao() {
   // --------------------------------------------------------------------------
   // Reação principal ao mudar o turno
   // --------------------------------------------------------------------------
+  // --------------------------------------------------------------------------
+  // Reação principal ao mudar o turno ou semestre
+  // --------------------------------------------------------------------------
   useEffect(() => {
-    async function carregarTurno() {
+    async function carregarTurnoESemestre() {
       setCarregandoTabela(true);
 
       if (!turnoSelecionado) {
@@ -316,13 +340,13 @@ export default function Modulacao() {
 
       try {
         await carregarTurmasDoTurno(turnoSelecionado);
-        // carrega/atualiza o map de total de aulas por professor para este turno
-        const mapAulasTotais = await carregarAulasTotaisDoTurno(turnoSelecionado);
+        // carrega/atualiza o map de total de aulas por professor para este turno e semestre
+        const mapAulasTotais = await carregarAulasTotaisDoTurno(turnoSelecionado, semestreSelecionado);
 
-        // MODULAÇÃO INTELIGENTE: carrega carga real por turma × disciplina
+        // MODULAÇÃO INTELIGENTE: carrega carga real por turma × disciplina para o semestre selecionado
         try {
           const { data: cargaTurmaData } = await api.get("/api/modulacao/carga-turma", {
-            params: { turno: turnoSelecionado },
+            params: { turno: turnoSelecionado, semestre: semestreSelecionado },
           });
           // Normaliza chaves para Number (o backend retorna string em JSON)
           const normalizado = {};
@@ -337,11 +361,13 @@ export default function Modulacao() {
           setCargaPorTurmaDisc({});
         }
 
-        // busca as alocações do turno
-        const { data } = await api.get("/api/modulacao", { params: { turno: turnoSelecionado } });
+        // busca as alocações do turno e semestre
+        const { data } = await api.get("/api/modulacao", {
+          params: { turno: turnoSelecionado, semestre: semestreSelecionado },
+        });
         const alocs = normalizeAlocacoes(data);
 
-        // ── NOVO: 1 linha por (professor_id × disciplina_id) ──────────────────
+        // ── 1 linha por (professor_id × disciplina_id) ──────────────────
         const linhasMap = new Map();
         for (const a of alocs) {
           const key = `${a.professor_id}|${a.disciplina_id}`;
@@ -361,20 +387,25 @@ export default function Modulacao() {
           naturalCompare(x.nome, y.nome) || naturalCompare(x.disciplina_nome, y.disciplina_nome)
         );
 
-          setProfessoresTabela(profs);
-          // alocacoes agora inclui discId para diferenciar linhas do mesmo professor
-          setAlocacoes(alocs.map((a) => ({ profId: a.professor_id, turmaId: a.turma_id, discId: a.disciplina_id })));
-        } catch {
-          setProfessoresTabela([]);
-          setAlocacoes([]);
-        } finally {
-          setCarregandoTabela(false);
-        }
+        setProfessoresTabela(profs);
+        // alocacoes agora inclui discId e semestre
+        setAlocacoes(alocs.map((a) => ({
+          profId: a.professor_id,
+          turmaId: a.turma_id,
+          discId: a.disciplina_id,
+          semestre: a.semestre ?? semestreSelecionado,
+        })));
+      } catch {
+        setProfessoresTabela([]);
+        setAlocacoes([]);
+      } finally {
+        setCarregandoTabela(false);
       }
-      carregarTurno();
-    }, [turnoSelecionado]);
+    }
+    carregarTurnoESemestre();
+  }, [turnoSelecionado, semestreSelecionado]);
 
-  // Recarrega a lista do picker ao alterar o turno, se ele estiver aberto
+  // Recarrega a lista do picker ao alterar o turno ou semestre, se ele estiver aberto
   useEffect(() => {
     if (abrirPickerProf && turnoSelecionado) {
       setCarregandoProf(true);
@@ -382,37 +413,32 @@ export default function Modulacao() {
         setCarregandoProf(false);
       });
     }
-  }, [turnoSelecionado, abrirPickerProf]);
+  }, [turnoSelecionado, semestreSelecionado, abrirPickerProf]);
 
   // --------------------------------------------------------------------------
-  // Busca professores do turno e cria um map { profId: aulasTotal }
-  async function carregarAulasTotaisDoTurno(turno) {
+  // Busca professores do turno e cria um map { profId: aulasTotal } filtrado pelo semestre
+  async function carregarAulasTotaisDoTurno(turno, sem = semestreSelecionado) {
     try {
       let lista = [];
-      // tenta já filtrar por turno no backend
       try {
         const { data } = await api.get(`/api/professores`, { params: { turno } });
         lista = Array.isArray(data) ? data : (Array.isArray(data?.professores) ? data.professores : []);
       } catch {
-        // fallback sem filtro
         const { data } = await api.get(`/api/professores`);
         lista = Array.isArray(data) ? data : (Array.isArray(data?.professores) ? data.professores : []);
       }
 
-      // se vierem vários turnos, filtra aqui
-      // e também removemos os professores inativos para não aparecerem nas inconsistências
       lista = filtraPorTurno(lista, turno).filter((p) => String(p.status).toLowerCase() !== "inativo");
 
-      // constrói o map { profId|disciplinaId: aulasTotal } usando campos flexíveis do vínculo
       const map = {};
       for (const p of lista) {
         const id = Number(p?.id ?? p?.professor_id ?? p?.uuid);
         if (!id) continue;
 
-        // NOVO: busca aulas dentro dos vínculos (uma cota por disciplina)
         const vinculos = Array.isArray(p.vinculos) ? p.vinculos : [];
         const vinculosTurno = vinculos.filter(
-          (v) => String(v.turno || "").toLowerCase() === String(turno).toLowerCase()
+          (v) => String(v.turno || "").toLowerCase() === String(turno).toLowerCase() &&
+                 (Number(v.semestre ?? 0) === 0 || Number(v.semestre) === Number(sem))
         );
 
         if (vinculosTurno.length > 0) {
@@ -422,7 +448,6 @@ export default function Modulacao() {
             map[`${id}|${discId}`] = tot;
           }
         } else {
-          // fallback para modelo legado se vinculos estiver vazio
           const tot =
             Number(
               p?.aulas ??
@@ -434,7 +459,7 @@ export default function Modulacao() {
           if (p.disciplina_id) {
              map[`${id}|${p.disciplina_id}`] = tot;
           } else {
-             map[id] = tot; // fallback mais fraco
+             map[id] = tot;
           }
         }
       }
@@ -447,7 +472,7 @@ export default function Modulacao() {
   }
 
   // --------------------------------------------------------------------------
-  // Carrega os professores disponíveis para o turno informado (sem abrir/fechar o picker)
+  // Carrega os professores disponíveis para o turno e semestre informado
   async function carregarProfessoresDoTurno(turno) {
     try {
       let lista = [];
@@ -460,23 +485,24 @@ export default function Modulacao() {
         lista = filtraPorTurno(bruta, turno);
       }
 
-      // ── NOVO: expande 1 linha por vínculo (prof × disciplina × turno) ──
+      // ── Expande 1 linha por vínculo (prof × disciplina × turno × semestre) ──
       const linhas = [];
       for (const p of lista) {
         const vinculos = Array.isArray(p.vinculos) ? p.vinculos : [];
         const vinculosTurno = vinculos.filter(
-          (v) => String(v.turno || "").toLowerCase() === String(turno).toLowerCase()
+          (v) => String(v.turno || "").toLowerCase() === String(turno).toLowerCase() &&
+                 (Number(v.semestre ?? 0) === 0 || Number(v.semestre) === Number(semestreSelecionado))
         );
-        if (vinculosTurno.length === 0) continue; // professor não tem vínculo neste turno
+        if (vinculosTurno.length === 0) continue; // professor não tem vínculo neste turno/semestre
         for (const v of vinculosTurno) {
           linhas.push({
-            // chave única no picker: prof_id + disciplina_id
             rowKey: `${p.id}|${v.disciplina_id}`,
             id: p.id,
             nome: p.nome,
             disciplina_id: v.disciplina_id,
             disciplina_nome: v.disciplina_nome || v.disciplina || "—",
             aulas: Number(v.aulas ?? 0) || 0,
+            semestre: Number(v.semestre ?? 0),
             turno: v.turno,
           });
         }
@@ -654,27 +680,35 @@ export default function Modulacao() {
         professor_id: removerAlvo.id,
         turma_id: turmaId,
         disciplina_id: removerAlvo.disciplina_id,
+        semestre: semestreSelecionado,
       }));
 
       let removedOk = false;
       try {
-        await api.post("/api/modulacao/remover", { turno: turnoSelecionado, itens });
+        await api.post("/api/modulacao/remover", { turno: turnoSelecionado, semestre: semestreSelecionado, itens });
         removedOk = true;
       } catch {
         // fallback 1-a-1
         for (const turmaId of turmasDoProf) {
           await api.delete(
             `/api/modulacao/${removerAlvo.id}/${turmaId}/${removerAlvo.disciplina_id}`,
-            { params: { turno: turnoSelecionado } }
+            { params: { turno: turnoSelecionado, semestre: semestreSelecionado } }
           );
         }
         removedOk = true;
       }
 
       if (removedOk) {
-        const { data } = await api.get("/api/modulacao", { params: { turno: turnoSelecionado } });
+        const { data } = await api.get("/api/modulacao", {
+          params: { turno: turnoSelecionado, semestre: semestreSelecionado },
+        });
         const alocs = normalizeAlocacoes(data);
-        setAlocacoes(alocs.map((a) => ({ profId: a.professor_id, turmaId: a.turma_id, discId: a.disciplina_id })));
+        setAlocacoes(alocs.map((a) => ({
+          profId: a.professor_id,
+          turmaId: a.turma_id,
+          discId: a.disciplina_id,
+          semestre: a.semestre ?? semestreSelecionado,
+        })));
 
         // remove somente a linha desta disciplina; outras disciplinas do prof ficam
         const aindaTemEstaDisc = alocs.some(
@@ -711,26 +745,29 @@ export default function Modulacao() {
     setSaveStage("Preparando…");
     setSaveBanner(null);
 
-    // helper para quebrar a chave "prof|turma|disc"
+    // helper para quebrar a chave "prof|turma|disc|semestre"
     const parseKey = (key) => {
-      const [p, t, d] = String(key).split("|");
+      const [p, t, d, s] = String(key).split("|");
       return {
         professor_id: Number(p),
         turma_id: t === "null" ? null : Number(t),
         disciplina_id: Number(d),
         turno: turnoSelecionado,
+        semestre: s ? Number(s) : semestreSelecionado,
       };
     };
 
     try {
-      // 1) Carrega alocações atuais do backend (existentes)
+      // 1) Carrega alocações atuais do backend (existentes) para o turno e semestre selecionados
       let existentesSet = new Set();
       let existentesArr = [];
       try {
-        const { data } = await api.get(`/api/modulacao`, { params: { turno: turnoSelecionado } });
+        const { data } = await api.get(`/api/modulacao`, {
+          params: { turno: turnoSelecionado, semestre: semestreSelecionado },
+        });
         const existentes = Array.isArray(data?.alocacoes) ? data.alocacoes : [];
         for (const a of existentes) {
-          const k = `${a.professor_id}|${a.turma_id ?? "null"}|${a.disciplina_id}`;
+          const k = `${a.professor_id}|${a.turma_id ?? "null"}|${a.disciplina_id}|${semestreSelecionado}`;
           existentesSet.add(k);
           existentesArr.push(k);
         }
@@ -740,13 +777,14 @@ export default function Modulacao() {
       }
 
       // 2) Monta PAYLOAD atual (a partir da grade/checkboxes)
-      // Usa a chave (profId, turmaId, discId) — agora que alocacoes inclui discId
+      // Usa a chave (profId, turmaId, discId, semestre)
       const bruto = professoresTabela.flatMap((prof) => {
         const turmasAlocadas = alocacoes
           .filter((a) => a.profId === prof.id && a.discId === prof.disciplina_id)
           .map((a) => a.turmaId);
         return turmasAlocadas.map((turmaId) => ({
           turno: turnoSelecionado,
+          semestre: semestreSelecionado,
           professor_id: Number(prof.id),
           turma_id: Number(turmaId),
           disciplina_id: Number(prof.disciplina_id),
@@ -754,30 +792,30 @@ export default function Modulacao() {
         }));
       });
 
-      // remove duplicados (prof|turma|disc) do payload
+      // remove duplicados (prof|turma|disc|semestre) do payload
       const payload = [];
       const payloadSet = new Set();
       for (const r of bruto) {
-        const key = `${r.professor_id}|${r.turma_id}|${r.disciplina_id}`;
+        const key = `${r.professor_id}|${r.turma_id}|${r.disciplina_id}|${r.semestre}`;
         if (!payloadSet.has(key)) {
           payloadSet.add(key);
           payload.push(r);
         }
       }
 
-      // 3) DIFF
+      // 3) DIFF estrito por semestre
       const novos = payload.filter(
-        (r) => !existentesSet.has(`${r.professor_id}|${r.turma_id}|${r.disciplina_id}`)
+        (r) => !existentesSet.has(`${r.professor_id}|${r.turma_id}|${r.disciplina_id}|${r.semestre}`)
       );
       const removidos = existentesArr
-        .filter((k) => !payloadSet.has(k))        // aquilo que existia e agora sumiu nos checkboxes
+        .filter((k) => !payloadSet.has(k))        // aquilo que existia no semestre e agora sumiu
         .map(parseKey);
 
       // 4) Sem mudanças → mensagem amigável e sai
       if (novos.length === 0 && removidos.length === 0) {
         setSaveBanner({
           type: "info",
-          text: "Tudo certo por aqui. Nenhuma alteração para salvar.",
+          text: `Tudo certo por aqui. Nenhuma alteração para salvar no ${semestreSelecionado}º Semestre.`,
         });
         setSaving(false);
         setTimeout(() => setSaveBanner(null), 4000);
@@ -785,8 +823,7 @@ export default function Modulacao() {
       }
 
       // 5) Executa operações no backend (remover depois inserir para evitar conflito)
-      //    Mantém a mesma lógica de fallback que você já usa para inserir.
-      //    REMOÇÕES
+      //    REMOÇÕES (isoladas por semestre)
       if (removidos.length > 0) {
         setSaveStage("Removendo alocações…");
 
@@ -797,6 +834,7 @@ export default function Modulacao() {
         try {
           const r = await api.post("/api/modulacao/remover", {
             turno: turnoSelecionado,
+            semestre: semestreSelecionado,
             itens: removidos,
           });
           removedOk = r?.status >= 200 && r?.status < 300;
@@ -808,7 +846,7 @@ export default function Modulacao() {
         if (!removedOk) {
           try {
             const r = await api.delete("/api/modulacao", {
-              data: { turno: turnoSelecionado, itens: removidos },
+              data: { turno: turnoSelecionado, semestre: semestreSelecionado, itens: removidos },
             });
             removedOk = r?.status >= 200 && r?.status < 300;
           } catch (e) {
@@ -816,12 +854,12 @@ export default function Modulacao() {
           }
         }
 
-        // (C) uma-a-uma: DELETE /api/modulacao/:prof/:turma/:disc?turno=...
+        // (C) uma-a-uma: DELETE /api/modulacao/:prof/:turma/:disc?turno=...&semestre=...
         if (!removedOk) {
           try {
             for (const r of removidos) {
               const url = `/api/modulacao/${r.professor_id}/${r.turma_id}/${r.disciplina_id}`;
-              await api.delete(url, { params: { turno: turnoSelecionado } });
+              await api.delete(url, { params: { turno: turnoSelecionado, semestre: semestreSelecionado } });
             }
             removedOk = true;
           } catch (e) {
@@ -830,16 +868,14 @@ export default function Modulacao() {
         }
 
         if (!removedOk) {
-          // falha real → aborta fluxo para não “recarregar” o estado errado
           setSaveBanner({
-             type: "error",
+            type: "error",
             text: "Não foi possível remover algumas alocações. Verifique as rotas do backend (/api/modulacao).",
           });
           setSaving(false);
           return;
         }
       }
-
 
       // INSERÇÕES
       if (novos.length > 0) {
@@ -860,12 +896,14 @@ export default function Modulacao() {
       // 6) Refresh de dados após commit (tabela, alocações, saldos e lista de disponíveis)
       setSaveStage("Atualizando visão…");
       try {
-        // recarrega alocações do turno
-        const { data } = await api.get("/api/modulacao", { params: { turno: turnoSelecionado } });
+        // recarrega alocações do turno e semestre
+        const { data } = await api.get("/api/modulacao", {
+          params: { turno: turnoSelecionado, semestre: semestreSelecionado },
+        });
         const alocs = normalizeAlocacoes(data);
 
-        // atualiza map de aulas totais e remonta linhas da tabela (mesma lógica que você já usa)
-        const mapAulasTotais = await carregarAulasTotaisDoTurno(turnoSelecionado);
+        // atualiza map de aulas totais e remonta linhas da tabela
+        const mapAulasTotais = await carregarAulasTotaisDoTurno(turnoSelecionado, semestreSelecionado);
 
         // pós-save: reconstrói linhas por (prof × disciplina)
         const linhasMap2 = new Map();
@@ -880,6 +918,7 @@ export default function Modulacao() {
               disciplina_nome: a.disciplina_nome || "—",
               aulas: Number(mapAulasTotais[`${a.professor_id}|${a.disciplina_id}`] ?? mapAulasTotais[a.professor_id] ?? 0) || 0,
               turno: a.turno,
+              semestre: Number(a.semestre ?? semestreSelecionado),
             });
           }
         }
@@ -888,12 +927,17 @@ export default function Modulacao() {
         );
 
         setProfessoresTabela(profs2);
-        setAlocacoes(alocs.map((a) => ({ profId: a.professor_id, turmaId: a.turma_id, discId: a.disciplina_id })));
+        setAlocacoes(alocs.map((a) => ({
+          profId: a.professor_id,
+          turmaId: a.turma_id,
+          discId: a.disciplina_id,
+          semestre: a.semestre ?? semestreSelecionado,
+        })));
       } catch {
         // se falhar o refresh, mantém o estado atual
       }
 
-      // (extra) Atualiza lista do picker, pois desalocados voltam a ficar disponíveis
+      // (extra) Atualiza lista do picker
       try {
         await carregarProfessoresDoTurno(turnoSelecionado);
       } catch {}
@@ -903,7 +947,7 @@ export default function Modulacao() {
       setSavePercent(100);
       setSaveBanner({
         type: "success",
-        text: `Horários salvos com sucesso! (+${novos.length} / -${removidos.length})`,
+        text: `Modulação do ${semestreSelecionado}º Semestre salva com sucesso! (+${novos.length} / -${removidos.length})`,
       });
     } catch (err) {
       setSaveBanner({ type: "error", text: "Erro ao salvar horários. Tente novamente." });
@@ -1042,18 +1086,22 @@ export default function Modulacao() {
   setChecarTurnoAlvo(turno);
 
   try {
-    // 1) Total de aulas por professor (por turno) – já existe em Modulacao
-    const mapAulas = await carregarAulasTotaisDoTurno(turno); // { [profId]: total }
+    // 1) Total de aulas por professor (por turno e semestre)
+    const mapAulas = await carregarAulasTotaisDoTurno(turno, semestreSelecionado); // { [profId]: total }
 
-    // 2) Alocações do turno (professor-disciplina-turma)
-    const { data } = await api.get("/api/modulacao", { params: { turno } });
+    // 2) Alocações do turno e semestre (professor-disciplina-turma)
+    const { data } = await api.get("/api/modulacao", {
+      params: { turno, semestre: semestreSelecionado },
+    });
     const alocs = normalizeAlocacoes(data); // [{ professor_id, professor_nome, disciplina_id, disciplina_nome, turma_id, turma_nome, turno }]
 
     // 3) Disciplinas necessárias por turma (base do Diagnóstico de Insumos)
     //    /api/modulacao/diagnostico → detalhe_por_turma: [{ turma_id, turma_nome, disciplina_id, disciplina_nome, carga }]
     let detalhe = [];
     try {
-      const { data: diag } = await api.get("/api/modulacao/diagnostico", { params: { turno } });
+      const { data: diag } = await api.get("/api/modulacao/diagnostico", {
+        params: { turno, semestre: semestreSelecionado },
+      });
       detalhe = Array.isArray(diag?.detalhe_por_turma) ? diag.detalhe_por_turma : [];
     } catch {
       detalhe = [];
@@ -1260,24 +1308,58 @@ export default function Modulacao() {
          )}
         </div>
 
+        {/* Seletor de Semestre Moderno */}
+        <div className="flex items-center bg-white p-1 rounded-xl border border-blue-200 shadow-sm">
+          <button
+            type="button"
+            onClick={() => setSemestreSelecionado(1)}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              semestreSelecionado === 1
+                ? "bg-gradient-to-r from-blue-700 to-indigo-700 text-white shadow-sm"
+                : "text-slate-600 hover:text-blue-700 hover:bg-blue-50"
+            }`}
+          >
+            <span className={`w-2 h-2 rounded-full ${semestreSelecionado === 1 ? "bg-emerald-400 animate-pulse" : "bg-slate-300"}`} />
+            <span>1º SEMESTRE</span>
+            <span className={`font-normal text-[10px] px-1.5 py-0.5 rounded ${semestreSelecionado === 1 ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"}`}>
+              1º e 2º Bim
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setSemestreSelecionado(2)}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              semestreSelecionado === 2
+                ? "bg-gradient-to-r from-blue-700 to-indigo-700 text-white shadow-sm"
+                : "text-slate-600 hover:text-blue-700 hover:bg-blue-50"
+            }`}
+          >
+            <span className={`w-2 h-2 rounded-full ${semestreSelecionado === 2 ? "bg-purple-400 animate-pulse" : "bg-slate-300"}`} />
+            <span>2º SEMESTRE</span>
+            <span className={`font-normal text-[10px] px-1.5 py-0.5 rounded ${semestreSelecionado === 2 ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"}`}>
+              3º e 4º Bim
+            </span>
+          </button>
+        </div>
+
         {/* Inserir Professor */}
         <button
           onClick={abrirInserirProfessor}
           disabled={!turnoSelecionado}
-          className="inline-flex items-center gap-2 bg-emerald-600 text-white font-medium px-4 py-2 rounded hover:bg-emerald-700 disabled:opacity-50"
+          className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-semibold text-xs uppercase tracking-wider px-4 py-2.5 rounded-xl shadow-md shadow-emerald-600/20 disabled:opacity-50 transition-all cursor-pointer"
         >
-          <UserPlusIcon className="h-5 w-5" />
-          <span className="uppercase">Inserir Professor</span>
+          <UserPlusIcon className="h-4 w-4" />
+          <span>INSERIR PROFESSOR</span>
         </button>
 
         {/* RELATÓRIOS */}
         <button
           onClick={() => setAbrirRelatorios(true)}
-          className="inline-flex items-center gap-2 bg-indigo-600 text-white font-medium px-4 py-2 rounded hover:bg-indigo-700 disabled:opacity-50"
+          className="inline-flex items-center gap-2 bg-white text-indigo-700 border border-indigo-200 font-semibold text-xs uppercase tracking-wider px-4 py-2.5 rounded-xl hover:bg-indigo-50 shadow-sm disabled:opacity-50 transition-all cursor-pointer"
           title="Abrir relatórios"
         >
-          <DocumentTextIcon className="h-5 w-5" />
-          <span className="uppercase">Relatórios</span>
+          <DocumentTextIcon className="h-4 w-4 text-indigo-600" />
+          <span>RELATÓRIOS</span>
         </button>
 
 
@@ -1285,19 +1367,19 @@ export default function Modulacao() {
 
 
         {/* ▶️ Botão RELATÓRIO com checagem prévia */}
-<button
-  onClick={async () => {
-    if (!turnoSelecionado) {
-      alert("Selecione um turno na Grade Horária para checar.");
-      return;
-    }
-    await checkTurno(turnoSelecionado);
-  }}
-  className="inline-flex items-center gap-2 bg-purple-600 text-white font-medium px-4 py-2 rounded hover:bg-purple-700"
-  title="Checar inconsistências antes de gerar"
->
-  Relatório (com checagem)
-</button>
+        <button
+          onClick={async () => {
+            if (!turnoSelecionado) {
+              alert("Selecione um turno na Grade Horária para checar.");
+              return;
+            }
+            await checkTurno(turnoSelecionado);
+          }}
+          className="inline-flex items-center gap-2 bg-white text-purple-700 border border-purple-200 font-semibold text-xs uppercase tracking-wider px-4 py-2.5 rounded-xl hover:bg-purple-50 shadow-sm transition-all cursor-pointer"
+          title="Checar inconsistências antes de gerar"
+        >
+          <span>CHECAGEM DE INSUMOS</span>
+        </button>
 
 {/* ⚠️ Alerta de inconsistências */}
 {checarOpen && (
@@ -1445,18 +1527,17 @@ export default function Modulacao() {
 <ModalDiagnosticoInsumos
   open={diagOpen}
   turnoInicial={checarTurnoAlvo}
+  semestreInicial={semestreSelecionado}
   onClose={() => setDiagOpen(false)}
 />
-
-
 
         {/* SALVAR */}
         <button
           onClick={handleSalvarModulacao}
           disabled={saving || !turnoSelecionado}
-          className="bg-blue-600 text-white font-semibold px-5 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
+          className="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-wider px-5 py-2.5 rounded-xl shadow-md shadow-blue-500/20 disabled:opacity-50 transition-all cursor-pointer"
         >
-          {saving ? "SALVANDO…" : "SALVAR"}
+          {saving ? "SALVANDO…" : "SALVAR GRADE"}
         </button>
 
         {/* ⬅️ Progresso AO LADO do botão SALVAR (mesma linha) */}
@@ -1625,92 +1706,201 @@ export default function Modulacao() {
      })()}
 
 
-      {/* Picker de Professores */}
-      {abrirPickerProf && (
-        <div className="bg-white rounded border p-3 mb-3 shadow-sm">
-          <div className="flex items-center justify-between mb-2">
-            <div className="text-sm text-gray-700">
-              Listando professores do turno: <b>{turnoSelecionado || "—"}</b>
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                placeholder="Buscar professor…"
-                value={buscaProf}
-                onChange={(e) => setBuscaProf(e.target.value)}
-                className="border rounded px-3 py-1 w-64"
-              />
-              <button
-                onClick={() => setAbrirPickerProf(false)}
-                className="px-3 py-1 rounded border hover:bg-gray-50"
-              >
-                Fechar
-              </button>
-            </div>
-          </div>
+      {/* Modal Premium de Inserção de Professores (sem empurrar a grade) */}
+      {abrirPickerProf &&
+        ReactDOM.createPortal(
+          <div
+            className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-all"
+            onClick={() => setAbrirPickerProf(false)}
+          >
+            <div
+              className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden border border-blue-100 animate-fadeIn"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header Premium com Gradiente */}
+              <div className="bg-gradient-to-r from-emerald-800 via-teal-700 to-cyan-800 p-6 flex justify-between items-center text-white relative overflow-hidden flex-shrink-0">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full translate-x-20 -translate-y-20 blur-3xl pointer-events-none" />
+                <div className="flex items-center gap-4 relative z-10">
+                  <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-md border border-white/20 shadow-inner">
+                    <UserPlusIcon className="w-7 h-7 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                      Inserir Professor na Grade
+                      <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/40 text-emerald-100 border border-emerald-400/30">
+                        {semestreSelecionado}º SEMESTRE
+                      </span>
+                    </h2>
+                    <p className="text-emerald-100 text-xs mt-1 flex items-center gap-2">
+                      <span>Turno: <strong className="uppercase font-bold text-white">{turnoSelecionado || "—"}</strong></span>
+                      <span>•</span>
+                      <span>{professoresDisponiveis.length} vínculo{professoresDisponiveis.length !== 1 ? "s" : ""} apto{professoresDisponiveis.length !== 1 ? "s" : ""}</span>
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAbrirPickerProf(false)}
+                  className="bg-white/10 hover:bg-white/20 p-2.5 rounded-full transition-all text-white z-10 cursor-pointer"
+                  title="Fechar"
+                >
+                  <XMarkIcon className="w-5 h-5" />
+                </button>
+              </div>
 
+              {/* Barra de Pesquisa e Filtros */}
+              <div className="p-4 bg-slate-50 border-b border-gray-100 flex items-center gap-3 flex-shrink-0">
+                <div className="relative flex-1">
+                  <MagnifyingGlassIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                  <input
+                    autoFocus
+                    type="text"
+                    placeholder="Buscar por professor ou disciplina…"
+                    value={buscaProf}
+                    onChange={(e) => setBuscaProf(e.target.value)}
+                    className="w-full pl-11 pr-9 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all shadow-sm"
+                  />
+                  {buscaProf && (
+                    <button
+                      type="button"
+                      onClick={() => setBuscaProf("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-sm font-bold cursor-pointer"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+                <div className="text-xs text-gray-500 font-semibold whitespace-nowrap bg-white px-3 py-2.5 rounded-xl border border-gray-200 shadow-sm">
+                  {professoresFiltrados.length} encontrado{professoresFiltrados.length !== 1 ? "s" : ""}
+                </div>
+              </div>
 
-
-
-          {carregandoProf ? (
-            <div className="py-4 text-center text-gray-600">Carregando professores…</div>
-          ) : (
-            <div className="overflow-x-auto max-h-[40vh] overflow-y-auto">
-              <table className="w-full border-collapse mt-2">
-
-
-
-
-                <thead className="bg-blue-100">
-                  <tr>
-                    <th className="p-2 border text-center font-medium text-blue-900">Professor</th>
-                    <th className="p-2 border text-center font-medium text-blue-900">Disciplina</th>
-                    <th className="p-2 border text-center font-medium text-blue-900">Aulas</th>
-                    <th className="p-2 border text-center font-medium text-blue-900">Ação</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {professoresParaAdicionar.map((p) => (
-                    <tr key={p.id} className="hover:bg-blue-50">
-                      <td className="p-2 border text-center uppercase">{p.nome}</td>
-                      <td className="p-2 border text-center uppercase">{p.disciplina_nome}</td>
-                      <td className="p-2 border text-center">{p.aulas}</td>
-                      <td className="p-2 border text-center">
-                        <button
-                          onClick={() => {
-                            // ao selecionar no picker, adiciona a linha (prof × disciplina)
-                            if (!turmasTurno.length && turnoSelecionado) {
-                              carregarTurmasDoTurno(turnoSelecionado);
-                            }
-                            if (rowKeysJaInseridos.has(p.rowKey)) return;
-                            setProfessoresTabela((prev) => [
-                              ...prev,
-                              {
-                                rowKey: p.rowKey,
-                                id: p.id,
-                                nome: p.nome,
-                                disciplina_id: p.disciplina_id,
-                                disciplina_nome: p.disciplina_nome,
-                                aulas: Number(aulasTotaisPorProfessor[`${p.id}|${p.disciplina_id}`] ?? aulasTotaisPorProfessor[p.id] ?? p.aulas ?? 0) || 0,
-                                turno: turnoSelecionado,
-                              },
-                            ]);
-                          }}
-                          className={`px-3 py-1 rounded ${
-                            p.jaTem ? "bg-gray-200" : "bg-emerald-600 text-white hover:bg-emerald-700"
+              {/* Conteúdo / Lista de Professores Rolável */}
+              <div className="overflow-y-auto flex-1 p-4 bg-slate-50/50">
+                {carregandoProf ? (
+                  <div className="py-16 text-center text-gray-500 flex flex-col items-center gap-3">
+                    <div className="w-8 h-8 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+                    <span className="text-sm font-medium">Buscando professores vinculados…</span>
+                  </div>
+                ) : professoresParaAdicionar.length === 0 ? (
+                  <div className="py-16 text-center text-gray-400 flex flex-col items-center gap-2">
+                    <UserPlusIcon className="w-12 h-12 opacity-30 text-gray-400" />
+                    <p className="text-sm font-semibold text-gray-600">Nenhum professor encontrado</p>
+                    <p className="text-xs text-gray-400 max-w-sm">
+                      Verifique se os professores possuem vínculos cadastrados para o turno <b>{turnoSelecionado}</b> no <b>{semestreSelecionado}º Semestre</b>.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {professoresParaAdicionar.map((p) => {
+                      const jaEstaNaGrade = p.jaTem;
+                      return (
+                        <div
+                          key={p.rowKey}
+                          className={`flex items-center justify-between p-3.5 rounded-2xl border transition-all ${
+                            jaEstaNaGrade
+                              ? "bg-slate-100/80 border-slate-200 opacity-70"
+                              : "bg-white border-slate-200/80 hover:border-emerald-300 hover:shadow-md hover:bg-emerald-50/20"
                           }`}
-                          disabled={p.jaTem}
                         >
-                          {p.jaTem ? "Adicionado" : "Adicionar"}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                          {/* Avatar + Nome + Disciplina */}
+                          <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm flex-shrink-0 ${
+                              jaEstaNaGrade ? "bg-slate-200 text-slate-500" : "bg-emerald-100 text-emerald-800"
+                            }`}>
+                              {(p.nome || "?").charAt(0)}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="font-bold text-sm text-slate-800 uppercase truncate">
+                                  {p.nome}
+                                </span>
+                                {p.semestre === 1 && (
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-cyan-100 text-cyan-800 border border-cyan-200">
+                                    1º SEM
+                                  </span>
+                                )}
+                                {p.semestre === 2 && (
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">
+                                    2º SEM
+                                  </span>
+                                )}
+                                {p.semestre === 0 && (
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                                    ANUAL
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200 uppercase">
+                                  {p.disciplina_nome}
+                                </span>
+                                <span className="text-xs text-slate-500 font-medium">
+                                  • {p.aulas} aula{p.aulas !== 1 ? "s" : ""} semanal{p.aulas !== 1 ? "is" : ""}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Botão de Ação */}
+                          <div className="ml-4 flex-shrink-0">
+                            {jaEstaNaGrade ? (
+                              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-200 text-slate-600 text-xs font-bold border border-slate-300">
+                                <CheckIcon className="w-4 h-4 text-emerald-600" /> Na Grade
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (!turmasTurno.length && turnoSelecionado) {
+                                    carregarTurmasDoTurno(turnoSelecionado);
+                                  }
+                                  if (rowKeysJaInseridos.has(p.rowKey)) return;
+                                  setProfessoresTabela((prev) => [
+                                    ...prev,
+                                    {
+                                      rowKey: p.rowKey,
+                                      id: p.id,
+                                      nome: p.nome,
+                                      disciplina_id: p.disciplina_id,
+                                      disciplina_nome: p.disciplina_nome,
+                                      aulas: Number(aulasTotaisPorProfessor[`${p.id}|${p.disciplina_id}`] ?? aulasTotaisPorProfessor[p.id] ?? p.aulas ?? 0) || 0,
+                                      turno: turnoSelecionado,
+                                      semestre: semestreSelecionado,
+                                    },
+                                  ]);
+                                  showToast("success", `${p.nome} (${p.disciplina_nome}) adicionado à grade!`, 2000);
+                                }}
+                                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold shadow-md shadow-emerald-500/20 active:scale-95 transition-all cursor-pointer"
+                              >
+                                <UserPlusIcon className="w-4 h-4" /> + Adicionar à Grade
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="p-4 bg-white border-t border-gray-100 flex items-center justify-between flex-shrink-0">
+                <span className="text-xs text-gray-500">
+                  Dica: você pode adicionar múltiplos professores antes de fechar este modal.
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setAbrirPickerProf(false)}
+                  className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-900 text-white text-sm font-bold shadow-md transition-all cursor-pointer"
+                >
+                  Concluir e Voltar para a Grade
+                </button>
+              </div>
             </div>
-          )}
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
 
       {/* Tabela principal */}
       {turnoSelecionado && (
@@ -1899,7 +2089,7 @@ export default function Modulacao() {
                                     if (restanteAtual < cargaTurma) return;
                                     setAlocacoes((prev) => [
                                       ...prev,
-                                      { profId: prof.id, turmaId: turma.id, discId: prof.disciplina_id },
+                                      { profId: prof.id, turmaId: turma.id, discId: prof.disciplina_id, semestre: semestreSelecionado },
                                     ]);
                                   } else {
                                     setAlocacoes((prev) =>
@@ -1938,38 +2128,73 @@ export default function Modulacao() {
 
 
 
-      {/* Modal de confirmação de remoção */}
+      {/* Modal Premium de confirmação de remoção */}
       {removerOpen && removerAlvo && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center">
-        <div className="absolute inset-0 bg-black/40" onClick={() => setRemoverOpen(false)} />
-        <div className="relative bg-white rounded-2xl shadow-2xl w-[90vw] max-w-md p-6">
-          <h3 className="text-lg font-semibold text-blue-900 mb-2">
-            Remover {removerAlvo.nome} da Grade?
-          </h3>
-          <p className="text-sm text-gray-700 mb-5">
-            Isso irá excluir <strong>todas as marcações</strong> desse professor neste turno
-            (todas as turmas marcadas), e ele voltará para a lista de “Inserir Professor”.
-          </p>
-          <div className="flex items-center justify-end gap-2">
-            <button
-              onClick={() => setRemoverOpen(false)}
-              className="px-3 py-2 rounded border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-              disabled={removendo}
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={confirmarRemocaoLinha}
-              className="px-3 py-2 rounded bg-rose-600 hover:bg-rose-700 text-white disabled:opacity-50"
-              disabled={removendo}
-              aria-busy={removendo}
-            >
-              {removendo ? "Removendo…" : "Sim, remover"}
-            </button>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
+          <div className="absolute inset-0" onClick={() => setRemoverOpen(false)} />
+          <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-rose-100 z-10">
+            {/* Header com degradê rose */}
+            <div className="bg-gradient-to-r from-rose-700 to-red-600 p-5 text-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center font-bold text-lg">
+                  🗑️
+                </div>
+                <div>
+                  <h3 className="text-base font-bold tracking-tight text-white">
+                    Remover Linha da Grade
+                  </h3>
+                  <p className="text-rose-100 text-xs mt-0.5">
+                    {semestreSelecionado}º Semestre • Turno {turnoSelecionado}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRemoverOpen(false)}
+                className="bg-white/10 hover:bg-white/20 p-2 rounded-full transition-all text-white cursor-pointer"
+              >
+                <XMarkIcon className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Conteúdo */}
+            <div className="p-6">
+              <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 mb-4">
+                <p className="font-bold text-sm text-slate-800 uppercase mb-1">
+                  {removerAlvo.nome}
+                </p>
+                <span className="text-xs font-semibold px-2 py-0.5 rounded bg-blue-100 text-blue-800 uppercase">
+                  {removerAlvo.disciplina_nome}
+                </span>
+              </div>
+              <p className="text-sm text-slate-600 leading-relaxed">
+                Isso excluirá <strong>todas as marcações</strong> deste professor nesta disciplina no <strong>{semestreSelecionado}º Semestre</strong>. O professor voltará a ficar disponível para inserção.
+              </p>
+            </div>
+
+            {/* Rodapé */}
+            <div className="p-4 bg-slate-50 border-t border-gray-100 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setRemoverOpen(false)}
+                className="px-4 py-2.5 rounded-xl border border-gray-300 text-gray-700 font-semibold text-xs hover:bg-white transition-all disabled:opacity-50 cursor-pointer"
+                disabled={removendo}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmarRemocaoLinha}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-700 hover:to-red-700 text-white font-bold text-xs shadow-md shadow-rose-500/20 disabled:opacity-50 transition-all cursor-pointer"
+                disabled={removendo}
+                aria-busy={removendo}
+              >
+                {removendo ? "Removendo…" : "Sim, remover da Grade"}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-    )}
+      )}
 
 
 

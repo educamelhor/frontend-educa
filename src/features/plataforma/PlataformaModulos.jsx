@@ -24,6 +24,8 @@ const MODULOS_TREE = [
       { id: 'secretaria.tabela_codigos', label: 'Tabela de Códigos' },
       { id: 'secretaria.sincronizar_seedf', label: 'Sincronizar SEEDF' },
       { id: 'secretaria.modulacao', label: 'Modulação' },
+      { id: 'secretaria.etapas', label: 'Etapas de Ensino' },
+      { id: 'secretaria.conflitos_notas', label: 'Conflitos de Notas' },
     ]
   },
   // ── DISCIPLINAR: módulo reservado — sempre ativo para perfis militares.

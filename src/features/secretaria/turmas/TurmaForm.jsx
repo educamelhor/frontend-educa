@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Input from '../../../components/ui/Input';
 import { Button } from "../../../components/ui/Button";
+import api from '../../../services/api';
 
 function anoLetivoPadrao() {
   const hoje = new Date();
@@ -12,6 +13,15 @@ function anoLetivoPadrao() {
 
 export default function TurmaForm({ open, onClose, onSubmit, turma }) {
   const anoAtual = String(anoLetivoPadrao());
+  const [etapasList, setEtapasList] = useState([]);
+
+  useEffect(() => {
+    if (open) {
+      api.get('/etapas')
+        .then(res => setEtapasList(res.data || []))
+        .catch(err => console.error('Erro ao buscar etapas no TurmaForm:', err));
+    }
+  }, [open]);
 
   const [form, setForm] = useState({
     escola_id: '',
@@ -174,9 +184,17 @@ export default function TurmaForm({ open, onClose, onSubmit, turma }) {
           className="w-full border rounded p-2 uppercase"
         >
           <option value="">— Selecione a etapa —</option>
-          <option value="INFANTIL">Infantil</option>
-          <option value="FUNDAMENTAL">Fundamental</option>
-          <option value="MÉDIO">Médio</option>
+          {etapasList.length > 0 ? (
+            etapasList.map(etp => (
+              <option key={etp.id} value={etp.nome.toUpperCase()}>{etp.nome}</option>
+            ))
+          ) : (
+            <>
+              <option value="INFANTIL">Infantil</option>
+              <option value="FUNDAMENTAL">Fundamental</option>
+              <option value="MÉDIO">Médio</option>
+            </>
+          )}
         </select>
         {errors.etapa && <p className="text-red-600 text-sm">{errors.etapa}</p>}
       </div>

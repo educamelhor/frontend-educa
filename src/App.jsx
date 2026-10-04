@@ -98,6 +98,8 @@ import LayoutGrade from "./features/secretaria/horarios/LayoutGrade.jsx";
 import ExecutarMock from "./features/secretaria/horarios/ExecutarMock.jsx";
 import AgenteCredenciais from "./features/agente-educa/Credenciais";
 import AgentePlanos from "./features/agente-educa/AgentePlanos";
+import ListaEtapas from "./features/secretaria/etapas/ListaEtapas";
+import PainelConflitosNotas from "./features/secretaria/conflitos/PainelConflitosNotas";
 import AgenteNotas from "./features/agente-educa/AgenteNotas";
 
 // ✅ MÓDULO FREQUÊNCIA
@@ -410,6 +412,8 @@ export default function App() {
           <Route path="/secretaria/horarios"        element={<RequireModulo modulo="secretaria"><HorariosPage /></RequireModulo>} />
           <Route path="/secretaria/horarios/wizard" element={<RequireModulo modulo="secretaria"><HorariosPage /></RequireModulo>} />
           <Route path="/secretaria/horarios/configuracoes-pedagogicas" element={<RequireModulo modulo="secretaria"><ConfiguracoesPedagogicas /></RequireModulo>} />
+          <Route path="/secretaria/etapas"          element={<RequireModulo modulo="secretaria"><ListaEtapas /></RequireModulo>} />
+          <Route path="/secretaria/conflitos-notas" element={<RequireModulo modulo="secretaria"><PainelConflitosNotas /></RequireModulo>} />
           <Route path="/secretaria/tabela-codigos" element={<RequireModulo modulo="secretaria"><TabelaCodigos /></RequireModulo>} />
 
           {/* ── Pedagógico ───────────────────────────────────────────────── */}

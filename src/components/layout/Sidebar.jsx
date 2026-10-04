@@ -1596,6 +1596,28 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
 
+                {hasModulo('secretaria.etapas') && (
+                <li>
+                  <Link
+                    to="/secretaria/etapas"
+                    className={getSubmenuLinkClasses('/secretaria/etapas')}
+                  >
+                    <TableCellsIcon className="h-5 w-5 mr-2" /> Etapas
+                  </Link>
+                </li>
+                )}
+
+                {hasModulo('secretaria.conflitos_notas') && (
+                <li>
+                  <Link
+                    to="/secretaria/conflitos-notas"
+                    className={getSubmenuLinkClasses('/secretaria/conflitos-notas')}
+                  >
+                    <CheckCircleIcon className="h-5 w-5 mr-2" /> Conflitos de Notas
+                  </Link>
+                </li>
+                )}
+
                 {/* NOVO SUBMENU: Boletim */}
                 {hasModulo('secretaria.boletim') && (
                 <li>

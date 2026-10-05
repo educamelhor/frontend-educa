@@ -2078,9 +2078,9 @@ export default function Modulacao() {
                           {Number(r.aulasAgr) > 0 && (
                             <span
                               className="text-[10px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.2 rounded border border-purple-200 mt-0.5 tracking-tight"
-                              title={`${r.aulasAgr} aula(s) em Turmas de Agrupamento / Eletivas`}
+                              title={`${r.aulasAgr} aula(s) alocadas em Turmas de Agrupamento / Eletivas`}
                             >
-                              +${r.aulasAgr} eletiva
+                              +{r.aulasAgr} eletiva
                             </span>
                           )}
                         </div>
@@ -2092,15 +2092,18 @@ export default function Modulacao() {
                         const isChecked = alocacoes.some(
                           (a) => a.profId === prof.id && a.turmaId === turma.id && a.discId === prof.disciplina_id
                         );
+                        const disciplinaNaGrade = cargaPorTurmaDisc[turma.id]?.[prof.disciplina_id] != null;
                         const cargaTurma =
                           cargaPorTurmaDisc[turma.id]?.[prof.disciplina_id] ??
                           Number(cargaPorDisciplina[prof.disciplina_id]) ??
                           1;
                         const restanteAtual = r.restante;
                         const semSaldo = !isChecked && restanteAtual < cargaTurma;
-                        const tooltipBloqueio = semSaldo
+                        const tooltipBloqueio = !disciplinaNaGrade && !isChecked
+                          ? `A turma ${turma.turma || turma.nome} não possui ${prof.disciplina_nome} na sua grade regular.`
+                          : semSaldo
                           ? restanteAtual <= 0
-                            ? `${prof.nome} (${prof.disciplina_nome}) está 100% modulado`
+                            ? `${prof.nome} está 100% modulado(a) (${r.usadasFgb ?? 0}h regulares + ${r.aulasAgr ?? 0}h em agrupamento). Saldo restante: 0.`
                             : `Insuficiente: esta turma consome ${cargaTurma} aula(s), mas restam apenas ${restanteAtual}`
                           : `Total: ${r.total} • Usadas: ${r.usadas} • Restante: ${restanteAtual} • Esta turma: ${cargaTurma} aula(s)`;
 

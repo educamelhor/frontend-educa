@@ -182,6 +182,8 @@ export default function Modulacao() {
   const [cargaPorTurmaDisc, setCargaPorTurmaDisc] = useState({}); // {turmaId: {discId: N}}
   // Comunicabilidade com Turmas de Agrupamento / Eletivas (FGB + Agrupamentos)
   const [resumoAgrupamentos, setResumoAgrupamentos] = useState({ por_professor: {}, por_prof_disc: {}, por_prof_turno: {}, itens: [] });
+  // Linhas de agrupamento/eletiva removidas manualmente na sessão atual
+  const [linhasOcultadasManual, setLinhasOcultadasManual] = useState(new Set());
 
   // ESTADOS (adicione junto aos outros useState de UI/relatórios)
   const [removerOpen, setRemoverOpen] = useState(false);
@@ -345,11 +347,13 @@ export default function Modulacao() {
         // carrega/atualiza o map de total de aulas por professor para este turno e semestre
         const mapAulasTotais = await carregarAulasTotaisDoTurno(turnoSelecionado, semestreSelecionado);
         // Carrega aulas alocadas em Turmas de Agrupamento (Eletivas / IFA) para comunicabilidade
+        let agrItens = [];
         try {
           const { data: agrData } = await api.get("/api/agrupamentos/modulacao/resumo", {
             params: { turno: turnoSelecionado, semestre: semestreSelecionado },
           });
           setResumoAgrupamentos(agrData || { por_professor: {}, por_prof_disc: {}, por_prof_turno: {}, itens: [] });
+          agrItens = Array.isArray(agrData?.itens) ? agrData.itens : [];
         } catch {
           setResumoAgrupamentos({ por_professor: {}, por_prof_disc: {}, por_prof_turno: {}, itens: [] });
         }
@@ -380,6 +384,7 @@ export default function Modulacao() {
 
         // ── 1 linha por (professor_id × disciplina_id) ──────────────────
         const linhasMap = new Map();
+        // 1) Alocações regulares
         for (const a of alocs) {
           const key = `${a.professor_id}|${a.disciplina_id}`;
           if (!linhasMap.has(key)) {
@@ -390,10 +395,30 @@ export default function Modulacao() {
               disciplina_id: Number(a.disciplina_id),
               disciplina_nome: a.disciplina_nome || "—",
               aulas: Number(mapAulasTotais[`${a.professor_id}|${a.disciplina_id}`] ?? mapAulasTotais[a.professor_id] ?? 0) || 0,
-              turno: a.turno,
+              turno: a.turno || turnoSelecionado,
+              semestre: Number(a.semestre ?? semestreSelecionado),
             });
           }
         }
+
+        // 2) Professores modulados em Turmas de Agrupamento / Eletivas no turno e semestre
+        for (const agr of agrItens) {
+          const key = `${agr.professor_id}|${agr.disciplina_id}`;
+          if (!linhasMap.has(key) && !linhasOcultadasManual.has(key)) {
+            linhasMap.set(key, {
+              rowKey: key,
+              id: Number(agr.professor_id),
+              nome: agr.professor_nome || `Professor ${agr.professor_id}`,
+              disciplina_id: Number(agr.disciplina_id),
+              disciplina_nome: agr.disciplina_nome || "—",
+              aulas: Number(mapAulasTotais[key] ?? mapAulasTotais[agr.professor_id] ?? agr.aulas_agrupamento ?? 0) || 0,
+              turno: agr.turno || turnoSelecionado,
+              semestre: semestreSelecionado,
+              isAgrupamento: true,
+            });
+          }
+        }
+
         const profs = Array.from(linhasMap.values()).sort((x, y) =>
           naturalCompare(x.nome, y.nome) || naturalCompare(x.disciplina_nome, y.disciplina_nome)
         );
@@ -686,11 +711,12 @@ export default function Modulacao() {
         .map((a) => a.turmaId);
 
       if (turmasDoProf.length === 0) {
+        setLinhasOcultadasManual((prev) => new Set([...prev, removerAlvo.rowKey]));
         setProfessoresTabela((arr) => arr.filter((p) => p.rowKey !== removerAlvo.rowKey));
         setRemoverOpen(false);
         setRemoverAlvo(null);
         try { await carregarProfessoresDoTurno(turnoSelecionado); } catch {}
-        showToast("success", "Linha removida da lista.");
+        showToast("success", "Linha removida da grade.");
         return;
       }
  
@@ -733,6 +759,7 @@ export default function Modulacao() {
           (a) => a.professor_id === removerAlvo.id && a.disciplina_id === removerAlvo.disciplina_id
         );
         if (!aindaTemEstaDisc) {
+          setLinhasOcultadasManual((prev) => new Set([...prev, removerAlvo.rowKey]));
           setProfessoresTabela((arr) => arr.filter((p) => p.rowKey !== removerAlvo.rowKey));
         }
 
@@ -829,11 +856,11 @@ export default function Modulacao() {
         .filter((k) => !payloadSet.has(k))        // aquilo que existia no semestre e agora sumiu
         .map(parseKey);
 
-      // 4) Sem mudanças → mensagem amigável e sai
+      // 4) Sem mudanças em turmas regulares → confirma consistência e encerra
       if (novos.length === 0 && removidos.length === 0) {
         setSaveBanner({
-          type: "info",
-          text: `Tudo certo por aqui. Nenhuma alteração para salvar no ${semestreSelecionado}º Semestre.`,
+          type: "success",
+          text: `Grade horária do ${semestreSelecionado}º Semestre consistente e sincronizada!`,
         });
         setSaving(false);
         setTimeout(() => setSaveBanner(null), 4000);
@@ -922,15 +949,20 @@ export default function Modulacao() {
 
         // atualiza map de aulas totais e remonta linhas da tabela
         const mapAulasTotais = await carregarAulasTotaisDoTurno(turnoSelecionado, semestreSelecionado);
+        let agrItens2 = [];
         try {
           const { data: agrData } = await api.get("/api/agrupamentos/modulacao/resumo", {
             params: { turno: turnoSelecionado, semestre: semestreSelecionado },
           });
           setResumoAgrupamentos(agrData || { por_professor: {}, por_prof_disc: {}, por_prof_turno: {}, itens: [] });
-        } catch {}
+          agrItens2 = Array.isArray(agrData?.itens) ? agrData.itens : [];
+        } catch {
+          setResumoAgrupamentos({ por_professor: {}, por_prof_disc: {}, por_prof_turno: {}, itens: [] });
+        }
 
         // pós-save: reconstrói linhas por (prof × disciplina)
         const linhasMap2 = new Map();
+        // 1) Alocações regulares
         for (const a of alocs) {
           const key = `${a.professor_id}|${a.disciplina_id}`;
           if (!linhasMap2.has(key)) {
@@ -941,11 +973,40 @@ export default function Modulacao() {
               disciplina_id: Number(a.disciplina_id),
               disciplina_nome: a.disciplina_nome || "—",
               aulas: Number(mapAulasTotais[`${a.professor_id}|${a.disciplina_id}`] ?? mapAulasTotais[a.professor_id] ?? 0) || 0,
-              turno: a.turno,
+              turno: a.turno || turnoSelecionado,
               semestre: Number(a.semestre ?? semestreSelecionado),
             });
           }
         }
+
+        // 2) Turmas de Agrupamento / Eletivas (comunicabilidade automática)
+        for (const agr of agrItens2) {
+          const key = `${agr.professor_id}|${agr.disciplina_id}`;
+          if (!linhasMap2.has(key) && !linhasOcultadasManual.has(key)) {
+            linhasMap2.set(key, {
+              rowKey: key,
+              id: Number(agr.professor_id),
+              nome: agr.professor_nome || `Professor ${agr.professor_id}`,
+              disciplina_id: Number(agr.disciplina_id),
+              disciplina_nome: agr.disciplina_nome || "—",
+              aulas: Number(mapAulasTotais[key] ?? mapAulasTotais[agr.professor_id] ?? agr.aulas_agrupamento ?? 0) || 0,
+              turno: agr.turno || turnoSelecionado,
+              semestre: semestreSelecionado,
+              isAgrupamento: true,
+            });
+          }
+        }
+
+        // 3) Preserva quem já estava na grade antes do salvamento (ex: inseridos manualmente)
+        for (const pAnt of professoresTabela) {
+          if (!linhasMap2.has(pAnt.rowKey) && !linhasOcultadasManual.has(pAnt.rowKey)) {
+            linhasMap2.set(pAnt.rowKey, {
+              ...pAnt,
+              aulas: Number(mapAulasTotais[pAnt.rowKey] ?? mapAulasTotais[pAnt.id] ?? pAnt.aulas ?? 0) || 0,
+            });
+          }
+        }
+
         const profs2 = Array.from(linhasMap2.values()).sort((x, y) =>
           naturalCompare(x.nome, y.nome) || naturalCompare(x.disciplina_nome, y.disciplina_nome)
         );
@@ -1880,6 +1941,11 @@ export default function Modulacao() {
                                     carregarTurmasDoTurno(turnoSelecionado);
                                   }
                                   if (rowKeysJaInseridos.has(p.rowKey)) return;
+                                  setLinhasOcultadasManual((prev) => {
+                                    const next = new Set(prev);
+                                    next.delete(p.rowKey);
+                                    return next;
+                                  });
                                   setProfessoresTabela((prev) => [
                                     ...prev,
                                     {
@@ -2054,7 +2120,16 @@ export default function Modulacao() {
                         className="py-2 px-4 border sticky z-20 bg-white w-[160px]"
                         style={{ left: 260 }}
                       >
-                        {prof.disciplina_nome || "—"}
+                        <div className="flex flex-col">
+                          <span className="font-medium text-slate-800">
+                            {prof.disciplina_nome || "—"}
+                          </span>
+                          {(prof.isAgrupamento || Number(r.aulasAgr) > 0) && (
+                            <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.2 rounded border border-purple-200 mt-0.5 w-fit tracking-tight">
+                              Turma de Agrupamento
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Aulas (restante dinâmico com comunicabilidade FGB + Eletivas) */}

@@ -104,22 +104,25 @@ export default function AgrupamentoEnturmacaoModal({
     return Array.from(set).length > 0 ? Array.from(set) : listaPadrao;
   }, [turmasOrigem]);
 
-  // Turmas filtradas pelo turno selecionado (e etapa, se aplicável)
+  // Turmas filtradas pelo turno selecionado (sem travar por etapa, permitindo todas as turmas do turno)
   const turmasDoTurno = useMemo(() => {
-    return turmasOrigem.filter((t) => {
+    const list = turmasOrigem.filter((t) => {
       if (
         turnoOrigemSelecionado &&
         normalizaTexto(t.turno) !== normalizaTexto(turnoOrigemSelecionado)
       ) {
         return false;
       }
-      // Se agrupamento tiver etapa definida (ex: Médio), filtra turmas do Médio
-      if (agrupamento?.etapa && t.etapa) {
-        if (normalizaTexto(t.etapa) !== normalizaTexto(agrupamento.etapa)) return false;
-      }
       return true;
     });
-  }, [turmasOrigem, turnoOrigemSelecionado, agrupamento?.etapa]);
+
+    // Ordenação lógica natural (ex: 7º ANO A, 8º ANO A, 9º ANO A, 1º ANO A...)
+    return list.sort((a, b) => {
+      const nomeA = String(a.turma || a.nome || "");
+      const nomeB = String(b.turma || b.nome || "");
+      return nomeA.localeCompare(nomeB, "pt-BR", { numeric: true, sensitivity: "base" });
+    });
+  }, [turmasOrigem, turnoOrigemSelecionado]);
 
   // Se trocar de turno e a turma selecionada não pertencer a esse turno, reseta
   useEffect(() => {
@@ -205,9 +208,8 @@ export default function AgrupamentoEnturmacaoModal({
     setErro("");
     setConflitosAlerta(null);
 
-    const turmaNome =
-      turmasDoTurno.find((t) => String(t.id) === String(turmaOrigemSelecionada))
-        ?.nome || "turma";
+    const tSel = turmasDoTurno.find((t) => String(t.id) === String(turmaOrigemSelecionada));
+    const turmaNome = tSel?.turma || tSel?.nome || "turma";
 
     try {
       const payload = {
@@ -525,6 +527,9 @@ export default function AgrupamentoEnturmacaoModal({
                   <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto pr-1">
                     {turmasDoTurno.map((turma) => {
                       const isAtiva = String(turmaOrigemSelecionada) === String(turma.id);
+                      const nomeTurma = turma.turma || turma.nome || turma.nome_oficial || "Turma";
+                      const etapaTurma = turma.etapa || turma.serie || "";
+
                       return (
                         <button
                           key={turma.id}
@@ -533,20 +538,22 @@ export default function AgrupamentoEnturmacaoModal({
                             setTurmaOrigemSelecionada(turma.id);
                             setSelecionados(new Set());
                           }}
-                          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                          className={`px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 ${
                             isAtiva
-                              ? "bg-gradient-to-r from-indigo-600 to-violet-700 text-white shadow-md shadow-indigo-100 scale-105"
-                              : "bg-white hover:bg-indigo-50/60 text-slate-700 border border-slate-200/90 shadow-sm hover:border-indigo-300"
+                              ? "bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white shadow-md shadow-indigo-100 scale-105"
+                              : "bg-white hover:bg-indigo-50/70 text-slate-800 border border-slate-200/90 shadow-sm hover:border-indigo-300"
                           }`}
                         >
-                          <span>{turma.nome}</span>
-                          <span
-                            className={`text-[10px] px-1.5 py-0.2 rounded-md ${
-                              isAtiva ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"
-                            }`}
-                          >
-                            {turma.etapa || turma.serie || "Regular"}
-                          </span>
+                          <span className="font-extrabold text-sm">{nomeTurma}</span>
+                          {etapaTurma && (
+                            <span
+                              className={`text-[10px] px-2 py-0.5 rounded-lg font-semibold ${
+                                isAtiva ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600 border border-slate-200"
+                              }`}
+                            >
+                              {etapaTurma}
+                            </span>
+                          )}
                         </button>
                       );
                     })}
@@ -630,7 +637,7 @@ export default function AgrupamentoEnturmacaoModal({
                   {/* Lista de Alunos da Turma */}
                   {carregandoCandidatos ? (
                     <div className="py-8 text-center text-xs text-slate-400">
-                      Carregando alunos da turma {turmaObjSelecionada?.nome}…
+                      Carregando alunos da turma {turmaObjSelecionada?.turma || turmaObjSelecionada?.nome}…
                     </div>
                   ) : candidatos.length === 0 ? (
                     <div className="py-8 text-center text-slate-500 text-xs bg-slate-50 rounded-2xl border border-dashed border-slate-200">

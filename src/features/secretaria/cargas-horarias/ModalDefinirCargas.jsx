@@ -72,7 +72,13 @@ export default function ModalDefinirCargas({ turno, turma, onClose, semestre = 1
       setErro("");
       try {
         const { data } = await api.get("/api/disciplinas", {
-          params: { escola_id, turno },
+          params: { 
+            escola_id, 
+            turno: turma?.turno || turno,
+            etapa: turma?.etapa,
+            modo_oferta: 'TURMA',
+            apenas_regulares: true,
+          },
         });
         const arr = Array.isArray(data) ? data : [];
 
@@ -99,7 +105,7 @@ export default function ModalDefinirCargas({ turno, turma, onClose, semestre = 1
       }
     }
     load();
-  }, [turno, escola_id]);
+  }, [turno, turma?.turno, turma?.etapa, escola_id]);
 
   // --------------------------------------------------------------------------
   // Linhas dinâmicas conforme 'qtd' (limite de segurança)

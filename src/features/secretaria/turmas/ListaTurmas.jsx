@@ -1,6 +1,7 @@
 // src/features/secretaria/turmas/ListaTurmas.jsx
 
 import React, { useState, useEffect } from "react";
+import ReactDOM from "react-dom";
 import { TrashIcon, PencilSquareIcon } from "@heroicons/react/24/solid";
 import Modal from "../../../components/ui/Modal";
 import TurmaForm from "./TurmaForm";
@@ -179,8 +180,7 @@ export default function ListaTurmas() {
   if (loading) return <p className="p-6">Carregando turmas...</p>;
 
   return (
-    <div className="p-6">
-      <h2 className="text-2xl font-semibold mb-4">Cadastro de Turmas</h2>
+    <div className="space-y-4">
 
       {/* Mensagem de sucesso */}
       {successMessage && (
@@ -316,43 +316,68 @@ export default function ListaTurmas() {
         </table>
       </div>
 
-      {/* Modal de formulário */}
-      <Modal open={isFormOpen} onClose={() => setFormOpen(false)}>
-        <TurmaForm
-          open={isFormOpen}
-          onClose={() => {
-            setFormOpen(false);
-            setEditingTurma(null);
-          }}
-          onSubmit={handleSaveTurma}
-          turma={editingTurma}
-        />
-      </Modal>
+      {/* Modal de formulário Premium */}
+      <TurmaForm
+        open={isFormOpen}
+        onClose={() => {
+          setFormOpen(false);
+          setEditingTurma(null);
+        }}
+        onSubmit={handleSaveTurma}
+        turma={editingTurma}
+      />
 
-      {/* Modal de exclusão */}
-      <Modal open={!!toDeleteTurma} onClose={() => setToDeleteTurma(null)}>
-        <div className="p-6 space-y-4">
-          <h3 className="text-lg font-semibold">Confirmação</h3>
-          <p>
-            Tem certeza que deseja excluir a turma{" "}
-            <strong>{toDeleteTurma?.turma}</strong>?
-          </p>
-          <div className="flex justify-end space-x-2">
-            <button
-              onClick={() => setToDeleteTurma(null)}
-              className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+      {/* Modal de exclusão Premium */}
+      {toDeleteTurma &&
+        ReactDOM.createPortal(
+          <div
+            className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-all"
+            onClick={() => setToDeleteTurma(null)}
+          >
+            <div
+              className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 space-y-4 border border-slate-100 animate-fadeIn"
+              onClick={(e) => e.stopPropagation()}
             >
-              Não
-            </button>
-            <button
-              onClick={handleDeleteTurmaConfirmed}
-              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-            >
-              Sim
-            </button>
-          </div>
-        </div>
-      </Modal>
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center flex-shrink-0">
+                  <TrashIcon className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">Excluir Turma</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Esta ação removerá o registro da turma regular
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-3.5 bg-red-50/70 border border-red-100 rounded-xl text-xs text-red-800">
+                Tem certeza que deseja excluir a turma{" "}
+                <strong className="font-bold text-red-900">
+                  {toDeleteTurma?.turma || toDeleteTurma?.nome}
+                </strong>
+                ? Esta operação não pode ser desfeita.
+              </div>
+
+              <div className="flex justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setToDeleteTurma(null)}
+                  className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 font-semibold text-xs hover:bg-slate-50 transition cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteTurmaConfirmed}
+                  className="px-5 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-sm shadow-red-200 transition cursor-pointer"
+                >
+                  Confirmar Exclusão
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
 
       {/* Modal de Normalização / Mapeamento (EDUCA.MELHOR / EDUCADF) */}
       <Modal open={isNormalizationOpen} onClose={() => setIsNormalizationOpen(false)}>

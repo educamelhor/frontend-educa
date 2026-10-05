@@ -6,30 +6,10 @@ import {
   UserGroupIcon,
 } from "@heroicons/react/24/solid";
 import ListaTurmas from "./ListaTurmas";
-import TurmaForm from "./TurmaForm";
 import ListaAgrupamentos from "./agrupamentos/ListaAgrupamentos";
 
 export default function Turmas() {
   const [abaAtiva, setAbaAtiva] = useState("regulares"); // "regulares" | "agrupamentos"
-
-  // Estado para controle de abertura do formulário de turma regular
-  const [openForm, setOpenForm] = useState(false);
-  const [selectedTurma, setSelectedTurma] = useState(null);
-
-  const handleNovaTurma = () => {
-    setSelectedTurma(null);
-    setOpenForm(true);
-  };
-
-  const handleEditarTurma = (turma) => {
-    setSelectedTurma(turma);
-    setOpenForm(true);
-  };
-
-  const handleCloseForm = () => {
-    setOpenForm(false);
-    setSelectedTurma(null);
-  };
 
   return (
     <div className="p-6 space-y-6">
@@ -88,20 +68,7 @@ export default function Turmas() {
 
       {/* Conteúdo da Aba Ativa */}
       {abaAtiva === "regulares" ? (
-        <div>
-          <ListaTurmas
-            onNovaTurma={handleNovaTurma}
-            onEditarTurma={handleEditarTurma}
-          />
-
-          {openForm && (
-            <TurmaForm
-              open={openForm}
-              onClose={handleCloseForm}
-              turma={selectedTurma}
-            />
-          )}
-        </div>
+        <ListaTurmas />
       ) : (
         <ListaAgrupamentos />
       )}

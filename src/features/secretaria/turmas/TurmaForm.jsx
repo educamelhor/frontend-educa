@@ -1,9 +1,12 @@
 // src/features/secretaria/turmas/TurmaForm.jsx
-
-import React, { useState, useEffect } from 'react';
-import Input from '../../../components/ui/Input';
-import { Button } from "../../../components/ui/Button";
-import api from '../../../services/api';
+import React, { useState, useEffect } from "react";
+import ReactDOM from "react-dom";
+import {
+  XMarkIcon,
+  BuildingOffice2Icon,
+  CalendarDaysIcon,
+} from "@heroicons/react/24/solid";
+import api from "../../../services/api";
 
 function anoLetivoPadrao() {
   const hoje = new Date();
@@ -17,20 +20,21 @@ export default function TurmaForm({ open, onClose, onSubmit, turma }) {
 
   useEffect(() => {
     if (open) {
-      api.get('/etapas')
-        .then(res => setEtapasList(res.data || []))
-        .catch(err => console.error('Erro ao buscar etapas no TurmaForm:', err));
+      api
+        .get("/api/etapas")
+        .then((res) => setEtapasList(res.data || []))
+        .catch((err) => console.error("Erro ao buscar etapas no TurmaForm:", err));
     }
   }, [open]);
 
   const [form, setForm] = useState({
-    escola_id: '',
-    nome: '',
-    etapa: '',
+    escola_id: "",
+    nome: "",
+    etapa: "",
     ano: anoAtual,
-    turno: '',
-    serie: '',
-    regime: 'anual',
+    turno: "",
+    serie: "",
+    regime: "anual",
   });
 
   const [errors, setErrors] = useState({});
@@ -45,72 +49,60 @@ export default function TurmaForm({ open, onClose, onSubmit, turma }) {
       "2º Ano",
       "3º Ano",
       "4º Ano",
-      "5º Ano"
+      "5º Ano",
     ],
-    FUNDAMENTAL: [
-      "6º Ano",
-      "7º Ano",
-      "8º Ano",
-      "9º Ano"
-    ],
-    "MÉDIO": [
-      "1ª Série",
-      "2ª Série",
-      "3ª Série"
-    ]
+    FUNDAMENTAL: ["6º Ano", "7º Ano", "8º Ano", "9º Ano"],
+    MÉDIO: ["1ª Série", "2ª Série", "3ª Série"],
   };
 
-  // Preenche form para edição ou limpa para novo
   useEffect(() => {
     if (!open) return;
 
-    // Escola é definida pelo contexto do login (localStorage)
-    const escolaIdLogin = localStorage.getItem('escola_id') || '';
+    const escolaIdLogin = localStorage.getItem("escola_id") || "";
 
     if (turma) {
       setForm({
         id: turma.id ?? null,
-        escola_id: turma.escola_id ?? escolaIdLogin ?? '',
-        nome: turma.nome ?? turma.turma ?? '',
-        etapa: turma.etapa ?? '',
+        escola_id: turma.escola_id ?? escolaIdLogin ?? "",
+        nome: turma.nome ?? turma.turma ?? "",
+        etapa: turma.etapa ?? "",
         ano: turma.ano ?? anoAtual,
-        turno: turma.turno?.toUpperCase() ?? '',
-        serie: turma.serie ?? '',
-        regime: turma.regime ?? 'anual',
+        turno: turma.turno?.toUpperCase() ?? "",
+        serie: turma.serie ?? "",
+        regime: turma.regime ?? "anual",
       });
     } else {
       setForm({
         escola_id: escolaIdLogin,
-        nome: '',
-        etapa: '',
+        nome: "",
+        etapa: "",
         ano: anoAtual,
-        turno: '',
-        serie: '',
-        regime: 'anual',
+        turno: "",
+        serie: "",
+        regime: "anual",
       });
       setErrors({});
     }
-  }, [open, turma]);
+  }, [open, turma, anoAtual]);
 
-  // Atualiza campos
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setForm(f => ({ ...f, [name]: value }));
+    setForm((f) => ({ ...f, [name]: value }));
+    if (errors[name]) {
+      setErrors((errs) => ({ ...errs, [name]: undefined }));
+    }
   };
 
-  // Valida campos
   const validate = () => {
     const errs = {};
-    // escola_id não é mais selecionado no formulário (vem do login)
-    if (!form.nome) errs.nome = 'Turma obrigatória';
-    if (!form.etapa) errs.etapa = 'Etapa obrigatória';
-    if (!form.ano) errs.ano = 'Ano obrigatório';
-    if (!form.turno) errs.turno = 'Turno obrigatório';
-    if (!form.serie) errs.serie = 'Série obrigatória';
+    if (!form.nome.trim()) errs.nome = "Nome da turma é obrigatório";
+    if (!form.etapa) errs.etapa = "Etapa é obrigatória";
+    if (!form.ano) errs.ano = "Ano é obrigatório";
+    if (!form.turno) errs.turno = "Turno é obrigatório";
+    if (!form.serie) errs.serie = "Série é obrigatória";
     return errs;
   };
 
-  // Submete
   const handleSubmit = async (e) => {
     e.preventDefault();
     const errs = validate();
@@ -120,26 +112,19 @@ export default function TurmaForm({ open, onClose, onSubmit, turma }) {
     }
 
     setSending(true);
-
-    // ✅ FIX MÉDIO 5: escola_id NÃO é mais enviado no payload — o backend usa exclusivamente req.user.escola_id (JWT).
-    // Manter escola_id no localStorage apenas para a verificação de duplicidade local (ListaTurmas.find).
-    const escolaIdLocal = localStorage.getItem('escola_id') || '';
+    const escolaIdLocal = localStorage.getItem("escola_id") || "";
 
     const dados = {
-      // id incluso para que ListaTurmas.handleSaveTurma pule a verificação
-      // de duplicidade para a própria turma sendo editada
       ...(form.id ? { id: form.id } : {}),
       nome: form.nome.trim().toUpperCase(),
       etapa: form.etapa.trim().toUpperCase(),
       ano: String(form.ano).trim(),
       turno: form.turno.trim().toUpperCase(),
       serie: form.serie.trim().toUpperCase(),
-      regime: form.regime || 'anual',
-      // escola_id incluso apenas para a verificação de duplicidade cliente-side antes do POST
+      regime: form.regime || "anual",
       _escola_id_local: escolaIdLocal,
     };
 
-    // Mantém compatibilidade: onSubmit pode retornar boolean (atual) ou { ok, message } (melhoria)
     let result = false;
     try {
       result = await onSubmit(dados);
@@ -147,12 +132,12 @@ export default function TurmaForm({ open, onClose, onSubmit, turma }) {
       setSending(false);
     }
 
-    if (typeof result === 'boolean') {
+    if (typeof result === "boolean") {
       if (result) onClose();
       return;
     }
 
-    if (result && typeof result === 'object') {
+    if (result && typeof result === "object") {
       if (result.ok) onClose();
       if (result.ok === false && result.message) {
         alert(result.message);
@@ -162,140 +147,257 @@ export default function TurmaForm({ open, onClose, onSubmit, turma }) {
 
   if (!open) return null;
 
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4 p-4">
-      {/* Nome */}
-      <div>
-        <label className="block mb-1">Turma</label>
-        <Input name="nome" value={form.nome} onChange={handleChange} />
-        {errors.nome && <p className="text-red-600 text-sm">{errors.nome}</p>}
-      </div>
-
-      {/* Etapa */}
-      <div>
-        <label className="block mb-1">Etapa</label>
-        <select
-          name="etapa"
-          value={form.etapa}
-          onChange={(e) => {
-            handleChange(e);
-            setForm(f => ({ ...f, serie: '' })); // limpa série ao mudar etapa
-          }}
-          className="w-full border rounded p-2 uppercase"
-        >
-          <option value="">— Selecione a etapa —</option>
-          {etapasList.length > 0 ? (
-            etapasList.map(etp => (
-              <option key={etp.id} value={etp.nome.toUpperCase()}>{etp.nome}</option>
-            ))
-          ) : (
-            <>
-              <option value="INFANTIL">Infantil</option>
-              <option value="FUNDAMENTAL">Fundamental</option>
-              <option value="MÉDIO">Médio</option>
-            </>
-          )}
-        </select>
-        {errors.etapa && <p className="text-red-600 text-sm">{errors.etapa}</p>}
-      </div>
-
-      {/* Ano */}
-      <div>
-        <label className="block mb-1">Ano</label>
-        <input
-          name="ano"
-          value={form.ano}
-          readOnly
-          disabled
-          className="w-full border rounded p-2 bg-gray-100 text-gray-500 cursor-not-allowed font-medium"
-        />
-        {errors.ano && <p className="text-red-600 text-sm">{errors.ano}</p>}
-      </div>
-
-      {/* Turno */}
-      <div>
-        <label className="block mb-1">Turno</label>
-        <select
-          name="turno"
-          value={form.turno}
-          onChange={handleChange}
-          className="w-full border rounded p-2 uppercase"
-        >
-          <option value="">— Selecione o turno —</option>
-          <option value="MATUTINO">Matutino</option>
-          <option value="VESPERTINO">Vespertino</option>
-          <option value="NOTURNO">Noturno</option>
-        </select>
-        {errors.turno && <p className="text-red-600 text-sm">{errors.turno}</p>}
-      </div>
-
-      {/* Série */}
-      <div>
-        <label className="block mb-1">Série</label>
-        {form.etapa && opcoesSerie[form.etapa] ? (
-          <select
-            name="serie"
-            value={form.serie}
-            onChange={handleChange}
-            className="w-full border rounded p-2 uppercase"
+  return ReactDOM.createPortal(
+    <div
+      className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-all"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-3xl shadow-2xl w-full max-w-xl flex flex-col overflow-hidden border border-slate-100 animate-fadeIn"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header Premium com Gradiente */}
+        <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-cyan-800 p-6 flex justify-between items-center text-white relative overflow-hidden flex-shrink-0">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full translate-x-20 -translate-y-20 blur-3xl pointer-events-none" />
+          <div className="flex items-center gap-4 relative z-10">
+            <div className="bg-white/20 p-3 rounded-2xl backdrop-blur-md border border-white/20 shadow-inner">
+              <BuildingOffice2Icon className="w-7 h-7 text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+                {turma ? "Editar Turma Regular" : "Nova Turma Regular"}
+              </h2>
+              <p className="text-blue-100 text-xs mt-1">
+                Cadastro e modulação da turma para a base curricular nacional
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="bg-white/10 hover:bg-white/20 p-2.5 rounded-full transition-all text-white z-10 cursor-pointer"
+            title="Fechar"
           >
-            <option value="">— Selecione a série —</option>
-            {opcoesSerie[form.etapa].map((serie, idx) => (
-              <option key={idx} value={serie}>{serie}</option>
-            ))}
-          </select>
-        ) : (
-          <Input
-            name="serie"
-            value={form.serie}
-            onChange={handleChange}
-          />
-        )}
-        {errors.serie && <p className="text-red-600 text-sm">{errors.serie}</p>}
-      </div>
-
-      {/* Regime */}
-      <div>
-        <label className="block mb-1 font-medium text-gray-700">Regime Letivo</label>
-        <div className="flex gap-3">
-          {[
-            { value: 'anual',     label: '🗓️ Anual',     desc: 'Grade igual nos 2 semestres' },
-            { value: 'semestral', label: '📅 Semestral', desc: 'Grade diferente por semestre' },
-          ].map(op => (
-            <button
-              key={op.value}
-              type="button"
-              onClick={() => setForm(f => ({ ...f, regime: op.value }))}
-              className={`flex-1 flex flex-col items-center gap-1 px-4 py-3 rounded-lg border-2 transition text-sm font-semibold ${
-                form.regime === op.value
-                  ? 'border-blue-600 bg-blue-50 text-blue-800'
-                  : 'border-gray-200 bg-white text-gray-600 hover:border-blue-300'
-              }`}
-            >
-              <span className="text-base">{op.label}</span>
-              <span className="text-xs font-normal text-gray-500">{op.desc}</span>
-            </button>
-          ))}
+            <XMarkIcon className="w-5 h-5" />
+          </button>
         </div>
-      </div>
 
-      {/* Botões */}
-      <div className="flex justify-end gap-2 mt-6">
-        <Button
-          type="button"
-          onClick={onClose}
-          className="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded transition"
-        >
-          Cancelar
-        </Button>
-        <Button
-          type="submit"
-          disabled={sending}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition"
-        >
-          {sending ? 'Salvando…' : 'Salvar'}
-        </Button>
+        {/* Formulário */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto max-h-[80vh]">
+          {/* Nome da Turma */}
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+              Nome da Turma <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              name="nome"
+              placeholder="Ex: 1º ANO A, 2º ANO B, INFANTIL I..."
+              value={form.nome}
+              onChange={handleChange}
+              className={`w-full px-4 py-2.5 rounded-xl border text-sm font-semibold uppercase transition outline-none ${
+                errors.nome
+                  ? "border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-100"
+                  : "border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+              }`}
+            />
+            {errors.nome && (
+              <p className="text-red-600 text-xs mt-1 font-medium">{errors.nome}</p>
+            )}
+          </div>
+
+          {/* Grid: Etapa e Turno */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                Etapa de Ensino <span className="text-red-500">*</span>
+              </label>
+              <select
+                name="etapa"
+                value={form.etapa}
+                onChange={(e) => {
+                  handleChange(e);
+                  setForm((f) => ({ ...f, serie: "" }));
+                }}
+                className={`w-full px-3 py-2.5 rounded-xl border text-sm font-medium transition bg-white outline-none uppercase ${
+                  errors.etapa
+                    ? "border-red-400 focus:border-red-500"
+                    : "border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                }`}
+              >
+                <option value="">— Selecione a etapa —</option>
+                {etapasList.length > 0 ? (
+                  etapasList.map((etp) => (
+                    <option key={etp.id} value={etp.nome.toUpperCase()}>
+                      {etp.nome}
+                    </option>
+                  ))
+                ) : (
+                  <>
+                    <option value="INFANTIL">Infantil</option>
+                    <option value="FUNDAMENTAL">Fundamental</option>
+                    <option value="MÉDIO">Médio</option>
+                  </>
+                )}
+              </select>
+              {errors.etapa && (
+                <p className="text-red-600 text-xs mt-1 font-medium">{errors.etapa}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                Turno <span className="text-red-500">*</span>
+              </label>
+              <select
+                name="turno"
+                value={form.turno}
+                onChange={handleChange}
+                className={`w-full px-3 py-2.5 rounded-xl border text-sm font-medium transition bg-white outline-none uppercase ${
+                  errors.turno
+                    ? "border-red-400 focus:border-red-500"
+                    : "border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                }`}
+              >
+                <option value="">— Selecione o turno —</option>
+                <option value="MATUTINO">Matutino</option>
+                <option value="VESPERTINO">Vespertino</option>
+                <option value="NOTURNO">Noturno</option>
+                <option value="INTEGRAL">Integral</option>
+              </select>
+              {errors.turno && (
+                <p className="text-red-600 text-xs mt-1 font-medium">{errors.turno}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Grid: Ano Letivo e Série */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                Ano Letivo
+              </label>
+              <input
+                name="ano"
+                value={form.ano}
+                readOnly
+                disabled
+                className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-100 text-slate-600 font-bold text-sm cursor-not-allowed"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                Série / Ano Escolar <span className="text-red-500">*</span>
+              </label>
+              {form.etapa && opcoesSerie[form.etapa] ? (
+                <select
+                  name="serie"
+                  value={form.serie}
+                  onChange={handleChange}
+                  className={`w-full px-3 py-2.5 rounded-xl border text-sm font-medium transition bg-white outline-none uppercase ${
+                    errors.serie
+                      ? "border-red-400 focus:border-red-500"
+                      : "border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                  }`}
+                >
+                  <option value="">— Selecione a série —</option>
+                  {opcoesSerie[form.etapa].map((serie, idx) => (
+                    <option key={idx} value={serie}>
+                      {serie}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  name="serie"
+                  placeholder="Ex: 1ª Série, 6º Ano..."
+                  value={form.serie}
+                  onChange={handleChange}
+                  className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium transition outline-none uppercase ${
+                    errors.serie
+                      ? "border-red-400 focus:border-red-500"
+                      : "border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                  }`}
+                />
+              )}
+              {errors.serie && (
+                <p className="text-red-600 text-xs mt-1 font-medium">{errors.serie}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Regime Letivo (Anual vs Semestral) */}
+          <div className="pt-2">
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+              Regime de Oferta
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                {
+                  value: "anual",
+                  label: "🗓️ Anual",
+                  desc: "Grade e matriz iguais nos dois semestres",
+                },
+                {
+                  value: "semestral",
+                  label: "📅 Semestral",
+                  desc: "Grade e modulação distintas por semestre",
+                },
+              ].map((op) => {
+                const isSelected = form.regime === op.value;
+                return (
+                  <button
+                    key={op.value}
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, regime: op.value }))}
+                    className={`flex flex-col items-center text-center p-3.5 rounded-2xl border-2 transition-all cursor-pointer ${
+                      isSelected
+                        ? "border-indigo-600 bg-indigo-50/70 text-indigo-900 shadow-sm"
+                        : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                    }`}
+                  >
+                    <span className="text-sm font-bold">{op.label}</span>
+                    <span className="text-[11px] text-slate-500 mt-1 leading-snug">
+                      {op.desc}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Rodapé com Ações */}
+          <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={sending}
+              className="px-5 py-2.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-50 font-semibold text-sm transition cursor-pointer"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={sending}
+              className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-700 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-sm shadow-md shadow-indigo-100 transition disabled:opacity-50 cursor-pointer flex items-center gap-2"
+            >
+              {sending ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Salvando…</span>
+                </>
+              ) : turma ? (
+                "Salvar Alterações"
+              ) : (
+                "Cadastrar Turma"
+              )}
+            </button>
+          </div>
+        </form>
       </div>
-    </form>
+    </div>,
+    document.body
   );
 }

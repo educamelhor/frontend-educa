@@ -9,7 +9,7 @@ import { Routes, Route } from 'react-router-dom';
 
 // Submódulos
 import ListaProfessores from './professores/ListaProfessores';
-import ListaTurmas from './turmas/ListaTurmas';
+import Turmas from './turmas';
 import ListaDisciplinas from './disciplinas/ListaDisciplinas';
 import ListaCargasHorarias from './cargas-horarias/ListaCargasHorarias';
 import Alunos from "./alunos";
@@ -28,7 +28,7 @@ export default function Secretaria() {
       <Route path="professores" element={<ListaProfessores />} />
 
       {/* Turmas */}
-      <Route path="turmas" element={<ListaTurmas />} />
+      <Route path="turmas" element={<Turmas />} />
 
       {/* Disciplinas */}
       <Route path="disciplinas" element={<ListaDisciplinas />} />

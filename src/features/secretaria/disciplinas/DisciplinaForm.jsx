@@ -4,10 +4,18 @@ const TIPOS = [
   { value: 'REGULAR',             label: 'Regular (Base Nacional)' },
   { value: 'PARTE_DIVERSIFICADA', label: 'Parte Diversificada (PD1/PD2/PD3)' },
   { value: 'IFA',                 label: 'IFA — Itinerário Formativo' },
-  { value: 'PCA',                 label: 'PCA — Projeto de Contemplação de Área' },
+  { value: 'PCA',                 label: 'PCA — Percurso Comum de Aprofundamento' },
   { value: 'ELETIVA',             label: 'Eletiva / Optativa' },
   { value: 'PROJETO',             label: 'Projeto Interdisciplinar' },
 ];
+
+// Modo de oferta: TURMA = cursada pela turma regular; AGRUPAMENTO = turma de agrupamento
+// (alunos de turmas distintas). O padrão deriva do tipo, mas a escola pode alterar.
+const MODOS_OFERTA = [
+  { value: 'TURMA',       label: 'Turma regular (toda a turma cursa)' },
+  { value: 'AGRUPAMENTO', label: 'Turma de agrupamento (alunos de turmas distintas)' },
+];
+const modoPadraoDoTipo = (tipo) => (['IFA', 'ELETIVA', 'PROJETO'].includes(tipo) ? 'AGRUPAMENTO' : 'TURMA');
 
 export default function DisciplinaForm({ open, onClose, onSubmit, disciplina }) {
   const [form, setForm] = useState({
@@ -15,6 +23,7 @@ export default function DisciplinaForm({ open, onClose, onSubmit, disciplina }) 
     abreviatura: '',
     nome_oficial: '',
     tipo: 'REGULAR',
+    modo_oferta: 'TURMA',
     carga: 1,
     etapa: 'GERAL',
     turno: 'INTEGRAL'
@@ -31,6 +40,7 @@ export default function DisciplinaForm({ open, onClose, onSubmit, disciplina }) 
         abreviatura: disciplina.abreviatura ?? '',
         nome_oficial: disciplina.nome_oficial ?? '',
         tipo: disciplina.tipo ?? 'REGULAR',
+        modo_oferta: disciplina.modo_oferta ?? modoPadraoDoTipo(disciplina.tipo),
         carga: disciplina.carga ?? 1,
         etapa: disciplina.etapa ?? 'GERAL',
         turno: disciplina.turno ?? 'INTEGRAL',
@@ -42,6 +52,7 @@ export default function DisciplinaForm({ open, onClose, onSubmit, disciplina }) 
         abreviatura: '',
         nome_oficial: '',
         tipo: 'REGULAR',
+        modo_oferta: 'TURMA',
         carga: 1,
         etapa: 'GERAL',
         turno: 'INTEGRAL'
@@ -52,7 +63,11 @@ export default function DisciplinaForm({ open, onClose, onSubmit, disciplina }) 
 
   const handleChange = e => {
     const { name, value } = e.target;
-    setForm(f => ({ ...f, [name]: value }));
+    setForm(f => (
+      name === 'tipo'
+        ? { ...f, tipo: value, modo_oferta: modoPadraoDoTipo(value) }
+        : { ...f, [name]: value }
+    ));
     if (errors[name]) setErrors(er => ({ ...er, [name]: undefined }));
   };
 
@@ -221,9 +236,41 @@ export default function DisciplinaForm({ open, onClose, onSubmit, disciplina }) 
               {(form.tipo === 'IFA' || form.tipo === 'PCA') && (
                 <div style={{ marginTop:8, padding:'8px 12px', background:'#eff6ff', border:'1px solid #93c5fd', borderRadius:8 }}>
                   <p style={{ margin:0, fontSize:12, color:'#1d4ed8' }}>
-                    💡 Para {form.tipo}s, use o nome completo no campo Disciplina acima (ex: "{form.tipo === 'IFA' ? 'IFA - PRODUÇÃO TEXTUAL E COMUNICAÇÃO' : 'PCA - PROJETO INTERDISCIPLINAR DE CIÊNCIAS'}").
+                    💡 Para {form.tipo}s, use o nome completo no campo Disciplina acima (ex: "{form.tipo === 'IFA' ? 'IFA - PRODUÇÃO TEXTUAL E COMUNICAÇÃO' : 'PCA - PERCURSO COMUM DE APROFUNDAMENTO EM CIÊNCIAS DA NATUREZA'}").
                   </p>
                 </div>
+              )}
+            </div>
+
+            {/* Campo: Modo de oferta */}
+            <div style={{ marginBottom: 16 }}>
+              <label style={{ display:'block', marginBottom:6, fontSize:13, fontWeight:600, color:'#374151', textTransform:'uppercase', letterSpacing:'0.5px' }}>
+                Modo de oferta <span style={{ fontSize:10, color:'#9ca3af', fontWeight:400, textTransform:'none' }}>(como a disciplina é cursada)</span>
+              </label>
+              <div style={{ position:'relative' }}>
+                <select
+                  name="modo_oferta"
+                  value={form.modo_oferta || 'TURMA'}
+                  onChange={handleChange}
+                  style={{ ...fieldStyle(false), paddingRight:34, appearance:'none', cursor:'pointer' }}
+                  onFocus={onFocusStyle}
+                  onBlur={onBlurStyle(false)}
+                >
+                  {MODOS_OFERTA.map(op => (
+                    <option key={op.value} value={op.value}>{op.label}</option>
+                  ))}
+                </select>
+                <span style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', pointerEvents:'none', color:'#6b7280', fontSize:11 }}>▼</span>
+              </div>
+              {form.tipo === 'PCA' && (
+                <p style={{ margin:'6px 0 0', fontSize:11, color:'#6b7280' }}>
+                  O Percurso Comum de Aprofundamento é, em regra, cursado por toda a turma (alinhado à Formação Geral Básica). A escola pode optar por oferecê-lo em agrupamento.
+                </p>
+              )}
+              {form.tipo !== 'PCA' && form.modo_oferta === 'AGRUPAMENTO' && (
+                <p style={{ margin:'6px 0 0', fontSize:11, color:'#6b7280' }}>
+                  Esta disciplina será ofertada em Turmas de Agrupamento (Secretaria → Turmas), reunindo alunos de turmas distintas.
+                </p>
               )}
             </div>
 

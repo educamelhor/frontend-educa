@@ -2173,8 +2173,15 @@ export default function Modulacao() {
                           Number(cargaPorDisciplina[prof.disciplina_id]) ??
                           1;
                         const restanteAtual = r.restante;
+                        const ehAgrupamento = Boolean(prof.isAgrupamento || Number(r.aulasAgr) > 0);
                         const semSaldo = !isChecked && restanteAtual < cargaTurma;
-                        const tooltipBloqueio = !disciplinaNaGrade && !isChecked
+                        const bloqueado = !isChecked && (ehAgrupamento || !disciplinaNaGrade || semSaldo);
+
+                        const tooltipBloqueio = ehAgrupamento
+                          ? isChecked
+                            ? `Clique para desmarcar. Esta é uma Turma de Agrupamento, sua modulação correta é via aba Turmas de Agrupamento.`
+                            : `Esta disciplina refere-se a uma Turma de Agrupamento / Eletiva. A modulação de professores é realizada diretamente no módulo de Agrupamentos e contabilizada via badge roxo (+${r.aulasAgr || 1} eletiva), sem marcação em turmas regulares.`
+                          : !disciplinaNaGrade && !isChecked
                           ? `A turma ${turma.turma || turma.nome} não possui ${prof.disciplina_nome} na sua grade regular.`
                           : semSaldo
                           ? restanteAtual <= 0
@@ -2194,9 +2201,10 @@ export default function Modulacao() {
                                 type="checkbox"
                                 title={tooltipBloqueio}
                                 checked={isChecked}
-                                disabled={semSaldo}
-                                style={semSaldo ? { cursor: "not-allowed", opacity: 0.35 } : {}}
+                                disabled={bloqueado}
+                                style={bloqueado ? { cursor: "not-allowed", opacity: 0.25 } : {}}
                                 onChange={(e) => {
+                                  if (bloqueado && e.target.checked) return;
                                   if (e.target.checked) {
                                     if (restanteAtual < cargaTurma) return;
                                     setAlocacoes((prev) => [

@@ -32,12 +32,14 @@ export default function AgrupamentoFormModal({
   onSaved,
   agrupamento = null,
   anoLetivoPadrao = new Date().getFullYear(),
+  turnoPadrao = "Noturno",
+  semestrePadrao = 2,
 }) {
   const [form, setForm] = useState({
     nome: "",
     tipo: "IFA",
-    turno: "Matutino",
-    semestre: 1,
+    turno: turnoPadrao && turnoPadrao !== "TODOS" ? turnoPadrao : "Noturno",
+    semestre: semestrePadrao && semestrePadrao !== "TODOS" ? Number(semestrePadrao) : 2,
     etapa_id: "",
     capacidade: "",
     status: "ABERTO",
@@ -65,8 +67,8 @@ export default function AgrupamentoFormModal({
       setForm({
         nome: agrupamento.nome || "",
         tipo: agrupamento.tipo || "IFA",
-        turno: agrupamento.turno || "Matutino",
-        semestre: agrupamento.semestre ?? 1,
+        turno: agrupamento.turno || "Noturno",
+        semestre: agrupamento.semestre ?? 2,
         etapa_id: agrupamento.etapa_id || "",
         capacidade: agrupamento.capacidade ?? "",
         status: agrupamento.status || "ABERTO",
@@ -76,15 +78,15 @@ export default function AgrupamentoFormModal({
       setForm({
         nome: "",
         tipo: "IFA",
-        turno: "Matutino",
-        semestre: 1,
+        turno: turnoPadrao && turnoPadrao !== "TODOS" ? turnoPadrao : "Noturno",
+        semestre: semestrePadrao && semestrePadrao !== "TODOS" ? Number(semestrePadrao) : 2,
         etapa_id: "",
         capacidade: "",
         status: "ABERTO",
         ano_letivo: anoLetivoPadrao,
       });
     }
-  }, [open, agrupamento, anoLetivoPadrao]);
+  }, [open, agrupamento, anoLetivoPadrao, turnoPadrao, semestrePadrao]);
 
   if (!open) return null;
 

@@ -514,6 +514,8 @@ export default function ListaAgrupamentos() {
         }}
         agrupamento={agrupamentoEditando}
         anoLetivoPadrao={anoLetivo}
+        turnoPadrao={turnoFiltro !== "TODOS" ? turnoFiltro : "Noturno"}
+        semestrePadrao={semestreFiltro !== "TODOS" ? Number(semestreFiltro) : 2}
         onSaved={carregarAgrupamentos}
       />
 

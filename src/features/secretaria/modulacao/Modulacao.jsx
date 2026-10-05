@@ -180,6 +180,8 @@ export default function Modulacao() {
   // MODULAÇÃO INTELIGENTE: carga real por turma × disciplina
   // { turma_id: { disciplina_id: N_aulas } } — preenchido pelo endpoint /api/modulacao/carga-turma
   const [cargaPorTurmaDisc, setCargaPorTurmaDisc] = useState({}); // {turmaId: {discId: N}}
+  // Comunicabilidade com Turmas de Agrupamento / Eletivas (FGB + Agrupamentos)
+  const [resumoAgrupamentos, setResumoAgrupamentos] = useState({ por_professor: {}, por_prof_disc: {}, por_prof_turno: {}, itens: [] });
 
   // ESTADOS (adicione junto aos outros useState de UI/relatórios)
   const [removerOpen, setRemoverOpen] = useState(false);
@@ -342,6 +344,15 @@ export default function Modulacao() {
         await carregarTurmasDoTurno(turnoSelecionado);
         // carrega/atualiza o map de total de aulas por professor para este turno e semestre
         const mapAulasTotais = await carregarAulasTotaisDoTurno(turnoSelecionado, semestreSelecionado);
+        // Carrega aulas alocadas em Turmas de Agrupamento (Eletivas / IFA) para comunicabilidade
+        try {
+          const { data: agrData } = await api.get("/api/agrupamentos/modulacao/resumo", {
+            params: { turno: turnoSelecionado, semestre: semestreSelecionado },
+          });
+          setResumoAgrupamentos(agrData || { por_professor: {}, por_prof_disc: {}, por_prof_turno: {}, itens: [] });
+        } catch {
+          setResumoAgrupamentos({ por_professor: {}, por_prof_disc: {}, por_prof_turno: {}, itens: [] });
+        }
 
         // MODULAÇÃO INTELIGENTE: carrega carga real por turma × disciplina para o semestre selecionado
         try {
@@ -628,23 +639,30 @@ export default function Modulacao() {
     const map = {};
     for (const prof of professoresTabela) {
       const total = Number(aulasTotaisPorProfessor[prof.id] ?? prof.aulas ?? 0) || 0;
-      // soma aulas usadas SOMENTE para esta disciplina específica
-      const usadas = alocacoes
+      // soma aulas usadas na FGB (turmas regulares)
+      const usadasFgb = alocacoes
         .filter((a) => a.profId === prof.id && a.discId === prof.disciplina_id)
         .reduce((soma, a) => {
           const cargaEspecifica = cargaPorTurmaDisc[a.turmaId]?.[prof.disciplina_id];
           const carga = cargaEspecifica ?? Number(cargaPorDisciplina[prof.disciplina_id]) ?? 1;
           return soma + (carga || 1);
         }, 0);
+
+      // Comunicabilidade com Turmas de Agrupamento / Eletivas (por professor e disciplina)
+      const aulasAgr = Number(resumoAgrupamentos?.por_prof_disc?.[prof.rowKey] ?? 0);
+      const usadasTotal = usadasFgb + aulasAgr;
+
       map[prof.rowKey] = {
         total,
-        usadas,
-        restante: total - usadas,
+        usadas: usadasTotal,
+        usadasFgb,
+        aulasAgr,
+        restante: total - usadasTotal,
         carga: Number(cargaPorDisciplina[prof.disciplina_id]) || 1,
       };
     }
     return map;
-  }, [professoresTabela, alocacoes, aulasTotaisPorProfessor, cargaPorDisciplina, cargaPorTurmaDisc]);
+  }, [professoresTabela, alocacoes, aulasTotaisPorProfessor, cargaPorDisciplina, cargaPorTurmaDisc, resumoAgrupamentos]);
 
 
 
@@ -904,6 +922,12 @@ export default function Modulacao() {
 
         // atualiza map de aulas totais e remonta linhas da tabela
         const mapAulasTotais = await carregarAulasTotaisDoTurno(turnoSelecionado, semestreSelecionado);
+        try {
+          const { data: agrData } = await api.get("/api/agrupamentos/modulacao/resumo", {
+            params: { turno: turnoSelecionado, semestre: semestreSelecionado },
+          });
+          setResumoAgrupamentos(agrData || { por_professor: {}, por_prof_disc: {}, por_prof_turno: {}, itens: [] });
+        } catch {}
 
         // pós-save: reconstrói linhas por (prof × disciplina)
         const linhasMap2 = new Map();
@@ -2033,23 +2057,33 @@ export default function Modulacao() {
                         {prof.disciplina_nome || "—"}
                       </td>
 
-                      {/* Aulas (restante dinâmico) */}
+                      {/* Aulas (restante dinâmico com comunicabilidade FGB + Eletivas) */}
                       <td
-                        className="py-2 px-4 border text-center sticky z-20 bg-white w-[100px]"
+                        className="py-2 px-4 border text-center sticky z-20 bg-white w-[110px]"
                         style={{ left: 260 + 160 }}
                       >
-                        <span
-                          className={
-                            r.restante < 0
-                              ? "text-red-600 font-semibold"
-                              : r.restante === 0
-                              ? "text-amber-600 font-semibold"
-                              : "text-gray-900"
-                          }
-                          title={`Total: ${r.total} • Usadas: ${r.usadas} • Restante: ${r.restante}`}
-                        >
-                          {r.restante}
-                        </span>
+                        <div className="flex flex-col items-center justify-center">
+                          <span
+                            className={
+                              r.restante < 0
+                                ? "text-red-600 font-bold"
+                                : r.restante === 0
+                                ? "text-amber-600 font-bold"
+                                : "text-gray-900 font-semibold"
+                            }
+                            title={`Contrato: ${r.total} aulas | Regulares (FGB): ${r.usadasFgb ?? r.usadas} | Agrupamento (Eletivas/IFA): ${r.aulasAgr || 0} | Saldo: ${r.restante}`}
+                          >
+                            {r.restante}
+                          </span>
+                          {Number(r.aulasAgr) > 0 && (
+                            <span
+                              className="text-[10px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.2 rounded border border-purple-200 mt-0.5 tracking-tight"
+                              title={`${r.aulasAgr} aula(s) em Turmas de Agrupamento / Eletivas`}
+                            >
+                              +${r.aulasAgr} eletiva
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Turmas — checkboxes com lógica inteligente de carga */}

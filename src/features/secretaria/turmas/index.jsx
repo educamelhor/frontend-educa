@@ -34,11 +34,11 @@ export default function Turmas() {
             onClick={() => setAbaAtiva("regulares")}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               abaAtiva === "regulares"
-                ? "bg-white text-indigo-700 shadow-sm"
-                : "text-slate-600 hover:text-slate-900"
+                ? "bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white shadow-md shadow-indigo-100"
+                : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"
             }`}
           >
-            <BuildingOffice2Icon className="w-4 h-4 text-indigo-600" />
+            <BuildingOffice2Icon className={`w-4 h-4 ${abaAtiva === "regulares" ? "text-white" : "text-indigo-600"}`} />
             <span>Turmas Regulares</span>
           </button>
 
@@ -47,16 +47,16 @@ export default function Turmas() {
             onClick={() => setAbaAtiva("agrupamentos")}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               abaAtiva === "agrupamentos"
-                ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md shadow-indigo-100"
-                : "text-slate-600 hover:text-slate-900"
+                ? "bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white shadow-md shadow-indigo-100"
+                : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"
             }`}
           >
-            <UserGroupIcon className="w-4 h-4" />
+            <UserGroupIcon className={`w-4 h-4 ${abaAtiva === "agrupamentos" ? "text-white" : "text-indigo-600"}`} />
             <span>Turmas de Agrupamento</span>
             <span
               className={`text-[10px] px-1.5 py-0.2 rounded-md font-semibold ${
                 abaAtiva === "agrupamentos"
-                  ? "bg-white/25 text-white"
+                  ? "bg-white/20 text-white"
                   : "bg-purple-100 text-purple-800"
               }`}
             >

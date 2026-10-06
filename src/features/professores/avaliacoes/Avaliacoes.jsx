@@ -567,9 +567,7 @@ export default function Avaliacoes() {
   // Comportamento novo: fixo_direcao com NOTA JÁ IMPORTADA = bloqueado.
   // fixo_direcao SEM nota (aluno ausente, '-') = desbloqueado só para código 1234.
   const isItemBloqueado = (itemIdx) => {
-    if (!avaliacaoPadrao) return false;
-    const arrItens = Array.isArray(plano?.itens) ? plano.itens : JSON.parse(plano?.itens || "[]");
-    return !!arrItens[itemIdx]?.fixo_direcao;
+    return false;
   };
 
   // Retorna true quando a célula da Prova Bimestral já tem nota importada do gabarito
@@ -587,25 +585,15 @@ export default function Avaliacoes() {
 
     const key = getNotaKey(alunoId, itemIdx, opIdx);
 
-    // Prova Bimestral (fixo_direcao): só permite edição se a célula está vazia
-    // e somente para o código de ausência 1234 — armazena digitação parcial no buffer
+    // Prova Bimestral (fixo_direcao): permite notas manuais normais de 0 a 5 e código 1234 para ausência
     if (isItemFixoDirecao(itemIdx)) {
-      const notaAtual = notas[key];
-      const jaTemNota = notaAtual !== undefined && notaAtual !== null && notaAtual !== "";
-      if (jaTemNota || ausentesSet.has(key)) return; // bloqueado: nota já importada ou já ausente
-
-      // Armazena o valor parcial para exibição
-      setTempGabarito(prev => ({ ...prev, [key]: val }));
-
-      // Quando completa o código 1234, confirma ausência
       if (val === "1234") {
         setNotas(prev => ({ ...prev, [key]: 0 }));
         setAusentesSet(prev => new Set([...prev, key]));
         setCoresCelulas(prev => ({ ...prev, [key]: "ausente" }));
-        // Limpa o buffer após confirmar
-        setTempGabarito(prev => { const t = { ...prev }; delete t[key]; return t; });
+        setTempGabarito(prev => { const n = { ...prev }; delete n[key]; return n; });
+        return;
       }
-      return;
     }
 
     if (isItemBloqueado(itemIdx)) return; // outras colunas bloqueadas
@@ -647,15 +635,12 @@ export default function Avaliacoes() {
   // Exemplos: "1" → 1.00 | ",4" → 0.40 | "1." → 1.00 | "" → remove
   const handleNotaBlur = (alunoId, itemIdx, opIdx, maxVal) => {
     if (diarioFechado) return;
+    const key = getNotaKey(alunoId, itemIdx, opIdx);
     if (isItemFixoDirecao(itemIdx)) {
       // Limpa buffer se não completou 1234
-      const key = getNotaKey(alunoId, itemIdx, opIdx);
       setTempGabarito(prev => { const t = { ...prev }; delete t[key]; return t; });
-      setFocusedKey(null);
-      return;
     }
     if (isItemBloqueado(itemIdx)) return;
-    const key = getNotaKey(alunoId, itemIdx, opIdx);
     setFocusedKey(null); // sai do modo de edição → exibe formatado
     const raw = notas[key];
     if (raw === undefined || raw === "") return;
@@ -1389,7 +1374,7 @@ export default function Avaliacoes() {
               A coluna <strong>"Prova Bimestral"</strong> e sua data serão definidas automaticamente pela direção ao criar o gabarito de prova.
             </p>
             <p className="text-xs text-amber-600 mt-1 font-medium">
-              🔒 Apenas a coluna de Avaliação Bimestral está bloqueada. As demais colunas continuam editáveis normalmente.
+              ✏️ A coluna "Prova Bimestral" (5,00 pts) foi gerada automaticamente e está aberta para edição manual pelo professor, podendo também receber notas importadas do Gabarito.
             </p>
           </div>
         </section>
@@ -2000,7 +1985,7 @@ export default function Avaliacoes() {
                                                 const val = notas[key];
                                                 const cor = coresCelulas[key];
                                                 const isGabaritoVazio = isItemFixoDirecao(col.itemIdx) && (val === undefined || val === null || val === "") && !ausentesSet.has(key);
-                                                const cellBloqueada = diarioFechado || (isItemBloqueado(col.itemIdx) && !isGabaritoVazio);
+                                                const cellBloqueada = diarioFechado;
                                                 const isFocused = focusedKey === key;
                                                 const isAusente = ausentesSet.has(key);
 

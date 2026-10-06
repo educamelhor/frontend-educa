@@ -126,9 +126,76 @@ export default function Planos() {
   // Dados do BD (Professor Logado)
   // ---------------------------
   const [disciplinas, setDisciplinas] = useState([]);
-  const bimestres = ["1º Bimestre", "2º Bimestre", "3º Bimestre", "4º Bimestre"];
   const [turmas, setTurmas] = useState([]);
   const [loadingInicial, setLoadingInicial] = useState(true);
+
+  // Helper para identificar semestralidade e tipo da turma
+  const getTurmaBadge = (t) => {
+    if (t?.is_agrupamento) {
+      const label = t.agrupamento_tipo ? `Agrupamento / ${t.agrupamento_tipo}` : "Agrupamento / IFA";
+      return {
+        label,
+        bg: "rgba(168,85,247,0.2)",
+        text: "#d8b4fe",
+        border: "rgba(168,85,247,0.4)",
+      };
+    }
+    const sem = Number(t?.semestre ?? 0);
+    const regime = String(t?.regime || "").toLowerCase();
+    if (sem === 1 || (regime === "semestral" && sem === 1)) {
+      return {
+        label: "1º Sem (1º/2º Bim)",
+        bg: "rgba(6,182,212,0.2)",
+        text: "#67e8f9",
+        border: "rgba(6,182,212,0.4)",
+      };
+    }
+    if (sem === 2 || (regime === "semestral" && sem === 2)) {
+      return {
+        label: "2º Sem (3º/4º Bim)",
+        bg: "rgba(245,158,11,0.2)",
+        text: "#fcd34d",
+        border: "rgba(245,158,11,0.4)",
+      };
+    }
+    return {
+      label: "Anual",
+      bg: "rgba(148,163,184,0.15)",
+      text: "#94a3b8",
+      border: "rgba(148,163,184,0.3)",
+    };
+  };
+
+  // Seletor dinâmico de bimestres por semestralidade da turma
+  const bimestresDisponiveis = React.useMemo(() => {
+    if (!turmaSelecionada && turmasSelecionadas.length === 0) {
+      return ["1º Bimestre", "2º Bimestre", "3º Bimestre", "4º Bimestre"];
+    }
+    const targetId = turmaSelecionada || turmasSelecionadas[0];
+    const turmaObj = turmas.find(
+      (t) => String(t.id) === String(targetId) || t.nome === targetId
+    );
+    const sem = Number(turmaObj?.semestre ?? 0);
+    const regime = String(turmaObj?.regime || "").toLowerCase();
+
+    // 1º Semestre -> 1º e 2º Bimestres
+    if (sem === 1 || (regime === "semestral" && sem === 1)) {
+      return ["1º Bimestre", "2º Bimestre"];
+    }
+    // 2º Semestre -> 3º e 4º Bimestres
+    if (sem === 2 || (regime === "semestral" && sem === 2)) {
+      return ["3º Bimestre", "4º Bimestre"];
+    }
+    // Anual ou padrão
+    return ["1º Bimestre", "2º Bimestre", "3º Bimestre", "4º Bimestre"];
+  }, [turmaSelecionada, turmasSelecionadas, turmas]);
+
+  // Se o bimestre previamente selecionado não for válido para a turma, seleciona o primeiro válido
+  useEffect(() => {
+    if (bimestreSelecionado && !bimestresDisponiveis.includes(bimestreSelecionado)) {
+      setBimestreSelecionado(bimestresDisponiveis[0] || null);
+    }
+  }, [bimestresDisponiveis, bimestreSelecionado]);
 
   // Governança: escola adota avaliação padrão bimestral + nomes das disciplinas de exceção
   const [escolaAdotaBimestral, setEscolaAdotaBimestral] = useState(false);
@@ -643,13 +710,14 @@ export default function Planos() {
                   {turmas.map(t => {
                     const nm = t.nome || t;
                     const id = t.id || nm;
+                    const badge = getTurmaBadge(t);
 
                     // Modo simples: seleção única, clique avança para etapa 2
                     if (!modoMultiTurma) {
                       const isSel = turmaSelecionada === id || turmaSelecionada === nm;
                       return (
                         <button key={id} onClick={() => { setTurmaSelecionada(id); setEtapaAtiva(2); }} style={{
-                          padding: "0.55rem 1.2rem",
+                          padding: "0.5rem 1rem",
                           borderRadius: "0.6rem",
                           fontWeight: 700,
                           fontSize: "0.875rem",
@@ -660,27 +728,61 @@ export default function Planos() {
                           border: isSel ? "none" : "1px solid rgba(255,255,255,0.12)",
                           boxShadow: isSel ? "0 4px 14px rgba(34,211,238,0.35)" : "none",
                           transform: isSel ? "scale(1.04)" : "scale(1)",
-                        }}>{nm}</button>
+                          display: "inline-flex",
+                          flexDirection: "column",
+                          alignItems: "flex-start",
+                          gap: "3px",
+                        }}>
+                          <span>{nm}</span>
+                          <span style={{
+                            fontSize: "0.65rem",
+                            padding: "1px 6px",
+                            borderRadius: "4px",
+                            fontWeight: 700,
+                            background: badge.bg,
+                            color: badge.text,
+                            border: `1px solid ${badge.border}`,
+                          }}>
+                            {badge.label}
+                          </span>
+                        </button>
                       );
                     }
 
                     // Modo multi-turma: toggle por checkbox visual
                     const isChecked = turmasSelecionadas.includes(id);
+
+                    // Trava de compatibilidade de semestres no modo multi-turma
+                    let semIncompativel = false;
+                    if (turmasSelecionadas.length > 0 && !isChecked) {
+                      const firstId = turmasSelecionadas[0];
+                      const firstObj = turmas.find(x => String(x.id) === String(firstId) || x.nome === firstId);
+                      const firstSem = Number(firstObj?.semestre ?? 0);
+                      const thisSem = Number(t?.semestre ?? 0);
+                      if (firstSem !== thisSem) {
+                        semIncompativel = true;
+                      }
+                    }
+
                     return (
                       <button
                         key={id}
+                        disabled={semIncompativel}
+                        title={semIncompativel ? "Turma de semestre diferente da(s) já selecionada(s)" : undefined}
                         onClick={() => {
+                          if (semIncompativel) return;
                           setTurmasSelecionadas(prev =>
                             prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
                           );
                         }}
                         style={{
-                          display: "flex", alignItems: "center", gap: "0.45rem",
-                          padding: "0.5rem 1rem",
+                          display: "inline-flex", alignItems: "center", gap: "0.55rem",
+                          padding: "0.5rem 0.9rem",
                           borderRadius: "0.6rem",
                           fontWeight: 700,
                           fontSize: "0.875rem",
-                          cursor: "pointer",
+                          cursor: semIncompativel ? "not-allowed" : "pointer",
+                          opacity: semIncompativel ? 0.35 : 1,
                           transition: "all 0.2s",
                           background: isChecked ? "linear-gradient(135deg,#818cf8,#6366f1)" : "rgba(255,255,255,0.07)",
                           color: isChecked ? "#fff" : "#cbd5e1",
@@ -703,7 +805,20 @@ export default function Planos() {
                             </svg>
                           )}
                         </span>
-                        {nm}
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "2px" }}>
+                          <span>{nm}</span>
+                          <span style={{
+                            fontSize: "0.62rem",
+                            padding: "1px 5px",
+                            borderRadius: "3px",
+                            fontWeight: 700,
+                            background: badge.bg,
+                            color: badge.text,
+                            border: `1px solid ${badge.border}`,
+                          }}>
+                            {badge.label}
+                          </span>
+                        </div>
                       </button>
                     );
                   })}
@@ -774,7 +889,7 @@ export default function Planos() {
               <div>
                 <p style={{ fontSize: "0.78rem", color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "0.75rem" }}>Selecione o bimestre</p>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-                  {bimestres.map(b => {
+                  {bimestresDisponiveis.map(b => {
                     const isSel = bimestreSelecionado === b;
                     const enc = bimestreEncerrado(b);
                     return (

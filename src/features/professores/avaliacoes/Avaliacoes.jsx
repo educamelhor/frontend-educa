@@ -36,8 +36,92 @@ export default function Avaliacoes() {
   const [turmaSelecionada, setTurmaSelecionada] = useState("");
 
   const [disciplinas, setDisciplinas] = useState([]);
-  const bimestres = ["1º Bimestre", "2º Bimestre", "3º Bimestre", "4º Bimestre"];
   const [turmas, setTurmas] = useState([]);
+
+  // Helper para identificar semestralidade e tipo da turma
+  const getTurmaBadge = (t) => {
+    if (t?.is_agrupamento) {
+      const label = t.agrupamento_tipo ? `Agrupamento / ${t.agrupamento_tipo}` : "Agrupamento / IFA";
+      return {
+        label,
+        bg: "rgba(168,85,247,0.2)",
+        text: "#d8b4fe",
+        border: "rgba(168,85,247,0.4)",
+      };
+    }
+    const sem = Number(t?.semestre ?? 0);
+    const regime = String(t?.regime || "").toLowerCase();
+    if (sem === 1 || (regime === "semestral" && sem === 1)) {
+      return {
+        label: "1º Sem (1º/2º Bim)",
+        bg: "rgba(6,182,212,0.2)",
+        text: "#67e8f9",
+        border: "rgba(6,182,212,0.4)",
+      };
+    }
+    if (sem === 2 || (regime === "semestral" && sem === 2)) {
+      return {
+        label: "2º Sem (3º/4º Bim)",
+        bg: "rgba(245,158,11,0.2)",
+        text: "#fcd34d",
+        border: "rgba(245,158,11,0.4)",
+      };
+    }
+    return {
+      label: "Anual",
+      bg: "rgba(148,163,184,0.15)",
+      text: "#94a3b8",
+      border: "rgba(148,163,184,0.3)",
+    };
+  };
+
+  // Seletor dinâmico de bimestres pela semestralidade da turma
+  const bimestresDisponiveis = React.useMemo(() => {
+    if (!turmaSelecionada) {
+      return ["1º Bimestre", "2º Bimestre", "3º Bimestre", "4º Bimestre"];
+    }
+    const turmaObj = turmas.find(
+      (t) => String(t.id) === String(turmaSelecionada) || t.nome === turmaSelecionada
+    );
+    const sem = Number(turmaObj?.semestre ?? 0);
+    const regime = String(turmaObj?.regime || "").toLowerCase();
+
+    // 1º Semestre -> 1º e 2º Bimestres
+    if (sem === 1 || (regime === "semestral" && sem === 1)) {
+      return ["1º Bimestre", "2º Bimestre"];
+    }
+    // 2º Semestre -> 3º e 4º Bimestres
+    if (sem === 2 || (regime === "semestral" && sem === 2)) {
+      return ["3º Bimestre", "4º Bimestre"];
+    }
+    // Anual ou padrão
+    return ["1º Bimestre", "2º Bimestre", "3º Bimestre", "4º Bimestre"];
+  }, [turmaSelecionada, turmas]);
+
+  // Filtro de turmas compatíveis com o bimestre selecionado
+  const turmasCompativeis = React.useMemo(() => {
+    if (!bimestreSelecionado) return turmas;
+    const isBim1ou2 = bimestreSelecionado === "1º Bimestre" || bimestreSelecionado === "2º Bimestre";
+    const isBim3ou4 = bimestreSelecionado === "3º Bimestre" || bimestreSelecionado === "4º Bimestre";
+
+    return turmas.filter(t => {
+      const sem = Number(t?.semestre ?? 0);
+      const regime = String(t?.regime || "").toLowerCase();
+      const isSem1 = sem === 1 || (regime === "semestral" && sem === 1);
+      const isSem2 = sem === 2 || (regime === "semestral" && sem === 2);
+
+      if (isBim1ou2 && isSem2) return false;
+      if (isBim3ou4 && isSem1) return false;
+      return true;
+    });
+  }, [turmas, bimestreSelecionado]);
+
+  // Reset de bimestre se a troca de turma tornar o bimestre atual incompatível
+  useEffect(() => {
+    if (turmaSelecionada && bimestreSelecionado && !bimestresDisponiveis.includes(bimestreSelecionado)) {
+      setBimestreSelecionado(bimestresDisponiveis[0] || "");
+    }
+  }, [turmaSelecionada, bimestresDisponiveis, bimestreSelecionado]);
 
   // ---------------------------
   // Dados Reais
@@ -1188,7 +1272,7 @@ export default function Avaliacoes() {
             <div>
               <p style={{ fontSize: "0.75rem", color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "0.7rem" }}>Selecione o bimestre</p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-                {bimestres.map(b => {
+                {bimestresDisponiveis.map(b => {
                   const isSel = bimestreSelecionado === b;
                   return (
                     <button key={b} onClick={() => { setBimestreSelecionado(b); setTurmaSelecionada(""); setEtapaAtiva(3); }} style={{
@@ -1209,21 +1293,39 @@ export default function Avaliacoes() {
           {etapaAtiva === 3 && (
             <div>
               <p style={{ fontSize: "0.75rem", color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "0.7rem" }}>Selecione a turma</p>
-              {turmas.length === 0 ? (
-                <span style={{ color: "#64748b", fontSize: "0.875rem" }}>Sem turmas para esta disciplina</span>
+              {turmasCompativeis.length === 0 ? (
+                <span style={{ color: "#64748b", fontSize: "0.875rem" }}>Sem turmas disponíveis para este bimestre</span>
               ) : (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-                  {turmas.map(t => {
+                  {turmasCompativeis.map(t => {
                     const isSel = String(turmaSelecionada) === String(t.id);
+                    const badge = getTurmaBadge(t);
                     return (
                       <button key={t.id} onClick={() => setTurmaSelecionada(t.id)} style={{
-                        padding: "0.55rem 1.3rem", borderRadius: "0.6rem", fontWeight: 700, fontSize: "0.875rem", cursor: "pointer", transition: "all 0.2s",
+                        padding: "0.5rem 1rem", borderRadius: "0.6rem", fontWeight: 700, fontSize: "0.875rem", cursor: "pointer", transition: "all 0.2s",
                         background: isSel ? "linear-gradient(135deg,#22d3ee,#0ea5e9)" : "rgba(255,255,255,0.07)",
                         color: isSel ? "#0f172a" : "#cbd5e1",
                         border: isSel ? "none" : "1px solid rgba(255,255,255,0.12)",
                         boxShadow: isSel ? "0 4px 14px rgba(34,211,238,0.35)" : "none",
                         transform: isSel ? "scale(1.04)" : "scale(1)",
-                      }}>{t.nome}</button>
+                        display: "inline-flex",
+                        flexDirection: "column",
+                        alignItems: "flex-start",
+                        gap: "3px",
+                      }}>
+                        <span>{t.nome}</span>
+                        <span style={{
+                          fontSize: "0.65rem",
+                          padding: "1px 6px",
+                          borderRadius: "4px",
+                          fontWeight: 700,
+                          background: badge.bg,
+                          color: badge.text,
+                          border: `1px solid ${badge.border}`,
+                        }}>
+                          {badge.label}
+                        </span>
+                      </button>
                     );
                   })}
                 </div>
@@ -1855,8 +1957,15 @@ export default function Avaliacoes() {
                                         <tr key={aluno.id} className={`hover:bg-indigo-50/30 transition-colors border-b border-slate-100 group ${diarioFechado ? 'opacity-90' : ''}`}>
                                             <td className="px-6 py-3 text-center text-sm font-semibold text-slate-400">{index + 1}</td>
                                             <td className="px-6 py-3 font-bold text-slate-700 sticky left-0 bg-white group-hover:bg-indigo-50/30 transition-colors border-r border-slate-100 z-10 flex flex-col">
-                                                <span>{aluno.nome}</span>
-                                                <span className="text-xs font-medium text-slate-400">Mat: {aluno.matricula || "---"}</span>
+                                                <span className="font-bold text-slate-800 uppercase">{aluno.nome}</span>
+                                                <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                                                    <span className="text-xs font-medium text-slate-400">Mat: {aluno.matricula || "---"}</span>
+                                                    {aluno.turma_origem_nome && (
+                                                        <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+                                                            Origem: {aluno.turma_origem_nome}
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </td>
 
                                             {/* CÉLULAS DE INPUT */}

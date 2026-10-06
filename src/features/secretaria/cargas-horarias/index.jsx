@@ -683,17 +683,16 @@ export default function CargasHorariasPage() {
 
       {/* ── MODAIS ────────────────────────────────────────────────────────── */}
 
-      {/* Modal: Definir Cargas Turma Regular (primeiro cadastro) */}
-      <Modal open={openModalDefinir} onClose={handleModalDefinirClose}>
-        {openModalDefinir && turnoSelecionado && turmaSelecionada && (
-          <ModalDefinirCargas
-            turno={turnoSelecionado}
-            turma={turmaSelecionada}
-            onClose={handleModalDefinirClose}
-            semestre={semestreSelecionado}
-          />
-        )}
-      </Modal>
+      {/* Modal: Definir Cargas Turma Regular */}
+      {openModalDefinir && turnoSelecionado && turmaSelecionada && (
+        <ModalDefinirCargas
+          open={openModalDefinir}
+          turno={turnoSelecionado}
+          turma={turmaSelecionada}
+          onClose={handleModalDefinirClose}
+          semestre={semestreSelecionado}
+        />
+      )}
 
       {/* Modal: Editar/Definir Cargas Turma Regular (com lixeira) */}
       <Modal open={openModalEditar} onClose={handleModalEditarClose}>

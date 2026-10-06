@@ -75,9 +75,24 @@ export default function Avaliacoes() {
     };
   };
 
-  // Seletor dinâmico de bimestres pela semestralidade da turma
+  // Seletor dinâmico de bimestres pela semestralidade da turma ou das turmas da disciplina
   const bimestresDisponiveis = React.useMemo(() => {
     if (!turmaSelecionada) {
+      if (turmas.length > 0) {
+        const todosSem1 = turmas.every((t) => {
+          const sem = Number(t?.semestre ?? 0);
+          const regime = String(t?.regime || "").toLowerCase();
+          return sem === 1 || (regime === "semestral" && sem === 1);
+        });
+        if (todosSem1) return ["1º Bimestre", "2º Bimestre"];
+
+        const todosSem2 = turmas.every((t) => {
+          const sem = Number(t?.semestre ?? 0);
+          const regime = String(t?.regime || "").toLowerCase();
+          return sem === 2 || (regime === "semestral" && sem === 2);
+        });
+        if (todosSem2) return ["3º Bimestre", "4º Bimestre"];
+      }
       return ["1º Bimestre", "2º Bimestre", "3º Bimestre", "4º Bimestre"];
     }
     const turmaObj = turmas.find(
@@ -361,7 +376,13 @@ export default function Avaliacoes() {
         });
 
         const planosRetornados = resAvaliacoes.data || [];
-        const planoEncontrado = planosRetornados.find(p => p.turmas === turmaNome);
+        const planoEncontrado = planosRetornados.find((p) => {
+          if (!p.turmas) return false;
+          const tNorm = String(turmaNome).trim().toLowerCase();
+          return p.turmas
+            .split(",")
+            .some((item) => item.trim().toLowerCase() === tNorm);
+        });
 
         // 2) Verifica se o plano existe e qual seu status
         if (!planoEncontrado) {

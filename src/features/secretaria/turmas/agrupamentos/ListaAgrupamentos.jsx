@@ -208,6 +208,7 @@ export default function ListaAgrupamentos() {
               <span>Nova Turma de Agrupamento</span>
             </button>
 
+            {/* Ocultado temporariamente a pedido do usuário
             <button
               type="button"
               onClick={() => setMigracaoModalOpen(true)}
@@ -217,6 +218,7 @@ export default function ListaAgrupamentos() {
               <BoltIcon className="w-4 h-4 text-amber-600" />
               <span>Migrar Legados (IFA/Eletivas)</span>
             </button>
+            */}
           </div>
 
           {/* Seletor de Ano Letivo e Busca */}

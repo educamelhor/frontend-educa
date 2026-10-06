@@ -58,15 +58,12 @@ export default function ModalDefinirCargas({
       setLoading(true);
       setErro("");
       try {
-        // 1) Disciplinas regulares do turno e etapa da turma
+        // 1) Disciplinas do catálogo (filtradas estritamente por tipo: REGULAR)
         const [resDiscs, resCargas] = await Promise.all([
           api.get("/api/disciplinas", {
             params: {
               escola_id,
-              turno: turma?.turno || turno,
-              etapa: turma?.etapa,
-              modo_oferta: "TURMA",
-              apenas_regulares: true,
+              tipo: "REGULAR",
             },
           }),
           turma?.id

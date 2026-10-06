@@ -63,9 +63,7 @@ export default function ModalCargasLote({ turno, turmas, onClose, onSaved }) {
         const { data } = await api.get("/api/disciplinas", {
           params: { 
             escola_id, 
-            turno,
-            modo_oferta: 'TURMA',
-            apenas_regulares: true,
+            tipo: "REGULAR",
           },
         });
         const arr = Array.isArray(data) ? data : [];

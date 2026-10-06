@@ -142,14 +142,11 @@ export default function ListaCargasHorarias({
       setLoadingTurma(true);
       setErroTurma("");
       try {
-        // 1) Disciplinas disponíveis (respeitando turno, etapa da turma e modo regular)
+        // 1) Disciplinas disponíveis (filtradas estritamente por tipo: REGULAR)
         const { data: dataDiscsRaw } = await api.get("/api/disciplinas", {
           params: { 
             escola_id, 
-            turno: turma?.turno || turno,
-            etapa: turma?.etapa,
-            modo_oferta: 'TURMA',
-            apenas_regulares: true,
+            tipo: "REGULAR",
           },
         });
         const discs = Array.isArray(dataDiscsRaw) ? dataDiscsRaw : [];

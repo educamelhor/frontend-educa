@@ -1370,11 +1370,10 @@ export default function Avaliacoes() {
               📝 Avaliação Padrão Bimestral Ativada
             </h3>
             <p className="text-sm text-amber-700 mt-1">
-              Esta escola adota o sistema de <strong>avaliação padrão bimestral (semana de prova)</strong>.
-              A coluna <strong>"Prova Bimestral"</strong> e sua data serão definidas automaticamente pela direção ao criar o gabarito de prova.
+              Esta escola adota o sistema de <strong>avaliação padrão bimestral (semana de prova)</strong>. A coluna <strong>"Prova Bimestral"</strong> será definida automaticamente.
             </p>
             <p className="text-xs text-amber-600 mt-1 font-medium">
-              ✏️ A coluna "Prova Bimestral" (5,00 pts) foi gerada automaticamente e está aberta para edição manual pelo professor, podendo também receber notas importadas do Gabarito.
+              ✏️ A coluna "Prova Bimestral" (5,00 pts) foi gerada automaticamente e irá receber notas importadas do Gabarito.
             </p>
           </div>
         </section>

@@ -183,6 +183,20 @@ export default function ModalDefinirCargas({
     });
   };
 
+  const handleRemoverLinha = (index) => {
+    if (itens.length <= 1) {
+      setItens([{ disciplina_id: "", carga: 2 }]);
+      setQtd(1);
+      return;
+    }
+    setItens((prev) => {
+      const novo = [...prev];
+      novo.splice(index, 1);
+      return novo;
+    });
+    setQtd((prev) => Math.max(1, (Number(prev) || 1) - 1));
+  };
+
   // --------------------------------------------------------------------------
   // Linhas válidas e totais
   // --------------------------------------------------------------------------
@@ -281,7 +295,7 @@ export default function ModalDefinirCargas({
 
             <div className="min-w-0">
               <h2 className="text-lg sm:text-xl font-bold tracking-tight text-white flex items-center gap-2 truncate">
-                Definir Cargas por Disciplina
+                Alterar / Definir Cargas por Disciplina
               </h2>
               <div className="flex flex-wrap items-center gap-2 text-xs text-blue-100 mt-1">
                 <span>
@@ -453,11 +467,11 @@ export default function ModalDefinirCargas({
                       <span className="text-xs font-bold text-slate-600">aulas</span>
                     </div>
 
-                    {/* Botão de Limpar Linha */}
+                    {/* Botão de Remover Linha */}
                     <button
                       type="button"
-                      onClick={() => handleLimparLinha(i)}
-                      title="Limpar seleção desta linha"
+                      onClick={() => handleRemoverLinha(i)}
+                      title="Remover esta linha"
                       className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition cursor-pointer flex-shrink-0 self-end sm:self-center"
                     >
                       <TrashIcon className="w-4 h-4" />
@@ -465,6 +479,17 @@ export default function ModalDefinirCargas({
                   </div>
                 );
               })}
+
+              {/* Botão para Adicionar Nova Linha diretamente na lista */}
+              <button
+                type="button"
+                onClick={() => handleQtdChange(Math.min(35, (Number(qtd) || 0) + 1))}
+                disabled={Number(qtd) >= 35}
+                className="w-full py-3 px-4 rounded-2xl border-2 border-dashed border-indigo-200 hover:border-indigo-400 hover:bg-indigo-50/60 text-indigo-700 text-xs font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2 cursor-pointer shadow-2xs mt-2"
+              >
+                <PlusIcon className="w-4 h-4" />
+                <span>+ Adicionar Linha</span>
+              </button>
 
               {linhas.length === 0 && (
                 <div className="p-6 bg-white border border-slate-200 rounded-2xl text-center text-xs text-slate-500">

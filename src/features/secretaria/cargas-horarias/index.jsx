@@ -78,7 +78,6 @@ export default function CargasHorariasPage() {
 
   // Modais de turmas regulares
   const [openModalDefinir, setOpenModalDefinir] = useState(false);
-  const [openModalEditar, setOpenModalEditar] = useState(false);
   const [openModalLote, setOpenModalLote] = useState(false);
 
   // Cargas da turma regular selecionada
@@ -252,13 +251,7 @@ export default function CargasHorariasPage() {
     await recarregarCargasDaTurma(turmaSelecionada.id, semestreSelecionado);
   };
 
-  const handleAbrirEditar = () => setOpenModalEditar(true);
-
-  const handleModalEditarClose = async () => {
-    setOpenModalEditar(false);
-    if (!turmaSelecionada) return;
-    await recarregarCargasDaTurma(turmaSelecionada.id, semestreSelecionado);
-  };
+  const handleAbrirEditar = () => setOpenModalDefinir(true);
 
   const handleCopiarSemestre = async () => {
     if (!turmaSelecionada) return;
@@ -694,19 +687,6 @@ export default function CargasHorariasPage() {
         />
       )}
 
-      {/* Modal: Editar/Definir Cargas Turma Regular (com lixeira) */}
-      <Modal open={openModalEditar} onClose={handleModalEditarClose}>
-        {openModalEditar && turnoSelecionado && turmaSelecionada && (
-          <div className="w-[720px] max-w-[95vw]">
-            <ListaCargasHorarias
-              turma={turmaSelecionada}
-              turno={turnoSelecionado}
-              onSaved={handleModalEditarClose}
-              semestre={semestreSelecionado}
-            />
-          </div>
-        )}
-      </Modal>
 
       {/* Modal: Cadastrar em Lote Turmas Regulares */}
       <Modal open={openModalLote} onClose={() => setOpenModalLote(false)}>

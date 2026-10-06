@@ -94,7 +94,7 @@ export default function ListaCargasHorarias({
 
   // Conjunto de ids já escolhidos (para desabilitar repetição)
   const escolhidasSet = useMemo(
-    () => new Set(selecionadas.map(asId).filter(Boolean)),
+    () => new Set(selecionadas.map((it) => asId(it?.disciplina_id ?? it)).filter(Boolean)),
     [selecionadas]
   );
 
@@ -165,9 +165,12 @@ export default function ListaCargasHorarias({
           params: { turma_id: turma.id, semestre },
         });
         const itens = Array.isArray(dataCargas?.itens) ? dataCargas.itens : [];
-        const ids = itens.map((it) => asId(it.disciplina_id));
+        const slots = itens.map((it) => ({
+          disciplina_id: asId(it.disciplina_id),
+          carga: Number(it.carga) > 0 ? Number(it.carga) : 2,
+        }));
         // Se não houver nada salvo, deixa 1 slot vazio para o usuário começar
-        setSelecionadas(ids.length > 0 ? ids : [""]);
+        setSelecionadas(slots.length > 0 ? slots : [{ disciplina_id: "", carga: 2 }]);
       } catch (err) {
         console.error("Erro ao carregar dados do modo turma:", err);
         setErroTurma(
@@ -241,7 +244,18 @@ export default function ListaCargasHorarias({
     const idStr = asId(idDisc);
     setSelecionadas((prev) => {
       const novo = [...prev];
-      novo[index] = idStr || "";
+      const atual = novo[index] || { disciplina_id: "", carga: 2 };
+      novo[index] = { ...atual, disciplina_id: idStr || "" };
+      return novo;
+    });
+  }
+
+  function handleCargaTurma(index, valorCarga) {
+    const val = valorCarga === "" ? "" : Math.max(1, Math.min(30, Number(valorCarga) || 1));
+    setSelecionadas((prev) => {
+      const novo = [...prev];
+      const atual = novo[index] || { disciplina_id: "", carga: 2 };
+      novo[index] = { ...atual, carga: val };
       return novo;
     });
   }
@@ -249,13 +263,13 @@ export default function ListaCargasHorarias({
   function handleClearTurma(index) {
     setSelecionadas((prev) => {
       const novo = [...prev];
-      novo[index] = ""; // limpa a linha (slot permanece)
+      novo[index] = { disciplina_id: "", carga: 2 }; // limpa disciplina mas mantém slot
       return novo;
     });
   }
 
   function handleAddLinha() {
-    setSelecionadas((prev) => [...prev, ""]);
+    setSelecionadas((prev) => [...prev, { disciplina_id: "", carga: 2 }]);
   }
 
   function handleRemoveLinha(index) {
@@ -263,23 +277,33 @@ export default function ListaCargasHorarias({
     setSelecionadas((prev) => prev.filter((_, i) => i !== index));
   }
 
+  const totalCargaTurma = useMemo(() => {
+    return selecionadas.reduce((acc, it) => {
+      if (!it?.disciplina_id) return acc;
+      return acc + (Number(it.carga) || 0);
+    }, 0);
+  }, [selecionadas]);
+
   async function handleSalvarTurma() {
     try {
       setSavingTurma(true);
-      // Envia somente os ids preenchidos (não vazios)
-      const itens = selecionadas.filter(Boolean);
+      // Envia somente itens preenchidos (com disciplina_id) e suas respectivas cargas
+      const itens = selecionadas
+        .filter((it) => it && it.disciplina_id)
+        .map((it) => ({
+          disciplina_id: Number(it.disciplina_id),
+          carga: Number(it.carga) || 1,
+        }));
+
       const payload = {
-        // Caso o backend use req.user.escola_id, escola_id será ignorado,
-        // mas mantemos por compatibilidade
         escola_id,
         turma_id: turma?.id,
         semestre,
         itens,
       };
+
       const { data } = await api.post("/api/cargas-horarias/definir", payload);
-      // Feedback simples
-      alert(`✅ Cargas salvas! Total: ${data?.totalCarga ?? 0}`);
-      // Callback opcional para que o pai recarregue a tabela
+      alert(`✅ Cargas salvas! Total: ${data?.totalCarga ?? totalCargaTurma} aulas.`);
       if (typeof onSaved === "function") onSaved(data);
     } catch (err) {
       console.error("Erro ao salvar cargas da turma:", err);
@@ -304,108 +328,142 @@ export default function ListaCargasHorarias({
   // ==========================================================================
   if (turma) {
     return (
-      <div className="p-4 bg-white rounded-lg shadow-md border">
+      <div className="p-5 bg-white rounded-2xl shadow-xl border border-slate-200">
         {/* Cabeçalho do Editor por Turma */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
-          <h3 className="text-xl font-semibold text-blue-800">
-            Alterar / Definir Disciplinas — Turma {turma?.turma}
-          </h3>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 pb-3 border-b border-slate-100">
+          <div>
+            <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <span>Alterar / Definir Disciplinas</span>
+              <span className="text-xs px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-bold border border-blue-200 uppercase">
+                {turma?.turma ?? turma?.nome}
+              </span>
+            </h3>
+            <div className="text-xs text-slate-500 mt-1 flex items-center gap-2">
+              <span>Total da turma:</span>
+              <span className="px-2.5 py-0.5 rounded-md bg-emerald-50 text-emerald-800 font-extrabold border border-emerald-200 text-xs">
+                {totalCargaTurma} {totalCargaTurma === 1 ? "aula" : "aulas"}
+              </span>
+            </div>
+          </div>
 
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             <button
+              type="button"
               onClick={handleAddLinha}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-2"
+              className="px-3.5 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 flex items-center gap-1.5 text-xs font-bold transition shadow-sm cursor-pointer"
               title="Adicionar linha (novo slot)"
             >
-              <PlusIcon className="w-5 h-5" />
+              <PlusIcon className="w-4 h-4" />
               Adicionar linha
             </button>
             <button
+              type="button"
               onClick={handleSalvarTurma}
               disabled={savingTurma}
-              className={`px-4 py-2 rounded text-white ${
-                !savingTurma ? "bg-green-600 hover:bg-green-700" : "bg-green-300 cursor-not-allowed"
+              className={`px-5 py-2 rounded-xl text-white text-xs font-bold transition shadow-sm cursor-pointer flex items-center gap-1.5 ${
+                !savingTurma ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200" : "bg-slate-300 cursor-not-allowed"
               }`}
             >
-              {savingTurma ? "Salvando..." : "Salvar"}
+              {savingTurma ? (
+                <>
+                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <span>Salvando…</span>
+                </>
+              ) : (
+                "Salvar"
+              )}
             </button>
           </div>
         </div>
 
         {/* Estados de carregamento/erro (modo turma) */}
         {loadingTurma && (
-          <div className="mb-4 p-4 bg-gray-50 border rounded text-gray-700">
+          <div className="mb-4 p-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-600 text-xs font-medium text-center animate-pulse">
             Carregando disciplinas e cargas da turma…
           </div>
         )}
         {!loadingTurma && erroTurma && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded">
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-medium">
             {erroTurma}
           </div>
         )}
 
         {/* Linhas editáveis */}
         {!loadingTurma && !erroTurma && (
-          <div className="space-y-3">
+          <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
             {selecionadas.length === 0 && (
-              <div className="p-3 bg-gray-50 border rounded text-gray-600">
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-slate-500 text-center text-xs">
                 Nenhum slot definido. Clique em <strong>Adicionar linha</strong> para começar.
               </div>
             )}
 
-            {selecionadas.map((valor, idx) => {
-              const opcoes = opcoesParaLinha(valor);
-              const cargaSelecionada =
-                disciplinas.find((d) => asId(d.id) === asId(valor)) || null;
-              const carga = getCargaFromDisciplina(cargaSelecionada);
+            {selecionadas.map((item, idx) => {
+              const valorId = asId(item?.disciplina_id ?? "");
+              const opcoes = opcoesParaLinha(valorId);
 
               return (
                 <div
                   key={idx}
-                  className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center"
+                  className="p-2 rounded-xl border border-slate-200 bg-white hover:border-slate-300 transition-all flex flex-col sm:flex-row items-stretch sm:items-center gap-2"
                 >
-                  <div className="sm:col-span-2 text-sm text-gray-600 font-medium">
-                    Disciplina {idx + 1}
+                  {/* Número da linha */}
+                  <div className="sm:w-28 flex-shrink-0 text-xs font-bold text-slate-600 uppercase flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded-full bg-slate-100 border border-slate-200 text-slate-600 flex items-center justify-center text-[10px]">
+                      {idx + 1}
+                    </span>
+                    <span>Disc. {idx + 1}</span>
                   </div>
 
-                  <div className="sm:col-span-8 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={asId(valor || "")}
-                        onChange={(e) => handleSelectTurma(idx, e.target.value)}
-                        className="border rounded p-2 w-full min-w-0 max-w-full"
-                      >
-                        <option value="">— selecione —</option>
-                        {opcoes.map((d) => (
-                          <option key={d.id} value={d.id} disabled={d.disabled}>
-                            {d.nome}
-                            {getCargaFromDisciplina(d) ? ` • ${getCargaFromDisciplina(d)}h` : ""}
-                          </option>
-                        ))}
-                      </select>
-
-                      {/* Lixeira (limpar slot) */}
-                      <button
-                        onClick={() => handleClearTurma(idx)}
-                        className="text-red-600 hover:text-red-800"
-                        title="Limpar disciplina deste slot"
-                      >
-                        <TrashIcon className="w-5 h-5" />
-                      </button>
-
-                      {/* Remover linha por completo (opcional) */}
-                      <button
-                        onClick={() => handleRemoveLinha(idx)}
-                        className="text-gray-500 hover:text-gray-700"
-                        title="Remover esta linha"
-                      >
-                        <XCircleIcon className="w-5 h-5" />
-                      </button>
-                    </div>
+                  {/* Dropdown com nome da disciplina */}
+                  <div className="flex-1 min-w-0">
+                    <select
+                      value={valorId}
+                      onChange={(e) => handleSelectTurma(idx, e.target.value)}
+                      className="border border-slate-300 rounded-lg px-3 py-2 w-full text-sm font-medium text-slate-800 bg-white outline-none focus:ring-2 focus:ring-blue-500 uppercase"
+                    >
+                      <option value="">— selecione a disciplina —</option>
+                      {opcoes.map((d) => (
+                        <option key={d.id} value={d.id} disabled={d.disabled}>
+                          {d.nome}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
-                  <div className="sm:col-span-2 text-sm text-gray-700 text-center sm:text-left">
-                    {carga ? <span className="px-2 py-1 bg-blue-50 border rounded">Carga: {carga}</span> : <span className="text-gray-400">—</span>}
+                  {/* Campo de carga horária (aulas) */}
+                  <div className="flex items-center gap-1.5 justify-end sm:justify-start flex-shrink-0">
+                    <label className="text-xs text-slate-500 font-bold sm:hidden">Carga:</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={25}
+                      value={item?.carga ?? ""}
+                      onChange={(e) => handleCargaTurma(idx, e.target.value)}
+                      placeholder="2"
+                      className="w-16 px-2.5 py-1.5 border border-slate-300 rounded-lg text-sm font-bold text-center text-blue-900 bg-blue-50/40 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    />
+                    <span className="text-xs font-semibold text-slate-500 w-10">aulas</span>
+                  </div>
+
+                  {/* Ações: Limpar e Remover */}
+                  <div className="flex items-center gap-1 justify-end flex-shrink-0 pl-1">
+                    <button
+                      type="button"
+                      onClick={() => handleClearTurma(idx)}
+                      className="p-1.5 text-amber-600 hover:text-amber-800 hover:bg-amber-50 rounded-lg transition"
+                      title="Limpar disciplina deste slot"
+                    >
+                      <TrashIcon className="w-4 h-4" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveLinha(idx)}
+                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                      title="Remover esta linha"
+                    >
+                      <XCircleIcon className="w-4 h-4" />
+                    </button>
                   </div>
                 </div>
               );

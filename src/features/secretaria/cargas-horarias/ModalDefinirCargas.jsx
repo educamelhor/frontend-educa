@@ -1,179 +1,199 @@
 // src/features/secretaria/cargas-horarias/ModalDefinirCargas.jsx
 // ============================================================================
-// Modal – Cargas Horárias
-// ---------------------------------------------------------------------------
-// Objetivo
-// - Definir as disciplinas de uma turma (sem repetição) e calcular o Total da
-//   Carga a partir das cargas das disciplinas no banco.
-// - Salvar a definição em massa via POST /api/cargas-horarias/definir.
-// ---------------------------------------------------------------------------
-// Principais pontos
-// - Mantém o layout existente (sem simplificações), com grid responsivo.
-// - Evita overflow visual (min-w-0/max-w-full nos wrappers e no <select>).
-// - Normaliza IDs como string para impedir duplicidade por tipo (str/num).
-// - Opções já escolhidas em outra linha aparecem desabilitadas.
-// - Após salvar com sucesso: dispara alert simples e chama onClose()
-//   (o pai pode recarregar a tabela na sequência).
-// ---------------------------------------------------------------------------
-// Dependências
-// - api: "../../../services/api"
-// - O backend já implementa GET/POST de cargas-horarias.
+// Modal – Definir Cargas por Disciplina
+// ----------------------------------------------------------------------------
+// Objetivo:
+// - Vincular componentes curriculares a uma turma e definir a carga horária
+//   específica (aulas/semana) de cada disciplina nesta turma.
+// - Salvar a definição via POST /api/cargas-horarias/definir.
 // ============================================================================
 
 import React, { useEffect, useMemo, useState } from "react";
 import api from "../../../services/api";
 
-// ----------------------------------------------------------------------------
-// Util: normaliza qualquer id para string (evita bug str vs number)
-// ----------------------------------------------------------------------------
 const asId = (v) => (v == null ? "" : String(v));
 
-// ----------------------------------------------------------------------------
-/* Util: extrai campo de carga aceitando diferentes nomes (tolerante ao backend) */
-// ----------------------------------------------------------------------------
-function getCargaFromDisciplina(d) {
-  if (!d) return 0;
-  return (
-    Number(d.carga) ||          // campo padrão no seu banco
-    Number(d.carga_horaria) ||  // tolerância a schemas antigos
-    Number(d.aulas) ||
-    Number(d.horas) ||
-    Number(d.weekly_hours) ||
-    0
-  );
-}
-
-// ============================================================================
-// Componente
-// ============================================================================
 export default function ModalDefinirCargas({ turno, turma, onClose, semestre = 1 }) {
-  // --------------------------------------------------------------------------
-  // Estado: formulário e dados
-  // --------------------------------------------------------------------------
-  const [qtd, setQtd] = useState(1);                   // quantidade de disciplinas (linhas)
-  const [disciplinas, setDisciplinas] = useState([]);  // lista carregada da API
-  const [loading, setLoading] = useState(false);       // carregando disciplinas
-  const [erro, setErro] = useState("");                // erro de carregamento da API
+  const [qtd, setQtd] = useState(1);
+  const [disciplinas, setDisciplinas] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [erro, setErro] = useState("");
 
-  const [selecionadas, setSelecionadas] = useState([]); // array de ids (string)
-  const [cargaPorId, setCargaPorId] = useState({});     // cache id->carga
+  // Cada slot guarda: { disciplina_id: string, carga: number | string }
+  const [itens, setItens] = useState([]);
+  const [saving, setSaving] = useState(false);
 
-  const [saving, setSaving] = useState(false);         // estado de salvamento
-
-  // OBS: se o backend já usa req.user.escola_id (como turmas), este valor será ignorado.
   const escola_id = useMemo(() => localStorage.getItem("escola_id") || 1, []);
 
   // --------------------------------------------------------------------------
-  // Efeito: carregar disciplinas do turno ao abrir
+  // Carga inicial: disciplinas disponíveis + cargas já vinculadas à turma
   // --------------------------------------------------------------------------
   useEffect(() => {
     async function load() {
       setLoading(true);
       setErro("");
       try {
-        const { data } = await api.get("/api/disciplinas", {
-          params: { 
-            escola_id, 
-            turno: turma?.turno || turno,
-            etapa: turma?.etapa,
-            modo_oferta: 'TURMA',
-            apenas_regulares: true,
-          },
-        });
-        const arr = Array.isArray(data) ? data : [];
+        // 1) Disciplinas regulares do turno e etapa da turma
+        const [resDiscs, resCargas] = await Promise.all([
+          api.get("/api/disciplinas", {
+            params: {
+              escola_id,
+              turno: turma?.turno || turno,
+              etapa: turma?.etapa,
+              modo_oferta: "TURMA",
+              apenas_regulares: true,
+            },
+          }),
+          turma?.id
+            ? api
+                .get("/api/cargas-horarias", {
+                  params: { turma_id: turma.id, semestre },
+                })
+                .catch(() => ({ data: { itens: [] } }))
+            : Promise.resolve({ data: { itens: [] } }),
+        ]);
 
-        // Normaliza cada item (sempre id string + nome)
-        const normalizadas = arr.map((d, i) => ({
+        const rawDiscs = Array.isArray(resDiscs.data) ? resDiscs.data : [];
+        const normalizadas = rawDiscs.map((d, i) => ({
           id: asId(d.id ?? d.codigo ?? `disc-${i}`),
           nome: d.nome ?? d.disciplina ?? d.titulo ?? `Disciplina ${i + 1}`,
           ...d,
         }));
         setDisciplinas(normalizadas);
 
-        // Prepara cache de cargas
-        const cache = {};
-        for (const d of normalizadas) cache[asId(d.id)] = getCargaFromDisciplina(d);
-        setCargaPorId(cache);
-
-        // Zera seleções ao abrir
-        setSelecionadas([]);
+        // 2) Cargas já existentes da turma
+        const itensSalvos = Array.isArray(resCargas.data?.itens) ? resCargas.data.itens : [];
+        if (itensSalvos.length > 0) {
+          setQtd(itensSalvos.length);
+          setItens(
+            itensSalvos.map((it) => ({
+              disciplina_id: asId(it.disciplina_id),
+              carga: Number(it.carga) > 0 ? Number(it.carga) : 2,
+            }))
+          );
+        } else {
+          setQtd(1);
+          setItens([{ disciplina_id: "", carga: 2 }]);
+        }
       } catch (err) {
-        console.error("Erro ao listar disciplinas:", err);
-        setErro("Não foi possível carregar disciplinas do turno.");
+        console.error("Erro ao carregar dados do modal de cargas:", err);
+        setErro("Não foi possível carregar as disciplinas do turno.");
       } finally {
         setLoading(false);
       }
     }
     load();
-  }, [turno, turma?.turno, turma?.etapa, escola_id]);
+  }, [turno, turma?.id, turma?.turno, turma?.etapa, escola_id, semestre]);
 
   // --------------------------------------------------------------------------
-  // Linhas dinâmicas conforme 'qtd' (limite de segurança)
+  // Sincroniza o array 'itens' quando 'qtd' muda
   // --------------------------------------------------------------------------
+  const handleQtdChange = (novaQtd) => {
+    const n = Math.max(0, Math.min(35, Number(novaQtd) || 0));
+    setQtd(novaQtd);
+    setItens((prev) => {
+      const novo = [...prev];
+      if (n > novo.length) {
+        for (let i = novo.length; i < n; i++) {
+          novo.push({ disciplina_id: "", carga: 2 });
+        }
+      } else if (n < novo.length) {
+        novo.splice(n);
+      }
+      return novo;
+    });
+  };
+
   const linhas = useMemo(() => {
-    const n = Math.max(0, Math.min(30, Number(qtd) || 0));
+    const n = Math.max(0, Math.min(35, Number(qtd) || 0));
     return Array.from({ length: n }, (_, idx) => idx);
   }, [qtd]);
 
-  // --------------------------------------------------------------------------
-  // Conjunto de ids já escolhidos (para desabilitar opções repetidas)
-  // --------------------------------------------------------------------------
-  const escolhidasSet = useMemo(
-    () => new Set(selecionadas.map(asId).filter(Boolean)),
-    [selecionadas]
-  );
+  // Conjunto de disciplinas já escolhidas para desabilitar duplicidade
+  const escolhidasSet = useMemo(() => {
+    return new Set(
+      itens
+        .slice(0, Number(qtd) || 0)
+        .map((it) => asId(it?.disciplina_id))
+        .filter(Boolean)
+    );
+  }, [itens, qtd]);
 
   // --------------------------------------------------------------------------
-  // Handler: seleção por linha
+  // Handlers de edição por linha
   // --------------------------------------------------------------------------
-  function handleSelect(index, idDisc) {
+  const handleSelectDisciplina = (index, idDisc) => {
     const idStr = asId(idDisc);
-    setSelecionadas((prev) => {
+    setItens((prev) => {
       const novo = [...prev];
-      novo[index] = idStr || "";
+      const atual = novo[index] || { disciplina_id: "", carga: 2 };
+      novo[index] = {
+        ...atual,
+        disciplina_id: idStr || "",
+        carga: atual.carga ? atual.carga : 2,
+      };
       return novo;
     });
-  }
+  };
+
+  const handleCargaChange = (index, valorCarga) => {
+    const valor = valorCarga === "" ? "" : Math.max(1, Math.min(30, Number(valorCarga) || 1));
+    setItens((prev) => {
+      const novo = [...prev];
+      const atual = novo[index] || { disciplina_id: "", carga: 2 };
+      novo[index] = {
+        ...atual,
+        carga: valor,
+      };
+      return novo;
+    });
+  };
 
   // --------------------------------------------------------------------------
-  // Total de carga (somatório das cargas das disciplinas selecionadas)
+  // Total da carga horária somando os inputs de cada disciplina
   // --------------------------------------------------------------------------
-  const totalCarga = useMemo(
-    () => selecionadas.reduce((acc, id) => acc + (cargaPorId[asId(id)] || 0), 0),
-    [selecionadas, cargaPorId]
-  );
+  const totalCarga = useMemo(() => {
+    return linhas.reduce((acc, i) => {
+      const it = itens[i];
+      if (!it?.disciplina_id) return acc;
+      return acc + (Number(it.carga) || 0);
+    }, 0);
+  }, [linhas, itens]);
 
-  // --------------------------------------------------------------------------
-  // Validação: só pode prosseguir se todas as linhas estiverem preenchidas
-  // --------------------------------------------------------------------------
+  // Validação: todas as linhas precisam de disciplina e carga preenchida
   const podeProsseguir = useMemo(() => {
     const n = Number(qtd) || 0;
     if (n === 0) return false;
-    return Array.from({ length: n }).every((_, i) => !!selecionadas[i]);
-  }, [qtd, selecionadas]);
+    return linhas.every((i) => {
+      const it = itens[i];
+      return Boolean(it?.disciplina_id && Number(it?.carga) > 0);
+    });
+  }, [linhas, itens, qtd]);
 
   // --------------------------------------------------------------------------
-  // Salvar: envia definição em massa ao backend
+  // Salvar
   // --------------------------------------------------------------------------
   async function handleSalvar() {
     try {
       setSaving(true);
+      const itensValidos = linhas
+        .map((i) => itens[i])
+        .filter((it) => it && it.disciplina_id)
+        .map((it) => ({
+          disciplina_id: Number(it.disciplina_id),
+          carga: Number(it.carga) || 1,
+        }));
 
       const payload = {
-        // Se a API já usa req.user.escola_id, este campo será ignorado no backend revisado.
-        // Mantido aqui por compatibilidade com versões antigas.
         escola_id,
         turma_id: turma?.id,
         semestre,
-        itens: selecionadas, // array de ids (string/number)
+        itens: itensValidos,
       };
 
       const { data } = await api.post("/api/cargas-horarias/definir", payload);
 
-      // Feedback simples — pode ser trocado por toast do seu design system.
-      alert(`✅ Cargas salvas com sucesso!\nTotal: ${data?.totalCarga ?? 0}`);
-
-      // Fecha o modal; o pai (index.jsx) recarrega as cargas no onClose.
+      alert(`✅ Cargas salvas com sucesso!\nTotal da turma: ${data?.totalCarga ?? totalCarga} aulas.`);
       onClose();
     } catch (err) {
       console.error("Erro ao salvar cargas:", err?.response?.data || err?.message);
@@ -183,105 +203,155 @@ export default function ModalDefinirCargas({ turno, turma, onClose, semestre = 1
     }
   }
 
-  // --------------------------------------------------------------------------
-  // Render
-  // --------------------------------------------------------------------------
   return (
-    <div className="w-full max-w-2xl mx-auto p-4 box-border">
-      {/* Cabeçalho ----------------------------------------------------------- */}
-      <div className="mb-4 overflow-hidden">
-        <div className="text-xs text-gray-500 font-medium">
-          Turno: <span className="text-blue-700">{turno}</span> &nbsp;|&nbsp; Turma:{" "}
-          <span className="text-blue-700">{turma?.turma ?? turma?.nome}</span>
+    <div className="w-full max-w-2xl mx-auto p-5 box-border bg-white rounded-2xl">
+      {/* Cabeçalho */}
+      <div className="mb-4 pb-3 border-b border-slate-100">
+        <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-500 mb-1">
+          <span>Turno:</span>
+          <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 font-bold uppercase border border-blue-200">
+            {turno}
+          </span>
+          <span className="text-slate-300">•</span>
+          <span>Turma:</span>
+          <span className="px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-bold uppercase border border-indigo-200">
+            {turma?.turma ?? turma?.nome}
+          </span>
+          {turma?.regime === "semestral" && (
+            <>
+              <span className="text-slate-300">•</span>
+              <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 font-bold border border-amber-200">
+                {semestre}º Semestre
+              </span>
+            </>
+          )}
         </div>
-        <h2 className="text-xl font-bold text-blue-900 mt-1">
+        <h2 className="text-xl font-bold text-slate-900 tracking-tight">
           Definir Cargas por Disciplina
         </h2>
-      </div>
-
-      {/* Quantidade --------------------------------------------------------- */}
-      <div className="mb-3 overflow-hidden">
-        <label className="block text-sm font-medium mb-1">Quantas disciplinas?</label>
-        <input
-          type="number"
-          min={0}
-          max={30}
-          value={qtd}
-          onChange={(e) => setQtd(e.target.value)}
-          className="border rounded p-2 w-28 max-w-full"
-        />
-        <p className="text-[11px] text-gray-500 mt-1">
-          Informe o número de disciplinas que esta <strong>turma</strong> terá no turno{" "}
-          <strong>{turno}</strong>.
+        <p className="text-xs text-slate-500 mt-0.5">
+          Selecione os componentes curriculares desta turma e informe a carga horária semanal (aulas) de cada um.
         </p>
       </div>
 
-      {/* Linhas dinâmicas --------------------------------------------------- */}
+      {/* Quantidade de Disciplinas */}
+      <div className="mb-4 p-3 bg-slate-50/80 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+            Quantas disciplinas nesta turma?
+          </label>
+          <p className="text-[11px] text-slate-500">
+            Defina o número de linhas para organizar a matriz desta turma.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            type="number"
+            min={1}
+            max={35}
+            value={qtd}
+            onChange={(e) => handleQtdChange(e.target.value)}
+            className="w-20 px-3 py-1.5 border border-slate-300 rounded-lg text-sm font-bold text-center bg-white shadow-inner focus:ring-2 focus:ring-blue-500 focus:outline-none"
+          />
+          <span className="text-xs font-bold text-slate-600 uppercase">disciplinas</span>
+        </div>
+      </div>
+
+      {/* Lista Dinâmica de Disciplinas */}
       {loading ? (
-        <div className="p-3 bg-gray-50 border rounded overflow-hidden">Carregando disciplinas…</div>
+        <div className="p-6 bg-slate-50 border border-slate-200 rounded-xl text-center text-sm font-medium text-slate-500 animate-pulse">
+          Carregando disciplinas disponíveis…
+        </div>
       ) : erro ? (
-        <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded overflow-hidden">
+        <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-sm font-medium">
           {erro}
         </div>
       ) : (
-        <div className="space-y-3 max-h-[320px] overflow-y-auto overflow-x-hidden">
+        <div className="space-y-2.5 max-h-[340px] overflow-y-auto pr-1">
           {linhas.map((i) => {
-            const valor = asId(selecionadas[i] || "");
+            const item = itens[i] || { disciplina_id: "", carga: 2 };
+            const valorId = asId(item.disciplina_id);
+
             return (
               <div
                 key={i}
-                className="flex flex-col sm:grid sm:grid-cols-5 gap-2 sm:gap-3 items-start sm:items-center"
+                className="p-2.5 rounded-xl border border-slate-200 bg-white hover:border-slate-300 hover:shadow-xs transition-all flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5"
               >
-                <div className="sm:col-span-2 text-sm text-gray-600 font-medium min-w-0">
-                  Disciplina {i + 1}
+                {/* Rótulo da linha */}
+                <div className="sm:w-28 flex-shrink-0 text-xs font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
+                  <span className="w-5 h-5 rounded-full bg-slate-100 border border-slate-200 text-slate-600 flex items-center justify-center text-[10px]">
+                    {i + 1}
+                  </span>
+                  <span>Disc. {i + 1}</span>
                 </div>
 
-                <div className="w-full sm:col-span-3 min-w-0">
+                {/* Dropdown com nome limpo da disciplina */}
+                <div className="flex-1 min-w-0">
                   <select
-                    value={valor}
-                    onChange={(e) => handleSelect(i, e.target.value)}
-                    className="border rounded p-2 w-full min-w-0 max-w-full text-sm"
+                    value={valorId}
+                    onChange={(e) => handleSelectDisciplina(i, e.target.value)}
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm font-medium text-slate-800 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none uppercase"
                   >
-                    <option value="">— selecione —</option>
+                    <option value="">— Selecione a disciplina —</option>
                     {disciplinas.map((d) => {
                       const idStr = asId(d.id);
-                      const escolhidaNestaLinha = valor === idStr;
                       const escolhidaEmOutraLinha =
-                        escolhidasSet.has(idStr) && !escolhidaNestaLinha;
+                        escolhidasSet.has(idStr) && valorId !== idStr;
 
                       return (
-                        <option key={idStr} value={idStr} disabled={escolhidaEmOutraLinha}>
+                        <option
+                          key={idStr}
+                          value={idStr}
+                          disabled={escolhidaEmOutraLinha}
+                        >
                           {d.nome}
-                          {getCargaFromDisciplina(d) ? ` • ${getCargaFromDisciplina(d)}h` : ""}
                         </option>
                       );
                     })}
                   </select>
+                </div>
+
+                {/* Input editável de carga horária (aulas) */}
+                <div className="flex items-center gap-1.5 justify-end sm:justify-start flex-shrink-0 pl-1">
+                  <label className="text-xs text-slate-500 font-bold sm:hidden">Carga:</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={25}
+                    value={item.carga ?? ""}
+                    onChange={(e) => handleCargaChange(i, e.target.value)}
+                    placeholder="2"
+                    className="w-16 px-2.5 py-1.5 border border-slate-300 rounded-lg text-sm font-bold text-center text-blue-900 bg-blue-50/40 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+                  <span className="text-xs font-semibold text-slate-500 w-10">aulas</span>
                 </div>
               </div>
             );
           })}
 
           {linhas.length === 0 && (
-            <div className="p-3 bg-gray-50 border rounded text-gray-600 overflow-hidden">
-              Defina acima a quantidade de disciplinas para esta turma.
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-center text-xs text-slate-500">
+              Defina a quantidade de disciplinas acima para preencher.
             </div>
           )}
         </div>
       )}
 
-      {/* Rodapé ------------------------------------------------------------- */}
-      <div className="mt-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 overflow-hidden">
-        <div className="text-base min-w-0">
-          <span className="font-semibold text-blue-900">Total de carga horária:</span>{" "}
-          <span className="font-bold">{totalCarga}</span>
+      {/* Rodapé com Totalizador e Ações */}
+      <div className="mt-5 pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <span className="text-xs uppercase font-bold text-slate-500">Total da Turma:</span>
+          <span className="px-3 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 font-extrabold text-base">
+            {totalCarga} {totalCarga === 1 ? "aula" : "aulas"}
+          </span>
         </div>
 
-        <div className="flex gap-2 justify-end flex-shrink-0">
+        <div className="flex items-center gap-2 justify-end">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded text-sm"
+            disabled={saving}
+            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold uppercase tracking-wider transition cursor-pointer"
           >
             Cancelar
           </button>
@@ -290,14 +360,21 @@ export default function ModalDefinirCargas({ turno, turma, onClose, semestre = 1
             type="button"
             disabled={!podeProsseguir || saving}
             onClick={handleSalvar}
-            className={`px-4 py-2 rounded text-white text-sm ${
+            className={`px-5 py-2 rounded-xl text-white text-xs font-bold uppercase tracking-wider transition shadow-sm cursor-pointer flex items-center gap-1.5 ${
               podeProsseguir && !saving
-                ? "bg-green-600 hover:bg-green-700"
-                : "bg-green-300 cursor-not-allowed"
+                ? "bg-blue-600 hover:bg-blue-700 shadow-blue-200"
+                : "bg-slate-300 text-slate-500 cursor-not-allowed"
             }`}
-            title={podeProsseguir ? "" : "Preencha todas as disciplinas para continuar"}
+            title={podeProsseguir ? "" : "Selecione uma disciplina e carga para todas as linhas"}
           >
-            {saving ? "Salvando..." : "Continuar"}
+            {saving ? (
+              <>
+                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span>Salvando…</span>
+              </>
+            ) : (
+              "Salvar Cargas"
+            )}
           </button>
         </div>
       </div>

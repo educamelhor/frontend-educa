@@ -47,8 +47,8 @@ export default function ModalCargasLote({ turno, turmas, onClose, onSaved }) {
   const [disciplinas, setDisciplinas] = useState([]);
   const [loadingDiscs, setLoadingDiscs] = useState(false);
   const [erroDiscs, setErroDiscs] = useState("");
+  // Cada item: { disciplina_id: string, carga: number | string }
   const [selecionadas, setSelecionadas] = useState([]);
-  const [cargaPorId, setCargaPorId] = useState({});
   const [saving, setSaving] = useState(false);
 
   const escola_id = useMemo(() => localStorage.getItem("escola_id") || 1, []);
@@ -75,10 +75,7 @@ export default function ModalCargasLote({ turno, turmas, onClose, onSaved }) {
           ...d,
         }));
         setDisciplinas(norm);
-        const cache = {};
-        norm.forEach((d) => { cache[asId(d.id)] = getCarga(d); });
-        setCargaPorId(cache);
-        setSelecionadas([]);
+        setSelecionadas([{ disciplina_id: "", carga: 2 }]);
       } catch {
         setErroDiscs("Não foi possível carregar as disciplinas.");
       } finally {
@@ -88,31 +85,65 @@ export default function ModalCargasLote({ turno, turmas, onClose, onSaved }) {
     load();
   }, [etapa, turno, escola_id]);
 
+  const handleQtdChange = (novaQtd) => {
+    const n = Math.max(0, Math.min(35, Number(novaQtd) || 0));
+    setQtd(novaQtd);
+    setSelecionadas((prev) => {
+      const arr = [...prev];
+      if (n > arr.length) {
+        for (let i = arr.length; i < n; i++) {
+          arr.push({ disciplina_id: "", carga: 2 });
+        }
+      } else if (n < arr.length) {
+        arr.splice(n);
+      }
+      return arr;
+    });
+  };
+
   const linhas = useMemo(() => {
-    const n = Math.max(0, Math.min(30, Number(qtd) || 0));
+    const n = Math.max(0, Math.min(35, Number(qtd) || 0));
     return Array.from({ length: n }, (_, i) => i);
   }, [qtd]);
 
   const escolhidasSet = useMemo(
-    () => new Set(selecionadas.map(asId).filter(Boolean)),
+    () => new Set(selecionadas.map((it) => asId(it?.disciplina_id)).filter(Boolean)),
     [selecionadas]
   );
 
-  const totalCarga = useMemo(
-    () => selecionadas.reduce((acc, id) => acc + (cargaPorId[asId(id)] || 0), 0),
-    [selecionadas, cargaPorId]
-  );
+  const totalCarga = useMemo(() => {
+    return linhas.reduce((acc, i) => {
+      const it = selecionadas[i];
+      if (!it?.disciplina_id) return acc;
+      return acc + (Number(it.carga) || 0);
+    }, 0);
+  }, [linhas, selecionadas]);
 
   const podeProsseguir = useMemo(() => {
     const n = Number(qtd) || 0;
     if (n === 0) return false;
-    return Array.from({ length: n }).every((_, i) => !!selecionadas[i]);
-  }, [qtd, selecionadas]);
+    return linhas.every((i) => {
+      const it = selecionadas[i];
+      return Boolean(it?.disciplina_id && Number(it?.carga) > 0);
+    });
+  }, [linhas, selecionadas, qtd]);
 
   function handleSelect(idx, idDisc) {
+    const idStr = asId(idDisc);
     setSelecionadas((prev) => {
       const arr = [...prev];
-      arr[idx] = asId(idDisc) || "";
+      const atual = arr[idx] || { disciplina_id: "", carga: 2 };
+      arr[idx] = { ...atual, disciplina_id: idStr || "" };
+      return arr;
+    });
+  }
+
+  function handleCargaChange(idx, valorCarga) {
+    const val = valorCarga === "" ? "" : Math.max(1, Math.min(30, Number(valorCarga) || 1));
+    setSelecionadas((prev) => {
+      const arr = [...prev];
+      const atual = arr[idx] || { disciplina_id: "", carga: 2 };
+      arr[idx] = { ...atual, carga: val };
       return arr;
     });
   }
@@ -122,7 +153,14 @@ export default function ModalCargasLote({ turno, turmas, onClose, onSaved }) {
     try {
       setSaving(true);
       const turma_ids = Array.from(turmasSelecionadas);
-      const itens = selecionadas.filter(Boolean);
+      const itens = linhas
+        .map((i) => selecionadas[i])
+        .filter((it) => it && it.disciplina_id)
+        .map((it) => ({
+          disciplina_id: Number(it.disciplina_id),
+          carga: Number(it.carga) || 1,
+        }));
+
       const { data } = await api.post("/api/cargas-horarias/definir-lote", {
         escola_id,
         turma_ids,
@@ -263,68 +301,92 @@ export default function ModalCargasLote({ turno, turmas, onClose, onSaved }) {
           </div>
 
           {/* Quantidade de disciplinas */}
-          <div className="mb-3">
-            <label className="block text-sm font-medium mb-1">
-              Quantas disciplinas?
-            </label>
-            <input
-              type="number"
-              min={0}
-              max={30}
-              value={qtd}
-              onChange={(e) => setQtd(e.target.value)}
-              className="border rounded p-2 w-28"
-            />
-            <p className="text-[11px] text-gray-500 mt-1">
-              Esse conjunto será aplicado a <strong>todas</strong> as turmas selecionadas.
-            </p>
+          <div className="mb-3 p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
+                Quantas disciplinas por turma?
+              </label>
+              <p className="text-[11px] text-slate-500">
+                Esse conjunto será aplicado a <strong>todas</strong> as turmas selecionadas.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={1}
+                max={35}
+                value={qtd}
+                onChange={(e) => handleQtdChange(e.target.value)}
+                className="border border-slate-300 rounded-lg p-1.5 w-16 text-center text-sm font-bold bg-white"
+              />
+              <span className="text-xs font-bold text-slate-600 uppercase">disc.</span>
+            </div>
           </div>
 
           {/* Seleção de disciplinas */}
           {loadingDiscs ? (
-            <div className="p-3 bg-gray-50 border rounded text-sm text-gray-500">
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-center text-xs text-slate-500">
               Carregando disciplinas…
             </div>
           ) : erroDiscs ? (
-            <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded text-sm">
+            <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs">
               {erroDiscs}
             </div>
           ) : (
-            <div className="space-y-2 max-h-64 overflow-y-auto">
+            <div className="space-y-2.5 max-h-72 overflow-y-auto pr-1">
               {linhas.map((i) => {
-                const valor = asId(selecionadas[i] || "");
+                const item = selecionadas[i] || { disciplina_id: "", carga: 2 };
+                const valorId = asId(item.disciplina_id);
+
                 return (
                   <div
                     key={i}
-                    className="grid grid-cols-5 gap-2 items-center"
+                    className="p-2 rounded-xl border border-slate-200 bg-white flex flex-col sm:flex-row items-stretch sm:items-center gap-2"
                   >
-                    <div className="col-span-2 text-sm text-gray-600 font-medium">
-                      Disciplina {i + 1}
+                    <div className="sm:w-24 flex-shrink-0 text-xs font-bold text-slate-600 uppercase flex items-center gap-1.5">
+                      <span className="w-5 h-5 rounded-full bg-slate-100 border border-slate-200 text-slate-600 flex items-center justify-center text-[10px]">
+                        {i + 1}
+                      </span>
+                      <span>Disc. {i + 1}</span>
                     </div>
-                    <div className="col-span-3">
+
+                    <div className="flex-1 min-w-0">
                       <select
-                        value={valor}
+                        value={valorId}
                         onChange={(e) => handleSelect(i, e.target.value)}
-                        className="border rounded p-2 w-full text-sm"
+                        className="border border-slate-300 rounded-lg px-3 py-1.5 w-full text-xs font-medium text-slate-800 bg-white outline-none focus:ring-2 focus:ring-blue-500 uppercase"
                       >
-                        <option value="">— selecione —</option>
+                        <option value="">— selecione a disciplina —</option>
                         {disciplinas.map((d) => {
                           const idStr = asId(d.id);
-                          const outra = escolhidasSet.has(idStr) && valor !== idStr;
+                          const outra = escolhidasSet.has(idStr) && valorId !== idStr;
                           return (
                             <option key={idStr} value={idStr} disabled={outra}>
                               {d.nome}
-                              {getCarga(d) ? ` • ${getCarga(d)}h` : ""}
                             </option>
                           );
                         })}
                       </select>
                     </div>
+
+                    <div className="flex items-center gap-1.5 justify-end sm:justify-start flex-shrink-0">
+                      <label className="text-xs text-slate-500 font-bold sm:hidden">Carga:</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={25}
+                        value={item.carga ?? ""}
+                        onChange={(e) => handleCargaChange(i, e.target.value)}
+                        placeholder="2"
+                        className="w-16 px-2 py-1 border border-slate-300 rounded-lg text-xs font-bold text-center text-blue-900 bg-blue-50/40 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      />
+                      <span className="text-xs font-semibold text-slate-500">aulas</span>
+                    </div>
                   </div>
                 );
               })}
               {linhas.length === 0 && (
-                <div className="p-3 bg-gray-50 border rounded text-sm text-gray-500">
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-center text-xs text-slate-500">
                   Informe a quantidade de disciplinas acima.
                 </div>
               )}
@@ -332,25 +394,29 @@ export default function ModalCargasLote({ turno, turmas, onClose, onSaved }) {
           )}
 
           {/* Rodapé */}
-          <div className="mt-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div className="text-sm">
-              <span className="font-semibold text-blue-900">Total por turma:</span>{" "}
-              <span className="font-bold text-blue-700">{totalCarga}h</span>
+          <div className="mt-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-3 border-t border-slate-100">
+            <div className="text-xs font-bold text-slate-700 flex items-center gap-2">
+              <span className="text-slate-500 uppercase">Total por turma:</span>
+              <span className="px-2.5 py-0.5 rounded-md bg-emerald-50 text-emerald-800 font-extrabold border border-emerald-200">
+                {totalCarga} {totalCarga === 1 ? "aula" : "aulas"}
+              </span>
             </div>
             <div className="flex gap-2 justify-end">
               <button
+                type="button"
                 onClick={() => setEtapa(1)}
-                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded text-sm"
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold uppercase tracking-wider transition cursor-pointer"
               >
                 ← Voltar
               </button>
               <button
+                type="button"
                 disabled={!podeProsseguir || saving}
                 onClick={handleSalvar}
-                className={`px-5 py-2 rounded text-white text-sm font-semibold transition ${
+                className={`px-5 py-2 rounded-xl text-white text-xs font-bold uppercase tracking-wider transition shadow-sm cursor-pointer ${
                   podeProsseguir && !saving
-                    ? "bg-green-600 hover:bg-green-700"
-                    : "bg-green-300 cursor-not-allowed"
+                    ? "bg-emerald-600 hover:bg-emerald-700"
+                    : "bg-slate-300 text-slate-500 cursor-not-allowed"
                 }`}
               >
                 {saving

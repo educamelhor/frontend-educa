@@ -39,32 +39,45 @@ export default function Avaliacoes() {
   const [turmas, setTurmas] = useState([]);
 
   // Helper para identificar semestralidade e tipo da turma
+  const isTurmaSemestral = (t) =>
+    Boolean(t?.is_agrupamento || String(t?.regime || "anual").toLowerCase().trim() === "semestral");
+
   const getTurmaBadge = (t) => {
     if (t?.is_agrupamento) {
       const label = t.agrupamento_tipo ? `Agrupamento / ${t.agrupamento_tipo}` : "Agrupamento / IFA";
+      const sem = Number(t?.semestre ?? 0);
+      const semSuffix = sem === 1 ? " (1º Sem)" : sem === 2 ? " (2º Sem)" : "";
       return {
-        label,
+        label: `${label}${semSuffix}`,
         bg: "rgba(168,85,247,0.2)",
         text: "#d8b4fe",
         border: "rgba(168,85,247,0.4)",
       };
     }
-    const sem = Number(t?.semestre ?? 0);
-    const regime = String(t?.regime || "").toLowerCase();
-    if (sem === 1 || (regime === "semestral" && sem === 1)) {
+    const regime = String(t?.regime || "anual").toLowerCase().trim();
+    if (regime === "semestral") {
+      const sem = Number(t?.semestre ?? 0);
+      if (sem === 1) {
+        return {
+          label: "1º Sem (1º/2º Bim)",
+          bg: "rgba(6,182,212,0.2)",
+          text: "#67e8f9",
+          border: "rgba(6,182,212,0.4)",
+        };
+      }
+      if (sem === 2) {
+        return {
+          label: "2º Sem (3º/4º Bim)",
+          bg: "rgba(245,158,11,0.2)",
+          text: "#fcd34d",
+          border: "rgba(245,158,11,0.4)",
+        };
+      }
       return {
-        label: "1º Sem (1º/2º Bim)",
+        label: "Semestral",
         bg: "rgba(6,182,212,0.2)",
         text: "#67e8f9",
         border: "rgba(6,182,212,0.4)",
-      };
-    }
-    if (sem === 2 || (regime === "semestral" && sem === 2)) {
-      return {
-        label: "2º Sem (3º/4º Bim)",
-        bg: "rgba(245,158,11,0.2)",
-        text: "#fcd34d",
-        border: "rgba(245,158,11,0.4)",
       };
     }
     return {
@@ -79,36 +92,29 @@ export default function Avaliacoes() {
   const bimestresDisponiveis = React.useMemo(() => {
     if (!turmaSelecionada) {
       if (turmas.length > 0) {
-        const todosSem1 = turmas.every((t) => {
-          const sem = Number(t?.semestre ?? 0);
-          const regime = String(t?.regime || "").toLowerCase();
-          return sem === 1 || (regime === "semestral" && sem === 1);
-        });
-        if (todosSem1) return ["1º Bimestre", "2º Bimestre"];
+        const todasSemestrais = turmas.every((t) => isTurmaSemestral(t));
+        if (todasSemestrais) {
+          const todosSem1 = turmas.every((t) => Number(t?.semestre ?? 0) === 1);
+          if (todosSem1) return ["1º Bimestre", "2º Bimestre"];
 
-        const todosSem2 = turmas.every((t) => {
-          const sem = Number(t?.semestre ?? 0);
-          const regime = String(t?.regime || "").toLowerCase();
-          return sem === 2 || (regime === "semestral" && sem === 2);
-        });
-        if (todosSem2) return ["3º Bimestre", "4º Bimestre"];
+          const todosSem2 = turmas.every((t) => Number(t?.semestre ?? 0) === 2);
+          if (todosSem2) return ["3º Bimestre", "4º Bimestre"];
+        }
       }
       return ["1º Bimestre", "2º Bimestre", "3º Bimestre", "4º Bimestre"];
     }
     const turmaObj = turmas.find(
       (t) => String(t.id) === String(turmaSelecionada) || t.nome === turmaSelecionada
     );
-    const sem = Number(turmaObj?.semestre ?? 0);
-    const regime = String(turmaObj?.regime || "").toLowerCase();
+    if (!turmaObj) return ["1º Bimestre", "2º Bimestre", "3º Bimestre", "4º Bimestre"];
 
-    // 1º Semestre -> 1º e 2º Bimestres
-    if (sem === 1 || (regime === "semestral" && sem === 1)) {
-      return ["1º Bimestre", "2º Bimestre"];
+    const isSemestral = isTurmaSemestral(turmaObj);
+    if (isSemestral) {
+      const sem = Number(turmaObj?.semestre ?? 0);
+      if (sem === 1) return ["1º Bimestre", "2º Bimestre"];
+      if (sem === 2) return ["3º Bimestre", "4º Bimestre"];
     }
-    // 2º Semestre -> 3º e 4º Bimestres
-    if (sem === 2 || (regime === "semestral" && sem === 2)) {
-      return ["3º Bimestre", "4º Bimestre"];
-    }
+
     // Anual ou padrão
     return ["1º Bimestre", "2º Bimestre", "3º Bimestre", "4º Bimestre"];
   }, [turmaSelecionada, turmas]);
@@ -120,13 +126,12 @@ export default function Avaliacoes() {
     const isBim3ou4 = bimestreSelecionado === "3º Bimestre" || bimestreSelecionado === "4º Bimestre";
 
     return turmas.filter(t => {
-      const sem = Number(t?.semestre ?? 0);
-      const regime = String(t?.regime || "").toLowerCase();
-      const isSem1 = sem === 1 || (regime === "semestral" && sem === 1);
-      const isSem2 = sem === 2 || (regime === "semestral" && sem === 2);
+      const isSemestral = isTurmaSemestral(t);
+      if (!isSemestral) return true; // Turmas anuais são compatíveis com todos os bimestres
 
-      if (isBim1ou2 && isSem2) return false;
-      if (isBim3ou4 && isSem1) return false;
+      const sem = Number(t?.semestre ?? 0);
+      if (isBim1ou2 && sem === 2) return false;
+      if (isBim3ou4 && sem === 1) return false;
       return true;
     });
   }, [turmas, bimestreSelecionado]);

@@ -130,32 +130,45 @@ export default function Planos() {
   const [loadingInicial, setLoadingInicial] = useState(true);
 
   // Helper para identificar semestralidade e tipo da turma
+  const isTurmaSemestral = (t) =>
+    Boolean(t?.is_agrupamento || String(t?.regime || "anual").toLowerCase().trim() === "semestral");
+
   const getTurmaBadge = (t) => {
     if (t?.is_agrupamento) {
       const label = t.agrupamento_tipo ? `Agrupamento / ${t.agrupamento_tipo}` : "Agrupamento / IFA";
+      const sem = Number(t?.semestre ?? 0);
+      const semSuffix = sem === 1 ? " (1º Sem)" : sem === 2 ? " (2º Sem)" : "";
       return {
-        label,
+        label: `${label}${semSuffix}`,
         bg: "rgba(168,85,247,0.2)",
         text: "#d8b4fe",
         border: "rgba(168,85,247,0.4)",
       };
     }
-    const sem = Number(t?.semestre ?? 0);
-    const regime = String(t?.regime || "").toLowerCase();
-    if (sem === 1 || (regime === "semestral" && sem === 1)) {
+    const regime = String(t?.regime || "anual").toLowerCase().trim();
+    if (regime === "semestral") {
+      const sem = Number(t?.semestre ?? 0);
+      if (sem === 1) {
+        return {
+          label: "1º Sem (1º/2º Bim)",
+          bg: "rgba(6,182,212,0.2)",
+          text: "#67e8f9",
+          border: "rgba(6,182,212,0.4)",
+        };
+      }
+      if (sem === 2) {
+        return {
+          label: "2º Sem (3º/4º Bim)",
+          bg: "rgba(245,158,11,0.2)",
+          text: "#fcd34d",
+          border: "rgba(245,158,11,0.4)",
+        };
+      }
       return {
-        label: "1º Sem (1º/2º Bim)",
+        label: "Semestral",
         bg: "rgba(6,182,212,0.2)",
         text: "#67e8f9",
         border: "rgba(6,182,212,0.4)",
-      };
-    }
-    if (sem === 2 || (regime === "semestral" && sem === 2)) {
-      return {
-        label: "2º Sem (3º/4º Bim)",
-        bg: "rgba(245,158,11,0.2)",
-        text: "#fcd34d",
-        border: "rgba(245,158,11,0.4)",
       };
     }
     return {
@@ -175,18 +188,20 @@ export default function Planos() {
     const turmaObj = turmas.find(
       (t) => String(t.id) === String(targetId) || t.nome === targetId
     );
-    const sem = Number(turmaObj?.semestre ?? 0);
-    const regime = String(turmaObj?.regime || "").toLowerCase();
+    if (!turmaObj) return ["1º Bimestre", "2º Bimestre", "3º Bimestre", "4º Bimestre"];
 
-    // 1º Semestre -> 1º e 2º Bimestres
-    if (sem === 1 || (regime === "semestral" && sem === 1)) {
-      return ["1º Bimestre", "2º Bimestre"];
+    const isSemestral = isTurmaSemestral(turmaObj);
+    if (isSemestral) {
+      const sem = Number(turmaObj?.semestre ?? 0);
+      if (sem === 1) {
+        return ["1º Bimestre", "2º Bimestre"];
+      }
+      if (sem === 2) {
+        return ["3º Bimestre", "4º Bimestre"];
+      }
     }
-    // 2º Semestre -> 3º e 4º Bimestres
-    if (sem === 2 || (regime === "semestral" && sem === 2)) {
-      return ["3º Bimestre", "4º Bimestre"];
-    }
-    // Anual ou padrão
+
+    // Anual ou padrão: todos os 4 bimestres
     return ["1º Bimestre", "2º Bimestre", "3º Bimestre", "4º Bimestre"];
   }, [turmaSelecionada, turmasSelecionadas, turmas]);
 
@@ -757,10 +772,17 @@ export default function Planos() {
                     if (turmasSelecionadas.length > 0 && !isChecked) {
                       const firstId = turmasSelecionadas[0];
                       const firstObj = turmas.find(x => String(x.id) === String(firstId) || x.nome === firstId);
-                      const firstSem = Number(firstObj?.semestre ?? 0);
-                      const thisSem = Number(t?.semestre ?? 0);
-                      if (firstSem !== thisSem) {
+                      const isFirstSem = isTurmaSemestral(firstObj);
+                      const isThisSem = isTurmaSemestral(t);
+
+                      if (isFirstSem !== isThisSem) {
                         semIncompativel = true;
+                      } else if (isFirstSem && isThisSem) {
+                        const firstSem = Number(firstObj?.semestre ?? 0);
+                        const thisSem = Number(t?.semestre ?? 0);
+                        if (firstSem !== thisSem) {
+                          semIncompativel = true;
+                        }
                       }
                     }
 

@@ -40,19 +40,54 @@ export default function TurmaForm({ open, onClose, onSubmit, turma }) {
   const [errors, setErrors] = useState({});
   const [sending, setSending] = useState(false);
 
-  // Opções de série para cada etapa
+  // Opções de série padronizadas para cada etapa
   const opcoesSerie = {
     INFANTIL: [
-      "1º Período",
-      "2º Período",
-      "1º Ano",
-      "2º Ano",
-      "3º Ano",
-      "4º Ano",
-      "5º Ano",
+      "1º PERÍODO",
+      "2º PERÍODO",
+      "1º ANO",
+      "2º ANO",
+      "3º ANO",
+      "4º ANO",
+      "5º ANO",
     ],
-    FUNDAMENTAL: ["6º Ano", "7º Ano", "8º Ano", "9º Ano"],
-    MÉDIO: ["1ª Série", "2ª Série", "3ª Série"],
+    FUNDAMENTAL: ["6º ANO", "7º ANO", "8º ANO", "9º ANO"],
+    MÉDIO: ["1ª SÉRIE", "2ª SÉRIE", "3ª SÉRIE"],
+    EJA: [
+      "1º SEGMENTO",
+      "2º SEGMENTO",
+      "3º SEGMENTO",
+      "1ª ETAPA",
+      "2ª ETAPA",
+      "3ª ETAPA",
+    ],
+  };
+
+  const normalizarTexto = (str = "") =>
+    String(str || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[º°ª]/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toUpperCase();
+
+  const getOpcoesSerieParaEtapa = (etapa) => {
+    if (!etapa) return null;
+    const etp = String(etapa).trim().toUpperCase();
+    if (etp.includes("INFANTIL") || etp.includes("CRECHE")) {
+      return opcoesSerie.INFANTIL;
+    }
+    if (etp.includes("FUNDAMENTAL")) {
+      return opcoesSerie.FUNDAMENTAL;
+    }
+    if (etp.includes("MÉDIO") || etp.includes("MEDIO")) {
+      return opcoesSerie.MÉDIO;
+    }
+    if (etp.includes("EJA")) {
+      return opcoesSerie.EJA;
+    }
+    return opcoesSerie[etp] || null;
   };
 
   useEffect(() => {
@@ -61,15 +96,24 @@ export default function TurmaForm({ open, onClose, onSubmit, turma }) {
     const escolaIdLogin = localStorage.getItem("escola_id") || "";
 
     if (turma) {
+      const etapaTurma = turma.etapa ? String(turma.etapa).trim().toUpperCase() : "";
+      const serieOriginal = turma.serie ? String(turma.serie).trim() : "";
+      const opcoesDisponiveis = getOpcoesSerieParaEtapa(etapaTurma) || [];
+
+      // Procura correspondência normalizada na lista de séries da etapa
+      const optEncontrada = opcoesDisponiveis.find(
+        (op) => normalizarTexto(op) === normalizarTexto(serieOriginal)
+      );
+
       setForm({
         id: turma.id ?? null,
         escola_id: turma.escola_id ?? escolaIdLogin ?? "",
         nome: turma.nome ?? turma.turma ?? "",
-        etapa: turma.etapa ?? "",
+        etapa: etapaTurma,
         ano: turma.ano ?? anoAtual,
         turno: turma.turno?.toUpperCase() ?? "",
-        serie: turma.serie ?? "",
-        regime: turma.regime ?? "anual",
+        serie: optEncontrada || (serieOriginal ? serieOriginal.toUpperCase() : ""),
+        regime: turma.regime ? String(turma.regime).trim().toLowerCase() : "anual",
       });
     } else {
       setForm({
@@ -290,38 +334,54 @@ export default function TurmaForm({ open, onClose, onSubmit, turma }) {
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
                 Série / Ano Escolar <span className="text-red-500">*</span>
               </label>
-              {form.etapa && opcoesSerie[form.etapa] ? (
-                <select
-                  name="serie"
-                  value={form.serie}
-                  onChange={handleChange}
-                  className={`w-full px-3 py-2.5 rounded-xl border text-sm font-medium transition bg-white outline-none uppercase ${
-                    errors.serie
-                      ? "border-red-400 focus:border-red-500"
-                      : "border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-                  }`}
-                >
-                  <option value="">— Selecione a série —</option>
-                  {opcoesSerie[form.etapa].map((serie, idx) => (
-                    <option key={idx} value={serie}>
-                      {serie}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  type="text"
-                  name="serie"
-                  placeholder="Ex: 1ª Série, 6º Ano..."
-                  value={form.serie}
-                  onChange={handleChange}
-                  className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium transition outline-none uppercase ${
-                    errors.serie
-                      ? "border-red-400 focus:border-red-500"
-                      : "border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-                  }`}
-                />
-              )}
+              {(() => {
+                const opcoes = getOpcoesSerieParaEtapa(form.etapa);
+                if (opcoes && opcoes.length > 0) {
+                  const valorNormalizado = normalizarTexto(form.serie);
+                  const optionCorrespondente = opcoes.find(
+                    (op) => normalizarTexto(op) === valorNormalizado
+                  );
+                  const selectedVal = optionCorrespondente || form.serie;
+
+                  return (
+                    <select
+                      name="serie"
+                      value={selectedVal}
+                      onChange={handleChange}
+                      className={`w-full px-3 py-2.5 rounded-xl border text-sm font-medium transition bg-white outline-none uppercase ${
+                        errors.serie
+                          ? "border-red-400 focus:border-red-500"
+                          : "border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                      }`}
+                    >
+                      <option value="">— Selecione a série —</option>
+                      {opcoes.map((serie, idx) => (
+                        <option key={idx} value={serie}>
+                          {serie}
+                        </option>
+                      ))}
+                      {/* Se o valor atual da turma for customizado/não constar na lista padrão, mantém selecionado */}
+                      {form.serie && !optionCorrespondente && (
+                        <option value={form.serie}>{form.serie}</option>
+                      )}
+                    </select>
+                  );
+                }
+                return (
+                  <input
+                    type="text"
+                    name="serie"
+                    placeholder="Ex: 1ª SÉRIE, 6º ANO..."
+                    value={form.serie}
+                    onChange={handleChange}
+                    className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium transition outline-none uppercase ${
+                      errors.serie
+                        ? "border-red-400 focus:border-red-500"
+                        : "border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                    }`}
+                  />
+                );
+              })()}
               {errors.serie && (
                 <p className="text-red-600 text-xs mt-1 font-medium">{errors.serie}</p>
               )}

@@ -194,7 +194,8 @@ export default function FaltasPage() {
       const tot = Number(e.faltas?.total || 0);
       if (tot > 0) comFaltas++;
       totalFaltasAno += tot;
-      if (e.justificadas?.dias > 0) totalAtestados += e.justificadas.dias;
+      const justTotal = Number(e.justificadas?.total ?? e.justificadas?.dias ?? 0);
+      if (justTotal > 0) totalAtestados += justTotal;
     }
 
     const mediaFaltas = totalAlunos > 0 ? (totalFaltasAno / totalAlunos).toFixed(1) : 0;
@@ -429,17 +430,49 @@ export default function FaltasPage() {
                 <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
                   <th className="py-3.5 px-4 w-12 text-center">#</th>
                   <th className="py-3.5 px-4 min-w-[240px]">Estudante</th>
-                  <th className="py-3.5 px-4 w-28 text-center bg-blue-50/50 text-blue-900 border-l border-r border-blue-100">
-                    1º Bimestre
+                  <th className="py-3.5 px-3 text-center bg-blue-50/50 text-blue-900 border-l border-r border-blue-100 min-w-[110px]">
+                    <div>1º Bimestre</div>
+                    <div className="flex items-center justify-center gap-1.5 mt-0.5 text-[9px] font-semibold">
+                      <span className="text-rose-600 flex items-center gap-0.5" title="Faltas">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block" /> Faltas
+                      </span>
+                      <span className="text-emerald-700 flex items-center gap-0.5" title="Faltas Justificadas / Atestados">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" /> Justif.
+                      </span>
+                    </div>
                   </th>
-                  <th className="py-3.5 px-4 w-28 text-center bg-blue-50/50 text-blue-900 border-r border-blue-100">
-                    2º Bimestre
+                  <th className="py-3.5 px-3 text-center bg-blue-50/50 text-blue-900 border-r border-blue-100 min-w-[110px]">
+                    <div>2º Bimestre</div>
+                    <div className="flex items-center justify-center gap-1.5 mt-0.5 text-[9px] font-semibold">
+                      <span className="text-rose-600 flex items-center gap-0.5" title="Faltas">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block" /> Faltas
+                      </span>
+                      <span className="text-emerald-700 flex items-center gap-0.5" title="Faltas Justificadas / Atestados">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" /> Justif.
+                      </span>
+                    </div>
                   </th>
-                  <th className="py-3.5 px-4 w-28 text-center bg-blue-50/50 text-blue-900 border-r border-blue-100">
-                    3º Bimestre
+                  <th className="py-3.5 px-3 text-center bg-blue-50/50 text-blue-900 border-r border-blue-100 min-w-[110px]">
+                    <div>3º Bimestre</div>
+                    <div className="flex items-center justify-center gap-1.5 mt-0.5 text-[9px] font-semibold">
+                      <span className="text-rose-600 flex items-center gap-0.5" title="Faltas">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block" /> Faltas
+                      </span>
+                      <span className="text-emerald-700 flex items-center gap-0.5" title="Faltas Justificadas / Atestados">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" /> Justif.
+                      </span>
+                    </div>
                   </th>
-                  <th className="py-3.5 px-4 w-28 text-center bg-blue-50/50 text-blue-900 border-r border-blue-100">
-                    4º Bimestre
+                  <th className="py-3.5 px-3 text-center bg-blue-50/50 text-blue-900 border-r border-blue-100 min-w-[110px]">
+                    <div>4º Bimestre</div>
+                    <div className="flex items-center justify-center gap-1.5 mt-0.5 text-[9px] font-semibold">
+                      <span className="text-rose-600 flex items-center gap-0.5" title="Faltas">
+                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block" /> Faltas
+                      </span>
+                      <span className="text-emerald-700 flex items-center gap-0.5" title="Faltas Justificadas / Atestados">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" /> Justif.
+                      </span>
+                    </div>
                   </th>
                   <th className="py-3.5 px-4 w-32 text-center bg-indigo-50/80 text-indigo-950 font-black border-r border-indigo-100">
                     Total Faltas
@@ -510,9 +543,9 @@ export default function FaltasPage() {
                                 <span className="text-[11px] text-slate-400 font-mono">
                                   Matrícula: {aluno.codigo}
                                 </span>
-                                {aluno.justificadas?.dias > 0 && (
-                                  <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
-                                    {aluno.justificadas.dias}d justif.
+                                {Number(aluno.justificadas?.total || aluno.justificadas?.dias || 0) > 0 && (
+                                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                                    {aluno.justificadas.total || aluno.justificadas.dias}d justif.
                                   </span>
                                 )}
                               </div>
@@ -521,60 +554,162 @@ export default function FaltasPage() {
                         </td>
 
                         {/* 1º Bimestre */}
-                        <td className="py-3 px-4 text-center font-semibold bg-blue-50/20 border-l border-r border-blue-50">
-                          {aluno.faltas?.b1 > 0 ? (
-                            <span className="px-2 py-0.5 rounded-md font-bold text-rose-700 bg-rose-50 border border-rose-200">
-                              {aluno.faltas.b1}
-                            </span>
-                          ) : (
-                            <span className="text-slate-300 font-bold">0</span>
-                          )}
+                        <td className="py-3 px-3 text-center font-semibold bg-blue-50/20 border-l border-r border-blue-50">
+                          <div className="flex items-center justify-center gap-1.5">
+                            {/* Badge Vermelha - Faltas */}
+                            {aluno.faltas?.b1 > 0 ? (
+                              <span
+                                className="px-2 py-0.5 rounded-md font-bold text-rose-700 bg-rose-50 border border-rose-200 text-xs shadow-xs"
+                                title={`${aluno.faltas.b1} falta(s) no 1º Bimestre`}
+                              >
+                                {aluno.faltas.b1}
+                              </span>
+                            ) : (
+                              <span className="text-slate-300 font-bold px-1.5 py-0.5 text-xs">0</span>
+                            )}
+
+                            {/* Badge Verde - Faltas Justificadas */}
+                            {Number(aluno.justificadas?.b1 || 0) > 0 ? (
+                              <span
+                                className="px-2 py-0.5 rounded-md font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 text-xs shadow-xs"
+                                title={`${aluno.justificadas.b1} falta(s) justificada(s) no 1º Bimestre`}
+                              >
+                                {aluno.justificadas.b1}
+                              </span>
+                            ) : aluno.faltas?.b1 > 0 ? (
+                              <span
+                                className="px-1.5 py-0.5 rounded-md font-medium text-emerald-700/40 bg-emerald-50/40 border border-emerald-100/50 text-[11px]"
+                                title="0 faltas justificadas no 1º Bimestre"
+                              >
+                                0
+                              </span>
+                            ) : null}
+                          </div>
                         </td>
 
                         {/* 2º Bimestre */}
-                        <td className="py-3 px-4 text-center font-semibold bg-blue-50/20 border-r border-blue-50">
-                          {aluno.faltas?.b2 > 0 ? (
-                            <span className="px-2 py-0.5 rounded-md font-bold text-rose-700 bg-rose-50 border border-rose-200">
-                              {aluno.faltas.b2}
-                            </span>
-                          ) : (
-                            <span className="text-slate-300 font-bold">0</span>
-                          )}
+                        <td className="py-3 px-3 text-center font-semibold bg-blue-50/20 border-r border-blue-50">
+                          <div className="flex items-center justify-center gap-1.5">
+                            {/* Badge Vermelha - Faltas */}
+                            {aluno.faltas?.b2 > 0 ? (
+                              <span
+                                className="px-2 py-0.5 rounded-md font-bold text-rose-700 bg-rose-50 border border-rose-200 text-xs shadow-xs"
+                                title={`${aluno.faltas.b2} falta(s) no 2º Bimestre`}
+                              >
+                                {aluno.faltas.b2}
+                              </span>
+                            ) : (
+                              <span className="text-slate-300 font-bold px-1.5 py-0.5 text-xs">0</span>
+                            )}
+
+                            {/* Badge Verde - Faltas Justificadas */}
+                            {Number(aluno.justificadas?.b2 || 0) > 0 ? (
+                              <span
+                                className="px-2 py-0.5 rounded-md font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 text-xs shadow-xs"
+                                title={`${aluno.justificadas.b2} falta(s) justificada(s) no 2º Bimestre`}
+                              >
+                                {aluno.justificadas.b2}
+                              </span>
+                            ) : aluno.faltas?.b2 > 0 ? (
+                              <span
+                                className="px-1.5 py-0.5 rounded-md font-medium text-emerald-700/40 bg-emerald-50/40 border border-emerald-100/50 text-[11px]"
+                                title="0 faltas justificadas no 2º Bimestre"
+                              >
+                                0
+                              </span>
+                            ) : null}
+                          </div>
                         </td>
 
                         {/* 3º Bimestre */}
-                        <td className="py-3 px-4 text-center font-semibold bg-blue-50/20 border-r border-blue-50">
-                          {aluno.faltas?.b3 > 0 ? (
-                            <span className="px-2 py-0.5 rounded-md font-bold text-rose-700 bg-rose-50 border border-rose-200">
-                              {aluno.faltas.b3}
-                            </span>
-                          ) : (
-                            <span className="text-slate-300 font-bold">0</span>
-                          )}
+                        <td className="py-3 px-3 text-center font-semibold bg-blue-50/20 border-r border-blue-50">
+                          <div className="flex items-center justify-center gap-1.5">
+                            {/* Badge Vermelha - Faltas */}
+                            {aluno.faltas?.b3 > 0 ? (
+                              <span
+                                className="px-2 py-0.5 rounded-md font-bold text-rose-700 bg-rose-50 border border-rose-200 text-xs shadow-xs"
+                                title={`${aluno.faltas.b3} falta(s) no 3º Bimestre`}
+                              >
+                                {aluno.faltas.b3}
+                              </span>
+                            ) : (
+                              <span className="text-slate-300 font-bold px-1.5 py-0.5 text-xs">0</span>
+                            )}
+
+                            {/* Badge Verde - Faltas Justificadas */}
+                            {Number(aluno.justificadas?.b3 || 0) > 0 ? (
+                              <span
+                                className="px-2 py-0.5 rounded-md font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 text-xs shadow-xs"
+                                title={`${aluno.justificadas.b3} falta(s) justificada(s) no 3º Bimestre`}
+                              >
+                                {aluno.justificadas.b3}
+                              </span>
+                            ) : aluno.faltas?.b3 > 0 ? (
+                              <span
+                                className="px-1.5 py-0.5 rounded-md font-medium text-emerald-700/40 bg-emerald-50/40 border border-emerald-100/50 text-[11px]"
+                                title="0 faltas justificadas no 3º Bimestre"
+                              >
+                                0
+                              </span>
+                            ) : null}
+                          </div>
                         </td>
 
                         {/* 4º Bimestre */}
-                        <td className="py-3 px-4 text-center font-semibold bg-blue-50/20 border-r border-blue-50">
-                          {aluno.faltas?.b4 > 0 ? (
-                            <span className="px-2 py-0.5 rounded-md font-bold text-rose-700 bg-rose-50 border border-rose-200">
-                              {aluno.faltas.b4}
-                            </span>
-                          ) : (
-                            <span className="text-slate-300 font-bold">0</span>
-                          )}
+                        <td className="py-3 px-3 text-center font-semibold bg-blue-50/20 border-r border-blue-50">
+                          <div className="flex items-center justify-center gap-1.5">
+                            {/* Badge Vermelha - Faltas */}
+                            {aluno.faltas?.b4 > 0 ? (
+                              <span
+                                className="px-2 py-0.5 rounded-md font-bold text-rose-700 bg-rose-50 border border-rose-200 text-xs shadow-xs"
+                                title={`${aluno.faltas.b4} falta(s) no 4º Bimestre`}
+                              >
+                                {aluno.faltas.b4}
+                              </span>
+                            ) : (
+                              <span className="text-slate-300 font-bold px-1.5 py-0.5 text-xs">0</span>
+                            )}
+
+                            {/* Badge Verde - Faltas Justificadas */}
+                            {Number(aluno.justificadas?.b4 || 0) > 0 ? (
+                              <span
+                                className="px-2 py-0.5 rounded-md font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 text-xs shadow-xs"
+                                title={`${aluno.justificadas.b4} falta(s) justificada(s) no 4º Bimestre`}
+                              >
+                                {aluno.justificadas.b4}
+                              </span>
+                            ) : aluno.faltas?.b4 > 0 ? (
+                              <span
+                                className="px-1.5 py-0.5 rounded-md font-medium text-emerald-700/40 bg-emerald-50/40 border border-emerald-100/50 text-[11px]"
+                                title="0 faltas justificadas no 4º Bimestre"
+                              >
+                                0
+                              </span>
+                            ) : null}
+                          </div>
                         </td>
 
                         {/* Total Geral */}
                         <td className="py-3 px-4 text-center bg-indigo-50/40 border-r border-indigo-100">
-                          <span
-                            className={`px-3 py-1 rounded-lg font-black text-sm inline-block ${
-                              total > 0
-                                ? "bg-indigo-600 text-white shadow-sm"
-                                : "text-slate-400 bg-slate-100"
-                            }`}
-                          >
-                            {total}
-                          </span>
+                          <div className="flex flex-col items-center justify-center gap-1">
+                            <span
+                              className={`px-3 py-1 rounded-lg font-black text-sm inline-block ${
+                                total > 0
+                                  ? "bg-indigo-600 text-white shadow-sm"
+                                  : "text-slate-400 bg-slate-100"
+                              }`}
+                            >
+                              {total}
+                            </span>
+                            {Number(aluno.justificadas?.total || aluno.justificadas?.dias || 0) > 0 && (
+                              <span
+                                className="px-2 py-0.5 rounded-full font-bold text-[10px] text-emerald-800 bg-emerald-100 border border-emerald-300"
+                                title={`${aluno.justificadas.total || aluno.justificadas.dias} dia(s) justificado(s) no total`}
+                              >
+                                {aluno.justificadas.total || aluno.justificadas.dias} justif.
+                              </span>
+                            )}
+                          </div>
                         </td>
 
                         {/* Situação */}
@@ -622,10 +757,10 @@ export default function FaltasPage() {
                                   <DocumentTextIcon className="w-4 h-4 text-blue-600" />
                                   Detalhamento de Faltas por Componente Curricular — {aluno.nome}
                                 </span>
-                                {aluno.justificadas?.dias > 0 && (
+                                {Number(aluno.justificadas?.total || aluno.justificadas?.dias || 0) > 0 && (
                                   <span className="text-xs text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
                                     <CheckCircleIcon className="w-3.5 h-3.5 text-emerald-600" />
-                                    {aluno.justificadas.dias} dia(s) com atestado médico/justificativa
+                                    {aluno.justificadas.total || aluno.justificadas.dias} dia(s) com atestado / justificativa (Módulo Frequência)
                                   </span>
                                 )}
                               </div>
@@ -661,6 +796,40 @@ export default function FaltasPage() {
                                 <p className="text-xs text-slate-400 italic">
                                   Nenhum registro de falta individual por disciplina para este aluno.
                                 </p>
+                              )}
+
+                              {aluno.justificadas?.detalhes && aluno.justificadas.detalhes.length > 0 && (
+                                <div className="mt-4 pt-3 border-t border-slate-100">
+                                  <p className="text-xs font-bold text-slate-700 mb-2 flex items-center gap-1.5">
+                                    <DocumentTextIcon className="w-4 h-4 text-emerald-600" />
+                                    Justificativas e Atestados Registrados no Módulo Frequência:
+                                  </p>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                                    {aluno.justificadas.detalhes.map((just, jIdx) => (
+                                      <div
+                                        key={just.id || jIdx}
+                                        className="p-2.5 bg-emerald-50/50 rounded-xl border border-emerald-200 text-xs flex flex-col gap-1"
+                                      >
+                                        <div className="flex items-center justify-between">
+                                          <span className="font-bold text-emerald-900 capitalize">
+                                            {String(just.tipo || "Atestado").replace(/_/g, " ")}
+                                          </span>
+                                          <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-extrabold text-[10px]">
+                                            {just.dias} dia(s)
+                                          </span>
+                                        </div>
+                                        <p className="text-[11px] text-emerald-700">
+                                          Período: {just.data_inicio ? String(just.data_inicio).slice(0, 10).split('-').reverse().join('/') : "—"} até {just.data_fim ? String(just.data_fim).slice(0, 10).split('-').reverse().join('/') : "—"}
+                                        </p>
+                                        {just.observacao && (
+                                          <p className="text-[11px] text-slate-600 italic bg-white/80 p-1.5 rounded border border-emerald-100">
+                                            "{just.observacao}"
+                                          </p>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
                               )}
                             </div>
                           </td>

@@ -5,9 +5,9 @@
 // Fluxo:
 //   1. Selecionar Ano Letivo e Turno (Matutino, Vespertino, Noturno)
 //   2. Selecionar Turma
-//   3. Renderizar tabela de estudantes x disciplinas
+//   3. Renderizar documento institucional com Cabeçalho Premium (padrão SEDF)
 //   4. Seleção de bimestre (1º, 2º, 3º, 4º)
-//   5. Botão de impressão PDF
+//   5. Botão de impressão PDF (com suporte perfeito a paisagem A4 e cores)
 // ============================================================================
 
 import React, { useState, useEffect, useCallback } from "react";
@@ -52,6 +52,9 @@ function corCelula(nota, flagged) {
 export default function MapaNotaRelatorio() {
   const navigate = useNavigate();
 
+  // Dados da Escola
+  const [nomeEscola, setNomeEscola] = useState("CENTRO DE ENSINO FUNDAMENTAL 04 – COLÉGIO CÍVICO MILITAR");
+
   // Filtros principais
   const [anosLetivos, setAnosLetivos] = useState([]);
   const [anoLetivo, setAnoLetivo] = useState(anoLetivoPadrao());
@@ -70,6 +73,14 @@ export default function MapaNotaRelatorio() {
   const [erroMapa, setErroMapa] = useState(null);
 
   const turnos = ["Matutino", "Vespertino", "Noturno"];
+
+  // ── 0. Nome da escola ──────────────────────────────────────────────────────
+  useEffect(() => {
+    const saved = localStorage.getItem("nome_escola");
+    if (saved && saved !== "Escola não definida") {
+      setNomeEscola(saved);
+    }
+  }, []);
 
   // ── 1. Anos Letivos ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -162,34 +173,73 @@ export default function MapaNotaRelatorio() {
           0%, 100% { filter: drop-shadow(0 0 3px rgba(234,179,8,0.6)); transform: scale(1); }
           50%       { filter: drop-shadow(0 0 7px rgba(234,179,8,1));   transform: scale(1.15); }
         }
+
+        /* ── Estilos de Impressão Oficial (A4 Paisagem) ── */
         @media print {
-          body {
-            background: #fff !important;
-            color: #000 !important;
+          @page {
+            size: landscape;
+            margin: 8mm 10mm;
           }
+
+          body, html {
+            background: #ffffff !important;
+            color: #000000 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
+          }
+
           .no-print {
             display: none !important;
           }
+
           .printable-card {
             box-shadow: none !important;
-            border: 1px solid #cbd5e1 !important;
+            border: none !important;
             border-radius: 0 !important;
             margin: 0 !important;
             padding: 0 !important;
+            max-width: 100% !important;
+            width: 100% !important;
           }
+
+          .table-scroll-container {
+            overflow: visible !important;
+            width: 100% !important;
+          }
+
           table {
+            width: 100% !important;
+            border-collapse: collapse !important;
+            table-layout: auto !important;
+            font-size: 8pt !important;
             page-break-inside: auto;
           }
+
           tr {
             page-break-inside: avoid;
             page-break-after: auto;
           }
+
           thead {
             display: table-header-group;
           }
+
           tfoot {
             display: table-footer-group;
           }
+
+          th, td {
+            border: 1px solid #94a3b8 !important;
+            padding: 4px 4px !important;
+            font-size: 8pt !important;
+          }
+
+          th {
+            background-color: #1e3a8a !important;
+            color: #ffffff !important;
+          }
+
           * {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
@@ -314,7 +364,7 @@ export default function MapaNotaRelatorio() {
           )}
         </div>
 
-        {/* ── Tabela do Mapa de Notas da Turma (quando turma selecionada) ── */}
+        {/* ── Documento Oficial do Mapa de Notas (quando turma selecionada) ── */}
         {turmaSelecionada && (
           <div
             className="printable-card"
@@ -322,39 +372,42 @@ export default function MapaNotaRelatorio() {
               backgroundColor: "#fff",
               borderRadius: "16px",
               width: "100%",
-              maxWidth: "1300px",
+              maxWidth: "1350px",
               margin: "0 auto 40px",
               boxShadow: "0 10px 35px rgba(0,0,0,0.08)",
               border: "1px solid #e2e8f0",
               overflow: "hidden",
             }}
           >
-            {/* ── Cabeçalho do Card da Turma ──────────────────────────────── */}
-            <div style={{
-              padding: "20px 24px 16px",
-              background: "linear-gradient(135deg, #1e3a8a, #3b82f6)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 16,
-              flexWrap: "wrap",
-            }}>
+            {/* ── Barra de Ações Web (oculta na impressão) ────────────────── */}
+            <div
+              className="no-print"
+              style={{
+                padding: "16px 24px",
+                background: "linear-gradient(135deg, #1e3a8a, #3b82f6)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 16,
+                flexWrap: "wrap",
+              }}
+            >
               <div>
                 <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "#bfdbfe", textTransform: "uppercase", letterSpacing: "0.08em" }}>
                   Relatório Pedagógico · Mapa de Nota
                 </div>
-                <h2 style={{ margin: 0, color: "#fff", fontSize: "1.4rem", fontWeight: 800 }}>
+                <h2 style={{ margin: 0, color: "#fff", fontSize: "1.35rem", fontWeight: 800 }}>
                   Turma {turmaNome}
                 </h2>
                 <div style={{ fontSize: "0.78rem", color: "#93c5fd", marginTop: 2 }}>
-                  Boletim coletivo · Turno {turmaSelecionada.turno || turnoSelecionado} · Ano Letivo {anoLetivo}
+                  Turno {turmaSelecionada.turno || turnoSelecionado} · Ano Letivo {anoLetivo}
                 </div>
               </div>
 
-              {/* Controles: Seletor de Bimestre + Botão PDF */}
-              <div className="no-print" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              {/* Controles Web: Seletor de Bimestre + Botão PDF */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                 {/* Seletor de Bimestre */}
-                <div style={{ display: "flex", alignItems: "center", gap: 6, backgroundColor: "rgba(0,0,0,0.15)", padding: "4px 8px", borderRadius: "10px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, backgroundColor: "rgba(0,0,0,0.18)", padding: "4px 8px", borderRadius: "10px" }}>
                   <span style={{ color: "#bfdbfe", fontSize: "0.75rem", fontWeight: 700, marginRight: 2 }}>
                     Bimestre:
                   </span>
@@ -363,7 +416,7 @@ export default function MapaNotaRelatorio() {
                       key={b.valor}
                       onClick={() => setBimestre(b.valor)}
                       style={{
-                        padding: "5px 12px",
+                        padding: "6px 12px",
                         borderRadius: "6px",
                         fontWeight: 700,
                         fontSize: "0.75rem",
@@ -386,16 +439,16 @@ export default function MapaNotaRelatorio() {
                   style={{
                     display: "flex",
                     alignItems: "center",
-                    gap: 6,
-                    padding: "7px 16px",
+                    gap: 7,
+                    padding: "8px 18px",
                     borderRadius: "8px",
                     fontWeight: 800,
-                    fontSize: "0.82rem",
+                    fontSize: "0.85rem",
                     cursor: "pointer",
                     border: "2px solid #ffffff",
                     backgroundColor: "#ffffff",
                     color: "#1e3a8a",
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.18)",
                     transition: "all 0.15s",
                   }}
                   onMouseEnter={e => { e.currentTarget.style.backgroundColor = "#f0f4ff"; }}
@@ -412,7 +465,118 @@ export default function MapaNotaRelatorio() {
               </div>
             </div>
 
-            {/* ── Legenda ─────────────────────────────────────────────────── */}
+            {/* ── CABEÇALHO INSTITUCIONAL PREMIUM (Padrão Oficial do Sistema) ── */}
+            <div
+              style={{
+                padding: "20px 24px 14px",
+                backgroundColor: "#ffffff",
+                position: "relative",
+              }}
+            >
+              {/* Linhas institucionais duplas (Dourada + Azul) */}
+              <div style={{
+                position: "absolute",
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: "2.5px",
+                backgroundColor: "#b8860b", // Dourado oficial
+              }} />
+              <div style={{
+                position: "absolute",
+                bottom: -2.5,
+                left: 0,
+                right: 0,
+                height: "1px",
+                backgroundColor: "#1e3a5f", // Azul oficial
+              }} />
+
+              {/* Grade de Logos e Textos Oficiais */}
+              <div style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 16,
+              }}>
+                {/* Logo Esquerda (Brasão DF / Educa Melhor) */}
+                <div style={{ width: 70, height: 70, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <img
+                    src="/logo-escola-left.png"
+                    alt="Brasão Institucional"
+                    style={{ maxHeight: 66, maxWidth: 66, objectFit: "contain" }}
+                    onError={(e) => {
+                      if (!e.currentTarget.dataset.tried) {
+                        e.currentTarget.dataset.tried = "true";
+                        e.currentTarget.src = "/LOGO_EDUCA_MELHOR.jpeg";
+                      }
+                    }}
+                  />
+                </div>
+
+                {/* Textos Centrais Institucionais */}
+                <div style={{ textAlign: "center", flex: 1, lineHeight: 1.25, padding: "0 8px" }}>
+                  <div style={{ fontSize: "0.78rem", fontWeight: 800, color: "#1e3a5f", letterSpacing: "0.6px" }}>
+                    GOVERNO DO DISTRITO FEDERAL
+                  </div>
+                  <div style={{ fontSize: "0.82rem", fontWeight: 800, color: "#1e3a5f", letterSpacing: "0.3px" }}>
+                    SECRETARIA DE ESTADO DE EDUCAÇÃO DO DISTRITO FEDERAL
+                  </div>
+                  <div style={{ fontSize: "0.74rem", fontWeight: 700, color: "#1e3a5f" }}>
+                    COORDENAÇÃO REGIONAL DE ENSINO DE PLANALTINA
+                  </div>
+                  <div style={{ fontSize: "0.98rem", fontWeight: 900, color: "#1e3a5f", margin: "2px 0 1px", letterSpacing: "-0.2px" }}>
+                    {nomeEscola}
+                  </div>
+                  <div style={{ fontSize: "0.7rem", color: "#555555" }}>
+                    INEP 53006160
+                  </div>
+                </div>
+
+                {/* Logo Direita (Brasão da Escola / CCMDF) */}
+                <div style={{ width: 70, height: 70, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <img
+                    src="/logo-escola-right.png"
+                    alt="Brasão Escola"
+                    style={{ maxHeight: 66, maxWidth: 66, objectFit: "contain" }}
+                    onError={(e) => {
+                      if (!e.currentTarget.dataset.tried) {
+                        e.currentTarget.dataset.tried = "true";
+                        e.currentTarget.src = "/LOGO_CCMDF.jpg";
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Faixa de Identificação do Documento Impresso */}
+              <div style={{
+                marginTop: "16px",
+                padding: "8px 16px",
+                backgroundColor: "#f8fafc",
+                borderRadius: "8px",
+                border: "1px solid #e2e8f0",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: 10,
+                fontSize: "0.8rem",
+              }}>
+                <div>
+                  <span style={{ fontWeight: 900, color: "#1e3a8a", fontSize: "0.88rem", letterSpacing: "0.2px" }}>
+                    MAPA DE NOTA — {BIMESTRES.find(b => b.valor === bimestre)?.label?.toUpperCase() || `${bimestre}º BIMESTRE`}
+                  </span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap" }}>
+                  <span>TURMA: <strong style={{ color: "#1e3a8a" }}>{turmaNome}</strong></span>
+                  <span>TURNO: <strong style={{ color: "#1e3a8a" }}>{(turmaSelecionada.turno || turnoSelecionado || "").toUpperCase()}</strong></span>
+                  <span>ANO LETIVO: <strong style={{ color: "#1e3a8a" }}>{anoLetivo}</strong></span>
+                  <span style={{ color: "#64748b" }}>EMISSÃO: {new Date().toLocaleDateString("pt-BR")}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* ── Legenda de Cores ─────────────────────────────────────────── */}
             <div style={{
               padding: "10px 24px",
               background: "#f8fafc",
@@ -430,7 +594,7 @@ export default function MapaNotaRelatorio() {
               ].map(({ cor, borda, label }) => (
                 <div key={label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
                   <span style={{
-                    display: "inline-block", width: 16, height: 16, borderRadius: 4,
+                    display: "inline-block", width: 14, height: 14, borderRadius: 3,
                     backgroundColor: cor, border: `2px solid ${borda}`,
                   }} />
                   <span style={{ fontSize: "0.72rem", color: "#475569", fontWeight: 600 }}>{label}</span>
@@ -441,8 +605,8 @@ export default function MapaNotaRelatorio() {
               </span>
             </div>
 
-            {/* ── Tabela ──────────────────────────────────────────────────── */}
-            <div style={{ overflowX: "auto", padding: "0 0 12px" }}>
+            {/* ── Tabela de Notas ─────────────────────────────────────────── */}
+            <div className="table-scroll-container" style={{ overflowX: "auto", padding: "0 0 12px" }}>
               {loadingMapa ? (
                 <div style={{ padding: 60, textAlign: "center", color: "#64748b" }}>
                   <div style={{ fontSize: "2rem", marginBottom: 12 }}>⏳</div>
@@ -476,13 +640,13 @@ export default function MapaNotaRelatorio() {
                   </div>
                 </div>
               ) : (
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.8rem" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.78rem" }}>
                   <thead>
                     <tr style={{ background: "#1e3a8a", color: "#fff", position: "sticky", top: 0, zIndex: 10 }}>
                       <th style={{
-                        padding: "12px 18px", textAlign: "left", fontWeight: 800,
+                        padding: "10px 14px", textAlign: "left", fontWeight: 800,
                         position: "sticky", left: 0, background: "#1e3a8a", zIndex: 11,
-                        minWidth: 260, borderRight: "2px solid rgba(255,255,255,0.2)",
+                        minWidth: 240, borderRight: "2px solid rgba(255,255,255,0.2)",
                       }}>
                         Estudante
                       </th>
@@ -491,15 +655,15 @@ export default function MapaNotaRelatorio() {
                           key={disc.id}
                           title={disc.nome}
                           style={{
-                            padding: "12px 8px",
+                            padding: "10px 6px",
                             textAlign: "center",
                             fontWeight: 700,
-                            minWidth: 80,
+                            minWidth: 72,
                             borderRight: "1px solid rgba(255,255,255,0.12)",
                             whiteSpace: "nowrap",
                             overflow: "hidden",
                             textOverflow: "ellipsis",
-                            maxWidth: 110,
+                            maxWidth: 100,
                             fontSize: "0.72rem",
                           }}
                         >
@@ -525,7 +689,7 @@ export default function MapaNotaRelatorio() {
                         >
                           {/* Nome do Estudante — fixo à esquerda */}
                           <td style={{
-                            padding: "9px 18px",
+                            padding: "8px 14px",
                             fontWeight: 600,
                             color: isDestaque ? "#15803d" : "#1e293b",
                             position: "sticky",
@@ -572,10 +736,10 @@ export default function MapaNotaRelatorio() {
                                       : `${disc.nome}: ${nota.toFixed(1)}`
                                 }
                                 style={{
-                                  padding: "8px 6px",
+                                  padding: "7px 4px",
                                   textAlign: "center",
                                   fontWeight: 700,
-                                  fontSize: "0.85rem",
+                                  fontSize: "0.82rem",
                                   borderBottom: "1px solid #f1f5f9",
                                   borderRight: "1px solid #f1f5f9",
                                   backgroundColor: cor.bg,
@@ -589,7 +753,7 @@ export default function MapaNotaRelatorio() {
                                     {flagged && <span style={{ fontSize: "0.55rem", display: "block", lineHeight: 1 }}>⚠️</span>}
                                   </>
                                 ) : (
-                                  <span style={{ color: "#cbd5e1", fontSize: "0.75rem" }}>—</span>
+                                  <span style={{ color: "#cbd5e1", fontSize: "0.72rem" }}>—</span>
                                 )}
                               </td>
                             );
@@ -602,7 +766,7 @@ export default function MapaNotaRelatorio() {
               )}
             </div>
 
-            {/* ── Rodapé do Card ─────────────────────────────────────────── */}
+            {/* ── Rodapé Institucional ─────────────────────────────────────── */}
             <div style={{
               padding: "12px 24px",
               borderTop: "1px solid #e2e8f0",
@@ -616,8 +780,8 @@ export default function MapaNotaRelatorio() {
               <span>
                 {alunos.length > 0 && `${alunos.length} estudante${alunos.length !== 1 ? "s" : ""} · ${disciplinas.length} disciplina${disciplinas.length !== 1 ? "s" : ""}`}
               </span>
-              <span className="no-print" style={{ color: "#94a3b8" }}>
-                Relatório gerado em tempo real
+              <span>
+                Documento gerado pelo Sistema EDUCA.MELHOR · {new Date().toLocaleDateString("pt-BR")}
               </span>
             </div>
           </div>

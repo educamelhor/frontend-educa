@@ -263,6 +263,24 @@ export default function RelatoriosPedagogicos() {
           available={false}
           badge="EM BREVE"
         />
+
+        <ReportCard
+          icon="📊"
+          title="Mapa de Nota"
+          description="Visualização consolidada das notas bimestrais de todos os estudantes por turma e disciplina."
+          route="/pedagogico/relatorios/mapa-nota"
+          available={false}
+          badge="EM BREVE"
+        />
+
+        <ReportCard
+          icon="📈"
+          title="Média Anual"
+          description="Acompanhamento da média acumulada anual e cálculo de pontos faltantes para aprovação."
+          route="/pedagogico/relatorios/media-anual"
+          available={false}
+          badge="EM BREVE"
+        />
       </div>
     </div>
   );

@@ -278,8 +278,8 @@ export default function RelatoriosPedagogicos() {
           title="Média Anual"
           description="Acompanhamento da média acumulada anual e cálculo de pontos faltantes para aprovação."
           route="/pedagogico/relatorios/media-anual"
-          available={false}
-          badge="EM BREVE"
+          available={true}
+          badge="DISPONÍVEL"
         />
       </div>
     </div>

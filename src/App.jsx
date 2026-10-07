@@ -149,6 +149,7 @@ import RelatoriosPedagogicos from "./features/pedagogico/relatorios/RelatoriosPe
 import PlanoAvaliacaoPage from "./features/pedagogico/relatorios/PlanoAvaliacaoPage.jsx";
 import ConselhoClasseResumo from "./features/pedagogico/relatorios/ConselhoClasseResumo.jsx";
 import MapaNotaRelatorio from "./features/pedagogico/relatorios/MapaNotaRelatorio.jsx";
+import MediaAnualRelatorio from "./features/pedagogico/relatorios/MediaAnualRelatorio.jsx";
 import AgendaPedagogica from "./features/pedagogico/agenda/AgendaPedagogica.jsx";
 
 // ✅ MÓDULO MERENDA
@@ -452,6 +453,7 @@ export default function App() {
           <Route path="/pedagogico/relatorios/plano-avaliacao" element={<RequireModulo modulo="pedagogico"><PlanoAvaliacaoPage /></RequireModulo>} />
           <Route path="/pedagogico/relatorios/conselho" element={<RequireModulo modulo="pedagogico"><ConselhoClasseResumo /></RequireModulo>} />
           <Route path="/pedagogico/relatorios/mapa-nota" element={<RequireModulo modulo="pedagogico"><MapaNotaRelatorio /></RequireModulo>} />
+          <Route path="/pedagogico/relatorios/media-anual" element={<RequireModulo modulo="pedagogico"><MediaAnualRelatorio /></RequireModulo>} />
           <Route path="/pedagogico/agenda" element={<RequireModulo modulo="pedagogico"><AgendaPedagogica /></RequireModulo>} />
 
           {/* ── Professores ──────────────────────────────────────────────── */}

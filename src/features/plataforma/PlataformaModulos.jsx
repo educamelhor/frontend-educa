@@ -27,6 +27,7 @@ const MODULOS_TREE = [
       { id: 'secretaria.etapas', label: 'Etapas de Ensino' },
       { id: 'secretaria.conflitos_notas', label: 'Conflitos de Notas' },
       { id: 'secretaria.faltas', label: 'Faltas' },
+      { id: 'secretaria.liberacao', label: 'Liberação' },
     ]
   },
   // ── DISCIPLINAR: módulo reservado — sempre ativo para perfis militares.
@@ -58,6 +59,7 @@ const MODULOS_TREE = [
       { id: 'frequencia.relatorios', label: 'Relatórios' },
       { id: 'frequencia.busca_ativa', label: 'Busca Ativa' },
       { id: 'frequencia.conselho_tutelar', label: 'Conselho Tutelar' },
+      { id: 'frequencia.liberacao', label: 'Liberação' },
     ]
   },
   {

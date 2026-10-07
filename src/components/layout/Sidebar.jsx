@@ -33,6 +33,7 @@ import {
   PlusCircleIcon,
   SparklesIcon,
   DevicePhoneMobileIcon,
+  ArrowRightOnRectangleIcon,
 } from '@heroicons/react/24/outline';
 import {
   PERFIS_MILITARES_SET,
@@ -1743,6 +1744,25 @@ export default function Sidebar({ isOpen, onClose }) {
                     }}>NOVO</span>
                   </Link>
                 </li>
+                {hasModulo('secretaria.liberacao') && (
+                <li>
+                  <Link
+                    to="/secretaria/liberacao"
+                    className={getSubmenuLinkClasses('/secretaria/liberacao')}
+                    style={{
+                      background: isActive('/secretaria/liberacao')
+                        ? 'linear-gradient(90deg, rgba(5,150,105,0.15), transparent)'
+                        : undefined,
+                    }}
+                  >
+                    <ArrowRightOnRectangleIcon 
+                      className="h-5 w-5 mr-2" 
+                      style={{ color: isActive('/secretaria/liberacao') ? '#059669' : undefined }} 
+                    />
+                    <span className="flex-1">Liberação de Alunos</span>
+                  </Link>
+                </li>
+                )}
               </ul>
             )}
             </>
@@ -1987,6 +2007,25 @@ export default function Sidebar({ isOpen, onClose }) {
                     className={getSubmenuLinkClasses('/frequencia/conselho-tutelar')}
                   >
                     <ClipboardDocumentListIcon className="h-5 w-5 mr-2" /> Conselho Tutelar
+                  </Link>
+                </li>
+                )}
+                {hasModulo('frequencia.liberacao') && (
+                <li>
+                  <Link
+                    to="/frequencia/liberacao"
+                    className={getSubmenuLinkClasses('/frequencia/liberacao')}
+                    style={{
+                      background: isActive('/frequencia/liberacao')
+                        ? 'linear-gradient(90deg, rgba(5,150,105,0.15), transparent)'
+                        : undefined,
+                    }}
+                  >
+                    <ArrowRightOnRectangleIcon
+                      className="h-5 w-5 mr-2"
+                      style={{ color: isActive('/frequencia/liberacao') ? '#059669' : undefined }}
+                    />
+                    <span className="flex-1">Liberação</span>
                   </Link>
                 </li>
                 )}

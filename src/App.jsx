@@ -107,6 +107,7 @@ import Atestados from "./features/frequencia/Atestados.jsx";
 import Relatorios from "./features/frequencia/Relatorios.jsx";
 import BuscaAtiva from "./features/frequencia/BuscaAtiva.jsx";
 import ConselhoTutelar from "./features/frequencia/ConselhoTutelar.jsx";
+import LiberacaoFrequencia from "./features/frequencia/liberacao/LiberacaoPage.jsx";
 
 // ✅ MÓDULO MONITORAMENTO — Visitantes
 import VisitantesRegistrar from "./features/monitoramento/Visitantes/VisitantesRegistrar.jsx";
@@ -461,10 +462,12 @@ export default function App() {
           <Route path="/professores/boletim"    element={<RequireModulo modulo="professores"><BoletimManual /></RequireModulo>} />
 
           {/* ── Frequência ───────────────────────────────────────────────── */}
-          <Route path="/frequencia/atestados"       element={<RequireModulo modulo="frequencia"><Atestados /></RequireModulo>} />
-          <Route path="/frequencia/relatorios"      element={<RequireModulo modulo="frequencia"><Relatorios /></RequireModulo>} />
-          <Route path="/frequencia/busca-ativa"     element={<RequireModulo modulo="frequencia"><BuscaAtiva /></RequireModulo>} />
+          <Route path="/frequencia/atestados"        element={<RequireModulo modulo="frequencia"><Atestados /></RequireModulo>} />
+          <Route path="/frequencia/relatorios"       element={<RequireModulo modulo="frequencia"><Relatorios /></RequireModulo>} />
+          <Route path="/frequencia/busca-ativa"      element={<RequireModulo modulo="frequencia"><BuscaAtiva /></RequireModulo>} />
           <Route path="/frequencia/conselho-tutelar" element={<RequireModulo modulo="frequencia"><ConselhoTutelar /></RequireModulo>} />
+          <Route path="/frequencia/liberacao"        element={<RequireModulo modulo="frequencia.liberacao"><LiberacaoFrequencia /></RequireModulo>} />
+          <Route path="/secretaria/liberacao"        element={<RequireModulo modulo="secretaria.liberacao"><LiberacaoFrequencia /></RequireModulo>} />
 
           {/* ── Merenda ─────────────────────────────────────────────────── */}
           <Route path="/merenda/cadastro" element={<RequireModulo modulo="merenda.cadastro"><MerendaCadastroPage /></RequireModulo>} />

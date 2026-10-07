@@ -140,6 +140,9 @@ import DiarioSecretaria from "./features/secretaria/diarios/DiarioSecretaria.jsx
 // ✅ NOVO IMPORT: Relatórios da Secretaria
 import RelatoriosSecretaria from "./features/secretaria/relatorios/RelatoriosSecretaria.jsx";
 
+// ✅ NOVO IMPORT: Faltas → Secretaria
+import FaltasPage from "./features/secretaria/faltas/index.jsx";
+
 // ✅ NOVO IMPORT: Relatórios Pedagógicos
 import RelatoriosPedagogicos from "./features/pedagogico/relatorios/RelatoriosPedagogicos.jsx";
 import PlanoAvaliacaoPage from "./features/pedagogico/relatorios/PlanoAvaliacaoPage.jsx";
@@ -404,6 +407,7 @@ export default function App() {
           <Route path="/secretaria/boletim"    element={<RequireModulo modulo="secretaria"><BoletimEdicao /></RequireModulo>} />
           <Route path="/secretaria/diarios"    element={<RequireModulo modulo="secretaria"><DiarioSecretaria /></RequireModulo>} />
           <Route path="/secretaria/relatorios" element={<RequireModulo modulo="secretaria"><RelatoriosSecretaria /></RequireModulo>} />
+          <Route path="/secretaria/faltas"     element={<RequireModulo modulo="secretaria"><FaltasPage /></RequireModulo>} />
           {/* ✅ Agente Secretaria e Sincronizar SEEDF */}
           <Route path="/secretaria/agente"           element={<RequireModulo modulo="secretaria"><AgenteSecretaria /></RequireModulo>} />
           <Route path="/secretaria/sincronizar-seedf" element={<RequireModulo modulo="secretaria"><SincronizarSEEDF /></RequireModulo>} />

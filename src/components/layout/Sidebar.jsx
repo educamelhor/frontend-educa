@@ -1642,6 +1642,33 @@ export default function Sidebar({ isOpen, onClose }) {
                 </li>
                 )}
 
+                {/* NOVO SUBMENU: Faltas */}
+                {(hasModulo('secretaria.faltas') || hasModulo('secretaria')) && (
+                <li>
+                  <Link
+                    to="/secretaria/faltas"
+                    className={getSubmenuLinkClasses('/secretaria/faltas')}
+                    style={{
+                      background: isActive('/secretaria/faltas')
+                        ? 'linear-gradient(90deg, rgba(239,68,68,0.15), transparent)'
+                        : undefined,
+                    }}
+                  >
+                    <CalendarDaysIcon className="h-5 w-5 mr-2" style={{ color: isActive('/secretaria/faltas') ? '#f87171' : undefined }} />
+                    <span className="flex-1">Faltas</span>
+                    <span style={{
+                      fontSize: '0.5rem',
+                      fontWeight: 800,
+                      background: 'linear-gradient(135deg, #ef4444, #f97316)',
+                      color: '#fff',
+                      padding: '1px 5px',
+                      borderRadius: '6px',
+                      letterSpacing: '0.5px',
+                    }}>NOVO</span>
+                  </Link>
+                </li>
+                )}
+
                 {/* NOVO SUBMENU: Agente */}
                 <li>
                   <Link

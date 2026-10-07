@@ -26,6 +26,7 @@ const MODULOS_TREE = [
       { id: 'secretaria.modulacao', label: 'Modulação' },
       { id: 'secretaria.etapas', label: 'Etapas de Ensino' },
       { id: 'secretaria.conflitos_notas', label: 'Conflitos de Notas' },
+      { id: 'secretaria.faltas', label: 'Faltas' },
     ]
   },
   // ── DISCIPLINAR: módulo reservado — sempre ativo para perfis militares.

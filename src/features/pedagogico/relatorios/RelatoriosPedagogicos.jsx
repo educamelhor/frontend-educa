@@ -269,8 +269,8 @@ export default function RelatoriosPedagogicos() {
           title="Mapa de Nota"
           description="Visualização consolidada das notas bimestrais de todos os estudantes por turma e disciplina."
           route="/pedagogico/relatorios/mapa-nota"
-          available={false}
-          badge="EM BREVE"
+          available={true}
+          badge="DISPONÍVEL"
         />
 
         <ReportCard

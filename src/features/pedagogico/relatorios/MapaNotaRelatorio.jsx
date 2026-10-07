@@ -71,6 +71,7 @@ export default function MapaNotaRelatorio() {
   const [notas, setNotas] = useState({});
   const [flags, setFlags] = useState(new Set());
   const [erroMapa, setErroMapa] = useState(null);
+  const [gerandoPDF, setGerandoPDF] = useState(false);
 
   const turnos = ["Matutino", "Vespertino", "Noturno"];
 
@@ -160,8 +161,34 @@ export default function MapaNotaRelatorio() {
   };
 
   // ── Gerar / Imprimir PDF ──────────────────────────────────────────────────
-  const handleImprimirPDF = () => {
-    window.print();
+  const handleImprimirPDF = async () => {
+    if (!turmaSelecionada?.id || gerandoPDF) return;
+    setGerandoPDF(true);
+    try {
+      const resp = await api.get(`/notas/turmas/${turmaSelecionada.id}/mapa-nota/pdf`, {
+        params: { bimestre, ano: anoLetivo },
+        responseType: "blob",
+        timeout: 90000,
+      });
+      const blob = new Blob([resp.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      const safeTurmaNome = (turmaSelecionada?.turma || turmaSelecionada?.nome || "turma")
+        .replace(/\s+/g, "_")
+        .replace(/[^a-zA-Z0-9_]/g, "");
+      link.setAttribute("download", `Mapa_Nota_${safeTurmaNome}_${bimestre}Bim_${anoLetivo}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+      setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      console.error("[MapaNotaRelatorio] Erro ao gerar PDF:", err);
+      // Se der erro no download direto, abre a visualização para impressão como fallback
+      alert("Não foi possível gerar o PDF pelo servidor. Tente novamente.");
+    } finally {
+      setGerandoPDF(false);
+    }
   };
 
   const turmaNome = turmaSelecionada?.turma || turmaSelecionada?.nome || "";
@@ -169,6 +196,11 @@ export default function MapaNotaRelatorio() {
   return (
     <>
       <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+
         @keyframes pulse-gold-mapa {
           0%, 100% { filter: drop-shadow(0 0 3px rgba(234,179,8,0.6)); transform: scale(1); }
           50%       { filter: drop-shadow(0 0 7px rgba(234,179,8,1));   transform: scale(1.15); }
@@ -187,6 +219,7 @@ export default function MapaNotaRelatorio() {
             margin: 0 !important;
             padding: 0 !important;
             width: 100% !important;
+            overflow: visible !important;
           }
 
           .no-print {
@@ -206,6 +239,16 @@ export default function MapaNotaRelatorio() {
           .table-scroll-container {
             overflow: visible !important;
             width: 100% !important;
+            max-width: 100% !important;
+            scrollbar-width: none !important;
+          }
+
+          .table-scroll-container::-webkit-scrollbar {
+            display: none !important;
+          }
+
+          .table-scroll-container *, th, td {
+            position: static !important;
           }
 
           table {
@@ -436,6 +479,7 @@ export default function MapaNotaRelatorio() {
                 {/* Botão com ícone de impressora e texto "PDF" */}
                 <button
                   onClick={handleImprimirPDF}
+                  disabled={gerandoPDF}
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -444,23 +488,42 @@ export default function MapaNotaRelatorio() {
                     borderRadius: "8px",
                     fontWeight: 800,
                     fontSize: "0.85rem",
-                    cursor: "pointer",
+                    cursor: gerandoPDF ? "not-allowed" : "pointer",
                     border: "2px solid #ffffff",
                     backgroundColor: "#ffffff",
                     color: "#1e3a8a",
                     boxShadow: "0 4px 12px rgba(0,0,0,0.18)",
+                    opacity: gerandoPDF ? 0.75 : 1,
                     transition: "all 0.15s",
                   }}
-                  onMouseEnter={e => { e.currentTarget.style.backgroundColor = "#f0f4ff"; }}
-                  onMouseLeave={e => { e.currentTarget.style.backgroundColor = "#ffffff"; }}
-                  title="Gerar / Imprimir PDF do Mapa de Nota"
+                  onMouseEnter={e => { if (!gerandoPDF) e.currentTarget.style.backgroundColor = "#f0f4ff"; }}
+                  onMouseLeave={e => { if (!gerandoPDF) e.currentTarget.style.backgroundColor = "#ffffff"; }}
+                  title="Baixar PDF Institucional do Mapa de Nota"
                 >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M6 9V2h12v7" />
-                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
-                    <rect x="6" y="14" width="12" height="8" />
-                  </svg>
-                  <span>PDF</span>
+                  {gerandoPDF ? (
+                    <>
+                      <svg
+                        style={{ animation: "spin 1s linear infinite", width: 16, height: 16 }}
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2.5}
+                      >
+                        <circle cx="12" cy="12" r="9" stroke="currentColor" strokeDasharray="30" strokeDashoffset="10" strokeLinecap="round" opacity="0.4" />
+                        <path d="M12 3a9 9 0 0 1 9 9" stroke="currentColor" strokeLinecap="round" />
+                      </svg>
+                      <span>Gerando...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M6 9V2h12v7" />
+                        <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                        <rect x="6" y="14" width="12" height="8" />
+                      </svg>
+                      <span>PDF</span>
+                    </>
+                  )}
                 </button>
               </div>
             </div>

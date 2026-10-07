@@ -481,7 +481,9 @@ export default function Modulacao() {
           for (const v of vinculosTurno) {
             const discId = v.disciplina_id;
             const tot = Number(v.aulas ?? 0) || 0;
-            map[`${id}|${discId}`] = tot;
+            const key = `${id}|${discId}`;
+            map[key] = (map[key] || 0) + tot;
+            map[id] = (map[id] || 0) + tot;
           }
         } else {
           const tot =
@@ -521,8 +523,8 @@ export default function Modulacao() {
         lista = filtraPorTurno(bruta, turno);
       }
 
-      // ── Expande 1 linha por vínculo (prof × disciplina × turno × semestre) ──
-      const linhas = [];
+      // ── Agrupa por (professor_id × disciplina_id), somando semestral + anual ──
+      const mapProfs = new Map();
       for (const p of lista) {
         const vinculos = Array.isArray(p.vinculos) ? p.vinculos : [];
         const vinculosTurno = vinculos.filter(
@@ -530,19 +532,33 @@ export default function Modulacao() {
                  (Number(v.semestre ?? 0) === 0 || Number(v.semestre) === Number(semestreSelecionado))
         );
         if (vinculosTurno.length === 0) continue; // professor não tem vínculo neste turno/semestre
+
         for (const v of vinculosTurno) {
-          linhas.push({
-            rowKey: `${p.id}|${v.disciplina_id}`,
-            id: p.id,
-            nome: p.nome,
-            disciplina_id: v.disciplina_id,
-            disciplina_nome: v.disciplina_nome || v.disciplina || "—",
-            aulas: Number(v.aulas ?? 0) || 0,
-            semestre: Number(v.semestre ?? 0),
-            turno: v.turno,
-          });
+          const discId = v.disciplina_id;
+          const key = `${p.id}|${discId}`;
+          const vAulas = Number(v.aulas ?? 0) || 0;
+          const vSem = Number(v.semestre ?? 0);
+
+          if (!mapProfs.has(key)) {
+            mapProfs.set(key, {
+              rowKey: key,
+              id: p.id,
+              nome: p.nome,
+              disciplina_id: discId,
+              disciplina_nome: v.disciplina_nome || v.disciplina || "—",
+              aulas: vAulas,
+              semestre: vSem,
+              turno: v.turno || turno,
+              semestres: [{ semestre: vSem, aulas: vAulas }],
+            });
+          } else {
+            const item = mapProfs.get(key);
+            item.aulas += vAulas;
+            item.semestres.push({ semestre: vSem, aulas: vAulas });
+          }
         }
       }
+      const linhas = Array.from(mapProfs.values());
       linhas.sort((a, b) => naturalCompare(a.nome, b.nome) || naturalCompare(a.disciplina_nome, b.disciplina_nome));
       setProfessoresDisponiveis(linhas);
     } catch {
@@ -663,7 +679,13 @@ export default function Modulacao() {
   const resumoAulas = useMemo(() => {
     const map = {};
     for (const prof of professoresTabela) {
-      const total = Number(aulasTotaisPorProfessor[prof.id] ?? prof.aulas ?? 0) || 0;
+      const total = Number(
+        aulasTotaisPorProfessor[prof.rowKey] ??
+        aulasTotaisPorProfessor[`${prof.id}|${prof.disciplina_id}`] ??
+        prof.aulas ??
+        aulasTotaisPorProfessor[prof.id] ??
+        0
+      ) || 0;
       // soma aulas usadas na FGB (turmas regulares)
       const usadasFgb = alocacoes
         .filter((a) => a.profId === prof.id && a.discId === prof.disciplina_id)
@@ -833,7 +855,7 @@ export default function Modulacao() {
           professor_id: Number(prof.id),
           turma_id: Number(turmaId),
           disciplina_id: Number(prof.disciplina_id),
-          aulas: Number(cargaPorDisciplina[prof.disciplina_id]) || 1,
+          aulas: Number(cargaPorTurmaDisc[turmaId]?.[prof.disciplina_id] ?? cargaPorDisciplina[prof.disciplina_id]) || 1,
         }));
       });
 
@@ -1900,20 +1922,40 @@ export default function Modulacao() {
                                 <span className="font-bold text-sm text-slate-800 uppercase truncate">
                                   {p.nome}
                                 </span>
-                                {p.semestre === 1 && (
-                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-cyan-100 text-cyan-800 border border-cyan-200">
-                                    1º SEM
-                                  </span>
-                                )}
-                                {p.semestre === 2 && (
-                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">
-                                    2º SEM
-                                  </span>
-                                )}
-                                {p.semestre === 0 && (
-                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
-                                    ANUAL
-                                  </span>
+                                {Array.isArray(p.semestres) && p.semestres.length > 0 ? (
+                                  p.semestres.map((s, idx) => (
+                                    <span
+                                      key={idx}
+                                      className={`text-[10px] font-bold px-2 py-0.5 rounded border ${
+                                        s.semestre === 1
+                                          ? "bg-cyan-100 text-cyan-800 border-cyan-200"
+                                          : s.semestre === 2
+                                          ? "bg-amber-100 text-amber-800 border-amber-200"
+                                          : "bg-slate-100 text-slate-700 border-slate-200"
+                                      }`}
+                                    >
+                                      {s.semestre === 1 ? "1º SEM" : s.semestre === 2 ? "2º SEM" : "ANUAL"}
+                                      {p.semestres.length > 1 && ` • ${s.aulas}h`}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <>
+                                    {p.semestre === 1 && (
+                                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-cyan-100 text-cyan-800 border border-cyan-200">
+                                        1º SEM
+                                      </span>
+                                    )}
+                                    {p.semestre === 2 && (
+                                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">
+                                        2º SEM
+                                      </span>
+                                    )}
+                                    {p.semestre === 0 && (
+                                      <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                                        ANUAL
+                                      </span>
+                                    )}
+                                  </>
                                 )}
                               </div>
                               <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -1954,7 +1996,12 @@ export default function Modulacao() {
                                       nome: p.nome,
                                       disciplina_id: p.disciplina_id,
                                       disciplina_nome: p.disciplina_nome,
-                                      aulas: Number(aulasTotaisPorProfessor[`${p.id}|${p.disciplina_id}`] ?? aulasTotaisPorProfessor[p.id] ?? p.aulas ?? 0) || 0,
+                                      aulas: Number(
+                                        aulasTotaisPorProfessor[`${p.id}|${p.disciplina_id}`] ??
+                                        p.aulas ??
+                                        aulasTotaisPorProfessor[p.id] ??
+                                        0
+                                      ) || 0,
                                       turno: turnoSelecionado,
                                       semestre: semestreSelecionado,
                                     },

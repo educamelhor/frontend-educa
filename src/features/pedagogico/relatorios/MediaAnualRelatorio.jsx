@@ -351,33 +351,34 @@ export default function MediaAnualRelatorio() {
                 value={anoLetivo}
                 onChange={(e) => {
                   setAnoLetivo(Number(e.target.value));
+                  setTurnoSelecionado(null);
                   setTurmaSelecionada(null);
                   setAlunos([]);
                   setDisciplinas([]);
                   setMedias({});
                   setSomas({});
                 }}
-                className="bg-transparent font-bold text-blue-900 focus:outline-none cursor-pointer text-sm"
+                className="border rounded px-2 py-1 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                {anosLetivos.map(a => (
+                {anosLetivos.map((a) => (
                   <option key={a} value={a}>{a}</option>
                 ))}
               </select>
             </div>
           </div>
 
-          {/* ── Filtro de Turno ───────────────────────────────────────────── */}
-          <div className="flex justify-center gap-3 mb-8">
+          {/* Botões de Turnos (Matutino, Vespertino, Noturno) */}
+          <div className="flex justify-center gap-4 mb-8 flex-wrap">
             {turnos.map((turno) => {
-              const active = turnoSelecionado === turno;
+              const ativo = turnoSelecionado === turno;
               return (
                 <button
                   key={turno}
                   onClick={() => handleTurnoClick(turno)}
-                  className={`px-6 py-2.5 rounded-full font-bold text-sm transition-all duration-200 shadow-sm ${
-                    active
-                      ? "bg-blue-900 text-white shadow-md transform scale-105"
-                      : "bg-white text-gray-700 hover:bg-blue-50 border border-gray-200"
+                  className={`px-8 py-3.5 text-lg font-semibold rounded-xl shadow-md transition transform hover:scale-105 ${
+                    ativo
+                      ? "bg-green-600 text-white"
+                      : "bg-white text-blue-800 border border-blue-400 hover:bg-blue-100"
                   }`}
                 >
                   {turno}
@@ -386,65 +387,52 @@ export default function MediaAnualRelatorio() {
             })}
           </div>
 
-          {/* ── Grid de Turmas ────────────────────────────────────────────── */}
+          {/* Cards de Turmas */}
           {turnoSelecionado && (
-            <div className="max-w-5xl mx-auto mb-10">
-              <div className="text-center mb-4">
-                <span className="text-xs font-bold text-blue-900 uppercase tracking-wider bg-blue-100 px-3 py-1 rounded-full">
-                  Turmas do Turno {turnoSelecionado}
-                </span>
-              </div>
-
+            <div className="flex flex-wrap justify-center gap-4 mb-10">
               {loadingTurmas ? (
-                <div className="text-center py-8 text-gray-500 font-medium">
+                <p className="w-full text-center text-gray-500">
                   Carregando turmas...
-                </div>
-              ) : turmasFiltradas.length === 0 ? (
-                <div className="text-center py-8 text-gray-500 font-medium bg-white rounded-xl border border-gray-200">
-                  Nenhuma turma encontrada para o turno {turnoSelecionado} no ano {anoLetivo}.
-                </div>
+                </p>
+              ) : turmasFiltradas.length > 0 ? (
+                turmasFiltradas.map((turma) => {
+                  const isSelected = turmaSelecionada?.id === turma.id;
+                  return (
+                    <div
+                      key={turma.id}
+                      onClick={() => handleTurmaClick(turma)}
+                      className={`bg-gradient-to-b from-blue-200 to-blue-50 rounded-lg px-6 py-3 shadow-md cursor-pointer hover:shadow-xl transition-transform hover:scale-105 text-center font-bold text-blue-900 text-base flex items-center justify-center whitespace-nowrap min-w-[120px] ${
+                        isSelected ? "ring-2 ring-green-600 border-2 border-green-600" : ""
+                      }`}
+                    >
+                      {turma.turma || turma.nome}
+                    </div>
+                  );
+                })
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                  {turmasFiltradas.map((turma) => {
-                    const isSelected = turmaSelecionada?.id === turma.id;
-                    const nome = turma.turma || turma.nome || "Turma";
-                    return (
-                      <button
-                        key={turma.id}
-                        onClick={() => handleTurmaClick(turma)}
-                        className={`p-3.5 rounded-xl font-bold text-sm transition-all duration-200 text-center border ${
-                          isSelected
-                            ? "bg-blue-900 text-white border-blue-900 shadow-lg transform scale-102"
-                            : "bg-white text-gray-800 border-gray-200 hover:border-blue-300 hover:bg-blue-50/50 shadow-sm"
-                        }`}
-                      >
-                        <div className="text-base font-extrabold">{nome}</div>
-                        <div className={`text-xs mt-1 ${isSelected ? "text-blue-200" : "text-gray-500"}`}>
-                          {turma.total_alunos ? `${turma.total_alunos} alunos` : turma.serie || "Regular"}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
+                <p className="w-full text-center text-gray-500">
+                  Nenhuma turma encontrada no turno {turnoSelecionado} para o ano {anoLetivo}.
+                </p>
               )}
             </div>
           )}
         </div>
 
-        {/* ── Documento Oficial / Relatório da Turma Selecionada ─────────── */}
+        {/* ── Documento Oficial do Relatório (quando turma selecionada) ── */}
         {turmaSelecionada && (
-          <div className="max-w-6xl mx-auto">
-            <div
-              className="printable-card"
-              style={{
-                backgroundColor: "#ffffff",
-                borderRadius: "16px",
-                boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
-                border: "1px solid #e2e8f0",
-                overflow: "hidden",
-                marginBottom: "32px",
-              }}
-            >
+          <div
+            className="printable-card"
+            style={{
+              backgroundColor: "#fff",
+              borderRadius: "16px",
+              width: "100%",
+              maxWidth: "1350px",
+              margin: "0 auto 40px",
+              boxShadow: "0 10px 35px rgba(0,0,0,0.08)",
+              border: "1px solid #e2e8f0",
+              overflow: "hidden",
+            }}
+          >
               {/* ── Top Bar Interativa: Alternância Média / Pontos + Botão PDF ── */}
               <div
                 className="no-print"
@@ -960,7 +948,6 @@ export default function MediaAnualRelatorio() {
                 </div>
               </div>
             </div>
-          </div>
         )}
       </div>
     </>

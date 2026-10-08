@@ -111,7 +111,7 @@ api.interceptors.response.use(
     // Se 401, limpa sessão e volta pro login
     // ⚠️  Exceção: páginas públicas (ativação de conta, cadastro) não redirecionam
     // pois o usuário ainda não tem sessão e o 401 viria de endpoint protegido por engano.
-    const PAGINAS_PUBLICAS = ["/ativar-diretor", "/cadastro"];
+    const PAGINAS_PUBLICAS = ["/ativar-diretor", "/cadastro", "/print", "/verificar"];
     const estaEmPaginaPublica = PAGINAS_PUBLICAS.some(
       (p) => window?.location?.pathname?.startsWith(p)
     );

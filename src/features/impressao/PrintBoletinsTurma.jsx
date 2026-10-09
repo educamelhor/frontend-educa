@@ -49,7 +49,7 @@ export default function PrintBoletinsTurma() {
     if (turma_id) {
       const url = `/api/impressao/boletins?turma_id=${turma_id}${
         aluno_id ? `&aluno_id=${encodeURIComponent(aluno_id)}` : ""
-      }${secret ? `&secret=${secret}` : ""}`;
+      }${anoParam ? `&ano=${encodeURIComponent(anoParam)}` : ""}${secret ? `&secret=${secret}` : ""}`;
 
       api
         .get(url)
@@ -78,7 +78,7 @@ export default function PrintBoletinsTurma() {
           console.error("Erro ao buscar boletins:", err);
         });
     }
-  }, [turma_id, secret, aluno_id]);
+  }, [turma_id, secret, aluno_id, anoParam]);
 
   // -------------------------------------------------------------------------
   // Estado de loading (API ainda não respondeu)

@@ -64,8 +64,13 @@ export default function PrintBoletinsTurma() {
             resultado = res.data.data.alunos;
           }
 
-          if (aluno_id) {
-            resultado = resultado.filter((a) => String(a.id) === String(aluno_id) || String(a.codigo) === String(aluno_id));
+          if (aluno_id && resultado.length > 1) {
+            resultado = resultado.filter(
+              (a) =>
+                String(a.id) === String(aluno_id) ||
+                String(a.codigo) === String(aluno_id) ||
+                Number(a.id) === Number(aluno_id)
+            );
           }
 
           setAlunos(resultado);
@@ -73,9 +78,9 @@ export default function PrintBoletinsTurma() {
           console.log("Boletins retornados para turma_id", turma_id, resultado);
         })
         .catch((err) => {
+          console.error("Erro ao buscar boletins:", err);
           setAlunos([]);
           setCarregado(true);
-          console.error("Erro ao buscar boletins:", err);
         });
     }
   }, [turma_id, secret, aluno_id, anoParam]);

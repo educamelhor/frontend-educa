@@ -1321,8 +1321,17 @@ function ModalAutenticacaoDiretor({ modalState, onClose, onConfirmSuccess, histo
   const acao = modalState.acao;
   const isAtivacao = acao === "ativar";
 
-  const nomeDiretor = localStorage.getItem("usuario_nome") || localStorage.getItem("nome") || "Diretor(a)";
-  const nomeEscola = localStorage.getItem("escola_nome") || localStorage.getItem("nome_escola") || "CEF04-CCMDF";
+  const nomeDiretor =
+    localStorage.getItem("userName") ||
+    localStorage.getItem("usuario_nome") ||
+    localStorage.getItem("nome_usuario") ||
+    localStorage.getItem("nome") ||
+    localStorage.getItem("user_name") ||
+    "Diretor(a)";
+  const nomeEscola =
+    localStorage.getItem("nome_escola") ||
+    localStorage.getItem("escola_nome") ||
+    "CEF04-CCMDF";
   const escolaId = localStorage.getItem("escola_id");
   const token = localStorage.getItem("token");
 

@@ -19,11 +19,27 @@ const normalizeName = (name) => {
   if (
     n === "PRATICA ESTUDANTIL" ||
     n === "PD1" ||
-    n === "PD2" ||
     n === "PARTE DIVERSIFICADA I" ||
-    n === "PARTE DIVERSIFICADA II"
+    n === "PRATICA DIVERSIFICADA I" ||
+    n === "PRATICAS DIVERSIFICADAS I"
   ) {
-    return "PRATICA ESTUDANTIL";
+    return "PARTE DIVERSIFICADA I";
+  }
+  if (
+    n === "PD2" ||
+    n === "PARTE DIVERSIFICADA II" ||
+    n === "PRATICA DIVERSIFICADA II" ||
+    n === "PRATICAS DIVERSIFICADAS II"
+  ) {
+    return "PARTE DIVERSIFICADA II";
+  }
+  if (
+    n === "PD3" ||
+    n === "PARTE DIVERSIFICADA III" ||
+    n === "PRATICA DIVERSIFICADA III" ||
+    n === "PRATICAS DIVERSIFICADAS III"
+  ) {
+    return "PARTE DIVERSIFICADA III";
   }
   return n;
 };

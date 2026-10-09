@@ -135,7 +135,7 @@ export default function ConselhoClasse() {
     try {
       const escola_id = localStorage.getItem("escola_id") || 1;
       const { data } = await api.get(`/api/alunos`, {
-        params: { turma_id: turma.id, ano_letivo: anoLetivo },
+        params: { turma_id: turma.id, ano_letivo: anoLetivo, contexto: "conselho" },
       });
       setAlunosTurma(data?.alunos || data || []);
     } catch (err) {

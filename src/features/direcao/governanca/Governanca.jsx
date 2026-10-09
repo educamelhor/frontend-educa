@@ -20,6 +20,17 @@ const API = getApiRoot();
 
 // ── Mapa de ícones SVG por categoria (inline para zero deps) ──
 const CATEGORY_META = {
+  pedagogico: {
+    label: "Pedagógico",
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 14l9-5-9-5-9 5 9 5z" />
+        <path strokeLinecap="round" strokeLinejoin="round" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0112 20.055a11.952 11.952 0 01-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
+      </svg>
+    ),
+    gradient: "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)",
+    color: "#8b5cf6",
+  },
   boletim: {
     label: "Boletim",
     icon: (
@@ -147,6 +158,11 @@ export default function Governanca() {
   const [datasLimiteCeo, setDatasLimiteCeo] = useState({ "1": null, "2": null, "3": null, "4": null });
   const [premiumModalData, setPremiumModalData] = useState(null);
 
+  // ── Estados para Categoria Pedagógico (Liberação de Fotos no Conselho) ──
+  const [pedagogicoConfig, setPedagogicoConfig] = useState({ liberar_fotos_conselho: false });
+  const [historicoCiclos, setHistoricoCiclos] = useState([]);
+  const [pedagogicoAuthModal, setPedagogicoAuthModal] = useState({ open: false, acao: "ativar" });
+
   const escolaId = localStorage.getItem("escola_id");
   const token = localStorage.getItem("token");
   const perfil = String(localStorage.getItem("perfil") || "").toLowerCase();
@@ -247,13 +263,34 @@ export default function Governanca() {
     }
   }, [escolaId, token, perfil]);
 
+  // ── Fetch config pedagógica e histórico de ciclos ──
+  const fetchPedagogicoConfig = useCallback(async () => {
+    try {
+      const res = await fetch(`${API}/api/governanca/pedagogico-config?escola_id=${escolaId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "x-escola-id": escolaId,
+          "x-perfil": perfil,
+        },
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setPedagogicoConfig({ liberar_fotos_conselho: !!data.liberar_fotos_conselho });
+        setHistoricoCiclos(data.historicoCiclos || []);
+      }
+    } catch (err) {
+      console.warn("Erro ao buscar config pedagógica:", err);
+    }
+  }, [escolaId, token, perfil]);
+
   useEffect(() => {
     if (escolaId && token) {
       fetchConfigs();
       fetchBoletimAppConfig();
+      fetchPedagogicoConfig();
       fetchDisciplinas();
     }
-  }, [fetchConfigs, fetchBoletimAppConfig, fetchDisciplinas, escolaId, token]);
+  }, [fetchConfigs, fetchBoletimAppConfig, fetchPedagogicoConfig, fetchDisciplinas, escolaId, token]);
 
   // ✅ [GOVERNANÇA v2] Fetch perfis que este diretor pode gerenciar
   const fetchMeusPerfis = useCallback(async () => {
@@ -860,6 +897,15 @@ export default function Governanca() {
                         onTriggerPremiumModal={(bim, dLim) => setPremiumModalData({ open: true, bimestre: bim, dataLimite: dLim })}
                       />
                     )}
+
+                    {/* Banner customizado Categoria Pedagógico (Liberação de Fotos no Conselho) */}
+                    {catLower === "pedagogico" && (
+                      <PedagogicoBanner
+                        pedagogicoConfig={pedagogicoConfig}
+                        historicoCiclos={historicoCiclos}
+                        onTriggerAuthModal={(acao) => setPedagogicoAuthModal({ open: true, acao })}
+                      />
+                    )}
                   </div>
                 )}
               </div>
@@ -1084,8 +1130,516 @@ export default function Governanca() {
         modalData={premiumModalData}
         onClose={() => setPremiumModalData(null)}
       />
+
+      {/* ── MODAL DE AUTENTICAÇÃO DO DIRETOR (CATEGORIA PEDAGÓGICO) ── */}
+      <ModalAutenticacaoDiretor
+        modalState={pedagogicoAuthModal}
+        onClose={() => setPedagogicoAuthModal({ open: false, acao: "ativar" })}
+        historicoCiclos={historicoCiclos}
+        onConfirmSuccess={(novoValor, novosCiclos) => {
+          setPedagogicoConfig({ liberar_fotos_conselho: novoValor });
+          if (Array.isArray(novosCiclos)) setHistoricoCiclos(novosCiclos);
+          showToast(novoValor ? "✅ Fotos dos alunos liberadas no Conselho de Classe (Uso Interno)!" : "🔒 Liberação de fotos revogada.", "success");
+        }}
+      />
         </>
       )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PEDAGOGICO BANNER — Liberação de imagens no Conselho de Classe
+// ═══════════════════════════════════════════════════════════════
+function PedagogicoBanner({ pedagogicoConfig, onTriggerAuthModal, historicoCiclos }) {
+  const isLiberado = pedagogicoConfig.liberar_fotos_conselho;
+
+  return (
+    <div style={{
+      margin: "16px 20px 20px",
+      padding: "20px",
+      borderRadius: "14px",
+      background: "linear-gradient(135deg, #f8fafc 0%, #f3e8ff 100%)",
+      border: "1.5px solid #ddd6fe",
+      boxShadow: "0 4px 14px rgba(139, 92, 246, 0.08)",
+    }}>
+      {/* Header do Banner */}
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 16 }}>
+        <div style={{
+          width: 40,
+          height: 40,
+          borderRadius: 12,
+          background: "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)",
+          color: "#fff",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 20,
+          flexShrink: 0,
+          boxShadow: "0 4px 10px rgba(139, 92, 246, 0.25)",
+        }}>
+          🎓
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 700, fontSize: 16, color: "#4c1d95" }}>
+            Liberação de Imagens no Conselho de Classe (Uso Interno)
+          </div>
+          <div style={{ fontSize: 12.5, color: "#475569", marginTop: 2, lineHeight: 1.4 }}>
+            Gerencie a identificação visual (corômetro) dos estudantes pela equipe docente e pedagógica durante o Conselho de Classe.
+          </div>
+        </div>
+      </div>
+
+      {/* Alerta Informativo LGPD */}
+      <div style={{
+        padding: "10px 14px",
+        borderRadius: "10px",
+        backgroundColor: "#f3e8ff",
+        borderLeft: "4px solid #8b5cf6",
+        color: "#5b21b6",
+        fontSize: 12,
+        fontWeight: 600,
+        marginBottom: 16,
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+      }}>
+        <span>ℹ️</span>
+        <span>A ativação desta governança é de responsabilidade exclusiva da Direção e sobrepõe a trava de termos individuais da LGPD exclusivamente para uso interno no Conselho de Classe. Estudantes com termo assinado pelo responsável permanecem sempre com foto liberada.</span>
+      </div>
+
+      {/* Grid Extensível de Pills / Badges Pedagógicos */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 14 }}>
+        {/* Pill 1: Liberação de Fotos no Conselho de Classe */}
+        <div style={{
+          background: isLiberado
+            ? "linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)"
+            : "#fff",
+          border: isLiberado ? "1.5px solid #10b981" : "1.5px solid #e2e8f0",
+          borderRadius: "12px",
+          padding: "14px 16px",
+          display: "flex",
+          flexDirection: "column",
+          gap: 12,
+          boxShadow: "0 2px 6px rgba(0,0,0,0.04)",
+          transition: "all 0.2s ease",
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontWeight: 700, fontSize: 13.5, color: "#1e293b", display: "flex", alignItems: "center", gap: 6 }}>
+              📸 Fotos no Conselho de Classe
+            </span>
+
+            {/* Toggle Pill Button */}
+            <button
+              type="button"
+              onClick={() => onTriggerAuthModal(isLiberado ? "desativar" : "ativar")}
+              style={{
+                width: 46,
+                height: 25,
+                borderRadius: 13,
+                border: "none",
+                cursor: "pointer",
+                position: "relative",
+                background: isLiberado
+                  ? "linear-gradient(135deg, #10b981, #059669)"
+                  : "#cbd5e1",
+                transition: "background .2s ease",
+              }}
+              title={isLiberado ? "Clique para desativar a exibição de fotos" : "Clique para autenticar e ativar a exibição de fotos"}
+            >
+              <div style={{
+                width: 21,
+                height: 21,
+                borderRadius: "50%",
+                background: "#fff",
+                position: "absolute",
+                top: 2,
+                transform: isLiberado ? "translateX(22px)" : "translateX(2px)",
+                transition: "transform .2s ease",
+                boxShadow: "0 1px 4px rgba(0,0,0,0.2)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 10,
+              }}>
+                {isLiberado ? "✓" : "🔒"}
+              </div>
+            </button>
+          </div>
+
+          {/* Status Badge */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            {isLiberado ? (
+              <div style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+                fontSize: 11,
+                fontWeight: 700,
+                color: "#047857",
+                background: "rgba(16, 185, 129, 0.15)",
+                padding: "4px 10px",
+                borderRadius: 20,
+              }}>
+                <span>🔓 Fotos Liberadas (Uso Interno)</span>
+              </div>
+            ) : (
+              <div style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+                fontSize: 11,
+                fontWeight: 700,
+                color: "#991b1b",
+                background: "rgba(239, 68, 68, 0.1)",
+                padding: "4px 10px",
+                borderRadius: 20,
+              }}>
+                <span>🔒 Fotos Ocultas (Padrão LGPD)</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MODAL AUTENTICAÇÃO DIRETORES — Rastreabilidade por CPF + Senha
+// ═══════════════════════════════════════════════════════════════
+function ModalAutenticacaoDiretor({ modalState, onClose, onConfirmSuccess, historicoCiclos }) {
+  if (!modalState || !modalState.open) return null;
+
+  const [cpf, setCpf] = useState("");
+  const [senha, setSenha] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [erroMsg, setErroMsg] = useState("");
+  const [showSenha, setShowSenha] = useState(false);
+  const [showHistorico, setShowHistorico] = useState(false);
+
+  const acao = modalState.acao;
+  const isAtivacao = acao === "ativar";
+
+  const nomeDiretor = localStorage.getItem("usuario_nome") || localStorage.getItem("nome") || "Diretor(a)";
+  const nomeEscola = localStorage.getItem("escola_nome") || localStorage.getItem("nome_escola") || "CEF04-CCMDF";
+  const escolaId = localStorage.getItem("escola_id");
+  const token = localStorage.getItem("token");
+
+  const handleCpfChange = (e) => {
+    let val = e.target.value.replace(/\D/g, "");
+    if (val.length > 11) val = val.slice(0, 11);
+    val = val.replace(/(\d{3})(\d)/, "$1.$2");
+    val = val.replace(/(\d{3})(\d)/, "$1.$2");
+    val = val.replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+    setCpf(val);
+  };
+
+  const handleConfirmar = async (e) => {
+    e.preventDefault();
+    setErroMsg("");
+
+    if (!cpf || cpf.replace(/\D/g, "").length !== 11) {
+      setErroMsg("Por favor, digite um CPF válido com 11 dígitos.");
+      return;
+    }
+    if (!senha) {
+      setErroMsg("Por favor, digite a sua senha de acesso ao sistema.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const res = await fetch(`${API}/api/governanca/autenticar-liberacao-fotos`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+          "x-escola-id": escolaId,
+        },
+        body: JSON.stringify({
+          escola_id: escolaId,
+          cpf,
+          senha,
+          acao,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.ok) {
+        onConfirmSuccess(data.valor === "1", data.historicoCiclos || []);
+        onClose();
+      } else {
+        setErroMsg(data.message || "Erro na verificação de credenciais.");
+      }
+    } catch {
+      setErroMsg("Erro de conexão com o servidor ao autenticar.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{
+      position: "fixed",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: "rgba(15, 23, 42, 0.75)",
+      backdropFilter: "blur(6px)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 10000,
+      animation: "fadeIn 0.25s ease",
+      padding: 16,
+    }}>
+      <div style={{
+        background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)",
+        borderRadius: 24,
+        width: "100%",
+        maxWidth: 520,
+        padding: "30px 28px",
+        boxShadow: "0 25px 50px -12px rgba(139, 92, 246, 0.3), 0 0 0 2px #8b5cf6",
+        color: "#fff",
+        animation: "scaleIn 0.25s ease",
+        position: "relative",
+      }}>
+        {/* Cabeçalho do Modal */}
+        <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20 }}>
+          <div style={{
+            width: 52,
+            height: 52,
+            borderRadius: "50%",
+            background: "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 26,
+            boxShadow: "0 0 20px rgba(139, 92, 246, 0.5)",
+            flexShrink: 0,
+          }}>
+            🛡️
+          </div>
+          <div>
+            <div style={{
+              fontSize: 10,
+              fontWeight: 800,
+              letterSpacing: 1.5,
+              textTransform: "uppercase",
+              color: "#c4b5fd",
+              marginBottom: 2,
+            }}>
+              Autenticação Rígida do Diretor — Rastreabilidade LGPD
+            </div>
+            <h3 style={{ fontSize: 18, fontWeight: 800, margin: 0, color: "#fff" }}>
+              {isAtivacao ? "Autorizar Liberação de Fotos" : "Revogar Liberação de Fotos"}
+            </h3>
+          </div>
+        </div>
+
+        {/* Quadro Informativo do Diretor e Escola */}
+        <div style={{
+          background: "rgba(255, 255, 255, 0.06)",
+          borderRadius: 14,
+          padding: "14px 16px",
+          marginBottom: 20,
+          border: "1px solid rgba(255, 255, 255, 0.1)",
+          fontSize: 13,
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+            <span style={{ color: "#94a3b8" }}>👤 Diretor Responsável:</span>
+            <strong style={{ color: "#fef08a" }}>{nomeDiretor}</strong>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+            <span style={{ color: "#94a3b8" }}>🏛️ Instituição / Escola:</span>
+            <strong style={{ color: "#fff" }}>{nomeEscola}</strong>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <span style={{ color: "#94a3b8" }}>⚖️ Ação Rastreável:</span>
+            <strong style={{ color: isAtivacao ? "#6ee7b7" : "#fca5a5" }}>
+              {isAtivacao ? "Ativar Corômetro no Conselho" : "Desativar Corômetro no Conselho"}
+            </strong>
+          </div>
+        </div>
+
+        {/* Mensagem de Erro */}
+        {erroMsg && (
+          <div style={{
+            background: "rgba(239, 68, 68, 0.2)",
+            border: "1px solid #ef4444",
+            borderRadius: 10,
+            padding: "10px 14px",
+            fontSize: 12.5,
+            color: "#fca5a5",
+            marginBottom: 16,
+            fontWeight: 600,
+          }}>
+            ⚠️ {erroMsg}
+          </div>
+        )}
+
+        {/* Formulário de Validação */}
+        <form onSubmit={handleConfirmar}>
+          <div style={{ marginBottom: 14 }}>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#cbd5e1", marginBottom: 6 }}>
+              1. Digite seu CPF (Diretor):
+            </label>
+            <input
+              type="text"
+              value={cpf}
+              onChange={handleCpfChange}
+              placeholder="000.000.000-00"
+              style={{
+                width: "100%",
+                padding: "12px 14px",
+                borderRadius: 10,
+                border: "1px solid rgba(255,255,255,0.2)",
+                background: "rgba(0, 0, 0, 0.3)",
+                color: "#fff",
+                fontSize: 14,
+                fontWeight: 600,
+                outline: "none",
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+
+          <div style={{ marginBottom: 20 }}>
+            <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#cbd5e1", marginBottom: 6 }}>
+              2. Digite sua Senha de Login no Sistema:
+            </label>
+            <div style={{ position: "relative" }}>
+              <input
+                type={showSenha ? "text" : "password"}
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
+                placeholder="Sua senha habitual"
+                style={{
+                  width: "100%",
+                  padding: "12px 40px 12px 14px",
+                  borderRadius: 10,
+                  border: "1px solid rgba(255,255,255,0.2)",
+                  background: "rgba(0, 0, 0, 0.3)",
+                  color: "#fff",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowSenha(!showSenha)}
+                style={{
+                  position: "absolute",
+                  right: 10,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "none",
+                  border: "none",
+                  color: "#94a3b8",
+                  cursor: "pointer",
+                  fontSize: 16,
+                }}
+              >
+                {showSenha ? "👁️" : "🔒"}
+              </button>
+            </div>
+          </div>
+
+          {/* Histórico de Ciclos expansível */}
+          {Array.isArray(historicoCiclos) && historicoCiclos.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <button
+                type="button"
+                onClick={() => setShowHistorico(!showHistorico)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "#c4b5fd",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  padding: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+              >
+                <span>📜 Histórico de Ciclos Anteriores ({historicoCiclos.length})</span>
+                <span>{showHistorico ? "▲" : "▼"}</span>
+              </button>
+
+              {showHistorico && (
+                <div style={{
+                  marginTop: 10,
+                  maxHeight: 140,
+                  overflowY: "auto",
+                  background: "rgba(0, 0, 0, 0.3)",
+                  borderRadius: 10,
+                  padding: "10px",
+                  fontSize: 11,
+                  border: "1px solid rgba(255,255,255,0.1)",
+                }}>
+                  {historicoCiclos.map((c) => (
+                    <div key={c.id} style={{ marginBottom: 8, paddingBottom: 6, borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                      <div style={{ color: "#fef08a", fontWeight: 700 }}>
+                        👤 {c.diretor_nome} (CPF: {c.diretor_cpf})
+                      </div>
+                      <div style={{ color: "#94a3b8", marginTop: 2 }}>
+                        🟢 Início: {c.data_inicio_fmt} | 🔴 Fim: {c.data_fim_fmt || "Em andamento (Ativo)"}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Botões de Ação */}
+          <div style={{ display: "flex", gap: 12 }}>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                flex: 1,
+                padding: "12px",
+                borderRadius: 12,
+                border: "1px solid rgba(255,255,255,0.2)",
+                background: "transparent",
+                color: "#cbd5e1",
+                fontWeight: 700,
+                fontSize: 14,
+                cursor: "pointer",
+              }}
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              style={{
+                flex: 1.5,
+                padding: "12px",
+                borderRadius: 12,
+                border: "none",
+                background: isAtivacao
+                  ? "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%)"
+                  : "linear-gradient(135deg, #ef4444 0%, #dc2626 100%)",
+                color: "#fff",
+                fontWeight: 800,
+                fontSize: 14,
+                cursor: loading ? "not-allowed" : "pointer",
+                boxShadow: "0 6px 18px rgba(139, 92, 246, 0.4)",
+              }}
+            >
+              {loading ? "Verificando..." : isAtivacao ? "Confirmar e Liberar Fotos" : "Confirmar e Desativar"}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

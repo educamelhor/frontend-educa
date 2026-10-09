@@ -147,6 +147,9 @@ export default function BoletimAnual({
           setAluno(studentObj);
           setNotas(notasPreCarregadas);
           setRanking(alunoPreCarregado?.ranking || null);
+          if (alunoPreCarregado?.disciplinas && Array.isArray(alunoPreCarregado.disciplinas) && alunoPreCarregado.disciplinas.length > 0) {
+            setDisciplinasList(alunoPreCarregado.disciplinas);
+          }
           currentEscolaId = studentObj.escola_id;
           currentEtapa = studentObj.etapa;
           currentTurno = studentObj.turno;
@@ -222,7 +225,7 @@ export default function BoletimAnual({
         }
       }
 
-      // Buscar disciplinas correspondentes de forma dinâmica
+      // Buscar disciplinas correspondentes da turma de forma dinâmica
       if (currentEscolaId) {
         try {
           if (currentRegime === "semestral" && currentTurmaId) {
@@ -234,20 +237,29 @@ export default function BoletimAnual({
               setDisciplinasSem1((resSem1.data?.itens || []).map(d => ({ id: d.disciplina_id, nome: d.disciplina_nome })));
               setDisciplinasSem2((resSem2.data?.itens || []).map(d => ({ id: d.disciplina_id, nome: d.disciplina_nome })));
             }
-          } else {
-            const resDisc = await api.get("/api/disciplinas", {
-              params: {
-                escola_id: currentEscolaId,
-                etapa: currentEtapa,
-                turno: currentTurno,
-              },
-            });
-            if (!cancelado && Array.isArray(resDisc.data)) {
-              const parsed = resDisc.data.map((d) => ({
-                id: d.id,
-                nome: d.nome || d.disciplina,
-              }));
-              setDisciplinasList(parsed);
+          } else if (currentTurmaId) {
+            // Tenta buscar cargas da turma registradas pela direção
+            const resCargas = await api.get("/api/cargas-horarias", { params: { turma_id: currentTurmaId } });
+            const itens = resCargas.data?.itens || [];
+            if (!cancelado && itens.length > 0) {
+              setDisciplinasList(itens.map(d => ({ id: d.disciplina_id, nome: d.disciplina_nome })));
+            } else if (!cancelado && alunoPreCarregado?.disciplinas && alunoPreCarregado.disciplinas.length > 0) {
+              setDisciplinasList(alunoPreCarregado.disciplinas);
+            } else if (!cancelado) {
+              const resDisc = await api.get("/api/disciplinas", {
+                params: {
+                  escola_id: currentEscolaId,
+                  etapa: currentEtapa,
+                  turno: currentTurno,
+                },
+              });
+              if (!cancelado && Array.isArray(resDisc.data)) {
+                const parsed = resDisc.data.map((d) => ({
+                  id: d.id,
+                  nome: d.nome || d.disciplina,
+                }));
+                setDisciplinasList(parsed);
+              }
             }
           }
         } catch (err) {
@@ -279,7 +291,7 @@ export default function BoletimAnual({
   }
 
   // ───────────────────────────────────────────────────────────────
-  // Disciplinas (mesma lista canônica do sistema)
+  // Disciplinas (apenas as cadastradas para a turma ou extraídas das notas do aluno)
   // ───────────────────────────────────────────────────────────────
   const DEFAULT_DISCIPLINAS = [
     { id: 26, nome: "Artes" },
@@ -294,7 +306,19 @@ export default function BoletimAnual({
     { id: 51, nome: "Prática Estudantil" },
   ];
 
-  const disciplinas = (disciplinasList.length > 0 ? disciplinasList : DEFAULT_DISCIPLINAS).map((d) => ({
+  let disciplinasFinais = disciplinasList;
+  if (disciplinasFinais.length === 0 && Array.isArray(notas) && notas.length > 0) {
+    const map = new Map();
+    notas.forEach((n) => {
+      const key = normalizeName(n.disciplina);
+      if (key && !map.has(key)) {
+        map.set(key, { id: n.disciplina_id || key, nome: n.disciplina });
+      }
+    });
+    disciplinasFinais = Array.from(map.values());
+  }
+
+  const disciplinas = (disciplinasFinais.length > 0 ? disciplinasFinais : DEFAULT_DISCIPLINAS).map((d) => ({
     ...d,
     nome: String(d.nome || "").toUpperCase(),
   }));

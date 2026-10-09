@@ -91,21 +91,27 @@ export default function Boletim({ codigo: codigoProp, exibirBotaoImprimir = true
           if (!cancelado) setRanking(null);
         }
 
-        // 4. Buscar disciplinas dinamicamente
+        // 4. Buscar disciplinas dinamicamente (respeitando a turma)
         try {
-          const resDisc = await api.get("/api/disciplinas", {
-            params: {
-              escola_id: resAluno.data.escola_id,
-              etapa: resAluno.data.etapa,
-              turno: resAluno.data.turno,
-            },
-          });
-          if (!cancelado && Array.isArray(resDisc.data)) {
-            const parsed = resDisc.data.map((d) => ({
-              id: d.id,
-              nome: d.nome || d.disciplina,
-            }));
-            setDisciplinasList(parsed);
+          if (resAluno.data.turma_id) {
+            const resCargas = await api.get("/api/cargas-horarias", {
+              params: { turma_id: resAluno.data.turma_id },
+            });
+            const itens = resCargas.data?.itens || [];
+            if (!cancelado && itens.length > 0) {
+              setDisciplinasList(itens.map((d) => ({ id: d.disciplina_id, nome: d.disciplina_nome })));
+            } else if (!cancelado) {
+              const resDisc = await api.get("/api/disciplinas", {
+                params: {
+                  escola_id: resAluno.data.escola_id,
+                  etapa: resAluno.data.etapa,
+                  turno: resAluno.data.turno,
+                },
+              });
+              if (!cancelado && Array.isArray(resDisc.data)) {
+                setDisciplinasList(resDisc.data.map((d) => ({ id: d.id, nome: d.nome || d.disciplina })));
+              }
+            }
           }
         } catch (err) {
           console.error("Erro ao carregar disciplinas do aluno:", err);
@@ -142,7 +148,7 @@ export default function Boletim({ codigo: codigoProp, exibirBotaoImprimir = true
     );
   }
 
-  // Disciplinas com fallback para a lista padrão
+  // Disciplinas com fallback para disciplinas com notas ou lista padrão
   const DEFAULT_DISCIPLINAS = [
     { id: 26, nome: "Artes" },
     { id: 25, nome: "Ciências" },
@@ -156,7 +162,19 @@ export default function Boletim({ codigo: codigoProp, exibirBotaoImprimir = true
     { id: 51, nome: "Prática Estudantil" }
   ];
 
-  const disciplinas = (disciplinasList.length > 0 ? disciplinasList : DEFAULT_DISCIPLINAS).map((d) => ({
+  let disciplinasFinais = disciplinasList;
+  if (disciplinasFinais.length === 0 && Array.isArray(notas) && notas.length > 0) {
+    const map = new Map();
+    notas.forEach((n) => {
+      const key = normalizeName(n.disciplina);
+      if (key && !map.has(key)) {
+        map.set(key, { id: n.disciplina_id || key, nome: n.disciplina });
+      }
+    });
+    disciplinasFinais = Array.from(map.values());
+  }
+
+  const disciplinas = (disciplinasFinais.length > 0 ? disciplinasFinais : DEFAULT_DISCIPLINAS).map((d) => ({
     ...d,
     nome: String(d.nome || "").toUpperCase(),
   }));

@@ -387,7 +387,7 @@ export default function Modulacao() {
         // 1) Alocações regulares
         for (const a of alocs) {
           const key = `${a.professor_id}|${a.disciplina_id}`;
-          if (!linhasMap.has(key)) {
+          if (!linhasMap.has(key) && !linhasOcultadasManual.has(key)) {
             linhasMap.set(key, {
               rowKey: key,
               id: Number(a.professor_id),
@@ -727,70 +727,66 @@ export default function Modulacao() {
     setRemovendo(true);
 
     try {
-      // filtra somente as turmas desta linha (prof × disciplina)
+      const profIdNum = Number(removerAlvo.id);
+      const discIdNum = Number(removerAlvo.disciplina_id);
+      const rowKeyStr = String(removerAlvo.rowKey);
+
+      // 1) Oculta a linha e remove alocações do estado local IMEDIATAMENTE na UI
+      setLinhasOcultadasManual((prev) => new Set([...prev, rowKeyStr]));
+      setProfessoresTabela((arr) => arr.filter((p) => String(p.rowKey) !== rowKeyStr));
+      setAlocacoes((arr) => arr.filter((a) => !(Number(a.profId) === profIdNum && Number(a.discId) === discIdNum)));
+
+      // 2) Identifica turmas associadas a essa linha
       const turmasDoProf = alocacoes
-        .filter((a) => a.profId === removerAlvo.id && a.discId === removerAlvo.disciplina_id)
+        .filter((a) => Number(a.profId) === profIdNum && Number(a.discId) === discIdNum)
         .map((a) => a.turmaId);
 
-      if (turmasDoProf.length === 0) {
-        setLinhasOcultadasManual((prev) => new Set([...prev, removerAlvo.rowKey]));
-        setProfessoresTabela((arr) => arr.filter((p) => p.rowKey !== removerAlvo.rowKey));
-        setRemoverOpen(false);
-        setRemoverAlvo(null);
-        try { await carregarProfessoresDoTurno(turnoSelecionado); } catch {}
-        showToast("success", "Linha removida da grade.");
-        return;
-      }
- 
-      const itens = turmasDoProf.map((turmaId) => ({
-        professor_id: removerAlvo.id,
-        turma_id: turmaId,
-        disciplina_id: removerAlvo.disciplina_id,
+      const turmasAlvo = turmasDoProf.length > 0 ? turmasDoProf : turmasTurno.map((t) => t.id);
+      const itens = turmasAlvo.map((turmaId) => ({
+        professor_id: profIdNum,
+        turma_id: Number(turmaId),
+        disciplina_id: discIdNum,
         semestre: semestreSelecionado,
       }));
 
-      let removedOk = false;
-      try {
-        await api.post("/api/modulacao/remover", { turno: turnoSelecionado, semestre: semestreSelecionado, itens });
-        removedOk = true;
-      } catch {
-        // fallback 1-a-1
-        for (const turmaId of turmasDoProf) {
-          await api.delete(
-            `/api/modulacao/${removerAlvo.id}/${turmaId}/${removerAlvo.disciplina_id}`,
-            { params: { turno: turnoSelecionado, semestre: semestreSelecionado } }
-          );
+      if (itens.length > 0) {
+        try {
+          await api.post("/api/modulacao/remover", { turno: turnoSelecionado, semestre: semestreSelecionado, itens });
+        } catch {
+          // fallback 1-a-1
+          for (const it of itens) {
+            try {
+              await api.delete(
+                `/api/modulacao/${profIdNum}/${it.turma_id}/${discIdNum}`,
+                { params: { turno: turnoSelecionado, semestre: semestreSelecionado } }
+              );
+            } catch {}
+          }
         }
-        removedOk = true;
       }
 
-      if (removedOk) {
+      // Re-busca alocações atualizadas do backend e mantém a linha removida excluída
+      try {
         const { data } = await api.get("/api/modulacao", {
           params: { turno: turnoSelecionado, semestre: semestreSelecionado },
         });
         const alocs = normalizeAlocacoes(data);
-        setAlocacoes(alocs.map((a) => ({
+        const alocsFiltrados = alocs.filter(
+          (a) => !(Number(a.professor_id) === profIdNum && Number(a.disciplina_id) === discIdNum)
+        );
+        setAlocacoes(alocsFiltrados.map((a) => ({
           profId: a.professor_id,
           turmaId: a.turma_id,
           discId: a.disciplina_id,
           semestre: a.semestre ?? semestreSelecionado,
         })));
+      } catch {}
 
-        // remove somente a linha desta disciplina; outras disciplinas do prof ficam
-        const aindaTemEstaDisc = alocs.some(
-          (a) => a.professor_id === removerAlvo.id && a.disciplina_id === removerAlvo.disciplina_id
-        );
-        if (!aindaTemEstaDisc) {
-          setLinhasOcultadasManual((prev) => new Set([...prev, removerAlvo.rowKey]));
-          setProfessoresTabela((arr) => arr.filter((p) => p.rowKey !== removerAlvo.rowKey));
-        }
+      try { await carregarProfessoresDoTurno(turnoSelecionado); } catch {}
 
-        try { await carregarProfessoresDoTurno(turnoSelecionado); } catch {}
-
-        setRemoverOpen(false);
-        setRemoverAlvo(null);
-        showToast("success", "Remoção concluída com sucesso.");
-      }
+      setRemoverOpen(false);
+      setRemoverAlvo(null);
+      showToast("success", "Linha removida da grade.");
     } catch (e) {
       console.error(e);
       showToast("error", "Não foi possível remover. Tente novamente.");

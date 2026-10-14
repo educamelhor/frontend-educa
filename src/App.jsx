@@ -43,6 +43,7 @@ import ConteudosProgramaticos from "./features/pedagogico/conteudos/ConteudosPro
 import Planos from "./features/professores/planos/Planos";
 import Avaliacoes from "./features/professores/avaliacoes/Avaliacoes";
 import ConteudosProfessor from "./features/professores/conteudos/Conteudos";
+import ChamadaProfessor from "./features/professores/chamada/Chamada";
 import ProvasEmBreve from "./features/pedagogico/ProvasEmBreve";
 import CapasProvas from "./features/gabarito/capas/CapasProvas";
 import BoletimManual from "./features/professores/boletim/BoletimManual";
@@ -460,6 +461,7 @@ export default function App() {
           <Route path="/professores/planos"       element={<RequireModulo modulo="professores"><Planos /></RequireModulo>} />
           <Route path="/professores/avaliacoes"   element={<RequireModulo modulo="professores"><Avaliacoes /></RequireModulo>} />
           <Route path="/professores/conteudos"    element={<RequireModulo modulo="professores"><ConteudosProfessor /></RequireModulo>} />
+          <Route path="/professores/chamada"      element={<RequireModulo modulo="professores"><ChamadaProfessor /></RequireModulo>} />
           <Route path="/professores/sala-recurso" element={<RequireModulo modulo="professores"><SalaRecursoProfessor /></RequireModulo>} />
           <Route path="/professores/provas"       element={<RequireModulo modulo="professores"><ProvasEmBreve /></RequireModulo>} />
           <Route path="/pedagogico/provas"      element={<ProvasEmBreve />} />

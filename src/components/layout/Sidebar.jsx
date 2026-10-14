@@ -604,6 +604,26 @@ export default function Sidebar({ isOpen, onClose }) {
                 </Link>
               </li>
               )}
+              {(hasModulo('professores.chamada') || hasModulo('professores')) && (
+              <li>
+                <Link
+                  to="/professores/chamada"
+                  className={getSubmenuLinkClasses('/professores/chamada')}
+                >
+                  <CalendarDaysIcon className="h-5 w-5 mr-2" />
+                  <span className="flex-1">Chamada</span>
+                  <span style={{
+                    fontSize: '0.5rem',
+                    fontWeight: 800,
+                    background: 'linear-gradient(135deg, #06b6d4, #3b82f6)',
+                    color: '#fff',
+                    padding: '1px 5px',
+                    borderRadius: '6px',
+                    letterSpacing: '0.5px',
+                  }}>NOVO</span>
+                </Link>
+              </li>
+              )}
               {hasModulo('professores.conteudos') && (
               <li>
                 <Link
@@ -692,6 +712,26 @@ export default function Sidebar({ isOpen, onClose }) {
                     className={getSubmenuLinkClasses('/professores/avaliacoes')}
                   >
                     <TableCellsIcon className="h-5 w-5 mr-2" /> Avaliações
+                  </Link>
+                </li>
+                )}
+                {(hasModulo('professores.chamada') || hasModulo('professores')) && (
+                <li>
+                  <Link
+                    to="/professores/chamada"
+                    className={getSubmenuLinkClasses('/professores/chamada')}
+                  >
+                    <CalendarDaysIcon className="h-5 w-5 mr-2" />
+                    <span className="flex-1">Chamada</span>
+                    <span style={{
+                      fontSize: '0.5rem',
+                      fontWeight: 800,
+                      background: 'linear-gradient(135deg, #06b6d4, #3b82f6)',
+                      color: '#fff',
+                      padding: '1px 5px',
+                      borderRadius: '6px',
+                      letterSpacing: '0.5px',
+                    }}>NOVO</span>
                   </Link>
                 </li>
                 )}

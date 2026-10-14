@@ -130,8 +130,24 @@ export default function Planos() {
   const [loadingInicial, setLoadingInicial] = useState(true);
 
   // Helper para identificar semestralidade e tipo da turma
-  const isTurmaSemestral = (t) =>
-    Boolean(t?.is_agrupamento || String(t?.regime || "anual").toLowerCase().trim() === "semestral");
+  const isTurmaSemestral = (t) => {
+    const sem = Number(t?.semestre ?? 0);
+    if (t?.is_agrupamento) return sem === 1 || sem === 2;
+    const regime = String(t?.regime || "anual").toLowerCase().trim();
+    return regime === "semestral" && (sem === 1 || sem === 2);
+  };
+
+  const getTurmaKey = (t) =>
+    t
+      ? `${t.is_agrupamento ? "agr" : "reg"}_${t.id || t.nome}_${String(t.regime || "anual")
+          .toLowerCase()
+          .trim()}_${Number(t.semestre ?? 0)}`
+      : "";
+
+  const findTurmaByKeyOrId = (key) =>
+    turmas.find(
+      (t) => getTurmaKey(t) === String(key) || String(t.id) === String(key) || t.nome === key
+    );
 
   const getTurmaBadge = (t) => {
     if (t?.is_agrupamento) {
@@ -185,9 +201,7 @@ export default function Planos() {
       return ["1º Bimestre", "2º Bimestre", "3º Bimestre", "4º Bimestre"];
     }
     const targetId = turmaSelecionada || turmasSelecionadas[0];
-    const turmaObj = turmas.find(
-      (t) => String(t.id) === String(targetId) || t.nome === targetId
-    );
+    const turmaObj = findTurmaByKeyOrId(targetId);
     if (!turmaObj) return ["1º Bimestre", "2º Bimestre", "3º Bimestre", "4º Bimestre"];
 
     const isSemestral = isTurmaSemestral(turmaObj);
@@ -303,14 +317,20 @@ export default function Planos() {
       setLoadingPlanos(true);
       try {
         const ano = new Date().getFullYear();
-        const turmaObj = turmas.find(t => String(t.id) === String(turmaSelecionada) || t.nome === turmaSelecionada);
+        const turmaObj = findTurmaByKeyOrId(turmaSelecionada);
         const turmaNome = turmaObj?.nome || turmaSelecionada;
         const turmaId = turmaObj?.id || turmaSelecionada;
 
-        // Busca apenas as disciplinas que o professor leciona nesta turma específica
+        // Busca apenas as disciplinas que o professor leciona nesta turma/oferta específica
         let disciplinasDaTurma = [];
         try {
-          const resDisc = await api.get(`/professores/me/turmas/${turmaId}/disciplinas`);
+          const resDisc = await api.get(`/professores/me/turmas/${turmaId}/disciplinas`, {
+            params: {
+              regime: turmaObj?.regime || undefined,
+              semestre: turmaObj?.semestre !== undefined ? turmaObj.semestre : undefined,
+              is_agrupamento: turmaObj?.is_agrupamento ? "1" : "0",
+            },
+          });
           if (resDisc.data?.ok) {
             disciplinasDaTurma = resDisc.data.disciplinas.map(d => d.nome);
           }
@@ -458,7 +478,7 @@ export default function Planos() {
 
       setItens(novosItens);
 
-      const turmaObj = turmas.find(t => String(t.id) === String(turmaSelecionada) || t.nome === turmaSelecionada);
+      const turmaObj = findTurmaByKeyOrId(turmaSelecionada);
       const payload = {
         disciplina: disciplinaSelecionada,
         bimestre: bimestreSelecionado,
@@ -491,7 +511,7 @@ export default function Planos() {
 
   const selecaoMinimaOk = !!turmaSelecionada && !!bimestreSelecionado;
   const bloqueadoPorTempo = !!bimestreSelecionado && bimestreEncerrado(bimestreSelecionado);
-  const turmaNomeSelecionada = turmas.find(t => String(t.id) === String(turmaSelecionada) || t.nome === turmaSelecionada)?.nome || turmaSelecionada || "";
+  const turmaNomeSelecionada = findTurmaByKeyOrId(turmaSelecionada)?.nome || turmaSelecionada || "";
 
   const [selecaoLote, setSelecaoLote] = useState([]);
   const toggleSelecaoLote = (t) => {
@@ -503,7 +523,7 @@ export default function Planos() {
     // Se multi-turma ativo: usa o array completo; senão: somente a turma principal
     const turmasParaAbrir = modoMultiTurma && turmasSelecionadas.length > 1
       ? turmasSelecionadas.map(id => {
-          const obj = turmas.find(t => String(t.id) === String(id) || t.nome === id);
+          const obj = findTurmaByKeyOrId(id);
           return obj?.nome || id;
         })
       : [turmaNomeSelecionada];
@@ -724,7 +744,7 @@ export default function Planos() {
 
                   {turmas.map(t => {
                     const nm = t.nome || t;
-                    const id = t.id || nm;
+                    const id = getTurmaKey(t) || t.id || nm;
                     const badge = getTurmaBadge(t);
 
                     // Modo simples: seleção única, clique avança para etapa 2
@@ -771,7 +791,7 @@ export default function Planos() {
                     let semIncompativel = false;
                     if (turmasSelecionadas.length > 0 && !isChecked) {
                       const firstId = turmasSelecionadas[0];
-                      const firstObj = turmas.find(x => String(x.id) === String(firstId) || x.nome === firstId);
+                      const firstObj = findTurmaByKeyOrId(firstId);
                       const isFirstSem = isTurmaSemestral(firstObj);
                       const isThisSem = isTurmaSemestral(t);
 
@@ -862,7 +882,7 @@ export default function Planos() {
                         📋 {turmasSelecionadas.length} turma{turmasSelecionadas.length > 1 ? "s" : ""} — mesmo plano:
                       </span>
                       {turmasSelecionadas.map(id => {
-                        const obj = turmas.find(t => String(t.id) === String(id) || t.nome === id);
+                        const obj = findTurmaByKeyOrId(id);
                         const nm = obj?.nome || id;
                         return (
                           <span key={id} style={{
@@ -1593,7 +1613,7 @@ export default function Planos() {
 
                   try {
                     const nomeCodigo = "Plano-" + Math.floor(Math.random() * 10000); // Gerado via backend depois logicamente
-                    const turmaObj = turmas.find(t => String(t.id) === String(turmaSelecionada) || t.nome === turmaSelecionada);
+                    const turmaObj = findTurmaByKeyOrId(turmaSelecionada);
                     const payload = {
                       disciplina: disciplinaSelecionada,
                       bimestre: bimestreSelecionado,
@@ -2277,7 +2297,7 @@ export default function Planos() {
                   try {
                     const nomeCodigo = "Plano-" + Math.floor(Math.random() * 10000);
                     const novoStatus = planoModo === "professor_autonomo" ? "APROVADO" : "ENVIADO";
-                    const turmaObj = turmas.find(t => String(t.id) === String(turmaSelecionada) || t.nome === turmaSelecionada);
+                    const turmaObj = findTurmaByKeyOrId(turmaSelecionada);
                     const payload = {
                       disciplina: disciplinaSelecionada,
                       bimestre: bimestreSelecionado,

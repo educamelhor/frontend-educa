@@ -39,8 +39,12 @@ export default function Avaliacoes() {
   const [turmas, setTurmas] = useState([]);
 
   // Helper para identificar semestralidade e tipo da turma
-  const isTurmaSemestral = (t) =>
-    Boolean(t?.is_agrupamento || String(t?.regime || "anual").toLowerCase().trim() === "semestral");
+  const isTurmaSemestral = (t) => {
+    const sem = Number(t?.semestre ?? 0);
+    if (t?.is_agrupamento) return sem === 1 || sem === 2;
+    const regime = String(t?.regime || "anual").toLowerCase().trim();
+    return regime === "semestral" && (sem === 1 || sem === 2);
+  };
 
   const getTurmaBadge = (t) => {
     if (t?.is_agrupamento) {
@@ -88,60 +92,53 @@ export default function Avaliacoes() {
     };
   };
 
-  // Seletor dinâmico de bimestres pela semestralidade da turma ou das turmas da disciplina
+  // Seletor dinâmico de bimestres pelas turmas da disciplina selecionada (Etapa 1 → Etapa 2)
   const bimestresDisponiveis = React.useMemo(() => {
-    if (!turmaSelecionada) {
-      if (turmas.length > 0) {
-        const todasSemestrais = turmas.every((t) => isTurmaSemestral(t));
-        if (todasSemestrais) {
-          const todosSem1 = turmas.every((t) => Number(t?.semestre ?? 0) === 1);
-          if (todosSem1) return ["1º Bimestre", "2º Bimestre"];
-
-          const todosSem2 = turmas.every((t) => Number(t?.semestre ?? 0) === 2);
-          if (todosSem2) return ["3º Bimestre", "4º Bimestre"];
-        }
+    if (turmas.length > 0) {
+      const todasSemestrais = turmas.every((t) => isTurmaSemestral(t));
+      if (todasSemestrais) {
+        const temSem1 = turmas.some((t) => Number(t?.semestre ?? 0) === 1);
+        const temSem2 = turmas.some((t) => Number(t?.semestre ?? 0) === 2);
+        if (temSem1 && !temSem2) return ["1º Bimestre", "2º Bimestre"];
+        if (temSem2 && !temSem1) return ["3º Bimestre", "4º Bimestre"];
       }
-      return ["1º Bimestre", "2º Bimestre", "3º Bimestre", "4º Bimestre"];
     }
-    const turmaObj = turmas.find(
-      (t) => String(t.id) === String(turmaSelecionada) || t.nome === turmaSelecionada
-    );
-    if (!turmaObj) return ["1º Bimestre", "2º Bimestre", "3º Bimestre", "4º Bimestre"];
-
-    const isSemestral = isTurmaSemestral(turmaObj);
-    if (isSemestral) {
-      const sem = Number(turmaObj?.semestre ?? 0);
-      if (sem === 1) return ["1º Bimestre", "2º Bimestre"];
-      if (sem === 2) return ["3º Bimestre", "4º Bimestre"];
-    }
-
-    // Anual ou padrão
     return ["1º Bimestre", "2º Bimestre", "3º Bimestre", "4º Bimestre"];
-  }, [turmaSelecionada, turmas]);
+  }, [turmas]);
 
-  // Filtro de turmas compatíveis com o bimestre selecionado
+  // Filtro de turmas compatíveis com o bimestre selecionado (Etapa 3)
   const turmasCompativeis = React.useMemo(() => {
-    if (!bimestreSelecionado) return turmas;
     const isBim1ou2 = bimestreSelecionado === "1º Bimestre" || bimestreSelecionado === "2º Bimestre";
     const isBim3ou4 = bimestreSelecionado === "3º Bimestre" || bimestreSelecionado === "4º Bimestre";
 
-    return turmas.filter(t => {
-      const isSemestral = isTurmaSemestral(t);
-      if (!isSemestral) return true; // Turmas anuais são compatíveis com todos os bimestres
+    const filtradas = !bimestreSelecionado
+      ? turmas
+      : turmas.filter((t) => {
+          const isSemestral = isTurmaSemestral(t);
+          if (!isSemestral) return true; // Turmas anuais são compatíveis com todos os bimestres
 
-      const sem = Number(t?.semestre ?? 0);
-      if (isBim1ou2 && sem === 2) return false;
-      if (isBim3ou4 && sem === 1) return false;
+          const sem = Number(t?.semestre ?? 0);
+          if (isBim1ou2 && sem === 2) return false;
+          if (isBim3ou4 && sem === 1) return false;
+          return true;
+        });
+
+    // Deduplica por id caso haja mais de uma entrada compatível para a mesma turma
+    const seen = new Set();
+    return filtradas.filter((t) => {
+      const k = `${t.is_agrupamento ? "agr" : "reg"}_${t.id}`;
+      if (seen.has(k)) return false;
+      seen.add(k);
       return true;
     });
   }, [turmas, bimestreSelecionado]);
 
-  // Reset de bimestre se a troca de turma tornar o bimestre atual incompatível
+  // Reset de bimestre se a troca de disciplina tornar o bimestre atual incompatível
   useEffect(() => {
-    if (turmaSelecionada && bimestreSelecionado && !bimestresDisponiveis.includes(bimestreSelecionado)) {
+    if (bimestreSelecionado && !bimestresDisponiveis.includes(bimestreSelecionado)) {
       setBimestreSelecionado(bimestresDisponiveis[0] || "");
     }
-  }, [turmaSelecionada, bimestresDisponiveis, bimestreSelecionado]);
+  }, [bimestresDisponiveis, bimestreSelecionado]);
 
   // ---------------------------
   // Dados Reais

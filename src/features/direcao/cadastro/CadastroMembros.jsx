@@ -85,9 +85,13 @@ export default function CadastroMembros() {
   const [editId, setEditId] = useState(null);
   const [formNome, setFormNome] = useState("");
   const [formCpf, setFormCpf] = useState("");
-  const [formFuncao, setFormFuncao] = useState("coordenador");
+  const [formFuncao, setFormFuncao] = useState("coordenacao");
   const [formErro, setFormErro] = useState("");
   const [salvando, setSalvando] = useState(false);
+  const funcaoSelectRef = useRef(null);
+
+  // Modal Informativo de Bloqueio por Duplicidade na Mesma Função
+  const [duplicidadeModal, setDuplicidadeModal] = useState(null); // { nome, cpf, funcao }
 
   // Modal Confirmar Status
   const [confirmModal, setConfirmModal] = useState(null); // { tipo, membro }
@@ -163,13 +167,13 @@ export default function CadastroMembros() {
 
   // ── Abrir Modal Adicionar ──
   const abrirAdicionar = () => {
-    setEditId(null); setFormNome(""); setFormCpf(""); setFormFuncao("coordenador"); setFormErro("");
+    setEditId(null); setFormNome(""); setFormCpf(""); setFormFuncao("coordenacao"); setFormErro("");
     setModalAberto("adicionar");
   };
 
   // ── Abrir Modal Editar ──
   const abrirEditar = (m) => {
-    setEditId(m.id); setFormNome(m.nome); setFormCpf(m.cpf || ""); setFormFuncao(m.funcao || "coordenador"); setFormErro("");
+    setEditId(m.id); setFormNome(m.nome); setFormCpf(m.cpf || ""); setFormFuncao(m.funcao || "coordenacao"); setFormErro("");
     setMenuAberto(null);
     setModalAberto("editar");
   };
@@ -183,12 +187,34 @@ export default function CadastroMembros() {
       if (!formCpf || formCpf.replace(/\D/g, "").length < 11) { setFormErro("CPF inválido."); return; }
       if (!validarCPF(formCpf)) { setFormErro("CPF inválido. Verifique os dígitos verificadores."); return; }
     }
+
+    const cpfLimpo = formCpf.replace(/\D/g, "");
+
+    // ── Validação Prévia no Frontend: Bloqueio na Mesma Função ──
+    const jaExisteNaMesmaFuncao = membros.find(m => {
+      const cpfM = String(m.cpf || "").replace(/\D/g, "");
+      const mesmaFuncao = m.funcao === formFuncao;
+      if (modalAberto === "adicionar") {
+        return cpfM === cpfLimpo && mesmaFuncao;
+      }
+      return cpfM === cpfLimpo && mesmaFuncao && m.id !== editId;
+    });
+
+    if (jaExisteNaMesmaFuncao) {
+      setDuplicidadeModal({
+        nome: jaExisteNaMesmaFuncao.nome || formNome.trim(),
+        cpf: cpfLimpo,
+        funcao: formFuncao,
+      });
+      return;
+    }
+
     setSalvando(true);
     try {
       if (modalAberto === "adicionar") {
         await api.post("/api/direcao/cadastro", {
           nome: formNome.trim(),
-          cpf: formCpf.replace(/\D/g, ""),
+          cpf: cpfLimpo,
           funcao: formFuncao,
           escola_id: Number(escolaId),
         });
@@ -203,7 +229,16 @@ export default function CadastroMembros() {
       setModalAberto(false);
       fetchMembros();
     } catch (err) {
-      setFormErro(err?.response?.data?.message || "Erro ao salvar.");
+      const respData = err?.response?.data;
+      if (respData?.codigo === "DUPLICIDADE_MESMA_FUNCAO") {
+        setDuplicidadeModal({
+          nome: respData.nome || formNome.trim(),
+          cpf: cpfLimpo,
+          funcao: respData.funcao || formFuncao,
+        });
+        return;
+      }
+      setFormErro(respData?.message || "Erro ao salvar.");
     } finally { setSalvando(false); }
   };
 
@@ -544,8 +579,12 @@ export default function CadastroMembros() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Função (Perfil) *</label>
-                <select value={formFuncao} onChange={e => setFormFuncao(e.target.value)}
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white">
+                <select
+                  ref={funcaoSelectRef}
+                  value={formFuncao}
+                  onChange={e => setFormFuncao(e.target.value)}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white font-medium text-slate-800"
+                >
                   {FUNCOES.map(f => <option key={f.value} value={f.value}>{f.label}</option>)}
                 </select>
               </div>
@@ -632,6 +671,107 @@ export default function CadastroMembros() {
               <button onClick={handleExcluir} disabled={executandoExcluir}
                 className="flex-1 bg-red-600 hover:bg-red-700 text-white font-medium py-2.5 rounded-lg transition">
                 {executandoExcluir ? "Excluindo..." : "Sim, Excluir"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ MODAL PREMIUM INFORMATIVO — BLOQUEIO DE DUPLICIDADE DE FUNÇÃO ═══ */}
+      {duplicidadeModal && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-sm cadastro-animate-in">
+          <div
+            className="w-full max-w-lg rounded-2xl p-6 md:p-8 text-white shadow-2xl relative border border-amber-500/40"
+            style={{
+              background: "linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%)",
+              boxShadow: "0 20px 40px -15px rgba(245, 158, 11, 0.3), 0 0 0 1px rgba(245, 158, 11, 0.35)",
+            }}
+          >
+            {/* Header com Ícone e Tag */}
+            <div className="flex items-center gap-3.5 mb-5">
+              <div
+                style={{
+                  width: 50,
+                  height: 50,
+                  borderRadius: "50%",
+                  background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+                  boxShadow: "0 0 20px rgba(245, 158, 11, 0.4)",
+                }}
+                className="flex items-center justify-center text-2xl flex-shrink-0"
+              >
+                ⚠️
+              </div>
+              <div>
+                <span className="text-[10px] font-extrabold tracking-widest text-amber-300 uppercase px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30">
+                  Governança Escolar • Regra de Função Única
+                </span>
+                <h3 className="text-xl font-bold text-white mt-1">
+                  Duplicidade de Função Não Permitida
+                </h3>
+              </div>
+            </div>
+
+            {/* Quadro Informativo com dados do membro */}
+            <div className="bg-white/5 border border-white/10 rounded-xl p-4 mb-5 space-y-2.5 text-sm">
+              <div className="flex justify-between items-center text-slate-300">
+                <span>👤 Membro:</span>
+                <strong className="text-white">{duplicidadeModal.nome}</strong>
+              </div>
+              <div className="flex justify-between items-center text-slate-300">
+                <span>🪪 CPF:</span>
+                <span className="font-mono font-semibold text-amber-300">{fmtCPF(duplicidadeModal.cpf)}</span>
+              </div>
+              <div className="flex justify-between items-center text-slate-300">
+                <span>🚫 Função Atual:</span>
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  {funcaoLabel(duplicidadeModal.funcao)}
+                </span>
+              </div>
+            </div>
+
+            {/* Texto Explicativo da Regra */}
+            <p className="text-sm text-slate-300 leading-relaxed mb-4">
+              Este profissional já possui um cadastro ativo como <strong>{funcaoLabel(duplicidadeModal.funcao)}</strong> nesta escola.
+              Para preservar a consistência de permissões e relatórios, o sistema <strong>não permite cadastrar o mesmo profissional duas vezes na mesma função</strong>.
+            </p>
+
+            {/* Dica Construtiva: Múltiplas funções permitidas */}
+            <div className="p-3.5 rounded-xl bg-blue-500/10 border border-blue-400/30 text-blue-200 text-xs leading-relaxed mb-6 flex gap-2.5 items-start">
+              <span className="text-base flex-shrink-0">💡</span>
+              <div>
+                <strong className="text-blue-100">Múltiplas funções permitidas:</strong> Se este profissional desempenha papéis complementares (por exemplo, atua também como <em>Coordenação</em>, <em>Supervisor</em> ou <em>Secretaria</em>), selecione a outra função para concluir o cadastro.
+              </div>
+            </div>
+
+            {/* Botões de Ação */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setDuplicidadeModal(null);
+                  setModalAberto(false);
+                }}
+                className="w-full sm:flex-1 py-3 px-4 rounded-xl border border-white/20 text-slate-300 hover:text-white hover:bg-white/5 font-semibold text-sm transition text-center"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setDuplicidadeModal(null);
+                  setTimeout(() => {
+                    if (funcaoSelectRef.current) {
+                      funcaoSelectRef.current.focus();
+                    }
+                  }, 100);
+                }}
+                className="w-full sm:flex-1.5 py-3 px-4 rounded-xl text-slate-900 font-bold text-sm transition flex items-center justify-center gap-2"
+                style={{
+                  background: "linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)",
+                  boxShadow: "0 4px 15px rgba(245, 158, 11, 0.35)",
+                }}
+              >
+                <span>🔄 Selecionar Outra Função</span>
               </button>
             </div>
           </div>

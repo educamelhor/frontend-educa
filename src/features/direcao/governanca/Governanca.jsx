@@ -5,6 +5,7 @@
 // ============================================================================
 import React, { useState, useEffect, useCallback } from "react";
 import LogosEscola from "./LogosEscola.jsx";
+import AnoLetivoGovernanca from "./AnoLetivoGovernanca.jsx";
 
 // URL de produção — mesma lógica do src/services/api.js
 function getApiRoot() {
@@ -20,6 +21,16 @@ const API = getApiRoot();
 
 // ── Mapa de ícones SVG por categoria (inline para zero deps) ──
 const CATEGORY_META = {
+  ano_letivo: {
+    label: "Ano Letivo",
+    icon: (
+      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.6}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5m-9-6h.008v.008H12v-.008zM12 15h.008v.008H12V15zm0 2.25h.008v.008H12v-.008zM9.75 15h.008v.008H9.75V15zm0 2.25h.008v.008H9.75v-.008zM7.5 15h.008v.008H7.5V15zm0 2.25h.008v.008H7.5v-.008zm6.75-4.5h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V15zm0 2.25h.008v.008h-.008v-.008zm2.25-4.5h.008v.008H16.5v-.008zm0 2.25h.008v.008H16.5V15z" />
+      </svg>
+    ),
+    gradient: "linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%)",
+    color: "#0ea5e9",
+  },
   pedagogico: {
     label: "Pedagógico",
     icon: (
@@ -163,6 +174,11 @@ export default function Governanca() {
   const [historicoCiclos, setHistoricoCiclos] = useState([]);
   const [pedagogicoAuthModal, setPedagogicoAuthModal] = useState({ open: false, acao: "ativar" });
 
+  // ── Estados para Categoria Ano Letivo (Bimestres, Semestres e Calendário Interativo) ──
+  const [anoLetivoRef, setAnoLetivoRef] = useState(() => new Date().getFullYear());
+  const [anoLetivoPeriodos, setAnoLetivoPeriodos] = useState([]);
+  const [anoLetivoExcecoes, setAnoLetivoExcecoes] = useState([]);
+
   const escolaId = localStorage.getItem("escola_id");
   const token = localStorage.getItem("token");
   const perfil = String(localStorage.getItem("perfil") || "").toLowerCase();
@@ -206,7 +222,7 @@ export default function Governanca() {
       const data = await res.json();
       if (data.ok) {
         const raw = data.configuracoes || {};
-        const merged = {};
+        const merged = { ano_letivo: [] };
         for (const [k, list] of Object.entries(raw)) {
           const kLower = String(k).toLowerCase().trim();
           if (!merged[kLower]) merged[kLower] = [];
@@ -283,14 +299,35 @@ export default function Governanca() {
     }
   }, [escolaId, token, perfil]);
 
+  // ── Fetch config do Ano Letivo (Períodos e Exceções de Calendário) ──
+  const fetchAnoLetivoConfig = useCallback(async (anoTarget = anoLetivoRef) => {
+    try {
+      const res = await fetch(`${API}/api/governanca/ano-letivo-config?escola_id=${escolaId}&ano=${anoTarget}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "x-escola-id": escolaId,
+          "x-perfil": perfil,
+        },
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setAnoLetivoPeriodos(data.periodos || []);
+        setAnoLetivoExcecoes(data.excecoes || []);
+      }
+    } catch (err) {
+      console.warn("Erro ao buscar config do Ano Letivo:", err);
+    }
+  }, [escolaId, token, perfil, anoLetivoRef]);
+
   useEffect(() => {
     if (escolaId && token) {
       fetchConfigs();
       fetchBoletimAppConfig();
       fetchPedagogicoConfig();
+      fetchAnoLetivoConfig(anoLetivoRef);
       fetchDisciplinas();
     }
-  }, [fetchConfigs, fetchBoletimAppConfig, fetchPedagogicoConfig, fetchDisciplinas, escolaId, token]);
+  }, [fetchConfigs, fetchBoletimAppConfig, fetchPedagogicoConfig, fetchAnoLetivoConfig, fetchDisciplinas, escolaId, token, anoLetivoRef]);
 
   // ✅ [GOVERNANÇA v2] Fetch perfis que este diretor pode gerenciar
   const fetchMeusPerfis = useCallback(async () => {
@@ -829,7 +866,14 @@ export default function Governanca() {
             };
             const isExpanded = expandedCats.has(cat);
             const items = configsPorCategoria[cat] || [];
-            const displayCount = items.filter((cfg) => cfg.chave !== "escola.avaliacao_padrao_bimestral.excecoes" && !cfg.chave.startsWith("boletim.app.liberar_")).length;
+            const displayCount =
+              catLower === "ano_letivo"
+                ? 2
+                : items.filter(
+                    (cfg) =>
+                      cfg.chave !== "escola.avaliacao_padrao_bimestral.excecoes" &&
+                      !cfg.chave.startsWith("boletim.app.liberar_")
+                  ).length;
 
             return (
               <div key={cat} style={styles.categoryCard}>
@@ -875,7 +919,12 @@ export default function Governanca() {
                 {isExpanded && (
                   <div style={styles.itemsList}>
                     {items
-                      .filter((cfg) => cfg.chave !== "escola.avaliacao_padrao_bimestral.excecoes" && !cfg.chave.startsWith("boletim.app.liberar_"))
+                      .filter(
+                        (cfg) =>
+                          cfg.chave !== "escola.avaliacao_padrao_bimestral.excecoes" &&
+                          !cfg.chave.startsWith("boletim.app.liberar_") &&
+                          !cfg.chave.startsWith("ano_letivo.")
+                      )
                       .map((cfg) => (
                         <ConfigItem
                           key={cfg.id}
@@ -886,6 +935,25 @@ export default function Governanca() {
                           onOpenExceptions={handleOpenExceptionsModal}
                         />
                       ))}
+
+                    {/* Banner customizado Categoria Ano Letivo (Bimestres + Semestres + Calendário Interativo) */}
+                    {catLower === "ano_letivo" && (
+                      <AnoLetivoGovernanca
+                        apiBase={API}
+                        escolaId={escolaId}
+                        token={token}
+                        perfil={perfil}
+                        anoLetivo={anoLetivoRef}
+                        setAnoLetivo={setAnoLetivoRef}
+                        periodos={anoLetivoPeriodos}
+                        excecoes={anoLetivoExcecoes}
+                        onRefreshState={(newState) => {
+                          if (newState?.periodos) setAnoLetivoPeriodos(newState.periodos);
+                          if (newState?.excecoes) setAnoLetivoExcecoes(newState.excecoes);
+                        }}
+                        showToast={showToast}
+                      />
+                    )}
 
                     {/* Banner customizado Liberar Notas no App (Etapa 1 Governança) */}
                     {catLower === "boletim" && (

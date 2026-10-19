@@ -2179,9 +2179,11 @@ function ConfigItem({ cfg, color, onChange, isPending, onOpenExceptions }) {
 // ═══════════════════════════════════════════════════════════════
 const styles = {
   root: {
-    maxWidth: 960,
+    width: "100%",
+    maxWidth: "100%",
     margin: "0 auto",
-    padding: "0 8px",
+    padding: "0 4px",
+    boxSizing: "border-box",
     fontFamily: "'Montserrat', 'Inter', system-ui, sans-serif",
   },
 

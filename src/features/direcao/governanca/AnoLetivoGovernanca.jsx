@@ -420,8 +420,8 @@ export default function AnoLetivoGovernanca({
         {/* Grid com os 4 Badges de Bimestres */}
         <div style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(205px, 1fr))",
-          gap: 12,
+          gridTemplateColumns: "repeat(auto-fit, minmax(235px, 1fr))",
+          gap: 14,
         }}>
           {[1, 2, 3, 4].map((bim) => {
             const pObj = getPeriodoObj("bimestre", bim);
@@ -567,7 +567,7 @@ export default function AnoLetivoGovernanca({
         {/* Grid com os 2 Badges de Semestres */}
         <div style={{
           display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+          gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
           gap: 14,
         }}>
           {[1, 2].map((sem) => {
@@ -693,11 +693,19 @@ function PeriodoBadgeCard({
           : "0 1px 3px rgba(0,0,0,0.04)",
         transition: "all 0.2s ease",
         position: "relative",
+        boxSizing: "border-box",
+        minWidth: 0,
       }}
     >
       {/* Topo do Card: Título + Ícone Olhinho + Botão Editar */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+      <div style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        gap: 8,
+        flexWrap: "wrap",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
           <span
             style={{
               width: 10,
@@ -706,24 +714,30 @@ function PeriodoBadgeCard({
               background: isConfigurado ? "#10b981" : "#cbd5e1",
               boxShadow: isConfigurado ? "0 0 8px rgba(16, 185, 129, 0.6)" : "none",
               display: "inline-block",
+              flexShrink: 0,
             }}
           />
-          <span style={{ fontWeight: 800, fontSize: 14.5, color: "#1e293b" }}>
+          <span style={{
+            fontWeight: 800,
+            fontSize: 14.5,
+            color: "#1e293b",
+            whiteSpace: "nowrap",
+          }}>
             {titulo}
           </span>
         </div>
 
         {/* Ações: Olhinho (se configurado) + Botão Configurar/Editar */}
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
           {isConfigurado && (
             <button
               type="button"
               onClick={onOpenCalendar}
               title="Visualizar Calendário Letivo, Sábados Letivos e Feriados"
               style={{
-                width: 34,
-                height: 34,
-                borderRadius: 10,
+                width: 32,
+                height: 32,
+                borderRadius: 9,
                 border: "1.5px solid #10b981",
                 background: "linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%)",
                 color: "#047857",
@@ -733,10 +747,11 @@ function PeriodoBadgeCard({
                 justifyContent: "center",
                 boxShadow: "0 2px 8px rgba(16, 185, 129, 0.22)",
                 transition: "all 0.15s ease",
+                flexShrink: 0,
               }}
             >
               {/* Ícone Olhinho SVG */}
-              <svg xmlns="http://www.w3.org/2000/svg" style={{ width: 18, height: 18 }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
+              <svg xmlns="http://www.w3.org/2000/svg" style={{ width: 17, height: 17 }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
@@ -748,9 +763,9 @@ function PeriodoBadgeCard({
             onClick={onOpenEdit}
             title={isConfigurado ? "Editar datas de início e término" : "Configurar datas de início e término"}
             style={{
-              height: 34,
+              height: 32,
               padding: "0 10px",
-              borderRadius: 10,
+              borderRadius: 9,
               border: isConfigurado ? "1px solid #e2e8f0" : `1px solid ${corTema}`,
               background: isConfigurado ? "#f8fafc" : corTema,
               color: isConfigurado ? "#334155" : "#ffffff",
@@ -760,6 +775,8 @@ function PeriodoBadgeCard({
               display: "flex",
               alignItems: "center",
               gap: 4,
+              whiteSpace: "nowrap",
+              flexShrink: 0,
               transition: "all 0.15s ease",
             }}
           >

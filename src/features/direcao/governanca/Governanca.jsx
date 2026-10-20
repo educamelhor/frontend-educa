@@ -174,10 +174,11 @@ export default function Governanca() {
   const [historicoCiclos, setHistoricoCiclos] = useState([]);
   const [pedagogicoAuthModal, setPedagogicoAuthModal] = useState({ open: false, acao: "ativar" });
 
-  // ── Estados para Categoria Ano Letivo (Bimestres, Semestres e Calendário Interativo) ──
+  // ── Estados para Categoria Ano Letivo (Bimestres, Semestres, Horários e Calendário Interativo) ──
   const [anoLetivoRef, setAnoLetivoRef] = useState(() => new Date().getFullYear());
   const [anoLetivoPeriodos, setAnoLetivoPeriodos] = useState([]);
   const [anoLetivoExcecoes, setAnoLetivoExcecoes] = useState([]);
+  const [anoLetivoHorarios, setAnoLetivoHorarios] = useState([]);
 
   const escolaId = localStorage.getItem("escola_id");
   const token = localStorage.getItem("token");
@@ -299,7 +300,7 @@ export default function Governanca() {
     }
   }, [escolaId, token, perfil]);
 
-  // ── Fetch config do Ano Letivo (Períodos e Exceções de Calendário) ──
+  // ── Fetch config do Ano Letivo (Períodos, Exceções e Horários de Aula) ──
   const fetchAnoLetivoConfig = useCallback(async (anoTarget = anoLetivoRef) => {
     try {
       const res = await fetch(`${API}/api/governanca/ano-letivo-config?escola_id=${escolaId}&ano=${anoTarget}`, {
@@ -313,6 +314,7 @@ export default function Governanca() {
       if (data.ok) {
         setAnoLetivoPeriodos(data.periodos || []);
         setAnoLetivoExcecoes(data.excecoes || []);
+        setAnoLetivoHorarios(data.horarios || []);
       }
     } catch (err) {
       console.warn("Erro ao buscar config do Ano Letivo:", err);
@@ -850,7 +852,7 @@ export default function Governanca() {
             const items = configsPorCategoria[cat] || [];
             const displayCount =
               catLower === "ano_letivo"
-                ? 2
+                ? 3
                 : items.filter(
                     (cfg) =>
                       cfg.chave !== "escola.avaliacao_padrao_bimestral.excecoes" &&
@@ -918,7 +920,7 @@ export default function Governanca() {
                         />
                       ))}
 
-                    {/* Banner customizado Categoria Ano Letivo (Bimestres + Semestres + Calendário Interativo) */}
+                    {/* Banner customizado Categoria Ano Letivo (Bimestres + Semestres + Horário das Aulas + Calendário Interativo) */}
                     {catLower === "ano_letivo" && (
                       <AnoLetivoGovernanca
                         apiBase={API}
@@ -929,9 +931,11 @@ export default function Governanca() {
                         setAnoLetivo={setAnoLetivoRef}
                         periodos={anoLetivoPeriodos}
                         excecoes={anoLetivoExcecoes}
+                        horarios={anoLetivoHorarios}
                         onRefreshState={(newState) => {
                           if (newState?.periodos) setAnoLetivoPeriodos(newState.periodos);
                           if (newState?.excecoes) setAnoLetivoExcecoes(newState.excecoes);
+                          if (newState?.horarios) setAnoLetivoHorarios(newState.horarios);
                         }}
                         showToast={showToast}
                       />

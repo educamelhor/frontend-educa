@@ -6,6 +6,7 @@
 // com Modal Premium de Justificativa e Contador Dinâmico de Dias Letivos.
 // ============================================================================
 import React, { useState, useMemo } from "react";
+import HorarioAulasSection from "./HorarioAulasSection.jsx";
 
 const MESES_NOMES = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -139,6 +140,7 @@ export default function AnoLetivoGovernanca({
   setAnoLetivo,
   periodos,
   excecoes,
+  horarios,
   onRefreshState,
   showToast,
 }) {
@@ -605,6 +607,20 @@ export default function AnoLetivoGovernanca({
           })}
         </div>
       </div>
+
+      {/* =====================================================================
+          CONTAINER 3: HORÁRIO DAS AULAS (GRADE DE TEMPOS POR TURNO)
+      ===================================================================== */}
+      <HorarioAulasSection
+        apiBase={apiBase}
+        escolaId={escolaId}
+        token={token}
+        perfil={perfil}
+        anoLetivo={anoLetivo}
+        horarios={horarios}
+        onRefreshState={onRefreshState}
+        showToast={showToast}
+      />
 
       {/* =====================================================================
           MODAL 1: CONFIGURAR / EDITAR DATAS DE INÍCIO E TÉRMINO

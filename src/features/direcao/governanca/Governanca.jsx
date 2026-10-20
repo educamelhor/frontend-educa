@@ -753,24 +753,6 @@ export default function Governanca() {
       {/* ── ABA CONFIGURAÇÕES (conteúdo original abaixo) ── */}
       {activeTab === "configs" && (
         <>
-        {/* ── TOAST ── */}
-        {toast && (
-
-        <div
-          style={{
-            ...styles.toast,
-            background:
-              toast.type === "error"
-                ? "linear-gradient(135deg, #ef4444, #dc2626)"
-                : toast.type === "info"
-                ? "linear-gradient(135deg, #3b82f6, #2563eb)"
-                : "linear-gradient(135deg, #10b981, #059669)",
-          }}
-        >
-          {toast.msg}
-        </div>
-      )}
-
       {/* ── HEADER ── */}
       <div style={styles.headerCard}>
         <div style={styles.headerLeft}>
@@ -2235,13 +2217,13 @@ const styles = {
     position: "fixed",
     top: 24,
     right: 24,
-    zIndex: 9999,
+    zIndex: 99999,
     padding: "12px 24px",
     borderRadius: 12,
     color: "#fff",
     fontWeight: 600,
     fontSize: 14,
-    boxShadow: "0 8px 32px rgba(0,0,0,0.18)",
+    boxShadow: "0 10px 36px rgba(0,0,0,0.35), 0 0 0 1.5px rgba(255,255,255,0.25)",
     animation: "slideIn .3s ease",
   },
 

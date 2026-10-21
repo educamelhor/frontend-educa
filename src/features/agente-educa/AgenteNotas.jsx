@@ -41,6 +41,72 @@ const BIMESTRE_COLORS = {
   "4º Bimestre": "#f59e0b",
 };
 
+const DISCIPLINA_EDUCADF_MAP = {
+  "PORTUGUES": "LÍNGUA PORTUGUESA",
+  "LINGUA PORTUGUESA": "LÍNGUA PORTUGUESA",
+  "INGLES": "LEM/INGLÊS",
+  "LEM INGLES": "LEM/INGLÊS",
+  "LEM/INGLES": "LEM/INGLÊS",
+  "ESPANHOL": "LEM/ESPANHOL",
+  "LEM ESPANHOL": "LEM/ESPANHOL",
+  "LEM/ESPANHOL": "LEM/ESPANHOL",
+  "CIENCIAS": "CIÊNCIAS NATURAIS",
+  "CIENCIAS NATURAIS": "CIÊNCIAS NATURAIS",
+  "ED FISICA": "EDUCAÇÃO FÍSICA",
+  "EDUCACAO FISICA": "EDUCAÇÃO FÍSICA",
+  "PARTE DIVERSIFICADA I": "PARTE DIVERSIFICADA I",
+  "PRATICA DIVERSIFICADA I": "PARTE DIVERSIFICADA I",
+  "PRATICAS DIVERSIFICADAS I": "PARTE DIVERSIFICADA I",
+  "PARTE DIVERSIFICADA 1": "PARTE DIVERSIFICADA I",
+  "PD1": "PARTE DIVERSIFICADA I",
+  "PD 1": "PARTE DIVERSIFICADA I",
+  "PD I": "PARTE DIVERSIFICADA I",
+  "PARTE DIVERSIFICADA II": "PARTE DIVERSIFICADA II",
+  "PRATICA DIVERSIFICADA II": "PARTE DIVERSIFICADA II",
+  "PRATICAS DIVERSIFICADAS II": "PARTE DIVERSIFICADA II",
+  "PARTE DIVERSIFICADA 2": "PARTE DIVERSIFICADA II",
+  "PD2": "PARTE DIVERSIFICADA II",
+  "PD 2": "PARTE DIVERSIFICADA II",
+  "PD II": "PARTE DIVERSIFICADA II",
+  "PARTE DIVERSIFICADA III": "PARTE DIVERSIFICADA III",
+  "PRATICA DIVERSIFICADA III": "PARTE DIVERSIFICADA III",
+  "PRATICAS DIVERSIFICADAS III": "PARTE DIVERSIFICADA III",
+  "PARTE DIVERSIFICADA 3": "PARTE DIVERSIFICADA III",
+  "PD3": "PARTE DIVERSIFICADA III",
+  "PD 3": "PARTE DIVERSIFICADA III",
+  "PD III": "PARTE DIVERSIFICADA III",
+  "MATEMATICA": "MATEMÁTICA",
+  "HISTORIA": "HISTÓRIA",
+  "GEOGRAFIA": "GEOGRAFIA",
+  "ARTES": "ARTES",
+  "ARTE": "ARTES",
+  "ENSINO RELIGIOSO": "ENSINO RELIGIOSO",
+  "BIOLOGIA": "BIOLOGIA",
+  "FISICA": "FÍSICA",
+  "QUIMICA": "QUÍMICA",
+  "FILOSOFIA": "FILOSOFIA",
+  "SOCIOLOGIA": "SOCIOLOGIA",
+};
+
+function resolverComponenteEducaDF(plano) {
+  const oficialBanco = (plano?.disciplina_oficial || "").trim();
+  if (oficialBanco) {
+    return { nomeOficial: oficialBanco, mapeado: true, origem: "secretaria" };
+  }
+  const disc = String(plano?.disciplina || "").trim();
+  const upper = disc
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\.\s*/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (DISCIPLINA_EDUCADF_MAP[upper]) {
+    return { nomeOficial: DISCIPLINA_EDUCADF_MAP[upper], mapeado: true, origem: "padrao" };
+  }
+  return { nomeOficial: disc, mapeado: false, origem: "nenhum" };
+}
+
 // ── Card individual de plano ──────────────────────────
 function NotaCard({ plano, onExportar, onReexportar, exportandoId, onVerRelatorio }) {
   const [expanded, setExpanded] = useState(false);
@@ -50,6 +116,7 @@ function NotaCard({ plano, onExportar, onReexportar, exportandoId, onVerRelatori
   const itens      = Array.isArray(plano.itens) ? plano.itens : JSON.parse(plano.itens || "[]");
   const bimestral  = itens.find(i => i.fixo_direcao);
   const exportando = exportandoId === plano.id;
+  const compInfo   = resolverComponenteEducaDF(plano);
 
   const emExecucao         = !!plano.agente_executando_desde &&
     (Date.now() - new Date(plano.agente_executando_desde).getTime() < 15 * 60 * 1000);
@@ -139,8 +206,33 @@ function NotaCard({ plano, onExportar, onReexportar, exportandoId, onVerRelatori
                 )}
               </div>
 
-              <div style={{ fontSize: "1.05rem", fontWeight: 800, color: "#e2e8f0", marginBottom: 4 }}>
-                {plano.disciplina}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
+                <span style={{ fontSize: "1.05rem", fontWeight: 800, color: "#e2e8f0" }}>
+                  {plano.disciplina}
+                </span>
+                {compInfo.mapeado ? (
+                  <span
+                    title="Componente correspondente no portal EDUCADF (configurado em Secretaria > Disciplinas)"
+                    style={{
+                      fontSize: "0.65rem", fontWeight: 700, padding: "2px 9px", borderRadius: 99,
+                      background: "rgba(6,182,212,0.12)", color: "#67e8f9",
+                      border: "1px solid rgba(6,182,212,0.3)",
+                    }}
+                  >
+                    EDUCADF: {compInfo.nomeOficial}
+                  </span>
+                ) : (
+                  <span
+                    title="Esta disciplina ainda não possui vínculo com o Padrão Oficial (EDUCADF) em Secretaria > Disciplinas"
+                    style={{
+                      fontSize: "0.65rem", fontWeight: 700, padding: "2px 9px", borderRadius: 99,
+                      background: "rgba(245,158,11,0.12)", color: "#fcd34d",
+                      border: "1px solid rgba(245,158,11,0.35)",
+                    }}
+                  >
+                    ⚠️ Sem vínculo EDUCADF (Secretaria &gt; Disciplinas)
+                  </span>
+                )}
               </div>
               <div style={{ fontSize: "0.8rem", color: "#94a3b8", fontWeight: 500 }}>
                 Turma: <strong style={{ color: "#cbd5e1" }}>{plano.turmas}</strong>

@@ -180,6 +180,8 @@ export default function Avaliacoes() {
   // Novo fluxo: EXPORTAR BOLETIM em etapas
   const [modalNotasPendentes, setModalNotasPendentes] = useState(false);
   const [modalDataBimestralFaltando, setModalDataBimestralFaltando] = useState(false);
+  const [dataBimestralTemp, setDataBimestralTemp] = useState("");
+  const [salvandoDataBimestral, setSalvandoDataBimestral] = useState(false);
   const [modalConfirmarExportar, setModalConfirmarExportar] = useState(false);
   const [modalProgressoExportar, setModalProgressoExportar] = useState(false);
   const [progressoExportar, setProgressoExportar] = useState(0); // 0-100
@@ -996,8 +998,10 @@ export default function Avaliacoes() {
   // ---------------------------
   const handleClickExportarBoletim = () => {
     // NOVA VALIDAÇÃO: Prova Bimestral sem data
-    const provaBimestralItem = plano?.itens?.find(i => i.fixo_direcao === 1);
+    const arrItens = Array.isArray(plano?.itens) ? plano.itens : JSON.parse(plano?.itens || "[]");
+    const provaBimestralItem = arrItens.find(i => Number(i.fixo_direcao) === 1);
     if (provaBimestralItem && !provaBimestralItem.data_inicio) {
+      setDataBimestralTemp("");
       setModalDataBimestralFaltando(true);
       return;
     }
@@ -1007,6 +1011,43 @@ export default function Avaliacoes() {
     } else {
       setModalConfirmarExportar(true);
     }
+  };
+
+  // Salva a data da Prova Bimestral diretamente pelo modal de bloqueio e avança para exportação
+  const salvarDataBimestralEContinuar = async () => {
+    if (!plano?.id || !dataBimestralTemp) return;
+    const arrItens = Array.isArray(plano?.itens) ? plano.itens : JSON.parse(plano?.itens || "[]");
+    const itemIdx = arrItens.findIndex(i => Number(i.fixo_direcao) === 1);
+    const provaBimestralItem = itemIdx >= 0 ? arrItens[itemIdx] : null;
+    if (!provaBimestralItem?.id) return;
+
+    setSalvandoDataBimestral(true);
+    try {
+      const resp = await api.patch(`/avaliacoes/${plano.id}/item/${provaBimestralItem.id}/data`, {
+        data_inicio: dataBimestralTemp,
+      });
+      if (resp.data?.ok) {
+        setPlano(prev => {
+          const itens = Array.isArray(prev.itens) ? prev.itens : JSON.parse(prev.itens || "[]");
+          const novosItens = itens.map((it, idx) =>
+            idx === itemIdx ? { ...it, data_inicio: dataBimestralTemp } : it
+          );
+          return { ...prev, itens: novosItens };
+        });
+        showMsg("success", `Data de "${provaBimestralItem.atividade}" registrada com sucesso.`);
+        setModalDataBimestralFaltando(false);
+        if (!todasNotasLancadas) {
+          setModalNotasPendentes(true);
+        } else {
+          setModalConfirmarExportar(true);
+        }
+      } else {
+        showMsg("error", resp.data?.error || "Erro ao salvar data da Prova Bimestral.");
+      }
+    } catch (err) {
+      showMsg("error", err.response?.data?.error || "Erro ao salvar data da Prova Bimestral.");
+    }
+    setSalvandoDataBimestral(false);
   };
 
   const handleExportarBoletimComProgresso = async () => {
@@ -2311,6 +2352,123 @@ export default function Avaliacoes() {
                 </button>
                 <button onClick={()=>setModalZero(null)} className="flex-1 py-3 rounded-xl font-bold text-sm transition-all" style={{background:"rgba(99,102,241,0.2)",color:"#a5b4fc",border:"1px solid rgba(99,102,241,0.3)"}}>
                   Manter Nota 0,00
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* MODAL: DATA DA PROVA BIMESTRAL FALTANDO                        */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {modalDataBimestralFaltando && (
+        <div
+          className="fixed inset-0 z-[300] flex items-center justify-center"
+          style={{ background: "rgba(2,6,23,0.78)", backdropFilter: "blur(10px)" }}
+          onClick={() => !salvandoDataBimestral && setModalDataBimestralFaltando(false)}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            className="w-full max-w-md mx-4 rounded-2xl overflow-hidden shadow-2xl"
+            style={{
+              background: "linear-gradient(155deg, #1e293b 0%, #0f172a 100%)",
+              border: "1px solid rgba(245,158,11,0.35)",
+              boxShadow: "0 28px 68px rgba(0,0,0,0.65)",
+            }}
+          >
+            {/* Header */}
+            <div
+              className="p-5 flex items-center gap-3.5"
+              style={{
+                background: "linear-gradient(135deg, rgba(245,158,11,0.18), rgba(217,119,6,0.08))",
+                borderBottom: "1px solid rgba(245,158,11,0.2)",
+              }}
+            >
+              <div
+                className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl shrink-0"
+                style={{ background: "rgba(245,158,11,0.2)", border: "1px solid rgba(245,158,11,0.35)" }}
+              >
+                📅
+              </div>
+              <div>
+                <div className="text-white font-black text-base leading-tight">
+                  Data da Prova Bimestral Pendente
+                </div>
+                <div className="text-amber-400 text-xs font-semibold mt-0.5">
+                  Requisito obrigatório antes de exportar ao boletim
+                </div>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-4">
+              <div
+                className="rounded-xl p-3.5 text-xs leading-relaxed"
+                style={{
+                  background: "rgba(245,158,11,0.08)",
+                  border: "1px solid rgba(245,158,11,0.22)",
+                  color: "#fde68a",
+                }}
+              >
+                Para exportar as notas para o boletim, é necessário informar a{" "}
+                <strong className="text-white">data de realização da Prova Bimestral</strong>{" "}
+                (exigida no registro oficial do diário).
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-300 mb-2">
+                  Informe a data de realização da Prova Bimestral
+                </label>
+                <input
+                  type="date"
+                  value={dataBimestralTemp}
+                  onChange={e => setDataBimestralTemp(e.target.value)}
+                  className="w-full rounded-xl px-4 py-3 text-base font-bold outline-none transition-all"
+                  style={{
+                    background: "rgba(255,255,255,0.06)",
+                    border: "1px solid rgba(245,158,11,0.4)",
+                    color: "#f8fafc",
+                  }}
+                />
+                <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
+                  Você também pode alterar essa data a qualquer momento clicando no botão{" "}
+                  <strong className="text-amber-300">📅 + data</strong> no cabeçalho da coluna Prova Bimestral.
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-1">
+                <button
+                  onClick={() => setModalDataBimestralFaltando(false)}
+                  disabled={salvandoDataBimestral}
+                  className="flex-1 py-3 rounded-xl font-bold text-sm transition-all cursor-pointer"
+                  style={{
+                    background: "rgba(255,255,255,0.06)",
+                    color: "#94a3b8",
+                    border: "1px solid rgba(255,255,255,0.12)",
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={salvarDataBimestralEContinuar}
+                  disabled={salvandoDataBimestral || !dataBimestralTemp}
+                  className="px-5 py-3 rounded-xl font-bold text-white text-sm transition-all"
+                  style={{
+                    flex: 2,
+                    background:
+                      salvandoDataBimestral || !dataBimestralTemp
+                        ? "rgba(245,158,11,0.25)"
+                        : "linear-gradient(135deg, #d97706, #b45309)",
+                    boxShadow:
+                      !salvandoDataBimestral && dataBimestralTemp
+                        ? "0 4px 14px rgba(217,119,6,0.4)"
+                        : "none",
+                    cursor: salvandoDataBimestral || !dataBimestralTemp ? "not-allowed" : "pointer",
+                    opacity: salvandoDataBimestral || !dataBimestralTemp ? 0.6 : 1,
+                  }}
+                >
+                  {salvandoDataBimestral ? "Salvando..." : "📅 Salvar Data e Exportar"}
                 </button>
               </div>
             </div>

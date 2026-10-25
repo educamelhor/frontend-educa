@@ -170,6 +170,9 @@ import {
   ImpressaoSalaRecursos,
 } from "./features/sala-recursos";
 
+// ✅ MÓDULO ADMINISTRATIVO
+import AdministrativoModule from "./features/administrativo";
+
 // Layout protegido para rotas autenticadas
 function ProtectedLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -528,6 +531,13 @@ export default function App() {
           <Route path="/direcao/governanca" element={
             <RequireModulo modulo="direcao"><RequireDiretor><Governanca /></RequireDiretor></RequireModulo>
           } />
+
+          {/* ── Administrativo ───────────────────────────────────────────── */}
+          <Route path="/administrativo"            element={<RequireModulo modulo="administrativo"><AdministrativoModule /></RequireModulo>} />
+          <Route path="/administrativo/servidores" element={<RequireModulo modulo="administrativo"><AdministrativoModule /></RequireModulo>} />
+          <Route path="/administrativo/frequencia" element={<RequireModulo modulo="administrativo"><AdministrativoModule /></RequireModulo>} />
+          <Route path="/administrativo/ocorrencias" element={<RequireModulo modulo="administrativo"><AdministrativoModule /></RequireModulo>} />
+          <Route path="/administrativo/relatorios" element={<RequireModulo modulo="administrativo"><AdministrativoModule /></RequireModulo>} />
 
           <Route path="*" element={<Navigate to="/home" replace />} />
         </Route>

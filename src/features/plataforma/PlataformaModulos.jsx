@@ -154,6 +154,15 @@ const MODULOS_TREE = [
       { id: 'sala_recurso.atendimentos', label: 'Diário de Sessões' },
     ]
   },
+  {
+    id: 'administrativo', label: 'Administrativo', icon: '🏢',
+    filhos: [
+      { id: 'administrativo.servidores', label: 'Servidores & Equipe' },
+      { id: 'administrativo.frequencia', label: 'Frequência & Ponto' },
+      { id: 'administrativo.ocorrencias', label: 'Abonos & Ocorrências' },
+      { id: 'administrativo.relatorios', label: 'Espelho & Relatórios' },
+    ]
+  },
 ];
 
 // ── Group accent colors (cycle) ───────────────────────────────────────────────

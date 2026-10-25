@@ -284,6 +284,7 @@ export default function Sidebar({ isOpen, onClose }) {
     else if (p.startsWith('/merenda')) setOpenGroup('merenda');
     else if (p.startsWith('/comunicacao')) setOpenGroup('comunicacao');
     else if (p.startsWith('/sala-recursos')) setOpenGroup('sala_recurso');
+    else if (p.startsWith('/administrativo')) setOpenGroup('administrativo');
     else setOpenGroup(null);
   }, [location.pathname]);
 
@@ -1807,6 +1808,117 @@ export default function Sidebar({ isOpen, onClose }) {
             )}
             </>
             )}
+
+        {/* ────────────────────────────────────────────────────
+            GRUPO: ADMINISTRATIVO
+            Objetivo: Registros, frequência, abonos, atestados, ausências e
+                      negociações internas de professores, servidores e terceirizados.
+            Guard: isScopeEscola && !isDisciplinar && !isProfessor && hasModulo('administrativo')
+        ──────────────────────────────────────────────────── */}
+        {isScopeEscola && !isDisciplinar && !isProfessor && hasModulo('administrativo') && (
+          <>
+            <button
+              className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 mt-2 transition"
+              onClick={() => setOpenGroup(openGroup === 'administrativo' ? null : 'administrativo')}
+              type="button"
+              style={{
+                background: openGroup === 'administrativo'
+                  ? 'linear-gradient(90deg, rgba(14,165,233,0.22), transparent)'
+                  : undefined,
+              }}
+            >
+              <ClipboardDocumentListIcon className="h-5 w-5 mr-2" style={{ color: openGroup === 'administrativo' ? '#38bdf8' : '#7dd3fc' }} />
+              <span className="flex-1 text-left" style={{ fontWeight: 700 }}>Administrativo</span>
+              <span style={{
+                fontSize: '0.52rem',
+                fontWeight: 800,
+                background: 'linear-gradient(135deg, #0284c7, #2563eb)',
+                color: '#fff',
+                padding: '2px 6px',
+                borderRadius: '8px',
+                letterSpacing: '0.5px',
+                marginRight: 4,
+              }}>NOVO</span>
+              {openGroup === 'administrativo' ? (
+                <ChevronDownIcon className="h-4 w-4" />
+              ) : (
+                <ChevronRightIcon className="h-4 w-4" />
+              )}
+            </button>
+
+            {openGroup === 'administrativo' && (
+              <ul className="ml-4 mb-2">
+                {hasModulo('administrativo.servidores') && (
+                <li>
+                  <Link
+                    to="/administrativo/servidores"
+                    className={getSubmenuLinkClasses('/administrativo/servidores')}
+                    style={{
+                      background: isActive('/administrativo/servidores')
+                        ? 'linear-gradient(90deg, rgba(14,165,233,0.18), transparent)'
+                        : undefined,
+                    }}
+                  >
+                    <UsersIcon className="h-5 w-5 mr-2" style={{ color: isActive('/administrativo/servidores') ? '#38bdf8' : undefined }} />
+                    <span className="flex-1">Servidores & Equipe</span>
+                  </Link>
+                </li>
+                )}
+
+                {hasModulo('administrativo.frequencia') && (
+                <li>
+                  <Link
+                    to="/administrativo/frequencia"
+                    className={getSubmenuLinkClasses('/administrativo/frequencia')}
+                    style={{
+                      background: isActive('/administrativo/frequencia')
+                        ? 'linear-gradient(90deg, rgba(16,185,129,0.18), transparent)'
+                        : undefined,
+                    }}
+                  >
+                    <CalendarDaysIcon className="h-5 w-5 mr-2" style={{ color: isActive('/administrativo/frequencia') ? '#34d399' : undefined }} />
+                    <span className="flex-1">Frequência & Ponto</span>
+                  </Link>
+                </li>
+                )}
+
+                {hasModulo('administrativo.ocorrencias') && (
+                <li>
+                  <Link
+                    to="/administrativo/ocorrencias"
+                    className={getSubmenuLinkClasses('/administrativo/ocorrencias')}
+                    style={{
+                      background: isActive('/administrativo/ocorrencias')
+                        ? 'linear-gradient(90deg, rgba(139,92,246,0.18), transparent)'
+                        : undefined,
+                    }}
+                  >
+                    <DocumentTextIcon className="h-5 w-5 mr-2" style={{ color: isActive('/administrativo/ocorrencias') ? '#a78bfa' : undefined }} />
+                    <span className="flex-1">Abonos & Ocorrências</span>
+                  </Link>
+                </li>
+                )}
+
+                {hasModulo('administrativo.relatorios') && (
+                <li>
+                  <Link
+                    to="/administrativo/relatorios"
+                    className={getSubmenuLinkClasses('/administrativo/relatorios')}
+                    style={{
+                      background: isActive('/administrativo/relatorios')
+                        ? 'linear-gradient(90deg, rgba(245,158,11,0.18), transparent)'
+                        : undefined,
+                    }}
+                  >
+                    <ChartBarIcon className="h-5 w-5 mr-2" style={{ color: isActive('/administrativo/relatorios') ? '#fbbf24' : undefined }} />
+                    <span className="flex-1">Espelho & Relatórios</span>
+                  </Link>
+                </li>
+                )}
+              </ul>
+            )}
+          </>
+        )}
 
         {isScopeEscola && !isDisciplinar && !isProfessor && hasModulo('pedagogico') && (
           <>

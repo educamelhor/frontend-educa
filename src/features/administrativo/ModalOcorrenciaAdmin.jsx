@@ -70,6 +70,7 @@ export const SUBTIPOS_POR_TIPO = {
     "HORAS NAO TRABALHADAS",
   ],
   negociacao: [
+    "NEGOCIAÇÃO INTERNA - DIREÇÃO / COORDENAÇÃO",
     "NEGOCIAÇÃO INTERNA — LIBERAÇÃO COM REPOSIÇÃO DE CARGA HORÁRIA",
     "NEGOCIAÇÃO INTERNA — TROCA DE TURNO / ACORDO COM A DIREÇÃO",
     "ADICIONAL NOTURNO",
@@ -369,7 +370,7 @@ export default function ModalOcorrenciaAdmin({
                 1. Natureza / Categoria do Registro Administrativo (6 Grupos)
               </label>
               <span className="text-[11px] font-semibold text-slate-400">
-                39 ocorrências oficiais SIGEP/SEEDF organizadas por categoria
+                {CATALOGO_EVENTOS_SIGEP.length} ocorrências oficiais SIGEP/SEEDF organizadas por categoria
               </span>
             </div>
 

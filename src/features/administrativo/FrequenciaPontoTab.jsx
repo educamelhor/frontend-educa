@@ -269,14 +269,18 @@ export default function FrequenciaPontoTab({
     if (occAuto) {
       const statusMap = {
         abono: "abono",
+        afastamento: "abono",
         atestado: "atestado",
+        licenca: "atestado",
         negociacao: "negociacao",
-        ausencia: occAuto.subtipo?.toLowerCase().includes("atraso")
-          ? "atraso"
-          : "falta",
+        ausencia:
+          occAuto.subtipo?.toLowerCase().includes("atraso") ||
+          occAuto.subtipo?.toLowerCase().includes("horas")
+            ? "atraso"
+            : "falta",
       };
       return {
-        status: statusMap[occAuto.tipo] || "ausencia",
+        status: statusMap[occAuto.tipo] || "abono",
         turno1_nome: turnosSrv.turno1.nome,
         entrada: "—",
         saida: "—",

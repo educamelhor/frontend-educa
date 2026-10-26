@@ -52,43 +52,63 @@ export const TURNOS_TRABALHO = [
 export const TIPOS_OCORRENCIA_ADMIN = [
   {
     value: "abono",
-    label: "Abono de Ponto",
+    label: "Abono de Ponto (LC 840 / TRE)",
     shortLabel: "Abono",
     cor: "#059669",
     bg: "#d1fae5",
     border: "#6ee7b7",
     icone: "sparkles",
-    descricao: "Abono anual regulamentar (limite padrão de 5 abonos/ano)",
+    descricao: "Abono anual Art. 151 LC 840/2011, Abono Bimestral Lei 449/1993 e Abono TRE",
   },
   {
     value: "atestado",
-    label: "Atestado Médico / Licença",
+    label: "Atestado & Exame Médico",
     shortLabel: "Atestado",
     cor: "#2563eb",
     bg: "#dbeafe",
     border: "#93c5fd",
     icone: "document",
-    descricao: "Afastamento por motivo de saúde, acompanhamento familiar ou licença médica",
+    descricao: "Atestado até 3 dias, comparecimento servidor/família/Subsaúde, atividade terapêutica e exame periódico",
+  },
+  {
+    value: "licenca",
+    label: "Licença Médica / Familiar",
+    shortLabel: "Licença",
+    cor: "#0284c7",
+    bg: "#e0f2fe",
+    border: "#7dd3fc",
+    icone: "shield",
+    descricao: "Licença médica/odontológica, acompanhamento familiar, maternidade, paternidade, adotante e acidente",
+  },
+  {
+    value: "afastamento",
+    label: "Afastamento & Dispensa Legal",
+    shortLabel: "Afastamento",
+    cor: "#d97706",
+    bg: "#fef3c7",
+    border: "#fcd34d",
+    icone: "briefcase",
+    descricao: "Casamento, falecimento, doação de sangue, serviço eleitoral, júri e dispensas por decreto",
   },
   {
     value: "ausencia",
-    label: "Ausência / Falta / Atraso",
-    shortLabel: "Ausência",
+    label: "Falta, Paralisação & Horas",
+    shortLabel: "Ausência / Falta",
     cor: "#dc2626",
     bg: "#fee2e2",
     border: "#fca5a5",
     icone: "exclamation",
-    descricao: "Falta injustificada, falta justificada, atraso ou saída antecipada",
+    descricao: "Falta, falta injustificada, falta paralisação, horas não trabalhadas e atraso/saída",
   },
   {
     value: "negociacao",
-    label: "Negociação Interna / Banco de Horas",
-    shortLabel: "Negociação Interna",
+    label: "Negociação & Calendário",
+    shortLabel: "Acordo / Evento",
     cor: "#7c3aed",
     bg: "#ede9fe",
     border: "#c4b5fd",
     icone: "handshake",
-    descricao: "Acordo interno com a direção para troca de turno, liberação ou reposição futura",
+    descricao: "Acordo interno de reposição, dia letivo móvel, ponto facultativo, recesso, sábado letivo e suspensão de aulas",
   },
 ];
 
@@ -1123,11 +1143,17 @@ export function useAdministrativoData() {
       const isAnoAtual = !anoOcc || anoOcc === anoAtual;
 
       if (occ.tipo === "abono" && isAnoAtual && occ.status !== "cancelado") {
-        st.abonosUsados += Number(occ.dias) || 1;
-        st.abonosRestantes = Math.max(0, LIMITE_ABONOS_ANUAL - st.abonosUsados);
-      } else if (occ.tipo === "atestado") {
+        const isTRE = String(occ.subtipo || "").toLowerCase().includes("tre");
+        if (!isTRE) {
+          st.abonosUsados += Number(occ.dias) || 1;
+          st.abonosRestantes = Math.max(0, LIMITE_ABONOS_ANUAL - st.abonosUsados);
+        }
+      } else if (occ.tipo === "atestado" || occ.tipo === "licenca") {
         st.totalAtestados += 1;
         st.diasAtestado += Number(occ.dias) || 1;
+      } else if (occ.tipo === "afastamento") {
+        st.totalAfastamentos = (st.totalAfastamentos || 0) + 1;
+        st.diasAfastamento = (st.diasAfastamento || 0) + (Number(occ.dias) || 1);
       } else if (occ.tipo === "ausencia") {
         st.totalAusencias += 1;
       } else if (occ.tipo === "negociacao") {

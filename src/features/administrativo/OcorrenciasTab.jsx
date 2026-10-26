@@ -71,6 +71,8 @@ export default function OcorrenciasTab({
       todos: ocorrencias.length,
       abono: 0,
       atestado: 0,
+      licenca: 0,
+      afastamento: 0,
       ausencia: 0,
       negociacao: 0,
       negociacaoPendente: 0,
@@ -101,6 +103,7 @@ export default function OcorrenciasTab({
           (o.motivo || "").toLowerCase().includes(q) ||
           (o.cid || "").toLowerCase().includes(q) ||
           (o.medico || "").toLowerCase().includes(q) ||
+          (o.documento_ref || "").toLowerCase().includes(q) ||
           (o.forma_compensacao || "").toLowerCase().includes(q)
         );
       })
@@ -298,13 +301,14 @@ export default function OcorrenciasTab({
                           {occ.motivo}
                         </p>
 
-                        {occ.tipo === "atestado" && (occ.cid || occ.medico || occ.documento_ref) && (
-                          <div className="mt-1.5 p-2 rounded-lg bg-blue-50/80 border border-blue-100 text-[11px] text-blue-800">
-                            {occ.medico && <span><strong>Médico:</strong> {occ.medico} </span>}
-                            {occ.cid && <span>• <strong>CID:</strong> {occ.cid} </span>}
-                            {occ.documento_ref && <span>• <strong>Ref:</strong> {occ.documento_ref}</span>}
-                          </div>
-                        )}
+                        {(occ.tipo === "atestado" || occ.tipo === "licenca" || occ.tipo === "afastamento") &&
+                          (occ.cid || occ.medico || occ.documento_ref) && (
+                            <div className="mt-1.5 p-2 rounded-lg bg-blue-50/80 border border-blue-100 text-[11px] text-blue-800">
+                              {occ.medico && <span><strong>Médico/Perícia:</strong> {occ.medico} </span>}
+                              {occ.cid && <span>• <strong>CID:</strong> {occ.cid} </span>}
+                              {occ.documento_ref && <span>• <strong>Doc/SEI:</strong> {occ.documento_ref}</span>}
+                            </div>
+                          )}
 
                         {occ.tipo === "negociacao" && (
                           <div className="mt-1.5 p-2 rounded-lg bg-purple-50/80 border border-purple-100 text-[11px] text-purple-900">

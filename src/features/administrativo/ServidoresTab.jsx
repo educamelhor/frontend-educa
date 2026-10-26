@@ -420,18 +420,10 @@ export default function ServidoresTab({
                 <SparklesIcon className="h-3 w-3 text-amber-300 absolute -top-1 -right-1 drop-shadow" />
               </span>
 
-              {/* Texto em duas camadas com hierarquia executiva */}
-              <div className="relative text-left leading-tight">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] font-extrabold uppercase tracking-widest text-sky-200">
-                    Ação Principal do Quadro
-                  </span>
-                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" />
-                </div>
-                <div className="text-xs sm:text-[13px] font-extrabold tracking-wide text-white flex items-center gap-1">
-                  + CADASTRAR SERVIDOR / TERCEIRIZADO
-                </div>
-              </div>
+              {/* Texto limpo e direto */}
+              <span className="relative text-xs sm:text-[13px] font-extrabold tracking-wide text-white">
+                CADASTRAR SERVIDOR / TERCEIRIZADO
+              </span>
             </button>
           </div>
         </div>

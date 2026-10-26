@@ -84,9 +84,34 @@ export default function FrequenciaPontoTab({
     const manual = registrosDoDia[srv.id];
     const occAuto = ocorrenciaVigentePorServidor[srv.id];
 
+    const isVespertino = normalizarTurno(srv.turno) === "Vespertino";
+    const horarioStr =
+      isVespertino && srv.horario_trabalho === "07:30 às 12:30"
+        ? "13:00 às 18:00"
+        : srv.horario_trabalho || getHorarioPadraoPorTurno(srv.turno);
+    const horarioPadrao = horarioStr.split(" às ");
+    const entradaPadrao = horarioPadrao[0] || "07:30";
+    const saidaPadrao = horarioPadrao[1] || "17:30";
+
+    // Se o usuário clicou novamente na opção ativa para desmarcar
+    if (manual && manual._desmarcado) {
+      return {
+        status: null,
+        entrada: entradaPadrao,
+        saida: saidaPadrao,
+        observacao: manual.observacao || "",
+        origem_auto: false,
+        ocorrencia_vinculada: null,
+      };
+    }
+
     if (manual && manual.status) {
+      const corrigirVespertinoCache =
+        isVespertino && manual.entrada === "07:30" && manual.saida === "12:30";
       return {
         ...manual,
+        entrada: corrigirVespertinoCache ? "13:00" : manual.entrada || entradaPadrao,
+        saida: corrigirVespertinoCache ? "18:00" : manual.saida || saidaPadrao,
         origem_auto: false,
         ocorrencia_vinculada: occAuto || null,
       };
@@ -109,15 +134,10 @@ export default function FrequenciaPontoTab({
       };
     }
 
-    const horarioStr =
-      normalizarTurno(srv.turno) === "Vespertino" && srv.horario_trabalho === "07:30 às 12:30"
-        ? "13:00 às 18:00"
-        : srv.horario_trabalho || getHorarioPadraoPorTurno(srv.turno);
-    const horarioPadrao = horarioStr.split(" às ");
     return {
       status: null, // pendente de chamada
-      entrada: horarioPadrao[0] || "07:30",
-      saida: horarioPadrao[1] || "17:30",
+      entrada: entradaPadrao,
+      saida: saidaPadrao,
       observacao: "",
       origem_auto: false,
       ocorrencia_vinculada: null,
@@ -454,12 +474,27 @@ export default function FrequenciaPontoTab({
                             <button
                               key={op.value}
                               type="button"
-                              onClick={() =>
-                                onRegistrarPonto(dataSel, srv.id, {
-                                  ...reg,
-                                  status: op.value,
-                                })
+                              title={
+                                isAtivo
+                                  ? `Clique novamente para desmarcar "${op.label}"`
+                                  : `Marcar como "${op.label}"`
                               }
+                              onClick={() => {
+                                if (isAtivo) {
+                                  // Clicou novamente na mesma opção -> desmarca!
+                                  onRegistrarPonto(dataSel, srv.id, {
+                                    ...reg,
+                                    status: null,
+                                    _desmarcado: true,
+                                  });
+                                } else {
+                                  onRegistrarPonto(dataSel, srv.id, {
+                                    ...reg,
+                                    status: op.value,
+                                    _desmarcado: false,
+                                  });
+                                }
+                              }}
                               className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold border transition ${
                                 isAtivo
                                   ? "shadow-sm scale-[1.03]"
@@ -497,6 +532,7 @@ export default function FrequenciaPontoTab({
                             onRegistrarPonto(dataSel, srv.id, {
                               ...reg,
                               status: reg.status || "presente",
+                              _desmarcado: false,
                               entrada: e.target.value,
                             })
                           }
@@ -511,6 +547,7 @@ export default function FrequenciaPontoTab({
                             onRegistrarPonto(dataSel, srv.id, {
                               ...reg,
                               status: reg.status || "presente",
+                              _desmarcado: false,
                               saida: e.target.value,
                             })
                           }
@@ -529,6 +566,7 @@ export default function FrequenciaPontoTab({
                           onRegistrarPonto(dataSel, srv.id, {
                             ...reg,
                             status: reg.status || "presente",
+                            _desmarcado: false,
                             observacao: e.target.value,
                           })
                         }

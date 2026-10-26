@@ -113,8 +113,17 @@ export default function ServidoresTab({
   // Modal Dossiê / Prontuário 360º do Servidor
   const [dossieServidorId, setDossieServidorId] = useState(null);
 
-  // Modal Confirmação de Exclusão
-  const [confirmExcluir, setConfirmExcluir] = useState(null);
+  // Modal Premium Concatenado: Inativação & Exclusão Hierárquica
+  // { servidor: obj, modo: 'inativar' | 'excluir', inativadoNesteFluxo: boolean }
+  const [modalCicloVida, setModalCicloVida] = useState(null);
+
+  const servidorCicloAtual = useMemo(() => {
+    if (!modalCicloVida?.servidor) return null;
+    return (
+      servidores.find((s) => s.id === modalCicloVida.servidor.id) ||
+      modalCicloVida.servidor
+    );
+  }, [servidores, modalCicloVida]);
 
   const dossieServidor = useMemo(
     () => servidores.find((s) => s.id === dossieServidorId) || null,
@@ -362,7 +371,7 @@ export default function ServidoresTab({
 
       {/* ── Barra de Busca, Filtros e Botões de Ação ── */}
       <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-sm space-y-3">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3.5">
           {/* Busca */}
           <div className="relative flex-1">
             <MagnifyingGlassIcon className="h-5 w-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -371,31 +380,58 @@ export default function ServidoresTab({
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
               placeholder="Buscar servidor por nome, CPF, matrícula, cargo, disciplina, setor ou empresa..."
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+              className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-300 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none shadow-inner bg-slate-50/40 focus:bg-white transition"
             />
           </div>
 
-          {/* Botões Principais */}
-          <div className="flex flex-wrap items-center gap-2.5">
-            <button
-              type="button"
-              onClick={() => onAbrirModalOcorrencia(null, "abono")}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs font-bold transition"
-            >
-              <CalendarDaysIcon className="h-4 w-4" />
-              + Registrar Abono / Atestado / Acordo
-            </button>
-
+          {/* Botão Principal da Aba (Destaque Premium Hero CTA) */}
+          <div className="flex items-center">
             <button
               type="button"
               onClick={abrirNovoServidor}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-white text-xs font-bold shadow-md hover:opacity-95 transition"
+              className="group relative inline-flex items-center gap-3 pl-3 pr-5 py-2.5 rounded-2xl text-white transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 overflow-hidden"
               style={{
-                background: "linear-gradient(135deg, #0f172a, #1e3a8a)",
+                background:
+                  "linear-gradient(135deg, #1e40af 0%, #2563eb 50%, #0284c7 100%)",
+                boxShadow:
+                  "0 10px 25px -5px rgba(37, 99, 235, 0.55), 0 0 0 3px rgba(59, 130, 246, 0.18)",
               }}
             >
-              <PlusIcon className="h-4 w-4" />
-              Cadastrar Servidor / Terceirizado
+              {/* Efeito de brilho sutil no hover */}
+              <span
+                className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                style={{
+                  background:
+                    "radial-gradient(circle at 85% 20%, rgba(255,255,255,0.28), transparent 60%)",
+                }}
+              />
+
+              {/* Ícone em cápsula iluminada */}
+              <span
+                className="relative flex items-center justify-center w-9 h-9 rounded-xl transition-transform duration-200 group-hover:scale-105 group-hover:rotate-3"
+                style={{
+                  background:
+                    "linear-gradient(135deg, rgba(255,255,255,0.26), rgba(255,255,255,0.1))",
+                  border: "1px solid rgba(255,255,255,0.35)",
+                  boxShadow: "inset 0 1px 1px rgba(255,255,255,0.4)",
+                }}
+              >
+                <PlusIcon className="h-5 w-5 text-white stroke-[2.6]" />
+                <SparklesIcon className="h-3 w-3 text-amber-300 absolute -top-1 -right-1 drop-shadow" />
+              </span>
+
+              {/* Texto em duas camadas com hierarquia executiva */}
+              <div className="relative text-left leading-tight">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-extrabold uppercase tracking-widest text-sky-200">
+                    Ação Principal do Quadro
+                  </span>
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse" />
+                </div>
+                <div className="text-xs sm:text-[13px] font-extrabold tracking-wide text-white flex items-center gap-1">
+                  + CADASTRAR SERVIDOR / TERCEIRIZADO
+                </div>
+              </div>
             </button>
           </div>
         </div>
@@ -699,7 +735,7 @@ export default function ServidoresTab({
 
                       {/* Ações */}
                       <td className="py-3.5 px-4 text-right">
-                        <div className="inline-flex items-center justify-end gap-1">
+                        <div className="inline-flex items-center justify-end gap-1.5">
                           <button
                             type="button"
                             onClick={() => setDossieServidorId(srv.id)}
@@ -708,15 +744,6 @@ export default function ServidoresTab({
                           >
                             <IdentificationIcon className="h-4 w-4" />
                             <span className="hidden xl:inline">Dossiê</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => onAbrirModalOcorrencia(srv, "abono")}
-                            title="Lançar Abono, Atestado, Ausência ou Negociação"
-                            className="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white transition"
-                          >
-                            <CalendarDaysIcon className="h-4 w-4" />
                           </button>
 
                           <button
@@ -730,24 +757,41 @@ export default function ServidoresTab({
 
                           <button
                             type="button"
-                            onClick={() => {
-                              onAlternarStatus(srv);
-                              toast.success(
-                                srv.ativo
-                                  ? `${srv.nome} marcado como inativo.`
-                                  : `${srv.nome} reativado no quadro!`
-                              );
-                            }}
-                            title={srv.ativo ? "Inativar Servidor" : "Reativar Servidor"}
-                            className="p-1.5 rounded-lg bg-amber-50 hover:bg-amber-500 text-amber-700 hover:text-white transition"
+                            onClick={() =>
+                              setModalCicloVida({
+                                servidor: srv,
+                                modo: "inativar",
+                                inativadoNesteFluxo: false,
+                              })
+                            }
+                            title={
+                              srv.ativo
+                                ? "Inativar Cadastro (Preservando Histórico)"
+                                : "Reativar Cadastro no Quadro Ativo"
+                            }
+                            className={`p-1.5 rounded-lg transition ${
+                              srv.ativo
+                                ? "bg-amber-50 hover:bg-amber-500 text-amber-700 hover:text-white"
+                                : "bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white"
+                            }`}
                           >
-                            <NoSymbolIcon className="h-4 w-4" />
+                            {srv.ativo ? (
+                              <NoSymbolIcon className="h-4 w-4" />
+                            ) : (
+                              <ArrowPathIcon className="h-4 w-4" />
+                            )}
                           </button>
 
                           <button
                             type="button"
-                            onClick={() => setConfirmExcluir(srv)}
-                            title="Excluir da listagem administrativa"
+                            onClick={() =>
+                              setModalCicloVida({
+                                servidor: srv,
+                                modo: "excluir",
+                                inativadoNesteFluxo: false,
+                              })
+                            }
+                            title="Fluxo Hierárquico de Exclusão de Cadastro"
                             className="p-1.5 rounded-lg bg-red-50 hover:bg-red-600 text-red-600 hover:text-white transition"
                           >
                             <TrashIcon className="h-4 w-4" />
@@ -1309,53 +1353,445 @@ export default function ServidoresTab({
         </div>
       )}
 
-      {/* Modal de Confirmação de Exclusão */}
-      {confirmExcluir && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-xl border border-slate-200 max-w-md w-full p-6 space-y-4">
-            <div className="flex items-center gap-3 text-red-600">
-              <ExclamationTriangleIcon className="h-7 w-7 flex-shrink-0" />
-              <h3 className="text-lg font-bold text-slate-900">
-                Remover Servidor da Listagem?
-              </h3>
-            </div>
-            <p className="text-sm text-slate-600 leading-relaxed">
-              Deseja remover <strong>{confirmExcluir.nome}</strong> do quadro administrativo? Você também pode optar por apenas <strong>Inativar</strong> o registro para preservar o histórico.
-            </p>
-            <div className="flex justify-end gap-2.5 pt-2">
-              <button
-                type="button"
-                onClick={() => setConfirmExcluir(null)}
-                className="px-4 py-2 rounded-xl border border-slate-300 text-slate-700 text-xs font-bold"
+      {/* ── MODAL PREMIUM CONCATENADO: INATIVAÇÃO & EXCLUSÃO HIERÁRQUICA ── */}
+      {modalCicloVida && servidorCicloAtual && (() => {
+        const srv = servidorCicloAtual;
+        const modo = modalCicloVida.modo; // 'inativar' | 'excluir'
+        const isAtivo = Boolean(srv.ativo);
+        const catMeta = getCategoriaMeta(srv.categoria);
+        const stSrv = statsPorServidor[srv.id] || {
+          abonosUsados: 0,
+          totalAtestados: 0,
+          totalAusencias: 0,
+          negociacoesPendentes: 0,
+          negociacoesConcluidas: 0,
+        };
+        const totalRegistrosHistoricos =
+          (stSrv.abonosUsados || 0) +
+          (stSrv.totalAtestados || 0) +
+          (stSrv.totalAusencias || 0) +
+          (stSrv.negociacoesPendentes || 0) +
+          (stSrv.negociacoesConcluidas || 0);
+
+        const headerGradient =
+          modo === "excluir"
+            ? "linear-gradient(135deg, #450a0a 0%, #991b1b 55%, #dc2626 100%)"
+            : isAtivo
+            ? "linear-gradient(135deg, #451a03 0%, #b45309 55%, #d97706 100%)"
+            : "linear-gradient(135deg, #064e3b 0%, #047857 55%, #059669 100%)";
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/65 backdrop-blur-sm p-4 overflow-y-auto">
+            <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-xl w-full overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-150">
+              {/* Cabeçalho Premium */}
+              <div
+                className="px-6 py-5 text-white flex items-start justify-between gap-4"
+                style={{ background: headerGradient }}
               >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onAlternarStatus(confirmExcluir);
-                  setConfirmExcluir(null);
-                  toast.success("Servidor inativado com histórico preservado.");
-                }}
-                className="px-4 py-2 rounded-xl bg-amber-500 text-white text-xs font-bold"
-              >
-                Apenas Inativar
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onExcluirServidor(confirmExcluir);
-                  setConfirmExcluir(null);
-                  toast.success("Servidor removido da listagem.");
-                }}
-                className="px-4 py-2 rounded-xl bg-red-600 text-white text-xs font-bold"
-              >
-                Excluir
-              </button>
+                <div className="flex items-start gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-white/15 border border-white/25 flex items-center justify-center flex-shrink-0 shadow-inner">
+                    {modo === "excluir" ? (
+                      <TrashIcon className="h-6 w-6 text-white" />
+                    ) : isAtivo ? (
+                      <NoSymbolIcon className="h-6 w-6 text-amber-200" />
+                    ) : (
+                      <ArrowPathIcon className="h-6 w-6 text-emerald-200" />
+                    )}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-white/20 text-white">
+                        {modo === "excluir"
+                          ? "Protocolo de Segurança em 2 Etapas"
+                          : isAtivo
+                          ? "Gestão de Status Funcional"
+                          : "Reintegração ao Quadro Ativo"}
+                      </span>
+                    </div>
+                    <h3 className="text-lg font-extrabold tracking-tight mt-1">
+                      {modo === "excluir"
+                        ? "Fluxo Hierárquico de Exclusão de Servidor"
+                        : isAtivo
+                        ? "Confirmar Inativação de Cadastro?"
+                        : "Confirmar Reativação do Servidor?"}
+                    </h3>
+                    <p className="text-xs text-white/85 mt-0.5">
+                      {modo === "excluir"
+                        ? "Para proteção do acervo escolar, nenhum cadastro ativo pode ser excluído diretamente."
+                        : isAtivo
+                        ? "O servidor sairá das chamadas diárias ativas, mantendo 100% do histórico preservado."
+                        : "O servidor voltará imediatamente para a listagem ativa e para a chamada diária de ponto."}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setModalCicloVida(null)}
+                  className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition flex-shrink-0"
+                  title="Fechar"
+                >
+                  <XMarkIcon className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Corpo do Modal */}
+              <div className="p-6 space-y-5">
+                {/* Card de Identificação do Servidor */}
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-11 h-11 rounded-xl flex items-center justify-center font-extrabold text-sm flex-shrink-0 shadow-sm"
+                      style={{
+                        background: catMeta.bg,
+                        color: catMeta.cor,
+                        border: `1px solid ${catMeta.cor}30`,
+                      }}
+                    >
+                      {String(srv.nome || "S")
+                        .split(" ")
+                        .filter(Boolean)
+                        .slice(0, 2)
+                        .map((p) => p[0])
+                        .join("")
+                        .toUpperCase()}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-extrabold text-slate-900 text-sm">
+                          {srv.nome}
+                        </span>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
+                            isAtivo
+                              ? "bg-emerald-100 text-emerald-800 border border-emerald-300"
+                              : "bg-amber-100 text-amber-800 border border-amber-300"
+                          }`}
+                        >
+                          {isAtivo ? "● Cadastro Ativo" : "● Cadastro Inativo"}
+                        </span>
+                      </div>
+                      <div className="text-xs text-slate-500 mt-0.5">
+                        {srv.cargo || catMeta.label} • Vínculo:{" "}
+                        <strong className="text-slate-700">
+                          {getVinculoLabel(srv.vinculo)}
+                        </strong>{" "}
+                        {srv.cpf ? `• CPF: ${formatarCPF(srv.cpf)}` : ""}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="px-3 py-2 rounded-xl bg-white border border-slate-200 text-right flex-shrink-0">
+                    <div className="text-[10px] font-bold uppercase text-slate-400">
+                      Acervo Vinculado
+                    </div>
+                    <div className="text-xs font-extrabold text-slate-800">
+                      {totalRegistrosHistoricos} ocorrência(s) + Ponto
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── MODO 1: INATIVAR / REATIVAR ── */}
+                {modo === "inativar" && (
+                  <>
+                    {isAtivo ? (
+                      <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-200 space-y-2.5">
+                        <div className="flex items-center gap-2 text-amber-900 font-extrabold text-xs uppercase tracking-wider">
+                          <ShieldCheckIcon className="h-5 w-5 text-amber-600 flex-shrink-0" />
+                          Por que a Inativação é o padrão seguro do sistema?
+                        </div>
+                        <ul className="text-xs text-amber-900/90 space-y-1.5 pl-1 leading-relaxed">
+                          <li className="flex items-start gap-2">
+                            <span className="font-bold text-amber-600">✓</span>
+                            <span>
+                              <strong>Preservação Total do Histórico:</strong> Todos os registros de frequência diária, abonos, atestados médicos, negociações internas e relatórios permanecem intactos para auditoria da Secretaria/SEEDF.
+                            </span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="font-bold text-amber-600">✓</span>
+                            <span>
+                              <strong>Limpeza da Chamada Diária:</strong> O servidor deixa de aparecer nas listas operacionais do dia a dia, evitando lançamentos acidentais.
+                            </span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <span className="font-bold text-amber-600">✓</span>
+                            <span>
+                              <strong>Reversível a Qualquer Momento:</strong> Caso o servidor retorne à unidade escolar, basta filtrar por <em>"Apenas Inativos"</em> e reativar seu cadastro com 1 clique.
+                            </span>
+                          </li>
+                        </ul>
+                      </div>
+                    ) : (
+                      <div className="p-4 rounded-2xl bg-emerald-50/80 border border-emerald-200 space-y-2">
+                        <div className="flex items-center gap-2 text-emerald-900 font-extrabold text-xs uppercase tracking-wider">
+                          <CheckCircleIcon className="h-5 w-5 text-emerald-600 flex-shrink-0" />
+                          Reintegração Imediata ao Quadro Ativo
+                        </div>
+                        <p className="text-xs text-emerald-900/90 leading-relaxed">
+                          Ao confirmar a reativação, <strong>{srv.nome}</strong> voltará a figurar entre os servidores ativos da escola, reconectando todo o seu histórico anterior e habilitando seu nome na Frequência & Ponto Diário.
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Rodapé do Modo Inativar / Reativar */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-slate-100">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setModalCicloVida({
+                            servidor: srv,
+                            modo: "excluir",
+                            inativadoNesteFluxo: false,
+                          })
+                        }
+                        className="text-[11px] font-bold text-slate-400 hover:text-red-600 transition text-left"
+                      >
+                        Precisa excluir definitivamente? Abrir fluxo hierárquico →
+                      </button>
+
+                      <div className="flex items-center justify-end gap-2.5">
+                        <button
+                          type="button"
+                          onClick={() => setModalCicloVida(null)}
+                          className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 hover:bg-slate-50 text-xs font-bold transition"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onAlternarStatus(srv);
+                            setModalCicloVida(null);
+                            toast.success(
+                              isAtivo
+                                ? `${srv.nome} inativado com sucesso! Histórico 100% preservado.`
+                                : `${srv.nome} reativado no quadro de servidores!`
+                            );
+                          }}
+                          className={`px-5 py-2.5 rounded-xl text-white text-xs font-extrabold shadow-md transition flex items-center gap-1.5 ${
+                            isAtivo
+                              ? "bg-amber-600 hover:bg-amber-700"
+                              : "bg-emerald-600 hover:bg-emerald-700"
+                          }`}
+                        >
+                          {isAtivo ? (
+                            <>
+                              <NoSymbolIcon className="h-4 w-4" />
+                              Confirmar Inativação
+                            </>
+                          ) : (
+                            <>
+                              <ArrowPathIcon className="h-4 w-4" />
+                              Confirmar Reativação
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* ── MODO 2: FLUXO HIERÁRQUICO DE EXCLUSÃO (INATIVAR ➔ EXCLUIR) ── */}
+                {modo === "excluir" && (
+                  <>
+                    {/* Stepper Visual das 2 Etapas Hierárquicas */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* Etapa 1 */}
+                      <div
+                        className={`p-3.5 rounded-2xl border-2 transition ${
+                          isAtivo
+                            ? "bg-amber-50/90 border-amber-400 shadow-sm"
+                            : "bg-emerald-50/80 border-emerald-300"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase ${
+                              isAtivo
+                                ? "bg-amber-200 text-amber-900"
+                                : "bg-emerald-200 text-emerald-900"
+                            }`}
+                          >
+                            1ª Etapa Obrigatória
+                          </span>
+                          {!isAtivo ? (
+                            <CheckCircleIcon className="h-5 w-5 text-emerald-600" />
+                          ) : (
+                            <ClockIcon className="h-5 w-5 text-amber-600" />
+                          )}
+                        </div>
+                        <div className="font-extrabold text-xs text-slate-900 mt-2">
+                          Inativação Prévia do Servidor
+                        </div>
+                        <div className="text-[11px] text-slate-600 mt-0.5 leading-snug">
+                          {isAtivo
+                            ? "Pendente: o servidor ainda está Ativo no quadro."
+                            : modalCicloVida.inativadoNesteFluxo
+                            ? "Concluída agora! Servidor já está Inativo."
+                            : "Concluída: o servidor já se encontra Inativo."}
+                        </div>
+                      </div>
+
+                      {/* Etapa 2 */}
+                      <div
+                        className={`p-3.5 rounded-2xl border-2 transition ${
+                          isAtivo
+                            ? "bg-slate-100/80 border-slate-200 opacity-75"
+                            : "bg-red-50/80 border-red-300 shadow-sm"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase ${
+                              isAtivo
+                                ? "bg-slate-200 text-slate-600"
+                                : "bg-red-200 text-red-900"
+                            }`}
+                          >
+                            2ª Etapa Final
+                          </span>
+                          <TrashIcon
+                            className={`h-5 w-5 ${
+                              isAtivo ? "text-slate-400" : "text-red-600"
+                            }`}
+                          />
+                        </div>
+                        <div className="font-extrabold text-xs text-slate-900 mt-2">
+                          Exclusão Definitiva do Registro
+                        </div>
+                        <div className="text-[11px] text-slate-600 mt-0.5 leading-snug">
+                          {isAtivo
+                            ? "🔒 Bloqueada até que o cadastro seja inativado."
+                            : "🔓 Liberada para confirmação definitiva."}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Alerta Educativo sobre a Importância do Histórico */}
+                    <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-200 space-y-2">
+                      <div className="flex items-center gap-2 text-blue-900 font-extrabold text-xs uppercase tracking-wider">
+                        <ShieldCheckIcon className="h-5 w-5 text-blue-600 flex-shrink-0" />
+                        Importância de Manter o Histórico Funcional
+                      </div>
+                      <p className="text-xs text-blue-900/90 leading-relaxed">
+                        Mesmo quando um professor, servidor ou colaborador terceirizado encerra seu contrato ou muda de escola,{" "}
+                        <strong>manter o cadastro apenas como INATIVO</strong> preserva a memória institucional da unidade (folhas de ponto passadas, atestados entregues, abonos concedidos e termos de reposição).{" "}
+                        <span className="underline decoration-blue-400">
+                          A exclusão definitiva só deve ser utilizada para cadastros feitos por engano ou em duplicidade.
+                        </span>
+                      </p>
+                    </div>
+
+                    {/* Ações Inteligentes conforme a Etapa Atual */}
+                    {isAtivo ? (
+                      <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200/90 space-y-3">
+                        <div className="flex items-start gap-2.5">
+                          <ExclamationTriangleIcon className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                          <div className="text-xs text-amber-900 leading-relaxed">
+                            <strong>Ação Bloqueada na 1ª Etapa:</strong> Como{" "}
+                            <strong>{srv.nome}</strong> está <strong>ATIVO</strong>, escolha abaixo se deseja apenas inativá-lo (recomendado) ou avançar para a 2ª etapa:
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2.5 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => setModalCicloVida(null)}
+                            className="px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 text-xs font-bold transition"
+                          >
+                            Cancelar
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onAlternarStatus(srv);
+                              setModalCicloVida(null);
+                              toast.success(
+                                `${srv.nome} foi inativado! Histórico funcional preservado com segurança.`
+                              );
+                            }}
+                            className="px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-extrabold shadow-sm transition flex items-center justify-center gap-1.5"
+                          >
+                            <NoSymbolIcon className="h-4 w-4" />
+                            Apenas Inativar e Manter Histórico (Recomendado)
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onAlternarStatus(srv);
+                              setModalCicloVida((prev) => ({
+                                ...prev,
+                                servidor: { ...srv, ativo: false },
+                                inativadoNesteFluxo: true,
+                              }));
+                              toast.success(
+                                "1ª Etapa cumprida: Servidor inativado. 2ª Etapa (Exclusão) liberada."
+                              );
+                            }}
+                            className="px-3.5 py-2.5 rounded-xl border border-red-300 bg-white hover:bg-red-50 text-red-700 text-xs font-bold transition flex items-center justify-center gap-1"
+                            title="Inativa o cadastro agora e libera o botão de exclusão definitiva"
+                          >
+                            Inativar p/ Liberar Exclusão →
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-4 rounded-2xl bg-red-50/80 border border-red-200 space-y-3">
+                        <div className="flex items-start gap-2.5">
+                          <ExclamationTriangleIcon className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                          <div className="text-xs text-red-900 leading-relaxed">
+                            {modalCicloVida.inativadoNesteFluxo ? (
+                              <>
+                                <strong>1ª Etapa Concluída!</strong> O cadastro de{" "}
+                                <strong>{srv.nome}</strong> já foi inativado. Você pode encerrar agora mantendo o histórico preservado, ou confirmar a{" "}
+                                <strong>Exclusão Definitiva</strong>.
+                              </>
+                            ) : (
+                              <>
+                                <strong>Pré-requisito atendido:</strong> O cadastro de{" "}
+                                <strong>{srv.nome}</strong> já se encontra{" "}
+                                <strong>INATIVO</strong>. Tem certeza de que deseja excluir definitivamente este registro da listagem administrativa?
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2.5 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => setModalCicloVida(null)}
+                            className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold shadow-sm transition flex items-center justify-center gap-1.5"
+                          >
+                            <ShieldCheckIcon className="h-4 w-4" />
+                            Manter Apenas Inativo (Preservar Histórico)
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onExcluirServidor(srv);
+                              setModalCicloVida(null);
+                              toast.success(
+                                `Cadastro de ${srv.nome} excluído definitivamente da listagem.`
+                              );
+                            }}
+                            className="px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-extrabold shadow-md transition flex items-center justify-center gap-1.5"
+                          >
+                            <TrashIcon className="h-4 w-4" />
+                            Confirmar Exclusão Definitiva
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

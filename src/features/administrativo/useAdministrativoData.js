@@ -124,7 +124,15 @@ export function getHorarioPadraoPorTurno(turno = "") {
   return "07:30 às 17:30";
 }
 
+const ORDEM_CRONOLOGICA_TURNO = {
+  Matutino: 1,
+  Vespertino: 2,
+  Noturno: 3,
+  "Escala 12x36": 4,
+};
+
 // Retorna a estrutura de 1º e 2º Turno (separados pelo intervalo de almoço para jornadas > 20h)
+// Garante SEMPRE a ordem cronológica da esquerda para a direita: MATUTINO ➔ VESPERTINO ➔ NOTURNO
 export function getTurnosEJornadaServidor(srv = {}) {
   const normTurno = normalizarTurno(srv?.turno || "Matutino");
   const ch = String(srv?.carga_horaria || "40h").toLowerCase();
@@ -133,46 +141,72 @@ export function getTurnosEJornadaServidor(srv = {}) {
     ((ch.includes("40") || ch.includes("44") || ch.includes("20+20") || normTurno === "Integral") &&
       !ch.includes("12x36"));
 
-  const nome1 = srv?.turno_1
-    ? normalizarTurno(srv.turno_1)
-    : normTurno === "Integral"
-    ? "Matutino"
-    : normTurno || "Matutino";
-
-  const padrao1 = getHorarioPadraoPorTurno(nome1).split(" às ");
-  const turno1 = {
-    nome: nome1,
-    entrada: srv?.entrada_1 || padrao1[0] || "07:30",
-    saida: srv?.saida_1 || padrao1[1] || "12:30",
-  };
-
+  // Caso de turno único (ex: 20h ou 12x36)
   if (!temDoisTurnos) {
+    const nomeUnico = srv?.turno_1
+      ? normalizarTurno(srv.turno_1)
+      : normTurno === "Integral"
+      ? "Matutino"
+      : normTurno || "Matutino";
+    const padraoUnico = getHorarioPadraoPorTurno(nomeUnico).split(" às ");
     return {
       temDoisTurnos: false,
-      turno1,
+      turno1: {
+        nome: nomeUnico,
+        entrada: srv?.entrada_1 || padraoUnico[0] || "07:30",
+        saida: srv?.saida_1 || padraoUnico[1] || "12:30",
+      },
       turno2: null,
     };
   }
 
-  const nome2 = srv?.turno_2
-    ? normalizarTurno(srv.turno_2)
-    : nome1 === "Matutino"
-    ? "Vespertino"
-    : nome1 === "Vespertino"
-    ? "Matutino"
-    : "Vespertino";
+  // Caso de 2 turnos (40h / 20+20 / 44h / Integral): define os dois turnos e ordena cronologicamente
+  let rawT1 = srv?.turno_1 ? normalizarTurno(srv.turno_1) : null;
+  let rawT2 = srv?.turno_2 ? normalizarTurno(srv.turno_2) : null;
 
-  const padrao2 = getHorarioPadraoPorTurno(nome2).split(" às ");
-  const turno2 = {
-    nome: nome2,
-    entrada: srv?.entrada_2 || padrao2[0] || "13:00",
-    saida: srv?.saida_2 || padrao2[1] || "18:00",
-  };
+  if (!rawT1 || !rawT2) {
+    if (normTurno === "Noturno") {
+      rawT1 = rawT1 || "Vespertino";
+      rawT2 = rawT2 || "Noturno";
+    } else {
+      // Para servidores diurnos de 40h/44h (Matutino, Vespertino ou Integral),
+      // os dois turnos são Matutino (1º) e Vespertino (2º)
+      rawT1 = "Matutino";
+      rawT2 = "Vespertino";
+    }
+  }
+
+  // Monta objetos candidatos e ordena por ORDEM_CRONOLOGICA_TURNO (Matutino [1] -> Vespertino [2] -> Noturno [3])
+  const p1 = getHorarioPadraoPorTurno(rawT1).split(" às ");
+  const p2 = getHorarioPadraoPorTurno(rawT2).split(" às ");
+
+  const candidatos = [
+    {
+      nome: rawT1,
+      entrada: srv?.entrada_1 || p1[0] || "07:30",
+      saida: srv?.saida_1 || p1[1] || "12:30",
+      peso: ORDEM_CRONOLOGICA_TURNO[rawT1] || 99,
+    },
+    {
+      nome: rawT2,
+      entrada: srv?.entrada_2 || p2[0] || "13:00",
+      saida: srv?.saida_2 || p2[1] || "18:00",
+      peso: ORDEM_CRONOLOGICA_TURNO[rawT2] || 99,
+    },
+  ].sort((a, b) => a.peso - b.peso);
 
   return {
     temDoisTurnos: true,
-    turno1,
-    turno2,
+    turno1: {
+      nome: candidatos[0].nome,
+      entrada: candidatos[0].entrada,
+      saida: candidatos[0].saida,
+    },
+    turno2: {
+      nome: candidatos[1].nome,
+      entrada: candidatos[1].entrada,
+      saida: candidatos[1].saida,
+    },
   };
 }
 

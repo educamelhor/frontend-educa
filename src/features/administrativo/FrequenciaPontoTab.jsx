@@ -220,24 +220,45 @@ export default function FrequenciaPontoTab({
 
     // 2) Se há lançamento manual ou coletivo salvo para o servidor nesta data
     if (manual && manual.status) {
-      const isVespertino1 = turnosSrv.turno1.nome === "Vespertino";
-      const corrigirVespertinoCache =
-        isVespertino1 && manual.entrada === "07:30" && manual.saida === "12:30";
+      let ent1 = manual.entrada || entrada1Padrao;
+      let sai1 = manual.saida || saida1Padrao;
+      let ent2 = manual.entrada_2 !== undefined ? manual.entrada_2 : entrada2Padrao;
+      let sai2 = manual.saida_2 !== undefined ? manual.saida_2 : saida2Padrao;
+
+      // Normaliza registros em cache antigos (ex: quando Vespertino estava na 1ª coluna ou Integral em coluna única 07:30 às 17:30)
+      if (turnosSrv.temDoisTurnos && turnosSrv.turno1.nome === "Matutino") {
+        if (
+          (ent1 === "13:00" && sai1 === "18:00") ||
+          sai1 === "17:00" ||
+          sai1 === "17:30"
+        ) {
+          ent1 = entrada1Padrao;
+          sai1 = saida1Padrao;
+        }
+        if (
+          !ent2 ||
+          !sai2 ||
+          (ent2 === "07:30" && sai2 === "12:30")
+        ) {
+          ent2 = entrada2Padrao;
+          sai2 = saida2Padrao;
+        }
+      } else if (!turnosSrv.temDoisTurnos && turnosSrv.turno1.nome === "Vespertino") {
+        if (ent1 === "07:30" && sai1 === "12:30") {
+          ent1 = "13:00";
+          sai1 = "18:00";
+        }
+      }
 
       return {
         ...manual,
         turno1_nome: turnosSrv.turno1.nome,
-        entrada: corrigirVespertinoCache
-          ? "13:00"
-          : manual.entrada || entrada1Padrao,
-        saida: corrigirVespertinoCache
-          ? "18:00"
-          : manual.saida || saida1Padrao,
+        entrada: ent1,
+        saida: sai1,
         temDoisTurnos: turnosSrv.temDoisTurnos,
         turno2_nome: turnosSrv.turno2?.nome || null,
-        entrada_2:
-          manual.entrada_2 !== undefined ? manual.entrada_2 : entrada2Padrao,
-        saida_2: manual.saida_2 !== undefined ? manual.saida_2 : saida2Padrao,
+        entrada_2: ent2,
+        saida_2: sai2,
         origem_auto: false,
         origem_fallback_letivo: false,
         ocorrencia_vinculada: occAuto || null,
@@ -384,30 +405,30 @@ export default function FrequenciaPontoTab({
     infoDiaLetivo,
   ]);
 
-  // Subtítulos dinâmicos das colunas ENTRADA / SAÍDA conforme filtro ou contexto da listagem
+  // Subtítulos dinâmicos das colunas ENTRADA / SAÍDA (sempre na sequência: Matutino -> Vespertino -> Noturno)
   const subtituloColunaTurno1 = useMemo(() => {
-    if (filtroTurno !== "todos") {
-      return normalizarTurno(filtroTurno);
-    }
+    const ordem = ["Matutino", "Vespertino", "Noturno"];
     const turnosPresentes = new Set(
-      listaFiltrada.map((s) => getTurnosEJornadaServidor(s).turno1.nome)
+      listaFiltrada
+        .map((s) => getTurnosEJornadaServidor(s).turno1.nome)
+        .filter(Boolean)
     );
-    if (turnosPresentes.size === 1) {
-      return Array.from(turnosPresentes)[0];
-    }
-    return "Matutino / Vespertino / Noturno";
-  }, [filtroTurno, listaFiltrada]);
+    const ordenados = ordem.filter((t) => turnosPresentes.has(t));
+    if (ordenados.length > 0) return ordenados.join(" / ");
+    return "Matutino / Vespertino";
+  }, [listaFiltrada]);
 
   const subtituloColunaTurno2 = useMemo(() => {
+    const ordem = ["Matutino", "Vespertino", "Noturno"];
     const turnos2Presentes = new Set(
       listaFiltrada
         .map((s) => getTurnosEJornadaServidor(s).turno2?.nome)
         .filter(Boolean)
     );
-    if (turnos2Presentes.size === 1) {
-      return `${Array.from(turnos2Presentes)[0]} (Pós-Almoço)`;
-    }
-    return "Vespertino / Matutino / Noturno";
+    const ordenados = ordem.filter((t) => turnos2Presentes.has(t));
+    if (ordenados.length === 1) return `${ordenados[0]} (Pós-Almoço)`;
+    if (ordenados.length > 1) return ordenados.join(" / ");
+    return "Vespertino / Noturno";
   }, [listaFiltrada]);
 
   // Servidores impactados no Modal de Registro Coletivo

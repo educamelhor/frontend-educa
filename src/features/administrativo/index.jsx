@@ -74,6 +74,9 @@ export default function AdministrativoModule() {
     pontoDiario,
     statsPorServidor,
     loading,
+    biometriaAtiva,
+    alternarBiometria,
+    calendarioGovernanca,
     recarregarSistema,
     salvarServidor,
     alternarStatusServidor,
@@ -82,6 +85,7 @@ export default function AdministrativoModule() {
     excluirOcorrencia,
     atualizarStatusOcorrencia,
     registrarPontoServidor,
+    registrarPontoColetivo,
     marcarTodosPresentesNoDia,
   } = useAdministrativoData();
 
@@ -262,7 +266,11 @@ export default function AdministrativoModule() {
           servidores={servidores}
           ocorrencias={ocorrencias}
           pontoDiario={pontoDiario}
+          biometriaAtiva={biometriaAtiva}
+          onAlternarBiometria={alternarBiometria}
+          calendarioGovernanca={calendarioGovernanca}
           onRegistrarPonto={registrarPontoServidor}
+          onRegistrarPontoColetivo={registrarPontoColetivo}
           onMarcarTodosPresentes={marcarTodosPresentesNoDia}
           onAbrirModalOcorrencia={abrirModalNovaOcorrencia}
         />

@@ -124,6 +124,136 @@ export function getHorarioPadraoPorTurno(turno = "") {
   return "07:30 às 17:30";
 }
 
+// Retorna a estrutura de 1º e 2º Turno (separados pelo intervalo de almoço para jornadas > 20h)
+export function getTurnosEJornadaServidor(srv = {}) {
+  const normTurno = normalizarTurno(srv?.turno || "Matutino");
+  const ch = String(srv?.carga_horaria || "40h").toLowerCase();
+  const temDoisTurnos =
+    Boolean(srv?.turno_2) ||
+    ((ch.includes("40") || ch.includes("44") || ch.includes("20+20") || normTurno === "Integral") &&
+      !ch.includes("12x36"));
+
+  const nome1 = srv?.turno_1
+    ? normalizarTurno(srv.turno_1)
+    : normTurno === "Integral"
+    ? "Matutino"
+    : normTurno || "Matutino";
+
+  const padrao1 = getHorarioPadraoPorTurno(nome1).split(" às ");
+  const turno1 = {
+    nome: nome1,
+    entrada: srv?.entrada_1 || padrao1[0] || "07:30",
+    saida: srv?.saida_1 || padrao1[1] || "12:30",
+  };
+
+  if (!temDoisTurnos) {
+    return {
+      temDoisTurnos: false,
+      turno1,
+      turno2: null,
+    };
+  }
+
+  const nome2 = srv?.turno_2
+    ? normalizarTurno(srv.turno_2)
+    : nome1 === "Matutino"
+    ? "Vespertino"
+    : nome1 === "Vespertino"
+    ? "Matutino"
+    : "Vespertino";
+
+  const padrao2 = getHorarioPadraoPorTurno(nome2).split(" às ");
+  const turno2 = {
+    nome: nome2,
+    entrada: srv?.entrada_2 || padrao2[0] || "13:00",
+    saida: srv?.saida_2 || padrao2[1] || "18:00",
+  };
+
+  return {
+    temDoisTurnos: true,
+    turno1,
+    turno2,
+  };
+}
+
+// Verifica se uma data ISO ('YYYY-MM-DD') é Dia Letivo conforme Direção -> Governança -> Ano Letivo
+export function verificarDiaLetivoGovernanca(dataISO, calendarioGov = {}) {
+  if (!dataISO || !/^\d{4}-\d{2}-\d{2}$/.test(String(dataISO))) {
+    return { isLetivo: true, label: "Dia Letivo", detalhe: "Calendário Escolar" };
+  }
+  const [y, m, d] = String(dataISO).split("-").map(Number);
+  const dt = new Date(y, m - 1, d, 12, 0, 0);
+  const dow = dt.getDay(); // 0 = Dom, 1..5 = Seg..Sex, 6 = Sáb
+
+  const periodos = Array.isArray(calendarioGov?.periodos) ? calendarioGov.periodos : [];
+  const excecoes = Array.isArray(calendarioGov?.excecoes) ? calendarioGov.excecoes : [];
+
+  const exc = excecoes.find((e) => e && e.data === dataISO);
+  if (exc) {
+    if (Number(exc.status_letivo) === 0) {
+      return {
+        isLetivo: false,
+        label: "Dia Não Letivo (Governança)",
+        detalhe: exc.motivo || exc.descricao || "Feriado / Recesso cadastrado na Governança",
+      };
+    }
+    if (Number(exc.status_letivo) === 1) {
+      return {
+        isLetivo: true,
+        label: dow === 6 ? "Sábado Letivo (Governança)" : "Dia Letivo (Governança)",
+        detalhe: exc.motivo || exc.descricao || "Dia letivo oficial confirmado na Governança",
+      };
+    }
+  }
+
+  if (dow === 0) {
+    return {
+      isLetivo: false,
+      label: "Domingo (Não Letivo)",
+      detalhe: "Fim de semana — sem expediente letivo regular",
+    };
+  }
+
+  if (dow === 6) {
+    return {
+      isLetivo: false,
+      label: "Sábado (Não Letivo)",
+      detalhe: "Sábado sem marcação de Sábado Letivo na Governança",
+    };
+  }
+
+  // Segunda a Sexta (dow 1..5): verifica se está dentro de algum Bimestre/Semestre configurado na Governança
+  const periodosValidos = periodos.filter((p) => p && p.data_inicio && p.data_fim);
+  if (periodosValidos.length > 0) {
+    const periodoAtivo = periodosValidos.find(
+      (p) => dataISO >= p.data_inicio && dataISO <= p.data_fim
+    );
+    if (periodoAtivo) {
+      const nomePer =
+        periodoAtivo.tipo === "semestre"
+          ? `${periodoAtivo.numero}º Semestre`
+          : `${periodoAtivo.numero}º Bimestre`;
+      return {
+        isLetivo: true,
+        label: `Dia Letivo (${nomePer})`,
+        detalhe: `Dentro do calendário oficial da Governança (${nomePer})`,
+      };
+    } else {
+      return {
+        isLetivo: false,
+        label: "Recesso / Fora do Bimestre",
+        detalhe: "Data fora dos períodos bimestrais configurados em Direção → Governança",
+      };
+    }
+  }
+
+  return {
+    isLetivo: true,
+    label: "Dia Letivo (Seg–Sex)",
+    detalhe: "Dia útil letivo padrão",
+  };
+}
+
 function mapFuncaoToCategoria(funcao = "") {
   const f = String(funcao || "").toLowerCase().trim();
   if (f === "professor") return "professor";
@@ -258,12 +388,29 @@ export function useAdministrativoData() {
       overrides: `educa_admin_overrides_v1_${escolaId}`,
       ocorrencias: `educa_admin_ocorrencias_v1_${escolaId}`,
       ponto: `educa_admin_ponto_v1_${escolaId}`,
+      biometria: `educa_admin_biometria_v1_${escolaId}`,
     }),
     [escolaId]
   );
 
   const [systemUsers, setSystemUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Estado da Biometria (Ponto Eletrônico): OFF por padrão na SEEDF (usa fallback Presente em dias letivos)
+  const [biometriaAtiva, setBiometriaAtiva] = useState(() => {
+    try {
+      const raw = localStorage.getItem(`educa_admin_biometria_v1_${escolaId}`);
+      return raw ? JSON.parse(raw) === true : false;
+    } catch {
+      return false;
+    }
+  });
+
+  // Calendário Letivo sincronizado de Direção -> Governança -> Ano Letivo
+  const [calendarioGovernanca, setCalendarioGovernanca] = useState({
+    periodos: [],
+    excecoes: [],
+  });
 
   // Persistência local (sincronizada e pronta para o backend na Etapa 2)
   const [customStaff, setCustomStaff] = useState(() => {
@@ -329,11 +476,24 @@ export function useAdministrativoData() {
     } catch {}
   }, [pontoDiario, STORAGE_KEYS.ponto]);
 
-  // Busca automática de TODOS os professores + membros da direção/secretaria/equipe
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.biometria, JSON.stringify(biometriaAtiva));
+    } catch {}
+  }, [biometriaAtiva, STORAGE_KEYS.biometria]);
+
+  const alternarBiometria = useCallback((novoValor) => {
+    setBiometriaAtiva((prev) =>
+      typeof novoValor === "boolean" ? novoValor : !prev
+    );
+  }, []);
+
+  // Busca automática de TODOS os professores + membros da direção/secretaria/equipe + Calendário Letivo da Governança
   const carregarDadosSistema = useCallback(async () => {
     setLoading(true);
     try {
-      const [resProf, resCad, resEq] = await Promise.allSettled([
+      const anoAtual = new Date().getFullYear();
+      const [resProf, resCad, resEq, resGov] = await Promise.allSettled([
         api.get("/api/professores"),
         escolaId && escolaId !== "default"
           ? api.get(`/api/direcao/cadastro?escola_id=${escolaId}`)
@@ -341,7 +501,17 @@ export function useAdministrativoData() {
         escolaId && escolaId !== "default"
           ? api.get(`/api/direcao/equipe?escola_id=${escolaId}`)
           : Promise.resolve({ data: { membros: [] } }),
+        escolaId && escolaId !== "default"
+          ? api.get(`/api/governanca/ano-letivo-config?escola_id=${escolaId}&ano=${anoAtual}`)
+          : Promise.resolve({ data: { ok: false } }),
       ]);
+
+      if (resGov.status === "fulfilled" && resGov.value?.data?.ok) {
+        setCalendarioGovernanca({
+          periodos: resGov.value.data.periodos || [],
+          excecoes: resGov.value.data.excecoes || [],
+        });
+      }
 
       const profsRaw =
         resProf.status === "fulfilled" && Array.isArray(resProf.value?.data)
@@ -787,21 +957,95 @@ export function useAdministrativoData() {
     });
   }, []);
 
+  // Lançamento Coletivo de Frequência & Ponto (Ponto Facultativo, Dia Letivo Móvel, Decreto, Paralisação, etc.)
+  const registrarPontoColetivo = useCallback(
+    ({
+      dataInicio,
+      dataFim,
+      servidoresAlvo = [],
+      status = "abono",
+      observacao = "",
+    }) => {
+      const dtIniStr = dataInicio || new Date().toISOString().slice(0, 10);
+      const dtFimStr = dataFim && dataFim >= dtIniStr ? dataFim : dtIniStr;
+
+      const datasIntervalo = [];
+      const [yI, mI, dI] = dtIniStr.split("-").map(Number);
+      const [yF, mF, dF] = dtFimStr.split("-").map(Number);
+      const cur = new Date(yI, mI - 1, dI, 12, 0, 0);
+      const end = new Date(yF, mF - 1, dF, 12, 0, 0);
+
+      while (cur <= end && datasIntervalo.length < 60) {
+        const y = cur.getFullYear();
+        const m = String(cur.getMonth() + 1).padStart(2, "0");
+        const d = String(cur.getDate()).padStart(2, "0");
+        datasIntervalo.push(`${y}-${m}-${d}`);
+        cur.setDate(cur.getDate() + 1);
+      }
+
+      setPontoDiario((prev) => {
+        const next = { ...prev };
+        datasIntervalo.forEach((iso) => {
+          const doDia = { ...(next[iso] || {}) };
+          servidoresAlvo.forEach((srv) => {
+            const turnosSrv = getTurnosEJornadaServidor(srv);
+            if (!status || status === "limpar") {
+              doDia[srv.id] = {
+                status: null,
+                _desmarcado: true,
+                entrada: turnosSrv.turno1.entrada,
+                saida: turnosSrv.turno1.saida,
+                entrada_2: turnosSrv.turno2 ? turnosSrv.turno2.entrada : "",
+                saida_2: turnosSrv.turno2 ? turnosSrv.turno2.saida : "",
+                observacao: "",
+                atualizado_em: new Date().toISOString(),
+              };
+            } else {
+              const isPresenca = status === "presente" || status === "atraso";
+              doDia[srv.id] = {
+                ...(doDia[srv.id] || {}),
+                status,
+                _desmarcado: false,
+                coletivo: true,
+                entrada: isPresenca ? turnosSrv.turno1.entrada : "—",
+                saida: isPresenca ? turnosSrv.turno1.saida : "—",
+                entrada_2: turnosSrv.turno2
+                  ? isPresenca
+                    ? turnosSrv.turno2.entrada
+                    : "—"
+                  : "",
+                saida_2: turnosSrv.turno2
+                  ? isPresenca
+                    ? turnosSrv.turno2.saida
+                    : "—"
+                  : "",
+                observacao: observacao || doDia[srv.id]?.observacao || "",
+                atualizado_em: new Date().toISOString(),
+              };
+            }
+          });
+          next[iso] = doDia;
+        });
+        return next;
+      });
+    },
+    []
+  );
+
   const marcarTodosPresentesNoDia = useCallback(
     (dataISO, listaServidores) => {
       setPontoDiario((prev) => {
         const doDia = { ...(prev[dataISO] || {}) };
         listaServidores.forEach((srv) => {
           if (!doDia[srv.id] || !doDia[srv.id].status) {
-            const horarioStr =
-              normalizarTurno(srv.turno) === "Vespertino" && srv.horario_trabalho === "07:30 às 12:30"
-                ? "13:00 às 18:00"
-                : srv.horario_trabalho || getHorarioPadraoPorTurno(srv.turno);
-            const horarioPadrao = horarioStr.split(" às ");
+            const turnosSrv = getTurnosEJornadaServidor(srv);
             doDia[srv.id] = {
               status: "presente",
-              entrada: horarioPadrao[0] || "07:30",
-              saida: horarioPadrao[1] || "17:30",
+              _desmarcado: false,
+              entrada: turnosSrv.turno1.entrada,
+              saida: turnosSrv.turno1.saida,
+              entrada_2: turnosSrv.turno2 ? turnosSrv.turno2.entrada : "",
+              saida_2: turnosSrv.turno2 ? turnosSrv.turno2.saida : "",
               observacao: "",
               atualizado_em: new Date().toISOString(),
             };
@@ -878,6 +1122,9 @@ export function useAdministrativoData() {
     pontoDiario,
     statsPorServidor,
     loading,
+    biometriaAtiva,
+    alternarBiometria,
+    calendarioGovernanca,
     recarregarSistema: carregarDadosSistema,
     salvarServidor,
     alternarStatusServidor,
@@ -886,6 +1133,7 @@ export function useAdministrativoData() {
     excluirOcorrencia,
     atualizarStatusOcorrencia,
     registrarPontoServidor,
+    registrarPontoColetivo,
     marcarTodosPresentesNoDia,
   };
 }

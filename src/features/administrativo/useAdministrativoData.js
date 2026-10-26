@@ -533,10 +533,13 @@ export function useAdministrativoData() {
       return true;
     });
 
-    return [...listaSistema, ...listaCustom].sort((a, b) => {
-      if (Boolean(a.ativo) !== Boolean(b.ativo)) return a.ativo ? -1 : 1;
-      return String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR");
-    });
+    return [...listaSistema, ...listaCustom].sort((a, b) =>
+      String(a.nome || "")
+        .trim()
+        .localeCompare(String(b.nome || "").trim(), "pt-BR", {
+          sensitivity: "base",
+        })
+    );
   }, [systemUsers, overrides, customStaff]);
 
   // Se ainda não houver ocorrências salvas e já carregamos servidores, popula exemplos realistas no 1º uso

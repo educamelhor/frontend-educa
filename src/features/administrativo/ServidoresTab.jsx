@@ -154,28 +154,36 @@ export default function ServidoresTab({
     };
   }, [servidores]);
 
-  // Lista Filtrada
+  // Lista Filtrada (sempre em ordem alfabética estrita por nome, independente do status ou filtro)
   const servidoresFiltrados = useMemo(() => {
-    return servidores.filter((s) => {
-      if (filtroStatus === "ativos" && !s.ativo) return false;
-      if (filtroStatus === "inativos" && s.ativo) return false;
-      if (filtroCategoria !== "todos" && s.categoria !== filtroCategoria) return false;
-      if (filtroVinculo !== "todos" && s.vinculo !== filtroVinculo) return false;
-      if (filtroAcesso === "com_acesso" && !s.acesso_sistema) return false;
-      if (filtroAcesso === "sem_acesso" && s.acesso_sistema) return false;
+    return servidores
+      .filter((s) => {
+        if (filtroStatus === "ativos" && !s.ativo) return false;
+        if (filtroStatus === "inativos" && s.ativo) return false;
+        if (filtroCategoria !== "todos" && s.categoria !== filtroCategoria) return false;
+        if (filtroVinculo !== "todos" && s.vinculo !== filtroVinculo) return false;
+        if (filtroAcesso === "com_acesso" && !s.acesso_sistema) return false;
+        if (filtroAcesso === "sem_acesso" && s.acesso_sistema) return false;
 
-      if (!busca.trim()) return true;
-      const q = busca.toLowerCase().trim();
-      return (
-        (s.nome || "").toLowerCase().includes(q) ||
-        (s.cpf || "").includes(q) ||
-        formatarCPF(s.cpf).includes(q) ||
-        (s.matricula || "").toLowerCase().includes(q) ||
-        (s.cargo || "").toLowerCase().includes(q) ||
-        (s.setor || "").toLowerCase().includes(q) ||
-        (s.empresa || "").toLowerCase().includes(q)
+        if (!busca.trim()) return true;
+        const q = busca.toLowerCase().trim();
+        return (
+          (s.nome || "").toLowerCase().includes(q) ||
+          (s.cpf || "").includes(q) ||
+          formatarCPF(s.cpf).includes(q) ||
+          (s.matricula || "").toLowerCase().includes(q) ||
+          (s.cargo || "").toLowerCase().includes(q) ||
+          (s.setor || "").toLowerCase().includes(q) ||
+          (s.empresa || "").toLowerCase().includes(q)
+        );
+      })
+      .sort((a, b) =>
+        String(a.nome || "")
+          .trim()
+          .localeCompare(String(b.nome || "").trim(), "pt-BR", {
+            sensitivity: "base",
+          })
       );
-    });
   }, [servidores, filtroStatus, filtroCategoria, filtroVinculo, filtroAcesso, busca]);
 
   // Abrir modal de Novo Servidor

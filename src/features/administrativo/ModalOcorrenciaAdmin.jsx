@@ -6,7 +6,7 @@
 // 3. LICENÇA — Licença Médica/Odontológica, Acomp. Pessoa Doente Família, Maternidade, Paternidade, Adotante, Acidente
 // 4. AFASTAMENTO — Casamento, Falecimento, Doação de Sangue, Eleitoral, Júri e Dispensas por Decreto
 // 5. AUSÊNCIA / FALTA — Falta, Falta Injustificada, Falta Paralisação, Horas Não Trabalhadas
-// 6. ACORDO / EVENTO — Negociação Interna (Banco de Horas/Reposição), Dia Letivo Móvel, Ponto Facultativo, Recesso, Suspensão de Aulas, Adicional Noturno
+// 6. OUTROS — Negociação Interna (Banco de Horas/Reposição), Dia Letivo Móvel, Ponto Facultativo, Recesso, Suspensão de Aulas, Adicional Noturno
 // ============================================================================
 
 import React, { useState, useEffect, useMemo } from "react";
@@ -20,11 +20,13 @@ import {
   CheckCircleIcon,
   MagnifyingGlassIcon,
   ShieldCheckIcon,
+  LockClosedIcon,
 } from "@heroicons/react/24/outline";
 import {
   TIPOS_OCORRENCIA_ADMIN,
   LIMITE_ABONOS_ANUAL,
   formatarCPF,
+  getUsuarioLogadoRastreabilidade,
 } from "./useAdministrativoData";
 
 export const SUBTIPOS_POR_TIPO = {
@@ -138,7 +140,7 @@ export default function ModalOcorrenciaAdmin({
   const [dias, setDias] = useState(1);
   const [motivo, setMotivo] = useState("");
   const [autorizadoPor, setAutorizadoPor] = useState(
-    "Direção / Supervisão Administrativa"
+    () => getUsuarioLogadoRastreabilidade().resumo
   );
   const [status, setStatus] = useState("aprovado");
 
@@ -160,6 +162,7 @@ export default function ModalOcorrenciaAdmin({
     if (!aberto) return;
     setErro("");
     setBuscaRapidaEvento("");
+    const usrLogado = getUsuarioLogadoRastreabilidade();
 
     if (registroEdicao) {
       const tEd = registroEdicao.tipo || "abono";
@@ -174,7 +177,8 @@ export default function ModalOcorrenciaAdmin({
       );
       setDias(registroEdicao.dias || 1);
       setMotivo(registroEdicao.motivo || "");
-      setAutorizadoPor(registroEdicao.autorizado_por || "Direção Escolar");
+      // Rastreabilidade: identifica sempre o usuário logado responsável
+      setAutorizadoPor(usrLogado.resumo);
       setStatus(registroEdicao.status || "aprovado");
       setCid(registroEdicao.cid || "");
       setMedico(registroEdicao.medico || "");
@@ -193,7 +197,7 @@ export default function ModalOcorrenciaAdmin({
       setDataFim(dt);
       setDias(1);
       setMotivo("");
-      setAutorizadoPor("Direção Escolar");
+      setAutorizadoPor(usrLogado.resumo);
       setStatus(getStatusPadraoPorTipo(t, subPadrao));
       setCid("");
       setMedico("");
@@ -830,16 +834,29 @@ export default function ModalOcorrenciaAdmin({
             </div>
 
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
-                Autorizado / Registrado por
-              </label>
-              <input
-                type="text"
-                value={autorizadoPor}
-                onChange={(e) => setAutorizadoPor(e.target.value)}
-                placeholder="Ex: Diretor(a) / Supervisor(a) Administrativo"
-                className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
-              />
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Autorizado / Registrado por
+                </label>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                  <LockClosedIcon className="h-3 w-3 text-slate-500" />
+                  Rastreabilidade Automática (Usuário Logado)
+                </span>
+              </div>
+              <div className="relative flex items-center">
+                <LockClosedIcon className="h-4 w-4 text-slate-400 absolute left-3.5 pointer-events-none" />
+                <input
+                  type="text"
+                  value={autorizadoPor}
+                  readOnly
+                  disabled
+                  title="Campo bloqueado para auditoria: preenchido automaticamente com a identificação do usuário logado."
+                  className="w-full rounded-xl border border-slate-200 bg-slate-100/90 pl-9 pr-32 py-2.5 text-sm font-bold text-slate-700 cursor-not-allowed select-none outline-none"
+                />
+                <span className="absolute right-3 px-2 py-0.5 rounded-md bg-emerald-100/90 text-emerald-800 border border-emerald-200 text-[10px] font-extrabold uppercase tracking-wider pointer-events-none">
+                  Sessão Ativa
+                </span>
+              </div>
             </div>
           </div>
 

@@ -103,7 +103,7 @@ export const TIPOS_OCORRENCIA_ADMIN = [
   {
     value: "negociacao",
     label: "Negociação & Calendário",
-    shortLabel: "Acordo / Evento",
+    shortLabel: "Outros",
     cor: "#7c3aed",
     bg: "#ede9fe",
     border: "#c4b5fd",
@@ -113,6 +113,95 @@ export const TIPOS_OCORRENCIA_ADMIN = [
 ];
 
 export const LIMITE_ABONOS_ANUAL = 5;
+
+export function getUsuarioLogadoRastreabilidade() {
+  try {
+    let nome = (localStorage.getItem("userName") || "").trim();
+    let perfil = (localStorage.getItem("perfil") || "").trim().toLowerCase();
+    let email = (localStorage.getItem("email") || "").trim();
+    let cpf = (localStorage.getItem("cpf") || "").trim();
+
+    // Fallback: decodifica payload do JWT caso algum campo não esteja salvo isoladamente
+    const token =
+      localStorage.getItem("token") ||
+      localStorage.getItem("plataforma_token") ||
+      "";
+    if (token && token.split(".").length === 3) {
+      try {
+        const base64Url = token.split(".")[1];
+        const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+        const jsonPayload = decodeURIComponent(
+          atob(base64)
+            .split("")
+            .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+            .join("")
+        );
+        const payload = JSON.parse(jsonPayload);
+        if (!nome || nome === "Usuário") {
+          nome = String(
+            payload?.nome || payload?.name || payload?.userName || nome || ""
+          ).trim();
+        }
+        if (!perfil) {
+          perfil = String(payload?.perfil || payload?.role || "")
+            .trim()
+            .toLowerCase();
+        }
+        if (!email) {
+          email = String(payload?.email || "").trim();
+        }
+        if (!cpf) {
+          cpf = String(payload?.cpf || "").trim();
+        }
+      } catch {
+        // silencioso
+      }
+    }
+
+    const mapaPerfis = {
+      diretor: "Diretor(a)",
+      direcao: "Direção Escolar",
+      vice_diretor: "Vice-Diretor(a)",
+      secretaria: "Secretaria Escolar",
+      secretario: "Secretário(a) Escolar",
+      administrativo: "Supervisor(a) / Administrativo",
+      supervisor: "Supervisor(a) Administrativo",
+      coordenador: "Coordenador(a) Pedagógico",
+      pedagogico: "Equipe Pedagógica",
+      professor: "Professor(a)",
+      disciplinar: "Equipe Disciplinar",
+      militar: "Gestão Cívico-Militar",
+      ceo: "CEO / Plataforma",
+      admin: "Administrador do Sistema",
+    };
+
+    const cargoFormatado =
+      mapaPerfis[perfil] ||
+      (perfil
+        ? perfil.charAt(0).toUpperCase() + perfil.slice(1)
+        : "Gestão Escolar");
+
+    const nomeFinal =
+      nome && nome !== "Usuário" ? nome : "Usuário Autenticado";
+    const resumo = `${nomeFinal} • ${cargoFormatado}`;
+
+    return {
+      nome: nomeFinal,
+      perfil: cargoFormatado,
+      email,
+      cpf,
+      resumo,
+    };
+  } catch {
+    return {
+      nome: "Usuário Autenticado",
+      perfil: "Gestão Escolar",
+      email: "",
+      cpf: "",
+      resumo: "Usuário Autenticado • Gestão Escolar",
+    };
+  }
+}
 
 export function limparCPF(v) {
   return String(v || "").replace(/\D/g, "");
@@ -960,11 +1049,14 @@ export function useAdministrativoData() {
   const salvarOcorrencia = useCallback(
     (dados) => {
       const srv = servidores.find((s) => s.id === dados.servidor_id);
+      const usrLogado = getUsuarioLogadoRastreabilidade();
       const payload = {
         ...dados,
+        autorizado_por: dados.autorizado_por || usrLogado.resumo,
         servidor_nome: srv?.nome || dados.servidor_nome || "Servidor(a)",
         servidor_cargo: srv?.cargo || dados.servidor_cargo || "",
         servidor_categoria: srv?.categoria || dados.servidor_categoria || "administrativo",
+        atualizado_em: new Date().toISOString(),
       };
 
       if (dados.id) {

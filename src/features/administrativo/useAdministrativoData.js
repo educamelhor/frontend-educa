@@ -104,6 +104,26 @@ export function formatarCPF(v) {
   return d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
 }
 
+export function normalizarTurno(t = "") {
+  const s = String(t || "").toLowerCase().trim();
+  if (!s) return "";
+  if (s.includes("vesp") || s.includes("tarde")) return "Vespertino";
+  if (s.includes("mat") || s.includes("manh")) return "Matutino";
+  if (s.includes("not") || s.includes("noit")) return "Noturno";
+  if (s.includes("12x36") || s.includes("plant")) return "Escala 12x36";
+  if (s.includes("int") || s.includes("diurn")) return "Integral";
+  return t.charAt(0).toUpperCase() + t.slice(1).toLowerCase();
+}
+
+export function getHorarioPadraoPorTurno(turno = "") {
+  const norm = normalizarTurno(turno);
+  if (norm === "Vespertino") return "13:00 às 18:00";
+  if (norm === "Matutino") return "07:30 às 12:30";
+  if (norm === "Noturno") return "19:00 às 22:30";
+  if (norm === "Escala 12x36") return "07:00 às 19:00";
+  return "07:30 às 17:30";
+}
+
 function mapFuncaoToCategoria(funcao = "") {
   const f = String(funcao || "").toLowerCase().trim();
   if (f === "professor") return "professor";
@@ -344,9 +364,12 @@ export function useAdministrativoData() {
         const chave = cpfLimpo ? `cpf:${cpfLimpo}` : `prof:${p.id}`;
         const vinculos = Array.isArray(p.vinculos) ? p.vinculos : [];
         const turnosSet = new Set(
-          vinculos.map((v) => v.turno).filter(Boolean)
+          vinculos.map((v) => normalizarTurno(v.turno)).filter(Boolean)
         );
-        if (p.turno) turnosSet.add(p.turno);
+        if (p.turno) {
+          const tn = normalizarTurno(p.turno);
+          if (tn) turnosSet.add(tn);
+        }
         const turnosArr = Array.from(turnosSet);
         const turnoLabel =
           turnosArr.length > 1
@@ -386,12 +409,7 @@ export function useAdministrativoData() {
             disciplinasArr.length > 0
               ? `Regência (${disciplinasArr.join(", ")})`
               : "Corpo Docente",
-          horario_trabalho:
-            turnoLabel === "Integral"
-              ? "07:30 às 17:30"
-              : turnoLabel === "Vespertino"
-              ? "13:00 às 18:00"
-              : "07:30 às 12:30",
+          horario_trabalho: getHorarioPadraoPorTurno(turnoLabel),
           telefone: p.telefone || p.celular || "",
           email: p.email || "",
           acesso_sistema: true,
@@ -772,7 +790,11 @@ export function useAdministrativoData() {
         const doDia = { ...(prev[dataISO] || {}) };
         listaServidores.forEach((srv) => {
           if (!doDia[srv.id] || !doDia[srv.id].status) {
-            const horarioPadrao = (srv.horario_trabalho || "07:30 às 17:30").split(" às ");
+            const horarioStr =
+              normalizarTurno(srv.turno) === "Vespertino" && srv.horario_trabalho === "07:30 às 12:30"
+                ? "13:00 às 18:00"
+                : srv.horario_trabalho || getHorarioPadraoPorTurno(srv.turno);
+            const horarioPadrao = horarioStr.split(" às ");
             doDia[srv.id] = {
               status: "presente",
               entrada: horarioPadrao[0] || "07:30",

@@ -27,6 +27,8 @@ import {
   CATEGORIAS_SERVIDOR,
   TURNOS_TRABALHO,
   formatarCPF,
+  normalizarTurno,
+  getHorarioPadraoPorTurno,
 } from "./useAdministrativoData";
 
 const STATUS_PONTO_OPCOES = [
@@ -107,7 +109,11 @@ export default function FrequenciaPontoTab({
       };
     }
 
-    const horarioPadrao = (srv.horario_trabalho || "07:30 às 17:30").split(" às ");
+    const horarioStr =
+      normalizarTurno(srv.turno) === "Vespertino" && srv.horario_trabalho === "07:30 às 12:30"
+        ? "13:00 às 18:00"
+        : srv.horario_trabalho || getHorarioPadraoPorTurno(srv.turno);
+    const horarioPadrao = horarioStr.split(" às ");
     return {
       status: null, // pendente de chamada
       entrada: horarioPadrao[0] || "07:30",
@@ -143,7 +149,11 @@ export default function FrequenciaPontoTab({
   const listaFiltrada = useMemo(() => {
     return servidoresAtivos.filter((srv) => {
       if (filtroCategoria !== "todos" && srv.categoria !== filtroCategoria) return false;
-      if (filtroTurno !== "todos" && srv.turno !== filtroTurno) return false;
+      if (
+        filtroTurno !== "todos" &&
+        normalizarTurno(srv.turno) !== normalizarTurno(filtroTurno)
+      )
+        return false;
 
       const reg = getRegistroEfetivo(srv);
       if (filtroSituacaoDia !== "todos") {
@@ -426,10 +436,12 @@ export default function FrequenciaPontoTab({
 
                     <td className="py-3 px-4">
                       <div className="text-xs font-semibold text-slate-700">
-                        {srv.turno} ({srv.carga_horaria})
+                        {normalizarTurno(srv.turno) || srv.turno} ({srv.carga_horaria})
                       </div>
                       <div className="text-[10px] text-slate-400">
-                        {srv.horario_trabalho || "07:30 às 17:30"}
+                        {normalizarTurno(srv.turno) === "Vespertino" && srv.horario_trabalho === "07:30 às 12:30"
+                          ? "13:00 às 18:00"
+                          : srv.horario_trabalho || getHorarioPadraoPorTurno(srv.turno)}
                       </div>
                     </td>
 

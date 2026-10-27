@@ -5,13 +5,13 @@
 //   1) EmitirFolha.pdf            -> Servidor Efetivo COM Função Gratificada
 //   2) EmitirFolha_sem_função.pdf -> Servidor Efetivo SEM Função Gratificada
 //   3) EmitirFolha_contrato.pdf   -> Professor / Servidor CONTRATO TEMPORÁRIO
-// Renderiza Página 1 (Frente: Dias 01 a 31, Turnos Matutino/Vespertino/Noturno)
-// e Página 2 (Verso: Resumo da Frequência em quadrículas SIGEP, Tabela de Códigos
-// e Quadro de Assinaturas), integrado em tempo real aos lançamentos do sistema.
+// Renderiza exatamente 2 páginas A4 (Frente e Verso), 100% com estilos inline
+// para fidelidade absoluta tanto em tela quanto na geração/impressão de PDF.
 // ============================================================================
 
 import React, { useMemo } from "react";
 import { normalizarTurno } from "./useAdministrativoData";
+import brasaoDfImg from "./brasao-df.png";
 
 const MESES_EXTENSO = [
   "JANEIRO",
@@ -36,92 +36,217 @@ export function mapearOcorrenciaParaFolhaSEEDF(occ) {
   const tipo = String(occ.tipo || "").toLowerCase();
   const obs = String(occ.motivo || occ.observacao || "").toUpperCase();
 
-  if (sub.includes("FERIAS") || sub.includes("FÉRIAS") || obs.includes("FERIAS") || obs.includes("FÉRIAS")) {
-    return { textoAssinatura: "--- FERIAS ---", codigoSigep: "99902", descricaoCurta: "FÉRIAS REGULAMENTARES" };
+  if (
+    sub.includes("FERIAS") ||
+    sub.includes("FÉRIAS") ||
+    obs.includes("FERIAS") ||
+    obs.includes("FÉRIAS")
+  ) {
+    return {
+      textoAssinatura: "--- FERIAS ---",
+      codigoSigep: "99902",
+      descricaoCurta: "FÉRIAS REGULAMENTARES",
+    };
   }
   if (sub.includes("TRE") || obs.includes("TRE")) {
-    return { textoAssinatura: "--- ABONO TRE ---", codigoSigep: "00256", descricaoCurta: "ABONO TRE (SERV. ELEITORAL)" };
+    return {
+      textoAssinatura: "--- ABONO TRE ---",
+      codigoSigep: "00256",
+      descricaoCurta: "ABONO TRE (SERV. ELEITORAL)",
+    };
   }
   if (sub.includes("BIMESTRAL") || sub.includes("449")) {
-    return { textoAssinatura: "--- ABONO LEI 449/93 ---", codigoSigep: "00219", descricaoCurta: "ABONO BIMESTRAL LEI 449/1993" };
+    return {
+      textoAssinatura: "--- ABONO LEI 449/93 ---",
+      codigoSigep: "00219",
+      descricaoCurta: "ABONO BIMESTRAL LEI 449/1993",
+    };
   }
   if (tipo === "abono" || sub.includes("ABONO DE PONTO")) {
-    return { textoAssinatura: "--- ABONO DE PONTO ---", codigoSigep: "00219", descricaoCurta: "ABONO DE PONTO ART. 151 LC 840" };
+    return {
+      textoAssinatura: "--- ABONO DE PONTO ---",
+      codigoSigep: "00219",
+      descricaoCurta: "ABONO DE PONTO ART. 151 LC 840",
+    };
   }
   if (sub.includes("EXAME MEDICO") || sub.includes("118")) {
-    return { textoAssinatura: "--- EXAME PREVENTIVO ---", codigoSigep: "00118", descricaoCurta: "EXAME MÉDICO PREV. ART. 62 LC 840" };
+    return {
+      textoAssinatura: "--- EXAME PREVENTIVO ---",
+      codigoSigep: "00118",
+      descricaoCurta: "EXAME MÉDICO PREV. ART. 62 LC 840",
+    };
   }
   if (sub.includes("COMPARECIMENTO")) {
-    return { textoAssinatura: "--- ATEST. COMPAREC. ---", codigoSigep: "", descricaoCurta: sub };
+    return {
+      textoAssinatura: "--- ATEST. COMPAREC. ---",
+      codigoSigep: "",
+      descricaoCurta: sub,
+    };
   }
   if (tipo === "atestado") {
-    return { textoAssinatura: "--- ATESTADO MEDICO ---", codigoSigep: "", descricaoCurta: sub || "ATESTADO MÉDICO DE ATÉ 03 DIAS" };
+    return {
+      textoAssinatura: "--- ATESTADO MEDICO ---",
+      codigoSigep: "",
+      descricaoCurta: sub || "ATESTADO MÉDICO DE ATÉ 03 DIAS",
+    };
   }
   if (sub.includes("MATERNIDADE")) {
-    return { textoAssinatura: "--- LIC. MATERNIDADE ---", codigoSigep: "", descricaoCurta: sub };
+    return {
+      textoAssinatura: "--- LIC. MATERNIDADE ---",
+      codigoSigep: "",
+      descricaoCurta: sub,
+    };
   }
   if (sub.includes("PATERNIDADE")) {
-    return { textoAssinatura: "--- LIC. PATERNIDADE ---", codigoSigep: "", descricaoCurta: sub };
+    return {
+      textoAssinatura: "--- LIC. PATERNIDADE ---",
+      codigoSigep: "",
+      descricaoCurta: sub,
+    };
   }
   if (sub.includes("ADOTANTE")) {
-    return { textoAssinatura: "--- LICENCA ADOTANTE ---", codigoSigep: "", descricaoCurta: sub };
+    return {
+      textoAssinatura: "--- LICENCA ADOTANTE ---",
+      codigoSigep: "",
+      descricaoCurta: sub,
+    };
   }
   if (sub.includes("ACIDENTE")) {
-    return { textoAssinatura: "--- LIC. ACIDENTE SERV ---", codigoSigep: "", descricaoCurta: sub };
+    return {
+      textoAssinatura: "--- LIC. ACIDENTE SERV ---",
+      codigoSigep: "",
+      descricaoCurta: sub,
+    };
   }
   if (sub.includes("PESSOA DOENTE")) {
-    return { textoAssinatura: "--- LIC. ACOMP. FAMILIA ---", codigoSigep: "", descricaoCurta: sub };
+    return {
+      textoAssinatura: "--- LIC. ACOMP. FAMILIA ---",
+      codigoSigep: "",
+      descricaoCurta: sub,
+    };
   }
   if (tipo === "licenca") {
-    return { textoAssinatura: "--- LICENCA MEDICA ---", codigoSigep: "", descricaoCurta: sub || "LICENÇA MÉDICA OU ODONTOLÓGICA" };
+    return {
+      textoAssinatura: "--- LICENCA MEDICA ---",
+      codigoSigep: "",
+      descricaoCurta: sub || "LICENÇA MÉDICA OU ODONTOLÓGICA",
+    };
   }
   if (sub.includes("SANGUE")) {
-    return { textoAssinatura: "--- DOACAO DE SANGUE ---", codigoSigep: "", descricaoCurta: "AFAST. DOAÇÃO DE SANGUE ART. 62" };
+    return {
+      textoAssinatura: "--- DOACAO DE SANGUE ---",
+      codigoSigep: "",
+      descricaoCurta: "AFAST. DOAÇÃO DE SANGUE ART. 62",
+    };
   }
   if (sub.includes("CASAMENTO")) {
-    return { textoAssinatura: "--- AFAST. CASAMENTO ---", codigoSigep: "", descricaoCurta: "AFAST. CASAMENTO ART. 62 LC 840" };
+    return {
+      textoAssinatura: "--- AFAST. CASAMENTO ---",
+      codigoSigep: "",
+      descricaoCurta: "AFAST. CASAMENTO ART. 62 LC 840",
+    };
   }
   if (sub.includes("FALECIMENTO")) {
-    return { textoAssinatura: "--- AFAST. FALECIMENTO ---", codigoSigep: "", descricaoCurta: "AFAST. FALECIMENTO ART. 62 LC 840" };
+    return {
+      textoAssinatura: "--- AFAST. FALECIMENTO ---",
+      codigoSigep: "",
+      descricaoCurta: "AFAST. FALECIMENTO ART. 62 LC 840",
+    };
   }
   if (sub.includes("JURI")) {
-    return { textoAssinatura: "--- SERVICO DE JURI ---", codigoSigep: "", descricaoCurta: "AFAST. JÚRI / SERV. OBRIGATÓRIO" };
+    return {
+      textoAssinatura: "--- SERVICO DE JURI ---",
+      codigoSigep: "",
+      descricaoCurta: "AFAST. JÚRI / SERV. OBRIGATÓRIO",
+    };
   }
   if (sub.includes("ELEITORAL")) {
-    return { textoAssinatura: "--- AFAST. ELEITORAL ---", codigoSigep: "00256", descricaoCurta: sub };
+    return {
+      textoAssinatura: "--- AFAST. ELEITORAL ---",
+      codigoSigep: "00256",
+      descricaoCurta: sub,
+    };
   }
   if (tipo === "afastamento") {
-    return { textoAssinatura: "--- DISPENSA / AFAST. ---", codigoSigep: "", descricaoCurta: sub || "AFASTAMENTO LEGAL" };
+    return {
+      textoAssinatura: "--- DISPENSA / AFAST. ---",
+      codigoSigep: "",
+      descricaoCurta: sub || "AFASTAMENTO LEGAL",
+    };
   }
   if (sub.includes("PARALISACAO") || sub.includes("PARALISAÇÃO")) {
-    return { textoAssinatura: "--- FALTA PARALISACAO ---", codigoSigep: "40034", descricaoCurta: "FALTA PARALISAÇÃO (40034)" };
+    return {
+      textoAssinatura: "--- FALTA PARALISACAO ---",
+      codigoSigep: "40034",
+      descricaoCurta: "FALTA PARALISAÇÃO (40034)",
+    };
   }
   if (sub.includes("HORAS NAO TRABALHADAS")) {
-    return { textoAssinatura: "--- HORAS NAO TRAB. ---", codigoSigep: "40046", descricaoCurta: "HORAS NÃO TRABALHADAS (40046)" };
+    return {
+      textoAssinatura: "--- HORAS NAO TRAB. ---",
+      codigoSigep: "40046",
+      descricaoCurta: "HORAS NÃO TRABALHADAS (40046)",
+    };
   }
   if (tipo === "ausencia" || sub.includes("FALTA")) {
-    return { textoAssinatura: "--- FALTA ---", codigoSigep: "40010", descricaoCurta: sub || "FALTA (40010)" };
+    return {
+      textoAssinatura: "--- FALTA ---",
+      codigoSigep: "40010",
+      descricaoCurta: sub || "FALTA (40010)",
+    };
   }
   if (sub.includes("ADICIONAL NOTURNO")) {
-    return { textoAssinatura: "", codigoSigep: "18077", descricaoCurta: "ADICIONAL NOTURNO (18077)" };
+    return {
+      textoAssinatura: "",
+      codigoSigep: "18077",
+      descricaoCurta: "ADICIONAL NOTURNO (18077)",
+    };
   }
   if (sub.includes("PONTO FACULTATIVO") || obs.includes("PONTO FACULTATIVO")) {
-    return { textoAssinatura: "--- PONTO FACULTATIVO ---", codigoSigep: "", descricaoCurta: "PONTO FACULTATIVO" };
+    return {
+      textoAssinatura: "--- PONTO FACULTATIVO ---",
+      codigoSigep: "",
+      descricaoCurta: "PONTO FACULTATIVO",
+    };
   }
-  if (sub.includes("DIA LETIVO MÓVEL") || sub.includes("DIA LETIVO MOVEL") || obs.includes("DIA LETIVO MÓVEL")) {
-    return { textoAssinatura: "--- DIA LETIVO MOVEL ---", codigoSigep: "", descricaoCurta: "DIA LETIVO MÓVEL" };
+  if (
+    sub.includes("DIA LETIVO MÓVEL") ||
+    sub.includes("DIA LETIVO MOVEL") ||
+    obs.includes("DIA LETIVO MÓVEL")
+  ) {
+    return {
+      textoAssinatura: "--- DIA LETIVO MOVEL ---",
+      codigoSigep: "",
+      descricaoCurta: "DIA LETIVO MÓVEL",
+    };
   }
   if (sub.includes("RECESSO") || obs.includes("RECESSO")) {
-    return { textoAssinatura: "--- RECESSO ---", codigoSigep: "", descricaoCurta: "RECESSO ESCOLAR" };
+    return {
+      textoAssinatura: "--- RECESSO ---",
+      codigoSigep: "",
+      descricaoCurta: "RECESSO ESCOLAR",
+    };
   }
   if (sub.includes("FERIADO") || obs.includes("FERIADO")) {
-    return { textoAssinatura: "--- FERIADO ---", codigoSigep: "", descricaoCurta: "FERIADO" };
+    return {
+      textoAssinatura: "--- FERIADO ---",
+      codigoSigep: "",
+      descricaoCurta: "FERIADO",
+    };
   }
   if (sub.includes("SUSP. DAS AULAS")) {
-    return { textoAssinatura: "--- SUSP. DAS AULAS ---", codigoSigep: "", descricaoCurta: sub };
+    return {
+      textoAssinatura: "--- SUSP. DAS AULAS ---",
+      codigoSigep: "",
+      descricaoCurta: sub,
+    };
   }
   if (sub.includes("NEGOCIAÇÃO INTERNA") || tipo === "negociacao") {
-    return { textoAssinatura: "--- ACORDO / REPOSICAO ---", codigoSigep: "", descricaoCurta: sub || "NEGOCIAÇÃO INTERNA" };
+    return {
+      textoAssinatura: "--- ACORDO / REPOSICAO ---",
+      codigoSigep: "",
+      descricaoCurta: sub || "NEGOCIAÇÃO INTERNA",
+    };
   }
 
   return {
@@ -131,94 +256,39 @@ export function mapearOcorrenciaParaFolhaSEEDF(occ) {
   };
 }
 
-// Brasão Oficial da Secretaria de Estado de Educação / GDF em SVG Vetorial de Alta Definição
-function BrasaoGDFSvg() {
-  return (
-    <svg
-      viewBox="0 0 120 110"
-      className="w-14 h-14 mx-auto"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      {/* Triângulo externo estilo escudo de Brasília */}
-      <polygon
-        points="60,4 114,96 6,96"
-        stroke="#111827"
-        strokeWidth="2.5"
-        fill="#ffffff"
-      />
-      <polygon
-        points="60,11 107,92 13,92"
-        stroke="#111827"
-        strokeWidth="1.2"
-        fill="#f8fafc"
-      />
-      {/* Cruz de Brasília no topo */}
-      <line x1="60" y1="16" x2="60" y2="28" stroke="#111827" strokeWidth="1.8" />
-      <line x1="54" y1="22" x2="66" y2="22" stroke="#111827" strokeWidth="1.8" />
-      {/* Escudo quadrangular central com colunas do Palácio da Alvorada */}
-      <rect
-        x="43"
-        y="34"
-        width="34"
-        height="38"
-        rx="3"
-        stroke="#111827"
-        strokeWidth="2"
-        fill="#e5e7eb"
-      />
-      {/* Colunas do Palácio da Alvorada estilizadas */}
-      <path
-        d="M47 40 C53 48, 53 60, 47 68 L59 68 C54 60, 54 48, 59 40 Z"
-        fill="#111827"
-      />
-      <path
-        d="M61 40 C66 48, 66 60, 61 68 L73 68 C67 60, 67 48, 73 40 Z"
-        fill="#111827"
-      />
-      {/* Faixa inferior */}
-      <path
-        d="M16 98 Q60 106 104 98"
-        stroke="#111827"
-        strokeWidth="2"
-        fill="none"
-      />
-      <text
-        x="60"
-        y="105"
-        textAnchor="middle"
-        fontSize="6.5"
-        fontWeight="bold"
-        fill="#111827"
-        fontFamily="Arial, sans-serif"
-      >
-        VENTVRIS VENTIS
-      </text>
-    </svg>
-  );
-}
-
-// Renderiza uma fileira de quadrículas abertas no topo (estilo formulário SIGEP da Pág. 2)
+// Renderiza uma fileira horizontal de quadrículas abertas no topo (estilo formulário SIGEP da Pág. 2)
+// IMPORTANTE: 100% inline styles (display: inline-flex, flexDirection: row) para nunca empilhar no PDF!
 function QuadriculasSIGEP({ digitos = [], totalCaixas = 1 }) {
   const arr = Array.from({ length: totalCaixas }, (_, i) => digitos[i] ?? "");
   return (
-    <div className="inline-flex items-center">
+    <div
+      className="quadriculas-sigep-row"
+      style={{
+        display: "inline-flex",
+        flexDirection: "row",
+        flexWrap: "nowrap",
+        alignItems: "center",
+        verticalAlign: "middle",
+      }}
+    >
       {arr.map((char, idx) => (
         <div
           key={idx}
           style={{
-            width: "18px",
+            width: "19px",
             height: "22px",
             borderLeft: "1px solid #000",
             borderRight: idx === totalCaixas - 1 ? "1px solid #000" : "none",
             borderBottom: "1px solid #000",
+            borderTop: "none",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             fontSize: "11px",
-            fontWeight: 600,
+            fontWeight: 400,
             fontFamily: "Arial, Helvetica, sans-serif",
             color: "#000",
+            boxSizing: "border-box",
           }}
         >
           {char}
@@ -255,47 +325,66 @@ export default function FolhaPontoOficialSEEDF({
     modeloForcado === "temporario" ||
     (modeloForcado === "auto" && vinculoNorm.includes("tempor"));
 
-  // Determina se o servidor exerce função gratificada (Diretor, Vice, Supervisor, Secretário, Coordenador)
+  // Determina se o servidor exerce função gratificada (Diretor, Vice, Supervisor, Secretário)
   const funcaoGratificadaServidor = useMemo(() => {
     if (modeloForcado === "efetivo_sem_funcao") return "";
     if (servidor.funcao_gratificada) return servidor.funcao_gratificada;
     const cargoUp = String(servidor.cargo || "").toUpperCase();
-    if (cargoUp.includes("DIRETOR")) return "DIRETOR                        FGE-06";
-    if (cargoUp.includes("VICE")) return "VICE-DIRETOR                   FGE-05";
-    if (cargoUp.includes("SUPERVISOR")) return "SUPERVISOR ADMINISTRATIVO      DFG-02";
-    if (cargoUp.includes("CHEFE DE SECRETARIA") || cargoUp.includes("SECRETÁRIO") || cargoUp.includes("SECRETARIO")) {
-      return "CHEFE DE SECRETARIA            DFG-02";
+    if (cargoUp.includes("DIRETOR") && !cargoUp.includes("VICE")) {
+      return "DIRETOR                                FGE-06";
+    }
+    if (cargoUp.includes("VICE")) {
+      return "VICE-DIRETOR                           FGE-05";
+    }
+    if (cargoUp.includes("SUPERVISOR")) {
+      return "SUPERVISOR ADMINISTRATIVO              DFG-02";
+    }
+    if (
+      cargoUp.includes("CHEFE DE SECRETARIA") ||
+      cargoUp.includes("SECRETÁRIO") ||
+      cargoUp.includes("SECRETARIO")
+    ) {
+      return "CHEFE DE SECRETARIA                    DFG-02";
     }
     return "";
   }, [servidor, modeloForcado]);
 
-  // Dados institucionais da Unidade Escolar (com fallback fiel ao padrão SEEDF Planaltina / CEF 04)
+  // Dados institucionais da Unidade Escolar (normaliza siglas curtas como CEF04-CCMDF para o nome oficial SEEDF)
   const uaCodigo = dadosUnidade.ua || "007";
   const creNome =
     dadosUnidade.cre || "COORDENAÇÃO REGIONAL DE ENSINO DE PLANALTINA";
   const codEstabelecimento = dadosUnidade.codigoExercicio || "990230000043";
-  const nomeEstabelecimento =
-    dadosUnidade.nomeEscola ||
-    "CENTRO DE ENSINO FUNDAMENTAL 04 DE PLANALTINA - COLEGIO CM";
+  const nomeEstabelecimento = useMemo(() => {
+    const raw = String(dadosUnidade.nomeEscola || "").trim().toUpperCase();
+    if (!raw || raw === "CEF04-CCMDF" || raw === "CEF 04" || raw.length < 18) {
+      return "CENTRO DE ENSINO FUNDAMENTAL 04 DE PLANALTINA - COLEGIO CM";
+    }
+    return raw;
+  }, [dadosUnidade.nomeEscola]);
 
   // Dados funcionais do servidor formatados para o cabeçalho oficial
   const matriculaOficial =
-    servidor.matricula && !String(servidor.matricula).startsWith("PROF-") && !String(servidor.matricula).startsWith("DIR-") && !String(servidor.matricula).startsWith("EQP-")
+    servidor.matricula &&
+    !String(servidor.matricula).startsWith("PROF-") &&
+    !String(servidor.matricula).startsWith("DIR-") &&
+    !String(servidor.matricula).startsWith("EQP-")
       ? servidor.matricula
       : isTemporario
       ? "7062701-0"
       : "0027596-4";
 
   const nomeServidorUpper = String(servidor.nome || "").toUpperCase();
-  const chNumero = String(servidor.carga_horaria || "40h").replace(/\D/g, "") || "40";
+  const chNumero =
+    String(servidor.carga_horaria || "40h").replace(/\D/g, "") || "40";
   const isJornadaDupla = Number(chNumero) > 20;
 
   // Cargo/Especialidade e Disciplina
   const cargoBase = isTemporario
     ? "PROFESSOR TEMPORARIO"
-    : String(servidor.categoria || "") === "professor" || String(servidor.cargo || "").toUpperCase().includes("PROFESSOR")
-    ? "PROFESSOR DE EDUC. BASICA      25-PQ5"
-    : String(servidor.cargo || "SERVIDOR DE EDUC. BASICA").toUpperCase();
+    : String(servidor.categoria || "") === "professor" ||
+      String(servidor.cargo || "").toUpperCase().includes("PROFESSOR")
+    ? "PROFESSOR DE EDUC. BASICA     25-PQ5"
+    : String(servidor.cargo || "PROFESSOR DE EDUC. BASICA     25-PQ5").toUpperCase();
 
   const disciplinaExtr = useMemo(() => {
     const c = String(servidor.cargo || "");
@@ -324,7 +413,9 @@ export default function FolhaPontoOficialSEEDF({
 
   // Filtra ocorrências do servidor que intersectam o mês de referência
   const inicioMesISO = `${anoStr}-${String(mesNum).padStart(2, "0")}-01`;
-  const fimMesISO = `${anoStr}-${String(mesNum).padStart(2, "0")}-${String(ultimoDiaMes).padStart(2, "0")}`;
+  const fimMesISO = `${anoStr}-${String(mesNum).padStart(2, "0")}-${String(
+    ultimoDiaMes
+  ).padStart(2, "0")}`;
 
   const ocorrenciasDoMes = useMemo(() => {
     return ocorrencias
@@ -335,7 +426,9 @@ export default function FolhaPontoOficialSEEDF({
         const fim = String(o.data_fim || o.data_inicio || "");
         return ini <= fimMesISO && fim >= inicioMesISO;
       })
-      .sort((a, b) => String(a.data_inicio || "").localeCompare(String(b.data_inicio || "")));
+      .sort((a, b) =>
+        String(a.data_inicio || "").localeCompare(String(b.data_inicio || ""))
+      );
   }, [ocorrencias, servidor.id, inicioMesISO, fimMesISO]);
 
   // Constrói o mapa dos 31 dias da tabela
@@ -363,12 +456,19 @@ export default function FolhaPontoOficialSEEDF({
         : null;
 
       // Verifica se há registro no ponto diário
-      const regPonto = diaExisteNoMes ? pontoDiario?.[dataISO]?.[servidor.id] : null;
+      const regPonto = diaExisteNoMes
+        ? pontoDiario?.[dataISO]?.[servidor.id]
+        : null;
 
       let infoMapeada = null;
       if (occDia) {
         infoMapeada = mapearOcorrenciaParaFolhaSEEDF(occDia);
-      } else if (regPonto && regPonto.status && regPonto.status !== "presente" && regPonto.status !== "pendente") {
+      } else if (
+        regPonto &&
+        regPonto.status &&
+        regPonto.status !== "presente" &&
+        regPonto.status !== "pendente"
+      ) {
         infoMapeada = mapearOcorrenciaParaFolhaSEEDF({
           tipo: regPonto.status === "falta" ? "ausencia" : regPonto.status,
           subtipo: regPonto.observacao || regPonto.status.toUpperCase(),
@@ -378,7 +478,6 @@ export default function FolhaPontoOficialSEEDF({
 
       const sombreado = !diaExisteNoMes || isFimDeSemana;
 
-      // Textos das colunas de assinatura e entrada/saída
       let assinaturaEsq = "";
       let entradaEsq = "";
       let saidaEsq = "";
@@ -410,8 +509,14 @@ export default function FolhaPontoOficialSEEDF({
           saidaEsq = regPonto.saida || "";
         }
         if (turnosCabecalho.ativoApenas !== "esq") {
-          entradaDir = regPonto.entrada_t2 || (turnosCabecalho.ativoApenas === "dir" ? regPonto.entrada : "") || "";
-          saidaDir = regPonto.saida_t2 || (turnosCabecalho.ativoApenas === "dir" ? regPonto.saida : "") || "";
+          entradaDir =
+            regPonto.entrada_t2 ||
+            (turnosCabecalho.ativoApenas === "dir" ? regPonto.entrada : "") ||
+            "";
+          saidaDir =
+            regPonto.saida_t2 ||
+            (turnosCabecalho.ativoApenas === "dir" ? regPonto.saida : "") ||
+            "";
         }
       }
 
@@ -447,12 +552,15 @@ export default function FolhaPontoOficialSEEDF({
   const linhasResumoSigep = useMemo(() => {
     const preenchidas = ocorrenciasDoMes.slice(0, 6).map((occ) => {
       const m = mapearOcorrenciaParaFolhaSEEDF(occ);
-      const cod = String(m?.codigoSigep || "00219").padStart(5, "0").slice(0, 5);
+      const cod = String(m?.codigoSigep || "00219")
+        .padStart(5, "0")
+        .slice(0, 5);
       const cargaDigito = isJornadaDupla ? "3" : "1";
       const qtdDias = String(occ.dias || 1).padStart(5, "0").slice(-5);
 
       const iniDia = String(occ.data_inicio || "").slice(8, 10) || "01";
-      const fimDia = String(occ.data_fim || occ.data_inicio || "").slice(8, 10) || iniDia;
+      const fimDia =
+        String(occ.data_fim || occ.data_inicio || "").slice(8, 10) || iniDia;
 
       return {
         oper: ["I"],
@@ -485,8 +593,13 @@ export default function FolhaPontoOficialSEEDF({
     ocorrenciasDoMes.forEach((o) => {
       const dIni = String(o.data_inicio || "").slice(8, 10);
       const dFim = String(o.data_fim || o.data_inicio || "").slice(8, 10);
-      const per = dIni === dFim ? `Dia ${dIni}/${String(mesNum).padStart(2, "0")}` : `Dias ${dIni} a ${dFim}/${String(mesNum).padStart(2, "0")}`;
-      partes.push(`${per}: ${o.subtipo}${o.documento_ref ? ` (${o.documento_ref})` : ""}`);
+      const per =
+        dIni === dFim
+          ? `Dia ${dIni}/${String(mesNum).padStart(2, "0")}`
+          : `Dias ${dIni} a ${dFim}/${String(mesNum).padStart(2, "0")}`;
+      partes.push(
+        `${per}: ${o.subtipo}${o.documento_ref ? ` (${o.documento_ref})` : ""}`
+      );
     });
     if (observacaoManual && observacaoManual.trim()) {
       partes.push(observacaoManual.trim());
@@ -496,7 +609,7 @@ export default function FolhaPontoOficialSEEDF({
 
   return (
     <div
-      className="folha-seedf-wrapper space-y-8"
+      className="folha-seedf-wrapper space-y-8 print:space-y-0"
       style={{
         fontFamily: "Arial, Helvetica, sans-serif",
         color: "#000000",
@@ -509,136 +622,208 @@ export default function FolhaPontoOficialSEEDF({
         className="folha-seedf-page bg-white mx-auto shadow-md print:shadow-none"
         style={{
           width: "210mm",
-          minHeight: "296mm",
-          padding: "8mm 9mm",
+          height: "296mm",
+          maxHeight: "296mm",
+          padding: "7mm 9mm",
           boxSizing: "border-box",
           pageBreakAfter: "always",
+          breakAfter: "page",
+          overflow: "hidden",
         }}
       >
-        {/* ── CABEÇALHO MODELO 1: SERVIDOR EFETIVO (EmitirFolha.pdf) ── */}
+        {/* ── CABEÇALHO MODELO 1: SERVIDOR EFETIVO (EmitirFolha.pdf) ──
+            Dividido em DOIS blocos separados por micro-espaço, seguidos de
+            micro-espaço antes da Tabela de Assinaturas (fiel ao PDF da SEEDF) */}
         {!isTemporario ? (
-          <div style={{ border: "1px solid #000" }}>
-            {/* Faixa 1: Brasão + SECRETARIA DE ESTADO DE EDUCAÇÃO + CNPJ */}
+          <>
+            {/* BLOCO 1 DO CABEÇALHO: Brasão Oficial GDF + Secretaria + Folha de Frequência / Referência */}
             <div
               style={{
-                display: "grid",
-                gridTemplateColumns: "95px 1fr",
-                borderBottom: "1px solid #000",
-                minHeight: "58px",
-                alignItems: "center",
+                width: "100%",
+                border: "1px solid #000",
+                boxSizing: "border-box",
               }}
             >
-              <div style={{ padding: "2px 6px", textAlign: "center" }}>
-                <BrasaoGDFSvg />
-              </div>
-              <div style={{ textAlign: "center", paddingRight: "50px" }}>
-                <div
+              {/* Parte Superior: Brasão GDF oficial à esquerda + Título Centralizado */}
+              <div
+                style={{
+                  position: "relative",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  minHeight: "54px",
+                  padding: "3px 10px",
+                  borderBottom: "1px solid #000",
+                  boxSizing: "border-box",
+                }}
+              >
+                <img
+                  src={brasaoDfImg}
+                  alt="Brasão do Distrito Federal"
                   style={{
-                    fontSize: "19px",
-                    fontWeight: 400,
-                    letterSpacing: "0.4px",
-                    lineHeight: 1.2,
+                    position: "absolute",
+                    left: "14px",
+                    top: "3px",
+                    width: "46px",
+                    height: "48px",
+                    objectFit: "contain",
                   }}
-                >
-                  SECRETARIA DE ESTADO DE EDUCAÇÃO
+                />
+                <div style={{ textAlign: "center" }}>
+                  <div
+                    style={{
+                      fontSize: "19.5px",
+                      fontWeight: 400,
+                      letterSpacing: "0.3px",
+                      lineHeight: 1.15,
+                    }}
+                  >
+                    SECRETARIA DE ESTADO DE EDUCAÇÃO
+                  </div>
+                  <div style={{ fontSize: "11px", marginTop: "3px" }}>
+                    CNPJ: 00.394.676/0001-07
+                  </div>
                 </div>
-                <div style={{ fontSize: "11px", marginTop: "3px" }}>
-                  CNPJ: 00.394.676/0001-07
+              </div>
+
+              {/* Parte Inferior do Bloco 1: Folha de Frequência | REFERÊNCIA */}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  padding: "2px 6px",
+                  boxSizing: "border-box",
+                }}
+              >
+                <div style={{ fontSize: "15.5px", fontWeight: 400 }}>
+                  Folha de Frequência
+                </div>
+                <div style={{ fontSize: "11.5px", paddingRight: "28px" }}>
+                  <span>REFERÊNCIA:</span>
+                  <span style={{ marginLeft: "14px", fontWeight: 400 }}>
+                    {referenciaFormatada}
+                  </span>
                 </div>
               </div>
             </div>
 
-            {/* Faixa 2: Folha de Frequência | REFERÊNCIA */}
+            {/* MICRO-ESPAÇO (4px) + BLOCO 2: Dados da Escola (UA/Exercício) e Dados do Servidor */}
             <div
               style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                padding: "3px 8px",
-                borderBottom: "1px solid #000",
+                width: "100%",
+                border: "1px solid #000",
+                marginTop: "4px",
+                boxSizing: "border-box",
               }}
             >
-              <div style={{ fontSize: "15px", fontWeight: 400 }}>
-                Folha de Frequência
-              </div>
-              <div style={{ fontSize: "11.5px" }}>
-                <span>REFERÊNCIA:</span>
-                <span style={{ marginLeft: "14px", fontWeight: 400 }}>
-                  {referenciaFormatada}
-                </span>
-              </div>
-            </div>
-
-            {/* Faixa 3: UA e Exercício */}
-            <div
-              style={{
-                padding: "4px 8px",
-                borderBottom: "1px solid #000",
-                fontSize: "11px",
-                lineHeight: 1.55,
-              }}
-            >
-              <div>
-                <span style={{ display: "inline-block", width: "42px" }}>UA:</span>
-                <span style={{ display: "inline-block", width: "48px" }}>{uaCodigo}</span>
-                <span>{creNome}</span>
-              </div>
-              <div>
-                <span style={{ display: "inline-block", width: "70px" }}>Exercício:</span>
-                <span style={{ display: "inline-block", width: "120px" }}>
-                  {codEstabelecimento}
-                </span>
-                <span>{nomeEstabelecimento}</span>
-              </div>
-            </div>
-
-            {/* Faixa 4: Matrícula, Nome, Cargo/Especialidade, C.H. e Função */}
-            <div
-              style={{
-                padding: "4px 8px",
-                fontSize: "11px",
-                lineHeight: 1.6,
-              }}
-            >
-              <div>
-                <span>Matrícula:</span>
-                <span style={{ marginLeft: "12px", display: "inline-block", width: "90px" }}>
-                  {matriculaOficial}
-                </span>
-                <span>Nome: {nomeServidorUpper}</span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
+              {/* Sub-bloco Escola: UA e Exercício */}
+              <div
+                style={{
+                  padding: "4px 6px",
+                  borderBottom: "1px solid #000",
+                  fontSize: "11px",
+                  lineHeight: 1.5,
+                  boxSizing: "border-box",
+                }}
+              >
                 <div>
-                  <span>Cargo/Especialidade: </span>
-                  <span>{cargoBase}</span>
+                  <span style={{ display: "inline-block", width: "42px" }}>
+                    UA:
+                  </span>
+                  <span style={{ display: "inline-block", width: "46px" }}>
+                    {uaCodigo}
+                  </span>
+                  <span>{creNome}</span>
                 </div>
-                <div style={{ paddingRight: "45px" }}>
-                  <span>C.H. &nbsp;{chNumero}</span>
+                <div>
+                  <span style={{ display: "inline-block", width: "70px" }}>
+                    Exercício:
+                  </span>
+                  <span style={{ display: "inline-block", width: "120px" }}>
+                    {codEstabelecimento}
+                  </span>
+                  <span>{nomeEstabelecimento}</span>
                 </div>
               </div>
-              <div>
-                <span style={{ display: "inline-block", width: "68px" }}>Função:</span>
-                <span>{funcaoGratificadaServidor}</span>
+
+              {/* Sub-bloco Servidor: Matrícula, Nome, Cargo/Especialidade, C.H. e Função */}
+              <div
+                style={{
+                  padding: "4px 6px",
+                  fontSize: "11px",
+                  lineHeight: 1.55,
+                  boxSizing: "border-box",
+                }}
+              >
+                <div>
+                  <span>Matrícula:</span>
+                  <span
+                    style={{
+                      marginLeft: "12px",
+                      display: "inline-block",
+                      width: "92px",
+                    }}
+                  >
+                    {matriculaOficial}
+                  </span>
+                  <span>Nome: &nbsp;{nomeServidorUpper}</span>
+                </div>
+                <div
+                  style={{ display: "flex", justifyContent: "space-between" }}
+                >
+                  <div>
+                    <span>Cargo/Especialidade: </span>
+                    <span>{cargoBase}</span>
+                  </div>
+                  <div style={{ paddingRight: "48px" }}>
+                    <span>C.H. &nbsp;{chNumero}</span>
+                  </div>
+                </div>
+                <div>
+                  <span style={{ display: "inline-block", width: "68px" }}>
+                    Função:
+                  </span>
+                  <span>{funcaoGratificadaServidor}</span>
+                </div>
               </div>
             </div>
-          </div>
+          </>
         ) : (
           /* ── CABEÇALHO MODELO 2: CONTRATO TEMPORÁRIO (EmitirFolha_contrato.pdf) ── */
-          <div style={{ border: "1px solid #000" }}>
-            {/* Faixa 1: Brasão + Títulos */}
+          <div
+            style={{
+              width: "100%",
+              border: "1px solid #000",
+              boxSizing: "border-box",
+            }}
+          >
+            {/* Faixa 1: Brasão Oficial GDF + Títulos */}
             <div
               style={{
-                display: "grid",
-                gridTemplateColumns: "95px 1fr",
-                borderBottom: "1px solid #000",
-                minHeight: "62px",
+                position: "relative",
+                display: "flex",
                 alignItems: "center",
+                justifyContent: "center",
+                borderBottom: "1px solid #000",
+                minHeight: "60px",
+                padding: "4px 10px",
+                boxSizing: "border-box",
               }}
             >
-              <div style={{ padding: "2px 6px", textAlign: "center" }}>
-                <BrasaoGDFSvg />
-              </div>
-              <div style={{ textAlign: "center", paddingRight: "40px", lineHeight: 1.25 }}>
+              <img
+                src={brasaoDfImg}
+                alt="Brasão do Distrito Federal"
+                style={{
+                  position: "absolute",
+                  left: "14px",
+                  top: "4px",
+                  width: "48px",
+                  height: "50px",
+                  objectFit: "contain",
+                }}
+              />
+              <div style={{ textAlign: "center", lineHeight: 1.25 }}>
                 <div style={{ fontSize: "14.5px" }}>
                   SECRETARIA DE ESTADO DE EDUCAÇÃO
                 </div>
@@ -653,18 +838,23 @@ export default function FolhaPontoOficialSEEDF({
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "155px 1fr 195px",
+                gridTemplateColumns: "22% 52% 26%",
                 borderBottom: "1px solid #000",
                 fontSize: "10px",
+                boxSizing: "border-box",
               }}
             >
-              <div style={{ padding: "3px 6px", borderRight: "1px solid #000" }}>
+              <div
+                style={{ padding: "3px 6px", borderRight: "1px solid #000" }}
+              >
                 <div style={{ fontSize: "9px" }}>Código do Estabelecimento</div>
                 <div style={{ fontSize: "11px", marginTop: "2px" }}>
                   {codEstabelecimento}
                 </div>
               </div>
-              <div style={{ padding: "3px 6px", borderRight: "1px solid #000" }}>
+              <div
+                style={{ padding: "3px 6px", borderRight: "1px solid #000" }}
+              >
                 <div style={{ fontSize: "9px" }}>Nome do Estabelecimento</div>
                 <div
                   style={{
@@ -690,12 +880,15 @@ export default function FolhaPontoOficialSEEDF({
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "155px 1fr",
+                gridTemplateColumns: "22% 78%",
                 borderBottom: "1px solid #000",
                 fontSize: "10px",
+                boxSizing: "border-box",
               }}
             >
-              <div style={{ padding: "3px 6px", borderRight: "1px solid #000" }}>
+              <div
+                style={{ padding: "3px 6px", borderRight: "1px solid #000" }}
+              >
                 <div style={{ fontSize: "9px" }}>Matrícula/Inscrição</div>
                 <div style={{ fontSize: "11px", marginTop: "2px" }}>
                   {matriculaOficial}
@@ -710,35 +903,43 @@ export default function FolhaPontoOficialSEEDF({
             </div>
 
             {/* Faixa 4: CARGO e DISCIPLINA */}
-            <div style={{ padding: "4px 6px", fontSize: "10.5px", lineHeight: 1.5 }}>
+            <div
+              style={{
+                padding: "4px 6px",
+                fontSize: "10.5px",
+                lineHeight: 1.45,
+                boxSizing: "border-box",
+              }}
+            >
               <div>CARGO: &nbsp;&nbsp;&nbsp;{cargoBase}</div>
               <div>DISCIPLINA: &nbsp;{disciplinaExtr}</div>
             </div>
           </div>
         )}
 
-        {/* ── TABELA PRINCIPAL DOS 31 DIAS (COMUM AOS DOIS MODELOS) ── */}
+        {/* ── MICRO-ESPAÇO (5px) + TABELA PRINCIPAL DOS 31 DIAS (100% ALINHADA HORIZONTALMENTE) ── */}
         <table
           style={{
             width: "100%",
             borderCollapse: "collapse",
-            marginTop: isTemporario ? "0px" : "6px",
+            marginTop: isTemporario ? "0px" : "5px",
             border: "1px solid #000",
             tableLayout: "fixed",
+            boxSizing: "border-box",
           }}
         >
           <colgroup>
-            <col style={{ width: "28px" }} />
-            <col style={{ width: "205px" }} />
-            <col style={{ width: "76px" }} />
-            <col style={{ width: "76px" }} />
-            <col style={{ width: "205px" }} />
-            <col style={{ width: "76px" }} />
-            <col style={{ width: "76px" }} />
+            <col style={{ width: "4%" }} />
+            <col style={{ width: "28%" }} />
+            <col style={{ width: "10%" }} />
+            <col style={{ width: "10%" }} />
+            <col style={{ width: "28%" }} />
+            <col style={{ width: "10%" }} />
+            <col style={{ width: "10%" }} />
           </colgroup>
           <thead>
             {/* Linha 1: TURNO: Matutino | TURNO: Vespertino */}
-            <tr style={{ height: "22px" }}>
+            <tr style={{ height: "21px" }}>
               <th
                 style={{
                   border: "1px solid #000",
@@ -756,7 +957,9 @@ export default function FolhaPontoOficialSEEDF({
                 }}
               >
                 <span style={{ fontSize: "13px" }}>T</span>
-                <span style={{ fontSize: "9.5px", letterSpacing: "0.5px" }}>URNO: </span>
+                <span style={{ fontSize: "9.5px", letterSpacing: "0.5px" }}>
+                  URNO:{" "}
+                </span>
                 <span style={{ fontSize: "12px" }}>{turnosCabecalho.esq}</span>
               </th>
               <th
@@ -770,14 +973,22 @@ export default function FolhaPontoOficialSEEDF({
                 }}
               >
                 <span style={{ fontSize: "13px" }}>T</span>
-                <span style={{ fontSize: "9.5px", letterSpacing: "0.5px" }}>URNO: </span>
+                <span style={{ fontSize: "9.5px", letterSpacing: "0.5px" }}>
+                  URNO:{" "}
+                </span>
                 <span style={{ fontSize: "12px" }}>{turnosCabecalho.dir}</span>
               </th>
             </tr>
 
             {/* Linha 2: Dia | Assinatura do Servidor | Entrada | Saída ... */}
-            <tr style={{ height: "21px", fontSize: "10px" }}>
-              <th style={{ border: "1px solid #000", fontWeight: 400, textAlign: "center" }}>
+            <tr style={{ height: "20px", fontSize: "10px" }}>
+              <th
+                style={{
+                  border: "1px solid #000",
+                  fontWeight: 400,
+                  textAlign: "center",
+                }}
+              >
                 Dia
               </th>
               <th
@@ -790,10 +1001,22 @@ export default function FolhaPontoOficialSEEDF({
               >
                 Assinatura do Servidor
               </th>
-              <th style={{ border: "1px solid #000", fontWeight: 400, textAlign: "center" }}>
+              <th
+                style={{
+                  border: "1px solid #000",
+                  fontWeight: 400,
+                  textAlign: "center",
+                }}
+              >
                 Entrada
               </th>
-              <th style={{ border: "1px solid #000", fontWeight: 400, textAlign: "center" }}>
+              <th
+                style={{
+                  border: "1px solid #000",
+                  fontWeight: 400,
+                  textAlign: "center",
+                }}
+              >
                 Saída
               </th>
               <th
@@ -806,10 +1029,22 @@ export default function FolhaPontoOficialSEEDF({
               >
                 Assinatura do Servidor
               </th>
-              <th style={{ border: "1px solid #000", fontWeight: 400, textAlign: "center" }}>
+              <th
+                style={{
+                  border: "1px solid #000",
+                  fontWeight: 400,
+                  textAlign: "center",
+                }}
+              >
                 Entrada
               </th>
-              <th style={{ border: "1px solid #000", fontWeight: 400, textAlign: "center" }}>
+              <th
+                style={{
+                  border: "1px solid #000",
+                  fontWeight: 400,
+                  textAlign: "center",
+                }}
+              >
                 Saída
               </th>
             </tr>
@@ -828,7 +1063,9 @@ export default function FolhaPontoOficialSEEDF({
                   }}
                   title={
                     row.diaExisteNoMes && onClicarDia
-                      ? `Clique para lançar ou editar ocorrência no dia ${row.dia}/${String(mesNum).padStart(2, "0")}`
+                      ? `Clique para lançar ou editar ocorrência no dia ${row.dia}/${String(
+                          mesNum
+                        ).padStart(2, "0")}`
                       : undefined
                   }
                   className={
@@ -837,7 +1074,7 @@ export default function FolhaPontoOficialSEEDF({
                       : ""
                   }
                   style={{
-                    height: "20.2px",
+                    height: "19.8px",
                     backgroundColor: bgCell,
                     WebkitPrintColorAdjust: "exact",
                     printColorAdjust: "exact",
@@ -915,21 +1152,29 @@ export default function FolhaPontoOficialSEEDF({
           </tbody>
         </table>
 
-        {/* ── RODAPÉ DA PÁGINA 1 ── */}
+        {/* ── RODAPÉ DA PÁGINA 1 (100% DA LARGURA DA TABELA) ── */}
         {!isTemporario ? (
-          /* Efetivo: Caixa de Observações na Página 1 */
+          /* Efetivo: Caixa de Observações na Página 1 (100% alinhada com a tabela) */
           <div
             style={{
+              width: "100%",
               border: "1px solid #000",
-              marginTop: "6px",
-              minHeight: "92px",
+              marginTop: "5px",
+              minHeight: "86px",
               padding: "5px 8px",
               fontSize: "11px",
+              boxSizing: "border-box",
             }}
           >
             <div>Observações:</div>
             {textoObservacoesConsolidado && (
-              <div style={{ fontSize: "9.5px", marginTop: "4px", lineHeight: 1.35 }}>
+              <div
+                style={{
+                  fontSize: "9.5px",
+                  marginTop: "4px",
+                  lineHeight: 1.35,
+                }}
+              >
                 {textoObservacoesConsolidado}
               </div>
             )}
@@ -940,9 +1185,10 @@ export default function FolhaPontoOficialSEEDF({
             style={{
               width: "100%",
               borderCollapse: "collapse",
-              marginTop: "14px",
+              marginTop: "12px",
               border: "1px solid #000",
               fontSize: "10px",
+              boxSizing: "border-box",
             }}
           >
             <thead>
@@ -1027,25 +1273,33 @@ export default function FolhaPontoOficialSEEDF({
         className="folha-seedf-page bg-white mx-auto shadow-md print:shadow-none"
         style={{
           width: "210mm",
-          minHeight: "296mm",
-          padding: "8mm 9mm",
+          height: "296mm",
+          maxHeight: "296mm",
+          padding: "7mm 9mm",
           boxSizing: "border-box",
+          pageBreakAfter: "auto",
+          breakAfter: "auto",
+          overflow: "hidden",
         }}
       >
         {/* Cabeçalho Compacto da Página 2 (Comum a Efetivo e Temporário) */}
         <div
           style={{
+            width: "100%",
             display: "grid",
-            gridTemplateColumns: "92px 44px 44px 1fr",
+            gridTemplateColumns: "95px 46px 46px 1fr",
             border: "1px solid #000",
             fontSize: "11px",
+            boxSizing: "border-box",
           }}
         >
           <div style={{ padding: "4px 6px", borderRight: "1px solid #000" }}>
             <div style={{ fontSize: "9.5px" }}>
               M<span style={{ fontSize: "8.5px" }}>ATRÍCULA</span>
             </div>
-            <div style={{ fontWeight: 700, marginTop: "3px" }}>{matriculaOficial}</div>
+            <div style={{ fontWeight: 700, marginTop: "3px" }}>
+              {matriculaOficial}
+            </div>
           </div>
           <div
             style={{
@@ -1080,46 +1334,56 @@ export default function FolhaPontoOficialSEEDF({
         {!isTemporario ? (
           /* ── PÁGINA 2 MODELO EFETIVO: RESUMO DA FREQUÊNCIA + TABELA DE CÓDIGOS ── */
           <>
-            {/* Quadro RESUMO DA FREQUÊNCIA (Quadrículas SIGEP) */}
+            {/* Quadro RESUMO DA FREQUÊNCIA (Quadrículas SIGEP perfeitamente alinhadas na horizontal) */}
             <div
               style={{
+                width: "100%",
                 borderLeft: "1px solid #000",
                 borderRight: "1px solid #000",
                 borderBottom: "1px solid #000",
-                padding: "6px 10px 18px 10px",
+                padding: "6px 10px 14px 10px",
+                boxSizing: "border-box",
               }}
             >
-              <div style={{ fontSize: "10.5px", marginBottom: "18px" }}>
+              <div style={{ fontSize: "10.5px", marginBottom: "14px" }}>
                 RESUMO DA FREQUÊNCIA
               </div>
 
-              <div style={{ paddingLeft: "36px", paddingRight: "24px" }}>
+              <div style={{ paddingLeft: "34px", paddingRight: "22px" }}>
                 {/* Títulos das Colunas de Quadrículas */}
                 <div
                   style={{
                     display: "flex",
+                    flexDirection: "row",
                     alignItems: "center",
                     justifyContent: "space-between",
                     fontSize: "9.5px",
-                    marginBottom: "4px",
+                    marginBottom: "5px",
                   }}
                 >
-                  <span style={{ width: "28px" }}>Oper.</span>
+                  <span style={{ width: "26px" }}>Oper.</span>
                   <span style={{ width: "95px" }}>Código</span>
-                  <span style={{ width: "32px" }}>Carga</span>
-                  <span style={{ width: "48px" }}>Nº meses</span>
+                  <span style={{ width: "30px" }}>Carga</span>
+                  <span style={{ width: "46px" }}>Nº meses</span>
                   <span style={{ width: "95px" }}>Nº de horas/dias</span>
                   <span style={{ width: "44px" }}>Dia início</span>
                   <span style={{ width: "44px" }}>Dia fim</span>
                 </div>
 
-                {/* 6 Fileiras de Quadrículas */}
-                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                {/* 6 Fileiras Horizontais de Quadrículas */}
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "7px",
+                  }}
+                >
                   {linhasResumoSigep.map((ln, idx) => (
                     <div
                       key={idx}
                       style={{
                         display: "flex",
+                        flexDirection: "row",
                         alignItems: "center",
                         justifyContent: "space-between",
                       }}
@@ -1128,8 +1392,14 @@ export default function FolhaPontoOficialSEEDF({
                       <QuadriculasSIGEP digitos={ln.codigo} totalCaixas={5} />
                       <QuadriculasSIGEP digitos={ln.carga} totalCaixas={1} />
                       <QuadriculasSIGEP digitos={ln.meses} totalCaixas={2} />
-                      <QuadriculasSIGEP digitos={ln.horasDias} totalCaixas={5} />
-                      <QuadriculasSIGEP digitos={ln.diaInicio} totalCaixas={2} />
+                      <QuadriculasSIGEP
+                        digitos={ln.horasDias}
+                        totalCaixas={5}
+                      />
+                      <QuadriculasSIGEP
+                        digitos={ln.diaInicio}
+                        totalCaixas={2}
+                      />
                       <QuadriculasSIGEP digitos={ln.diaFim} totalCaixas={2} />
                     </div>
                   ))}
@@ -1137,23 +1407,26 @@ export default function FolhaPontoOficialSEEDF({
               </div>
             </div>
 
-            {/* Quadro LEGENDA e TABELA DE CÓDIGOS */}
+            {/* Micro-espaço + Quadro LEGENDA e TABELA DE CÓDIGOS */}
             <div
               style={{
-                borderLeft: "1px solid #000",
-                borderRight: "1px solid #000",
-                borderBottom: "1px solid #000",
-                padding: "6px 8px 10px 8px",
+                width: "100%",
+                border: "1px solid #000",
+                marginTop: "6px",
+                padding: "6px 8px 8px 8px",
                 fontSize: "10px",
+                boxSizing: "border-box",
               }}
             >
-              <div style={{ fontSize: "9.5px", marginBottom: "8px" }}>LEGENDA:</div>
+              <div style={{ fontSize: "9.5px", marginBottom: "6px" }}>
+                LEGENDA:
+              </div>
               <div
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
                   paddingRight: "80px",
-                  marginBottom: "8px",
+                  marginBottom: "6px",
                   fontSize: "10.5px",
                 }}
               >
@@ -1163,7 +1436,7 @@ export default function FolhaPontoOficialSEEDF({
                 <span>E &nbsp;- &nbsp;Exclusão</span>
               </div>
 
-              <div style={{ fontSize: "10px", marginBottom: "6px" }}>
+              <div style={{ fontSize: "10px", marginBottom: "5px" }}>
                 Tabela de Códigos
               </div>
 
@@ -1174,10 +1447,13 @@ export default function FolhaPontoOficialSEEDF({
                   borderCollapse: "collapse",
                   border: "1px solid #000",
                   fontSize: "9.5px",
+                  boxSizing: "border-box",
                 }}
               >
                 <thead>
-                  <tr style={{ height: "22px", borderBottom: "1px solid #000" }}>
+                  <tr
+                    style={{ height: "20px", borderBottom: "1px solid #000" }}
+                  >
                     <th
                       style={{
                         borderRight: "1px solid #000",
@@ -1229,14 +1505,14 @@ export default function FolhaPontoOficialSEEDF({
                         borderRight: "1px solid #000",
                         padding: "4px",
                         verticalAlign: "top",
-                        lineHeight: 1.75,
+                        lineHeight: 1.65,
                       }}
                     >
                       <div>10264</div>
                       <div>10265</div>
                       <div>10270</div>
-                      <div style={{ marginBottom: "10px" }}>10368</div>
-                      <div style={{ marginBottom: "10px" }}>10384</div>
+                      <div style={{ marginBottom: "9px" }}>10368</div>
+                      <div style={{ marginBottom: "9px" }}>10384</div>
                       <div>10267</div>
                       <div>10268</div>
                       <div>10528</div>
@@ -1246,7 +1522,7 @@ export default function FolhaPontoOficialSEEDF({
                         borderRight: "1px solid #000",
                         padding: "4px 6px",
                         verticalAlign: "top",
-                        lineHeight: 1.45,
+                        lineHeight: 1.38,
                       }}
                     >
                       <div style={{ marginBottom: "3px" }}>
@@ -1259,13 +1535,16 @@ export default function FolhaPontoOficialSEEDF({
                         Gratificação de Atividade Pedagógica - GAPED
                       </div>
                       <div style={{ marginBottom: "3px" }}>
-                        Gratificação de Atividade de Docência em Estabelecimento de Ensino Diferenciado – GADEED
+                        Gratificação de Atividade de Docência em Estabelecimento
+                        de Ensino Diferenciado – GADEED
                       </div>
                       <div style={{ marginBottom: "3px" }}>
-                        Gratificação de Atividade de Docência em Estabelecimento de Restrição de Liberdade – GADERL
+                        Gratificação de Atividade de Docência em Estabelecimento
+                        de Restrição de Liberdade – GADERL
                       </div>
                       <div style={{ marginBottom: "3px" }}>
-                        Gratificação de Atividade de Ensino Especial – GAEE (CAE)
+                        Gratificação de Atividade de Ensino Especial – GAEE
+                        (CAE)
                       </div>
                       <div style={{ marginBottom: "3px" }}>
                         Gratificação de Atividade Zona Rural - GAZR (CAE)
@@ -1279,7 +1558,7 @@ export default function FolhaPontoOficialSEEDF({
                         borderRight: "1px solid #000",
                         padding: "4px",
                         verticalAlign: "top",
-                        lineHeight: 1.9,
+                        lineHeight: 1.8,
                       }}
                     >
                       <div>118</div>
@@ -1294,7 +1573,7 @@ export default function FolhaPontoOficialSEEDF({
                       style={{
                         padding: "4px 6px",
                         verticalAlign: "top",
-                        lineHeight: 1.9,
+                        lineHeight: 1.8,
                       }}
                     >
                       <div>Exame Preventivo, LC 840/2011, art. 62</div>
@@ -1314,7 +1593,7 @@ export default function FolhaPontoOficialSEEDF({
                   display: "flex",
                   justifyContent: "space-between",
                   paddingRight: "90px",
-                  marginTop: "8px",
+                  marginTop: "6px",
                 }}
               >
                 <span>Carga:</span>
@@ -1322,7 +1601,7 @@ export default function FolhaPontoOficialSEEDF({
                 <span>2 &nbsp;- &nbsp;Carga II</span>
                 <span>3 &nbsp;- &nbsp;Ambas as cargas</span>
               </div>
-              <div style={{ marginTop: "6px" }}>
+              <div style={{ marginTop: "4px" }}>
                 <span style={{ display: "inline-block", width: "115px" }}>
                   Nº de meses:
                 </span>
@@ -1334,11 +1613,13 @@ export default function FolhaPontoOficialSEEDF({
           /* ── PÁGINA 2 MODELO CONTRATO TEMPORÁRIO: QUADRO DE OBSERVAÇÕES ── */
           <div
             style={{
+              width: "100%",
               border: "1px solid #000",
               marginTop: "8px",
               minHeight: "98px",
               padding: "4px 8px",
               fontSize: "9.5px",
+              boxSizing: "border-box",
             }}
           >
             <div>Observações:</div>
@@ -1353,21 +1634,24 @@ export default function FolhaPontoOficialSEEDF({
         {/* ── QUADRO DE ASSINATURAS (3 CAIXAS LADO A LADO — COMUM AOS DOIS MODELOS) ── */}
         <div
           style={{
+            width: "100%",
             display: "grid",
             gridTemplateColumns: "1fr 1fr 1fr",
             gap: "6px",
-            marginTop: "8px",
+            marginTop: "6px",
+            boxSizing: "border-box",
           }}
         >
           <div
             style={{
               border: "1px solid #000",
-              height: "92px",
+              height: "84px",
               padding: "5px 8px",
               display: "flex",
               flexDirection: "column",
               justifyContent: "space-between",
               fontSize: "10px",
+              boxSizing: "border-box",
             }}
           >
             <div>Responsável pelas informações</div>
@@ -1381,12 +1665,13 @@ export default function FolhaPontoOficialSEEDF({
           <div
             style={{
               border: "1px solid #000",
-              height: "92px",
+              height: "84px",
               padding: "5px 8px",
               display: "flex",
               flexDirection: "column",
               justifyContent: "space-between",
               fontSize: "10px",
+              boxSizing: "border-box",
             }}
           >
             <div>Assinatura da Chefia</div>
@@ -1400,12 +1685,13 @@ export default function FolhaPontoOficialSEEDF({
           <div
             style={{
               border: "1px solid #000",
-              height: "92px",
+              height: "84px",
               padding: "5px 8px",
               display: "flex",
               flexDirection: "column",
               justifyContent: "space-between",
               fontSize: "10px",
+              boxSizing: "border-box",
             }}
           >
             <div>Assinatura do Superior</div>
@@ -1421,11 +1707,13 @@ export default function FolhaPontoOficialSEEDF({
         {!isTemporario && (
           <div
             style={{
+              width: "100%",
               border: "1px solid #000",
-              marginTop: "8px",
-              minHeight: "155px",
+              marginTop: "6px",
+              height: "138px",
               padding: "6px 10px",
               fontSize: "11px",
+              boxSizing: "border-box",
             }}
           >
             <div>MENSAGEM</div>

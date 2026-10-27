@@ -64,19 +64,37 @@ export default function RelatoriosTab({
   const [dadosUnidade, setDadosUnidade] = useState(() => {
     try {
       const salvo = localStorage.getItem(STORAGE_KEY_UNIDADE);
-      if (salvo) return JSON.parse(salvo);
+      if (salvo) {
+        const parsed = JSON.parse(salvo);
+        if (
+          parsed.nomeEscola === "CEF04-CCMDF" ||
+          parsed.nomeEscola === "CEF 04" ||
+          !parsed.nomeEscola
+        ) {
+          parsed.nomeEscola =
+            "CENTRO DE ENSINO FUNDAMENTAL 04 DE PLANALTINA - COLEGIO CM";
+        }
+        return parsed;
+      }
     } catch {
       // ignore
     }
-    const nomeEsc =
+    const rawNome = (
       localStorage.getItem("nome_escola") ||
       localStorage.getItem("escola_nome") ||
-      "CENTRO DE ENSINO FUNDAMENTAL 04 DE PLANALTINA - COLEGIO CM";
+      ""
+    )
+      .trim()
+      .toUpperCase();
+    const nomeEsc =
+      !rawNome || rawNome === "CEF04-CCMDF" || rawNome.length < 18
+        ? "CENTRO DE ENSINO FUNDAMENTAL 04 DE PLANALTINA - COLEGIO CM"
+        : rawNome;
     return {
       ua: "007",
       cre: "COORDENAÇÃO REGIONAL DE ENSINO DE PLANALTINA",
       codigoExercicio: "990230000043",
-      nomeEscola: nomeEsc.toUpperCase(),
+      nomeEscola: nomeEsc,
     };
   });
 
@@ -157,7 +175,7 @@ export default function RelatoriosTab({
     });
   }, [servidoresAtivos, filtroCategoria, busca]);
 
-  // Motor de Impressão / Renderização PDF A4 1:1 (Frente e Verso)
+  // Motor de Impressão / Renderização PDF A4 1:1 (Exatas 2 Páginas: Frente e Verso)
   const handleImprimirFolhaOficial = () => {
     if (modoRelatorio === "matriz") {
       window.print();
@@ -210,28 +228,30 @@ export default function RelatoriosTab({
               color: #000000;
             }
             .folha-seedf-wrapper {
-              margin: 0;
-              padding: 0;
+              margin: 0 !important;
+              padding: 0 !important;
             }
             .folha-seedf-page {
               width: 210mm !important;
-              min-height: 296mm !important;
-              padding: 8mm 9mm !important;
+              height: 296mm !important;
+              max-height: 296mm !important;
+              padding: 7mm 9mm !important;
               margin: 0 auto !important;
               background: #ffffff !important;
               box-shadow: none !important;
+              overflow: hidden !important;
               page-break-after: always;
               break-after: page;
             }
             .folha-seedf-page:last-child {
-              page-break-after: auto;
-              break-after: auto;
+              page-break-after: auto !important;
+              break-after: auto !important;
             }
-            svg {
-              width: 54px;
-              height: 54px;
-              display: block;
-              margin: 0 auto;
+            .quadriculas-sigep-row {
+              display: inline-flex !important;
+              flex-direction: row !important;
+              flex-wrap: nowrap !important;
+              align-items: center !important;
             }
           </style>
         </head>
@@ -239,10 +259,20 @@ export default function RelatoriosTab({
           ${conteudoHTML}
           <script>
             window.onload = function() {
-              setTimeout(function() {
-                window.focus();
-                window.print();
-              }, 250);
+              var imgs = Array.prototype.slice.call(document.images || []);
+              var promises = imgs.map(function(img) {
+                if (img.complete) return Promise.resolve();
+                return new Promise(function(resolve) {
+                  img.onload = resolve;
+                  img.onerror = resolve;
+                });
+              });
+              Promise.all(promises).then(function() {
+                setTimeout(function() {
+                  window.focus();
+                  window.print();
+                }, 200);
+              });
             };
           </script>
         </body>

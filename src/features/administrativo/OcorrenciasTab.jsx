@@ -262,15 +262,22 @@ export default function OcorrenciasTab({
 
                       {/* Tipo & Subtipo */}
                       <td className="py-3.5 px-4">
-                        <span
-                          className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-extrabold"
-                          style={{
-                            backgroundColor: meta.bg,
-                            color: meta.cor,
-                          }}
-                        >
-                          {meta.label}
-                        </span>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span
+                            className="inline-block px-2.5 py-0.5 rounded-full text-[11px] font-extrabold"
+                            style={{
+                              backgroundColor: meta.bg,
+                              color: meta.cor,
+                            }}
+                          >
+                            {meta.label}
+                          </span>
+                          {occ.lancamento_em_lote && (
+                            <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-100 text-purple-800 border border-purple-200">
+                              Lançamento em Lote
+                            </span>
+                          )}
+                        </div>
                         <div className="text-xs font-semibold text-slate-700 mt-1">
                           {occ.subtipo}
                         </div>

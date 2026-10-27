@@ -125,11 +125,6 @@ export default function AdministrativoModule() {
 
   const handleSalvarOcorrencia = (dados) => {
     salvarOcorrencia(dados);
-    toast.success(
-      dados.id
-        ? "Registro administrativo atualizado com sucesso!"
-        : "Registro lançado no prontuário do servidor!"
-    );
   };
 
   return (

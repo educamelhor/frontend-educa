@@ -1370,11 +1370,55 @@ export function useAdministrativoData() {
     }
   }, []);
 
-  // ── Ações CRUD de Ocorrências (Abonos, Atestados, Ausências, Negociações) ──
+  // ── Ações CRUD de Ocorrências (Abonos, Atestados, Ausências, Negociações e Lote) ──
   const salvarOcorrencia = useCallback(
     (dados) => {
-      const srv = servidores.find((s) => s.id === dados.servidor_id);
       const usrLogado = getUsuarioLogadoRastreabilidade();
+
+      // Suporte a Lançamento em Lote (múltiplos servidores/categorias de uma só vez)
+      if (
+        dados?.lancamento_em_lote &&
+        Array.isArray(dados?.servidores_ids) &&
+        dados.servidores_ids.length > 0
+      ) {
+        const loteId = `lote-${Date.now()}`;
+        const hojeStr = new Date().toISOString().slice(0, 10);
+        const tsIso = new Date().toISOString();
+        const {
+          lancamento_em_lote,
+          servidores_ids,
+          resumo_lote_categoria,
+          ...restoDados
+        } = dados;
+
+        const novasOcorrencias = servidores_ids
+          .map((srvId, idx) => {
+            const srv = servidores.find((s) => s.id === srvId);
+            if (!srv) return null;
+            return {
+              ...restoDados,
+              id: `occ-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 6)}`,
+              lote_id: loteId,
+              lancamento_em_lote: true,
+              resumo_lote_categoria: resumo_lote_categoria || "Lote Coletivo",
+              servidor_id: srv.id,
+              servidor_nome: srv.nome || "Servidor(a)",
+              servidor_cargo: srv.cargo || "",
+              servidor_categoria: srv.categoria || "administrativo",
+              autorizado_por: dados.autorizado_por || usrLogado.resumo,
+              criado_em: hojeStr,
+              atualizado_em: tsIso,
+            };
+          })
+          .filter(Boolean);
+
+        if (novasOcorrencias.length > 0) {
+          setOcorrencias((prev) => [...novasOcorrencias, ...prev]);
+        }
+        return { ok: true, lote: true, quantidade: novasOcorrencias.length };
+      }
+
+      const srv = servidores.find((s) => s.id === dados.servidor_id);
       const payload = {
         ...dados,
         autorizado_por: dados.autorizado_por || usrLogado.resumo,
@@ -1396,6 +1440,7 @@ export function useAdministrativoData() {
         };
         setOcorrencias((prev) => [nova, ...prev]);
       }
+      return { ok: true, lote: false, quantidade: 1 };
     },
     [servidores]
   );

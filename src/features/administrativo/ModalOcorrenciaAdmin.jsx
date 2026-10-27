@@ -9,7 +9,8 @@
 // 6. OUTROS — Negociação Interna (Banco de Horas/Reposição), Dia Letivo Móvel, Ponto Facultativo, Recesso, Suspensão de Aulas, Adicional Noturno
 // ============================================================================
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import { toast } from "react-hot-toast";
 import {
   XMarkIcon,
   CalendarDaysIcon,
@@ -158,10 +159,15 @@ export default function ModalOcorrenciaAdmin({
   const [formaCompensacao, setFormaCompensacao] = useState("");
 
   const [erro, setErro] = useState("");
+  const [campoErro, setCampoErro] = useState("");
+  const servidorRef = useRef(null);
+  const dataInicioRef = useRef(null);
+  const motivoRef = useRef(null);
 
   useEffect(() => {
     if (!aberto) return;
     setErro("");
+    setCampoErro("");
     setBuscaRapidaEvento("");
     const usrLogado = getUsuarioLogadoRastreabilidade();
 
@@ -276,15 +282,36 @@ export default function ModalOcorrenciaAdmin({
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!servidorId) {
-      setErro("Selecione o servidor ou colaborador.");
+      const msg = "Selecione o servidor ou colaborador para vincular o registro.";
+      setErro(msg);
+      setCampoErro("servidor");
+      toast.error(msg);
+      setTimeout(() => {
+        servidorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+        servidorRef.current?.focus();
+      }, 60);
       return;
     }
     if (!dataInicio) {
-      setErro("Informe a data inicial do registro.");
+      const msg = "Informe a data inicial do registro.";
+      setErro(msg);
+      setCampoErro("dataInicio");
+      toast.error(msg);
+      setTimeout(() => {
+        dataInicioRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+        dataInicioRef.current?.focus();
+      }, 60);
       return;
     }
     if (!motivo.trim()) {
-      setErro("Descreva a justificativa, observação ou fundamentação do registro.");
+      const msg = "Descreva a justificativa, observação ou fundamentação do registro.";
+      setErro(msg);
+      setCampoErro("motivo");
+      toast.error(msg);
+      setTimeout(() => {
+        motivoRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+        motivoRef.current?.focus();
+      }, 60);
       return;
     }
 
@@ -309,15 +336,20 @@ export default function ModalOcorrenciaAdmin({
       data_compensacao: tipo === "negociacao" ? dataCompensacao : "",
       forma_compensacao: tipo === "negociacao" ? formaCompensacao.trim() : "",
     });
+    toast.success(
+      registroEdicao
+        ? "Registro administrativo atualizado com sucesso!"
+        : "Registro administrativo confirmado com sucesso!"
+    );
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-3xl overflow-hidden my-8 animate-fadeIn">
-        {/* Header */}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden animate-fadeIn">
+        {/* Header Fixo */}
         <div
-          className="px-6 py-4 flex items-center justify-between text-white"
+          className="px-6 py-4 flex items-center justify-between text-white flex-shrink-0"
           style={{
             background:
               "linear-gradient(135deg, #0f172a 0%, #1e3a8a 60%, #1d4ed8 100%)",
@@ -354,16 +386,11 @@ export default function ModalOcorrenciaAdmin({
 
         <form
           onSubmit={handleSubmit}
-          className="p-6 space-y-5 max-h-[82vh] overflow-y-auto"
+          className="flex flex-col flex-1 overflow-hidden"
         >
-          {erro && (
-            <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm font-medium flex items-center gap-2">
-              <ExclamationTriangleIcon className="h-5 w-5 flex-shrink-0 text-red-500" />
-              <span>{erro}</span>
-            </div>
-          )}
-
-          {/* 1. Seletor de Categoria (6 Cards Interativos no Topo) */}
+          {/* Corpo Rolável do Formulário */}
+          <div className="p-6 space-y-5 overflow-y-auto flex-1">
+            {/* 1. Seletor de Categoria (6 Cards Interativos no Topo) */}
           <div>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
@@ -429,14 +456,32 @@ export default function ModalOcorrenciaAdmin({
 
           {/* 2. Seletor de Servidor */}
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
-              2. Servidor / Professor / Colaborador
-            </label>
+            <div className="flex items-center justify-between gap-2 mb-1.5">
+              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
+                2. Servidor / Professor / Colaborador
+              </label>
+              {campoErro === "servidor" && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-red-100 text-red-700 border border-red-200">
+                  Seleção Obrigatória
+                </span>
+              )}
+            </div>
             <div className="relative">
               <select
+                ref={servidorRef}
                 value={servidorId}
-                onChange={(e) => setServidorId(e.target.value)}
-                className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm font-medium text-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-slate-50/60"
+                onChange={(e) => {
+                  setServidorId(e.target.value);
+                  if (campoErro === "servidor") {
+                    setErro("");
+                    setCampoErro("");
+                  }
+                }}
+                className={`w-full rounded-xl border px-3.5 py-2.5 text-sm font-medium text-slate-800 outline-none transition ${
+                  campoErro === "servidor"
+                    ? "border-red-500 ring-2 ring-red-200 bg-red-50/40"
+                    : "border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-slate-50/60"
+                }`}
               >
                 <option value="">— Selecione o profissional —</option>
                 {servidores.map((s) => (
@@ -618,10 +663,21 @@ export default function ModalOcorrenciaAdmin({
                 Data Inicial
               </label>
               <input
+                ref={dataInicioRef}
                 type="date"
                 value={dataInicio}
-                onChange={(e) => setDataInicio(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 bg-white"
+                onChange={(e) => {
+                  setDataInicio(e.target.value);
+                  if (campoErro === "dataInicio") {
+                    setErro("");
+                    setCampoErro("");
+                  }
+                }}
+                className={`w-full rounded-lg border px-3 py-2 text-sm text-slate-800 bg-white transition ${
+                  campoErro === "dataInicio"
+                    ? "border-red-500 ring-2 ring-red-200 bg-red-50/40"
+                    : "border-slate-300"
+                }`}
               />
             </div>
             <div>
@@ -822,15 +878,34 @@ export default function ModalOcorrenciaAdmin({
           {/* Motivo / Justificativa e Responsável pela Autorização */}
           <div className="space-y-3">
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
-                Justificativa / Detalhamento / Observações Administrativas
-              </label>
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Justificativa / Detalhamento / Observações Administrativas{" "}
+                  <span className="text-red-500">*</span>
+                </label>
+                {campoErro === "motivo" && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-red-100 text-red-700 border border-red-200 animate-pulse">
+                    Preenchimento Obrigatório
+                  </span>
+                )}
+              </div>
               <textarea
+                ref={motivoRef}
                 rows={3}
                 placeholder="Descreva os detalhes do registro para constar no prontuário e espelho de ponto do servidor..."
                 value={motivo}
-                onChange={(e) => setMotivo(e.target.value)}
-                className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                onChange={(e) => {
+                  setMotivo(e.target.value);
+                  if (campoErro === "motivo" || erro) {
+                    setErro("");
+                    setCampoErro("");
+                  }
+                }}
+                className={`w-full rounded-xl border px-3.5 py-2.5 text-sm text-slate-800 outline-none transition ${
+                  campoErro === "motivo"
+                    ? "border-red-500 ring-2 ring-red-200 bg-red-50/40"
+                    : "border-slate-300 focus:ring-2 focus:ring-blue-500"
+                }`}
               />
             </div>
 
@@ -860,25 +935,64 @@ export default function ModalOcorrenciaAdmin({
               </div>
             </div>
           </div>
+          </div>
 
-          {/* Botões */}
-          <div className="pt-3 border-t border-slate-200 flex items-center justify-end gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 text-sm font-semibold hover:bg-slate-50 transition"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              className="px-6 py-2.5 rounded-xl text-white text-sm font-bold shadow-md hover:opacity-95 transition"
-              style={{
-                background: "linear-gradient(135deg, #1e3a8a, #2563eb)",
-              }}
-            >
-              {registroEdicao ? "Salvar Alterações" : "Confirmar Registro"}
-            </button>
+          {/* Rodapé Fixo com Alerta Prêmium 100% Visível + Botões de Ação */}
+          <div className="px-6 py-4 bg-slate-50/95 border-t border-slate-200 flex-shrink-0 space-y-3">
+            {erro && (
+              <div
+                role="alert"
+                className="p-3.5 rounded-xl text-white shadow-lg flex items-center justify-between gap-3 animate-fadeIn"
+                style={{
+                  background: "linear-gradient(135deg, #b91c1c 0%, #dc2626 55%, #e11d48 100%)",
+                  boxShadow: "0 10px 25px -5px rgba(220, 38, 38, 0.35)",
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-white/20 backdrop-blur flex-shrink-0">
+                    <ExclamationTriangleIcon className="h-5 w-5 text-white" />
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-extrabold uppercase tracking-wider text-red-100">
+                      Atenção • Campo Obrigatório Pendente
+                    </div>
+                    <div className="text-xs sm:text-sm font-bold text-white leading-snug">
+                      {erro}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setErro("");
+                    setCampoErro("");
+                  }}
+                  className="p-1.5 rounded-lg hover:bg-white/20 text-white/90 hover:text-white transition flex-shrink-0"
+                  title="Fechar aviso"
+                >
+                  <XMarkIcon className="h-4 w-4" />
+                </button>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-700 text-sm font-semibold hover:bg-slate-50 transition"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                className="px-6 py-2.5 rounded-xl text-white text-sm font-bold shadow-md hover:opacity-95 transition"
+                style={{
+                  background: "linear-gradient(135deg, #1e3a8a, #2563eb)",
+                }}
+              >
+                {registroEdicao ? "Salvar Alterações" : "Confirmar Registro"}
+              </button>
+            </div>
           </div>
         </form>
       </div>

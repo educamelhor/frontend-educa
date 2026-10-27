@@ -293,6 +293,9 @@ export default function AdministrativoModule() {
           ocorrencias={ocorrencias}
           pontoDiario={pontoDiario}
           statsPorServidor={statsPorServidor}
+          onAbrirModalOcorrencia={abrirModalNovaOcorrencia}
+          onAbrirModalEditarOcorrencia={abrirModalEditarOcorrencia}
+          onSalvarServidor={salvarServidor}
         />
       )}
 

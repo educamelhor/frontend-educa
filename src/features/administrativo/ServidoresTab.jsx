@@ -117,6 +117,70 @@ export default function ServidoresTab({
   // { servidor: obj, modo: 'inativar' | 'excluir', inativadoNesteFluxo: boolean }
   const [modalCicloVida, setModalCicloVida] = useState(null);
 
+  // Modal CADASTRAR HORÁRIO / CABEÇALHO (Passo 14 — Configuração Multi-Escola da Folha de Ponto)
+  const [modalHorarioCabecalhoAberto, setModalHorarioCabecalhoAberto] = useState(false);
+  const [cfgHorarioCabecalho, setCfgHorarioCabecalho] = useState(() => {
+    const padrao = {
+      // 1. Cabeçalho Institucional / Mantenedora
+      orgaoTitulo: "SECRETARIA DE ESTADO DE EDUCAÇÃO",
+      cnpjOrgao: "00.394.676/0001-07",
+      ua: "007",
+      cre: "COORDENAÇÃO REGIONAL DE ENSINO DE PLANALTINA",
+      // 2. Identificação da Unidade Escolar (Exercício)
+      codigoExercicio: "990230000043",
+      nomeEscola: "CENTRO DE ENSINO FUNDAMENTAL 04 DE PLANALTINA - COLEGIO CM",
+      siglaEscola: "CEF04-CCMDF",
+      cidadeUF: "Planaltina - DF",
+      // 3. Grade de Horários Padrão dos Turnos da Escola
+      matutinoEntrada: "07:30",
+      matutinoSaida: "12:30",
+      vespertinoEntrada: "13:00",
+      vespertinoSaida: "18:00",
+      noturnoEntrada: "19:00",
+      noturnoSaida: "23:00",
+      intervaloAlmoco: "12:00 às 13:00",
+      toleranciaMinutos: "15",
+      preencherHorariosPadraoNaFolha: false,
+      // 4. Assinaturas / Chefia e Observação Institucional da Folha
+      nomeChefiaImediata: "",
+      cargoChefiaImediata: "DIRETOR — FGE-06",
+      responsavelFrequenciaNome: "",
+      responsavelFrequenciaCargo: "SUPERVISOR ADMINISTRATIVO / SECRETARIA",
+      observacaoPadraoFolha: "",
+    };
+    try {
+      const salvo = localStorage.getItem("educa_admin_seedf_unidade_cfg_v1");
+      if (salvo) {
+        const parsed = JSON.parse(salvo);
+        return { ...padrao, ...parsed };
+      }
+    } catch {
+      // ignore
+    }
+    return padrao;
+  });
+
+  const handleSalvarHorarioCabecalho = (e) => {
+    e.preventDefault();
+    try {
+      localStorage.setItem(
+        "educa_admin_seedf_unidade_cfg_v1",
+        JSON.stringify(cfgHorarioCabecalho)
+      );
+      window.dispatchEvent(
+        new CustomEvent("educa:unidade-cfg-updated", {
+          detail: cfgHorarioCabecalho,
+        })
+      );
+      toast.success(
+        "Configurações de Horário e Cabeçalho da Escola salvas para as Folhas de Ponto!"
+      );
+      setModalHorarioCabecalhoAberto(false);
+    } catch {
+      toast.error("Não foi possível salvar as configurações de cabeçalho.");
+    }
+  };
+
   const servidorCicloAtual = useMemo(() => {
     if (!modalCicloVida?.servidor) return null;
     return (
@@ -379,25 +443,60 @@ export default function ServidoresTab({
 
       {/* ── Barra de Busca, Filtros e Botões de Ação ── */}
       <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-sm space-y-3">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3.5">
-          {/* Busca */}
-          <div className="relative flex-1">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          {/* Busca (reduzida para acomodar os dois botões de ação na mesma linha) */}
+          <div className="relative flex-1 min-w-[220px]">
             <MagnifyingGlassIcon className="h-5 w-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
-              placeholder="Buscar servidor por nome, CPF, matrícula, cargo, disciplina, setor ou empresa..."
+              placeholder="Buscar servidor por nome, CPF, matrícula, cargo, disciplina, setor..."
               className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-300 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none shadow-inner bg-slate-50/40 focus:bg-white transition"
             />
           </div>
 
-          {/* Botão Principal da Aba (Destaque Premium Hero CTA) */}
-          <div className="flex items-center">
+          {/* Botões Principais da Aba: CADASTRAR HORÁRIO / CABEÇALHO + CADASTRAR SERVIDOR / TERCEIRIZADO */}
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => setModalHorarioCabecalhoAberto(true)}
+              className="group relative inline-flex items-center gap-2.5 pl-3 pr-4 py-2.5 rounded-2xl text-white transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 overflow-hidden"
+              style={{
+                background:
+                  "linear-gradient(135deg, #0f172a 0%, #312e81 55%, #4338ca 100%)",
+                boxShadow:
+                  "0 10px 25px -5px rgba(49, 46, 129, 0.48), 0 0 0 3px rgba(99, 102, 241, 0.16)",
+              }}
+              title="Configurar Cabeçalho Institucional e Horários Padrão da Escola para as Folhas de Ponto"
+            >
+              <span
+                className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                style={{
+                  background:
+                    "radial-gradient(circle at 85% 20%, rgba(255,255,255,0.25), transparent 60%)",
+                }}
+              />
+              <span
+                className="relative flex items-center justify-center w-9 h-9 rounded-xl transition-transform duration-200 group-hover:scale-105"
+                style={{
+                  background:
+                    "linear-gradient(135deg, rgba(255,255,255,0.24), rgba(255,255,255,0.08))",
+                  border: "1px solid rgba(255,255,255,0.32)",
+                  boxShadow: "inset 0 1px 1px rgba(255,255,255,0.35)",
+                }}
+              >
+                <ClockIcon className="h-5 w-5 text-white stroke-[2.3]" />
+              </span>
+              <span className="relative text-xs sm:text-[13px] font-extrabold tracking-wide text-white whitespace-nowrap">
+                CADASTRAR HORÁRIO / CABEÇALHO
+              </span>
+            </button>
+
             <button
               type="button"
               onClick={abrirNovoServidor}
-              className="group relative inline-flex items-center gap-3 pl-3 pr-5 py-2.5 rounded-2xl text-white transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 overflow-hidden"
+              className="group relative inline-flex items-center gap-2.5 pl-3 pr-4 py-2.5 rounded-2xl text-white transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 overflow-hidden"
               style={{
                 background:
                   "linear-gradient(135deg, #1e40af 0%, #2563eb 50%, #0284c7 100%)",
@@ -429,7 +528,7 @@ export default function ServidoresTab({
               </span>
 
               {/* Texto limpo e direto */}
-              <span className="relative text-xs sm:text-[13px] font-extrabold tracking-wide text-white">
+              <span className="relative text-xs sm:text-[13px] font-extrabold tracking-wide text-white whitespace-nowrap">
                 CADASTRAR SERVIDOR / TERCEIRIZADO
               </span>
             </button>
@@ -1792,6 +1891,484 @@ export default function ServidoresTab({
           </div>
         );
       })()}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          MODAL: CADASTRAR HORÁRIO / CABEÇALHO (PASSO 14 — AUTONOMIA MULTI-ESCOLA)
+         ══════════════════════════════════════════════════════════════════════ */}
+      {modalHorarioCabecalhoAberto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-3xl overflow-hidden my-8">
+            {/* Header idêntico ao padrão do modal Cadastrar Servidor / Terceirizado */}
+            <div
+              className="px-6 py-4 flex items-center justify-between text-white"
+              style={{
+                background: "linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%)",
+              }}
+            >
+              <div>
+                <h3 className="text-lg font-bold">
+                  Cadastrar Horário / Cabeçalho da Unidade Escolar
+                </h3>
+                <p className="text-xs text-blue-200">
+                  Parâmetros institucionais e grade de horários que serão renderizados nas Folhas de Ponto (Espelho & Relatórios)
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalHorarioCabecalhoAberto(false)}
+                className="p-1.5 rounded-lg hover:bg-white/15 transition"
+              >
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={handleSalvarHorarioCabecalho}
+              className="p-6 space-y-5 max-h-[82vh] overflow-y-auto"
+            >
+              {/* 1. CABEÇALHO INSTITUCIONAL / ÓRGÃO MANTENEDOR */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 border-b border-slate-200 pb-1.5">
+                  <BuildingOffice2Icon className="h-4 w-4 text-blue-700" />
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-slate-700">
+                    1. Cabeçalho Institucional (Órgão / Mantenedora / Regional)
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
+                      Órgão / Secretaria / Mantenedora (Topo da Folha) *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={cfgHorarioCabecalho.orgaoTitulo}
+                      onChange={(e) =>
+                        setCfgHorarioCabecalho({
+                          ...cfgHorarioCabecalho,
+                          orgaoTitulo: e.target.value,
+                        })
+                      }
+                      placeholder="Ex: SECRETARIA DE ESTADO DE EDUCAÇÃO"
+                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
+                      CNPJ Institucional
+                    </label>
+                    <input
+                      type="text"
+                      value={cfgHorarioCabecalho.cnpjOrgao}
+                      onChange={(e) =>
+                        setCfgHorarioCabecalho({
+                          ...cfgHorarioCabecalho,
+                          cnpjOrgao: e.target.value,
+                        })
+                      }
+                      placeholder="Ex: 00.394.676/0001-07"
+                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
+                      Código UA (Regional)
+                    </label>
+                    <input
+                      type="text"
+                      value={cfgHorarioCabecalho.ua}
+                      onChange={(e) =>
+                        setCfgHorarioCabecalho({
+                          ...cfgHorarioCabecalho,
+                          ua: e.target.value,
+                        })
+                      }
+                      placeholder="Ex: 007"
+                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-3">
+                    <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
+                      Coordenação Regional de Ensino (CRE) / Diretoria Regional
+                    </label>
+                    <input
+                      type="text"
+                      value={cfgHorarioCabecalho.cre}
+                      onChange={(e) =>
+                        setCfgHorarioCabecalho({
+                          ...cfgHorarioCabecalho,
+                          cre: e.target.value,
+                        })
+                      }
+                      placeholder="Ex: COORDENAÇÃO REGIONAL DE ENSINO DE PLANALTINA"
+                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. IDENTIFICAÇÃO DA UNIDADE ESCOLAR (LOCAL DE EXERCÍCIO) */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 border-b border-slate-200 pb-1.5">
+                  <AcademicCapIcon className="h-4 w-4 text-blue-700" />
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-slate-700">
+                    2. Identificação da Unidade Escolar (Local de Exercício)
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
+                      Código do Estabelecimento (Exercício)
+                    </label>
+                    <input
+                      type="text"
+                      value={cfgHorarioCabecalho.codigoExercicio}
+                      onChange={(e) =>
+                        setCfgHorarioCabecalho({
+                          ...cfgHorarioCabecalho,
+                          codigoExercicio: e.target.value,
+                        })
+                      }
+                      placeholder="Ex: 990230000043"
+                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
+                      Nome Oficial da Unidade Escolar (Impresso na Folha) *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={cfgHorarioCabecalho.nomeEscola}
+                      onChange={(e) =>
+                        setCfgHorarioCabecalho({
+                          ...cfgHorarioCabecalho,
+                          nomeEscola: e.target.value,
+                        })
+                      }
+                      placeholder="Ex: CENTRO DE ENSINO FUNDAMENTAL 04 DE PLANALTINA - COLEGIO CM"
+                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
+                      Sigla / Identificação Curta da Escola
+                    </label>
+                    <input
+                      type="text"
+                      value={cfgHorarioCabecalho.siglaEscola}
+                      onChange={(e) =>
+                        setCfgHorarioCabecalho({
+                          ...cfgHorarioCabecalho,
+                          siglaEscola: e.target.value,
+                        })
+                      }
+                      placeholder="Ex: CEF04-CCMDF"
+                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm text-slate-800"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
+                      Cidade / UF (Localidade)
+                    </label>
+                    <input
+                      type="text"
+                      value={cfgHorarioCabecalho.cidadeUF}
+                      onChange={(e) =>
+                        setCfgHorarioCabecalho({
+                          ...cfgHorarioCabecalho,
+                          cidadeUF: e.target.value,
+                        })
+                      }
+                      placeholder="Ex: Planaltina - DF"
+                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm text-slate-800"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. GRADE DE HORÁRIOS PADRÃO DOS TURNOS DA ESCOLA */}
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ClockIcon className="h-4 w-4 text-indigo-700" />
+                    <span className="text-xs font-extrabold uppercase tracking-wider text-slate-700">
+                      3. Grade de Horários Padrão dos Turnos da Escola
+                    </span>
+                  </div>
+                  <span className="text-[11px] font-semibold text-slate-500">
+                    Referência para Ponto Diário e Folha de Frequência
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {/* Turno Matutino */}
+                  <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-2">
+                    <div className="text-xs font-extrabold text-amber-700 uppercase">
+                      ☀️ Turno Matutino
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase text-slate-500 mb-0.5">
+                          Entrada
+                        </label>
+                        <input
+                          type="time"
+                          value={cfgHorarioCabecalho.matutinoEntrada}
+                          onChange={(e) =>
+                            setCfgHorarioCabecalho({
+                              ...cfgHorarioCabecalho,
+                              matutinoEntrada: e.target.value,
+                            })
+                          }
+                          className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs font-bold text-slate-800"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase text-slate-500 mb-0.5">
+                          Saída
+                        </label>
+                        <input
+                          type="time"
+                          value={cfgHorarioCabecalho.matutinoSaida}
+                          onChange={(e) =>
+                            setCfgHorarioCabecalho({
+                              ...cfgHorarioCabecalho,
+                              matutinoSaida: e.target.value,
+                            })
+                          }
+                          className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs font-bold text-slate-800"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Turno Vespertino */}
+                  <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-2">
+                    <div className="text-xs font-extrabold text-blue-700 uppercase">
+                      🌤️ Turno Vespertino
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase text-slate-500 mb-0.5">
+                          Entrada
+                        </label>
+                        <input
+                          type="time"
+                          value={cfgHorarioCabecalho.vespertinoEntrada}
+                          onChange={(e) =>
+                            setCfgHorarioCabecalho({
+                              ...cfgHorarioCabecalho,
+                              vespertinoEntrada: e.target.value,
+                            })
+                          }
+                          className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs font-bold text-slate-800"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase text-slate-500 mb-0.5">
+                          Saída
+                        </label>
+                        <input
+                          type="time"
+                          value={cfgHorarioCabecalho.vespertinoSaida}
+                          onChange={(e) =>
+                            setCfgHorarioCabecalho({
+                              ...cfgHorarioCabecalho,
+                              vespertinoSaida: e.target.value,
+                            })
+                          }
+                          className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs font-bold text-slate-800"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Turno Noturno */}
+                  <div className="bg-white p-3 rounded-xl border border-slate-200 space-y-2">
+                    <div className="text-xs font-extrabold text-indigo-900 uppercase">
+                      🌙 Turno Noturno
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase text-slate-500 mb-0.5">
+                          Entrada
+                        </label>
+                        <input
+                          type="time"
+                          value={cfgHorarioCabecalho.noturnoEntrada}
+                          onChange={(e) =>
+                            setCfgHorarioCabecalho({
+                              ...cfgHorarioCabecalho,
+                              noturnoEntrada: e.target.value,
+                            })
+                          }
+                          className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs font-bold text-slate-800"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold uppercase text-slate-500 mb-0.5">
+                          Saída
+                        </label>
+                        <input
+                          type="time"
+                          value={cfgHorarioCabecalho.noturnoSaida}
+                          onChange={(e) =>
+                            setCfgHorarioCabecalho({
+                              ...cfgHorarioCabecalho,
+                              noturnoSaida: e.target.value,
+                            })
+                          }
+                          className="w-full rounded-lg border border-slate-300 px-2 py-1.5 text-xs font-bold text-slate-800"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">
+                      Intervalo / Almoço Padrão (Jornada 40h / 20h+20h)
+                    </label>
+                    <input
+                      type="text"
+                      value={cfgHorarioCabecalho.intervaloAlmoco}
+                      onChange={(e) =>
+                        setCfgHorarioCabecalho({
+                          ...cfgHorarioCabecalho,
+                          intervaloAlmoco: e.target.value,
+                        })
+                      }
+                      placeholder="Ex: 12:00 às 13:00"
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">
+                      Tolerância de Registro / Biometria (Minutos)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="60"
+                      value={cfgHorarioCabecalho.toleranciaMinutos}
+                      onChange={(e) =>
+                        setCfgHorarioCabecalho({
+                          ...cfgHorarioCabecalho,
+                          toleranciaMinutos: e.target.value,
+                        })
+                      }
+                      placeholder="Ex: 15"
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 4. RESPONSÁVEIS / CHEFIA E OBSERVAÇÃO PADRÃO DA FOLHA */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 border-b border-slate-200 pb-1.5">
+                  <DocumentTextIcon className="h-4 w-4 text-blue-700" />
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-slate-700">
+                    4. Chefia Imediata, Responsável pelo Ponto & Observações da Folha
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
+                      Nome da Chefia Imediata / Diretor(a)
+                    </label>
+                    <input
+                      type="text"
+                      value={cfgHorarioCabecalho.nomeChefiaImediata}
+                      onChange={(e) =>
+                        setCfgHorarioCabecalho({
+                          ...cfgHorarioCabecalho,
+                          nomeChefiaImediata: e.target.value,
+                        })
+                      }
+                      placeholder="Ex: ANDRÉ LUIZ MORAIS DOS SANTOS"
+                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm text-slate-800"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
+                      Cargo / Função da Chefia Imediata
+                    </label>
+                    <input
+                      type="text"
+                      value={cfgHorarioCabecalho.cargoChefiaImediata}
+                      onChange={(e) =>
+                        setCfgHorarioCabecalho({
+                          ...cfgHorarioCabecalho,
+                          cargoChefiaImediata: e.target.value,
+                        })
+                      }
+                      placeholder="Ex: DIRETOR — FGE-06"
+                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm text-slate-800"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
+                    Observação Institucional Padrão no Quadro &ldquo;Observações:&rdquo; da Folha (Opcional)
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={cfgHorarioCabecalho.observacaoPadraoFolha}
+                    onChange={(e) =>
+                      setCfgHorarioCabecalho({
+                        ...cfgHorarioCabecalho,
+                        observacaoPadraoFolha: e.target.value,
+                      })
+                    }
+                    placeholder="Texto institucional opcional que será exibido automaticamente no quadro de Observações das folhas de frequência da unidade..."
+                    className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm text-slate-800"
+                  />
+                </div>
+              </div>
+
+              {/* Rodapé idêntico ao modal Cadastrar Servidor */}
+              <div className="pt-3 border-t border-slate-200 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setModalHorarioCabecalhoAberto(false)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 text-sm font-semibold hover:bg-slate-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-6 py-2.5 rounded-xl text-white text-sm font-bold shadow-md hover:opacity-95"
+                  style={{
+                    background: "linear-gradient(135deg, #0f172a, #2563eb)",
+                  }}
+                >
+                  Salvar Horários & Cabeçalho
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

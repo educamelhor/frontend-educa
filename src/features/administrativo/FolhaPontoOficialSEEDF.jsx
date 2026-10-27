@@ -351,6 +351,9 @@ export default function FolhaPontoOficialSEEDF({
   }, [servidor, modeloForcado]);
 
   // Dados institucionais da Unidade Escolar (normaliza siglas curtas como CEF04-CCMDF para o nome oficial SEEDF)
+  const orgaoTitulo =
+    dadosUnidade.orgaoTitulo || "SECRETARIA DE ESTADO DE EDUCAÇÃO";
+  const cnpjOrgao = dadosUnidade.cnpjOrgao || "00.394.676/0001-07";
   const uaCodigo = dadosUnidade.ua || "007";
   const creNome =
     dadosUnidade.cre || "COORDENAÇÃO REGIONAL DE ENSINO DE PLANALTINA";
@@ -606,11 +609,22 @@ export default function FolhaPontoOficialSEEDF({
         `${per}: ${o.subtipo}${o.documento_ref ? ` (${o.documento_ref})` : ""}`
       );
     });
+    if (
+      dadosUnidade.observacaoPadraoFolha &&
+      String(dadosUnidade.observacaoPadraoFolha).trim()
+    ) {
+      partes.push(String(dadosUnidade.observacaoPadraoFolha).trim());
+    }
     if (observacaoManual && observacaoManual.trim()) {
       partes.push(observacaoManual.trim());
     }
     return partes.join("  |  ");
-  }, [ocorrenciasDoMes, mesNum, observacaoManual]);
+  }, [
+    ocorrenciasDoMes,
+    mesNum,
+    observacaoManual,
+    dadosUnidade.observacaoPadraoFolha,
+  ]);
 
   return (
     <div
@@ -683,10 +697,10 @@ export default function FolhaPontoOficialSEEDF({
                       lineHeight: 1.15,
                     }}
                   >
-                    SECRETARIA DE ESTADO DE EDUCAÇÃO
+                    {orgaoTitulo}
                   </div>
                   <div style={{ fontSize: "11px", marginTop: "3px" }}>
-                    CNPJ: 00.394.676/0001-07
+                    CNPJ: {cnpjOrgao}
                   </div>
                 </div>
               </div>

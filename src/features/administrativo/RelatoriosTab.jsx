@@ -162,6 +162,17 @@ export default function RelatoriosTab({
     }
   }, [dadosUnidade]);
 
+  useEffect(() => {
+    const onCfgUpdated = (e) => {
+      if (e?.detail) {
+        setDadosUnidade((prev) => ({ ...prev, ...e.detail }));
+      }
+    };
+    window.addEventListener("educa:unidade-cfg-updated", onCfgUpdated);
+    return () =>
+      window.removeEventListener("educa:unidade-cfg-updated", onCfgUpdated);
+  }, []);
+
   const folhaPrintRef = useRef(null);
   const lotePrintRef = useRef(null);
   const janelaLotePrintRef = useRef(null);

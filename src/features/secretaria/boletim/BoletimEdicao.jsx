@@ -203,6 +203,7 @@ export default function BoletimEdicao() {
           disciplina_id: item.disciplina_id,
           bimestre: filtroBimestre,
           ano_letivo: filtroAnoLetivo,
+          is_agrupamento: item.is_agrupamento ? 1 : 0,
         }
       });
       setAlunosNotas(res.data || []);
@@ -461,7 +462,10 @@ export default function BoletimEdicao() {
                 </label>
                 <select
                   value={filtroAnoLetivo}
-                  onChange={(e) => setFiltroAnoLetivo(Number(e.target.value))}
+                  onChange={(e) => {
+                    setFiltroAnoLetivo(Number(e.target.value));
+                    setFiltroTurma("todas");
+                  }}
                   className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition"
                 >
                   {anosLetivos.map((ano) => (
@@ -491,7 +495,10 @@ export default function BoletimEdicao() {
                 </label>
                 <select
                   value={filtroTurno}
-                  onChange={(e) => setFiltroTurno(e.target.value)}
+                  onChange={(e) => {
+                    setFiltroTurno(e.target.value);
+                    setFiltroTurma("todas");
+                  }}
                   className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition"
                 >
                   <option value="todos">Todos</option>
@@ -514,7 +521,7 @@ export default function BoletimEdicao() {
                   {turmas
                     .filter((t) => Number(t.ano) === filtroAnoLetivo && (filtroTurno === "todos" || t.turno?.toLowerCase() === filtroTurno))
                     .map((t) => (
-                      <option key={t.id} value={t.id}>{t.turma} ({t.turno})</option>
+                      <option key={t.id} value={t.id}>{t.turma || t.nome} ({t.turno})</option>
                   ))}
                 </select>
               </div>
@@ -530,7 +537,7 @@ export default function BoletimEdicao() {
                 >
                   <option value="todas">Todas</option>
                   {disciplinas.map((d) => (
-                    <option key={d.id} value={d.id}>{d.disciplina} ({d.etapa})</option>
+                    <option key={d.id} value={d.id}>{d.disciplina || d.nome} ({d.etapa})</option>
                   ))}
                 </select>
               </div>

@@ -367,15 +367,19 @@ export default function FolhaPontoOficialSEEDF({
     servidor.matricula &&
     !String(servidor.matricula).startsWith("PROF-") &&
     !String(servidor.matricula).startsWith("DIR-") &&
-    !String(servidor.matricula).startsWith("EQP-")
+    !String(servidor.matricula).startsWith("EQP-") &&
+    !String(servidor.matricula).startsWith("TERC-") &&
+    !String(servidor.matricula).startsWith("ADM-")
       ? servidor.matricula
       : isTemporario
       ? "7062701-0"
       : "0027596-4";
 
   const nomeServidorUpper = String(servidor.nome || "").toUpperCase();
-  const chNumero =
-    String(servidor.carga_horaria || "40h").replace(/\D/g, "") || "40";
+  const chRaw = String(servidor.carga_horaria || "40h").toLowerCase();
+  const chNumero = chRaw.includes("12x36")
+    ? "40"
+    : chRaw.replace(/\D/g, "") || "40";
   const isJornadaDupla = Number(chNumero) > 20;
 
   // Cargo/Especialidade e Disciplina
@@ -1236,6 +1240,7 @@ export default function FolhaPontoOficialSEEDF({
                         border: "1px solid #000",
                         padding: "2px 6px",
                         fontSize: "9.5px",
+                        textAlign: "left",
                       }}
                     >
                       {m ? m.descricaoCurta : ""}
@@ -1448,6 +1453,7 @@ export default function FolhaPontoOficialSEEDF({
                   border: "1px solid #000",
                   fontSize: "9.5px",
                   boxSizing: "border-box",
+                  textAlign: "left",
                 }}
               >
                 <thead>
@@ -1506,6 +1512,7 @@ export default function FolhaPontoOficialSEEDF({
                         padding: "4px",
                         verticalAlign: "top",
                         lineHeight: 1.65,
+                        textAlign: "left",
                       }}
                     >
                       <div>10264</div>
@@ -1523,6 +1530,7 @@ export default function FolhaPontoOficialSEEDF({
                         padding: "4px 6px",
                         verticalAlign: "top",
                         lineHeight: 1.38,
+                        textAlign: "left",
                       }}
                     >
                       <div style={{ marginBottom: "3px" }}>
@@ -1559,6 +1567,7 @@ export default function FolhaPontoOficialSEEDF({
                         padding: "4px",
                         verticalAlign: "top",
                         lineHeight: 1.8,
+                        textAlign: "left",
                       }}
                     >
                       <div>118</div>
@@ -1574,6 +1583,7 @@ export default function FolhaPontoOficialSEEDF({
                         padding: "4px 6px",
                         verticalAlign: "top",
                         lineHeight: 1.8,
+                        textAlign: "left",
                       }}
                     >
                       <div>Exame Preventivo, LC 840/2011, art. 62</div>

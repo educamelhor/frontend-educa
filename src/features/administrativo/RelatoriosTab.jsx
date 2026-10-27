@@ -25,6 +25,10 @@ import {
   SparklesIcon,
   ClockIcon,
   CheckBadgeIcon,
+  Square2StackIcon,
+  XMarkIcon,
+  CheckCircleIcon,
+  UsersIcon,
 } from "@heroicons/react/24/outline";
 import {
   LIMITE_ABONOS_ANUAL,
@@ -34,6 +38,51 @@ import {
 import FolhaPontoOficialSEEDF from "./FolhaPontoOficialSEEDF";
 
 const STORAGE_KEY_UNIDADE = "educa_admin_seedf_unidade_cfg_v1";
+
+const ESTILOS_IMPRESSAO_SEEDF = `
+  @page {
+    size: A4 portrait;
+    margin: 0mm;
+  }
+  * {
+    box-sizing: border-box;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #ffffff;
+    font-family: Arial, Helvetica, sans-serif;
+    color: #000000;
+  }
+  .folha-seedf-wrapper {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  .folha-seedf-page {
+    width: 210mm !important;
+    height: 296mm !important;
+    max-height: 296mm !important;
+    padding: 7mm 9mm !important;
+    margin: 0 auto !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+    overflow: hidden !important;
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+  .folha-seedf-wrapper:last-child .folha-seedf-page:last-child {
+    page-break-after: auto !important;
+    break-after: auto !important;
+  }
+  .quadriculas-sigep-row {
+    display: inline-flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+  }
+`;
 
 export default function RelatoriosTab({
   servidores = [],
@@ -59,6 +108,13 @@ export default function RelatoriosTab({
   const [preencherHorariosPonto, setPreencherHorariosPonto] = useState(false);
   const [mostrarConfigCabecalho, setMostrarConfigCabecalho] = useState(false);
   const [observacaoManual, setObservacaoManual] = useState("");
+
+  // Estado do Modal e Motor de Impressão em Lote (Passo 13)
+  const [modalLoteAberto, setModalLoteAberto] = useState(false);
+  const [filtroVinculoLote, setFiltroVinculoLote] = useState("todos"); // "todos" | "efetivo" | "temporario" | "docentes" | "gestao_apoio"
+  const [buscaLote, setBuscaLote] = useState("");
+  const [idsSelecionadosLote, setIdsSelecionadosLote] = useState([]);
+  const [renderizandoLoteDOM, setRenderizandoLoteDOM] = useState(false);
 
   // Configuração institucional da Unidade Escolar (UA / CRE / Código SIGEP)
   const [dadosUnidade, setDadosUnidade] = useState(() => {
@@ -107,8 +163,10 @@ export default function RelatoriosTab({
   }, [dadosUnidade]);
 
   const folhaPrintRef = useRef(null);
+  const lotePrintRef = useRef(null);
+  const janelaLotePrintRef = useRef(null);
 
-  // Lista ordenada alfabeticamente de servidores ativos para navegação
+  // Lista ordenada alfabeticamente de servidores ativos para navegação e lote
   const servidoresAtivos = useMemo(() => {
     return [...servidores]
       .filter((s) => s.ativo !== false)
@@ -175,7 +233,81 @@ export default function RelatoriosTab({
     });
   }, [servidoresAtivos, filtroCategoria, busca]);
 
-  // Motor de Impressão / Renderização PDF A4 1:1 (Exatas 2 Páginas: Frente e Verso)
+  // Lista filtrada dentro do Modal de Impressão em Lote
+  const servidoresVisiveisModalLote = useMemo(() => {
+    return servidoresAtivos.filter((s) => {
+      const vinc = String(s.vinculo || "").toLowerCase();
+      const cat = String(s.categoria || "").toLowerCase();
+      if (filtroVinculoLote === "efetivo" && vinc.includes("tempor")) {
+        return false;
+      }
+      if (filtroVinculoLote === "temporario" && !vinc.includes("tempor")) {
+        return false;
+      }
+      if (filtroVinculoLote === "docentes" && cat !== "docente") {
+        return false;
+      }
+      if (filtroVinculoLote === "gestao_apoio" && cat === "docente") {
+        return false;
+      }
+      if (!buscaLote.trim()) return true;
+      const q = buscaLote.toLowerCase().trim();
+      return (
+        String(s.nome || "").toLowerCase().includes(q) ||
+        String(s.cargo || "").toLowerCase().includes(q) ||
+        String(s.matricula || "").toLowerCase().includes(q)
+      );
+    });
+  }, [servidoresAtivos, filtroVinculoLote, buscaLote]);
+
+  // Servidores efetivamente selecionados para compor o PDF em lote (em ordem alfabética)
+  const servidoresSelecionadosParaLote = useMemo(() => {
+    const setIds = new Set(idsSelecionadosLote);
+    return servidoresAtivos.filter((s) => setIds.has(s.id));
+  }, [servidoresAtivos, idsSelecionadosLote]);
+
+  // Abre o Modal de Impressão em Lote já com todos os servidores ativos selecionados por padrão
+  const handleAbrirModalImpressaoLote = () => {
+    setFiltroVinculoLote("todos");
+    setBuscaLote("");
+    setIdsSelecionadosLote(servidoresAtivos.map((s) => s.id));
+    setModalLoteAberto(true);
+  };
+
+  // Alterna um filtro rápido de lote e já ajusta a seleção para aquele grupo
+  const handleAplicarFiltroRapidoLote = (novoFiltro) => {
+    setFiltroVinculoLote(novoFiltro);
+    const filtrados = servidoresAtivos.filter((s) => {
+      const vinc = String(s.vinculo || "").toLowerCase();
+      const cat = String(s.categoria || "").toLowerCase();
+      if (novoFiltro === "efetivo") return !vinc.includes("tempor");
+      if (novoFiltro === "temporario") return vinc.includes("tempor");
+      if (novoFiltro === "docentes") return cat === "docente";
+      if (novoFiltro === "gestao_apoio") return cat !== "docente";
+      return true;
+    });
+    setIdsSelecionadosLote(filtrados.map((s) => s.id));
+  };
+
+  const handleToggleServidorLote = (id) => {
+    setIdsSelecionadosLote((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const handleMarcarVisiveisLote = () => {
+    const idsVisiveis = servidoresVisiveisModalLote.map((s) => s.id);
+    setIdsSelecionadosLote((prev) =>
+      Array.from(new Set([...prev, ...idsVisiveis]))
+    );
+  };
+
+  const handleDesmarcarVisiveisLote = () => {
+    const setVisiveis = new Set(servidoresVisiveisModalLote.map((s) => s.id));
+    setIdsSelecionadosLote((prev) => prev.filter((id) => !setVisiveis.has(id)));
+  };
+
+  // Motor de Impressão Individual / Renderização PDF A4 1:1 (Exatas 2 Páginas: Frente e Verso)
   const handleImprimirFolhaOficial = () => {
     if (modoRelatorio === "matriz") {
       window.print();
@@ -210,50 +342,7 @@ export default function RelatoriosTab({
         <head>
           <meta charset="UTF-8" />
           <title>${tituloDoc}</title>
-          <style>
-            @page {
-              size: A4 portrait;
-              margin: 0mm;
-            }
-            * {
-              box-sizing: border-box;
-              -webkit-print-color-adjust: exact !important;
-              print-color-adjust: exact !important;
-            }
-            html, body {
-              margin: 0;
-              padding: 0;
-              background: #ffffff;
-              font-family: Arial, Helvetica, sans-serif;
-              color: #000000;
-            }
-            .folha-seedf-wrapper {
-              margin: 0 !important;
-              padding: 0 !important;
-            }
-            .folha-seedf-page {
-              width: 210mm !important;
-              height: 296mm !important;
-              max-height: 296mm !important;
-              padding: 7mm 9mm !important;
-              margin: 0 auto !important;
-              background: #ffffff !important;
-              box-shadow: none !important;
-              overflow: hidden !important;
-              page-break-after: always;
-              break-after: page;
-            }
-            .folha-seedf-page:last-child {
-              page-break-after: auto !important;
-              break-after: auto !important;
-            }
-            .quadriculas-sigep-row {
-              display: inline-flex !important;
-              flex-direction: row !important;
-              flex-wrap: nowrap !important;
-              align-items: center !important;
-            }
-          </style>
+          <style>${ESTILOS_IMPRESSAO_SEEDF}</style>
         </head>
         <body>
           ${conteudoHTML}
@@ -280,6 +369,132 @@ export default function RelatoriosTab({
     `);
     printWin.document.close();
   };
+
+  // Motor de Impressão em Lote (Renderiza todas as Folhas selecionadas no mês — 2 páginas A4 por servidor)
+  const handleDispararImpressaoLote = () => {
+    if (servidoresSelecionadosParaLote.length === 0) {
+      toast.error("Selecione ao menos 1 servidor para gerar a impressão em lote.");
+      return;
+    }
+
+    const printWin = window.open("", "_blank", "width=1024,height=900");
+    if (!printWin) {
+      toast.error(
+        "Permita pop-ups no navegador para gerar o PDF / Impressão em Lote das Folhas de Frequência."
+      );
+      return;
+    }
+
+    // Exibe tela inicial de preparação na janela aberta sincronamente (evita bloqueador de pop-up)
+    printWin.document.open();
+    printWin.document.write(`
+      <!DOCTYPE html>
+      <html lang="pt-BR">
+        <head>
+          <meta charset="UTF-8" />
+          <title>Preparando Lote SEEDF - ${mesReferencia}</title>
+          <style>
+            body {
+              margin: 0;
+              height: 100vh;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              font-family: Arial, Helvetica, sans-serif;
+              background: #f8fafc;
+              color: #0f172a;
+            }
+            .box {
+              background: #ffffff;
+              border: 1px solid #cbd5e1;
+              border-radius: 16px;
+              padding: 32px 40px;
+              text-align: center;
+              box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+            }
+            .title {
+              font-size: 18px;
+              font-weight: 700;
+              margin-bottom: 8px;
+            }
+            .sub {
+              font-size: 13px;
+              color: #475569;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="box">
+            <div class="title">Gerando Lote de Folhas de Frequência SEEDF...</div>
+            <div class="sub">Processando ${servidoresSelecionadosParaLote.length} servidor(es) (${servidoresSelecionadosParaLote.length * 2} páginas A4 — Frente e Verso). Aguarde um instante...</div>
+          </div>
+        </body>
+      </html>
+    `);
+    printWin.document.close();
+
+    janelaLotePrintRef.current = printWin;
+    setRenderizandoLoteDOM(true);
+  };
+
+  // Assim que o container invisível de lote terminar de renderizar todas as folhas, injeta na janela de impressão
+  useEffect(() => {
+    if (!renderizandoLoteDOM) return;
+
+    const timer = setTimeout(() => {
+      const printWin = janelaLotePrintRef.current;
+      if (!printWin || printWin.closed || !lotePrintRef.current) {
+        setRenderizandoLoteDOM(false);
+        return;
+      }
+
+      const conteudoLoteHTML = lotePrintRef.current.innerHTML;
+      const tituloLoteDoc = `Lote_Folhas_Frequencia_SEEDF_${mesReferencia}_${servidoresSelecionadosParaLote.length}_Servidores`;
+
+      printWin.document.open();
+      printWin.document.write(`
+        <!DOCTYPE html>
+        <html lang="pt-BR">
+          <head>
+            <meta charset="UTF-8" />
+            <title>${tituloLoteDoc}</title>
+            <style>${ESTILOS_IMPRESSAO_SEEDF}</style>
+          </head>
+          <body>
+            ${conteudoLoteHTML}
+            <script>
+              window.onload = function() {
+                var imgs = Array.prototype.slice.call(document.images || []);
+                var promises = imgs.map(function(img) {
+                  if (img.complete) return Promise.resolve();
+                  return new Promise(function(resolve) {
+                    img.onload = resolve;
+                    img.onerror = resolve;
+                  });
+                });
+                Promise.all(promises).then(function() {
+                  setTimeout(function() {
+                    window.focus();
+                    window.print();
+                  }, 250);
+                });
+              };
+            </script>
+          </body>
+        </html>
+      `);
+      printWin.document.close();
+
+      setRenderizandoLoteDOM(false);
+      setModalLoteAberto(false);
+      toast.success(
+        `Lote gerado com sucesso: ${servidoresSelecionadosParaLote.length} folhas (${servidoresSelecionadosParaLote.length * 2} páginas A4)!`
+      );
+    }, 120);
+
+    return () => clearTimeout(timer);
+  }, [renderizandoLoteDOM, mesReferencia, servidoresSelecionadosParaLote]);
 
   // Clique interativo em um dia da Folha de Frequência
   const handleClicarDiaFolha = (dataISO, occExistente) => {
@@ -311,7 +526,7 @@ export default function RelatoriosTab({
 
   return (
     <div className="space-y-5">
-      {/* ── Barra Superior: Alternador de Visão + Botão Oficial Imprimir / Salvar PDF ── */}
+      {/* ── Barra Superior: Alternador de Visão + Botões Imprimir / Salvar PDF e Impressão em Lote ── */}
       <div className="bg-white rounded-2xl p-4 border border-slate-200/90 shadow-sm flex flex-wrap items-center justify-between gap-4 print:hidden">
         <div className="flex flex-wrap items-center gap-2">
           <button
@@ -366,6 +581,19 @@ export default function RelatoriosTab({
           >
             <PrinterIcon className="h-4 w-4" />
             Imprimir / Salvar PDF
+          </button>
+
+          <button
+            type="button"
+            onClick={handleAbrirModalImpressaoLote}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-700 hover:bg-indigo-800 text-white text-xs font-extrabold shadow-md hover:shadow-lg transition"
+            title="Imprimir ou gerar PDF em lote com todas as folhas de frequência do mês selecionado"
+          >
+            <Square2StackIcon className="h-4 w-4" />
+            Impressão em Lote
+            <span className="ml-0.5 px-1.5 py-0.5 rounded-md bg-white/20 text-[10px] font-black">
+              {servidoresAtivos.length}
+            </span>
           </button>
         </div>
       </div>
@@ -820,6 +1048,319 @@ export default function RelatoriosTab({
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          MODAL PREMIUM DE IMPRESSÃO EM LOTE — FOLHAS DE PONTO OFICIAIS SEEDF
+         ══════════════════════════════════════════════════════════════════════ */}
+      {modalLoteAberto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 print:hidden animate-fadeIn">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+            {/* Cabeçalho do Modal */}
+            <div className="bg-gradient-to-r from-indigo-900 via-indigo-800 to-blue-900 px-6 py-4 text-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-xl bg-white/15 border border-white/20">
+                  <Square2StackIcon className="h-6 w-6 text-indigo-100" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-extrabold tracking-tight">
+                    Impressão em Lote — Folhas de Frequência SEEDF
+                  </h3>
+                  <p className="text-xs text-indigo-200">
+                    Gere ou imprima de uma só vez todas as folhas de ponto (Frente e Verso A4) do mês de referência
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setModalLoteAberto(false)}
+                className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition"
+              >
+                <XMarkIcon className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Painel de Configuração do Lote e Filtros Rápidos */}
+            <div className="p-5 bg-slate-50 border-b border-slate-200 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-[11px] font-extrabold uppercase text-slate-500 mb-1">
+                    Mês / Ano de Referência
+                  </label>
+                  <input
+                    type="month"
+                    value={mesReferencia}
+                    onChange={(e) => setMesReferencia(e.target.value)}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs sm:text-sm font-bold text-slate-800 focus:border-indigo-500 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-extrabold uppercase text-slate-500 mb-1">
+                    Modelo SEEDF no Lote
+                  </label>
+                  <select
+                    value={modeloForcado}
+                    onChange={(e) => setModeloForcado(e.target.value)}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs sm:text-sm font-bold text-slate-800 focus:border-indigo-500 outline-none"
+                  >
+                    <option value="auto">
+                      ✨ Automático pelo Vínculo de cada Servidor
+                    </option>
+                    <option value="efetivo">
+                      🏛️ Forçar Modelo Efetivo (Com Função)
+                    </option>
+                    <option value="efetivo_sem_funcao">
+                      📘 Forçar Modelo Efetivo (Sem Função)
+                    </option>
+                    <option value="temporario">
+                      📄 Forçar Modelo Contrato Temporário
+                    </option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-extrabold uppercase text-slate-500 mb-1">
+                    Preenchimento de Horários
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setPreencherHorariosPonto((v) => !v)}
+                    className={`w-full rounded-xl px-3 py-2 text-xs font-extrabold border transition flex items-center justify-center gap-1.5 ${
+                      preencherHorariosPonto
+                        ? "bg-indigo-600 text-white border-indigo-600"
+                        : "bg-white text-slate-700 border-slate-300 hover:bg-slate-100"
+                    }`}
+                  >
+                    <ClockIcon className="h-4 w-4" />
+                    {preencherHorariosPonto
+                      ? "Horários Preenchidos"
+                      : "Horários em Branco (Assinatura)"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Pílulas de Seleção Rápida de Grupo */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-[11px] font-extrabold uppercase text-slate-500 mr-1">
+                    Seleção Rápida:
+                  </span>
+                  {[
+                    { id: "todos", label: `Todos os Ativos (${servidoresAtivos.length})` },
+                    { id: "efetivo", label: "Apenas Efetivos" },
+                    { id: "temporario", label: "Contrato Temporário" },
+                    { id: "docentes", label: "Apenas Professores" },
+                    { id: "gestao_apoio", label: "Direção / Secretaria / Apoio" },
+                  ].map((f) => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      onClick={() => handleAplicarFiltroRapidoLote(f.id)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition ${
+                        filtroVinculoLote === f.id
+                          ? "bg-indigo-700 text-white border-indigo-700 shadow-sm"
+                          : "bg-white text-slate-700 border-slate-300 hover:bg-slate-100"
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Busca + Marcar / Desmarcar Visíveis */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1">
+                <div className="relative flex-1">
+                  <MagnifyingGlassIcon className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={buscaLote}
+                    onChange={(e) => setBuscaLote(e.target.value)}
+                    placeholder="Buscar servidor por nome, cargo ou matrícula..."
+                    className="w-full pl-9 pr-3 py-1.5 rounded-xl border border-slate-300 bg-white text-xs font-medium outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleMarcarVisiveisLote}
+                    className="px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-xs font-bold transition"
+                  >
+                    Marcar Visíveis ({servidoresVisiveisModalLote.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDesmarcarVisiveisLote}
+                    className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 text-xs font-bold transition"
+                  >
+                    Desmarcar Visíveis
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Lista Rolável de Servidores do Lote */}
+            <div className="flex-1 overflow-y-auto p-4 divide-y divide-slate-100">
+              {servidoresVisiveisModalLote.length === 0 ? (
+                <div className="py-10 text-center text-sm text-slate-400">
+                  Nenhum servidor encontrado para o filtro selecionado.
+                </div>
+              ) : (
+                servidoresVisiveisModalLote.map((srv, idx) => {
+                  const selecionado = idsSelecionadosLote.includes(srv.id);
+                  const isTemp = String(srv.vinculo || "")
+                    .toLowerCase()
+                    .includes("tempor");
+                  const qtdOcorrenciasMes = ocorrencias.filter(
+                    (o) =>
+                      o.servidor_id === srv.id &&
+                      o.status !== "cancelado" &&
+                      (String(o.data_inicio || "").startsWith(mesReferencia) ||
+                        String(o.data_fim || "").startsWith(mesReferencia))
+                  ).length;
+
+                  return (
+                    <label
+                      key={srv.id}
+                      className={`flex items-center justify-between gap-3 py-2.5 px-3 rounded-xl cursor-pointer transition ${
+                        selecionado
+                          ? "bg-indigo-50/70 hover:bg-indigo-50"
+                          : "hover:bg-slate-50 opacity-75"
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <input
+                          type="checkbox"
+                          checked={selecionado}
+                          onChange={() => handleToggleServidorLote(srv.id)}
+                          className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span className="text-[11px] font-bold text-slate-400 w-6">
+                          {String(idx + 1).padStart(2, "0")}
+                        </span>
+                        <div className="min-w-0">
+                          <div className="text-xs font-extrabold text-slate-800 truncate">
+                            {srv.nome}
+                          </div>
+                          <div className="text-[11px] text-slate-500 truncate">
+                            {srv.cargo} • C.H. {srv.carga_horaria || "40h"}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        {qtdOcorrenciasMes > 0 && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
+                            {qtdOcorrenciasMes} ocorrência(s) no mês
+                          </span>
+                        )}
+                        <span
+                          className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${
+                            isTemp
+                              ? "bg-amber-50 text-amber-800 border-amber-200"
+                              : "bg-emerald-50 text-emerald-800 border-emerald-200"
+                          }`}
+                        >
+                          {isTemp ? "TEMPORÁRIO" : "EFETIVO"}
+                        </span>
+                      </div>
+                    </label>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Rodapé Fixo com Resumo de Páginas e Botão de Disparo */}
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-indigo-100 text-indigo-700">
+                  <UsersIcon className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="text-xs font-extrabold text-slate-800">
+                    {servidoresSelecionadosParaLote.length} servidor(es) selecionado(s) para o lote
+                  </div>
+                  <div className="text-[11px] text-slate-500">
+                    Total a gerar:{" "}
+                    <strong className="text-indigo-700">
+                      {servidoresSelecionadosParaLote.length * 2} páginas A4
+                    </strong>{" "}
+                    (2 páginas Frente e Verso por servidor)
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setModalLoteAberto(false)}
+                  className="px-4 py-2.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  disabled={
+                    servidoresSelecionadosParaLote.length === 0 ||
+                    renderizandoLoteDOM
+                  }
+                  onClick={handleDispararImpressaoLote}
+                  className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-indigo-700 hover:bg-indigo-800 disabled:bg-slate-300 text-white text-xs font-extrabold shadow-md hover:shadow-lg transition"
+                >
+                  <PrinterIcon className="h-4 w-4" />
+                  {renderizandoLoteDOM
+                    ? "Preparando Lote..."
+                    : `Imprimir / Salvar PDF do Lote (${servidoresSelecionadosParaLote.length} Folhas)`}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Container Oculto de Renderização em Lote (Montado apenas no disparo da impressão em lote) */}
+      {renderizandoLoteDOM && (
+        <div
+          ref={lotePrintRef}
+          aria-hidden="true"
+          style={{
+            position: "fixed",
+            left: "-99999px",
+            top: 0,
+            width: "210mm",
+            pointerEvents: "none",
+            opacity: 0,
+          }}
+        >
+          {servidoresSelecionadosParaLote.map((srv, idx) => (
+            <FolhaPontoOficialSEEDF
+              key={srv.id}
+              servidor={
+                servidorEspelho && srv.id === servidorEspelho.id
+                  ? {
+                      ...srv,
+                      matricula: matriculaEdit || srv.matricula,
+                      funcao_gratificada:
+                        funcaoEdit !== undefined
+                          ? funcaoEdit
+                          : srv.funcao_gratificada,
+                    }
+                  : srv
+              }
+              mesReferencia={mesReferencia}
+              ocorrencias={ocorrencias}
+              pontoDiario={pontoDiario}
+              modeloForcado={modeloForcado}
+              dadosUnidade={dadosUnidade}
+              preencherHorariosPonto={preencherHorariosPonto}
+              observacaoManual={observacaoManual}
+              quebrarPaginaNoFinal={
+                idx < servidoresSelecionadosParaLote.length - 1
+              }
+            />
+          ))}
         </div>
       )}
     </div>

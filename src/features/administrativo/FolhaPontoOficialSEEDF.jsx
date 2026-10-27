@@ -308,6 +308,7 @@ export default function FolhaPontoOficialSEEDF({
   preencherHorariosPonto = false,
   observacaoManual = "",
   onClicarDia = null,
+  quebrarPaginaNoFinal = false,
 }) {
   if (!servidor) return null;
 
@@ -1282,8 +1283,8 @@ export default function FolhaPontoOficialSEEDF({
           maxHeight: "296mm",
           padding: "7mm 9mm",
           boxSizing: "border-box",
-          pageBreakAfter: "auto",
-          breakAfter: "auto",
+          pageBreakAfter: quebrarPaginaNoFinal ? "always" : "auto",
+          breakAfter: quebrarPaginaNoFinal ? "page" : "auto",
           overflow: "hidden",
         }}
       >

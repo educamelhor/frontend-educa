@@ -36,6 +36,11 @@ import {
   VINCULOS_SERVIDOR,
   CARGAS_HORARIAS,
   TURNOS_TRABALHO,
+  CARREIRAS_SEEDF,
+  CATALOGO_CARGOS_SEEDF,
+  FUNCOES_GRATIFICADAS_SEEDF,
+  PADROES_CARREIRA_SEEDF,
+  ETAPAS_TITULACAO_SEEDF,
   LIMITE_ABONOS_ANUAL,
   TIPOS_OCORRENCIA_ADMIN,
   formatarCPF,
@@ -55,6 +60,76 @@ function getCategoriaMeta(cat) {
 
 function getVinculoLabel(v) {
   return VINCULOS_SERVIDOR.find((x) => x.value === v)?.label || v || "Efetivo";
+}
+
+function getFuncaoGratificadaMeta(val) {
+  if (!val) return null;
+  const v = String(val).trim();
+  if (!v) return null;
+  const found = FUNCOES_GRATIFICADAS_SEEDF.find(
+    (f) =>
+      f.value === v ||
+      (f.impressaoFolha && f.impressaoFolha.trim() === v) ||
+      (f.label && f.label.toUpperCase() === v.toUpperCase())
+  );
+  if (found && found.value) return found;
+  return {
+    value: v,
+    label: v,
+    simbolo: v.includes("FGE")
+      ? (v.match(/FGE-\d+/i)?.[0] || "FGE").toUpperCase()
+      : "FUNÇÃO",
+    impressaoFolha: v,
+  };
+}
+
+function inferirDadosCatalogoServidor(srv) {
+  if (srv.cargo_catalogo_id) {
+    return {
+      cargo_catalogo_id: srv.cargo_catalogo_id,
+      subcargo: srv.subcargo || "",
+    };
+  }
+  const cat = String(srv.categoria || "").toLowerCase();
+  const vinc = String(srv.vinculo || "efetivo").toLowerCase();
+  const cargoRaw = String(srv.cargo || "");
+  const partes = cargoRaw.split("—").map((p) => p.trim());
+  const subExtraido = partes.length > 1 ? partes.slice(1).join(" — ") : "";
+
+  if (cat === "professor") {
+    return {
+      cargo_catalogo_id: vinc.includes("tempor") ? "peb_temporario" : "peb_efetivo",
+      subcargo: srv.subcargo || subExtraido,
+    };
+  }
+  if (cat === "terceirizado" || vinc === "terceirizado") {
+    return {
+      cargo_catalogo_id: "terceirizado_operacional",
+      subcargo: srv.subcargo || subExtraido,
+    };
+  }
+  if (cat === "disciplinar") {
+    return {
+      cargo_catalogo_id: "militar_ccmdf",
+      subcargo: srv.subcargo || subExtraido,
+    };
+  }
+  if (cargoRaw.toLowerCase().includes("orientador")) {
+    return {
+      cargo_catalogo_id: "pedagogo_orientador",
+      subcargo: srv.subcargo || subExtraido,
+    };
+  }
+  if (cat === "administrativo") {
+    return {
+      cargo_catalogo_id: "tecnico_ppge",
+      subcargo: srv.subcargo || subExtraido,
+    };
+  }
+  return {
+    cargo_catalogo_id: "",
+    subcargo: srv.subcargo || subExtraido,
+  };
 }
 
 function fmtDataBR(iso) {
@@ -88,13 +163,18 @@ export default function ServidoresTab({
   const [servidorEditando, setServidorEditando] = useState(null);
   const [salvandoForm, setSalvandoForm] = useState(false);
 
-  // Estado do formulário de Servidor
+  // Estado do formulário de Servidor (com suporte ao Catálogo Oficial SEEDF)
   const [form, setForm] = useState({
     id: null,
     nome: "",
     cpf: "",
     matricula: "",
     cargo: "",
+    cargo_catalogo_id: "terceirizado_operacional",
+    subcargo: "",
+    funcao_gratificada: "",
+    padrao_carreira: "25",
+    etapa_titulacao: "PQ5",
     categoria: "terceirizado",
     vinculo: "terceirizado",
     empresa: "",
@@ -259,6 +339,11 @@ export default function ServidoresTab({
       cpf: "",
       matricula: "",
       cargo: "",
+      cargo_catalogo_id: "terceirizado_operacional",
+      subcargo: "",
+      funcao_gratificada: "",
+      padrao_carreira: "25",
+      etapa_titulacao: "PQ5",
       categoria: "terceirizado",
       vinculo: "terceirizado",
       empresa: "",
@@ -279,12 +364,18 @@ export default function ServidoresTab({
   // Abrir modal de Edição de Servidor
   const abrirEditarServidor = (srv) => {
     setServidorEditando(srv);
+    const { cargo_catalogo_id, subcargo } = inferirDadosCatalogoServidor(srv);
     setForm({
       id: srv.id,
       nome: srv.nome || "",
       cpf: formatarCPF(srv.cpf) === "—" ? "" : formatarCPF(srv.cpf),
       matricula: srv.matricula || "",
       cargo: srv.cargo || "",
+      cargo_catalogo_id: cargo_catalogo_id || "",
+      subcargo: subcargo || "",
+      funcao_gratificada: srv.funcao_gratificada || "",
+      padrao_carreira: srv.padrao_carreira || "25",
+      etapa_titulacao: srv.etapa_titulacao || "PQ5",
       categoria: srv.categoria || "administrativo",
       vinculo: srv.vinculo || "efetivo",
       empresa: srv.empresa || "SEEDF",
@@ -695,8 +786,20 @@ export default function ServidoresTab({
 
                       {/* Cargo / Lotação */}
                       <td className="py-3.5 px-4">
-                        <div className="font-semibold text-slate-800 text-xs">
-                          {srv.cargo}
+                        <div className="font-semibold text-slate-800 text-xs flex flex-wrap items-center gap-1.5">
+                          <span>{srv.cargo}</span>
+                          {(() => {
+                            const fgeMeta = getFuncaoGratificadaMeta(srv.funcao_gratificada);
+                            if (!fgeMeta) return null;
+                            return (
+                              <span
+                                className="px-1.5 py-0.5 rounded-md text-[10px] font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-200"
+                                title={fgeMeta.label}
+                              >
+                                🏛️ {fgeMeta.simbolo || "FGE"}
+                              </span>
+                            );
+                          })()}
                         </div>
                         <div className="text-[11px] text-slate-500 mt-0.5">
                           {srv.setor || catMeta.label}
@@ -911,7 +1014,7 @@ export default function ServidoresTab({
          ══════════════════════════════════════════════════════════════════════ */}
       {modalFormAberto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl overflow-hidden my-8">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-3xl overflow-hidden my-8">
             <div
               className="px-6 py-4 flex items-center justify-between text-white"
               style={{
@@ -967,7 +1070,7 @@ export default function ServidoresTab({
                 </div>
               </div>
 
-              {/* Categoria, Cargo e Matrícula */}
+              {/* Seletor 1: Categoria no Quadro, Vínculo Funcional e Matrícula */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
@@ -975,7 +1078,23 @@ export default function ServidoresTab({
                   </label>
                   <select
                     value={form.categoria}
-                    onChange={(e) => setForm({ ...form, categoria: e.target.value })}
+                    onChange={(e) => {
+                      const novaCat = e.target.value;
+                      let novoVinc = form.vinculo;
+                      if (novaCat === "terceirizado") novoVinc = "terceirizado";
+                      else if (novaCat === "professor" && form.vinculo === "terceirizado") novoVinc = "efetivo";
+                      const sugerido = CATALOGO_CARGOS_SEEDF.find(
+                        (item) =>
+                          item.categorias.includes(novaCat) &&
+                          item.vinculos.includes(novoVinc)
+                      ) || CATALOGO_CARGOS_SEEDF.find((item) => item.categorias.includes(novaCat));
+                      setForm({
+                        ...form,
+                        categoria: novaCat,
+                        vinculo: novoVinc,
+                        cargo_catalogo_id: sugerido ? sugerido.id : form.cargo_catalogo_id,
+                      });
+                    }}
                     className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm text-slate-800"
                   >
                     {CATEGORIAS_SERVIDOR.map((c) => (
@@ -988,41 +1107,23 @@ export default function ServidoresTab({
 
                 <div>
                   <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                    Cargo / Função *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={form.cargo}
-                    onChange={(e) => setForm({ ...form, cargo: e.target.value })}
-                    placeholder="Ex: Auxiliar de Limpeza / Vigilante"
-                    className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                    Matrícula / Contrato
-                  </label>
-                  <input
-                    type="text"
-                    value={form.matricula}
-                    onChange={(e) => setForm({ ...form, matricula: e.target.value })}
-                    placeholder="Ex: SEEDF-19203 ou TERC-04"
-                    className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800"
-                  />
-                </div>
-              </div>
-
-              {/* Vínculo, Empresa/Órgão e Setor */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                    Vínculo Funcional
+                    Vínculo Funcional *
                   </label>
                   <select
                     value={form.vinculo}
-                    onChange={(e) => setForm({ ...form, vinculo: e.target.value })}
+                    onChange={(e) => {
+                      const novoVinc = e.target.value;
+                      const sugerido = CATALOGO_CARGOS_SEEDF.find(
+                        (item) =>
+                          item.categorias.includes(form.categoria) &&
+                          item.vinculos.includes(novoVinc)
+                      );
+                      setForm({
+                        ...form,
+                        vinculo: novoVinc,
+                        cargo_catalogo_id: sugerido ? sugerido.id : form.cargo_catalogo_id,
+                      });
+                    }}
                     className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm text-slate-800"
                   >
                     {VINCULOS_SERVIDOR.map((v) => (
@@ -1033,6 +1134,253 @@ export default function ServidoresTab({
                   </select>
                 </div>
 
+                <div>
+                  <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
+                    Matrícula / Contrato SIGEP
+                  </label>
+                  <input
+                    type="text"
+                    value={form.matricula}
+                    onChange={(e) => setForm({ ...form, matricula: e.target.value })}
+                    placeholder="Ex: 0027596-4 ou TERC-04"
+                    className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800"
+                  />
+                </div>
+              </div>
+
+              {/* ── PAINEL NORMATIVO SEEDF: CARGO, SUB-CARGO (ESPECIALIDADE), FUNÇÃO (FGE) E PADRÃO SIGEP ── */}
+              {(() => {
+                const cargosRecomendados = CATALOGO_CARGOS_SEEDF.filter(
+                  (c) =>
+                    c.categorias.includes(form.categoria) ||
+                    c.vinculos.includes(form.vinculo)
+                );
+                const itemCatalogoAtual = CATALOGO_CARGOS_SEEDF.find(
+                  (c) => c.id === form.cargo_catalogo_id
+                );
+                const listaSubcargos = itemCatalogoAtual?.subcargos || [];
+                const mostrarPadraoSigep =
+                  (form.vinculo === "efetivo" || form.vinculo === "readaptado") &&
+                  (itemCatalogoAtual?.exigePadraoSigep ||
+                    form.categoria === "professor" ||
+                    form.categoria === "direcao" ||
+                    form.categoria === "pedagogico");
+
+                return (
+                  <div className="bg-blue-50/45 p-4 rounded-xl border border-blue-200/80 space-y-3.5">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <span className="text-[11px] font-extrabold uppercase tracking-wider text-blue-900">
+                        🏛️ Padronização Funcional SEEDF (Cargo, Especialidade, FGE & SIGEP)
+                      </span>
+                      {itemCatalogoAtual?.cargoSigep && (
+                        <span className="px-2 py-0.5 rounded-md bg-white border border-blue-200 text-[10px] font-mono font-bold text-blue-800">
+                          SIGEP: {itemCatalogoAtual.cargoSigep}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Seletor 2: Cargo Oficial SEEDF + Seletor 3: Sub-cargo / Especialidade */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                      <div>
+                        <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
+                          Cargo Oficial SEEDF (Catálogo)
+                        </label>
+                        <select
+                          value={form.cargo_catalogo_id || "custom"}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (val === "custom") {
+                              setForm({
+                                ...form,
+                                cargo_catalogo_id: "custom",
+                                subcargo: "",
+                              });
+                              return;
+                            }
+                            const sel = CATALOGO_CARGOS_SEEDF.find((c) => c.id === val);
+                            const primeiroSub = sel?.subcargos?.[0] || "";
+                            const novoCargoComp = sel
+                              ? primeiroSub
+                                ? `${sel.cargoLabel} — ${primeiroSub}`
+                                : sel.cargoLabel
+                              : form.cargo;
+                            setForm({
+                              ...form,
+                              cargo_catalogo_id: val,
+                              subcargo: primeiroSub,
+                              cargo: novoCargoComp,
+                            });
+                          }}
+                          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs sm:text-sm font-semibold text-slate-800"
+                        >
+                          <optgroup label="Cargos Compatíveis com a Categoria / Vínculo">
+                            {cargosRecomendados.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.cargoLabel}
+                              </option>
+                            ))}
+                          </optgroup>
+                          <optgroup label="Todos os Cargos do Catálogo SEEDF">
+                            {CATALOGO_CARGOS_SEEDF.filter(
+                              (c) => !cargosRecomendados.some((r) => r.id === c.id)
+                            ).map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.cargoLabel}
+                              </option>
+                            ))}
+                          </optgroup>
+                          <option value="custom">
+                            ✍️ Outro Cargo / Digitação Livre
+                          </option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
+                          Sub-cargo / Especialidade / Disciplina
+                        </label>
+                        {listaSubcargos.length > 0 && form.cargo_catalogo_id !== "custom" ? (
+                          <select
+                            value={form.subcargo}
+                            onChange={(e) => {
+                              const sub = e.target.value;
+                              const baseLabel =
+                                itemCatalogoAtual?.cargoLabel || "Servidor";
+                              setForm({
+                                ...form,
+                                subcargo: sub,
+                                cargo: sub ? `${baseLabel} — ${sub}` : baseLabel,
+                              });
+                            }}
+                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs sm:text-sm text-slate-800"
+                          >
+                            <option value="">
+                              — Selecionar Especialidade / Componente —
+                            </option>
+                            {listaSubcargos.map((sub) => (
+                              <option key={sub} value={sub}>
+                                {sub}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            value={form.subcargo}
+                            onChange={(e) =>
+                              setForm({ ...form, subcargo: e.target.value })
+                            }
+                            placeholder="Ex: Matemática / Portaria / Limpeza"
+                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs sm:text-sm text-slate-800"
+                          />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Campo Editável do Nome Final do Cargo + Seletor 4: Função Gratificada Escolar (FGE) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                      <div>
+                        <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
+                          Cargo / Função (Descrição Final Editável) *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={form.cargo}
+                          onChange={(e) =>
+                            setForm({ ...form, cargo: e.target.value })
+                          }
+                          placeholder="Ex: Professor de Educação Básica (PEB) — Matemática"
+                          className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs sm:text-sm font-semibold text-slate-800"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
+                          Função Gratificada Escolar (FGE — Lei 5.326/2014)
+                        </label>
+                        <select
+                          value={form.funcao_gratificada}
+                          onChange={(e) =>
+                            setForm({
+                              ...form,
+                              funcao_gratificada: e.target.value,
+                            })
+                          }
+                          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs sm:text-sm font-semibold text-slate-800"
+                        >
+                          {FUNCOES_GRATIFICADAS_SEEDF.map((fn) => (
+                            <option key={fn.value} value={fn.value}>
+                              {fn.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Seletor Condicional: Padrão Vertical (01 a 25) + Etapa de Titulação (PQ1 a PQ6) */}
+                    {mostrarPadraoSigep && (
+                      <div className="pt-2 border-t border-blue-200/70 grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                        <div>
+                          <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">
+                            Padrão na Carreira (01 a 25)
+                          </label>
+                          <select
+                            value={form.padrao_carreira || "25"}
+                            onChange={(e) =>
+                              setForm({
+                                ...form,
+                                padrao_carreira: e.target.value,
+                              })
+                            }
+                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-800"
+                          >
+                            {PADROES_CARREIRA_SEEDF.map((p) => (
+                              <option key={p.value} value={p.value}>
+                                {p.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">
+                            Etapa de Titulação (PQ1 a PQ6)
+                          </label>
+                          <select
+                            value={form.etapa_titulacao || "PQ5"}
+                            onChange={(e) =>
+                              setForm({
+                                ...form,
+                                etapa_titulacao: e.target.value,
+                              })
+                            }
+                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-800"
+                          >
+                            {ETAPAS_TITULACAO_SEEDF.map((et) => (
+                              <option key={et.value} value={et.value}>
+                                {et.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="flex items-center justify-start sm:justify-end pb-0.5">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-900 text-white text-xs font-extrabold shadow-sm">
+                            Código SIGEP na Folha:{" "}
+                            <span className="font-mono text-amber-300">
+                              {`${form.padrao_carreira || "25"}-${form.etapa_titulacao || "PQ5"}`}
+                            </span>
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Órgão/Empresa e Setor/Lotação Interna */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
                     Órgão / Empresa Terceirizada
@@ -1054,7 +1402,7 @@ export default function ServidoresTab({
                     type="text"
                     value={form.setor}
                     onChange={(e) => setForm({ ...form, setor: e.target.value })}
-                    placeholder="Ex: Portaria / Bloco B / Cozinha"
+                    placeholder="Ex: Portaria / Bloco B / Cozinha / Regência"
                     className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800"
                   />
                 </div>
@@ -1234,6 +1582,17 @@ export default function ServidoresTab({
                     <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-white/20 text-white">
                       {dossieServidor.acesso_sistema ? "Com Acesso ao Sistema" : "Registro Interno (Sem Login)"}
                     </span>
+                    {(() => {
+                      const fgeMeta = getFuncaoGratificadaMeta(
+                        dossieServidor.funcao_gratificada
+                      );
+                      if (!fgeMeta) return null;
+                      return (
+                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-amber-400/25 text-amber-200 border border-amber-300/40">
+                          🏛️ {fgeMeta.label}
+                        </span>
+                      );
+                    })()}
                   </div>
                   <p className="text-xs text-blue-100 mt-0.5">
                     {dossieServidor.cargo} • CPF: {formatarCPF(dossieServidor.cpf)} • Matrícula: {dossieServidor.matricula || "—"}

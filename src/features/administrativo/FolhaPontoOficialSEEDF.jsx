@@ -10,7 +10,11 @@
 // ============================================================================
 
 import React, { useMemo } from "react";
-import { normalizarTurno } from "./useAdministrativoData";
+import {
+  normalizarTurno,
+  CATALOGO_CARGOS_SEEDF,
+  FUNCOES_GRATIFICADAS_SEEDF,
+} from "./useAdministrativoData";
 import brasaoDfImg from "./brasao-df.png";
 
 const MESES_EXTENSO = [
@@ -326,10 +330,16 @@ export default function FolhaPontoOficialSEEDF({
     modeloForcado === "temporario" ||
     (modeloForcado === "auto" && vinculoNorm.includes("tempor"));
 
-  // Determina se o servidor exerce função gratificada (Diretor, Vice, Supervisor, Secretário)
+  // Determina se o servidor exerce função gratificada escolar (FGE — Lei nº 5.326/2014)
   const funcaoGratificadaServidor = useMemo(() => {
     if (modeloForcado === "efetivo_sem_funcao") return "";
-    if (servidor.funcao_gratificada) return servidor.funcao_gratificada;
+    if (servidor.funcao_gratificada) {
+      const fgeItem = FUNCOES_GRATIFICADAS_SEEDF.find(
+        (f) => f.value === servidor.funcao_gratificada
+      );
+      if (fgeItem) return fgeItem.impressaoFolha || "";
+      return String(servidor.funcao_gratificada).replace(/DFG-02/gi, "FGE-02");
+    }
     const cargoUp = String(servidor.cargo || "").toUpperCase();
     if (cargoUp.includes("DIRETOR") && !cargoUp.includes("VICE")) {
       return "DIRETOR                                FGE-06";
@@ -337,15 +347,21 @@ export default function FolhaPontoOficialSEEDF({
     if (cargoUp.includes("VICE")) {
       return "VICE-DIRETOR                           FGE-05";
     }
+    if (cargoUp.includes("SUPERVISOR") && cargoUp.includes("NOTURNO")) {
+      return "SUPERVISOR NOTURNO                     FGE-01";
+    }
+    if (cargoUp.includes("SUPERVISOR") && cargoUp.includes("PEDAG")) {
+      return "SUPERVISOR PEDAGOGICO                  FGE-02";
+    }
     if (cargoUp.includes("SUPERVISOR")) {
-      return "SUPERVISOR ADMINISTRATIVO              DFG-02";
+      return "SUPERVISOR ADMINISTRATIVO              FGE-02";
     }
     if (
       cargoUp.includes("CHEFE DE SECRETARIA") ||
       cargoUp.includes("SECRETÁRIO") ||
       cargoUp.includes("SECRETARIO")
     ) {
-      return "CHEFE DE SECRETARIA                    DFG-02";
+      return "CHEFE DE SECRETARIA                    FGE-02";
     }
     return "";
   }, [servidor, modeloForcado]);
@@ -373,7 +389,8 @@ export default function FolhaPontoOficialSEEDF({
     !String(servidor.matricula).startsWith("DIR-") &&
     !String(servidor.matricula).startsWith("EQP-") &&
     !String(servidor.matricula).startsWith("TERC-") &&
-    !String(servidor.matricula).startsWith("ADM-")
+    !String(servidor.matricula).startsWith("ADM-") &&
+    !String(servidor.matricula).startsWith("CAD-")
       ? servidor.matricula
       : isTemporario
       ? "7062701-0"
@@ -386,20 +403,61 @@ export default function FolhaPontoOficialSEEDF({
     : chRaw.replace(/\D/g, "") || "40";
   const isJornadaDupla = Number(chNumero) > 20;
 
-  // Cargo/Especialidade e Disciplina
-  const cargoBase = isTemporario
-    ? "PROFESSOR TEMPORARIO"
-    : String(servidor.categoria || "") === "professor" ||
-      String(servidor.cargo || "").toUpperCase().includes("PROFESSOR")
-    ? "PROFESSOR DE EDUC. BASICA     25-PQ5"
-    : String(servidor.cargo || "PROFESSOR DE EDUC. BASICA     25-PQ5").toUpperCase();
+  // Cargo/Especialidade e Disciplina dinâmicos conforme Catálogo Oficial SEEDF e Padrão SIGEP
+  const cargoBase = useMemo(() => {
+    if (isTemporario) {
+      return "PROFESSOR TEMPORARIO";
+    }
+    const itemCat = CATALOGO_CARGOS_SEEDF.find(
+      (c) => c.id === servidor.cargo_catalogo_id
+    );
+    const padrao = String(servidor.padrao_carreira || "25").padStart(2, "0");
+    const etapa = String(servidor.etapa_titulacao || "PQ5").toUpperCase();
+    const codigoSigepPadrao = `${padrao}-${etapa}`;
+
+    if (itemCat) {
+      if (itemCat.exigePadraoSigep) {
+        return `${itemCat.cargoSigep}     ${codigoSigepPadrao}`;
+      }
+      return itemCat.cargoSigep;
+    }
+
+    const cargoUp = String(servidor.cargo || "").toUpperCase();
+    const catNorm = String(servidor.categoria || "").toLowerCase();
+
+    if (cargoUp.includes("ORIENTADOR") || cargoUp.includes("PEDAGOGO")) {
+      return `PEDAGOGO-ORIENTADOR EDUC.     ${codigoSigepPadrao}`;
+    }
+    if (
+      catNorm === "professor" ||
+      cargoUp.includes("PROFESSOR") ||
+      (catNorm === "direcao" && !cargoUp.includes("SECRETARI"))
+    ) {
+      return `PROFESSOR DE EDUC. BASICA     ${codigoSigepPadrao}`;
+    }
+    if (
+      cargoUp.includes("SECRETÁRIO") ||
+      cargoUp.includes("SECRETARIO") ||
+      cargoUp.includes("TECNICO") ||
+      cargoUp.includes("TÉCNICO")
+    ) {
+      return "TECNICO DE GESTAO EDUCACIONAL";
+    }
+    if (catNorm === "terceirizado" || vinculoNorm === "terceirizado") {
+      return cargoUp.split("—")[0].trim() || "PRESTADOR DE SERVICO TERCEIRIZADO";
+    }
+    return cargoUp.split("—")[0].trim() || `PROFESSOR DE EDUC. BASICA     ${codigoSigepPadrao}`;
+  }, [isTemporario, servidor, vinculoNorm]);
 
   const disciplinaExtr = useMemo(() => {
+    if (servidor.subcargo && String(servidor.subcargo).trim()) {
+      return String(servidor.subcargo).trim().toUpperCase();
+    }
     const c = String(servidor.cargo || "");
     if (c.includes("—")) return c.split("—")[1].trim().toUpperCase();
     if (c.includes("-")) return c.split("-")[1].trim().toUpperCase();
     return "";
-  }, [servidor.cargo]);
+  }, [servidor.subcargo, servidor.cargo]);
 
   // Determina os rótulos de Turno Esquerdo e Turno Direito (sempre Matutino -> Vespertino -> Noturno)
   const turnosCabecalho = useMemo(() => {

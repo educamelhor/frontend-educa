@@ -29,7 +29,7 @@ export const VINCULOS_SERVIDOR = [
   { value: "temporario", label: "Contrato Temporário" },
   { value: "terceirizado", label: "Terceirizado (Empresa)" },
   { value: "comissionado", label: "Cargo Comissionado" },
-  { value: "readaptado", label: "Servidor Readaptado" },
+  { value: "voluntario", label: "Educador Social Voluntário" },
   { value: "estagiario", label: "Estagiário / Menor Aprendiz" },
 ];
 
@@ -60,12 +60,12 @@ export const CARREIRAS_SEEDF = [
   {
     value: "magisterio",
     label: "Carreira Magistério Público do DF (Lei 5.105/2013)",
-    vinculosPermitidos: ["efetivo", "temporario", "readaptado"],
+    vinculosPermitidos: ["efetivo", "temporario"],
   },
   {
     value: "ppge_assistencia",
     label: "Carreira Políticas Públicas e Gestão Educacional — PPGE / Assistência (Lei 7.353/2023)",
-    vinculosPermitidos: ["efetivo", "comissionado", "readaptado"],
+    vinculosPermitidos: ["efetivo", "comissionado"],
   },
   {
     value: "terceirizado_contrato",
@@ -80,7 +80,7 @@ export const CARREIRAS_SEEDF = [
   {
     value: "voluntario_estagio",
     label: "Programa Educador Social Voluntário / Estágio",
-    vinculosPermitidos: ["estagiario", "temporario"],
+    vinculosPermitidos: ["voluntario", "estagiario", "temporario"],
   },
 ];
 
@@ -91,7 +91,7 @@ export const CATALOGO_CARGOS_SEEDF = [
     id: "peb_efetivo",
     carreira: "magisterio",
     categorias: ["professor", "direcao", "pedagogico"],
-    vinculos: ["efetivo", "readaptado"],
+    vinculos: ["efetivo"],
     cargoLabel: "Professor de Educação Básica (PEB)",
     cargoSigep: "PROFESSOR DE EDUC. BASICA",
     exigePadraoSigep: true, // Ex: 25-PQ5, 01-PQ4
@@ -270,11 +270,13 @@ export const CATALOGO_CARGOS_SEEDF = [
     id: "educador_voluntario",
     carreira: "voluntario_estagio",
     categorias: ["apoio", "pedagogico"],
-    vinculos: ["estagiario", "temporario"],
+    vinculos: ["voluntario", "estagiario", "temporario"],
     cargoLabel: "Educador Social Voluntário (ESV) / Estagiário",
     cargoSigep: "EDUCADOR SOCIAL VOLUNTARIO",
     exigePadraoSigep: false,
     subcargos: [
+      "Educador Social Voluntário — Apoio à Educação Integral / Oficinas",
+      "Educador Social Voluntário — Apoio a Estudantes com Necessidades Especiais (ANEE)",
       "Apoio à Educação Integral / Oficinas",
       "Apoio a Estudantes com Necessidades Especiais (ANEE)",
       "Estagiário de Nível Superior (Licenciatura / Pedagogia)",

@@ -59,6 +59,7 @@ function getCategoriaMeta(cat) {
 }
 
 function getVinculoLabel(v) {
+  if (v === "readaptado") return "Efetivo (SEEDF)";
   return VINCULOS_SERVIDOR.find((x) => x.value === v)?.label || v || "Efetivo";
 }
 
@@ -96,6 +97,12 @@ function inferirDadosCatalogoServidor(srv) {
   const partes = cargoRaw.split("—").map((p) => p.trim());
   const subExtraido = partes.length > 1 ? partes.slice(1).join(" — ") : "";
 
+  if (vinc === "voluntario" || vinc === "estagiario") {
+    return {
+      cargo_catalogo_id: "educador_voluntario",
+      subcargo: srv.subcargo || subExtraido,
+    };
+  }
   if (cat === "professor") {
     return {
       cargo_catalogo_id: vinc.includes("tempor") ? "peb_temporario" : "peb_efetivo",
@@ -1110,18 +1117,25 @@ export default function ServidoresTab({
                     Vínculo Funcional *
                   </label>
                   <select
-                    value={form.vinculo}
+                    value={form.vinculo === "readaptado" ? "efetivo" : form.vinculo}
                     onChange={(e) => {
                       const novoVinc = e.target.value;
-                      const sugerido = CATALOGO_CARGOS_SEEDF.find(
-                        (item) =>
-                          item.categorias.includes(form.categoria) &&
+                      const sugerido =
+                        CATALOGO_CARGOS_SEEDF.find(
+                          (item) =>
+                            item.categorias.includes(form.categoria) &&
+                            item.vinculos.includes(novoVinc)
+                        ) ||
+                        CATALOGO_CARGOS_SEEDF.find((item) =>
                           item.vinculos.includes(novoVinc)
-                      );
+                        );
                       setForm({
                         ...form,
                         vinculo: novoVinc,
                         cargo_catalogo_id: sugerido ? sugerido.id : form.cargo_catalogo_id,
+                        ...(novoVinc === "voluntario" && !form.cargo.trim()
+                          ? { cargo: "Educador Social Voluntário (ESV)" }
+                          : {}),
                       });
                     }}
                     className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm text-slate-800"

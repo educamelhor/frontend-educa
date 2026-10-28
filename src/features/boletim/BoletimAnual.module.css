@@ -351,16 +351,13 @@
 .mediaBimValor {
   font-size: 0.9rem;
   font-weight: 800;
-  background: linear-gradient(135deg, #2563eb, #7c3aed);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: #1e40af;
 }
 
 .mediaBimVazio {
-  font-size: 0.65rem;
-  color: #cbd5e1;
-  font-style: italic;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #64748b;
 }
 
 .somaNotasLabel {
@@ -662,6 +659,37 @@
   .rankingCard:hover {
     transform: none !important;
     box-shadow: none !important;
+  }
+
+  .mediaBimBadge {
+    background: #f8fafc !important;
+    border: 1px solid #cbd5e1 !important;
+    padding: 0.25rem 0.55rem !important;
+    border-radius: 6px !important;
+    box-shadow: none !important;
+    transform: none !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .mediaBimLabel {
+    color: #475569 !important;
+    -webkit-text-fill-color: #475569 !important;
+  }
+
+  .mediaBimValor {
+    color: #0f172a !important;
+    -webkit-text-fill-color: #0f172a !important;
+    background: none !important;
+    -webkit-background-clip: border-box !important;
+    background-clip: border-box !important;
+    font-weight: 800 !important;
+  }
+
+  .mediaBimVazio {
+    color: #475569 !important;
+    -webkit-text-fill-color: #475569 !important;
+    font-weight: 700 !important;
   }
 
   .btnImprimir {

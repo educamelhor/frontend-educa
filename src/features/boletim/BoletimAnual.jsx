@@ -719,10 +719,16 @@ export default function BoletimAnual({
           {govConfig.exibirMediaRodape && (
             <div className={s.mediasBimGrid}>
               {[1, 2, 3, 4].map((bim) => {
-                const notasDoBim = disciplinas
+                const discsDoBim =
+                  aluno?.regime === "semestral"
+                    ? (bim <= 2
+                        ? (disciplinasSem1.length > 0 ? disciplinasSem1 : disciplinas)
+                        : (disciplinasSem2.length > 0 ? disciplinasSem2 : disciplinas))
+                    : disciplinas;
+                const notasDoBim = discsDoBim
                   .map((disc) => findNota(disc.id, bim))
                   .map((x) => x.nota)
-                  .filter((x) => x != null);
+                  .filter((x) => x != null && x !== "");
                 const mediaBim = notasDoBim.length
                   ? (notasDoBim.reduce((a, b) => Number(a) + Number(b), 0) / notasDoBim.length).toFixed(2)
                   : null;

@@ -540,6 +540,7 @@ export default function Alunos() {
               <BoletimPrint
                 codigo={codigoAlunoBoletim}
                 exibirBotaoImprimir={false}
+                boletimConfig={boletimConfigData}
               />
             ) : (
               <BoletimAnual

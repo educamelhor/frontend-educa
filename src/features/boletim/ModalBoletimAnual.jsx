@@ -5,11 +5,41 @@
 // Reutiliza BoletimAnual.jsx internamente.
 // ============================================================================
 
-import React from "react";
+import React, { useEffect, useState } from "react";
+import api from "../../services/api";
 import BoletimAnual from "./BoletimAnual";
+import BoletimPrint from "./BoletimPrint";
 
 export default function ModalBoletimAnual({ open, codigo, onClose }) {
+  const [boletimConfigData, setBoletimConfigData] = useState(null);
+  const [loadingConfig, setLoadingConfig] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelado = false;
+    setLoadingConfig(true);
+    const eid = localStorage.getItem("escola_id");
+    api
+      .get("/api/governanca/boletim-config", {
+        params: eid ? { escola_id: eid } : {},
+      })
+      .then((res) => {
+        if (!cancelado) setBoletimConfigData(res.data || null);
+      })
+      .catch(() => {
+        if (!cancelado) setBoletimConfigData(null);
+      })
+      .finally(() => {
+        if (!cancelado) setLoadingConfig(false);
+      });
+    return () => {
+      cancelado = true;
+    };
+  }, [open, codigo]);
+
   if (!open) return null;
+
+  const exibirAnoAnterior = boletimConfigData?.["boletim.exibir_ano_anterior"] === "1";
 
   return (
     <div
@@ -65,10 +95,23 @@ export default function ModalBoletimAnual({ open, codigo, onClose }) {
           ×
         </button>
 
-        <BoletimAnual
-          codigo={codigo}
-          exibirBotaoImprimir={false}
-        />
+        {loadingConfig ? (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "80px 0" }}>
+            <span style={{ fontSize: "1.1rem", color: "#64748b" }}>Carregando configurações...</span>
+          </div>
+        ) : exibirAnoAnterior ? (
+          <BoletimPrint
+            codigo={codigo}
+            exibirBotaoImprimir={false}
+            boletimConfig={boletimConfigData}
+          />
+        ) : (
+          <BoletimAnual
+            codigo={codigo}
+            exibirBotaoImprimir={false}
+            boletimConfig={boletimConfigData}
+          />
+        )}
       </div>
     </div>
   );

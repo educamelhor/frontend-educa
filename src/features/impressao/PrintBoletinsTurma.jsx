@@ -9,6 +9,7 @@
 
 import React, { useEffect, useState, useRef } from "react";
 import BoletimAnual from "../boletim/BoletimAnual"; // ← layout de um único ano letivo
+import BoletimPrint from "../boletim/BoletimPrint"; // ← layout de 2 anos (quando boletim.exibir_ano_anterior = "1")
 import api from "../../services/api";
 
 export default function PrintBoletinsTurma() {
@@ -25,9 +26,11 @@ export default function PrintBoletinsTurma() {
   // -------------------------------------------------------------------------
   // Estados locais
   // alunos → lista de alunos da turma, cada um com suas notas detalhadas
+  // boletimConfig → configurações da categoria Boletim (Direção > Governança)
   // carregado → indica que a API respondeu
   // -------------------------------------------------------------------------
   const [alunos, setAlunos] = useState([]);
+  const [boletimConfig, setBoletimConfig] = useState(null);
   const [carregado, setCarregado] = useState(false);
 
   // -------------------------------------------------------------------------
@@ -44,6 +47,8 @@ export default function PrintBoletinsTurma() {
 
   // -------------------------------------------------------------------------
   // Busca os boletins da turma usando a rota oficial /api/impressao/boletins
+  // e garante que a configuração de Governança (Boletim) da escola esteja carregada
+  // ANTES de sinalizar #render-completo para o Playwright.
   // -------------------------------------------------------------------------
   useEffect(() => {
     if (turma_id) {
@@ -53,11 +58,13 @@ export default function PrintBoletinsTurma() {
 
       api
         .get(url)
-        .then((res) => {
+        .then(async (res) => {
           console.log("Resposta completa da API de boletins:", res.data);
 
           // Rota pode retornar { alunos: [...] } ou { data: { alunos: [...] } }
           let resultado = [];
+          let cfg = res.data?.boletim_config || res.data?.data?.boletim_config || null;
+
           if (res.data.alunos) {
             resultado = res.data.alunos;
           } else if (res.data.data && res.data.data.alunos) {
@@ -73,6 +80,25 @@ export default function PrintBoletinsTurma() {
             );
           }
 
+          if (!cfg && resultado.length > 0 && resultado[0]?.boletim_config) {
+            cfg = resultado[0].boletim_config;
+          }
+
+          if (!cfg) {
+            const escId = resultado[0]?.escola_id || localStorage.getItem("escola_id");
+            if (escId) {
+              try {
+                const cfgRes = await api.get("/api/governanca/boletim-config", {
+                  params: { escola_id: escId },
+                });
+                cfg = cfgRes.data?.config || null;
+              } catch {
+                cfg = null;
+              }
+            }
+          }
+
+          setBoletimConfig(cfg);
           setAlunos(resultado);
           setCarregado(true);
           console.log("Boletins retornados para turma_id", turma_id, resultado);
@@ -108,51 +134,66 @@ export default function PrintBoletinsTurma() {
   // Cada aluno ocupa uma página separada (page-break)
   // -------------------------------------------------------------------------
   return (
-  <div id="boletins-pronto" style={{ background: "#fff", margin: 0, padding: 0 }}>
-    {carregado && alunos.length === 0 ? (
-      <div
-        style={{
-          color: "#b91c1c",
-          fontSize: 22,
-          textAlign: "center",
-          margin: 40,
-        }}
-      >
-        Nenhum aluno encontrado para essa turma.
-      </div>
-    ) : (
-      <div ref={printRef}>
-        {alunos.map((aluno, idx) =>
-          aluno && aluno.codigo ? (
-            <div
-              className="boletim-print-page"
-              key={aluno.id || idx}
-              style={{
-                /* page-break-after faz a quebra APÓS o boletim, antes do próximo */
-                pageBreakAfter: idx < alunos.length - 1 ? "always" : "avoid",
-                breakAfter:     idx < alunos.length - 1 ? "always" : "avoid",
-                /* page-break-inside:avoid impede que um único boletim quebre no meio */
-                pageBreakInside: "avoid",
-                breakInside: "avoid",
-                background: "#fff",
-                overflow: "hidden",   /* garante que conteúdo não vaze além do bloco */
-              }}
-            >
-              <BoletimAnual
-                codigo={aluno.codigo}
-                alunoPreCarregado={aluno}
-                notasPreCarregadas={aluno.notas}
-                exibirBotaoImprimir={false}
-                anoLetivo={anoParam ? Number(anoParam) : undefined}
-              />
-            </div>
-          ) : null
-        )}
-      </div>
-    )}
+    <div id="boletins-pronto" style={{ background: "#fff", margin: 0, padding: 0 }}>
+      {carregado && alunos.length === 0 ? (
+        <div
+          style={{
+            color: "#b91c1c",
+            fontSize: 22,
+            textAlign: "center",
+            margin: 40,
+          }}
+        >
+          Nenhum aluno encontrado para essa turma.
+        </div>
+      ) : (
+        <div ref={printRef}>
+          {alunos.map((aluno, idx) => {
+            if (!aluno || !aluno.codigo) return null;
+            const cfgEfetiva = aluno.boletim_config || boletimConfig || null;
+            const exibirAnoAnterior = String(cfgEfetiva?.["boletim.exibir_ano_anterior"]) === "1";
 
-    {/* 🔑 Sinalizador SEMPRE presente, mesmo sem alunos */}
-    <div id="render-completo" style={{ display: "none" }} />
-  </div>
-);
+            return (
+              <div
+                className="boletim-print-page"
+                key={aluno.id || idx}
+                style={{
+                  /* page-break-after faz a quebra APÓS o boletim, antes do próximo */
+                  pageBreakAfter: idx < alunos.length - 1 ? "always" : "avoid",
+                  breakAfter:     idx < alunos.length - 1 ? "always" : "avoid",
+                  /* page-break-inside:avoid impede que um único boletim quebre no meio */
+                  pageBreakInside: "avoid",
+                  breakInside: "avoid",
+                  background: "#fff",
+                  overflow: "hidden",   /* garante que conteúdo não vaze além do bloco */
+                }}
+              >
+                {exibirAnoAnterior ? (
+                  <BoletimPrint
+                    codigo={aluno.codigo}
+                    alunoPreCarregado={aluno}
+                    notasPreCarregadas={aluno.notas}
+                    boletimConfig={cfgEfetiva}
+                    exibirBotaoImprimir={false}
+                  />
+                ) : (
+                  <BoletimAnual
+                    codigo={aluno.codigo}
+                    alunoPreCarregado={aluno}
+                    notasPreCarregadas={aluno.notas}
+                    boletimConfig={cfgEfetiva}
+                    exibirBotaoImprimir={false}
+                    anoLetivo={anoParam ? Number(anoParam) : undefined}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* 🔑 Sinalizador SEMPRE presente, mesmo sem alunos */}
+      <div id="render-completo" style={{ display: "none" }} />
+    </div>
+  );
 }

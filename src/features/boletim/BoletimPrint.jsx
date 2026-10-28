@@ -93,6 +93,7 @@ export default function BoletimPrint({
   onLoaded,
   notasPreCarregadas = null, // fluxo em lote
   alunoPreCarregado = null,   // dados do aluno vindos do backend (podem trazer ranking)
+  boletimConfig: boletimConfigProp = null, // config de governança pré-carregada
 }) {
   const { logoEsquerda, logoDireita } = useEscolaLogos();
   const [aluno, setAluno] = useState(null);
@@ -101,6 +102,13 @@ export default function BoletimPrint({
   const [erro, setErro] = useState("");
   const [showSemNotas, setShowSemNotas] = useState(true);
   const [disciplinasList, setDisciplinasList] = useState([]);
+
+  const initGov = boletimConfigProp || alunoPreCarregado?.boletim_config || null;
+  const [govConfig, setGovConfig] = useState({
+    exibirFaltas: initGov ? initGov["boletim.exibir_faltas"] !== "0" : true,
+    exibirRanking: initGov ? initGov["boletim.exibir_ranking"] !== "0" : true,
+    exibirMediaRodape: initGov ? initGov["boletim.exibir_media_rodape"] !== "0" : true,
+  });
 
   // -------------------------------------------------------------------------
   // Efeito: carrega dados (individual ou em lote)
@@ -113,10 +121,45 @@ export default function BoletimPrint({
       let currentEtapa = null;
       let currentTurno = null;
 
+      const aplicarGovConfig = (cfgData) => {
+        const cfg = cfgData || {};
+        const resolved = {
+          exibirFaltas: cfg["boletim.exibir_faltas"] !== "0",
+          exibirRanking: cfg["boletim.exibir_ranking"] !== "0",
+          exibirMediaRodape: cfg["boletim.exibir_media_rodape"] !== "0",
+        };
+        if (!cancelado) {
+          setGovConfig(resolved);
+        }
+        return resolved;
+      };
+
+      const fetchGovConfigByEscola = async (escolaIdRef) => {
+        const cfgPrevia = boletimConfigProp || alunoPreCarregado?.boletim_config;
+        if (cfgPrevia) {
+          return aplicarGovConfig(cfgPrevia);
+        }
+        const eid = escolaIdRef || localStorage.getItem("escola_id");
+        try {
+          const resCfg = await api.get("/api/governanca/boletim-config", {
+            params: eid ? { escola_id: eid } : {},
+          });
+          return aplicarGovConfig(resCfg.data);
+        } catch {
+          return { exibirFaltas: true, exibirRanking: true, exibirMediaRodape: true };
+        }
+      };
+
       // ---------------------------------------------------------------
       // Fluxo 2 → Impressão em lote (dados já pré-carregados)
       // ---------------------------------------------------------------
       if (notasPreCarregadas) {
+        currentEscolaId = alunoPreCarregado?.escola_id;
+        currentEtapa = alunoPreCarregado?.etapa;
+        currentTurno = alunoPreCarregado?.turno;
+
+        const govResolved = await fetchGovConfigByEscola(currentEscolaId);
+
         if (!cancelado) {
           setAluno({
             codigo,
@@ -129,11 +172,8 @@ export default function BoletimPrint({
           });
           setNotas(notasPreCarregadas);
 
-          // Ranking já vem pronto no fluxo de impressão em lote
-          setRanking(alunoPreCarregado?.ranking || null);
-          currentEscolaId = alunoPreCarregado?.escola_id;
-          currentEtapa = alunoPreCarregado?.etapa;
-          currentTurno = alunoPreCarregado?.turno;
+          // Ranking já vem pronto no fluxo de impressão em lote (somente se governança permitir)
+          setRanking(govResolved.exibirRanking ? (alunoPreCarregado?.ranking || null) : null);
         }
       } else {
         // ---------------------------------------------------------------
@@ -150,6 +190,9 @@ export default function BoletimPrint({
           currentEscolaId = resAluno.data.escola_id;
           currentEtapa = resAluno.data.etapa;
           currentTurno = resAluno.data.turno;
+
+          const govResolved = await fetchGovConfigByEscola(currentEscolaId);
+          if (cancelado) return;
 
           // 2) Buscar notas (detalhadas → fallback para básicas)
           const alunoId = resAluno.data.id;
@@ -178,36 +221,40 @@ export default function BoletimPrint({
           }));
           setNotas(norm);
 
-          // 3) Buscar RANKING (Escola + Turma) com fallback
-          try {
-            // Endpoint novo: escola + turma (formato igual ao PDF/Impressão)
-            const rk = await api.get(
-              `/api/notas/alunos/${alunoId}/ranking-completo?ts=${Date.now()}`
-            );
-            if (!cancelado) setRanking(rk.data);
-          } catch {
-            // Fallback: endpoint antigo (apenas escola)
+          // 3) Buscar RANKING (Escola + Turma) com fallback (somente se governança permitir)
+          if (govResolved.exibirRanking) {
             try {
-              const rkOld = await api.get(
-                `/api/notas/alunos/${alunoId}/ranking?ts=${Date.now()}`
+              // Endpoint novo: escola + turma (formato igual ao PDF/Impressão)
+              const rk = await api.get(
+                `/api/notas/alunos/${alunoId}/ranking-completo?ts=${Date.now()}`
               );
-              if (!cancelado) {
-                const r = rkOld.data || {};
-                setRanking({
-                  escola:
-                    r.ranking != null
-                      ? {
-                          ranking: r.ranking,
-                          total_alunos: r.total_alunos,
-                          semNotas: false,
-                        }
-                      : null,
-                  turma: null, // endpoint antigo não retorna ranking por turma
-                });
-              }
+              if (!cancelado) setRanking(rk.data);
             } catch {
-              if (!cancelado) setRanking(null);
+              // Fallback: endpoint antigo (apenas escola)
+              try {
+                const rkOld = await api.get(
+                  `/api/notas/alunos/${alunoId}/ranking?ts=${Date.now()}`
+                );
+                if (!cancelado) {
+                  const r = rkOld.data || {};
+                  setRanking({
+                    escola:
+                      r.ranking != null
+                        ? {
+                            ranking: r.ranking,
+                            total_alunos: r.total_alunos,
+                            semNotas: false,
+                          }
+                        : null,
+                    turma: null, // endpoint antigo não retorna ranking por turma
+                  });
+                }
+              } catch {
+                if (!cancelado) setRanking(null);
+              }
             }
+          } else {
+            if (!cancelado) setRanking(null);
           }
         } catch (e) {
           if (!cancelado) {
@@ -246,7 +293,7 @@ export default function BoletimPrint({
     return () => {
       cancelado = true;
     };
-  }, [codigo, onLoaded, notasPreCarregadas, alunoPreCarregado]);
+  }, [codigo, onLoaded, notasPreCarregadas, alunoPreCarregado, boletimConfigProp]);
 
   // -------------------------------------------------------------------------
   // Estados de erro e loading
@@ -466,18 +513,18 @@ export default function BoletimPrint({
               <th rowSpan={3} className={styles.cabDisc}>
                 Componentes<br />Curriculares
               </th>
-              <th colSpan={9} className={styles.ano2024}>{anoA}</th>
-              <th colSpan={9} className={styles.ano2025}>{anoB}</th>
-              <th rowSpan={2} colSpan={2} className={styles.final}>Resultado Final</th>
+              <th colSpan={govConfig.exibirFaltas ? 9 : 5} className={styles.ano2024}>{anoA}</th>
+              <th colSpan={govConfig.exibirFaltas ? 9 : 5} className={styles.ano2025}>{anoB}</th>
+              <th rowSpan={2} colSpan={govConfig.exibirFaltas ? 2 : 1} className={styles.final}>Resultado Final</th>
               <th rowSpan={3} className={styles.situacao}>Situação Final</th>
             </tr>
             <tr>
               {[1, 2, 3, 4].map((i) => (
-                <th key={`24b${i}`} colSpan={2}>{`${i}º BIM.`}</th>
+                <th key={`24b${i}`} colSpan={govConfig.exibirFaltas ? 2 : 1}>{`${i}º BIM.`}</th>
               ))}
               <th rowSpan={2} className={styles.rotated}>Média</th>
               {[1, 2, 3, 4].map((i) => (
-                <th key={`25b${i}`} colSpan={2}>{`${i}º BIM.`}</th>
+                <th key={`25b${i}`} colSpan={govConfig.exibirFaltas ? 2 : 1}>{`${i}º BIM.`}</th>
               ))}
               <th rowSpan={2} className={styles.rotated}>Média</th>
             </tr>
@@ -485,11 +532,11 @@ export default function BoletimPrint({
               {[...Array(8)].map((_, idx) => (
                 <React.Fragment key={idx}>
                   <th className={styles.rotated}>Notas</th>
-                  <th className={styles.rotated}>Faltas</th>
+                  {govConfig.exibirFaltas && <th className={styles.rotated}>Faltas</th>}
                 </React.Fragment>
               ))}
               <th className={styles.rotated}>Notas</th>
-              <th className={styles.rotated}>Faltas</th>
+              {govConfig.exibirFaltas && <th className={styles.rotated}>Faltas</th>}
             </tr>
           </thead>
           <tbody>
@@ -510,7 +557,7 @@ export default function BoletimPrint({
                   {bA.map((x, i) => (
                     <React.Fragment key={`A-${i}`}>
                       <td>{x.nota != null ? Number(x.nota).toFixed(2).replace(".", ",") : ""}</td>
-                      <td>{x.faltas != null ? x.faltas : ""}</td>
+                      {govConfig.exibirFaltas && <td>{x.faltas != null ? x.faltas : ""}</td>}
                     </React.Fragment>
                   ))}
                   <td>{mA.replace(".", ",")}</td>
@@ -518,13 +565,13 @@ export default function BoletimPrint({
                   {bB.map((x, i) => (
                     <React.Fragment key={`B-${i}`}>
                       <td>{x.nota != null ? Number(x.nota).toFixed(2).replace(".", ",") : ""}</td>
-                      <td>{x.faltas != null ? x.faltas : ""}</td>
+                      {govConfig.exibirFaltas && <td>{x.faltas != null ? x.faltas : ""}</td>}
                     </React.Fragment>
                   ))}
                   <td>{mB.replace(".", ",")}</td>
 
                   <td className={styles.finalCell}>{mediaFin.replace(".", ",")}</td>
-                  <td className={styles.faltasCell}>{faltasFin || ""}</td>
+                  {govConfig.exibirFaltas && <td className={styles.faltasCell}>{faltasFin || ""}</td>}
                   <td className={styles.situacaoCell}>{getSituacaoFinal(bA, bB)}</td>
                 </tr>
               );
@@ -540,33 +587,37 @@ export default function BoletimPrint({
             <strong>Soma das notas:</strong> {somaNotas.replace(".", ",")}
           </div>
 
-          {/* Ranking Escola */}
-          <div>
-            <strong>Ranking Escola:</strong>{" "}
-            {ranking?.escola ? (
-              ranking.escola.semNotas ? (
-                "Estudante não tem nota para entrar no ranking"
-              ) : (
-                `${ranking.escola.ranking}/${ranking.escola.total_alunos}`
-              )
-            ) : (
-              "Calculando..."
-            )}
-          </div>
+          {govConfig.exibirRanking && (
+            <>
+              {/* Ranking Escola */}
+              <div>
+                <strong>Ranking Escola:</strong>{" "}
+                {ranking?.escola ? (
+                  ranking.escola.semNotas ? (
+                    "Estudante não tem nota para entrar no ranking"
+                  ) : (
+                    `${ranking.escola.ranking}/${ranking.escola.total_alunos}`
+                  )
+                ) : (
+                  "Calculando..."
+                )}
+              </div>
 
-          {/* Ranking Turma */}
-          <div>
-            <strong>Ranking Turma:</strong>{" "}
-            {ranking?.turma ? (
-              ranking.turma.semNotas ? (
-                "Estudante não tem nota para entrar no ranking"
-              ) : (
-                `${ranking.turma.ranking}/${ranking.turma.total_alunos}`
-              )
-            ) : (
-              "Calculando..."
-            )}
-          </div>
+              {/* Ranking Turma */}
+              <div>
+                <strong>Ranking Turma:</strong>{" "}
+                {ranking?.turma ? (
+                  ranking.turma.semNotas ? (
+                    "Estudante não tem nota para entrar no ranking"
+                  ) : (
+                    `${ranking.turma.ranking}/${ranking.turma.total_alunos}`
+                  )
+                ) : (
+                  "Calculando..."
+                )}
+              </div>
+            </>
+          )}
 
           <div>
             <strong>Observações:</strong> Atenção!! Procure sempre melhorar suas médias e notas!!

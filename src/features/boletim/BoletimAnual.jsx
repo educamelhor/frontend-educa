@@ -110,17 +110,33 @@ export default function BoletimAnual({
   const [disciplinasSem2, setDisciplinasSem2] = useState([]);
 
   // Governança: config flags do boletim
-  const [govConfig, setGovConfig] = useState({
-    exibirFaltas: true,
-    exibirRanking: true,
-    exibirMediaRodape: true,
+  const parseGovConfig = (cfg) => ({
+    exibirAnoAnterior: cfg ? String(cfg["boletim.exibir_ano_anterior"]) === "1" : false,
+    exibirFaltas: cfg ? String(cfg["boletim.exibir_faltas"]) !== "0" : true,
+    exibirRanking: cfg ? String(cfg["boletim.exibir_ranking"]) !== "0" : true,
+    exibirMediaRodape: cfg ? String(cfg["boletim.exibir_media_rodape"]) !== "0" : true,
   });
+
+  const initialRawCfg = boletimConfigProp || alunoPreCarregado?.boletim_config || null;
+  const [govConfig, setGovConfig] = useState(() => parseGovConfig(initialRawCfg));
 
   // ───────────────────────────────────────────────────────────────
   // Fetch de dados
   // ───────────────────────────────────────────────────────────────
   useEffect(() => {
     let cancelado = false;
+
+    async function fetchConfigForEscola(escId) {
+      if (!escId) return null;
+      try {
+        const cfgRes = await api.get("/api/governanca/boletim-config", {
+          params: { escola_id: escId },
+        });
+        return cfgRes.data?.config || null;
+      } catch {
+        return null;
+      }
+    }
 
     async function fetchData() {
       let currentEscolaId = null;
@@ -129,48 +145,42 @@ export default function BoletimAnual({
       let currentRegime = null;
       let currentTurmaId = null;
 
-      // Buscar configs de governança (só se não veio como prop)
-      const configPromise = boletimConfigProp
-        ? Promise.resolve(boletimConfigProp)
-        : (async () => {
-            try {
-              const escolaId = localStorage.getItem("escola_id");
-              if (!escolaId) return null;
-              const cfgRes = await api.get("/api/governanca/boletim-config", {
-                params: { escola_id: escolaId },
-              });
-              return cfgRes.data?.config || null;
-            } catch {
-              return null;
-            }
-          })();
+      // Buscar configs de governança (só se não veio como prop nem no alunoPreCarregado)
+      const configPredefinida = boletimConfigProp || alunoPreCarregado?.boletim_config || null;
+      const configPromise = configPredefinida
+        ? Promise.resolve(configPredefinida)
+        : fetchConfigForEscola(alunoPreCarregado?.escola_id || localStorage.getItem("escola_id"));
 
-      // Fluxo pre-carregado (impressão em lote)
+      // Fluxo pre-carregado (impressão em lote / geração de PDF)
       if (notasPreCarregadas) {
+        const studentObj = {
+          codigo,
+          estudante: alunoPreCarregado?.nome || alunoPreCarregado?.estudante || "",
+          turma: alunoPreCarregado?.turma || "",
+          turno: alunoPreCarregado?.turno || "",
+          serie: alunoPreCarregado?.serie || "",
+          id: alunoPreCarregado?.id || null,
+          escola_id: alunoPreCarregado?.escola_id || null,
+          etapa: alunoPreCarregado?.etapa || null,
+          regime: alunoPreCarregado?.regime || null,
+          turma_id: alunoPreCarregado?.turma_id || null,
+        };
+        currentEscolaId = studentObj.escola_id;
+        currentEtapa = studentObj.etapa;
+        currentTurno = studentObj.turno;
+        currentRegime = studentObj.regime;
+        currentTurmaId = studentObj.turma_id;
+
+        const resolvedConfig = await configPromise;
         if (!cancelado) {
-          const studentObj = {
-            codigo,
-            estudante: alunoPreCarregado?.nome || alunoPreCarregado?.estudante || "",
-            turma: alunoPreCarregado?.turma || "",
-            turno: alunoPreCarregado?.turno || "",
-            serie: alunoPreCarregado?.serie || "",
-            id: alunoPreCarregado?.id || null,
-            escola_id: alunoPreCarregado?.escola_id || null,
-            etapa: alunoPreCarregado?.etapa || null,
-            regime: alunoPreCarregado?.regime || null,
-            turma_id: alunoPreCarregado?.turma_id || null,
-          };
+          const parsedCfg = parseGovConfig(resolvedConfig);
+          setGovConfig(parsedCfg);
           setAluno(studentObj);
           setNotas(notasPreCarregadas);
-          setRanking(alunoPreCarregado?.ranking || null);
+          setRanking(parsedCfg.exibirRanking ? (alunoPreCarregado?.ranking || null) : null);
           if (alunoPreCarregado?.disciplinas && Array.isArray(alunoPreCarregado.disciplinas) && alunoPreCarregado.disciplinas.length > 0) {
             setDisciplinasList(alunoPreCarregado.disciplinas);
           }
-          currentEscolaId = studentObj.escola_id;
-          currentEtapa = studentObj.etapa;
-          currentTurno = studentObj.turno;
-          currentRegime = studentObj.regime;
-          currentTurmaId = studentObj.turma_id;
         }
 
       } else {
@@ -180,7 +190,7 @@ export default function BoletimAnual({
           setShowSemNotas(true);
 
           // 1) Buscar aluno + config em PARALELO
-          const [resAluno, resolvedConfig] = await Promise.all([
+          let [resAluno, resolvedConfig] = await Promise.all([
             api.get(`/api/alunos/${codigo}`),
             configPromise,
           ]);
@@ -192,13 +202,16 @@ export default function BoletimAnual({
           currentRegime = resAluno.data.regime;
           currentTurmaId = resAluno.data.turma_id;
 
+          // Se localStorage não tinha escola_id (ou era diferente), busca a config pela escola do aluno
+          if (!resolvedConfig && currentEscolaId) {
+            resolvedConfig = await fetchConfigForEscola(currentEscolaId);
+            if (cancelado) return;
+          }
+
           // Aplicar config de governança
-          if (resolvedConfig && !cancelado) {
-            setGovConfig({
-              exibirFaltas: resolvedConfig["boletim.exibir_faltas"] !== "0",
-              exibirRanking: resolvedConfig["boletim.exibir_ranking"] !== "0",
-              exibirMediaRodape: resolvedConfig["boletim.exibir_media_rodape"] !== "0",
-            });
+          const parsedCfg = parseGovConfig(resolvedConfig);
+          if (!cancelado) {
+            setGovConfig(parsedCfg);
           }
 
           const alunoId = resAluno.data.id;
@@ -216,22 +229,26 @@ export default function BoletimAnual({
           const notasAno = norm.filter((n) => Number(n.ano) === ANO_CORRENTE);
           setNotas(notasAno);
 
-          // 3) Buscar ranking expandido (4 dimensões)
-          try {
-            const rk = await api.get(
-              `/api/notas/alunos/${alunoId}/ranking-anual?ano=${ANO_CORRENTE}&ts=${Date.now()}`
-            );
-            if (!cancelado) setRanking(rk.data);
-          } catch {
-            // Fallback para ranking-completo (2 dimensões)
+          // 3) Buscar ranking expandido (4 dimensões) SOMENTE se exibirRanking estiver habilitado na governança
+          if (parsedCfg.exibirRanking) {
             try {
-              const rkFb = await api.get(
-                `/api/notas/alunos/${alunoId}/ranking-completo?ts=${Date.now()}`
+              const rk = await api.get(
+                `/api/notas/alunos/${alunoId}/ranking-anual?ano=${ANO_CORRENTE}&ts=${Date.now()}`
               );
-              if (!cancelado) setRanking(rkFb.data);
+              if (!cancelado) setRanking(rk.data);
             } catch {
-              if (!cancelado) setRanking(null);
+              // Fallback para ranking-completo (2 dimensões)
+              try {
+                const rkFb = await api.get(
+                  `/api/notas/alunos/${alunoId}/ranking-completo?ts=${Date.now()}`
+                );
+                if (!cancelado) setRanking(rkFb.data);
+              } catch {
+                if (!cancelado) setRanking(null);
+              }
             }
+          } else if (!cancelado) {
+            setRanking(null);
           }
         } catch {
           if (!cancelado) {

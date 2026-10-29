@@ -545,8 +545,17 @@ export default function FolhaPontoOficialSEEDF({
   // Determina os rótulos de Turno Esquerdo e Turno Direito (sempre Matutino -> Vespertino -> Noturno)
   const turnosCabecalho = useMemo(() => {
     const tNorm = normalizarTurno(servidor.turno);
-    if (isJornadaDupla || tNorm === "Integral") {
-      if (tNorm === "Noturno") {
+    const temCpip =
+      Array.isArray(servidor.cpip_dias) && servidor.cpip_dias.length > 0;
+    const cpipNoturno =
+      temCpip &&
+      (String(servidor.cpip_turno || "").toLowerCase() === "noturno" ||
+        Object.values(servidor.cpip_turnos_por_dia || {}).some(
+          (v) => String(v || "").toLowerCase() === "noturno"
+        ));
+
+    if (isJornadaDupla || tNorm === "Integral" || temCpip) {
+      if (tNorm === "Noturno" || cpipNoturno) {
         return { esq: "Vespertino", dir: "Noturno" };
       }
       return { esq: "Matutino", dir: "Vespertino" };
@@ -558,7 +567,13 @@ export default function FolhaPontoOficialSEEDF({
       return { esq: "Matutino", dir: "Noturno", ativoApenas: "dir" };
     }
     return { esq: "Matutino", dir: "Vespertino", ativoApenas: "esq" };
-  }, [servidor.turno, isJornadaDupla]);
+  }, [
+    servidor.turno,
+    servidor.cpip_dias,
+    servidor.cpip_turno,
+    servidor.cpip_turnos_por_dia,
+    isJornadaDupla,
+  ]);
 
   // Filtra ocorrências do servidor que intersectam o mês de referência
   const inicioMesISO = `${anoStr}-${String(mesNum).padStart(2, "0")}-01`;
@@ -580,8 +595,20 @@ export default function FolhaPontoOficialSEEDF({
       );
   }, [ocorrencias, servidor.id, inicioMesISO, fimMesISO]);
 
-  // Constrói o mapa dos 31 dias da tabela
+  // Constrói o mapa dos 31 dias da tabela (incluindo CPIP por dia da semana e turno)
   const linhasDias = useMemo(() => {
+    const diasCpipSet = new Set(
+      Array.isArray(servidor.cpip_dias)
+        ? servidor.cpip_dias.map(Number).filter((n) => n >= 1 && n <= 5)
+        : []
+    );
+    const turnosCpipPorDia =
+      servidor.cpip_turnos_por_dia &&
+      typeof servidor.cpip_turnos_por_dia === "object"
+        ? servidor.cpip_turnos_por_dia
+        : {};
+    const turnoCpipPadrao = servidor.cpip_turno || "Vespertino";
+
     const lista = [];
     for (let d = 1; d <= 31; d++) {
       const diaStr = String(d).padStart(2, "0");
@@ -589,9 +616,10 @@ export default function FolhaPontoOficialSEEDF({
       const diaExisteNoMes = d <= ultimoDiaMes;
 
       let isFimDeSemana = false;
+      let dow = -1;
       if (diaExisteNoMes) {
         const dtObj = new Date(anoNum, mesNum - 1, d, 12, 0, 0);
-        const dow = dtObj.getDay();
+        dow = dtObj.getDay();
         isFimDeSemana = dow === 0 || dow === 6;
       }
 
@@ -652,20 +680,44 @@ export default function FolhaPontoOficialSEEDF({
           entradaDir = "------------";
           saidaDir = "------------";
         }
-      } else if (!isFimDeSemana && preencherHorariosPonto && regPonto) {
-        if (turnosCabecalho.ativoApenas !== "dir") {
-          entradaEsq = regPonto.entrada || "";
-          saidaEsq = regPonto.saida || "";
+      } else if (!isFimDeSemana) {
+        if (preencherHorariosPonto && regPonto) {
+          if (turnosCabecalho.ativoApenas !== "dir") {
+            entradaEsq = regPonto.entrada || "";
+            saidaEsq = regPonto.saida || "";
+          }
+          if (turnosCabecalho.ativoApenas !== "esq") {
+            entradaDir =
+              regPonto.entrada_t2 ||
+              (turnosCabecalho.ativoApenas === "dir" ? regPonto.entrada : "") ||
+              "";
+            saidaDir =
+              regPonto.saida_t2 ||
+              (turnosCabecalho.ativoApenas === "dir" ? regPonto.saida : "") ||
+              "";
+          }
         }
-        if (turnosCabecalho.ativoApenas !== "esq") {
-          entradaDir =
-            regPonto.entrada_t2 ||
-            (turnosCabecalho.ativoApenas === "dir" ? regPonto.entrada : "") ||
-            "";
-          saidaDir =
-            regPonto.saida_t2 ||
-            (turnosCabecalho.ativoApenas === "dir" ? regPonto.saida : "") ||
-            "";
+
+        // PASSO 26 — Renderização automática de CPIP no turno de coordenação do professor
+        if (diasCpipSet.has(dow)) {
+          const turnoAlvo = String(
+            turnosCpipPorDia[dow] || turnoCpipPadrao || "Vespertino"
+          )
+            .trim()
+            .toLowerCase();
+          const esqNorm = String(turnosCabecalho.esq || "Matutino")
+            .trim()
+            .toLowerCase();
+
+          if (turnoAlvo === esqNorm) {
+            assinaturaEsq = "--- CPIP ---";
+            entradaEsq = "------------";
+            saidaEsq = "------------";
+          } else {
+            assinaturaDir = "--- CPIP ---";
+            entradaDir = "------------";
+            saidaDir = "------------";
+          }
         }
       }
 
@@ -693,6 +745,9 @@ export default function FolhaPontoOficialSEEDF({
     ocorrenciasDoMes,
     pontoDiario,
     servidor.id,
+    servidor.cpip_dias,
+    servidor.cpip_turno,
+    servidor.cpip_turnos_por_dia,
     turnosCabecalho,
     preencherHorariosPonto,
   ]);

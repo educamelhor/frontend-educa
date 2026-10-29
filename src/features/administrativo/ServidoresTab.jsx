@@ -42,6 +42,11 @@ import {
   FUNCOES_GRATIFICADAS_SEEDF,
   PADROES_CARREIRA_SEEDF,
   ETAPAS_TITULACAO_SEEDF,
+  TURNOS_CPIP_SEEDF,
+  DIAS_SEMANA_CPIP_SEEDF,
+  ATALHOS_CPIP_SEEDF,
+  isServidorElegivelCPIP,
+  formatarResumoCPIP,
   LIMITE_ABONOS_ANUAL,
   TIPOS_OCORRENCIA_ADMIN,
   formatarCPF,
@@ -213,7 +218,7 @@ export default function ServidoresTab({
   const [servidorEditando, setServidorEditando] = useState(null);
   const [salvandoForm, setSalvandoForm] = useState(false);
 
-  // Estado do formulário de Servidor (com suporte ao Catálogo Oficial SEEDF)
+  // Estado do formulário de Servidor (com suporte ao Catálogo Oficial SEEDF e CPIP)
   const [form, setForm] = useState({
     id: null,
     nome: "",
@@ -233,6 +238,9 @@ export default function ServidoresTab({
     setor: "",
     exibir_lotacao_folha: false,
     horario_trabalho: "07:30 às 17:30",
+    cpip_turno: "Vespertino",
+    cpip_dias: [],
+    cpip_turnos_por_dia: {},
     telefone: "",
     email: "",
     acesso_sistema: false,
@@ -436,6 +444,9 @@ export default function ServidoresTab({
       setor: "",
       exibir_lotacao_folha: false,
       horario_trabalho: "07:00 às 17:00",
+      cpip_turno: "Vespertino",
+      cpip_dias: [],
+      cpip_turnos_por_dia: {},
       telefone: "",
       email: "",
       acesso_sistema: false,
@@ -450,6 +461,11 @@ export default function ServidoresTab({
   const abrirEditarServidor = (srv) => {
     setServidorEditando(srv);
     const { cargo_catalogo_id, subcargo } = inferirDadosCatalogoServidor(srv);
+    const turnoSugeridoCpip =
+      srv.cpip_turno ||
+      (String(srv.turno || "").toLowerCase() === "vespertino"
+        ? "Matutino"
+        : "Vespertino");
     setForm({
       id: srv.id,
       nome: srv.nome || "",
@@ -469,6 +485,14 @@ export default function ServidoresTab({
       setor: srv.setor || "",
       exibir_lotacao_folha: Boolean(srv.exibir_lotacao_folha),
       horario_trabalho: srv.horario_trabalho || "07:30 às 17:30",
+      cpip_turno: turnoSugeridoCpip,
+      cpip_dias: Array.isArray(srv.cpip_dias)
+        ? srv.cpip_dias.map(Number).filter((d) => d >= 1 && d <= 5)
+        : [],
+      cpip_turnos_por_dia:
+        srv.cpip_turnos_por_dia && typeof srv.cpip_turnos_por_dia === "object"
+          ? { ...srv.cpip_turnos_por_dia }
+          : {},
       telefone: srv.telefone || "",
       email: srv.email || "",
       acesso_sistema: Boolean(srv.acesso_sistema),
@@ -956,6 +980,20 @@ export default function ServidoresTab({
                             🕒 {srv.horario_trabalho}
                           </div>
                         )}
+                        {(() => {
+                          const resumoCpip = formatarResumoCPIP(srv);
+                          if (!resumoCpip) return null;
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => abrirEditarServidor(srv)}
+                              title={`CPIP configurada na Folha de Ponto: ${resumoCpip.textoLongo}`}
+                              className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300 text-[10px] font-extrabold transition"
+                            >
+                              <span>CPIP: {resumoCpip.textoCurto}</span>
+                            </button>
+                          );
+                        })()}
                       </td>
 
                       {/* Abonos / Ocorrências no Ano */}
@@ -1599,6 +1637,218 @@ export default function ServidoresTab({
                   />
                 </div>
               </div>
+
+              {/* ── PASSO 26: CPIP — COORDENAÇÃO PEDAGÓGICA INDIVIDUAL (NÃO PRESENCIAL) NA FOLHA DE PONTO ── */}
+              {isServidorElegivelCPIP(form) && (() => {
+                const diasSelecionados = Array.isArray(form.cpip_dias)
+                  ? form.cpip_dias.map(Number).filter((d) => d >= 1 && d <= 5)
+                  : [];
+                const turnoAtivo = form.cpip_turno || "Vespertino";
+                const resumoCpipForm = formatarResumoCPIP(form);
+
+                const selecionarTurnoCpip = (novoTurno) => {
+                  const novoMapa = { ...(form.cpip_turnos_por_dia || {}) };
+                  diasSelecionados.forEach((d) => {
+                    novoMapa[d] = novoTurno;
+                  });
+                  setForm({
+                    ...form,
+                    cpip_turno: novoTurno,
+                    cpip_turnos_por_dia: novoMapa,
+                  });
+                };
+
+                const alternarDiaCpip = (dow) => {
+                  const jaMarcado = diasSelecionados.includes(dow);
+                  const turnoDoDia =
+                    form.cpip_turnos_por_dia?.[dow] || turnoAtivo;
+
+                  // Se já está marcado mas com outro turno diferente do badge de turno ativo, atualiza para o turno ativo
+                  if (jaMarcado && turnoDoDia !== turnoAtivo) {
+                    setForm({
+                      ...form,
+                      cpip_turnos_por_dia: {
+                        ...(form.cpip_turnos_por_dia || {}),
+                        [dow]: turnoAtivo,
+                      },
+                    });
+                    return;
+                  }
+
+                  const novosDias = jaMarcado
+                    ? diasSelecionados.filter((d) => d !== dow)
+                    : [...diasSelecionados, dow].sort((a, b) => a - b);
+
+                  const novoMapa = { ...(form.cpip_turnos_por_dia || {}) };
+                  if (jaMarcado) {
+                    delete novoMapa[dow];
+                  } else {
+                    novoMapa[dow] = turnoAtivo;
+                  }
+
+                  setForm({
+                    ...form,
+                    cpip_dias: novosDias,
+                    cpip_turnos_por_dia: novoMapa,
+                  });
+                };
+
+                const aplicarAtalhoCpip = (diasAtalho) => {
+                  const novoMapa = {};
+                  diasAtalho.forEach((d) => {
+                    novoMapa[d] = turnoAtivo;
+                  });
+                  setForm({
+                    ...form,
+                    cpip_dias: [...diasAtalho].sort((a, b) => a - b),
+                    cpip_turnos_por_dia: novoMapa,
+                  });
+                };
+
+                const limparCpip = () => {
+                  setForm({
+                    ...form,
+                    cpip_dias: [],
+                    cpip_turnos_por_dia: {},
+                  });
+                };
+
+                return (
+                  <div className="p-4 rounded-xl bg-emerald-50/85 border-2 border-emerald-300 space-y-3.5 shadow-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <div className="text-xs font-extrabold uppercase tracking-wider text-emerald-950">
+                          CPIP — Coordenação Pedagógica Individual (Não Presencial)
+                        </div>
+                        <p className="text-[11px] text-emerald-900/85 mt-0.5">
+                          Selecione o turno da coordenação e clique nos dias da semana em que a folha de ponto do professor deve imprimir automaticamente <strong>--- CPIP ---</strong>.
+                        </p>
+                      </div>
+
+                      {resumoCpipForm ? (
+                        <span className="px-2.5 py-1 rounded-lg bg-emerald-800 text-white text-[11px] font-extrabold shadow-sm">
+                          Na Folha: --- CPIP --- • {resumoCpipForm.textoCurto}
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-1 rounded-lg bg-white/80 text-emerald-900 border border-emerald-300 text-[11px] font-bold">
+                          Sem CPIP marcada
+                        </span>
+                      )}
+                    </div>
+
+                    {/* 1º Passo: Seleção do Turno da CPIP (Badges) */}
+                    <div className="space-y-1.5">
+                      <div className="text-[11px] font-bold uppercase text-emerald-950">
+                        1. Turno da Coordenação (Coluna onde sairá impresso CPIP na Folha):
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {TURNOS_CPIP_SEEDF.map((t) => {
+                          const selecionado = turnoAtivo === t.value;
+                          return (
+                            <button
+                              key={t.value}
+                              type="button"
+                              onClick={() => selecionarTurnoCpip(t.value)}
+                              className={`px-3.5 py-2 rounded-xl text-xs font-extrabold border transition flex items-center gap-1.5 ${
+                                selecionado
+                                  ? "bg-emerald-700 text-white border-emerald-800 shadow-sm ring-2 ring-emerald-400/60"
+                                  : "bg-white/90 text-emerald-950 border-emerald-300 hover:bg-emerald-100/70"
+                              }`}
+                            >
+                              <span>{t.icone}</span>
+                              <span>{t.label}</span>
+                              {selecionado && (
+                                <span className="ml-0.5 text-[10px] bg-white/20 px-1.5 py-0.5 rounded">
+                                  Ativo
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* 2º Passo: Seleção dos Dias da Semana (1 clique marca / 1 clique desmarca) */}
+                    <div className="space-y-2 pt-1 border-t border-emerald-300/70">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="text-[11px] font-bold uppercase text-emerald-950">
+                          2. Dias da Semana da CPIP (1 clique seleciona • 1 clique desmarca):
+                        </span>
+
+                        {/* Atalhos Rápidos SEEDF */}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {ATALHOS_CPIP_SEEDF.map((at) => {
+                            const ativoAtalho =
+                              diasSelecionados.length === at.dias.length &&
+                              at.dias.every((d) => diasSelecionados.includes(d));
+                            return (
+                              <button
+                                key={at.id}
+                                type="button"
+                                onClick={() => aplicarAtalhoCpip(at.dias)}
+                                className={`px-2 py-1 rounded-lg text-[10px] font-extrabold border transition ${
+                                  ativoAtalho
+                                    ? "bg-emerald-800 text-white border-emerald-900"
+                                    : "bg-white/80 text-emerald-900 border-emerald-300 hover:bg-emerald-100"
+                                }`}
+                              >
+                                {at.label}
+                              </button>
+                            );
+                          })}
+                          {diasSelecionados.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={limparCpip}
+                              className="px-2 py-1 rounded-lg text-[10px] font-extrabold bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition"
+                            >
+                              ✕ Limpar
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                        {DIAS_SEMANA_CPIP_SEEDF.map((dia) => {
+                          const marcado = diasSelecionados.includes(dia.dow);
+                          const turnoDia =
+                            form.cpip_turnos_por_dia?.[dia.dow] || turnoAtivo;
+                          const siglaTurnoDia =
+                            turnoDia === "Matutino"
+                              ? "Mat"
+                              : turnoDia === "Noturno"
+                              ? "Not"
+                              : "Vesp";
+                          return (
+                            <button
+                              key={dia.dow}
+                              type="button"
+                              onClick={() => alternarDiaCpip(dia.dow)}
+                              className={`px-3 py-2.5 rounded-xl text-xs font-extrabold border-2 transition flex flex-col items-center justify-center gap-0.5 select-none ${
+                                marcado
+                                  ? "bg-emerald-600 text-white border-emerald-800 shadow-sm"
+                                  : "bg-white/90 text-slate-700 border-emerald-300 hover:bg-emerald-100/60 hover:border-emerald-400"
+                              }`}
+                            >
+                              <div className="flex items-center gap-1">
+                                <span>{marcado ? "✓" : "○"}</span>
+                                <span>{dia.shortLabel}</span>
+                              </div>
+                              <span
+                                className={`text-[10px] font-bold ${
+                                  marcado ? "text-emerald-100" : "text-slate-400"
+                                }`}
+                              >
+                                {marcado ? `CPIP • ${siglaTurnoDia}` : "Presencial"}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Contato */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

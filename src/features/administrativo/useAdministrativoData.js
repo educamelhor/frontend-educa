@@ -376,6 +376,122 @@ export const ETAPAS_TITULACAO_SEEDF = [
   { value: "PQ6", label: "PQ6 — Doutorado (Stricto Sensu)" },
 ];
 
+// ============================================================================
+// CONFIGURAÇÃO DE CPIP — COORDENAÇÃO PEDAGÓGICA INDIVIDUAL (NÃO PRESENCIAL)
+// Aplicável aos Professores (Efetivos e Contrato Temporário) na Folha SEEDF
+// ============================================================================
+export const TURNOS_CPIP_SEEDF = [
+  {
+    value: "Matutino",
+    label: "Matutino (1º Turno)",
+    shortLabel: "Matutino",
+    sigla: "Mat",
+    icone: "☀️",
+  },
+  {
+    value: "Vespertino",
+    label: "Vespertino (2º Turno)",
+    shortLabel: "Vespertino",
+    sigla: "Vesp",
+    icone: "🌤️",
+  },
+  {
+    value: "Noturno",
+    label: "Noturno (3º Turno)",
+    shortLabel: "Noturno",
+    sigla: "Not",
+    icone: "🌙",
+  },
+];
+
+export const DIAS_SEMANA_CPIP_SEEDF = [
+  { dow: 1, label: "2ª Feira", shortLabel: "2ª Seg", sigla: "2ª" },
+  { dow: 2, label: "3ª Feira", shortLabel: "3ª Ter", sigla: "3ª" },
+  { dow: 3, label: "4ª Feira", shortLabel: "4ª Qua", sigla: "4ª" },
+  { dow: 4, label: "5ª Feira", shortLabel: "5ª Qui", sigla: "5ª" },
+  { dow: 5, label: "6ª Feira", shortLabel: "6ª Sex", sigla: "6ª" },
+];
+
+export const ATALHOS_CPIP_SEEDF = [
+  { id: "ter_qui", label: "⚡ 3ª e 5ª (Ter/Qui)", dias: [2, 4] },
+  { id: "seg_sex", label: "⚡ 2ª e 6ª (Seg/Sex)", dias: [1, 5] },
+  { id: "ter_qua_qui", label: "⚡ 3ª, 4ª e 5ª", dias: [2, 3, 4] },
+  { id: "qua", label: "⚡ Apenas 4ª (Qua)", dias: [3] },
+];
+
+export function isServidorElegivelCPIP(servidorOuForm) {
+  if (!servidorOuForm) return false;
+  const cat = String(servidorOuForm.categoria || "").toLowerCase();
+  const cargo = String(servidorOuForm.cargo || "").toUpperCase();
+  const catId = String(servidorOuForm.cargo_catalogo_id || "").toLowerCase();
+  return (
+    cat === "professor" ||
+    cat === "docente" ||
+    cat === "pedagogico" ||
+    catId.includes("peb") ||
+    catId.includes("pedagogo") ||
+    cargo.includes("PROFESSOR") ||
+    cargo.includes("PEDAGOGO") ||
+    cargo.includes("ORIENTADOR") ||
+    cargo.includes("COORDENADOR")
+  );
+}
+
+export function formatarResumoCPIP(servidorOuForm) {
+  if (!servidorOuForm) return null;
+  const diasRaw = Array.isArray(servidorOuForm.cpip_dias)
+    ? servidorOuForm.cpip_dias.map(Number).filter((d) => d >= 1 && d <= 5)
+    : [];
+  const diasOrdenados = Array.from(new Set(diasRaw)).sort((a, b) => a - b);
+  if (diasOrdenados.length === 0) return null;
+
+  const turnoPadrao = servidorOuForm.cpip_turno || "Vespertino";
+  const turnosPorDia =
+    servidorOuForm.cpip_turnos_por_dia &&
+    typeof servidorOuForm.cpip_turnos_por_dia === "object"
+      ? servidorOuForm.cpip_turnos_por_dia
+      : {};
+
+  const mapaSiglaTurno = {
+    Matutino: "Mat",
+    Vespertino: "Vesp",
+    Noturno: "Not",
+  };
+
+  const turnosUsados = new Set(
+    diasOrdenados.map((d) => turnosPorDia[d] || turnoPadrao)
+  );
+  const mesmoTurno = turnosUsados.size === 1;
+  const turnoUnico = Array.from(turnosUsados)[0] || turnoPadrao;
+
+  const siglasDias = diasOrdenados.map((d) => {
+    const metaDia = DIAS_SEMANA_CPIP_SEEDF.find((x) => x.dow === d);
+    const tDia = turnosPorDia[d] || turnoPadrao;
+    if (mesmoTurno) return metaDia ? metaDia.sigla : `${d}ª`;
+    return `${metaDia ? metaDia.sigla : `${d}ª`}(${mapaSiglaTurno[tDia] || tDia})`;
+  });
+
+  const nomesDias = diasOrdenados.map((d) => {
+    const metaDia = DIAS_SEMANA_CPIP_SEEDF.find((x) => x.dow === d);
+    const tDia = turnosPorDia[d] || turnoPadrao;
+    if (mesmoTurno) return metaDia ? metaDia.label : `${d}ª Feira`;
+    return `${metaDia ? metaDia.label : `${d}ª Feira`} (${tDia})`;
+  });
+
+  return {
+    diasOrdenados,
+    turnoPadrao: turnoUnico,
+    mesmoTurno,
+    textoCurto: mesmoTurno
+      ? `${siglasDias.join(", ")} (${mapaSiglaTurno[turnoUnico] || turnoUnico})`
+      : siglasDias.join(", "),
+    textoLongo: mesmoTurno
+      ? `${nomesDias.join(", ")} — Turno ${turnoUnico}`
+      : nomesDias.join(", "),
+  };
+}
+
+
 export const TIPOS_OCORRENCIA_ADMIN = [
   {
     value: "abono",

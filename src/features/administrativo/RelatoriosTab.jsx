@@ -33,6 +33,11 @@ import {
 import {
   LIMITE_ABONOS_ANUAL,
   CATEGORIAS_SERVIDOR,
+  TURNOS_CPIP_SEEDF,
+  DIAS_SEMANA_CPIP_SEEDF,
+  ATALHOS_CPIP_SEEDF,
+  isServidorElegivelCPIP,
+  formatarResumoCPIP,
   formatarCPF,
 } from "./useAdministrativoData";
 import FolhaPontoOficialSEEDF from "./FolhaPontoOficialSEEDF";
@@ -796,6 +801,194 @@ export default function RelatoriosTab({
                 </button>
               </div>
             </div>
+
+            {/* ── PASSO 26: BARRA RÁPIDA DE CPIP (COORDENAÇÃO PEDAGÓGICA INDIVIDUAL) PARA PROFESSORES ── */}
+            {isServidorElegivelCPIP(servidorEspelho) && (() => {
+              const diasSelecionados = Array.isArray(servidorEspelho.cpip_dias)
+                ? servidorEspelho.cpip_dias.map(Number).filter((d) => d >= 1 && d <= 5)
+                : [];
+              const turnoPadraoSugerido =
+                servidorEspelho.cpip_turno ||
+                (String(servidorEspelho.turno || "").toLowerCase() === "vespertino"
+                  ? "Matutino"
+                  : "Vespertino");
+              const resumoCpipAtual = formatarResumoCPIP(servidorEspelho);
+
+              const salvarCpipRapida = (novoTurno, novosDias, novoMapa) => {
+                if (!onSalvarServidor) return;
+                onSalvarServidor({
+                  ...servidorEspelho,
+                  cpip_turno: novoTurno,
+                  cpip_dias: novosDias,
+                  cpip_turnos_por_dia: novoMapa,
+                });
+              };
+
+              const handleSelecionarTurno = (novoTurno) => {
+                const novoMapa = { ...(servidorEspelho.cpip_turnos_por_dia || {}) };
+                diasSelecionados.forEach((d) => {
+                  novoMapa[d] = novoTurno;
+                });
+                salvarCpipRapida(novoTurno, diasSelecionados, novoMapa);
+              };
+
+              const handleAlternarDia = (dow) => {
+                const jaMarcado = diasSelecionados.includes(dow);
+                const turnoDoDia =
+                  servidorEspelho.cpip_turnos_por_dia?.[dow] || turnoPadraoSugerido;
+
+                if (jaMarcado && turnoDoDia !== turnoPadraoSugerido) {
+                  const novoMapa = {
+                    ...(servidorEspelho.cpip_turnos_por_dia || {}),
+                    [dow]: turnoPadraoSugerido,
+                  };
+                  salvarCpipRapida(turnoPadraoSugerido, diasSelecionados, novoMapa);
+                  return;
+                }
+
+                const novosDias = jaMarcado
+                  ? diasSelecionados.filter((d) => d !== dow)
+                  : [...diasSelecionados, dow].sort((a, b) => a - b);
+
+                const novoMapa = { ...(servidorEspelho.cpip_turnos_por_dia || {}) };
+                if (jaMarcado) {
+                  delete novoMapa[dow];
+                } else {
+                  novoMapa[dow] = turnoPadraoSugerido;
+                }
+                salvarCpipRapida(turnoPadraoSugerido, novosDias, novoMapa);
+              };
+
+              const handleAtalho = (diasAtalho) => {
+                const novoMapa = {};
+                diasAtalho.forEach((d) => {
+                  novoMapa[d] = turnoPadraoSugerido;
+                });
+                salvarCpipRapida(
+                  turnoPadraoSugerido,
+                  [...diasAtalho].sort((a, b) => a - b),
+                  novoMapa
+                );
+              };
+
+              return (
+                <div className="p-3.5 rounded-xl bg-emerald-50/85 border-2 border-emerald-300 space-y-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs font-extrabold uppercase tracking-wider text-emerald-950">
+                        🖨️ CPIP — Coordenação Pedagógica Individual (Não Presencial):
+                      </span>
+                      {resumoCpipAtual ? (
+                        <span className="px-2.5 py-0.5 rounded-lg bg-emerald-800 text-white text-[11px] font-extrabold">
+                          --- CPIP --- • {resumoCpipAtual.textoCurto}
+                        </span>
+                      ) : (
+                        <span className="text-[11px] font-semibold text-emerald-900/80">
+                          Clique no turno e nos dias da semana para imprimir --- CPIP --- na folha abaixo
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {ATALHOS_CPIP_SEEDF.map((at) => {
+                        const ativoAtalho =
+                          diasSelecionados.length === at.dias.length &&
+                          at.dias.every((d) => diasSelecionados.includes(d));
+                        return (
+                          <button
+                            key={at.id}
+                            type="button"
+                            onClick={() => handleAtalho(at.dias)}
+                            className={`px-2 py-1 rounded-lg text-[10px] font-extrabold border transition ${
+                              ativoAtalho
+                                ? "bg-emerald-800 text-white border-emerald-900"
+                                : "bg-white/90 text-emerald-900 border-emerald-300 hover:bg-emerald-100"
+                            }`}
+                          >
+                            {at.label}
+                          </button>
+                        );
+                      })}
+                      {diasSelecionados.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => salvarCpipRapida(turnoPadraoSugerido, [], {})}
+                          className="px-2 py-1 rounded-lg text-[10px] font-extrabold bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition"
+                        >
+                          ✕ Limpar CPIP
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-2.5 pt-1 border-t border-emerald-300/70">
+                    {/* Badges de Turno */}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[11px] font-extrabold uppercase text-emerald-950 mr-1">
+                        Turno:
+                      </span>
+                      {TURNOS_CPIP_SEEDF.map((t) => {
+                        const sel = turnoPadraoSugerido === t.value;
+                        return (
+                          <button
+                            key={t.value}
+                            type="button"
+                            onClick={() => handleSelecionarTurno(t.value)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-extrabold border transition flex items-center gap-1 ${
+                              sel
+                                ? "bg-emerald-700 text-white border-emerald-800 shadow-sm"
+                                : "bg-white/90 text-emerald-950 border-emerald-300 hover:bg-emerald-100"
+                            }`}
+                          >
+                            <span>{t.icone}</span>
+                            <span>{t.shortLabel}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Badges de Dias da Semana */}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[11px] font-extrabold uppercase text-emerald-950 mr-1">
+                        Dias da Semana:
+                      </span>
+                      {DIAS_SEMANA_CPIP_SEEDF.map((dia) => {
+                        const marcado = diasSelecionados.includes(dia.dow);
+                        const turnoDia =
+                          servidorEspelho.cpip_turnos_por_dia?.[dia.dow] ||
+                          turnoPadraoSugerido;
+                        const siglaTurno =
+                          turnoDia === "Matutino"
+                            ? "Mat"
+                            : turnoDia === "Noturno"
+                            ? "Not"
+                            : "Vesp";
+                        return (
+                          <button
+                            key={dia.dow}
+                            type="button"
+                            onClick={() => handleAlternarDia(dia.dow)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-extrabold border-2 transition flex items-center gap-1.5 select-none ${
+                              marcado
+                                ? "bg-emerald-600 text-white border-emerald-800 shadow-sm"
+                                : "bg-white/90 text-slate-700 border-emerald-300 hover:bg-emerald-100/70"
+                            }`}
+                          >
+                            <span>{marcado ? "✓" : "○"}</span>
+                            <span>{dia.shortLabel}</span>
+                            {marcado && (
+                              <span className="text-[10px] px-1 py-0.2 rounded bg-emerald-800/70 text-emerald-100">
+                                {siglaTurno}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Painel Retrátil de Ajuste Fino do Cabeçalho SEEDF e Dados Funcionais */}
             {mostrarConfigCabecalho && (

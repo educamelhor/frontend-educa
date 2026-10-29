@@ -226,7 +226,7 @@ export default function AdministrativoModule() {
         </div>
 
         {/* ── Navegação de Submódulos / Abas ── */}
-        <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 mt-6 pt-5 border-t border-white/15">
+        <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-6 pt-5 border-t border-white/15">
           {TABS_ADMIN.map((tab) => {
             const Icon = tab.icon;
             const isAtiva = activeTab === tab.id && !tab.emBreve;
@@ -235,39 +235,39 @@ export default function AdministrativoModule() {
                 key={tab.id}
                 type="button"
                 onClick={() => handleTrocarAba(tab)}
-                className={`p-3 rounded-2xl text-left transition-all flex items-center gap-3 border ${
+                className={`p-3.5 rounded-2xl text-left transition-all flex items-center gap-3.5 border ${
                   isAtiva
                     ? "bg-white text-slate-900 border-white shadow-lg scale-[1.01]"
                     : "bg-white/10 hover:bg-white/15 text-white border-white/15"
                 }`}
               >
                 <div
-                  className={`p-2.5 rounded-xl flex-shrink-0 ${
+                  className={`p-3 rounded-xl flex-shrink-0 ${
                     isAtiva
-                      ? "bg-blue-600 text-white"
+                      ? "bg-blue-600 text-white shadow-sm"
                       : "bg-white/10 text-cyan-200"
                   }`}
                 >
-                  <Icon className="h-5 w-5" />
+                  <Icon className="h-6 w-6 stroke-[2.2]" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-1.5">
                     <span
-                      className={`text-xs font-extrabold truncate ${
+                      className={`text-base sm:text-lg font-black tracking-wide truncate leading-tight ${
                         isAtiva ? "text-slate-900" : "text-white"
                       }`}
                     >
                       {tab.label}
                     </span>
                     {tab.emBreve && (
-                      <span className="px-1.5 py-0.5 rounded-md text-[9px] font-extrabold uppercase tracking-wider bg-amber-400/25 text-amber-200 border border-amber-300/40 flex-shrink-0">
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wider bg-amber-400/25 text-amber-200 border border-amber-300/40 flex-shrink-0">
                         EM BREVE
                       </span>
                     )}
                   </div>
                   <div
-                    className={`text-[11px] truncate ${
-                      isAtiva ? "text-slate-500" : "text-blue-200/80"
+                    className={`text-xs font-medium truncate mt-0.5 ${
+                      isAtiva ? "text-slate-500" : "text-blue-200/85"
                     }`}
                   >
                     {tab.sublabel}

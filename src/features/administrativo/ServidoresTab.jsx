@@ -1139,11 +1139,8 @@ export default function ServidoresTab({
               {/* Nome, CPF e Matrícula */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="sm:col-span-2 p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-300/90">
-                  <label className="flex items-center justify-between gap-2 text-xs font-bold uppercase text-emerald-950 mb-1">
-                    <span>Nome Completo *</span>
-                    <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
-                      🖨️ Na Folha de Ponto (Nome)
-                    </span>
+                  <label className="block text-xs font-bold uppercase text-emerald-950 mb-1">
+                    Nome Completo *
                   </label>
                   <input
                     type="text"
@@ -1171,11 +1168,8 @@ export default function ServidoresTab({
               {/* Seletor 1: Categoria no Quadro, Vínculo Funcional e Matrícula */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-300/90">
-                  <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase text-emerald-950 mb-1">
-                    <span>Categoria no Quadro *</span>
-                    <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
-                      🖨️ Na Folha
-                    </span>
+                  <label className="block text-xs font-bold uppercase text-emerald-950 mb-1">
+                    Categoria no Quadro *
                   </label>
                   <select
                     value={form.categoria}
@@ -1207,11 +1201,8 @@ export default function ServidoresTab({
                 </div>
 
                 <div className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-300/90">
-                  <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase text-emerald-950 mb-1">
-                    <span>Vínculo Funcional *</span>
-                    <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
-                      🖨️ Modelo Folha
-                    </span>
+                  <label className="block text-xs font-bold uppercase text-emerald-950 mb-1">
+                    Vínculo Funcional *
                   </label>
                   <select
                     value={form.vinculo === "readaptado" ? "efetivo" : form.vinculo}
@@ -1246,11 +1237,8 @@ export default function ServidoresTab({
                 </div>
 
                 <div className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-300/90">
-                  <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase text-emerald-950 mb-1">
-                    <span>Matrícula / Contrato SIGEP</span>
-                    <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
-                      🖨️ Na Folha
-                    </span>
+                  <label className="block text-xs font-bold uppercase text-emerald-950 mb-1">
+                    Matrícula / Contrato SIGEP
                   </label>
                   <input
                     type="text"
@@ -1283,11 +1271,8 @@ export default function ServidoresTab({
                 return (
                   <div className="bg-emerald-50/75 p-4 rounded-xl border-2 border-emerald-300 space-y-3.5 shadow-sm">
                     <div className="flex items-center justify-between flex-wrap gap-2">
-                      <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-950 flex items-center gap-1.5">
-                        <span>🏛️ Padronização Funcional SEEDF (Cargo, Especialidade, FGE & SIGEP)</span>
-                        <span className="px-2 py-0.5 rounded-full bg-emerald-200/90 text-emerald-950 border border-emerald-400 text-[10px] font-black">
-                          🖨️ Todos os campos deste bloco renderizam na Folha de Ponto
-                        </span>
+                      <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-950">
+                        🏛️ Padronização Funcional SEEDF (Cargo, Especialidade, FGE & SIGEP)
                       </span>
                       {itemCatalogoAtual?.cargoSigep && (
                         <span className="px-2 py-0.5 rounded-md bg-white border border-emerald-300 text-[10px] font-mono font-bold text-emerald-900">
@@ -1299,11 +1284,8 @@ export default function ServidoresTab({
                     {/* Seletor 2: Cargo Oficial SEEDF + Seletor 3: Sub-cargo / Especialidade */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                       <div>
-                        <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase text-emerald-950 mb-1">
-                          <span>Cargo Oficial SEEDF (Catálogo)</span>
-                          <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
-                            🖨️ Cargo SIGEP
-                          </span>
+                        <label className="block text-xs font-bold uppercase text-emerald-950 mb-1">
+                          Cargo Oficial SEEDF (Catálogo)
                         </label>
                         <select
                           value={form.cargo_catalogo_id || "custom"}
@@ -1356,11 +1338,8 @@ export default function ServidoresTab({
                       </div>
 
                       <div>
-                        <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase text-emerald-950 mb-1">
-                          <span>Sub-cargo / Especialidade / Disciplina</span>
-                          <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
-                            🖨️ Especialidade / Disciplina
-                          </span>
+                        <label className="block text-xs font-bold uppercase text-emerald-950 mb-1">
+                          Sub-cargo / Especialidade / Disciplina
                         </label>
                         {listaSubcargos.length > 0 && form.cargo_catalogo_id !== "custom" ? (
                           <select
@@ -1403,11 +1382,8 @@ export default function ServidoresTab({
                     {/* Campo Editável do Nome Final do Cargo + Seletor 4: Função Gratificada Escolar (FGE) */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                       <div>
-                        <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase text-emerald-950 mb-1">
-                          <span>Cargo / Função (Descrição Final Editável) *</span>
-                          <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
-                            🖨️ Na Folha
-                          </span>
+                        <label className="block text-xs font-bold uppercase text-emerald-950 mb-1">
+                          Cargo / Função (Descrição Final Editável) *
                         </label>
                         <input
                           type="text"
@@ -1422,11 +1398,8 @@ export default function ServidoresTab({
                       </div>
 
                       <div>
-                        <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase text-emerald-950 mb-1">
-                          <span>Função Gratificada Escolar (FGE — Lei 5.326/2014)</span>
-                          <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
-                            🖨️ Campo Função:
-                          </span>
+                        <label className="block text-xs font-bold uppercase text-emerald-950 mb-1">
+                          Função Gratificada Escolar (FGE — Lei 5.326/2014)
                         </label>
                         <select
                           value={form.funcao_gratificada}
@@ -1451,11 +1424,8 @@ export default function ServidoresTab({
                     {mostrarPadraoSigep && (
                       <div className="pt-2 border-t border-emerald-300/80 grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
                         <div>
-                          <label className="flex items-center justify-between gap-1 text-[11px] font-bold uppercase text-emerald-950 mb-1">
-                            <span>Padrão na Carreira (01 a 25)</span>
-                            <span className="px-1 py-0.2 rounded text-[9px] font-extrabold bg-emerald-200 text-emerald-900">
-                              🖨️ SIGEP
-                            </span>
+                          <label className="block text-[11px] font-bold uppercase text-emerald-950 mb-1">
+                            Padrão na Carreira (01 a 25)
                           </label>
                           <select
                             value={form.padrao_carreira || "25"}
@@ -1476,11 +1446,8 @@ export default function ServidoresTab({
                         </div>
 
                         <div>
-                          <label className="flex items-center justify-between gap-1 text-[11px] font-bold uppercase text-emerald-950 mb-1">
-                            <span>Etapa de Titulação (PQ1 a PQ6)</span>
-                            <span className="px-1 py-0.2 rounded text-[9px] font-extrabold bg-emerald-200 text-emerald-900">
-                              🖨️ SIGEP
-                            </span>
+                          <label className="block text-[11px] font-bold uppercase text-emerald-950 mb-1">
+                            Etapa de Titulação (PQ1 a PQ6)
                           </label>
                           <select
                             value={form.etapa_titulacao || "PQ5"}
@@ -1530,11 +1497,8 @@ export default function ServidoresTab({
                 </div>
 
                 <div className="p-2.5 rounded-xl bg-emerald-50/75 border border-emerald-300/90">
-                  <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase text-emerald-950 mb-1">
-                    <span>Setor / Lotação (Opcional)</span>
-                    <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
-                      🖨️ Linha Lotação: na Folha
-                    </span>
+                  <label className="block text-xs font-bold uppercase text-emerald-950 mb-1">
+                    Setor / Lotação (Opcional)
                   </label>
                   <input
                     type="text"
@@ -1562,11 +1526,8 @@ export default function ServidoresTab({
               {/* Carga Horária, Turno e Horário de Trabalho */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
                 <div className="p-2.5 rounded-xl bg-emerald-50/80 border border-emerald-300/90">
-                  <label className="flex items-center justify-between gap-1 text-xs font-bold text-emerald-950 mb-1">
-                    <span>Carga Horária</span>
-                    <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
-                      🖨️ C.H. na Folha
-                    </span>
+                  <label className="block text-xs font-bold text-emerald-950 mb-1">
+                    Carga Horária
                   </label>
                   <select
                     value={form.carga_horaria}
@@ -1582,11 +1543,8 @@ export default function ServidoresTab({
                 </div>
 
                 <div className="p-2.5 rounded-xl bg-emerald-50/80 border border-emerald-300/90">
-                  <label className="flex items-center justify-between gap-1 text-xs font-bold text-emerald-950 mb-1">
-                    <span>Turno</span>
-                    <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
-                      🖨️ Turno na Folha
-                    </span>
+                  <label className="block text-xs font-bold text-emerald-950 mb-1">
+                    Turno
                   </label>
                   <select
                     value={form.turno}
@@ -2476,14 +2434,9 @@ export default function ServidoresTab({
                 {/* PASSO 23 — ITEM 5: Logo / Brasão do Cabeçalho */}
                 <div className="p-3 rounded-xl bg-emerald-50/75 border border-emerald-300/90 space-y-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-extrabold uppercase text-emerald-950">
-                        Logo / Brasão do Cabeçalho da Folha de Ponto
-                      </span>
-                      <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
-                        🖨️ Brasão no Topo da Folha
-                      </span>
-                    </div>
+                    <span className="text-xs font-extrabold uppercase text-emerald-950">
+                      Logo / Brasão do Cabeçalho da Folha de Ponto
+                    </span>
 
                     <div className="inline-flex flex-wrap rounded-xl border border-emerald-400 bg-white p-1 gap-1 shadow-sm">
                       <button
@@ -2732,11 +2685,8 @@ export default function ServidoresTab({
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="sm:col-span-2 p-2.5 rounded-xl bg-emerald-50/75 border border-emerald-300/90">
-                    <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase text-emerald-950 mb-1">
-                      <span>Órgão / Secretaria / Mantenedora (Topo da Folha) *</span>
-                      <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
-                        🖨️ Topo da Folha
-                      </span>
+                    <label className="block text-xs font-bold uppercase text-emerald-950 mb-1">
+                      Órgão / Secretaria / Mantenedora (Topo da Folha) *
                     </label>
                     <input
                       type="text"
@@ -2754,11 +2704,8 @@ export default function ServidoresTab({
                   </div>
 
                   <div className="p-2.5 rounded-xl bg-emerald-50/75 border border-emerald-300/90">
-                    <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase text-emerald-950 mb-1">
-                      <span>CNPJ Institucional</span>
-                      <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
-                        🖨️ CNPJ na Folha
-                      </span>
+                    <label className="block text-xs font-bold uppercase text-emerald-950 mb-1">
+                      CNPJ Institucional
                     </label>
                     <input
                       type="text"
@@ -2777,11 +2724,8 @@ export default function ServidoresTab({
 
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                   <div className="p-2.5 rounded-xl bg-emerald-50/75 border border-emerald-300/90">
-                    <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase text-emerald-950 mb-1">
-                      <span>Código UA (Regional)</span>
-                      <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
-                        🖨️ UA
-                      </span>
+                    <label className="block text-xs font-bold uppercase text-emerald-950 mb-1">
+                      Código UA (Regional)
                     </label>
                     <input
                       type="text"
@@ -2798,11 +2742,8 @@ export default function ServidoresTab({
                   </div>
 
                   <div className="sm:col-span-3 p-2.5 rounded-xl bg-emerald-50/75 border border-emerald-300/90">
-                    <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase text-emerald-950 mb-1">
-                      <span>Coordenação Regional de Ensino (CRE) / Diretoria Regional</span>
-                      <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
-                        🖨️ Regional na Folha
-                      </span>
+                    <label className="block text-xs font-bold uppercase text-emerald-950 mb-1">
+                      Coordenação Regional de Ensino (CRE) / Diretoria Regional
                     </label>
                     <input
                       type="text"
@@ -2831,11 +2772,8 @@ export default function ServidoresTab({
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="p-2.5 rounded-xl bg-emerald-50/75 border border-emerald-300/90">
-                    <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase text-emerald-950 mb-1">
-                      <span>Código do Estabelecimento (Exercício)</span>
-                      <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
-                        🖨️ Exercício
-                      </span>
+                    <label className="block text-xs font-bold uppercase text-emerald-950 mb-1">
+                      Código do Estabelecimento (Exercício)
                     </label>
                     <input
                       type="text"
@@ -2852,11 +2790,8 @@ export default function ServidoresTab({
                   </div>
 
                   <div className="sm:col-span-2 p-2.5 rounded-xl bg-emerald-50/75 border border-emerald-300/90">
-                    <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase text-emerald-950 mb-1">
-                      <span>Nome Oficial da Unidade Escolar (Impresso na Folha) *</span>
-                      <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
-                        🖨️ Local de Exercício (Frente e Verso)
-                      </span>
+                    <label className="block text-xs font-bold uppercase text-emerald-950 mb-1">
+                      Nome Oficial da Unidade Escolar (Impresso na Folha) *
                     </label>
                     <input
                       type="text"
@@ -2877,11 +2812,8 @@ export default function ServidoresTab({
                 {/* Linha Lotação: (Opcional — caso divirja de Exercício na Unidade Escolar) */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="p-2.5 rounded-xl bg-emerald-50/75 border border-emerald-300/90">
-                    <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase text-emerald-950 mb-1">
-                      <span>Código da Lotação Padrão (Opcional)</span>
-                      <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
-                        🖨️ Linha Lotação:
-                      </span>
+                    <label className="block text-xs font-bold uppercase text-emerald-950 mb-1">
+                      Código da Lotação Padrão (Opcional)
                     </label>
                     <input
                       type="text"
@@ -2898,11 +2830,8 @@ export default function ServidoresTab({
                   </div>
 
                   <div className="sm:col-span-2 p-2.5 rounded-xl bg-emerald-50/75 border border-emerald-300/90">
-                    <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase text-emerald-950 mb-1">
-                      <span>Lotação Padrão na Folha (Opcional — só preencha se divergir de Exercício)</span>
-                      <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
-                        🖨️ Linha Lotação: (Frente)
-                      </span>
+                    <label className="block text-xs font-bold uppercase text-emerald-950 mb-1">
+                      Lotação Padrão na Folha (Opcional — só preencha se divergir de Exercício)
                     </label>
                     <input
                       type="text"
@@ -3140,15 +3069,10 @@ export default function ServidoresTab({
 
               {/* 4. QUADROS DE ASSINATURA (RESPONSÁVEL, CHEFIA IMEDIATA, SUPERIOR) E OBSERVAÇÃO PADRÃO DA FOLHA (PASSO 20) */}
               <div className="space-y-3">
-                <div className="flex items-center justify-between flex-wrap gap-2 border-b border-slate-200 pb-1.5">
-                  <div className="flex items-center gap-2">
-                    <DocumentTextIcon className="h-4 w-4 text-emerald-700" />
-                    <span className="text-xs font-extrabold uppercase tracking-wider text-slate-700">
-                      4. Quadros de Assinatura (Responsável, Chefia e Superior) & Observações da Folha
-                    </span>
-                  </div>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-emerald-100 text-emerald-900 border border-emerald-300">
-                    🖨️ Autonomia de Impressão ou Carimbo Manual
+                <div className="flex items-center gap-2 border-b border-slate-200 pb-1.5">
+                  <DocumentTextIcon className="h-4 w-4 text-emerald-700" />
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-slate-700">
+                    4. Quadros de Assinatura (Responsável, Chefia e Superior) & Observações da Folha
                   </span>
                 </div>
 
@@ -3157,9 +3081,6 @@ export default function ServidoresTab({
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <span className="text-xs font-extrabold uppercase tracking-wide text-emerald-950">
                       Modo de Preenchimento dos Quadros de Assinatura (Verso e Frente Contrato Temporário)
-                    </span>
-                    <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
-                      🖨️ Na Folha de Ponto
                     </span>
                   </div>
 
@@ -3252,12 +3173,9 @@ export default function ServidoresTab({
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5">
                   {/* Quadro 1: Responsável pelas informações (Secretaria) */}
                   <div className="p-3 rounded-xl bg-emerald-50/75 border border-emerald-300/90 space-y-2.5">
-                    <div className="flex items-center justify-between gap-1 border-b border-emerald-200 pb-1">
+                    <div className="border-b border-emerald-200 pb-1">
                       <span className="text-[11px] font-extrabold uppercase text-emerald-950">
                         1º Quadro: Responsável pelas Informações
-                      </span>
-                      <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
-                        🖨️ Secretaria
                       </span>
                     </div>
 
@@ -3300,12 +3218,9 @@ export default function ServidoresTab({
 
                   {/* Quadro 2: Assinatura da Chefia (Direção / Chefia Imediata) */}
                   <div className="p-3 rounded-xl bg-emerald-50/75 border border-emerald-300/90 space-y-2.5">
-                    <div className="flex items-center justify-between gap-1 border-b border-emerald-200 pb-1">
+                    <div className="border-b border-emerald-200 pb-1">
                       <span className="text-[11px] font-extrabold uppercase text-emerald-950">
                         2º Quadro: Assinatura da Chefia
-                      </span>
-                      <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
-                        🖨️ Chefia
                       </span>
                     </div>
 
@@ -3348,12 +3263,9 @@ export default function ServidoresTab({
 
                   {/* Quadro 3: Assinatura do Superior (Supervisor / Vice-Direção / Superior) */}
                   <div className="p-3 rounded-xl bg-emerald-50/75 border border-emerald-300/90 space-y-2.5">
-                    <div className="flex items-center justify-between gap-1 border-b border-emerald-200 pb-1">
+                    <div className="border-b border-emerald-200 pb-1">
                       <span className="text-[11px] font-extrabold uppercase text-emerald-950">
                         3º Quadro: Assinatura do Superior
-                      </span>
-                      <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
-                        🖨️ Superior
                       </span>
                     </div>
 
@@ -3396,11 +3308,8 @@ export default function ServidoresTab({
                 </div>
 
                 <div className="p-2.5 rounded-xl bg-emerald-50/75 border border-emerald-300/90">
-                  <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase text-emerald-950 mb-1">
-                    <span>Observação Institucional Padrão no Quadro &ldquo;Observações:&rdquo; da Folha (Opcional)</span>
-                    <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
-                      🖨️ Quadro Observações:
-                    </span>
+                  <label className="block text-xs font-bold uppercase text-emerald-950 mb-1">
+                    Observação Institucional Padrão no Quadro &ldquo;Observações:&rdquo; da Folha (Opcional)
                   </label>
                   <textarea
                     rows={2}
@@ -3418,11 +3327,8 @@ export default function ServidoresTab({
 
                 {/* PASSO 22 — ITEM 4: Texto do Quadro MENSAGEM (Verso da Folha) */}
                 <div className="p-2.5 rounded-xl bg-emerald-50/75 border border-emerald-300/90">
-                  <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase text-emerald-950 mb-1">
-                    <span>Texto do Quadro MENSAGEM (Verso da Folha — Opcional)</span>
-                    <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
-                      🖨️ Quadro MENSAGEM (Verso)
-                    </span>
+                  <label className="block text-xs font-bold uppercase text-emerald-950 mb-1">
+                    Texto do Quadro MENSAGEM (Verso da Folha — Opcional)
                   </label>
                   <textarea
                     rows={2}

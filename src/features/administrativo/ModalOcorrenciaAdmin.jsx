@@ -785,15 +785,10 @@ export default function ModalOcorrenciaAdmin({
           {/* 2. Seletor de Servidor (Individual ou Resumo do Lote por Categoria) */}
           <div className="p-3 rounded-xl bg-emerald-50/75 border border-emerald-300/90">
             <div className="flex items-center justify-between gap-2 mb-1.5">
-              <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-950">
-                <span>
-                  {lancamentoEmLote && tipo === "negociacao" && !registroEdicao
-                    ? "2. Servidores & Categorias Contemplados no Lançamento em Lote"
-                    : "2. Servidor / Professor / Colaborador"}
-                </span>
-                <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
-                  🖨️ Vincula à Folha de Ponto
-                </span>
+              <label className="block text-xs font-bold uppercase tracking-wider text-emerald-950">
+                {lancamentoEmLote && tipo === "negociacao" && !registroEdicao
+                  ? "2. Servidores & Categorias Contemplados no Lançamento em Lote"
+                  : "2. Servidor / Professor / Colaborador"}
               </label>
               {campoErro === "servidor" && (
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-red-100 text-red-700 border border-red-200">
@@ -1021,11 +1016,8 @@ export default function ModalOcorrenciaAdmin({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase tracking-wider text-emerald-950 mb-1.5">
-                  <span>3. Evento / Classificação Oficial (SIGEP / SEEDF)</span>
-                  <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
-                    🖨️ Linha + Código SIGEP
-                  </span>
+                <label className="block text-xs font-bold uppercase tracking-wider text-emerald-950 mb-1.5">
+                  3. Evento / Classificação Oficial (SIGEP / SEEDF)
                 </label>
                 <select
                   value={subtipo}
@@ -1041,11 +1033,8 @@ export default function ModalOcorrenciaAdmin({
               </div>
 
               <div>
-                <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase tracking-wider text-emerald-950 mb-1.5">
-                  <span>Situação do Registro</span>
-                  <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
-                    🖨️ Ativa na Folha
-                  </span>
+                <label className="block text-xs font-bold uppercase tracking-wider text-emerald-950 mb-1.5">
+                  Situação do Registro
                 </label>
                 <select
                   value={status}
@@ -1087,11 +1076,8 @@ export default function ModalOcorrenciaAdmin({
           {/* 4. Período (Data Início, Data Fim, Total de Dias) */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-emerald-50/75 p-3.5 rounded-xl border-2 border-emerald-300">
             <div>
-              <label className="flex items-center justify-between gap-1 text-xs font-bold text-emerald-950 mb-1">
-                <span>Data Inicial</span>
-                <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
-                  🖨️ Dia Início
-                </span>
+              <label className="block text-xs font-bold text-emerald-950 mb-1">
+                Data Inicial
               </label>
               <input
                 ref={dataInicioRef}
@@ -1112,11 +1098,8 @@ export default function ModalOcorrenciaAdmin({
               />
             </div>
             <div>
-              <label className="flex items-center justify-between gap-1 text-xs font-bold text-emerald-950 mb-1">
-                <span>Data Final</span>
-                <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
-                  🖨️ Dia Fim
-                </span>
+              <label className="block text-xs font-bold text-emerald-950 mb-1">
+                Data Final
               </label>
               <input
                 type="date"
@@ -1127,11 +1110,8 @@ export default function ModalOcorrenciaAdmin({
               />
             </div>
             <div>
-              <label className="flex items-center justify-between gap-1 text-xs font-bold text-emerald-950 mb-1">
-                <span>Qtd. de Dias</span>
-                <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
-                  🖨️ Nº Dias (Verso)
-                </span>
+              <label className="block text-xs font-bold text-emerald-950 mb-1">
+                Qtd. de Dias
               </label>
               <input
                 type="number"
@@ -1206,11 +1186,8 @@ export default function ModalOcorrenciaAdmin({
                   />
                 </div>
                 <div className="p-2 rounded-lg bg-emerald-50/90 border border-emerald-300">
-                  <label className="flex items-center justify-between gap-1 text-xs font-bold text-emerald-950 mb-1">
-                    <span>Nº Processo SEI / Subsaúde / Anexo</span>
-                    <span className="px-1 py-0.2 rounded text-[9px] font-extrabold bg-emerald-200 text-emerald-900">
-                      🖨️ Obs. Folha
-                    </span>
+                  <label className="block text-xs font-bold text-emerald-950 mb-1">
+                    Nº Processo SEI / Subsaúde / Anexo
                   </label>
                   <input
                     type="text"
@@ -1233,11 +1210,8 @@ export default function ModalOcorrenciaAdmin({
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="p-2.5 rounded-xl bg-emerald-50/90 border border-emerald-300">
-                  <label className="flex items-center justify-between gap-1 text-xs font-bold text-emerald-950 mb-1">
-                    <span>Nº Processo SEI / Certidão / Declaração Oficial</span>
-                    <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
-                      🖨️ Obs. Folha
-                    </span>
+                  <label className="block text-xs font-bold text-emerald-950 mb-1">
+                    Nº Processo SEI / Certidão / Declaração Oficial
                   </label>
                   <input
                     type="text"

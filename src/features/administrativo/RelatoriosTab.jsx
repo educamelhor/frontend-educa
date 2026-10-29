@@ -674,11 +674,8 @@ export default function RelatoriosTab({
 
               {/* Mês / Ano de Referência */}
               <div className="lg:col-span-3 p-2 rounded-xl bg-emerald-50/75 border border-emerald-300/90">
-                <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase text-emerald-950 mb-1">
-                  <span>Mês / Ano de Referência</span>
-                  <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
-                    🖨️ Mês/Ano Folha
-                  </span>
+                <label className="block text-xs font-bold uppercase text-emerald-950 mb-1">
+                  Mês / Ano de Referência
                 </label>
                 <input
                   type="month"
@@ -690,11 +687,8 @@ export default function RelatoriosTab({
 
               {/* Seletor de Modelo Oficial SEEDF */}
               <div className="lg:col-span-4 p-2 rounded-xl bg-emerald-50/75 border border-emerald-300/90">
-                <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase text-emerald-950 mb-1">
-                  <span>Modelo Oficial SEEDF (SIGEP)</span>
-                  <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
-                    🖨️ Layout Folha
-                  </span>
+                <label className="block text-xs font-bold uppercase text-emerald-950 mb-1">
+                  Modelo Oficial SEEDF (SIGEP)
                 </label>
                 <select
                   value={modeloForcado}

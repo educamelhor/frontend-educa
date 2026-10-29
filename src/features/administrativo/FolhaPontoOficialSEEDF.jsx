@@ -382,6 +382,35 @@ export default function FolhaPontoOficialSEEDF({
     return raw;
   }, [dadosUnidade.nomeEscola]);
 
+  // Configuração de Assinaturas (PASSO 20 — Responsável pelas Informações, Chefia Imediata e Superior)
+  const imprimirAssinaturasNaFolha =
+    dadosUnidade.imprimirAssinaturasNaFolha !== false;
+  const respInfoNome = String(
+    dadosUnidade.responsavelFrequenciaNome || ""
+  )
+    .trim()
+    .toUpperCase();
+  const respInfoCargo = String(
+    dadosUnidade.responsavelFrequenciaCargo || ""
+  )
+    .trim()
+    .toUpperCase();
+  const chefiaNome = String(dadosUnidade.nomeChefiaImediata || "")
+    .trim()
+    .toUpperCase();
+  const chefiaCargo = String(dadosUnidade.cargoChefiaImediata || "")
+    .trim()
+    .toUpperCase();
+  const superiorNome = String(dadosUnidade.nomeSuperiorAssinatura || "")
+    .trim()
+    .toUpperCase();
+  const superiorCargo = String(dadosUnidade.cargoSuperiorAssinatura || "")
+    .trim()
+    .toUpperCase();
+  const temAlgumaAssinaturaPreenchida = Boolean(
+    respInfoNome || chefiaNome || superiorNome
+  );
+
   // Dados funcionais do servidor formatados para o cabeçalho oficial
   const matriculaOficial =
     servidor.matricula &&
@@ -1257,90 +1286,256 @@ export default function FolhaPontoOficialSEEDF({
             )}
           </div>
         ) : (
-          /* Contrato Temporário: Tabela OCORRÊNCIA | CARGA I | CARGA II na Página 1 */
-          <table
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              marginTop: "12px",
-              border: "1px solid #000",
-              fontSize: "10px",
-              boxSizing: "border-box",
-            }}
-          >
-            <thead>
-              <tr style={{ height: "20px" }}>
-                <th
+          /* Contrato Temporário: Tabela OCORRÊNCIA | CARGA I | CARGA II na Página 1 + Quadro Opcional de Assinaturas na Frente */
+          <>
+            <table
+              style={{
+                width: "100%",
+                borderCollapse: "collapse",
+                marginTop: "8px",
+                border: "1px solid #000",
+                fontSize: "10px",
+                boxSizing: "border-box",
+              }}
+            >
+              <thead>
+                <tr style={{ height: "19px" }}>
+                  <th
+                    style={{
+                      border: "1px solid #000",
+                      fontWeight: 400,
+                      width: "32%",
+                      textAlign: "center",
+                    }}
+                  >
+                    OCORRÊNCIA
+                  </th>
+                  <th
+                    style={{
+                      border: "1px solid #000",
+                      fontWeight: 400,
+                      width: "34%",
+                      textAlign: "center",
+                    }}
+                  >
+                    CARGA I (Nº DE HORAS)
+                  </th>
+                  <th
+                    style={{
+                      border: "1px solid #000",
+                      fontWeight: 400,
+                      width: "34%",
+                      textAlign: "center",
+                    }}
+                  >
+                    CARGA II (Nº DE HORAS)
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {[0, 1, 2, 3].map((idx) => {
+                  const occ = ocorrenciasDoMes[idx];
+                  const m = occ ? mapearOcorrenciaParaFolhaSEEDF(occ) : null;
+                  return (
+                    <tr key={idx} style={{ height: "19px" }}>
+                      <td
+                        style={{
+                          border: "1px solid #000",
+                          padding: "2px 6px",
+                          fontSize: "9.5px",
+                          textAlign: "left",
+                        }}
+                      >
+                        {m ? m.descricaoCurta : ""}
+                      </td>
+                      <td
+                        style={{
+                          border: "1px solid #000",
+                          textAlign: "center",
+                          fontSize: "9.5px",
+                        }}
+                      >
+                        {occ ? `${occ.dias || 1} dia(s)` : ""}
+                      </td>
+                      <td
+                        style={{
+                          border: "1px solid #000",
+                          textAlign: "center",
+                          fontSize: "9.5px",
+                        }}
+                      >
+                        {occ && isJornadaDupla ? `${occ.dias || 1} dia(s)` : ""}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+
+            {/* Quadro Compacto de Assinaturas na Frente (Contrato Temporário) quando houver identificação configurada */}
+            {imprimirAssinaturasNaFolha && temAlgumaAssinaturaPreenchida && (
+              <div
+                style={{
+                  width: "100%",
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr 1fr",
+                  gap: "6px",
+                  marginTop: "6px",
+                  boxSizing: "border-box",
+                }}
+              >
+                <div
                   style={{
                     border: "1px solid #000",
-                    fontWeight: 400,
-                    width: "32%",
-                    textAlign: "center",
+                    height: "52px",
+                    padding: "3px 6px",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                    fontSize: "8.5px",
+                    boxSizing: "border-box",
                   }}
                 >
-                  OCORRÊNCIA
-                </th>
-                <th
+                  <div>Responsável pelas informações</div>
+                  <div style={{ textAlign: "center" }}>
+                    <div
+                      style={{ borderTop: "1px solid #000", paddingTop: "1.5px" }}
+                    >
+                      {respInfoNome ? (
+                        <>
+                          <div
+                            style={{
+                              fontWeight: 700,
+                              fontSize: "8px",
+                              lineHeight: 1.1,
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
+                            {respInfoNome}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: "7.2px",
+                              lineHeight: 1.05,
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
+                            {respInfoCargo || "Assinatura / matrícula"}
+                          </div>
+                        </>
+                      ) : (
+                        "Assinatura / matrícula"
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div
                   style={{
                     border: "1px solid #000",
-                    fontWeight: 400,
-                    width: "34%",
-                    textAlign: "center",
+                    height: "52px",
+                    padding: "3px 6px",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                    fontSize: "8.5px",
+                    boxSizing: "border-box",
                   }}
                 >
-                  CARGA I (Nº DE HORAS)
-                </th>
-                <th
+                  <div>Assinatura da Chefia</div>
+                  <div style={{ textAlign: "center" }}>
+                    <div
+                      style={{ borderTop: "1px solid #000", paddingTop: "1.5px" }}
+                    >
+                      {chefiaNome ? (
+                        <>
+                          <div
+                            style={{
+                              fontWeight: 700,
+                              fontSize: "8px",
+                              lineHeight: 1.1,
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
+                            {chefiaNome}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: "7.2px",
+                              lineHeight: 1.05,
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
+                            {chefiaCargo || "Assinatura / carimbo"}
+                          </div>
+                        </>
+                      ) : (
+                        "Assinatura / carimbo"
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div
                   style={{
                     border: "1px solid #000",
-                    fontWeight: 400,
-                    width: "34%",
-                    textAlign: "center",
+                    height: "52px",
+                    padding: "3px 6px",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: "space-between",
+                    fontSize: "8.5px",
+                    boxSizing: "border-box",
                   }}
                 >
-                  CARGA II (Nº DE HORAS)
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {[0, 1, 2, 3].map((idx) => {
-                const occ = ocorrenciasDoMes[idx];
-                const m = occ ? mapearOcorrenciaParaFolhaSEEDF(occ) : null;
-                return (
-                  <tr key={idx} style={{ height: "20px" }}>
-                    <td
-                      style={{
-                        border: "1px solid #000",
-                        padding: "2px 6px",
-                        fontSize: "9.5px",
-                        textAlign: "left",
-                      }}
+                  <div>Assinatura do Superior</div>
+                  <div style={{ textAlign: "center" }}>
+                    <div
+                      style={{ borderTop: "1px solid #000", paddingTop: "1.5px" }}
                     >
-                      {m ? m.descricaoCurta : ""}
-                    </td>
-                    <td
-                      style={{
-                        border: "1px solid #000",
-                        textAlign: "center",
-                        fontSize: "9.5px",
-                      }}
-                    >
-                      {occ ? `${occ.dias || 1} dia(s)` : ""}
-                    </td>
-                    <td
-                      style={{
-                        border: "1px solid #000",
-                        textAlign: "center",
-                        fontSize: "9.5px",
-                      }}
-                    >
-                      {occ && isJornadaDupla ? `${occ.dias || 1} dia(s)` : ""}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      {superiorNome ? (
+                        <>
+                          <div
+                            style={{
+                              fontWeight: 700,
+                              fontSize: "8px",
+                              lineHeight: 1.1,
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
+                            {superiorNome}
+                          </div>
+                          <div
+                            style={{
+                              fontSize: "7.2px",
+                              lineHeight: 1.05,
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
+                            {superiorCargo || "Assinatura / carimbo"}
+                          </div>
+                        </>
+                      ) : (
+                        "Assinatura / carimbo"
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -1740,7 +1935,35 @@ export default function FolhaPontoOficialSEEDF({
             <div>Responsável pelas informações</div>
             <div style={{ textAlign: "center" }}>
               <div style={{ borderTop: "1px solid #000", paddingTop: "3px" }}>
-                Assinatura / matrícula
+                {imprimirAssinaturasNaFolha && respInfoNome ? (
+                  <>
+                    <div
+                      style={{
+                        fontWeight: 700,
+                        fontSize: "8.5px",
+                        lineHeight: 1.15,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      {respInfoNome}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "7.8px",
+                        lineHeight: 1.1,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      {respInfoCargo || "Assinatura / matrícula"}
+                    </div>
+                  </>
+                ) : (
+                  "Assinatura / matrícula"
+                )}
               </div>
             </div>
           </div>
@@ -1760,7 +1983,35 @@ export default function FolhaPontoOficialSEEDF({
             <div>Assinatura da Chefia</div>
             <div style={{ textAlign: "center" }}>
               <div style={{ borderTop: "1px solid #000", paddingTop: "3px" }}>
-                Assinatura / carimbo
+                {imprimirAssinaturasNaFolha && chefiaNome ? (
+                  <>
+                    <div
+                      style={{
+                        fontWeight: 700,
+                        fontSize: "8.5px",
+                        lineHeight: 1.15,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      {chefiaNome}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "7.8px",
+                        lineHeight: 1.1,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      {chefiaCargo || "Assinatura / carimbo"}
+                    </div>
+                  </>
+                ) : (
+                  "Assinatura / carimbo"
+                )}
               </div>
             </div>
           </div>
@@ -1780,7 +2031,35 @@ export default function FolhaPontoOficialSEEDF({
             <div>Assinatura do Superior</div>
             <div style={{ textAlign: "center" }}>
               <div style={{ borderTop: "1px solid #000", paddingTop: "3px" }}>
-                Assinatura / carimbo
+                {imprimirAssinaturasNaFolha && superiorNome ? (
+                  <>
+                    <div
+                      style={{
+                        fontWeight: 700,
+                        fontSize: "8.5px",
+                        lineHeight: 1.15,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      {superiorNome}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "7.8px",
+                        lineHeight: 1.1,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      {superiorCargo || "Assinatura / carimbo"}
+                    </div>
+                  </>
+                ) : (
+                  "Assinatura / carimbo"
+                )}
               </div>
             </div>
           </div>

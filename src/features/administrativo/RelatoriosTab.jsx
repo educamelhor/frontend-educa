@@ -879,6 +879,141 @@ export default function RelatoriosTab({
                   </div>
                 </div>
 
+                {/* Configuração Rápida dos Quadros de Assinatura (PASSO 20) */}
+                <div className="pt-2 border-t border-emerald-300/80 space-y-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-[11px] font-extrabold uppercase tracking-wide text-emerald-950">
+                      🖨️ Quadros de Assinatura (Verso e Frente Contrato Temporário):
+                    </span>
+                    <div className="inline-flex rounded-lg border border-emerald-400 bg-white p-0.5">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setDadosUnidade((p) => ({
+                            ...p,
+                            imprimirAssinaturasNaFolha: true,
+                          }))
+                        }
+                        className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition ${
+                          dadosUnidade.imprimirAssinaturasNaFolha !== false
+                            ? "bg-emerald-700 text-white shadow-sm"
+                            : "text-slate-700 hover:bg-emerald-50"
+                        }`}
+                      >
+                        🖨️ Imprimir Nome e Cargo
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setDadosUnidade((p) => ({
+                            ...p,
+                            imprimirAssinaturasNaFolha: false,
+                          }))
+                        }
+                        className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition ${
+                          dadosUnidade.imprimirAssinaturasNaFolha === false
+                            ? "bg-slate-800 text-white shadow-sm"
+                            : "text-slate-700 hover:bg-slate-100"
+                        }`}
+                      >
+                        🖋️ Deixar em Branco p/ Carimbo
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="p-2 rounded-lg bg-white/70 border border-emerald-300 space-y-1.5">
+                      <div className="text-[10px] font-extrabold uppercase text-emerald-900">
+                        1. Responsável pelas Informações (Secretaria)
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Nome (Ex: MARIA APARECIDA)"
+                        value={dadosUnidade.responsavelFrequenciaNome || ""}
+                        onChange={(e) =>
+                          setDadosUnidade((p) => ({
+                            ...p,
+                            responsavelFrequenciaNome: e.target.value,
+                          }))
+                        }
+                        className="w-full rounded border border-emerald-400 px-2 py-1 text-xs font-semibold text-slate-900 bg-emerald-50/80"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Cargo/Mat. (Ex: CHEFE DE SECRETARIA)"
+                        value={dadosUnidade.responsavelFrequenciaCargo || ""}
+                        onChange={(e) =>
+                          setDadosUnidade((p) => ({
+                            ...p,
+                            responsavelFrequenciaCargo: e.target.value,
+                          }))
+                        }
+                        className="w-full rounded border border-emerald-400 px-2 py-1 text-xs font-semibold text-slate-900 bg-emerald-50/80"
+                      />
+                    </div>
+
+                    <div className="p-2 rounded-lg bg-white/70 border border-emerald-300 space-y-1.5">
+                      <div className="text-[10px] font-extrabold uppercase text-emerald-900">
+                        2. Assinatura da Chefia (Direção)
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Nome (Ex: ANDRÉ LUIZ MORAIS)"
+                        value={dadosUnidade.nomeChefiaImediata || ""}
+                        onChange={(e) =>
+                          setDadosUnidade((p) => ({
+                            ...p,
+                            nomeChefiaImediata: e.target.value,
+                          }))
+                        }
+                        className="w-full rounded border border-emerald-400 px-2 py-1 text-xs font-semibold text-slate-900 bg-emerald-50/80"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Cargo (Ex: DIRETOR — FGE-06)"
+                        value={dadosUnidade.cargoChefiaImediata || ""}
+                        onChange={(e) =>
+                          setDadosUnidade((p) => ({
+                            ...p,
+                            cargoChefiaImediata: e.target.value,
+                          }))
+                        }
+                        className="w-full rounded border border-emerald-400 px-2 py-1 text-xs font-semibold text-slate-900 bg-emerald-50/80"
+                      />
+                    </div>
+
+                    <div className="p-2 rounded-lg bg-white/70 border border-emerald-300 space-y-1.5">
+                      <div className="text-[10px] font-extrabold uppercase text-emerald-900">
+                        3. Assinatura do Superior (Supervisor/Vice)
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Nome (Ex: CARLOS EDUARDO)"
+                        value={dadosUnidade.nomeSuperiorAssinatura || ""}
+                        onChange={(e) =>
+                          setDadosUnidade((p) => ({
+                            ...p,
+                            nomeSuperiorAssinatura: e.target.value,
+                          }))
+                        }
+                        className="w-full rounded border border-emerald-400 px-2 py-1 text-xs font-semibold text-slate-900 bg-emerald-50/80"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Cargo (Ex: VICE-DIRETOR — FGE-05)"
+                        value={dadosUnidade.cargoSuperiorAssinatura || ""}
+                        onChange={(e) =>
+                          setDadosUnidade((p) => ({
+                            ...p,
+                            cargoSuperiorAssinatura: e.target.value,
+                          }))
+                        }
+                        className="w-full rounded border border-emerald-400 px-2 py-1 text-xs font-semibold text-slate-900 bg-emerald-50/80"
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-[11px] font-bold text-emerald-950 mb-1">
                     Observação Adicional no Quadro &ldquo;Observações:&rdquo; da Folha (Opcional)

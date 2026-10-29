@@ -228,11 +228,14 @@ export default function ServidoresTab({
       intervaloAlmoco: "12:00 às 13:00",
       toleranciaMinutos: "15",
       preencherHorariosPadraoNaFolha: false,
-      // 4. Assinaturas / Chefia e Observação Institucional da Folha
+      // 4. Assinaturas / Chefia, Responsável, Superior e Observação Institucional da Folha (PASSO 20)
+      imprimirAssinaturasNaFolha: true,
+      responsavelFrequenciaNome: "",
+      responsavelFrequenciaCargo: "CHEFE DE SECRETARIA — FGE-02",
       nomeChefiaImediata: "",
       cargoChefiaImediata: "DIRETOR — FGE-06",
-      responsavelFrequenciaNome: "",
-      responsavelFrequenciaCargo: "SUPERVISOR ADMINISTRATIVO / SECRETARIA",
+      nomeSuperiorAssinatura: "",
+      cargoSuperiorAssinatura: "VICE-DIRETOR — FGE-05",
       observacaoPadraoFolha: "",
     };
     try {
@@ -558,7 +561,18 @@ export default function ServidoresTab({
           <div className="flex flex-wrap items-center gap-2.5 shrink-0">
             <button
               type="button"
-              onClick={() => setModalHorarioCabecalhoAberto(true)}
+              onClick={() => {
+                try {
+                  const salvo = localStorage.getItem("educa_admin_seedf_unidade_cfg_v1");
+                  if (salvo) {
+                    const parsed = JSON.parse(salvo);
+                    setCfgHorarioCabecalho((prev) => ({ ...prev, ...parsed }));
+                  }
+                } catch {
+                  // ignore
+                }
+                setModalHorarioCabecalhoAberto(true);
+              }}
               className="group relative inline-flex items-center gap-2.5 pl-3 pr-4 py-2.5 rounded-2xl text-white transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 overflow-hidden"
               style={{
                 background:
@@ -2360,7 +2374,7 @@ export default function ServidoresTab({
               onSubmit={handleSalvarHorarioCabecalho}
               className="p-6 space-y-5 max-h-[82vh] overflow-y-auto"
             >
-              {/* Legenda do Mapeamento de Edição da Folha de Ponto (PASSO 19) */}
+              {/* Legenda do Mapeamento de Edição da Folha de Ponto (PASSO 19 / PASSO 20) */}
               <div className="p-3 rounded-xl bg-emerald-50/90 border border-emerald-300 flex items-start sm:items-center justify-between gap-3">
                 <div className="flex items-start sm:items-center gap-2.5">
                   <span className="inline-flex items-center justify-center h-6 w-6 rounded-lg bg-emerald-600 text-white text-xs font-black flex-shrink-0 shadow-sm">
@@ -2374,11 +2388,11 @@ export default function ServidoresTab({
                     <span className="px-1.5 py-0.5 rounded bg-emerald-200/80 text-emerald-950 font-extrabold border border-emerald-400">
                       verde claro
                     </span>{" "}
-                    são renderizados diretamente no cabeçalho e no quadro de Observações da Folha de Frequência Oficial SEEDF.
+                    são renderizados diretamente no cabeçalho, nos quadros de Assinatura (Responsável, Chefia e Superior) e no quadro de Observações da Folha de Frequência Oficial SEEDF.
                   </div>
                 </div>
                 <span className="hidden md:inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase bg-white text-emerald-800 border border-emerald-300 flex-shrink-0">
-                  7 Campos na Folha
+                  14 Campos na Folha
                 </span>
               </div>
 
@@ -2754,50 +2768,260 @@ export default function ServidoresTab({
                 </div>
               </div>
 
-              {/* 4. RESPONSÁVEIS / CHEFIA E OBSERVAÇÃO PADRÃO DA FOLHA */}
+              {/* 4. QUADROS DE ASSINATURA (RESPONSÁVEL, CHEFIA IMEDIATA, SUPERIOR) E OBSERVAÇÃO PADRÃO DA FOLHA (PASSO 20) */}
               <div className="space-y-3">
-                <div className="flex items-center gap-2 border-b border-slate-200 pb-1.5">
-                  <DocumentTextIcon className="h-4 w-4 text-emerald-700" />
-                  <span className="text-xs font-extrabold uppercase tracking-wider text-slate-700">
-                    4. Chefia Imediata, Responsável pelo Ponto & Observações da Folha
+                <div className="flex items-center justify-between flex-wrap gap-2 border-b border-slate-200 pb-1.5">
+                  <div className="flex items-center gap-2">
+                    <DocumentTextIcon className="h-4 w-4 text-emerald-700" />
+                    <span className="text-xs font-extrabold uppercase tracking-wider text-slate-700">
+                      4. Quadros de Assinatura (Responsável, Chefia e Superior) & Observações da Folha
+                    </span>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-emerald-100 text-emerald-900 border border-emerald-300">
+                    🖨️ Autonomia de Impressão ou Carimbo Manual
                   </span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                      Nome da Chefia Imediata / Diretor(a)
-                    </label>
-                    <input
-                      type="text"
-                      value={cfgHorarioCabecalho.nomeChefiaImediata}
-                      onChange={(e) =>
-                        setCfgHorarioCabecalho({
-                          ...cfgHorarioCabecalho,
-                          nomeChefiaImediata: e.target.value,
-                        })
-                      }
-                      placeholder="Ex: ANDRÉ LUIZ MORAIS DOS SANTOS"
-                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm text-slate-800"
-                    />
+                {/* Seletor de Modo: Imprimir Nome/Cargo abaixo da linha vs Deixar em Branco para Carimbo */}
+                <div className="p-3 rounded-xl bg-emerald-50/85 border-2 border-emerald-300 space-y-2">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <span className="text-xs font-extrabold uppercase tracking-wide text-emerald-950">
+                      Modo de Preenchimento dos Quadros de Assinatura (Verso e Frente Contrato Temporário)
+                    </span>
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
+                      🖨️ Na Folha de Ponto
+                    </span>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                      Cargo / Função da Chefia Imediata
-                    </label>
-                    <input
-                      type="text"
-                      value={cfgHorarioCabecalho.cargoChefiaImediata}
-                      onChange={(e) =>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() =>
                         setCfgHorarioCabecalho({
                           ...cfgHorarioCabecalho,
-                          cargoChefiaImediata: e.target.value,
+                          imprimirAssinaturasNaFolha: true,
                         })
                       }
-                      placeholder="Ex: DIRETOR — FGE-06"
-                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm text-slate-800"
-                    />
+                      className={`p-2.5 rounded-xl border text-left transition flex items-start gap-2.5 ${
+                        cfgHorarioCabecalho.imprimirAssinaturasNaFolha !== false
+                          ? "bg-emerald-600 text-white border-emerald-700 shadow-sm"
+                          : "bg-white text-slate-700 border-emerald-300 hover:bg-emerald-50"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        checked={cfgHorarioCabecalho.imprimirAssinaturasNaFolha !== false}
+                        onChange={() =>
+                          setCfgHorarioCabecalho({
+                            ...cfgHorarioCabecalho,
+                            imprimirAssinaturasNaFolha: true,
+                          })
+                        }
+                        className="mt-0.5 h-4 w-4 text-emerald-700"
+                      />
+                      <div>
+                        <div className="text-xs font-extrabold">
+                          🖨️ Imprimir Nome e Cargo abaixo da linha de assinatura
+                        </div>
+                        <div
+                          className={`text-[11px] leading-snug mt-0.5 ${
+                            cfgHorarioCabecalho.imprimirAssinaturasNaFolha !== false
+                              ? "text-emerald-100"
+                              : "text-slate-500"
+                          }`}
+                        >
+                          Renderiza automaticamente os nomes e cargos preenchidos abaixo no Verso (Efetivo/Temporário) e na Frente (Contrato Temporário).
+                        </div>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCfgHorarioCabecalho({
+                          ...cfgHorarioCabecalho,
+                          imprimirAssinaturasNaFolha: false,
+                        })
+                      }
+                      className={`p-2.5 rounded-xl border text-left transition flex items-start gap-2.5 ${
+                        cfgHorarioCabecalho.imprimirAssinaturasNaFolha === false
+                          ? "bg-slate-800 text-white border-slate-900 shadow-sm"
+                          : "bg-white text-slate-700 border-emerald-300 hover:bg-slate-50"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        checked={cfgHorarioCabecalho.imprimirAssinaturasNaFolha === false}
+                        onChange={() =>
+                          setCfgHorarioCabecalho({
+                            ...cfgHorarioCabecalho,
+                            imprimirAssinaturasNaFolha: false,
+                          })
+                        }
+                        className="mt-0.5 h-4 w-4 text-slate-800"
+                      />
+                      <div>
+                        <div className="text-xs font-extrabold">
+                          🖋️ Deixar em branco para Carimbo Manual
+                        </div>
+                        <div
+                          className={`text-[11px] leading-snug mt-0.5 ${
+                            cfgHorarioCabecalho.imprimirAssinaturasNaFolha === false
+                              ? "text-slate-300"
+                              : "text-slate-500"
+                          }`}
+                        >
+                          Imprime apenas os rótulos padrão (&ldquo;Assinatura / matrícula&rdquo; e &ldquo;Assinatura / carimbo&rdquo;) para carimbo físico na escola.
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 3 Quadros de Assinatura da Folha (Responsável pelas Informações | Chefia Imediata | Superior) */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5">
+                  {/* Quadro 1: Responsável pelas informações (Secretaria) */}
+                  <div className="p-3 rounded-xl bg-emerald-50/75 border border-emerald-300/90 space-y-2.5">
+                    <div className="flex items-center justify-between gap-1 border-b border-emerald-200 pb-1">
+                      <span className="text-[11px] font-extrabold uppercase text-emerald-950">
+                        1º Quadro: Responsável pelas Informações
+                      </span>
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
+                        🖨️ Secretaria
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase text-emerald-950 mb-1">
+                        Nome (Secretaria / Ponto)
+                      </label>
+                      <input
+                        type="text"
+                        value={cfgHorarioCabecalho.responsavelFrequenciaNome || ""}
+                        onChange={(e) =>
+                          setCfgHorarioCabecalho({
+                            ...cfgHorarioCabecalho,
+                            responsavelFrequenciaNome: e.target.value,
+                          })
+                        }
+                        placeholder="Ex: MARIA APARECIDA DA SILVA"
+                        className="w-full rounded-xl border border-emerald-400 bg-emerald-50/90 px-3 py-2 text-xs font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase text-emerald-950 mb-1">
+                        Cargo / Função / Matrícula
+                      </label>
+                      <input
+                        type="text"
+                        value={cfgHorarioCabecalho.responsavelFrequenciaCargo || ""}
+                        onChange={(e) =>
+                          setCfgHorarioCabecalho({
+                            ...cfgHorarioCabecalho,
+                            responsavelFrequenciaCargo: e.target.value,
+                          })
+                        }
+                        placeholder="Ex: CHEFE DE SECRETARIA — FGE-02"
+                        className="w-full rounded-xl border border-emerald-400 bg-emerald-50/90 px-3 py-2 text-xs font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Quadro 2: Assinatura da Chefia (Direção / Chefia Imediata) */}
+                  <div className="p-3 rounded-xl bg-emerald-50/75 border border-emerald-300/90 space-y-2.5">
+                    <div className="flex items-center justify-between gap-1 border-b border-emerald-200 pb-1">
+                      <span className="text-[11px] font-extrabold uppercase text-emerald-950">
+                        2º Quadro: Assinatura da Chefia
+                      </span>
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
+                        🖨️ Chefia
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase text-emerald-950 mb-1">
+                        Nome da Chefia Imediata / Diretor(a)
+                      </label>
+                      <input
+                        type="text"
+                        value={cfgHorarioCabecalho.nomeChefiaImediata || ""}
+                        onChange={(e) =>
+                          setCfgHorarioCabecalho({
+                            ...cfgHorarioCabecalho,
+                            nomeChefiaImediata: e.target.value,
+                          })
+                        }
+                        placeholder="Ex: ANDRÉ LUIZ MORAIS DOS SANTOS"
+                        className="w-full rounded-xl border border-emerald-400 bg-emerald-50/90 px-3 py-2 text-xs font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase text-emerald-950 mb-1">
+                        Cargo / Função da Chefia Imediata
+                      </label>
+                      <input
+                        type="text"
+                        value={cfgHorarioCabecalho.cargoChefiaImediata || ""}
+                        onChange={(e) =>
+                          setCfgHorarioCabecalho({
+                            ...cfgHorarioCabecalho,
+                            cargoChefiaImediata: e.target.value,
+                          })
+                        }
+                        placeholder="Ex: DIRETOR — FGE-06"
+                        className="w-full rounded-xl border border-emerald-400 bg-emerald-50/90 px-3 py-2 text-xs font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Quadro 3: Assinatura do Superior (Supervisor / Vice-Direção / Superior) */}
+                  <div className="p-3 rounded-xl bg-emerald-50/75 border border-emerald-300/90 space-y-2.5">
+                    <div className="flex items-center justify-between gap-1 border-b border-emerald-200 pb-1">
+                      <span className="text-[11px] font-extrabold uppercase text-emerald-950">
+                        3º Quadro: Assinatura do Superior
+                      </span>
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
+                        🖨️ Superior
+                      </span>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase text-emerald-950 mb-1">
+                        Nome do Superior / Supervisor
+                      </label>
+                      <input
+                        type="text"
+                        value={cfgHorarioCabecalho.nomeSuperiorAssinatura || ""}
+                        onChange={(e) =>
+                          setCfgHorarioCabecalho({
+                            ...cfgHorarioCabecalho,
+                            nomeSuperiorAssinatura: e.target.value,
+                          })
+                        }
+                        placeholder="Ex: CARLOS EDUARDO PEREIRA"
+                        className="w-full rounded-xl border border-emerald-400 bg-emerald-50/90 px-3 py-2 text-xs font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold uppercase text-emerald-950 mb-1">
+                        Cargo / Função do Superior
+                      </label>
+                      <input
+                        type="text"
+                        value={cfgHorarioCabecalho.cargoSuperiorAssinatura || ""}
+                        onChange={(e) =>
+                          setCfgHorarioCabecalho({
+                            ...cfgHorarioCabecalho,
+                            cargoSuperiorAssinatura: e.target.value,
+                          })
+                        }
+                        placeholder="Ex: VICE-DIRETOR — FGE-05"
+                        className="w-full rounded-xl border border-emerald-400 bg-emerald-50/90 px-3 py-2 text-xs font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
+                      />
+                    </div>
                   </div>
                 </div>
 

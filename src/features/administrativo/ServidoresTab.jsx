@@ -7,8 +7,9 @@
 //   abrir o Prontuário / Dossiê 360º Individual do Servidor.
 // ============================================================================
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { toast } from "react-hot-toast";
+import api from "../../services/api";
 import {
   MagnifyingGlassIcon,
   PlusIcon,
@@ -289,7 +290,10 @@ export default function ServidoresTab({
       mensagemQuadroVerso: "",
     };
     try {
-      const salvo = localStorage.getItem("educa_admin_seedf_unidade_cfg_v1");
+      const escId = localStorage.getItem("escola_id") || "default";
+      const salvo =
+        localStorage.getItem(`educa_admin_seedf_unidade_cfg_v1_${escId}`) ||
+        localStorage.getItem("educa_admin_seedf_unidade_cfg_v1");
       if (salvo) {
         const parsed = JSON.parse(salvo);
         return { ...padrao, ...parsed };
@@ -300,20 +304,40 @@ export default function ServidoresTab({
     return padrao;
   });
 
-  const handleSalvarHorarioCabecalho = (e) => {
+  useEffect(() => {
+    const onCfgUpdated = (e) => {
+      if (e?.detail) {
+        setCfgHorarioCabecalho((prev) => ({ ...prev, ...e.detail }));
+      }
+    };
+    window.addEventListener("educa:unidade-cfg-updated", onCfgUpdated);
+    return () =>
+      window.removeEventListener("educa:unidade-cfg-updated", onCfgUpdated);
+  }, []);
+
+  const handleSalvarHorarioCabecalho = async (e) => {
     e.preventDefault();
     try {
-      localStorage.setItem(
-        "educa_admin_seedf_unidade_cfg_v1",
-        JSON.stringify(cfgHorarioCabecalho)
-      );
+      const escId = localStorage.getItem("escola_id") || "default";
+      const cfgStr = JSON.stringify(cfgHorarioCabecalho);
+      localStorage.setItem("educa_admin_seedf_unidade_cfg_v1", cfgStr);
+      localStorage.setItem(`educa_admin_seedf_unidade_cfg_v1_${escId}`, cfgStr);
+
       window.dispatchEvent(
         new CustomEvent("educa:unidade-cfg-updated", {
           detail: cfgHorarioCabecalho,
         })
       );
+
+      if (escId && escId !== "default") {
+        await api.put("/api/administrativo/config-unidade", {
+          escola_id: Number(escId),
+          config: cfgHorarioCabecalho,
+        });
+      }
+
       toast.success(
-        "Configurações de Horário e Cabeçalho da Escola salvas para as Folhas de Ponto!"
+        "Configurações de Horário e Cabeçalho da Escola salvas no sistema para as Folhas de Ponto!"
       );
       setModalHorarioCabecalhoAberto(false);
     } catch {
@@ -615,7 +639,10 @@ export default function ServidoresTab({
               type="button"
               onClick={() => {
                 try {
-                  const salvo = localStorage.getItem("educa_admin_seedf_unidade_cfg_v1");
+                  const escId = String(localStorage.getItem("escola_id") || "1");
+                  const salvo =
+                    localStorage.getItem(`educa_admin_seedf_unidade_cfg_v1_${escId}`) ||
+                    localStorage.getItem("educa_admin_seedf_unidade_cfg_v1");
                   if (salvo) {
                     const parsed = JSON.parse(salvo);
                     setCfgHorarioCabecalho((prev) => ({ ...prev, ...parsed }));

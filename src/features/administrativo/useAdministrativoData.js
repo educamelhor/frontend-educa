@@ -763,90 +763,29 @@ function mapFuncaoLabel(funcao = "") {
   return map[String(funcao || "").toLowerCase().trim()] || funcao || "Servidor(a)";
 }
 
-// Exemplos iniciais para demonstrar servidores sem acesso ao sistema (terceirizados/operacional)
-function getDefaultCustomStaff() {
-  return [
-    {
-      id: "adm-terc-1",
-      nome: "Maria do Socorro Ferreira",
-      cpf: "41829304155",
-      matricula: "TERC-2026-01",
-      cargo: "Auxiliar de Serviços Gerais (Limpeza)",
-      categoria: "terceirizado",
-      vinculo: "terceirizado",
-      empresa: "Conservadora Brasília Ltda",
-      carga_horaria: "44h",
-      turno: "Integral",
-      setor: "Conservação & Limpeza",
-      horario_trabalho: "07:00 às 17:00",
-      telefone: "(61) 99214-8810",
-      email: "",
-      acesso_sistema: false,
-      ativo: true,
-      origem: "administrativo",
-      observacoes: "Responsável pelo Bloco Pedagógico A e Pátio Central.",
-    },
-    {
-      id: "adm-terc-2",
-      nome: "Antônio Carlos Magalhães Rocha",
-      cpf: "52910483211",
-      matricula: "TERC-2026-02",
-      cargo: "Agente de Portaria e Controle de Acesso",
-      categoria: "terceirizado",
-      vinculo: "terceirizado",
-      empresa: "Segurança Forte DF",
-      carga_horaria: "12x36",
-      turno: "Escala 12x36",
-      setor: "Portaria Principal",
-      horario_trabalho: "07:00 às 19:00",
-      telefone: "(61) 98411-2390",
-      email: "",
-      acesso_sistema: false,
-      ativo: true,
-      origem: "administrativo",
-      observacoes: "Plantão diurno par.",
-    },
-    {
-      id: "adm-terc-3",
-      nome: "Francisca das Chagas Oliveira",
-      cpf: "63748291044",
-      matricula: "TERC-2026-03",
-      cargo: "Merendeira / Cozinheira Escolar",
-      categoria: "apoio",
-      vinculo: "terceirizado",
-      empresa: "NutriMais Alimentação",
-      carga_horaria: "44h",
-      turno: "Matutino",
-      setor: "Refeitório / Cozinha",
-      horario_trabalho: "06:30 às 15:30",
-      telefone: "(61) 99102-4451",
-      email: "",
-      acesso_sistema: false,
-      ativo: true,
-      origem: "administrativo",
-      observacoes: "Cozinheira chefe do turno matutino.",
-    },
-    {
-      id: "adm-serv-4",
-      nome: "Sebastião Mendes da Silva",
-      cpf: "71829364509",
-      matricula: "SEEDF-184920",
-      cargo: "Agente de Gestão Educacional — Conservação",
-      categoria: "administrativo",
-      vinculo: "readaptado",
-      empresa: "SEEDF",
-      carga_horaria: "40h",
-      turno: "Vespertino",
-      setor: "Mecanografia & Apoio Secretaria",
-      horario_trabalho: "13:00 às 18:00",
-      telefone: "(61) 98177-9012",
-      email: "",
-      acesso_sistema: false,
-      ativo: true,
-      origem: "administrativo",
-      observacoes: "Servidor efetivo sem necessidade de login ativo no portal; atua na reprografia.",
-    },
-  ];
+// IDs antigos de demonstração (mock) removidos para garantir 100% dados reais da escola
+const LEGACY_MOCK_STAFF_IDS = new Set([
+  "adm-terc-1",
+  "adm-terc-2",
+  "adm-terc-3",
+  "adm-serv-4",
+]);
+
+const LEGACY_MOCK_OCC_IDS = new Set([
+  "occ-seed-1",
+  "occ-seed-2",
+  "occ-seed-3",
+  "occ-seed-4",
+]);
+
+function filtrarMocksStaff(lista) {
+  if (!Array.isArray(lista)) return [];
+  return lista.filter((item) => item && !LEGACY_MOCK_STAFF_IDS.has(String(item.id)));
+}
+
+function filtrarMocksOcorrencias(lista) {
+  if (!Array.isArray(lista)) return [];
+  return lista.filter((item) => item && !LEGACY_MOCK_OCC_IDS.has(String(item.id)));
 }
 
 export function useAdministrativoData() {
@@ -859,6 +798,7 @@ export function useAdministrativoData() {
       ocorrencias: `educa_admin_ocorrencias_v1_${escolaId}`,
       ponto: `educa_admin_ponto_v1_${escolaId}`,
       biometria: `educa_admin_biometria_v1_${escolaId}`,
+      syncedBackend: `educa_admin_backend_synced_v1_${escolaId}`,
     }),
     [escolaId]
   );
@@ -882,18 +822,18 @@ export function useAdministrativoData() {
     excecoes: [],
   });
 
-  // Persistência local (sincronizada e pronta para o backend na Etapa 2)
+  // Cache local sincronizado com o banco de dados MySQL (/api/administrativo)
   const [customStaff, setCustomStaff] = useState(() => {
     try {
       const raw = localStorage.getItem(`educa_admin_custom_staff_v1_${escolaId}`);
-      if (raw) return JSON.parse(raw);
-      return getDefaultCustomStaff();
+      if (raw) return filtrarMocksStaff(JSON.parse(raw));
+      return [];
     } catch {
-      return getDefaultCustomStaff();
+      return [];
     }
   });
 
-  // Overrides permitem editar/complementar dados de professores ou membros da direção
+  // Overrides permitem editar/complementar a Ficha Funcional SIGEP de professores ou membros da direção
   const [overrides, setOverrides] = useState(() => {
     try {
       const raw = localStorage.getItem(`educa_admin_overrides_v1_${escolaId}`);
@@ -906,7 +846,7 @@ export function useAdministrativoData() {
   const [ocorrencias, setOcorrencias] = useState(() => {
     try {
       const raw = localStorage.getItem(`educa_admin_ocorrencias_v1_${escolaId}`);
-      return raw ? JSON.parse(raw) : [];
+      return raw ? filtrarMocksOcorrencias(JSON.parse(raw)) : [];
     } catch {
       return [];
     }
@@ -921,7 +861,7 @@ export function useAdministrativoData() {
     }
   });
 
-  // Salvar alterações no localStorage
+  // Atualizar cache local automaticamente
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEYS.customStaff, JSON.stringify(customStaff));
@@ -958,12 +898,54 @@ export function useAdministrativoData() {
     );
   }, []);
 
-  // Busca automática de TODOS os professores + membros da direção/secretaria/equipe + Calendário Letivo da Governança
+  // Busca automática de TODOS os professores + membros da direção/secretaria/equipe + Calendário Letivo + Dados do Módulo Administrativo no MySQL
   const carregarDadosSistema = useCallback(async () => {
     setLoading(true);
     try {
       const anoAtual = new Date().getFullYear();
-      const [resProf, resCad, resEq, resGov] = await Promise.allSettled([
+
+      // Migração transparente única: se houver dados reais no navegador antes da conexão MySQL, envia ao backend
+      if (escolaId && escolaId !== "default") {
+        const jaSincronizou = localStorage.getItem(STORAGE_KEYS.syncedBackend);
+        if (!jaSincronizou) {
+          try {
+            const cfgLocalRaw =
+              localStorage.getItem(`educa_admin_seedf_unidade_cfg_v1_${escolaId}`) ||
+              localStorage.getItem("educa_admin_seedf_unidade_cfg_v1");
+            const cfgLocal = cfgLocalRaw ? JSON.parse(cfgLocalRaw) : null;
+            const staffLocal = filtrarMocksStaff(
+              JSON.parse(localStorage.getItem(STORAGE_KEYS.customStaff) || "[]")
+            );
+            const ovLocal = JSON.parse(
+              localStorage.getItem(STORAGE_KEYS.overrides) || "{}"
+            );
+            const occLocal = filtrarMocksOcorrencias(
+              JSON.parse(localStorage.getItem(STORAGE_KEYS.ocorrencias) || "[]")
+            );
+
+            const temDadosReaisLocais =
+              Boolean(cfgLocal) ||
+              staffLocal.length > 0 ||
+              Object.keys(ovLocal || {}).length > 0 ||
+              occLocal.length > 0;
+
+            if (temDadosReaisLocais) {
+              await api.post("/api/administrativo/sync-local", {
+                escola_id: Number(escolaId),
+                configUnidade: cfgLocal,
+                customStaff: staffLocal,
+                overrides: ovLocal,
+                ocorrencias: occLocal,
+              });
+            }
+            localStorage.setItem(STORAGE_KEYS.syncedBackend, "1");
+          } catch {
+            //Continua normalmente se o backend ainda estiver atualizando
+          }
+        }
+      }
+
+      const [resProf, resCad, resEq, resGov, resAdm] = await Promise.allSettled([
         api.get("/api/professores"),
         escolaId && escolaId !== "default"
           ? api.get(`/api/direcao/cadastro?escola_id=${escolaId}`)
@@ -974,6 +956,9 @@ export function useAdministrativoData() {
         escolaId && escolaId !== "default"
           ? api.get(`/api/governanca/ano-letivo-config?escola_id=${escolaId}&ano=${anoAtual}`)
           : Promise.resolve({ data: { ok: false } }),
+        escolaId && escolaId !== "default"
+          ? api.get(`/api/administrativo/bootstrap?escola_id=${escolaId}`)
+          : Promise.resolve({ data: { ok: false } }),
       ]);
 
       if (resGov.status === "fulfilled" && resGov.value?.data?.ok) {
@@ -981,6 +966,39 @@ export function useAdministrativoData() {
           periodos: resGov.value.data.periodos || [],
           excecoes: resGov.value.data.excecoes || [],
         });
+      }
+
+      // Hidrata os estados com os dados persistidos no MySQL (/api/administrativo/bootstrap)
+      if (resAdm.status === "fulfilled" && resAdm.value?.data?.ok) {
+        const admData = resAdm.value.data;
+
+        if (Array.isArray(admData.customStaff)) {
+          setCustomStaff(filtrarMocksStaff(admData.customStaff));
+        }
+        if (admData.overrides && typeof admData.overrides === "object") {
+          setOverrides(admData.overrides);
+        }
+        if (Array.isArray(admData.ocorrencias)) {
+          setOcorrencias(filtrarMocksOcorrencias(admData.ocorrencias));
+        }
+        if (admData.pontoDiario && typeof admData.pontoDiario === "object") {
+          setPontoDiario((prev) => ({ ...prev, ...admData.pontoDiario }));
+        }
+        if (admData.configUnidade && typeof admData.configUnidade === "object") {
+          try {
+            const cfgStr = JSON.stringify(admData.configUnidade);
+            localStorage.setItem("educa_admin_seedf_unidade_cfg_v1", cfgStr);
+            localStorage.setItem(
+              `educa_admin_seedf_unidade_cfg_v1_${escolaId}`,
+              cfgStr
+            );
+            window.dispatchEvent(
+              new CustomEvent("educa:unidade-cfg-updated", {
+                detail: admData.configUnidade,
+              })
+            );
+          } catch {}
+        }
       }
 
       const profsRaw =
@@ -1143,7 +1161,7 @@ export function useAdministrativoData() {
     } finally {
       setLoading(false);
     }
-  }, [escolaId]);
+  }, [escolaId, STORAGE_KEYS]);
 
   useEffect(() => {
     carregarDadosSistema();
@@ -1168,6 +1186,7 @@ export function useAdministrativoData() {
     );
 
     const listaCustom = customStaff.filter((c) => {
+      if (!c || LEGACY_MOCK_STAFF_IDS.has(String(c.id))) return false;
       const cpfC = limparCPF(c.cpf);
       if (cpfC && cpfsSistema.has(cpfC)) return false;
       return true;
@@ -1182,129 +1201,61 @@ export function useAdministrativoData() {
     );
   }, [systemUsers, overrides, customStaff]);
 
-  // Se ainda não houver ocorrências salvas e já carregamos servidores, popula exemplos realistas no 1º uso
-  useEffect(() => {
-    if (loading || servidores.length === 0) return;
-    const jaInicializou = localStorage.getItem(`educa_admin_occ_seed_v1_${escolaId}`);
-    if (jaInicializou || ocorrencias.length > 0) return;
-
-    const hoje = new Date();
-    const fmt = (d) => d.toISOString().slice(0, 10);
-    const ontem = new Date(hoje);
-    ontem.setDate(hoje.getDate() - 2);
-    const semanaPassada = new Date(hoje);
-    semanaPassada.setDate(hoje.getDate() - 8);
-    const proxSemana = new Date(hoje);
-    proxSemana.setDate(hoje.getDate() + 6);
-
-    const s1 = servidores[0];
-    const s2 = servidores[1] || servidores[0];
-    const s3 = servidores[2] || servidores[0];
-    const s4 = servidores[3] || servidores[0];
-
-    const seedOcorrencias = [
-      {
-        id: "occ-seed-1",
-        servidor_id: s1.id,
-        servidor_nome: s1.nome,
-        servidor_cargo: s1.cargo,
-        servidor_categoria: s1.categoria,
-        tipo: "abono",
-        subtipo: "Abono de Ponto Anual (1º do ano)",
-        data_inicio: fmt(semanaPassada),
-        data_fim: fmt(semanaPassada),
-        dias: 1,
-        motivo: "Assuntos particulares inadiáveis (Abono regulamentar previsto em acordo coletivo/SEEDF).",
-        autorizado_por: "Direção Escolar",
-        status: "aprovado",
-        criado_em: fmt(semanaPassada),
-      },
-      {
-        id: "occ-seed-2",
-        servidor_id: s2.id,
-        servidor_nome: s2.nome,
-        servidor_cargo: s2.cargo,
-        servidor_categoria: s2.categoria,
-        tipo: "atestado",
-        subtipo: "Atestado Médico Próprio",
-        data_inicio: fmt(ontem),
-        data_fim: fmt(hoje),
-        dias: 3,
-        cid: "J06.9",
-        medico: "Dr. Ricardo Albuquerque — CRM/DF 21.840",
-        documento_ref: "ATEST-2026-089.pdf",
-        motivo: "Afastamento médico por quadro viral agudo com recomendação de repouso.",
-        autorizado_por: "Secretaria / RH",
-        status: "homologado",
-        criado_em: fmt(ontem),
-      },
-      {
-        id: "occ-seed-3",
-        servidor_id: s3.id,
-        servidor_nome: s3.nome,
-        servidor_cargo: s3.cargo,
-        servidor_categoria: s3.categoria,
-        tipo: "negociacao",
-        subtipo: "Liberação com Reposição de Carga Horária",
-        data_inicio: fmt(ontem),
-        data_fim: fmt(ontem),
-        dias: 1,
-        data_compensacao: fmt(proxSemana),
-        forma_compensacao: "Reposição de 4h no turno contrário em apoio pedagógico / projeto interdisciplinar.",
-        motivo: "Participação em congresso externo / compromisso familiar previamente acordado com a Direção.",
-        autorizado_por: "Diretor(a) Pedagógico",
-        status: "pendente_reposicao",
-        criado_em: fmt(ontem),
-      },
-      {
-        id: "occ-seed-4",
-        servidor_id: s4.id,
-        servidor_nome: s4.nome,
-        servidor_cargo: s4.cargo,
-        servidor_categoria: s4.categoria,
-        tipo: "ausencia",
-        subtipo: "Atraso / Entrada Tardia Justificada",
-        data_inicio: fmt(semanaPassada),
-        data_fim: fmt(semanaPassada),
-        dias: 1,
-        horas_ausencia: "01h30min",
-        motivo: "Problema no transporte público na via estrutural; comunicou a supervisão administrativa às 07h10.",
-        autorizado_por: "Supervisor Administrativo",
-        status: "registrado",
-        criado_em: fmt(semanaPassada),
-      },
-    ];
-
-    setOcorrencias(seedOcorrencias);
-    localStorage.setItem(`educa_admin_occ_seed_v1_${escolaId}`, "1");
-  }, [loading, servidores, ocorrencias.length, escolaId]);
-
-  // ── Ações CRUD de Servidores ────────────────────────────────────────────────
+  // ── Ações CRUD de Servidores (Persistidas no MySQL via /api/administrativo/servidores) ──
   const salvarServidor = useCallback(
     async (dados) => {
       const id = dados.id;
       const isSystem = String(id || "").startsWith("sys-");
 
       if (isSystem) {
+        const novoOverride = {
+          ...(overrides[id] || {}),
+          ...dados,
+          id,
+          atualizado_em: new Date().toISOString(),
+        };
         setOverrides((prev) => ({
           ...prev,
-          [id]: {
-            ...(prev[id] || {}),
-            ...dados,
-            atualizado_em: new Date().toISOString(),
-          },
+          [id]: novoOverride,
         }));
+
+        if (escolaId && escolaId !== "default") {
+          try {
+            await api.post("/api/administrativo/servidores", {
+              escola_id: Number(escolaId),
+              tipo_registro: "override",
+              servidor: novoOverride,
+            });
+          } catch (err) {
+            console.error("[Administrativo] Erro ao salvar override no backend:", err);
+          }
+        }
         return { ok: true, mode: "override" };
       }
 
       if (id) {
+        const atualizado = {
+          ...(customStaff.find((item) => item.id === id) || {}),
+          ...dados,
+          id,
+          cpf: limparCPF(dados.cpf),
+          atualizado_em: new Date().toISOString(),
+        };
         setCustomStaff((prev) =>
-          prev.map((item) =>
-            item.id === id
-              ? { ...item, ...dados, atualizado_em: new Date().toISOString() }
-              : item
-          )
+          prev.map((item) => (item.id === id ? atualizado : item))
         );
+
+        if (escolaId && escolaId !== "default") {
+          try {
+            await api.post("/api/administrativo/servidores", {
+              escola_id: Number(escolaId),
+              tipo_registro: "custom",
+              servidor: atualizado,
+            });
+          } catch (err) {
+            console.error("[Administrativo] Erro ao atualizar servidor no backend:", err);
+          }
+        }
         return { ok: true, mode: "update" };
       }
 
@@ -1319,7 +1270,7 @@ export function useAdministrativoData() {
         criado_em: new Date().toISOString(),
       };
 
-      // Se o gestor marcou "Conceder acesso ao sistema", também podemos pré-cadastrar em /api/direcao/cadastro
+      // Se o gestor marcou "Conceder acesso ao sistema", também pré-cadastra em /api/direcao/cadastro
       if (dados.acesso_sistema && dados.cpf && escolaId && escolaId !== "default") {
         try {
           await api.post("/api/direcao/cadastro", {
@@ -1328,53 +1279,123 @@ export function useAdministrativoData() {
             funcao: dados.funcao_sistema || dados.categoria || "administrativo",
             escola_id: Number(escolaId),
           });
+          // Salva também os metadados completos da ficha funcional por CPF
+          const chaveCpf = `cpf:${limparCPF(dados.cpf)}`;
+          setOverrides((prev) => ({
+            ...prev,
+            [chaveCpf]: { ...novoServidor, id: chaveCpf },
+          }));
+          await api.post("/api/administrativo/servidores", {
+            escola_id: Number(escolaId),
+            tipo_registro: "override",
+            servidor: { ...novoServidor, id: chaveCpf },
+          });
           await carregarDadosSistema();
           return { ok: true, mode: "created_system" };
         } catch {
-          // Se já existir ou falhar silenciosamente, garante no quadro local
+          // Se já existir ou falhar, garante no quadro administrativo
         }
       }
 
       setCustomStaff((prev) => [novoServidor, ...prev]);
+
+      if (escolaId && escolaId !== "default") {
+        try {
+          await api.post("/api/administrativo/servidores", {
+            escola_id: Number(escolaId),
+            tipo_registro: "custom",
+            servidor: novoServidor,
+          });
+        } catch (err) {
+          console.error("[Administrativo] Erro ao criar servidor no backend:", err);
+        }
+      }
+
       return { ok: true, mode: "created_local", servidor: novoServidor };
     },
-    [escolaId, carregarDadosSistema]
+    [escolaId, carregarDadosSistema, overrides, customStaff]
   );
 
-  const alternarStatusServidor = useCallback((servidor) => {
-    const novoStatus = !servidor.ativo;
-    if (String(servidor.id).startsWith("sys-")) {
-      setOverrides((prev) => ({
-        ...prev,
-        [servidor.id]: {
-          ...(prev[servidor.id] || {}),
+  const alternarStatusServidor = useCallback(
+    async (servidor) => {
+      const novoStatus = !servidor.ativo;
+      const isSystem = String(servidor.id).startsWith("sys-");
+
+      if (isSystem) {
+        const novoOv = {
+          ...(overrides[servidor.id] || {}),
+          id: servidor.id,
           ativo: novoStatus,
-        },
-      }));
-    } else {
-      setCustomStaff((prev) =>
-        prev.map((s) => (s.id === servidor.id ? { ...s, ativo: novoStatus } : s))
-      );
-    }
-  }, []);
+          atualizado_em: new Date().toISOString(),
+        };
+        setOverrides((prev) => ({
+          ...prev,
+          [servidor.id]: novoOv,
+        }));
+        if (escolaId && escolaId !== "default") {
+          try {
+            await api.post("/api/administrativo/servidores", {
+              escola_id: Number(escolaId),
+              tipo_registro: "override",
+              servidor: novoOv,
+            });
+          } catch {}
+        }
+      } else {
+        const atualizado = {
+          ...servidor,
+          ativo: novoStatus,
+          atualizado_em: new Date().toISOString(),
+        };
+        setCustomStaff((prev) =>
+          prev.map((s) => (s.id === servidor.id ? atualizado : s))
+        );
+        if (escolaId && escolaId !== "default") {
+          try {
+            await api.post("/api/administrativo/servidores", {
+              escola_id: Number(escolaId),
+              tipo_registro: "custom",
+              servidor: atualizado,
+            });
+          } catch {}
+        }
+      }
+    },
+    [escolaId, overrides]
+  );
 
-  const excluirServidor = useCallback((servidor) => {
-    if (String(servidor.id).startsWith("sys-")) {
-      setOverrides((prev) => ({
-        ...prev,
-        [servidor.id]: {
-          ...(prev[servidor.id] || {}),
-          _deleted: true,
-        },
-      }));
-    } else {
-      setCustomStaff((prev) => prev.filter((s) => s.id !== servidor.id));
-    }
-  }, []);
+  const excluirServidor = useCallback(
+    async (servidor) => {
+      if (String(servidor.id).startsWith("sys-")) {
+        setOverrides((prev) => ({
+          ...prev,
+          [servidor.id]: {
+            ...(prev[servidor.id] || {}),
+            _deleted: true,
+          },
+        }));
+      } else {
+        setCustomStaff((prev) => prev.filter((s) => s.id !== servidor.id));
+      }
 
-  // ── Ações CRUD de Ocorrências (Abonos, Atestados, Ausências, Negociações e Lote) ──
+      if (escolaId && escolaId !== "default") {
+        try {
+          await api.delete(
+            `/api/administrativo/servidores/${encodeURIComponent(
+              servidor.id
+            )}?escola_id=${escolaId}`
+          );
+        } catch (err) {
+          console.error("[Administrativo] Erro ao excluir servidor no backend:", err);
+        }
+      }
+    },
+    [escolaId]
+  );
+
+  // ── Ações CRUD de Ocorrências (Persistidas no MySQL via /api/administrativo/ocorrencias) ──
   const salvarOcorrencia = useCallback(
-    (dados) => {
+    async (dados) => {
       const usrLogado = getUsuarioLogadoRastreabilidade();
 
       // Suporte a Lançamento em Lote (múltiplos servidores/categorias de uma só vez)
@@ -1416,6 +1437,16 @@ export function useAdministrativoData() {
 
         if (novasOcorrencias.length > 0) {
           setOcorrencias((prev) => [...novasOcorrencias, ...prev]);
+          if (escolaId && escolaId !== "default") {
+            try {
+              await api.post("/api/administrativo/ocorrencias", {
+                escola_id: Number(escolaId),
+                ocorrencias: novasOcorrencias,
+              });
+            } catch (err) {
+              console.error("[Administrativo] Erro ao salvar lote de ocorrências no backend:", err);
+            }
+          }
         }
         return { ok: true, lote: true, quantidade: novasOcorrencias.length };
       }
@@ -1430,54 +1461,122 @@ export function useAdministrativoData() {
         atualizado_em: new Date().toISOString(),
       };
 
+      let occFinal = null;
       if (dados.id) {
+        occFinal = {
+          ...(ocorrencias.find((o) => o.id === dados.id) || {}),
+          ...payload,
+          id: dados.id,
+        };
         setOcorrencias((prev) =>
-          prev.map((o) => (o.id === dados.id ? { ...o, ...payload } : o))
+          prev.map((o) => (o.id === dados.id ? occFinal : o))
         );
       } else {
-        const nova = {
+        occFinal = {
           ...payload,
           id: `occ-${Date.now()}`,
           criado_em: new Date().toISOString().slice(0, 10),
         };
-        setOcorrencias((prev) => [nova, ...prev]);
+        setOcorrencias((prev) => [occFinal, ...prev]);
       }
+
+      if (escolaId && escolaId !== "default" && occFinal) {
+        try {
+          await api.post("/api/administrativo/ocorrencias", {
+            escola_id: Number(escolaId),
+            ocorrencia: occFinal,
+          });
+        } catch (err) {
+          console.error("[Administrativo] Erro ao salvar ocorrência no backend:", err);
+        }
+      }
+
       return { ok: true, lote: false, quantidade: 1 };
     },
-    [servidores]
+    [servidores, escolaId, ocorrencias]
   );
 
-  const excluirOcorrencia = useCallback((id) => {
-    setOcorrencias((prev) => prev.filter((o) => o.id !== id));
-  }, []);
+  const excluirOcorrencia = useCallback(
+    async (id) => {
+      setOcorrencias((prev) => prev.filter((o) => o.id !== id));
+      if (escolaId && escolaId !== "default" && id) {
+        try {
+          await api.delete(
+            `/api/administrativo/ocorrencias/${encodeURIComponent(
+              id
+            )}?escola_id=${escolaId}`
+          );
+        } catch (err) {
+          console.error("[Administrativo] Erro ao excluir ocorrência no backend:", err);
+        }
+      }
+    },
+    [escolaId]
+  );
 
-  const atualizarStatusOcorrencia = useCallback((id, novoStatus) => {
-    setOcorrencias((prev) =>
-      prev.map((o) => (o.id === id ? { ...o, status: novoStatus } : o))
-    );
-  }, []);
+  const atualizarStatusOcorrencia = useCallback(
+    async (id, novoStatus) => {
+      setOcorrencias((prev) =>
+        prev.map((o) => (o.id === id ? { ...o, status: novoStatus } : o))
+      );
+      if (escolaId && escolaId !== "default" && id) {
+        try {
+          await api.patch(
+            `/api/administrativo/ocorrencias/${encodeURIComponent(id)}/status`,
+            {
+              escola_id: Number(escolaId),
+              status: novoStatus,
+            }
+          );
+        } catch (err) {
+          console.error("[Administrativo] Erro ao atualizar status da ocorrência no backend:", err);
+        }
+      }
+    },
+    [escolaId]
+  );
 
-  // ── Ações de Ponto Diário ───────────────────────────────────────────────────
-  const registrarPontoServidor = useCallback((dataISO, servidorId, dadosPonto) => {
-    setPontoDiario((prev) => {
-      const doDia = prev[dataISO] || {};
-      return {
-        ...prev,
-        [dataISO]: {
-          ...doDia,
-          [servidorId]: {
-            ...(doDia[servidorId] || {}),
-            ...dadosPonto,
-            atualizado_em: new Date().toISOString(),
-          },
-        },
+  // ── Ações de Ponto Diário (Persistidas no MySQL via /api/administrativo/ponto) ──
+  const registrarPontoServidor = useCallback(
+    async (dataISO, servidorId, dadosPonto) => {
+      const novoPonto = {
+        ...(pontoDiario?.[dataISO]?.[servidorId] || {}),
+        ...dadosPonto,
+        atualizado_em: new Date().toISOString(),
       };
-    });
-  }, []);
+
+      setPontoDiario((prev) => {
+        const doDia = prev[dataISO] || {};
+        return {
+          ...prev,
+          [dataISO]: {
+            ...doDia,
+            [servidorId]: novoPonto,
+          },
+        };
+      });
+
+      if (escolaId && escolaId !== "default") {
+        try {
+          await api.post("/api/administrativo/ponto", {
+            escola_id: Number(escolaId),
+            entries: [
+              {
+                data_iso: dataISO,
+                servidor_id: servidorId,
+                dados: novoPonto,
+              },
+            ],
+          });
+        } catch {}
+      }
+    },
+    [escolaId, pontoDiario]
+  );
 
   // Lançamento Coletivo de Frequência & Ponto (Ponto Facultativo, Dia Letivo Móvel, Decreto, Paralisação, etc.)
   const registrarPontoColetivo = useCallback(
-    ({
+    async ({
       dataInicio,
       dataFim,
       servidoresAlvo = [],
@@ -1500,6 +1599,8 @@ export function useAdministrativoData() {
         datasIntervalo.push(`${y}-${m}-${d}`);
         cur.setDate(cur.getDate() + 1);
       }
+
+      const entriesToSync = [];
 
       setPontoDiario((prev) => {
         const next = { ...prev };
@@ -1541,17 +1642,33 @@ export function useAdministrativoData() {
                 atualizado_em: new Date().toISOString(),
               };
             }
+            entriesToSync.push({
+              data_iso: iso,
+              servidor_id: srv.id,
+              dados: doDia[srv.id],
+            });
           });
           next[iso] = doDia;
         });
         return next;
       });
+
+      if (escolaId && escolaId !== "default" && entriesToSync.length > 0) {
+        try {
+          await api.post("/api/administrativo/ponto", {
+            escola_id: Number(escolaId),
+            entries: entriesToSync,
+          });
+        } catch {}
+      }
     },
-    []
+    [escolaId]
   );
 
   const marcarTodosPresentesNoDia = useCallback(
-    (dataISO, listaServidores) => {
+    async (dataISO, listaServidores) => {
+      const entriesToSync = [];
+
       setPontoDiario((prev) => {
         const doDia = { ...(prev[dataISO] || {}) };
         listaServidores.forEach((srv) => {
@@ -1567,6 +1684,11 @@ export function useAdministrativoData() {
               observacao: "",
               atualizado_em: new Date().toISOString(),
             };
+            entriesToSync.push({
+              data_iso: dataISO,
+              servidor_id: srv.id,
+              dados: doDia[srv.id],
+            });
           }
         });
         return {
@@ -1574,8 +1696,17 @@ export function useAdministrativoData() {
           [dataISO]: doDia,
         };
       });
+
+      if (escolaId && escolaId !== "default" && entriesToSync.length > 0) {
+        try {
+          await api.post("/api/administrativo/ponto", {
+            escola_id: Number(escolaId),
+            entries: entriesToSync,
+          });
+        } catch {}
+      }
     },
-    []
+    [escolaId]
   );
 
   // ── Estatísticas por Servidor (Saldo de Abonos, Dias de Atestado, etc.) ────

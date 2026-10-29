@@ -36,6 +36,7 @@ import {
   formatarCPF,
 } from "./useAdministrativoData";
 import FolhaPontoOficialSEEDF from "./FolhaPontoOficialSEEDF";
+import api from "../../services/api";
 
 const STORAGE_KEY_UNIDADE = "educa_admin_seedf_unidade_cfg_v1";
 
@@ -119,7 +120,10 @@ export default function RelatoriosTab({
   // Configuração institucional da Unidade Escolar (UA / CRE / Código SIGEP)
   const [dadosUnidade, setDadosUnidade] = useState(() => {
     try {
-      const salvo = localStorage.getItem(STORAGE_KEY_UNIDADE);
+      const escId = localStorage.getItem("escola_id") || "default";
+      const salvo =
+        localStorage.getItem(`${STORAGE_KEY_UNIDADE}_${escId}`) ||
+        localStorage.getItem(STORAGE_KEY_UNIDADE);
       if (salvo) {
         const parsed = JSON.parse(salvo);
         if (
@@ -163,11 +167,26 @@ export default function RelatoriosTab({
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY_UNIDADE, JSON.stringify(dadosUnidade));
+      const escId = localStorage.getItem("escola_id") || "default";
+      const cfgStr = JSON.stringify(dadosUnidade);
+      localStorage.setItem(STORAGE_KEY_UNIDADE, cfgStr);
+      localStorage.setItem(`${STORAGE_KEY_UNIDADE}_${escId}`, cfgStr);
     } catch {
       // ignore
     }
-  }, [dadosUnidade]);
+    if (!mostrarConfigCabecalho) return;
+    const escId = localStorage.getItem("escola_id");
+    if (!escId || escId === "default") return;
+    const timer = setTimeout(() => {
+      api
+        .put("/api/administrativo/config-unidade", {
+          escola_id: Number(escId),
+          config: dadosUnidade,
+        })
+        .catch(() => {});
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [dadosUnidade, mostrarConfigCabecalho]);
 
   useEffect(() => {
     const onCfgUpdated = (e) => {

@@ -18,6 +18,11 @@ import {
   ArrowPathIcon,
   BriefcaseIcon,
   PlusIcon,
+  FingerPrintIcon,
+  SparklesIcon,
+  XMarkIcon,
+  ClockIcon,
+  ShieldCheckIcon,
 } from "@heroicons/react/24/outline";
 import { useAdministrativoData } from "./useAdministrativoData";
 import ServidoresTab from "./ServidoresTab";
@@ -30,35 +35,35 @@ const TABS_ADMIN = [
   {
     id: "servidores",
     path: "/administrativo/servidores",
-    label: "Quadro de Servidores",
+    label: "CADASTRO",
     sublabel: "Professores, Direção & Terceirizados",
     icon: UserGroupIcon,
   },
   {
     id: "frequencia",
     path: "/administrativo/frequencia",
-    label: "Frequência & Ponto Diário",
-    sublabel: "Presença, Horários & Chamada",
+    label: "BIOMETRIA",
+    sublabel: "Ponto Eletrônico & Leitura Biométrica",
     icon: CalendarDaysIcon,
+    emBreve: true,
   },
   {
     id: "ocorrencias",
     path: "/administrativo/ocorrencias",
-    label: "Abonos, Atestados & Acordos",
-    sublabel: "Ausências e Negociações Internas",
+    label: "LANÇAMENTOS",
+    sublabel: "Abonos, Atestados, Ausências & Acordos",
     icon: ClipboardDocumentCheckIcon,
   },
   {
     id: "relatorios",
     path: "/administrativo/relatorios",
-    label: "Espelho & Relatórios",
-    sublabel: "Saldo de Abonos & Impressão",
+    label: "IMPRIMIR / PDF",
+    sublabel: "Folha de Ponto Oficial SEEDF",
     icon: ChartBarIcon,
   },
 ];
 
 function getTabFromPathname(pathname) {
-  if (pathname.includes("/frequencia")) return "frequencia";
   if (pathname.includes("/ocorrencias")) return "ocorrencias";
   if (pathname.includes("/relatorios")) return "relatorios";
   return "servidores";
@@ -93,6 +98,11 @@ export default function AdministrativoModule() {
     getTabFromPathname(location.pathname)
   );
 
+  // Estado do Modal Prêmium "EM BREVE" da aba BIOMETRIA (Passo 18)
+  const [modalBiometriaEmBreve, setModalBiometriaEmBreve] = useState(() =>
+    location.pathname.includes("/frequencia")
+  );
+
   // Estado do Modal Global de Ocorrências (acessível de qualquer aba)
   const [modalOccAberto, setModalOccAberto] = useState(false);
   const [occEdicao, setOccEdicao] = useState(null);
@@ -101,10 +111,32 @@ export default function AdministrativoModule() {
   const [dataPreSel, setDataPreSel] = useState(null);
 
   useEffect(() => {
+    if (location.pathname.includes("/frequencia")) {
+      setModalBiometriaEmBreve(true);
+      const tabDestino =
+        activeTab && activeTab !== "frequencia" ? activeTab : "servidores";
+      setActiveTab(tabDestino);
+      navigate(`/administrativo/${tabDestino}`, { replace: true });
+      return;
+    }
     setActiveTab(getTabFromPathname(location.pathname));
-  }, [location.pathname]);
+  }, [location.pathname, activeTab, navigate]);
+
+  useEffect(() => {
+    const handler = () => setModalBiometriaEmBreve(true);
+    window.addEventListener("educa:abrir-modal-biometria-em-breve", handler);
+    return () =>
+      window.removeEventListener(
+        "educa:abrir-modal-biometria-em-breve",
+        handler
+      );
+  }, []);
 
   const handleTrocarAba = (tab) => {
+    if (tab.id === "frequencia" || tab.emBreve) {
+      setModalBiometriaEmBreve(true);
+      return;
+    }
     setActiveTab(tab.id);
     navigate(tab.path);
   };
@@ -197,7 +229,7 @@ export default function AdministrativoModule() {
         <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 mt-6 pt-5 border-t border-white/15">
           {TABS_ADMIN.map((tab) => {
             const Icon = tab.icon;
-            const isAtiva = activeTab === tab.id;
+            const isAtiva = activeTab === tab.id && !tab.emBreve;
             return (
               <button
                 key={tab.id}
@@ -218,13 +250,20 @@ export default function AdministrativoModule() {
                 >
                   <Icon className="h-5 w-5" />
                 </div>
-                <div className="min-w-0">
-                  <div
-                    className={`text-xs font-extrabold truncate ${
-                      isAtiva ? "text-slate-900" : "text-white"
-                    }`}
-                  >
-                    {tab.label}
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-1.5">
+                    <span
+                      className={`text-xs font-extrabold truncate ${
+                        isAtiva ? "text-slate-900" : "text-white"
+                      }`}
+                    >
+                      {tab.label}
+                    </span>
+                    {tab.emBreve && (
+                      <span className="px-1.5 py-0.5 rounded-md text-[9px] font-extrabold uppercase tracking-wider bg-amber-400/25 text-amber-200 border border-amber-300/40 flex-shrink-0">
+                        EM BREVE
+                      </span>
+                    )}
                   </div>
                   <div
                     className={`text-[11px] truncate ${
@@ -256,7 +295,8 @@ export default function AdministrativoModule() {
         />
       )}
 
-      {activeTab === "frequencia" && (
+      {/* Mantém FrequenciaPontoTab intacto no código (desativado enquanto emBreve estiver ativo) */}
+      {false && activeTab === "frequencia" && (
         <FrequenciaPontoTab
           servidores={servidores}
           ocorrencias={ocorrencias}
@@ -306,6 +346,95 @@ export default function AdministrativoModule() {
         tipoInicial={tipoPreSel}
         dataInicial={dataPreSel}
       />
+
+      {/* ── MODAL PRÊMIUM: BIOMETRIA — EM BREVE (PASSO 18) ── */}
+      {modalBiometriaEmBreve && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden">
+            {/* Header Gradiente Prêmium */}
+            <div
+              className="px-6 py-6 text-white relative overflow-hidden"
+              style={{
+                background:
+                  "linear-gradient(135deg, #0f172a 0%, #1e3a8a 55%, #0d9488 100%)",
+              }}
+            >
+              <div
+                className="absolute -right-10 -top-10 h-40 w-40 rounded-full pointer-events-none"
+                style={{
+                  background:
+                    "radial-gradient(circle, rgba(45,212,191,0.28) 0%, transparent 70%)",
+                }}
+              />
+              <div className="relative z-10 flex items-start justify-between gap-4">
+                <div className="flex items-center gap-3.5">
+                  <div className="h-14 w-14 rounded-2xl bg-white/15 backdrop-blur border border-white/25 flex items-center justify-center shadow-inner flex-shrink-0">
+                    <FingerPrintIcon className="h-8 w-8 text-teal-300" />
+                  </div>
+                  <div>
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-widest bg-amber-400/25 text-amber-200 border border-amber-300/40">
+                      <SparklesIcon className="h-3 w-3 text-amber-300" />
+                      EM BREVE
+                    </span>
+                    <h3 className="text-xl font-extrabold tracking-tight mt-1">
+                      Módulo de Biometria
+                    </h3>
+                    <p className="text-xs text-teal-100/90 mt-0.5">
+                      Ponto Eletrônico & Reconhecimento Biométrico Escolar
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setModalBiometriaEmBreve(false)}
+                  className="p-1.5 rounded-xl hover:bg-white/15 text-white/90 hover:text-white transition"
+                  title="Fechar"
+                >
+                  <XMarkIcon className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Corpo do Modal */}
+            <div className="p-6 space-y-4">
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-50 to-blue-50/50 border border-slate-200/90 space-y-2">
+                <div className="text-sm font-extrabold text-slate-800 flex items-center gap-2">
+                  <ClockIcon className="h-5 w-5 text-blue-600 flex-shrink-0" />
+                  <span>Recurso em Fase de Implantação</span>
+                </div>
+                <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                  O módulo de <strong>BIOMETRIA</strong> será liberado assim que a integração com os terminais de leitura biométrica for implantada na unidade escolar.
+                </p>
+              </div>
+
+              <div className="space-y-2.5 text-xs text-slate-600">
+                <div className="flex items-start gap-2.5 p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                  <ShieldCheckIcon className="h-4 w-4 text-teal-600 flex-shrink-0 mt-0.5" />
+                  <span>
+                    <strong>Fluxo Atual Ativo:</strong> Utilize normalmente as abas{" "}
+                    <strong>CADASTRO</strong>, <strong>LANÇAMENTOS</strong> e{" "}
+                    <strong>IMPRIMIR / PDF</strong> para gerenciar os servidores, registrar ocorrências e emitir as Folhas de Frequência oficiais da SEEDF.
+                  </span>
+                </div>
+              </div>
+
+              <div className="pt-2 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setModalBiometriaEmBreve(false)}
+                  className="w-full sm:w-auto px-6 py-2.5 rounded-xl text-white text-sm font-extrabold shadow-lg hover:opacity-95 transition"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, #0f172a 0%, #1e3a8a 60%, #0d9488 100%)",
+                  }}
+                >
+                  Entendi, voltar ao sistema
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1860,7 +1860,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     }}
                   >
                     <UsersIcon className="h-5 w-5 mr-2" style={{ color: isActive('/administrativo/servidores') ? '#38bdf8' : undefined }} />
-                    <span className="flex-1">Servidores & Equipe</span>
+                    <span className="flex-1">CADASTRO</span>
                   </Link>
                 </li>
                 )}
@@ -1869,6 +1869,12 @@ export default function Sidebar({ isOpen, onClose }) {
                 <li>
                   <Link
                     to="/administrativo/frequencia"
+                    onClick={(e) => {
+                      if (location.pathname.startsWith('/administrativo')) {
+                        e.preventDefault();
+                        window.dispatchEvent(new CustomEvent('educa:abrir-modal-biometria-em-breve'));
+                      }
+                    }}
                     className={getSubmenuLinkClasses('/administrativo/frequencia')}
                     style={{
                       background: isActive('/administrativo/frequencia')
@@ -1877,7 +1883,21 @@ export default function Sidebar({ isOpen, onClose }) {
                     }}
                   >
                     <CalendarDaysIcon className="h-5 w-5 mr-2" style={{ color: isActive('/administrativo/frequencia') ? '#34d399' : undefined }} />
-                    <span className="flex-1">Frequência & Ponto</span>
+                    <span className="flex-1">BIOMETRIA</span>
+                    <span
+                      style={{
+                        fontSize: '0.5rem',
+                        fontWeight: 800,
+                        background: 'rgba(245, 158, 11, 0.22)',
+                        color: '#fcd34d',
+                        border: '1px solid rgba(251, 191, 36, 0.4)',
+                        padding: '1px 5px',
+                        borderRadius: '6px',
+                        letterSpacing: '0.4px',
+                      }}
+                    >
+                      EM BREVE
+                    </span>
                   </Link>
                 </li>
                 )}
@@ -1894,7 +1914,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     }}
                   >
                     <DocumentTextIcon className="h-5 w-5 mr-2" style={{ color: isActive('/administrativo/ocorrencias') ? '#a78bfa' : undefined }} />
-                    <span className="flex-1">Abonos & Ocorrências</span>
+                    <span className="flex-1">LANÇAMENTOS</span>
                   </Link>
                 </li>
                 )}
@@ -1911,7 +1931,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     }}
                   >
                     <ChartBarIcon className="h-5 w-5 mr-2" style={{ color: isActive('/administrativo/relatorios') ? '#fbbf24' : undefined }} />
-                    <span className="flex-1">Espelho & Relatórios</span>
+                    <span className="flex-1">IMPRIMIR / PDF</span>
                   </Link>
                 </li>
                 )}

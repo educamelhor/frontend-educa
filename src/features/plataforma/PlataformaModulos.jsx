@@ -157,10 +157,10 @@ const MODULOS_TREE = [
   {
     id: 'administrativo', label: 'Administrativo', icon: '🏢',
     filhos: [
-      { id: 'administrativo.servidores', label: 'Servidores & Equipe' },
-      { id: 'administrativo.frequencia', label: 'Frequência & Ponto' },
-      { id: 'administrativo.ocorrencias', label: 'Abonos & Ocorrências' },
-      { id: 'administrativo.relatorios', label: 'Espelho & Relatórios' },
+      { id: 'administrativo.servidores', label: 'CADASTRO' },
+      { id: 'administrativo.frequencia', label: 'BIOMETRIA' },
+      { id: 'administrativo.ocorrencias', label: 'LANÇAMENTOS' },
+      { id: 'administrativo.relatorios', label: 'IMPRIMIR / PDF' },
     ]
   },
 ];

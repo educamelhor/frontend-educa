@@ -46,6 +46,48 @@ import {
   formatarCPF,
   limparCPF,
 } from "./useAdministrativoData";
+import brasaoDfImg from "./brasao-df.png";
+
+function converterArquivoImagemParaDataUrl(file, onDone) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const rawDataUrl = ev.target?.result;
+    if (!rawDataUrl) return;
+    if (file.type === "image/svg+xml") {
+      onDone(String(rawDataUrl));
+      return;
+    }
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const maxDim = 220;
+        let w = img.width || maxDim;
+        let h = img.height || maxDim;
+        if (w > maxDim || h > maxDim) {
+          if (w > h) {
+            h = Math.round((h * maxDim) / w);
+            w = maxDim;
+          } else {
+            w = Math.round((w * maxDim) / h);
+            h = maxDim;
+          }
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, w, h);
+        onDone(canvas.toDataURL("image/png"));
+      } catch {
+        onDone(String(rawDataUrl));
+      }
+    };
+    img.onerror = () => onDone(String(rawDataUrl));
+    img.src = String(rawDataUrl);
+  };
+  reader.readAsDataURL(file);
+}
 
 function getCategoriaMeta(cat) {
   return (
@@ -209,11 +251,15 @@ export default function ServidoresTab({
   const [modalHorarioCabecalhoAberto, setModalHorarioCabecalhoAberto] = useState(false);
   const [cfgHorarioCabecalho, setCfgHorarioCabecalho] = useState(() => {
     const padrao = {
-      // 1. Cabeçalho Institucional / Mantenedora
+      // 1. Cabeçalho Institucional / Mantenedora / Brasão (PASSO 23)
       orgaoTitulo: "SECRETARIA DE ESTADO DE EDUCAÇÃO",
       cnpjOrgao: "00.394.676/0001-07",
       ua: "007",
       cre: "COORDENAÇÃO REGIONAL DE ENSINO DE PLANALTINA",
+      modoLogoCabecalho: "brasao_gdf", // "brasao_gdf" | "personalizado" | "ocultar"
+      logoEsquerdaDataUrl: "",
+      exibirLogoDireita: false,
+      logoDireitaDataUrl: "",
       // 2. Identificação da Unidade Escolar (Exercício & Lotação Padrão — PASSO 21)
       codigoExercicio: "990230000043",
       nomeEscola: "CENTRO DE ENSINO FUNDAMENTAL 04 DE PLANALTINA - COLEGIO CM",
@@ -2414,17 +2460,274 @@ export default function ServidoresTab({
                   </div>
                 </div>
                 <span className="hidden md:inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase bg-white text-emerald-800 border border-emerald-300 flex-shrink-0">
-                  17 Campos na Folha
+                  19 Campos na Folha
                 </span>
               </div>
 
-              {/* 1. CABEÇALHO INSTITUCIONAL / ÓRGÃO MANTENEDOR */}
+              {/* 1. CABEÇALHO INSTITUCIONAL / ÓRGÃO MANTENEDOR / BRASÃO */}
               <div className="space-y-3">
                 <div className="flex items-center gap-2 border-b border-slate-200 pb-1.5">
                   <BuildingOffice2Icon className="h-4 w-4 text-emerald-700" />
                   <span className="text-xs font-extrabold uppercase tracking-wider text-slate-700">
-                    1. Cabeçalho Institucional (Órgão / Mantenedora / Regional)
+                    1. Cabeçalho Institucional (Órgão / Mantenedora / Regional / Brasão)
                   </span>
+                </div>
+
+                {/* PASSO 23 — ITEM 5: Logo / Brasão do Cabeçalho */}
+                <div className="p-3 rounded-xl bg-emerald-50/75 border border-emerald-300/90 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-extrabold uppercase text-emerald-950">
+                        Logo / Brasão do Cabeçalho da Folha de Ponto
+                      </span>
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
+                        🖨️ Brasão no Topo da Folha
+                      </span>
+                    </div>
+
+                    <div className="inline-flex flex-wrap rounded-xl border border-emerald-400 bg-white p-1 gap-1 shadow-sm">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCfgHorarioCabecalho({
+                            ...cfgHorarioCabecalho,
+                            modoLogoCabecalho: "brasao_gdf",
+                          })
+                        }
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition ${
+                          (cfgHorarioCabecalho.modoLogoCabecalho || "brasao_gdf") ===
+                          "brasao_gdf"
+                            ? "bg-emerald-700 text-white shadow-sm"
+                            : "text-slate-700 hover:bg-emerald-50"
+                        }`}
+                      >
+                        🏛️ Brasão Oficial GDF (Padrão)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCfgHorarioCabecalho({
+                            ...cfgHorarioCabecalho,
+                            modoLogoCabecalho: "personalizado",
+                          })
+                        }
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition ${
+                          cfgHorarioCabecalho.modoLogoCabecalho === "personalizado"
+                            ? "bg-emerald-700 text-white shadow-sm"
+                            : "text-slate-700 hover:bg-emerald-50"
+                        }`}
+                      >
+                        🖼️ Logo / Brasão Personalizado
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCfgHorarioCabecalho({
+                            ...cfgHorarioCabecalho,
+                            modoLogoCabecalho: "ocultar",
+                          })
+                        }
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold transition ${
+                          cfgHorarioCabecalho.modoLogoCabecalho === "ocultar"
+                            ? "bg-slate-800 text-white shadow-sm"
+                            : "text-slate-700 hover:bg-slate-100"
+                        }`}
+                      >
+                        📄 Ocultar (Papel Timbrado)
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    {/* Coluna 1: Brasão / Logo Principal (Esquerda do Cabeçalho) */}
+                    <div className="p-2.5 rounded-xl bg-white/85 border border-emerald-300 flex items-center gap-3">
+                      <div className="h-14 w-14 rounded-lg border border-emerald-300 bg-white flex items-center justify-center p-1 flex-shrink-0">
+                        {cfgHorarioCabecalho.modoLogoCabecalho === "ocultar" ? (
+                          <span className="text-[10px] font-bold text-slate-400 text-center leading-tight">
+                            Sem Brasão
+                          </span>
+                        ) : (
+                          <img
+                            src={
+                              cfgHorarioCabecalho.modoLogoCabecalho ===
+                                "personalizado" &&
+                              cfgHorarioCabecalho.logoEsquerdaDataUrl
+                                ? cfgHorarioCabecalho.logoEsquerdaDataUrl
+                                : brasaoDfImg
+                            }
+                            alt="Preview Brasão Esquerdo"
+                            className="max-h-12 max-w-12 object-contain"
+                          />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0 space-y-1.5">
+                        <div className="text-[11px] font-extrabold uppercase text-emerald-950">
+                          Brasão Principal (Esquerda do Topo)
+                        </div>
+                        {cfgHorarioCabecalho.modoLogoCabecalho ===
+                        "personalizado" ? (
+                          <div className="space-y-1.5">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <label className="px-2.5 py-1 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-bold cursor-pointer transition shadow-sm">
+                                Enviar Imagem (PNG/JPG/SVG)
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    const f = e.target.files?.[0];
+                                    converterArquivoImagemParaDataUrl(
+                                      f,
+                                      (dataUrl) => {
+                                        setCfgHorarioCabecalho((prev) => ({
+                                          ...prev,
+                                          modoLogoCabecalho: "personalizado",
+                                          logoEsquerdaDataUrl: dataUrl,
+                                        }));
+                                      }
+                                    );
+                                  }}
+                                />
+                              </label>
+                              {cfgHorarioCabecalho.logoEsquerdaDataUrl && (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setCfgHorarioCabecalho({
+                                      ...cfgHorarioCabecalho,
+                                      logoEsquerdaDataUrl: "",
+                                    })
+                                  }
+                                  className="px-2 py-1 rounded-lg border border-slate-300 text-[10px] font-bold text-slate-600 hover:bg-slate-100"
+                                >
+                                  Limpar
+                                </button>
+                              )}
+                            </div>
+                            <input
+                              type="text"
+                              value={
+                                cfgHorarioCabecalho.logoEsquerdaDataUrl?.startsWith(
+                                  "data:"
+                                )
+                                  ? ""
+                                  : cfgHorarioCabecalho.logoEsquerdaDataUrl || ""
+                              }
+                              onChange={(e) =>
+                                setCfgHorarioCabecalho({
+                                  ...cfgHorarioCabecalho,
+                                  logoEsquerdaDataUrl: e.target.value,
+                                })
+                              }
+                              placeholder="Ou cole a URL da imagem do Brasão..."
+                              className="w-full rounded-lg border border-emerald-400 bg-emerald-50/70 px-2.5 py-1 text-[11px] font-semibold text-slate-800 outline-none"
+                            />
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-emerald-900 leading-snug">
+                            {cfgHorarioCabecalho.modoLogoCabecalho === "ocultar"
+                              ? "O cabeçalho será impresso sem imagem de brasão à esquerda."
+                              : "Utilizando o Brasão Oficial do Distrito Federal (GDF / SEEDF)."}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Coluna 2: 2º Brasão / Logo da Escola à Direita (Opcional — Ex: CCMDF / Escola) */}
+                    <div className="p-2.5 rounded-xl bg-white/85 border border-emerald-300 flex items-center gap-3">
+                      <div className="h-14 w-14 rounded-lg border border-emerald-300 bg-white flex items-center justify-center p-1 flex-shrink-0">
+                        {cfgHorarioCabecalho.exibirLogoDireita &&
+                        cfgHorarioCabecalho.logoDireitaDataUrl ? (
+                          <img
+                            src={cfgHorarioCabecalho.logoDireitaDataUrl}
+                            alt="Preview Logo Direita"
+                            className="max-h-12 max-w-12 object-contain"
+                          />
+                        ) : (
+                          <span className="text-[10px] font-bold text-slate-400 text-center leading-tight">
+                            Opcional (Direita)
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0 space-y-1.5">
+                        <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(
+                              cfgHorarioCabecalho.exibirLogoDireita
+                            )}
+                            onChange={(e) =>
+                              setCfgHorarioCabecalho({
+                                ...cfgHorarioCabecalho,
+                                exibirLogoDireita: e.target.checked,
+                              })
+                            }
+                            className="h-3.5 w-3.5 rounded border-emerald-500 text-emerald-700"
+                          />
+                          <span className="text-[11px] font-extrabold uppercase text-emerald-950">
+                            2º Brasão / Logo da Escola à Direita (Opcional)
+                          </span>
+                        </label>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <label className="px-2.5 py-1 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-bold cursor-pointer transition shadow-sm">
+                            Enviar Logo Direita
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const f = e.target.files?.[0];
+                                converterArquivoImagemParaDataUrl(
+                                  f,
+                                  (dataUrl) => {
+                                    setCfgHorarioCabecalho((prev) => ({
+                                      ...prev,
+                                      exibirLogoDireita: true,
+                                      logoDireitaDataUrl: dataUrl,
+                                    }));
+                                  }
+                                );
+                              }}
+                            />
+                          </label>
+                          {cfgHorarioCabecalho.logoDireitaDataUrl && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setCfgHorarioCabecalho({
+                                  ...cfgHorarioCabecalho,
+                                  exibirLogoDireita: false,
+                                  logoDireitaDataUrl: "",
+                                })
+                              }
+                              className="px-2 py-1 rounded-lg border border-slate-300 text-[10px] font-bold text-slate-600 hover:bg-slate-100"
+                            >
+                              Remover
+                            </button>
+                          )}
+                        </div>
+                        <input
+                          type="text"
+                          value={
+                            cfgHorarioCabecalho.logoDireitaDataUrl?.startsWith(
+                              "data:"
+                            )
+                              ? ""
+                              : cfgHorarioCabecalho.logoDireitaDataUrl || ""
+                          }
+                          onChange={(e) =>
+                            setCfgHorarioCabecalho({
+                              ...cfgHorarioCabecalho,
+                              exibirLogoDireita: Boolean(e.target.value.trim()),
+                              logoDireitaDataUrl: e.target.value,
+                            })
+                          }
+                          placeholder="Ex: Logo CCMDF / Brasão da Escola (URL ou Upload)"
+                          className="w-full rounded-lg border border-emerald-400 bg-emerald-50/70 px-2.5 py-1 text-[11px] font-semibold text-slate-800 outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

@@ -421,6 +421,21 @@ export default function FolhaPontoOficialSEEDF({
     codEstabelecimento,
   ]);
 
+  // Configuração de Logo / Brasão do Cabeçalho (PASSO 23 — Item 5)
+  const modoLogoCabecalho = dadosUnidade.modoLogoCabecalho || "brasao_gdf";
+  const srcLogoEsquerda =
+    modoLogoCabecalho === "ocultar"
+      ? null
+      : modoLogoCabecalho === "personalizado" &&
+        String(dadosUnidade.logoEsquerdaDataUrl || "").trim()
+      ? String(dadosUnidade.logoEsquerdaDataUrl).trim()
+      : brasaoDfImg;
+  const srcLogoDireita =
+    dadosUnidade.exibirLogoDireita &&
+    String(dadosUnidade.logoDireitaDataUrl || "").trim()
+      ? String(dadosUnidade.logoDireitaDataUrl).trim()
+      : null;
+
   // Configuração de Assinaturas (PASSO 20 — Responsável pelas Informações, Chefia Imediata e Superior)
   const imprimirAssinaturasNaFolha =
     dadosUnidade.imprimirAssinaturasNaFolha !== false;
@@ -794,7 +809,7 @@ export default function FolhaPontoOficialSEEDF({
                 boxSizing: "border-box",
               }}
             >
-              {/* Parte Superior: Brasão GDF oficial à esquerda + Título Centralizado */}
+              {/* Parte Superior: Brasão à esquerda + Título Centralizado + 2º Brasão opcional à direita */}
               <div
                 style={{
                   position: "relative",
@@ -807,18 +822,20 @@ export default function FolhaPontoOficialSEEDF({
                   boxSizing: "border-box",
                 }}
               >
-                <img
-                  src={brasaoDfImg}
-                  alt="Brasão do Distrito Federal"
-                  style={{
-                    position: "absolute",
-                    left: "14px",
-                    top: "3px",
-                    width: "46px",
-                    height: "48px",
-                    objectFit: "contain",
-                  }}
-                />
+                {srcLogoEsquerda && (
+                  <img
+                    src={srcLogoEsquerda}
+                    alt="Brasão / Logo Institucional"
+                    style={{
+                      position: "absolute",
+                      left: "14px",
+                      top: "3px",
+                      width: "46px",
+                      height: "48px",
+                      objectFit: "contain",
+                    }}
+                  />
+                )}
                 <div style={{ textAlign: "center" }}>
                   <div
                     style={{
@@ -834,6 +851,20 @@ export default function FolhaPontoOficialSEEDF({
                     CNPJ: {cnpjOrgao}
                   </div>
                 </div>
+                {srcLogoDireita && (
+                  <img
+                    src={srcLogoDireita}
+                    alt="2º Brasão / Logo da Escola"
+                    style={{
+                      position: "absolute",
+                      right: "14px",
+                      top: "3px",
+                      width: "46px",
+                      height: "48px",
+                      objectFit: "contain",
+                    }}
+                  />
+                )}
               </div>
 
               {/* Parte Inferior do Bloco 1: Folha de Frequência | REFERÊNCIA */}
@@ -959,7 +990,7 @@ export default function FolhaPontoOficialSEEDF({
               boxSizing: "border-box",
             }}
           >
-            {/* Faixa 1: Brasão Oficial GDF + Títulos */}
+            {/* Faixa 1: Brasão à esquerda + Títulos + 2º Brasão opcional à direita */}
             <div
               style={{
                 position: "relative",
@@ -972,18 +1003,20 @@ export default function FolhaPontoOficialSEEDF({
                 boxSizing: "border-box",
               }}
             >
-              <img
-                src={brasaoDfImg}
-                alt="Brasão do Distrito Federal"
-                style={{
-                  position: "absolute",
-                  left: "14px",
-                  top: "4px",
-                  width: "48px",
-                  height: "50px",
-                  objectFit: "contain",
-                }}
-              />
+              {srcLogoEsquerda && (
+                <img
+                  src={srcLogoEsquerda}
+                  alt="Brasão / Logo Institucional"
+                  style={{
+                    position: "absolute",
+                    left: "14px",
+                    top: "4px",
+                    width: "48px",
+                    height: "50px",
+                    objectFit: "contain",
+                  }}
+                />
+              )}
               <div style={{ textAlign: "center", lineHeight: 1.25 }}>
                 <div style={{ fontSize: "14.5px" }}>
                   {orgaoTitulo}
@@ -993,6 +1026,20 @@ export default function FolhaPontoOficialSEEDF({
                   FOLHA DE FREQUÊNCIA - CONTRATO TEMPORÁRIO
                 </div>
               </div>
+              {srcLogoDireita && (
+                <img
+                  src={srcLogoDireita}
+                  alt="2º Brasão / Logo da Escola"
+                  style={{
+                    position: "absolute",
+                    right: "14px",
+                    top: "4px",
+                    width: "48px",
+                    height: "50px",
+                    objectFit: "contain",
+                  }}
+                />
+              )}
             </div>
 
             {/* Faixa 2: Código do Estabelecimento | Nome do Estabelecimento | Referência */}

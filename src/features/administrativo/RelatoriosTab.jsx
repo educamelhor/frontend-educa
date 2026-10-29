@@ -154,6 +154,10 @@ export default function RelatoriosTab({
       codigoLotacaoPadrao: "",
       nomeLotacaoPadrao: "",
       mensagemQuadroVerso: "",
+      modoLogoCabecalho: "brasao_gdf",
+      logoEsquerdaDataUrl: "",
+      exibirLogoDireita: false,
+      logoDireitaDataUrl: "",
     };
   });
 
@@ -791,6 +795,134 @@ export default function RelatoriosTab({
                     Todos os campos abaixo refletem em tempo real na Folha de Ponto
                   </span>
                 </div>
+
+                {/* Controle Rápido do Logo / Brasão do Cabeçalho (PASSO 23 — Item 5) */}
+                <div className="p-2.5 rounded-lg bg-white/75 border border-emerald-300 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[11px] font-extrabold uppercase text-emerald-950">
+                      🖨️ Brasão / Logo do Cabeçalho:
+                    </span>
+                    <div className="inline-flex rounded-lg border border-emerald-400 bg-white p-0.5">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setDadosUnidade((p) => ({
+                            ...p,
+                            modoLogoCabecalho: "brasao_gdf",
+                          }))
+                        }
+                        className={`px-2 py-1 rounded-md text-[10px] font-bold transition ${
+                          (dadosUnidade.modoLogoCabecalho || "brasao_gdf") ===
+                          "brasao_gdf"
+                            ? "bg-emerald-700 text-white shadow-sm"
+                            : "text-slate-700 hover:bg-emerald-50"
+                        }`}
+                      >
+                        🏛️ Brasão GDF
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setDadosUnidade((p) => ({
+                            ...p,
+                            modoLogoCabecalho: "personalizado",
+                          }))
+                        }
+                        className={`px-2 py-1 rounded-md text-[10px] font-bold transition ${
+                          dadosUnidade.modoLogoCabecalho === "personalizado"
+                            ? "bg-emerald-700 text-white shadow-sm"
+                            : "text-slate-700 hover:bg-emerald-50"
+                        }`}
+                      >
+                        🖼️ Personalizado
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setDadosUnidade((p) => ({
+                            ...p,
+                            modoLogoCabecalho: "ocultar",
+                          }))
+                        }
+                        className={`px-2 py-1 rounded-md text-[10px] font-bold transition ${
+                          dadosUnidade.modoLogoCabecalho === "ocultar"
+                            ? "bg-slate-800 text-white shadow-sm"
+                            : "text-slate-700 hover:bg-slate-100"
+                        }`}
+                      >
+                        📄 Ocultar
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    {dadosUnidade.modoLogoCabecalho === "personalizado" && (
+                      <label className="px-2.5 py-1 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-[10px] font-bold cursor-pointer transition shadow-sm">
+                        Enviar Brasão Esquerdo
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (!f) return;
+                            const r = new FileReader();
+                            r.onload = (ev) => {
+                              if (ev.target?.result) {
+                                setDadosUnidade((p) => ({
+                                  ...p,
+                                  modoLogoCabecalho: "personalizado",
+                                  logoEsquerdaDataUrl: String(ev.target.result),
+                                }));
+                              }
+                            };
+                            r.readAsDataURL(f);
+                          }}
+                        />
+                      </label>
+                    )}
+
+                    <label className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-950 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(dadosUnidade.exibirLogoDireita)}
+                        onChange={(e) =>
+                          setDadosUnidade((p) => ({
+                            ...p,
+                            exibirLogoDireita: e.target.checked,
+                          }))
+                        }
+                        className="h-3.5 w-3.5 rounded border-emerald-500 text-emerald-700"
+                      />
+                      <span>2º Brasão à Direita (Escola / CCMDF)</span>
+                    </label>
+
+                    <label className="px-2.5 py-1 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-950 border border-emerald-400 text-[10px] font-bold cursor-pointer transition">
+                      Enviar Logo Direita
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (!f) return;
+                          const r = new FileReader();
+                          r.onload = (ev) => {
+                            if (ev.target?.result) {
+                              setDadosUnidade((p) => ({
+                                ...p,
+                                exibirLogoDireita: true,
+                                logoDireitaDataUrl: String(ev.target.result),
+                              }));
+                            }
+                          };
+                          r.readAsDataURL(f);
+                        }}
+                      />
+                    </label>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   <div>
                     <label className="block text-[11px] font-bold text-emerald-950 mb-1">

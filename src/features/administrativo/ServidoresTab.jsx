@@ -188,6 +188,7 @@ export default function ServidoresTab({
     carga_horaria: "40h",
     turno: "Integral",
     setor: "",
+    exibir_lotacao_folha: false,
     horario_trabalho: "07:30 às 17:30",
     telefone: "",
     email: "",
@@ -213,9 +214,11 @@ export default function ServidoresTab({
       cnpjOrgao: "00.394.676/0001-07",
       ua: "007",
       cre: "COORDENAÇÃO REGIONAL DE ENSINO DE PLANALTINA",
-      // 2. Identificação da Unidade Escolar (Exercício)
+      // 2. Identificação da Unidade Escolar (Exercício & Lotação Padrão — PASSO 21)
       codigoExercicio: "990230000043",
       nomeEscola: "CENTRO DE ENSINO FUNDAMENTAL 04 DE PLANALTINA - COLEGIO CM",
+      codigoLotacaoPadrao: "",
+      nomeLotacaoPadrao: "",
       siglaEscola: "CEF04-CCMDF",
       cidadeUF: "Planaltina - DF",
       // 3. Grade de Horários Padrão dos Turnos da Escola
@@ -360,6 +363,7 @@ export default function ServidoresTab({
       carga_horaria: "44h",
       turno: "Integral",
       setor: "",
+      exibir_lotacao_folha: false,
       horario_trabalho: "07:00 às 17:00",
       telefone: "",
       email: "",
@@ -392,6 +396,7 @@ export default function ServidoresTab({
       carga_horaria: srv.carga_horaria || "40h",
       turno: srv.turno || "Integral",
       setor: srv.setor || "",
+      exibir_lotacao_folha: Boolean(srv.exibir_lotacao_folha),
       horario_trabalho: srv.horario_trabalho || "07:30 às 17:30",
       telefone: srv.telefone || "",
       email: srv.email || "",
@@ -1080,7 +1085,7 @@ export default function ServidoresTab({
                   </div>
                 </div>
                 <span className="hidden md:inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase bg-white text-emerald-800 border border-emerald-300 flex-shrink-0">
-                  12 Campos na Folha
+                  13 Campos na Folha
                 </span>
               </div>
 
@@ -1477,17 +1482,33 @@ export default function ServidoresTab({
                   />
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                    Setor / Lotação Interna
+                <div className="p-2.5 rounded-xl bg-emerald-50/75 border border-emerald-300/90">
+                  <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase text-emerald-950 mb-1">
+                    <span>Setor / Lotação (Opcional)</span>
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
+                      🖨️ Linha Lotação: na Folha
+                    </span>
                   </label>
                   <input
                     type="text"
                     value={form.setor}
                     onChange={(e) => setForm({ ...form, setor: e.target.value })}
-                    placeholder="Ex: Portaria / Bloco B / Cozinha / Regência"
-                    className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800"
+                    placeholder="Ex: CRE PLANALTINA ou 990230000000 - CRE PLANALTINA"
+                    className="w-full rounded-xl border border-emerald-400 bg-emerald-50/90 px-3.5 py-2.5 text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
                   />
+                  <label className="mt-2 flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(form.exibir_lotacao_folha)}
+                      onChange={(e) =>
+                        setForm({ ...form, exibir_lotacao_folha: e.target.checked })
+                      }
+                      className="h-4 w-4 rounded border-emerald-500 text-emerald-700 focus:ring-emerald-500"
+                    />
+                    <span className="text-[11px] font-bold text-emerald-900 leading-tight">
+                      Imprimir linha <strong className="underline">Lotação:</strong> na Folha de Ponto (quando divergir de Exercício)
+                    </span>
+                  </label>
                 </div>
               </div>
 
@@ -2392,7 +2413,7 @@ export default function ServidoresTab({
                   </div>
                 </div>
                 <span className="hidden md:inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase bg-white text-emerald-800 border border-emerald-300 flex-shrink-0">
-                  14 Campos na Folha
+                  16 Campos na Folha
                 </span>
               </div>
 
@@ -2495,12 +2516,12 @@ export default function ServidoresTab({
                 </div>
               </div>
 
-              {/* 2. IDENTIFICAÇÃO DA UNIDADE ESCOLAR (LOCAL DE EXERCÍCIO) */}
+              {/* 2. IDENTIFICAÇÃO DA UNIDADE ESCOLAR (LOCAL DE EXERCÍCIO E LOTAÇÃO) */}
               <div className="space-y-3">
                 <div className="flex items-center gap-2 border-b border-slate-200 pb-1.5">
                   <AcademicCapIcon className="h-4 w-4 text-emerald-700" />
                   <span className="text-xs font-extrabold uppercase tracking-wider text-slate-700">
-                    2. Identificação da Unidade Escolar (Local de Exercício)
+                    2. Identificação da Unidade Escolar (Local de Exercício e Lotação)
                   </span>
                 </div>
 
@@ -2544,6 +2565,51 @@ export default function ServidoresTab({
                         })
                       }
                       placeholder="Ex: CENTRO DE ENSINO FUNDAMENTAL 04 DE PLANALTINA - COLEGIO CM"
+                      className="w-full rounded-xl border border-emerald-400 bg-emerald-50/90 px-3.5 py-2.5 text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Linha Lotação: (Opcional — caso divirja de Exercício na Unidade Escolar) */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="p-2.5 rounded-xl bg-emerald-50/75 border border-emerald-300/90">
+                    <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase text-emerald-950 mb-1">
+                      <span>Código da Lotação Padrão (Opcional)</span>
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
+                        🖨️ Linha Lotação:
+                      </span>
+                    </label>
+                    <input
+                      type="text"
+                      value={cfgHorarioCabecalho.codigoLotacaoPadrao || ""}
+                      onChange={(e) =>
+                        setCfgHorarioCabecalho({
+                          ...cfgHorarioCabecalho,
+                          codigoLotacaoPadrao: e.target.value,
+                        })
+                      }
+                      placeholder="Ex: 990230000000 (se divergir)"
+                      className="w-full rounded-xl border border-emerald-400 bg-emerald-50/90 px-3.5 py-2.5 text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-2 p-2.5 rounded-xl bg-emerald-50/75 border border-emerald-300/90">
+                    <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase text-emerald-950 mb-1">
+                      <span>Lotação Padrão na Folha (Opcional — só preencha se divergir de Exercício)</span>
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
+                        🖨️ Linha Lotação: (Frente)
+                      </span>
+                    </label>
+                    <input
+                      type="text"
+                      value={cfgHorarioCabecalho.nomeLotacaoPadrao || ""}
+                      onChange={(e) =>
+                        setCfgHorarioCabecalho({
+                          ...cfgHorarioCabecalho,
+                          nomeLotacaoPadrao: e.target.value,
+                        })
+                      }
+                      placeholder="Deixe vazio se Lotação = Exercício (ou informe ex: CRE PLANALTINA / UNIDADE CEDENTE)"
                       className="w-full rounded-xl border border-emerald-400 bg-emerald-50/90 px-3.5 py-2.5 text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
                     />
                   </div>

@@ -382,6 +382,45 @@ export default function FolhaPontoOficialSEEDF({
     return raw;
   }, [dadosUnidade.nomeEscola]);
 
+  // Linha Lotação: personalizada (PASSO 21 — Item 3: quando divergir de Exercício, via Servidor ou Cabeçalho da Escola)
+  const lotacaoPersonalizada = useMemo(() => {
+    const codPadrao =
+      String(dadosUnidade.codigoLotacaoPadrao || "").trim() || codEstabelecimento;
+
+    if (servidor.exibir_lotacao_folha && String(servidor.setor || "").trim()) {
+      const rawSetor = String(servidor.setor).trim().toUpperCase();
+      const matchCod = rawSetor.match(/^(\d{6,15})\s*[-—:]?\s*(.+)$/);
+      if (matchCod) {
+        return {
+          codigo: matchCod[1].trim(),
+          nome: matchCod[2].trim(),
+        };
+      }
+      return {
+        codigo: codPadrao,
+        nome: rawSetor,
+      };
+    }
+
+    const nomeLotPadrao = String(dadosUnidade.nomeLotacaoPadrao || "")
+      .trim()
+      .toUpperCase();
+    if (nomeLotPadrao) {
+      return {
+        codigo: codPadrao,
+        nome: nomeLotPadrao,
+      };
+    }
+
+    return null;
+  }, [
+    servidor.exibir_lotacao_folha,
+    servidor.setor,
+    dadosUnidade.codigoLotacaoPadrao,
+    dadosUnidade.nomeLotacaoPadrao,
+    codEstabelecimento,
+  ]);
+
   // Configuração de Assinaturas (PASSO 20 — Responsável pelas Informações, Chefia Imediata e Superior)
   const imprimirAssinaturasNaFolha =
     dadosUnidade.imprimirAssinaturasNaFolha !== false;
@@ -823,7 +862,7 @@ export default function FolhaPontoOficialSEEDF({
                 boxSizing: "border-box",
               }}
             >
-              {/* Sub-bloco Escola: UA e Exercício */}
+              {/* Sub-bloco Escola: UA, Lotação (opcional quando divergir) e Exercício */}
               <div
                 style={{
                   padding: "4px 6px",
@@ -842,6 +881,17 @@ export default function FolhaPontoOficialSEEDF({
                   </span>
                   <span>{creNome}</span>
                 </div>
+                {lotacaoPersonalizada && (
+                  <div>
+                    <span style={{ display: "inline-block", width: "70px" }}>
+                      Lotação:
+                    </span>
+                    <span style={{ display: "inline-block", width: "120px" }}>
+                      {lotacaoPersonalizada.codigo}
+                    </span>
+                    <span>{lotacaoPersonalizada.nome}</span>
+                  </div>
+                )}
                 <div>
                   <span style={{ display: "inline-block", width: "70px" }}>
                     Exercício:
@@ -1008,7 +1058,7 @@ export default function FolhaPontoOficialSEEDF({
               </div>
             </div>
 
-            {/* Faixa 4: CARGO e DISCIPLINA */}
+            {/* Faixa 4: CARGO, DISCIPLINA e LOTAÇÃO (quando personalizada) */}
             <div
               style={{
                 padding: "4px 6px",
@@ -1018,7 +1068,25 @@ export default function FolhaPontoOficialSEEDF({
               }}
             >
               <div>CARGO: &nbsp;&nbsp;&nbsp;{cargoBase}</div>
-              <div>DISCIPLINA: &nbsp;{disciplinaExtr}</div>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: "12px",
+                }}
+              >
+                <span>DISCIPLINA: &nbsp;{disciplinaExtr}</span>
+                {lotacaoPersonalizada && (
+                  <span>
+                    LOTAÇÃO: &nbsp;
+                    {lotacaoPersonalizada.codigo
+                      ? `${lotacaoPersonalizada.codigo} - `
+                      : ""}
+                    {lotacaoPersonalizada.nome}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -1266,7 +1334,7 @@ export default function FolhaPontoOficialSEEDF({
               width: "100%",
               border: "1px solid #000",
               marginTop: "5px",
-              minHeight: "86px",
+              minHeight: lotacaoPersonalizada ? "70px" : "86px",
               padding: "5px 8px",
               fontSize: "11px",
               boxSizing: "border-box",

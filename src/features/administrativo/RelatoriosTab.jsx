@@ -151,6 +151,8 @@ export default function RelatoriosTab({
       cre: "COORDENAÇÃO REGIONAL DE ENSINO DE PLANALTINA",
       codigoExercicio: "990230000043",
       nomeEscola: nomeEsc,
+      codigoLotacaoPadrao: "",
+      nomeLotacaoPadrao: "",
     };
   });
 
@@ -197,14 +199,18 @@ export default function RelatoriosTab({
     [servidores, servidoresAtivos, servidorEspelhoId]
   );
 
-  // Campos editáveis rápidos do servidor selecionado (Matrícula SIGEP e Função Gratificada)
+  // Campos editáveis rápidos do servidor selecionado (Matrícula SIGEP, Função Gratificada e Lotação)
   const [matriculaEdit, setMatriculaEdit] = useState("");
   const [funcaoEdit, setFuncaoEdit] = useState("");
+  const [setorEdit, setSetorEdit] = useState("");
+  const [exibirLotacaoEdit, setExibirLotacaoEdit] = useState(false);
 
   useEffect(() => {
     if (!servidorEspelho) return;
     setMatriculaEdit(servidorEspelho.matricula || "");
     setFuncaoEdit(servidorEspelho.funcao_gratificada || "");
+    setSetorEdit(servidorEspelho.setor || "");
+    setExibirLotacaoEdit(Boolean(servidorEspelho.exibir_lotacao_folha));
   }, [servidorEspelho]);
 
   const indiceServidorAtual = useMemo(() => {
@@ -523,8 +529,10 @@ export default function RelatoriosTab({
       ...servidorEspelho,
       matricula: matriculaEdit.trim(),
       funcao_gratificada: funcaoEdit.trim(),
+      setor: setorEdit.trim(),
+      exibir_lotacao_folha: Boolean(exibirLotacaoEdit),
     });
-    toast.success("Matrícula e Função do servidor atualizadas na Folha de Ponto!");
+    toast.success("Matrícula, Função e Lotação do servidor atualizadas na Folha de Ponto!");
   };
 
   // Identifica qual modelo está ativo para exibir na badge informativa
@@ -843,7 +851,45 @@ export default function RelatoriosTab({
                   </div>
                 </div>
 
+                {/* Linha Lotação: Padrão da Escola (Opcional — caso divirja de Exercício) */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-emerald-300/80">
+                  <div>
+                    <label className="block text-[11px] font-bold text-emerald-950 mb-1">
+                      Código da Lotação Padrão (Opcional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ex: 990230000000"
+                      value={dadosUnidade.codigoLotacaoPadrao || ""}
+                      onChange={(e) =>
+                        setDadosUnidade((p) => ({
+                          ...p,
+                          codigoLotacaoPadrao: e.target.value,
+                        }))
+                      }
+                      className="w-full rounded-lg border border-emerald-400 px-2.5 py-1.5 text-xs font-semibold text-slate-900 bg-emerald-100/60"
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block text-[11px] font-bold text-emerald-950 mb-1">
+                      Lotação Padrão na Folha (Opcional — deixe vazio se igual a Exercício)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Só preencha se Lotação divergir de Exercício (ex: CRE PLANALTINA)"
+                      value={dadosUnidade.nomeLotacaoPadrao || ""}
+                      onChange={(e) =>
+                        setDadosUnidade((p) => ({
+                          ...p,
+                          nomeLotacaoPadrao: e.target.value,
+                        }))
+                      }
+                      className="w-full rounded-lg border border-emerald-400 px-2.5 py-1.5 text-xs font-semibold text-slate-900 bg-emerald-100/60"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-2 border-t border-emerald-300/80">
                   <div>
                     <label className="block text-[11px] font-bold text-emerald-950 mb-1">
                       Matrícula / Inscrição SIGEP do Servidor
@@ -868,13 +914,36 @@ export default function RelatoriosTab({
                       className="w-full rounded-lg border border-emerald-400 px-2.5 py-1.5 text-xs font-semibold text-slate-900 bg-emerald-100/60"
                     />
                   </div>
+                  <div>
+                    <label className="flex items-center justify-between gap-1 text-[11px] font-bold text-emerald-950 mb-1">
+                      <span>Setor / Lotação do Servidor</span>
+                      <label className="inline-flex items-center gap-1 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(exibirLotacaoEdit)}
+                          onChange={(e) => setExibirLotacaoEdit(e.target.checked)}
+                          className="h-3.5 w-3.5 rounded border-emerald-500 text-emerald-700"
+                        />
+                        <span className="text-[10px] font-extrabold text-emerald-900">
+                          Imprimir Lotação:
+                        </span>
+                      </label>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ex: CRE PLANALTINA"
+                      value={setorEdit}
+                      onChange={(e) => setSetorEdit(e.target.value)}
+                      className="w-full rounded-lg border border-emerald-400 px-2.5 py-1.5 text-xs font-semibold text-slate-900 bg-emerald-100/60"
+                    />
+                  </div>
                   <div className="flex items-end">
                     <button
                       type="button"
                       onClick={handleSalvarDadosRapidosServidor}
-                      className="px-4 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition shadow-sm"
+                      className="w-full px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition shadow-sm"
                     >
-                      Salvar Matrícula / Função no Cadastro
+                      Salvar Matrícula / Função / Lotação
                     </button>
                   </div>
                 </div>

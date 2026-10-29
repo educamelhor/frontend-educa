@@ -660,27 +660,33 @@ export default function RelatoriosTab({
               </div>
 
               {/* Mês / Ano de Referência */}
-              <div className="lg:col-span-3">
-                <label className="block text-xs font-bold uppercase text-slate-500 mb-1">
-                  Mês / Ano de Referência
+              <div className="lg:col-span-3 p-2 rounded-xl bg-emerald-50/75 border border-emerald-300/90">
+                <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase text-emerald-950 mb-1">
+                  <span>Mês / Ano de Referência</span>
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
+                    🖨️ Mês/Ano Folha
+                  </span>
                 </label>
                 <input
                   type="month"
                   value={mesReferencia}
                   onChange={(e) => setMesReferencia(e.target.value)}
-                  className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-xs sm:text-sm font-bold text-slate-800 focus:border-blue-500 outline-none"
+                  className="w-full rounded-xl border border-emerald-400 bg-emerald-50/90 px-3.5 py-2 text-xs sm:text-sm font-bold text-slate-900 focus:border-emerald-500 outline-none"
                 />
               </div>
 
               {/* Seletor de Modelo Oficial SEEDF */}
-              <div className="lg:col-span-4">
-                <label className="block text-xs font-bold uppercase text-slate-500 mb-1">
-                  Modelo Oficial SEEDF (SIGEP)
+              <div className="lg:col-span-4 p-2 rounded-xl bg-emerald-50/75 border border-emerald-300/90">
+                <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase text-emerald-950 mb-1">
+                  <span>Modelo Oficial SEEDF (SIGEP)</span>
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
+                    🖨️ Layout Folha
+                  </span>
                 </label>
                 <select
                   value={modeloForcado}
                   onChange={(e) => setModeloForcado(e.target.value)}
-                  className="w-full rounded-xl border border-slate-300 px-3 py-2 text-xs sm:text-sm font-bold text-slate-800 bg-slate-50 focus:border-blue-500 outline-none"
+                  className="w-full rounded-xl border border-emerald-400 px-3 py-2 text-xs sm:text-sm font-bold text-slate-900 bg-emerald-50/90 focus:border-emerald-500 outline-none"
                 >
                   <option value="auto">
                     ✨ Automático pelo Vínculo ({isTemporarioAtivo ? "Contrato Temporário" : "Servidor Efetivo"})
@@ -755,8 +761,8 @@ export default function RelatoriosTab({
                   onClick={() => setMostrarConfigCabecalho((v) => !v)}
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition ${
                     mostrarConfigCabecalho
-                      ? "bg-slate-900 text-white border-slate-900"
-                      : "bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200"
+                      ? "bg-emerald-800 text-white border-emerald-800"
+                      : "bg-emerald-50 text-emerald-900 border-emerald-300 hover:bg-emerald-100"
                   }`}
                 >
                   <Cog6ToothIcon className="h-4 w-4" />
@@ -767,13 +773,18 @@ export default function RelatoriosTab({
 
             {/* Painel Retrátil de Ajuste Fino do Cabeçalho SEEDF e Dados Funcionais */}
             {mostrarConfigCabecalho && (
-              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3 animate-fadeIn">
-                <div className="text-xs font-extrabold uppercase tracking-wider text-slate-700">
-                  Configuração dos Campos Oficiais da Folha de Frequência SEEDF
+              <div className="p-4 rounded-xl bg-emerald-50/80 border-2 border-emerald-300 space-y-3 animate-fadeIn">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="text-xs font-extrabold uppercase tracking-wider text-emerald-950 flex items-center gap-1.5">
+                    <span>🖨️ Configuração Direta dos Campos Oficiais da Folha de Frequência SEEDF</span>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-emerald-200/90 text-emerald-950 border border-emerald-400">
+                    Todos os campos abaixo refletem em tempo real na Folha de Ponto
+                  </span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                    <label className="block text-[11px] font-bold text-emerald-950 mb-1">
                       Código UA (Regional)
                     </label>
                     <input
@@ -782,11 +793,11 @@ export default function RelatoriosTab({
                       onChange={(e) =>
                         setDadosUnidade((p) => ({ ...p, ua: e.target.value }))
                       }
-                      className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs bg-white"
+                      className="w-full rounded-lg border border-emerald-400 px-2.5 py-1.5 text-xs font-semibold text-slate-900 bg-emerald-100/60"
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                    <label className="block text-[11px] font-bold text-emerald-950 mb-1">
                       Coordenação Regional de Ensino (CRE)
                     </label>
                     <input
@@ -795,11 +806,11 @@ export default function RelatoriosTab({
                       onChange={(e) =>
                         setDadosUnidade((p) => ({ ...p, cre: e.target.value }))
                       }
-                      className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs bg-white"
+                      className="w-full rounded-lg border border-emerald-400 px-2.5 py-1.5 text-xs font-semibold text-slate-900 bg-emerald-100/60"
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                    <label className="block text-[11px] font-bold text-emerald-950 mb-1">
                       Código do Estabelecimento (Exercício)
                     </label>
                     <input
@@ -811,11 +822,11 @@ export default function RelatoriosTab({
                           codigoExercicio: e.target.value,
                         }))
                       }
-                      className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs bg-white"
+                      className="w-full rounded-lg border border-emerald-400 px-2.5 py-1.5 text-xs font-semibold text-slate-900 bg-emerald-100/60"
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                    <label className="block text-[11px] font-bold text-emerald-950 mb-1">
                       Nome Oficial da Unidade Escolar
                     </label>
                     <input
@@ -827,14 +838,14 @@ export default function RelatoriosTab({
                           nomeEscola: e.target.value,
                         }))
                       }
-                      className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs bg-white"
+                      className="w-full rounded-lg border border-emerald-400 px-2.5 py-1.5 text-xs font-semibold text-slate-900 bg-emerald-100/60"
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-200">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-emerald-300/80">
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                    <label className="block text-[11px] font-bold text-emerald-950 mb-1">
                       Matrícula / Inscrição SIGEP do Servidor
                     </label>
                     <input
@@ -842,11 +853,11 @@ export default function RelatoriosTab({
                       placeholder="Ex: 0027596-4 ou 7062701-0"
                       value={matriculaEdit}
                       onChange={(e) => setMatriculaEdit(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs bg-white"
+                      className="w-full rounded-lg border border-emerald-400 px-2.5 py-1.5 text-xs font-semibold text-slate-900 bg-emerald-100/60"
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                    <label className="block text-[11px] font-bold text-emerald-950 mb-1">
                       Função Gratificada (Deixe vazio se sem função)
                     </label>
                     <input
@@ -854,14 +865,14 @@ export default function RelatoriosTab({
                       placeholder="Ex: DIRETOR FGE-06"
                       value={funcaoEdit}
                       onChange={(e) => setFuncaoEdit(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs bg-white"
+                      className="w-full rounded-lg border border-emerald-400 px-2.5 py-1.5 text-xs font-semibold text-slate-900 bg-emerald-100/60"
                     />
                   </div>
                   <div className="flex items-end">
                     <button
                       type="button"
                       onClick={handleSalvarDadosRapidosServidor}
-                      className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition"
+                      className="px-4 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold transition shadow-sm"
                     >
                       Salvar Matrícula / Função no Cadastro
                     </button>
@@ -869,7 +880,7 @@ export default function RelatoriosTab({
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                  <label className="block text-[11px] font-bold text-emerald-950 mb-1">
                     Observação Adicional no Quadro &ldquo;Observações:&rdquo; da Folha (Opcional)
                   </label>
                   <input
@@ -877,7 +888,7 @@ export default function RelatoriosTab({
                     placeholder="Texto complementar para constar no quadro de Observações da folha..."
                     value={observacaoManual}
                     onChange={(e) => setObservacaoManual(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs bg-white"
+                    className="w-full rounded-lg border border-emerald-400 px-2.5 py-1.5 text-xs font-semibold text-slate-900 bg-emerald-100/60"
                   />
                 </div>
               </div>

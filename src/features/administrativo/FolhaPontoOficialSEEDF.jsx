@@ -902,7 +902,7 @@ export default function FolhaPontoOficialSEEDF({
               />
               <div style={{ textAlign: "center", lineHeight: 1.25 }}>
                 <div style={{ fontSize: "14.5px" }}>
-                  SECRETARIA DE ESTADO DE EDUCAÇÃO
+                  {orgaoTitulo}
                 </div>
                 <div style={{ fontSize: "14px" }}>{creNome}</div>
                 <div style={{ fontSize: "14.5px" }}>

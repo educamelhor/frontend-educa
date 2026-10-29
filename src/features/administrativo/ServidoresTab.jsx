@@ -1048,11 +1048,36 @@ export default function ServidoresTab({
             </div>
 
             <form onSubmit={handleSalvarForm} className="p-6 space-y-4 max-h-[82vh] overflow-y-auto">
+              {/* Legenda do Mapeamento de Edição da Folha de Ponto (PASSO 19) */}
+              <div className="p-3 rounded-xl bg-emerald-50/90 border border-emerald-300 flex items-start sm:items-center justify-between gap-3">
+                <div className="flex items-start sm:items-center gap-2.5">
+                  <span className="inline-flex items-center justify-center h-6 w-6 rounded-lg bg-emerald-600 text-white text-xs font-black flex-shrink-0 shadow-sm">
+                    🖨️
+                  </span>
+                  <div className="text-xs text-emerald-950 leading-snug">
+                    <span className="font-extrabold uppercase tracking-wide">
+                      Mapeamento da Folha de Ponto:
+                    </span>{" "}
+                    Os campos destacados em{" "}
+                    <span className="px-1.5 py-0.5 rounded bg-emerald-200/80 text-emerald-950 font-extrabold border border-emerald-400">
+                      verde claro
+                    </span>{" "}
+                    são renderizados diretamente na Folha de Frequência Oficial SEEDF impressa para assinatura do servidor.
+                  </div>
+                </div>
+                <span className="hidden md:inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase bg-white text-emerald-800 border border-emerald-300 flex-shrink-0">
+                  12 Campos na Folha
+                </span>
+              </div>
+
               {/* Nome, CPF e Matrícula */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                    Nome Completo *
+                <div className="sm:col-span-2 p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-300/90">
+                  <label className="flex items-center justify-between gap-2 text-xs font-bold uppercase text-emerald-950 mb-1">
+                    <span>Nome Completo *</span>
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
+                      🖨️ Na Folha de Ponto (Nome)
+                    </span>
                   </label>
                   <input
                     type="text"
@@ -1060,10 +1085,10 @@ export default function ServidoresTab({
                     value={form.nome}
                     onChange={(e) => setForm({ ...form, nome: e.target.value })}
                     placeholder="Ex: Raimundo Nonato de Souza"
-                    className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full rounded-xl border border-emerald-400 bg-emerald-50/90 px-3.5 py-2.5 text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
                   />
                 </div>
-                <div>
+                <div className="p-2.5 rounded-xl bg-white border border-slate-200/80">
                   <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
                     CPF
                   </label>
@@ -1072,16 +1097,19 @@ export default function ServidoresTab({
                     value={form.cpf}
                     onChange={(e) => setForm({ ...form, cpf: e.target.value })}
                     placeholder="000.000.000-00"
-                    className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
                   />
                 </div>
               </div>
 
               {/* Seletor 1: Categoria no Quadro, Vínculo Funcional e Matrícula */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                    Categoria no Quadro *
+                <div className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-300/90">
+                  <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase text-emerald-950 mb-1">
+                    <span>Categoria no Quadro *</span>
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
+                      🖨️ Na Folha
+                    </span>
                   </label>
                   <select
                     value={form.categoria}
@@ -1102,7 +1130,7 @@ export default function ServidoresTab({
                         cargo_catalogo_id: sugerido ? sugerido.id : form.cargo_catalogo_id,
                       });
                     }}
-                    className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm text-slate-800"
+                    className="w-full rounded-xl border border-emerald-400 bg-emerald-50/90 px-3 py-2.5 text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
                   >
                     {CATEGORIAS_SERVIDOR.map((c) => (
                       <option key={c.value} value={c.value}>
@@ -1112,9 +1140,12 @@ export default function ServidoresTab({
                   </select>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                    Vínculo Funcional *
+                <div className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-300/90">
+                  <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase text-emerald-950 mb-1">
+                    <span>Vínculo Funcional *</span>
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
+                      🖨️ Modelo Folha
+                    </span>
                   </label>
                   <select
                     value={form.vinculo === "readaptado" ? "efetivo" : form.vinculo}
@@ -1138,7 +1169,7 @@ export default function ServidoresTab({
                           : {}),
                       });
                     }}
-                    className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm text-slate-800"
+                    className="w-full rounded-xl border border-emerald-400 bg-emerald-50/90 px-3 py-2.5 text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
                   >
                     {VINCULOS_SERVIDOR.map((v) => (
                       <option key={v.value} value={v.value}>
@@ -1148,16 +1179,19 @@ export default function ServidoresTab({
                   </select>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                    Matrícula / Contrato SIGEP
+                <div className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-300/90">
+                  <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase text-emerald-950 mb-1">
+                    <span>Matrícula / Contrato SIGEP</span>
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
+                      🖨️ Na Folha
+                    </span>
                   </label>
                   <input
                     type="text"
                     value={form.matricula}
                     onChange={(e) => setForm({ ...form, matricula: e.target.value })}
                     placeholder="Ex: 0027596-4 ou TERC-04"
-                    className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800"
+                    className="w-full rounded-xl border border-emerald-400 bg-emerald-50/90 px-3.5 py-2.5 text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
                   />
                 </div>
               </div>
@@ -1181,13 +1215,16 @@ export default function ServidoresTab({
                     form.categoria === "pedagogico");
 
                 return (
-                  <div className="bg-blue-50/45 p-4 rounded-xl border border-blue-200/80 space-y-3.5">
+                  <div className="bg-emerald-50/75 p-4 rounded-xl border-2 border-emerald-300 space-y-3.5 shadow-sm">
                     <div className="flex items-center justify-between flex-wrap gap-2">
-                      <span className="text-[11px] font-extrabold uppercase tracking-wider text-blue-900">
-                        🏛️ Padronização Funcional SEEDF (Cargo, Especialidade, FGE & SIGEP)
+                      <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-950 flex items-center gap-1.5">
+                        <span>🏛️ Padronização Funcional SEEDF (Cargo, Especialidade, FGE & SIGEP)</span>
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-200/90 text-emerald-950 border border-emerald-400 text-[10px] font-black">
+                          🖨️ Todos os campos deste bloco renderizam na Folha de Ponto
+                        </span>
                       </span>
                       {itemCatalogoAtual?.cargoSigep && (
-                        <span className="px-2 py-0.5 rounded-md bg-white border border-blue-200 text-[10px] font-mono font-bold text-blue-800">
+                        <span className="px-2 py-0.5 rounded-md bg-white border border-emerald-300 text-[10px] font-mono font-bold text-emerald-900">
                           SIGEP: {itemCatalogoAtual.cargoSigep}
                         </span>
                       )}
@@ -1196,8 +1233,11 @@ export default function ServidoresTab({
                     {/* Seletor 2: Cargo Oficial SEEDF + Seletor 3: Sub-cargo / Especialidade */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                       <div>
-                        <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                          Cargo Oficial SEEDF (Catálogo)
+                        <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase text-emerald-950 mb-1">
+                          <span>Cargo Oficial SEEDF (Catálogo)</span>
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
+                            🖨️ Cargo SIGEP
+                          </span>
                         </label>
                         <select
                           value={form.cargo_catalogo_id || "custom"}
@@ -1225,7 +1265,7 @@ export default function ServidoresTab({
                               cargo: novoCargoComp,
                             });
                           }}
-                          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs sm:text-sm font-semibold text-slate-800"
+                          className="w-full rounded-xl border border-emerald-400 bg-emerald-100/60 px-3 py-2 text-xs sm:text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
                         >
                           <optgroup label="Cargos Compatíveis com a Categoria / Vínculo">
                             {cargosRecomendados.map((c) => (
@@ -1250,8 +1290,11 @@ export default function ServidoresTab({
                       </div>
 
                       <div>
-                        <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                          Sub-cargo / Especialidade / Disciplina
+                        <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase text-emerald-950 mb-1">
+                          <span>Sub-cargo / Especialidade / Disciplina</span>
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
+                            🖨️ Especialidade / Disciplina
+                          </span>
                         </label>
                         {listaSubcargos.length > 0 && form.cargo_catalogo_id !== "custom" ? (
                           <select
@@ -1266,7 +1309,7 @@ export default function ServidoresTab({
                                 cargo: sub ? `${baseLabel} — ${sub}` : baseLabel,
                               });
                             }}
-                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs sm:text-sm text-slate-800"
+                            className="w-full rounded-xl border border-emerald-400 bg-emerald-100/60 px-3 py-2 text-xs sm:text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
                           >
                             <option value="">
                               — Selecionar Especialidade / Componente —
@@ -1285,7 +1328,7 @@ export default function ServidoresTab({
                               setForm({ ...form, subcargo: e.target.value })
                             }
                             placeholder="Ex: Matemática / Portaria / Limpeza"
-                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs sm:text-sm text-slate-800"
+                            className="w-full rounded-xl border border-emerald-400 bg-emerald-100/60 px-3 py-2 text-xs sm:text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
                           />
                         )}
                       </div>
@@ -1294,8 +1337,11 @@ export default function ServidoresTab({
                     {/* Campo Editável do Nome Final do Cargo + Seletor 4: Função Gratificada Escolar (FGE) */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                       <div>
-                        <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                          Cargo / Função (Descrição Final Editável) *
+                        <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase text-emerald-950 mb-1">
+                          <span>Cargo / Função (Descrição Final Editável) *</span>
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
+                            🖨️ Na Folha
+                          </span>
                         </label>
                         <input
                           type="text"
@@ -1305,13 +1351,16 @@ export default function ServidoresTab({
                             setForm({ ...form, cargo: e.target.value })
                           }
                           placeholder="Ex: Professor de Educação Básica (PEB) — Matemática"
-                          className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs sm:text-sm font-semibold text-slate-800"
+                          className="w-full rounded-xl border border-emerald-400 bg-emerald-100/60 px-3.5 py-2 text-xs sm:text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
                         />
                       </div>
 
                       <div>
-                        <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                          Função Gratificada Escolar (FGE — Lei 5.326/2014)
+                        <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase text-emerald-950 mb-1">
+                          <span>Função Gratificada Escolar (FGE — Lei 5.326/2014)</span>
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
+                            🖨️ Campo Função:
+                          </span>
                         </label>
                         <select
                           value={form.funcao_gratificada}
@@ -1321,7 +1370,7 @@ export default function ServidoresTab({
                               funcao_gratificada: e.target.value,
                             })
                           }
-                          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs sm:text-sm font-semibold text-slate-800"
+                          className="w-full rounded-xl border border-emerald-400 bg-emerald-100/60 px-3 py-2 text-xs sm:text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
                         >
                           {FUNCOES_GRATIFICADAS_SEEDF.map((fn) => (
                             <option key={fn.value} value={fn.value}>
@@ -1334,10 +1383,13 @@ export default function ServidoresTab({
 
                     {/* Seletor Condicional: Padrão Vertical (01 a 25) + Etapa de Titulação (PQ1 a PQ6) */}
                     {mostrarPadraoSigep && (
-                      <div className="pt-2 border-t border-blue-200/70 grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                      <div className="pt-2 border-t border-emerald-300/80 grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
                         <div>
-                          <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">
-                            Padrão na Carreira (01 a 25)
+                          <label className="flex items-center justify-between gap-1 text-[11px] font-bold uppercase text-emerald-950 mb-1">
+                            <span>Padrão na Carreira (01 a 25)</span>
+                            <span className="px-1 py-0.2 rounded text-[9px] font-extrabold bg-emerald-200 text-emerald-900">
+                              🖨️ SIGEP
+                            </span>
                           </label>
                           <select
                             value={form.padrao_carreira || "25"}
@@ -1347,7 +1399,7 @@ export default function ServidoresTab({
                                 padrao_carreira: e.target.value,
                               })
                             }
-                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-800"
+                            className="w-full rounded-lg border border-emerald-400 bg-emerald-100/60 px-3 py-1.5 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
                           >
                             {PADROES_CARREIRA_SEEDF.map((p) => (
                               <option key={p.value} value={p.value}>
@@ -1358,8 +1410,11 @@ export default function ServidoresTab({
                         </div>
 
                         <div>
-                          <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">
-                            Etapa de Titulação (PQ1 a PQ6)
+                          <label className="flex items-center justify-between gap-1 text-[11px] font-bold uppercase text-emerald-950 mb-1">
+                            <span>Etapa de Titulação (PQ1 a PQ6)</span>
+                            <span className="px-1 py-0.2 rounded text-[9px] font-extrabold bg-emerald-200 text-emerald-900">
+                              🖨️ SIGEP
+                            </span>
                           </label>
                           <select
                             value={form.etapa_titulacao || "PQ5"}
@@ -1369,7 +1424,7 @@ export default function ServidoresTab({
                                 etapa_titulacao: e.target.value,
                               })
                             }
-                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-800"
+                            className="w-full rounded-lg border border-emerald-400 bg-emerald-100/60 px-3 py-1.5 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
                           >
                             {ETAPAS_TITULACAO_SEEDF.map((et) => (
                               <option key={et.value} value={et.value}>
@@ -1380,7 +1435,7 @@ export default function ServidoresTab({
                         </div>
 
                         <div className="flex items-center justify-start sm:justify-end pb-0.5">
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-900 text-white text-xs font-extrabold shadow-sm">
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-900 text-white text-xs font-extrabold shadow-sm">
                             Código SIGEP na Folha:{" "}
                             <span className="font-mono text-amber-300">
                               {`${form.padrao_carreira || "25"}-${form.etapa_titulacao || "PQ5"}`}
@@ -1424,14 +1479,17 @@ export default function ServidoresTab({
 
               {/* Carga Horária, Turno e Horário de Trabalho */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">
-                    Carga Horária
+                <div className="p-2.5 rounded-xl bg-emerald-50/80 border border-emerald-300/90">
+                  <label className="flex items-center justify-between gap-1 text-xs font-bold text-emerald-950 mb-1">
+                    <span>Carga Horária</span>
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
+                      🖨️ C.H. na Folha
+                    </span>
                   </label>
                   <select
                     value={form.carga_horaria}
                     onChange={(e) => setForm({ ...form, carga_horaria: e.target.value })}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white"
+                    className="w-full rounded-lg border border-emerald-400 px-3 py-2 text-sm font-semibold text-slate-900 bg-emerald-50/90 focus:ring-2 focus:ring-emerald-500 outline-none"
                   >
                     {CARGAS_HORARIAS.map((ch) => (
                       <option key={ch.value} value={ch.value}>
@@ -1441,14 +1499,17 @@ export default function ServidoresTab({
                   </select>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">
-                    Turno
+                <div className="p-2.5 rounded-xl bg-emerald-50/80 border border-emerald-300/90">
+                  <label className="flex items-center justify-between gap-1 text-xs font-bold text-emerald-950 mb-1">
+                    <span>Turno</span>
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
+                      🖨️ Turno na Folha
+                    </span>
                   </label>
                   <select
                     value={form.turno}
                     onChange={(e) => setForm({ ...form, turno: e.target.value })}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white"
+                    className="w-full rounded-lg border border-emerald-400 px-3 py-2 text-sm font-semibold text-slate-900 bg-emerald-50/90 focus:ring-2 focus:ring-emerald-500 outline-none"
                   >
                     {TURNOS_TRABALHO.map((t) => (
                       <option key={t.value} value={t.value}>
@@ -1458,7 +1519,7 @@ export default function ServidoresTab({
                   </select>
                 </div>
 
-                <div>
+                <div className="p-2.5 rounded-xl bg-white border border-slate-200/80">
                   <label className="block text-xs font-bold text-slate-600 mb-1">
                     Horário Padrão (Ponto)
                   </label>
@@ -2299,19 +2360,44 @@ export default function ServidoresTab({
               onSubmit={handleSalvarHorarioCabecalho}
               className="p-6 space-y-5 max-h-[82vh] overflow-y-auto"
             >
+              {/* Legenda do Mapeamento de Edição da Folha de Ponto (PASSO 19) */}
+              <div className="p-3 rounded-xl bg-emerald-50/90 border border-emerald-300 flex items-start sm:items-center justify-between gap-3">
+                <div className="flex items-start sm:items-center gap-2.5">
+                  <span className="inline-flex items-center justify-center h-6 w-6 rounded-lg bg-emerald-600 text-white text-xs font-black flex-shrink-0 shadow-sm">
+                    🖨️
+                  </span>
+                  <div className="text-xs text-emerald-950 leading-snug">
+                    <span className="font-extrabold uppercase tracking-wide">
+                      Mapeamento da Folha de Ponto:
+                    </span>{" "}
+                    Os campos destacados em{" "}
+                    <span className="px-1.5 py-0.5 rounded bg-emerald-200/80 text-emerald-950 font-extrabold border border-emerald-400">
+                      verde claro
+                    </span>{" "}
+                    são renderizados diretamente no cabeçalho e no quadro de Observações da Folha de Frequência Oficial SEEDF.
+                  </div>
+                </div>
+                <span className="hidden md:inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase bg-white text-emerald-800 border border-emerald-300 flex-shrink-0">
+                  7 Campos na Folha
+                </span>
+              </div>
+
               {/* 1. CABEÇALHO INSTITUCIONAL / ÓRGÃO MANTENEDOR */}
               <div className="space-y-3">
                 <div className="flex items-center gap-2 border-b border-slate-200 pb-1.5">
-                  <BuildingOffice2Icon className="h-4 w-4 text-blue-700" />
+                  <BuildingOffice2Icon className="h-4 w-4 text-emerald-700" />
                   <span className="text-xs font-extrabold uppercase tracking-wider text-slate-700">
                     1. Cabeçalho Institucional (Órgão / Mantenedora / Regional)
                   </span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                      Órgão / Secretaria / Mantenedora (Topo da Folha) *
+                  <div className="sm:col-span-2 p-2.5 rounded-xl bg-emerald-50/75 border border-emerald-300/90">
+                    <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase text-emerald-950 mb-1">
+                      <span>Órgão / Secretaria / Mantenedora (Topo da Folha) *</span>
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
+                        🖨️ Topo da Folha
+                      </span>
                     </label>
                     <input
                       type="text"
@@ -2324,13 +2410,16 @@ export default function ServidoresTab({
                         })
                       }
                       placeholder="Ex: SECRETARIA DE ESTADO DE EDUCAÇÃO"
-                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                      className="w-full rounded-xl border border-emerald-400 bg-emerald-50/90 px-3.5 py-2.5 text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                      CNPJ Institucional
+                  <div className="p-2.5 rounded-xl bg-emerald-50/75 border border-emerald-300/90">
+                    <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase text-emerald-950 mb-1">
+                      <span>CNPJ Institucional</span>
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
+                        🖨️ CNPJ na Folha
+                      </span>
                     </label>
                     <input
                       type="text"
@@ -2342,15 +2431,18 @@ export default function ServidoresTab({
                         })
                       }
                       placeholder="Ex: 00.394.676/0001-07"
-                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                      className="w-full rounded-xl border border-emerald-400 bg-emerald-50/90 px-3.5 py-2.5 text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
                     />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                      Código UA (Regional)
+                  <div className="p-2.5 rounded-xl bg-emerald-50/75 border border-emerald-300/90">
+                    <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase text-emerald-950 mb-1">
+                      <span>Código UA (Regional)</span>
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
+                        🖨️ UA
+                      </span>
                     </label>
                     <input
                       type="text"
@@ -2362,13 +2454,16 @@ export default function ServidoresTab({
                         })
                       }
                       placeholder="Ex: 007"
-                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                      className="w-full rounded-xl border border-emerald-400 bg-emerald-50/90 px-3.5 py-2.5 text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
                     />
                   </div>
 
-                  <div className="sm:col-span-3">
-                    <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                      Coordenação Regional de Ensino (CRE) / Diretoria Regional
+                  <div className="sm:col-span-3 p-2.5 rounded-xl bg-emerald-50/75 border border-emerald-300/90">
+                    <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase text-emerald-950 mb-1">
+                      <span>Coordenação Regional de Ensino (CRE) / Diretoria Regional</span>
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
+                        🖨️ Regional na Folha
+                      </span>
                     </label>
                     <input
                       type="text"
@@ -2380,7 +2475,7 @@ export default function ServidoresTab({
                         })
                       }
                       placeholder="Ex: COORDENAÇÃO REGIONAL DE ENSINO DE PLANALTINA"
-                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                      className="w-full rounded-xl border border-emerald-400 bg-emerald-50/90 px-3.5 py-2.5 text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
                     />
                   </div>
                 </div>
@@ -2389,16 +2484,19 @@ export default function ServidoresTab({
               {/* 2. IDENTIFICAÇÃO DA UNIDADE ESCOLAR (LOCAL DE EXERCÍCIO) */}
               <div className="space-y-3">
                 <div className="flex items-center gap-2 border-b border-slate-200 pb-1.5">
-                  <AcademicCapIcon className="h-4 w-4 text-blue-700" />
+                  <AcademicCapIcon className="h-4 w-4 text-emerald-700" />
                   <span className="text-xs font-extrabold uppercase tracking-wider text-slate-700">
                     2. Identificação da Unidade Escolar (Local de Exercício)
                   </span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                      Código do Estabelecimento (Exercício)
+                  <div className="p-2.5 rounded-xl bg-emerald-50/75 border border-emerald-300/90">
+                    <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase text-emerald-950 mb-1">
+                      <span>Código do Estabelecimento (Exercício)</span>
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
+                        🖨️ Exercício
+                      </span>
                     </label>
                     <input
                       type="text"
@@ -2410,13 +2508,16 @@ export default function ServidoresTab({
                         })
                       }
                       placeholder="Ex: 990230000043"
-                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                      className="w-full rounded-xl border border-emerald-400 bg-emerald-50/90 px-3.5 py-2.5 text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
                     />
                   </div>
 
-                  <div className="sm:col-span-2">
-                    <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                      Nome Oficial da Unidade Escolar (Impresso na Folha) *
+                  <div className="sm:col-span-2 p-2.5 rounded-xl bg-emerald-50/75 border border-emerald-300/90">
+                    <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase text-emerald-950 mb-1">
+                      <span>Nome Oficial da Unidade Escolar (Impresso na Folha) *</span>
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
+                        🖨️ Local de Exercício (Frente e Verso)
+                      </span>
                     </label>
                     <input
                       type="text"
@@ -2429,7 +2530,7 @@ export default function ServidoresTab({
                         })
                       }
                       placeholder="Ex: CENTRO DE ENSINO FUNDAMENTAL 04 DE PLANALTINA - COLEGIO CM"
-                      className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                      className="w-full rounded-xl border border-emerald-400 bg-emerald-50/90 px-3.5 py-2.5 text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
                     />
                   </div>
                 </div>
@@ -2483,7 +2584,7 @@ export default function ServidoresTab({
                     </span>
                   </div>
                   <span className="text-[11px] font-semibold text-slate-500">
-                    Referência para Ponto Diário e Folha de Frequência
+                    Referência para Ponto Diário e Biometria (Não impresso na folha física)
                   </span>
                 </div>
 
@@ -2656,7 +2757,7 @@ export default function ServidoresTab({
               {/* 4. RESPONSÁVEIS / CHEFIA E OBSERVAÇÃO PADRÃO DA FOLHA */}
               <div className="space-y-3">
                 <div className="flex items-center gap-2 border-b border-slate-200 pb-1.5">
-                  <DocumentTextIcon className="h-4 w-4 text-blue-700" />
+                  <DocumentTextIcon className="h-4 w-4 text-emerald-700" />
                   <span className="text-xs font-extrabold uppercase tracking-wider text-slate-700">
                     4. Chefia Imediata, Responsável pelo Ponto & Observações da Folha
                   </span>
@@ -2700,9 +2801,12 @@ export default function ServidoresTab({
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold uppercase text-slate-600 mb-1">
-                    Observação Institucional Padrão no Quadro &ldquo;Observações:&rdquo; da Folha (Opcional)
+                <div className="p-2.5 rounded-xl bg-emerald-50/75 border border-emerald-300/90">
+                  <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase text-emerald-950 mb-1">
+                    <span>Observação Institucional Padrão no Quadro &ldquo;Observações:&rdquo; da Folha (Opcional)</span>
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
+                      🖨️ Quadro Observações:
+                    </span>
                   </label>
                   <textarea
                     rows={2}
@@ -2714,7 +2818,7 @@ export default function ServidoresTab({
                       })
                     }
                     placeholder="Texto institucional opcional que será exibido automaticamente no quadro de Observações das folhas de frequência da unidade..."
-                    className="w-full rounded-xl border border-slate-300 px-3.5 py-2 text-sm text-slate-800"
+                    className="w-full rounded-xl border border-emerald-400 bg-emerald-50/90 px-3.5 py-2 text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
                   />
                 </div>
               </div>

@@ -637,6 +637,28 @@ export default function ModalOcorrenciaAdmin({
         >
           {/* Corpo Rolável do Formulário */}
           <div className="p-6 space-y-5 overflow-y-auto flex-1">
+            {/* Legenda do Mapeamento de Edição da Folha de Ponto (PASSO 19) */}
+            <div className="p-3 rounded-xl bg-emerald-50/90 border border-emerald-300 flex items-start sm:items-center justify-between gap-3">
+              <div className="flex items-start sm:items-center gap-2.5">
+                <span className="inline-flex items-center justify-center h-6 w-6 rounded-lg bg-emerald-600 text-white text-xs font-black flex-shrink-0 shadow-sm">
+                  🖨️
+                </span>
+                <div className="text-xs text-emerald-950 leading-snug">
+                  <span className="font-extrabold uppercase tracking-wide">
+                    Mapeamento da Folha de Ponto:
+                  </span>{" "}
+                  Os campos em{" "}
+                  <span className="px-1.5 py-0.5 rounded bg-emerald-200/80 text-emerald-950 font-extrabold border border-emerald-400">
+                    verde claro
+                  </span>{" "}
+                  são impressos nas linhas diárias (01 a 31), no quadro de Observações e nos códigos SIGEP do Resumo da Frequência (Verso).
+                </div>
+              </div>
+              <span className="hidden md:inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase bg-white text-emerald-800 border border-emerald-300 flex-shrink-0">
+                7 Campos na Folha
+              </span>
+            </div>
+
             {/* 1. Seletor de Categoria (6 Cards Interativos no Topo) */}
           <div>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
@@ -761,12 +783,17 @@ export default function ModalOcorrenciaAdmin({
           </div>
 
           {/* 2. Seletor de Servidor (Individual ou Resumo do Lote por Categoria) */}
-          <div>
+          <div className="p-3 rounded-xl bg-emerald-50/75 border border-emerald-300/90">
             <div className="flex items-center justify-between gap-2 mb-1.5">
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-500">
-                {lancamentoEmLote && tipo === "negociacao" && !registroEdicao
-                  ? "2. Servidores & Categorias Contemplados no Lançamento em Lote"
-                  : "2. Servidor / Professor / Colaborador"}
+              <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-950">
+                <span>
+                  {lancamentoEmLote && tipo === "negociacao" && !registroEdicao
+                    ? "2. Servidores & Categorias Contemplados no Lançamento em Lote"
+                    : "2. Servidor / Professor / Colaborador"}
+                </span>
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
+                  🖨️ Vincula à Folha de Ponto
+                </span>
               </label>
               {campoErro === "servidor" && (
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-red-100 text-red-700 border border-red-200">
@@ -776,10 +803,10 @@ export default function ModalOcorrenciaAdmin({
             </div>
 
             {lancamentoEmLote && tipo === "negociacao" && !registroEdicao ? (
-              <div className="p-4 rounded-2xl bg-gradient-to-br from-purple-50/90 via-white to-indigo-50/60 border border-purple-300 shadow-sm space-y-3">
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-50/95 via-white to-purple-50/70 border border-emerald-400 shadow-sm space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                   <div className="flex items-center gap-2.5">
-                    <div className="h-10 w-10 rounded-xl bg-purple-700 text-white flex items-center justify-center shadow-sm flex-shrink-0">
+                    <div className="h-10 w-10 rounded-xl bg-emerald-700 text-white flex items-center justify-center shadow-sm flex-shrink-0">
                       <UserGroupIcon className="h-5 w-5" />
                     </div>
                     <div>
@@ -787,7 +814,7 @@ export default function ModalOcorrenciaAdmin({
                         <span className="text-xs sm:text-sm font-extrabold text-slate-900">
                           {servidoresLoteIds.length} de {servidoresAtivos.length} servidores selecionados no lote
                         </span>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-100 text-purple-800 border border-purple-200">
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-900 border border-emerald-300">
                           {GRUPOS_LOTE_RAPIDO.find((g) => g.id === grupoLoteAtivo)
                             ?.label || "Seleção Personalizada por Categoria"}
                         </span>
@@ -801,16 +828,16 @@ export default function ModalOcorrenciaAdmin({
                   <button
                     type="button"
                     onClick={() => setSubModalLoteAberto(true)}
-                    className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-purple-50 text-purple-800 border border-purple-300 text-xs font-extrabold shadow-sm transition flex-shrink-0"
+                    className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-emerald-50 text-emerald-900 border border-emerald-400 text-xs font-extrabold shadow-sm transition flex-shrink-0"
                   >
-                    <Square2StackIcon className="h-4 w-4 text-purple-700" />
+                    <Square2StackIcon className="h-4 w-4 text-emerald-700" />
                     <span>Abrir Sub-Modal de Categorias</span>
                   </button>
                 </div>
 
                 {/* Atalhos Rápidos de Categoria + Contadores */}
-                <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-purple-200/60">
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-purple-800 mr-1">
+                <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-emerald-200/60">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-900 mr-1">
                     Filtro Rápido:
                   </span>
                   {GRUPOS_LOTE_RAPIDO.slice(0, 6).map((grp) => {
@@ -826,8 +853,8 @@ export default function ModalOcorrenciaAdmin({
                         onClick={() => handleAplicarGrupoLote(grp.id)}
                         className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition ${
                           ativo
-                            ? "bg-purple-700 text-white border-purple-700 shadow-sm"
-                            : "bg-white text-slate-700 border-slate-200 hover:border-purple-300 hover:bg-purple-50/50"
+                            ? "bg-emerald-700 text-white border-emerald-700 shadow-sm"
+                            : "bg-white text-slate-700 border-slate-200 hover:border-emerald-400 hover:bg-emerald-50/50"
                         }`}
                       >
                         {grp.label} ({qtdGrupo})
@@ -870,10 +897,10 @@ export default function ModalOcorrenciaAdmin({
                         setCampoErro("");
                       }
                     }}
-                    className={`w-full rounded-xl border px-3.5 py-2.5 text-sm font-medium text-slate-800 outline-none transition ${
+                    className={`w-full rounded-xl border px-3.5 py-2.5 text-sm font-semibold text-slate-900 outline-none transition ${
                       campoErro === "servidor"
                         ? "border-red-500 ring-2 ring-red-200 bg-red-50/40"
-                        : "border-slate-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-slate-50/60"
+                        : "border-emerald-400 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-emerald-50/90"
                     }`}
                   >
                     <option value="">— Selecione o profissional —</option>
@@ -888,9 +915,9 @@ export default function ModalOcorrenciaAdmin({
 
                 {/* Card Resumo do Servidor Selecionado */}
                 {servidorAtual && (
-                  <div className="mt-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex flex-wrap items-center justify-between gap-3">
+                  <div className="mt-2.5 p-3 rounded-xl bg-white border border-emerald-200 flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
-                      <div className="h-9 w-9 rounded-full bg-blue-600 text-white font-bold text-xs flex items-center justify-center">
+                      <div className="h-9 w-9 rounded-full bg-emerald-700 text-white font-bold text-xs flex items-center justify-center">
                         {String(servidorAtual.nome || "S")
                           .split(" ")
                           .slice(0, 2)
@@ -948,19 +975,19 @@ export default function ModalOcorrenciaAdmin({
           </div>
 
           {/* 3. Classificação / Subtipo (Com Busca Rápida Transversal no Catálogo SIGEP) e Situação */}
-          <div className="space-y-3 p-4 rounded-2xl bg-slate-50/80 border border-slate-200">
+          <div className="space-y-3 p-4 rounded-2xl bg-emerald-50/70 border-2 border-emerald-300">
             {/* Barra de Localização Rápida de Evento SIGEP */}
             <div className="relative">
-              <MagnifyingGlassIcon className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <MagnifyingGlassIcon className="h-4 w-4 text-emerald-700 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 value={buscaRapidaEvento}
                 onChange={(e) => setBuscaRapidaEvento(e.target.value)}
                 placeholder="Pesquisa rápida em todos os eventos SIGEP/SEEDF (ex: Ponto Facultativo, Paralisação, Art 151, Sangue, TRE)..."
-                className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-xs text-slate-700 focus:border-blue-500 outline-none"
+                className="w-full pl-9 pr-4 py-2 rounded-xl border border-emerald-300 bg-white text-xs text-slate-700 focus:border-emerald-500 outline-none"
               />
               {resultadosBuscaEvento.length > 0 && (
-                <div className="mt-1.5 p-2 rounded-xl bg-white border border-blue-200 shadow-lg space-y-1 max-h-48 overflow-y-auto">
+                <div className="mt-1.5 p-2 rounded-xl bg-white border border-emerald-300 shadow-lg space-y-1 max-h-48 overflow-y-auto">
                   <div className="text-[10px] font-extrabold uppercase text-slate-400 px-2 py-0.5">
                     Clique para selecionar automaticamente a Categoria e o Evento:
                   </div>
@@ -972,7 +999,7 @@ export default function ModalOcorrenciaAdmin({
                         handleTrocarTipo(item.categoria, item.subtipo);
                         setBuscaRapidaEvento("");
                       }}
-                      className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-blue-50 flex items-center justify-between gap-2 text-xs transition"
+                      className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-emerald-50 flex items-center justify-between gap-2 text-xs transition"
                     >
                       <span className="font-bold text-slate-800">
                         {item.subtipo}
@@ -994,13 +1021,16 @@ export default function ModalOcorrenciaAdmin({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                  3. Evento / Classificação Oficial (SIGEP / SEEDF)
+                <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase tracking-wider text-emerald-950 mb-1.5">
+                  <span>3. Evento / Classificação Oficial (SIGEP / SEEDF)</span>
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
+                    🖨️ Linha + Código SIGEP
+                  </span>
                 </label>
                 <select
                   value={subtipo}
                   onChange={(e) => handleTrocarSubtipo(e.target.value)}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-xs sm:text-sm font-bold text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full rounded-xl border border-emerald-400 bg-emerald-100/60 px-3 py-2.5 text-xs sm:text-sm font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
                 >
                   {(SUBTIPOS_POR_TIPO[tipo] || []).map((st) => (
                     <option key={st} value={st}>
@@ -1011,13 +1041,16 @@ export default function ModalOcorrenciaAdmin({
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                  Situação do Registro
+                <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase tracking-wider text-emerald-950 mb-1.5">
+                  <span>Situação do Registro</span>
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
+                    🖨️ Ativa na Folha
+                  </span>
                 </label>
                 <select
                   value={status}
                   onChange={(e) => setStatus(e.target.value)}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-xs sm:text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                  className="w-full rounded-xl border border-emerald-400 bg-emerald-100/60 px-3 py-2.5 text-xs sm:text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
                 >
                   {isNegociacaoInterna ? (
                     <>
@@ -1052,10 +1085,13 @@ export default function ModalOcorrenciaAdmin({
           </div>
 
           {/* 4. Período (Data Início, Data Fim, Total de Dias) */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-emerald-50/75 p-3.5 rounded-xl border-2 border-emerald-300">
             <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">
-                Data Inicial
+              <label className="flex items-center justify-between gap-1 text-xs font-bold text-emerald-950 mb-1">
+                <span>Data Inicial</span>
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
+                  🖨️ Dia Início
+                </span>
               </label>
               <input
                 ref={dataInicioRef}
@@ -1068,28 +1104,34 @@ export default function ModalOcorrenciaAdmin({
                     setCampoErro("");
                   }
                 }}
-                className={`w-full rounded-lg border px-3 py-2 text-sm text-slate-800 bg-white transition ${
+                className={`w-full rounded-lg border px-3 py-2 text-sm font-semibold text-slate-900 transition ${
                   campoErro === "dataInicio"
                     ? "border-red-500 ring-2 ring-red-200 bg-red-50/40"
-                    : "border-slate-300"
+                    : "border-emerald-400 bg-emerald-100/60 focus:ring-2 focus:ring-emerald-500 outline-none"
                 }`}
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">
-                Data Final
+              <label className="flex items-center justify-between gap-1 text-xs font-bold text-emerald-950 mb-1">
+                <span>Data Final</span>
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
+                  🖨️ Dia Fim
+                </span>
               </label>
               <input
                 type="date"
                 value={dataFim}
                 min={dataInicio}
                 onChange={(e) => setDataFim(e.target.value)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-800 bg-white"
+                className="w-full rounded-lg border border-emerald-400 px-3 py-2 text-sm font-semibold text-slate-900 bg-emerald-100/60 focus:ring-2 focus:ring-emerald-500 outline-none"
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">
-                Qtd. de Dias
+              <label className="flex items-center justify-between gap-1 text-xs font-bold text-emerald-950 mb-1">
+                <span>Qtd. de Dias</span>
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
+                  🖨️ Nº Dias (Verso)
+                </span>
               </label>
               <input
                 type="number"
@@ -1097,7 +1139,7 @@ export default function ModalOcorrenciaAdmin({
                 max={365}
                 value={dias}
                 onChange={(e) => setDias(Number(e.target.value) || 1)}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-bold text-blue-700 bg-white"
+                className="w-full rounded-lg border border-emerald-400 px-3 py-2 text-sm font-extrabold text-emerald-900 bg-emerald-100/60 focus:ring-2 focus:ring-emerald-500 outline-none"
               />
             </div>
           </div>
@@ -1163,16 +1205,19 @@ export default function ModalOcorrenciaAdmin({
                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1">
-                    Nº Processo SEI / Subsaúde / Anexo
+                <div className="p-2 rounded-lg bg-emerald-50/90 border border-emerald-300">
+                  <label className="flex items-center justify-between gap-1 text-xs font-bold text-emerald-950 mb-1">
+                    <span>Nº Processo SEI / Subsaúde / Anexo</span>
+                    <span className="px-1 py-0.2 rounded text-[9px] font-extrabold bg-emerald-200 text-emerald-900">
+                      🖨️ Obs. Folha
+                    </span>
                   </label>
                   <input
                     type="text"
                     placeholder="Ex: SEI-00080-001234/2026"
                     value={documentoRef}
                     onChange={(e) => setDocumentoRef(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white"
+                    className="w-full rounded-lg border border-emerald-400 px-3 py-2 text-sm font-semibold text-slate-900 bg-emerald-100/60 focus:ring-2 focus:ring-emerald-500 outline-none"
                   />
                 </div>
               </div>
@@ -1187,16 +1232,19 @@ export default function ModalOcorrenciaAdmin({
                 Documentação Comprobatória do Afastamento Legal (LC 840/2011 / TRE / Decreto)
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Nº Processo SEI / Certidão / Declaração Oficial
+                <div className="p-2.5 rounded-xl bg-emerald-50/90 border border-emerald-300">
+                  <label className="flex items-center justify-between gap-1 text-xs font-bold text-emerald-950 mb-1">
+                    <span>Nº Processo SEI / Certidão / Declaração Oficial</span>
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
+                      🖨️ Obs. Folha
+                    </span>
                   </label>
                   <input
                     type="text"
                     placeholder="Ex: Certidão de Casamento / Declaração Hemocentro / TRE / SEI"
                     value={documentoRef}
                     onChange={(e) => setDocumentoRef(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm bg-white"
+                    className="w-full rounded-lg border border-emerald-400 px-3 py-2 text-sm font-semibold text-slate-900 bg-emerald-100/60 focus:ring-2 focus:ring-emerald-500 outline-none"
                   />
                 </div>
                 <div className="flex items-center">

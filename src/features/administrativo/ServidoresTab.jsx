@@ -240,6 +240,7 @@ export default function ServidoresTab({
       nomeSuperiorAssinatura: "",
       cargoSuperiorAssinatura: "VICE-DIRETOR — FGE-05",
       observacaoPadraoFolha: "",
+      mensagemQuadroVerso: "",
     };
     try {
       const salvo = localStorage.getItem("educa_admin_seedf_unidade_cfg_v1");
@@ -2413,7 +2414,7 @@ export default function ServidoresTab({
                   </div>
                 </div>
                 <span className="hidden md:inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase bg-white text-emerald-800 border border-emerald-300 flex-shrink-0">
-                  16 Campos na Folha
+                  17 Campos na Folha
                 </span>
               </div>
 
@@ -3108,6 +3109,28 @@ export default function ServidoresTab({
                       })
                     }
                     placeholder="Texto institucional opcional que será exibido automaticamente no quadro de Observações das folhas de frequência da unidade..."
+                    className="w-full rounded-xl border border-emerald-400 bg-emerald-50/90 px-3.5 py-2 text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
+                  />
+                </div>
+
+                {/* PASSO 22 — ITEM 4: Texto do Quadro MENSAGEM (Verso da Folha) */}
+                <div className="p-2.5 rounded-xl bg-emerald-50/75 border border-emerald-300/90">
+                  <label className="flex items-center justify-between gap-1 text-xs font-bold uppercase text-emerald-950 mb-1">
+                    <span>Texto do Quadro MENSAGEM (Verso da Folha — Opcional)</span>
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-emerald-200/80 text-emerald-900 border border-emerald-400/70">
+                      🖨️ Quadro MENSAGEM (Verso)
+                    </span>
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={cfgHorarioCabecalho.mensagemQuadroVerso || ""}
+                    onChange={(e) =>
+                      setCfgHorarioCabecalho({
+                        ...cfgHorarioCabecalho,
+                        mensagemQuadroVerso: e.target.value,
+                      })
+                    }
+                    placeholder="Ex: Devolver a folha de frequência devidamente assinada e sem rasuras na Secretaria Escolar até o 2º dia útil do mês subsequente."
                     className="w-full rounded-xl border border-emerald-400 bg-emerald-50/90 px-3.5 py-2 text-sm font-semibold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
                   />
                 </div>

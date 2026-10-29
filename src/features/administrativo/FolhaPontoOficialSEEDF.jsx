@@ -752,6 +752,11 @@ export default function FolhaPontoOficialSEEDF({
     dadosUnidade.observacaoPadraoFolha,
   ]);
 
+  // Texto do Quadro MENSAGEM no Verso da Folha (PASSO 22 — Item 4)
+  const textoMensagemVerso = String(
+    dadosUnidade.mensagemQuadroVerso || ""
+  ).trim();
+
   return (
     <div
       className="folha-seedf-wrapper space-y-8 print:space-y-0"
@@ -1974,6 +1979,17 @@ export default function FolhaPontoOficialSEEDF({
                 {textoObservacoesConsolidado}
               </div>
             )}
+            {textoMensagemVerso && (
+              <div
+                style={{
+                  marginTop: textoObservacoesConsolidado ? "4px" : "6px",
+                  lineHeight: 1.35,
+                  whiteSpace: "pre-wrap",
+                }}
+              >
+                {textoMensagemVerso}
+              </div>
+            )}
           </div>
         )}
 
@@ -2144,9 +2160,22 @@ export default function FolhaPontoOficialSEEDF({
               padding: "6px 10px",
               fontSize: "11px",
               boxSizing: "border-box",
+              overflow: "hidden",
             }}
           >
             <div>MENSAGEM</div>
+            {textoMensagemVerso && (
+              <div
+                style={{
+                  fontSize: "10px",
+                  marginTop: "6px",
+                  lineHeight: 1.4,
+                  whiteSpace: "pre-wrap",
+                }}
+              >
+                {textoMensagemVerso}
+              </div>
+            )}
           </div>
         )}
       </div>

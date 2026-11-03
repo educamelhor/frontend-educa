@@ -11,11 +11,13 @@ import WizardConfiguracaoGrade from "./WizardConfiguracaoGrade";
 import DisponibilidadePage from "./DisponibilidadePage";
 import DiagnosticoPreGeracaoPage from "./DiagnosticoPreGeracaoPage";
 import GerarHorarioPage from "./GerarHorarioPage";
+import HorarioManualPage from "./HorarioManualPage";
 
 const ABAS = [
   { id: "disponibilidade", label: "📅 Disponibilidade", desc: "Configure a disponibilidade dos professores" },
   { id: "diagnostico",     label: "🔍 Diagnóstico",     desc: "Verifique o Índice de Prontidão antes de gerar" },
   { id: "gerar",           label: "⚡ Gerar Horário",   desc: "Motor de geração automática do quadro" },
+  { id: "manual",          label: "✍️ Horário Manual",  desc: "Registre manualmente a grade horária de cada professor" },
 ];
 
 export default function HorariosShell() {
@@ -128,6 +130,12 @@ export default function HorariosShell() {
         )}
         {abaAtiva === "gerar" && (
           <GerarHorarioPage config={config} />
+        )}
+        {abaAtiva === "manual" && (
+          <HorarioManualPage
+            config={config}
+            turnoInicial={config?.turnos?.[0] || "matutino"}
+          />
         )}
       </div>
     </div>

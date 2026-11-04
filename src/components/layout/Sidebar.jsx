@@ -1948,7 +1948,7 @@ export default function Sidebar({ isOpen, onClose }) {
                     }}
                   >
                     <ClipboardDocumentListIcon className="h-5 w-5 mr-2" style={{ color: isActive('/administrativo/memorando') ? '#60a5fa' : undefined }} />
-                    <span className="flex-1">Memorando</span>
+                    <span className="flex-1">MEMORANDO</span>
                   </Link>
                 </li>
                 )}

@@ -23,14 +23,12 @@ import {
   XMarkIcon,
   ClockIcon,
   ShieldCheckIcon,
-  DocumentTextIcon,
 } from "@heroicons/react/24/outline";
 import { useAdministrativoData } from "./useAdministrativoData";
 import ServidoresTab from "./ServidoresTab";
 import FrequenciaPontoTab from "./FrequenciaPontoTab";
 import OcorrenciasTab from "./OcorrenciasTab";
 import RelatoriosTab from "./RelatoriosTab";
-import MemorandoTab from "./MemorandoTab";
 import ModalOcorrenciaAdmin from "./ModalOcorrenciaAdmin";
 
 const TABS_ADMIN = [
@@ -63,19 +61,11 @@ const TABS_ADMIN = [
     sublabel: "Folha de Ponto Oficial SEEDF",
     icon: ChartBarIcon,
   },
-  {
-    id: "memorando",
-    path: "/administrativo/memorando",
-    label: "MEMORANDO",
-    sublabel: "Memorando de Devolução SEEDF",
-    icon: DocumentTextIcon,
-  },
 ];
 
 function getTabFromPathname(pathname) {
   if (pathname.includes("/ocorrencias")) return "ocorrencias";
   if (pathname.includes("/relatorios")) return "relatorios";
-  if (pathname.includes("/memorando")) return "memorando";
   return "servidores";
 }
 
@@ -87,7 +77,6 @@ export default function AdministrativoModule() {
     servidores,
     ocorrencias,
     pontoDiario,
-    memorandos,
     statsPorServidor,
     loading,
     biometriaAtiva,
@@ -103,8 +92,6 @@ export default function AdministrativoModule() {
     registrarPontoServidor,
     registrarPontoColetivo,
     marcarTodosPresentesNoDia,
-    salvarMemorando,
-    excluirMemorando,
   } = useAdministrativoData();
 
   const [activeTab, setActiveTab] = useState(() =>
@@ -239,7 +226,7 @@ export default function AdministrativoModule() {
         </div>
 
         {/* ── Navegação de Submódulos / Abas ── */}
-        <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mt-6 pt-5 border-t border-white/15">
+        <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-6 pt-5 border-t border-white/15">
           {TABS_ADMIN.map((tab) => {
             const Icon = tab.icon;
             const isAtiva = activeTab === tab.id && !tab.emBreve;
@@ -248,38 +235,38 @@ export default function AdministrativoModule() {
                 key={tab.id}
                 type="button"
                 onClick={() => handleTrocarAba(tab)}
-                className={`p-3.5 rounded-2xl text-left transition-all flex items-center gap-3 border ${
+                className={`p-3.5 rounded-2xl text-left transition-all flex items-center gap-3.5 border ${
                   isAtiva
                     ? "bg-white text-slate-900 border-white shadow-lg scale-[1.01]"
                     : "bg-white/10 hover:bg-white/15 text-white border-white/15"
                 }`}
               >
                 <div
-                  className={`p-2.5 rounded-xl flex-shrink-0 ${
+                  className={`p-3 rounded-xl flex-shrink-0 ${
                     isAtiva
                       ? "bg-blue-600 text-white shadow-sm"
                       : "bg-white/10 text-cyan-200"
                   }`}
                 >
-                  <Icon className="h-5 w-5 stroke-[2.2]" />
+                  <Icon className="h-6 w-6 stroke-[2.2]" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-1.5">
                     <span
-                      className={`text-sm sm:text-base font-black tracking-wide truncate leading-tight ${
+                      className={`text-base sm:text-lg font-black tracking-wide truncate leading-tight ${
                         isAtiva ? "text-slate-900" : "text-white"
                       }`}
                     >
                       {tab.label}
                     </span>
                     {tab.emBreve && (
-                      <span className="px-1.5 py-0.5 rounded-md text-[9px] font-extrabold uppercase tracking-wider bg-amber-400/25 text-amber-200 border border-amber-300/40 flex-shrink-0">
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wider bg-amber-400/25 text-amber-200 border border-amber-300/40 flex-shrink-0">
                         EM BREVE
                       </span>
                     )}
                   </div>
                   <div
-                    className={`text-[11px] font-medium truncate mt-0.5 ${
+                    className={`text-xs font-medium truncate mt-0.5 ${
                       isAtiva ? "text-slate-500" : "text-blue-200/85"
                     }`}
                   >
@@ -344,16 +331,6 @@ export default function AdministrativoModule() {
           onAbrirModalOcorrencia={abrirModalNovaOcorrencia}
           onAbrirModalEditarOcorrencia={abrirModalEditarOcorrencia}
           onSalvarServidor={salvarServidor}
-        />
-      )}
-
-      {activeTab === "memorando" && (
-        <MemorandoTab
-          servidores={servidores}
-          ocorrencias={ocorrencias}
-          memorandos={memorandos}
-          onSalvarMemorando={salvarMemorando}
-          onExcluirMemorando={excluirMemorando}
         />
       )}
 

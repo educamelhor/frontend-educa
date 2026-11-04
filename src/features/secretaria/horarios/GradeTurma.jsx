@@ -1,34 +1,28 @@
 // ==================================================================================
 // frontend/src/features/secretaria/horarios/GradeTurma.jsx
-// Renderiza a grade por turma (mock/real) com nomes amigáveis + rótulo compacto
-// e cor por disciplina (estilo Urânia).
-// Agora aceita prop `layoutMode` e a repassa para o GradeBase como `layout`.
+// Renderiza a grade por turma com nomes amigáveis, rótulo compacto, cor por disciplina
+// (estilo Urânia) e suporte completo a Edição Interativa (Click-to-Swap / Move / Lock).
 // ==================================================================================
 
 import React from "react";
 import GradeBase from "./GradeBase.jsx";
 
-/**
- * Props
- * - turma: { id, nome }
- * - resultado: { grade_por_turma: { [turmaId]: { [dia]: { [ordem]: slot } } } }
- *   slot: { disciplina_id, professor_id, ... }
- * - periodosPorDia: { [dia]: [{ ordem }] }
- * - maps?: {
- *     disciplinaById?: { [id]: string },
- *     professorById?: { [id]: string },
- *     turmaById?: { [id]: string } // opcional (não usado aqui, mas mantido p/ simetria)
- *   }
- * - layoutMode?: "dias-linhas" | "dias-colunas"   // visual da malha (default controlado fora)
- */
-export default function GradeTurma({ turma, resultado, periodosPorDia, maps = {}, layoutMode }) {
+export default function GradeTurma({
+  turma,
+  resultado,
+  periodosPorDia,
+  maps = {},
+  layoutMode,
+  interativo = false,
+  selecao = null,
+  avaliarDestino = null,
+  onCellClick = null,
+  onToggleLock = null,
+}) {
   const dadosTurma = resultado?.grade_por_turma?.[turma.id] || {};
   const disciplinaById = maps.disciplinaById || {};
   const professorById = maps.professorById || {};
 
-  // ---------------------------------------------------------------------------
-  // Helpers: acesso ao slot (suporta dia->ordem e ordem->dia)
-  // ---------------------------------------------------------------------------
   function getSlot(dia, ordem) {
     const d = dadosTurma?.[dia] || dadosTurma?.[String(dia)];
     const o = dadosTurma?.[ordem] || dadosTurma?.[String(ordem)];
@@ -37,10 +31,6 @@ export default function GradeTurma({ turma, resultado, periodosPorDia, maps = {}
     const b = o?.[dia] || o?.[String(dia)];
     return b || null;
   }
-
-  // ---------------------------------------------------------------------------
-  // Helpers de rótulo compacto
-  // ---------------------------------------------------------------------------
 
   function sansAccent(s) {
     return (s || "")
@@ -55,7 +45,9 @@ export default function GradeTurma({ turma, resultado, periodosPorDia, maps = {}
     if (!n) return "";
     const palavras = n.split(" ").filter(Boolean);
     const compostas = ["EDUCACAO", "ED.", "ED", "CIENCIAS", "CIENCIA", "L. PORTUGUESA", "LINGUA"];
-    const ehComposta = palavras.length >= 2 && (compostas.includes(palavras[0].toUpperCase()) || palavras[0].length <= 2);
+    const ehComposta =
+      palavras.length >= 2 &&
+      (compostas.includes(palavras[0].toUpperCase()) || palavras[0].length <= 2);
     if (ehComposta) {
       const iniciais = palavras
         .filter((w) => w.length > 1 && !["DE", "DA", "DO", "E"].includes(w.toLowerCase()))
@@ -74,33 +66,79 @@ export default function GradeTurma({ turma, resultado, periodosPorDia, maps = {}
     return p[0].toUpperCase();
   }
 
-  // ---------------------------------------------------------------------------
-  // Paleta determinística por disciplina_id (pastéis legíveis no tema)
-  // ---------------------------------------------------------------------------
   const PALETA = [
-    { bg: "bg-indigo-50",   text: "text-indigo-800",   ring: "ring-indigo-200" },
-    { bg: "bg-amber-50",    text: "text-amber-800",    ring: "ring-amber-200" },
-    { bg: "bg-emerald-50",  text: "text-emerald-800",  ring: "ring-emerald-200" },
-    { bg: "bg-sky-50",      text: "text-sky-800",      ring: "ring-sky-200" },
-    { bg: "bg-rose-50",     text: "text-rose-800",     ring: "ring-rose-200" },
-    { bg: "bg-violet-50",   text: "text-violet-800",   ring: "ring-violet-200" },
-    { bg: "bg-lime-50",     text: "text-lime-800",     ring: "ring-lime-200" },
-    { bg: "bg-orange-50",   text: "text-orange-800",   ring: "ring-orange-200" },
-    { bg: "bg-cyan-50",     text: "text-cyan-800",     ring: "ring-cyan-200" },
-    { bg: "bg-fuchsia-50",  text: "text-fuchsia-800",  ring: "ring-fuchsia-200" },
+    { bg: "bg-indigo-50",  text: "text-indigo-800",  ring: "ring-indigo-200" },
+    { bg: "bg-amber-50",   text: "text-amber-800",   ring: "ring-amber-200" },
+    { bg: "bg-emerald-50", text: "text-emerald-800", ring: "ring-emerald-200" },
+    { bg: "bg-sky-50",     text: "text-sky-800",     ring: "ring-sky-200" },
+    { bg: "bg-rose-50",    text: "text-rose-800",    ring: "ring-rose-200" },
+    { bg: "bg-violet-50",  text: "text-violet-800",  ring: "ring-violet-200" },
+    { bg: "bg-lime-50",    text: "text-lime-800",    ring: "ring-lime-200" },
+    { bg: "bg-orange-50",  text: "text-orange-800",  ring: "ring-orange-200" },
+    { bg: "bg-cyan-50",    text: "text-cyan-800",    ring: "ring-cyan-200" },
+    { bg: "bg-fuchsia-50", text: "text-fuchsia-800", ring: "ring-fuchsia-200" },
   ];
+
   function corDisciplina(discId) {
     const i = Math.abs(Number(discId) || 0) % PALETA.length;
     return PALETA[i];
   }
 
-  // ---------------------------------------------------------------------------
-  // Renderização da célula (compacta + colorida)
-  // ---------------------------------------------------------------------------
+  const selecaoNestaTurma =
+    interativo && selecao && Number(selecao.turmaId) === Number(turma.id);
+
   const celulaRender = ({ dia, ordem }) => {
     const slot = getSlot(dia, ordem);
-    if (!slot) return <div className="text-gray-300 text-xs">—</div>;
+    const aval =
+      selecaoNestaTurma && typeof avaliarDestino === "function"
+        ? avaliarDestino(turma.id, dia, ordem)
+        : null;
 
+    // 1) Caso de célula vazia
+    if (!slot) {
+      if (selecaoNestaTurma && aval) {
+        if (aval.status === "livre") {
+          return (
+            <div
+              onClick={() => onCellClick && onCellClick({ turmaId: turma.id, dia, ordem, slot: null })}
+              title={aval.motivo || "Clique para mover a aula selecionada para este horário livre"}
+              className="rounded-xl px-2 py-2.5 text-center border-2 border-dashed border-emerald-500 bg-emerald-50/90 text-emerald-800 hover:bg-emerald-100 cursor-pointer transition-all shadow-sm"
+            >
+              <div className="text-[11px] font-bold leading-tight">🟢 Mover cá</div>
+              <div className="text-[10px] opacity-80 leading-tight">Horário livre</div>
+            </div>
+          );
+        }
+        if (aval.status === "aviso") {
+          return (
+            <div
+              onClick={() => onCellClick && onCellClick({ turmaId: turma.id, dia, ordem, slot: null })}
+              title={aval.motivo || "Mover com ressalva de preferência"}
+              className="rounded-xl px-2 py-2.5 text-center border-2 border-dashed border-amber-500 bg-amber-50/90 text-amber-800 hover:bg-amber-100 cursor-pointer transition-all shadow-sm"
+            >
+              <div className="text-[11px] font-bold leading-tight">🟡 Mover cá</div>
+              <div className="text-[10px] opacity-80 leading-tight">{aval.label || "Evitar"}</div>
+            </div>
+          );
+        }
+        if (aval.status === "bloqueado" || aval.status === "indisponivel") {
+          return (
+            <div
+              onClick={() => onCellClick && onCellClick({ turmaId: turma.id, dia, ordem, slot: null })}
+              title={aval.motivo || "Horário indisponível ou com choque de professor"}
+              className="rounded-xl px-2 py-2.5 text-center border border-dashed border-red-300 bg-red-50/60 text-red-700 cursor-not-allowed opacity-75"
+            >
+              <div className="text-[11px] font-bold leading-tight">🚫 {aval.label || "Choque"}</div>
+              <div className="text-[9px] truncate opacity-85 leading-tight">{aval.resumoCurto || "Indisponível"}</div>
+            </div>
+          );
+        }
+      }
+
+      return <div className="text-gray-300 text-xs py-2 text-center select-none">—</div>;
+    }
+
+    // 2) Célula ocupada
     const discId = slot.disciplina_id ?? slot.disciplina ?? null;
     const profId = slot.professor_id ?? slot.professor ?? null;
 
@@ -117,19 +155,91 @@ export default function GradeTurma({ turma, resultado, periodosPorDia, maps = {}
     const { bg, text, ring } = corDisciplina(discId);
     const isLocked = Boolean(slot.locked);
 
+    // Estilo interativo quando há seleção ativa nesta turma
+    let extraClasses = interativo
+      ? "cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all group"
+      : "";
+    let statusBadge = null;
+    let tooltipText = `${discNome} — ${profNome}${isLocked ? " (Fixado 📌)" : ""}`;
+
+    if (selecaoNestaTurma && aval) {
+      if (aval.status === "origem") {
+        extraClasses =
+          "cursor-pointer ring-2 ring-blue-600 bg-blue-100 text-blue-950 shadow-md scale-[1.02] transition-all";
+        statusBadge = (
+          <div className="text-[9px] font-extrabold uppercase tracking-wider text-blue-700 bg-blue-200/80 rounded px-1 mb-0.5 inline-block">
+            🎯 Selecionada
+          </div>
+        );
+        tooltipText = "Clique novamente para cancelar a seleção";
+      } else if (aval.status === "livre") {
+        extraClasses =
+          "cursor-pointer ring-2 ring-emerald-500 hover:bg-emerald-50/90 transition-all shadow-sm";
+        statusBadge = (
+          <div className="text-[9px] font-extrabold uppercase tracking-wider text-emerald-800 bg-emerald-200/80 rounded px-1 mb-0.5 inline-block">
+            🟢 ⇄ Trocar
+          </div>
+        );
+        tooltipText = aval.motivo || `Trocar com ${discNome} (${profNome})`;
+      } else if (aval.status === "aviso") {
+        extraClasses =
+          "cursor-pointer ring-2 ring-amber-500 hover:bg-amber-50/90 transition-all shadow-sm";
+        statusBadge = (
+          <div className="text-[9px] font-extrabold uppercase tracking-wider text-amber-900 bg-amber-200/80 rounded px-1 mb-0.5 inline-block">
+            🟡 ⇄ {aval.label || "Ressalva"}
+          </div>
+        );
+        tooltipText = aval.motivo || `Trocar com ressalva: ${discNome} (${profNome})`;
+      } else if (aval.status === "bloqueado" || aval.status === "indisponivel") {
+        extraClasses = "cursor-not-allowed ring-1 ring-red-300 opacity-60 transition-all";
+        statusBadge = (
+          <div className="text-[9px] font-bold uppercase tracking-wider text-red-800 bg-red-200/80 rounded px-1 mb-0.5 inline-block">
+            🚫 {aval.label || "Conflito"}
+          </div>
+        );
+        tooltipText = aval.motivo || "Troca bloqueada por conflito de professor ou indisponibilidade";
+      }
+    } else if (interativo) {
+      tooltipText += " — Clique para mover ou trocar de horário";
+    }
+
     return (
       <div
-        className={`relative rounded-xl px-2 py-1.5 text-center ${bg} ${text} ring-1 ${ring} shadow-[inset_0_0_0_1px_rgba(255,255,255,0.6)]`}
-        title={`${discNome} — ${profNome}${isLocked ? " (Fixado no Horário Manual)" : ""}`}
+        onClick={() => onCellClick && onCellClick({ turmaId: turma.id, dia, ordem, slot })}
+        className={`relative rounded-xl px-2 py-1.5 text-center ${bg} ${text} ring-1 ${ring} shadow-[inset_0_0_0_1px_rgba(255,255,255,0.6)] ${extraClasses}`}
+        title={tooltipText}
       >
-        {isLocked && (
-          <span
-            style={{ position: "absolute", top: 2, right: 4, fontSize: 10, lineHeight: 1 }}
-            title="Aula fixa (Horário Manual)"
+        {/* Botão de fixar/desafixar rápido (pino) */}
+        {(isLocked || (interativo && !selecaoNestaTurma)) && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onToggleLock) onToggleLock({ turmaId: turma.id, dia, ordem, slot });
+            }}
+            style={{
+              position: "absolute",
+              top: 2,
+              right: 3,
+              fontSize: 10,
+              lineHeight: 1,
+              background: "transparent",
+              border: "none",
+              padding: 2,
+              cursor: interativo ? "pointer" : "default",
+            }}
+            className={isLocked ? "opacity-100" : "opacity-0 group-hover:opacity-60 hover:!opacity-100"}
+            title={
+              isLocked
+                ? "Aula fixada (Horário Manual). Clique no pino para desafixar."
+                : "Clique no pino para fixar (travar) esta aula neste horário."
+            }
           >
             📌
-          </span>
+          </button>
         )}
+
+        {statusBadge}
         <div className="text-sm font-semibold leading-tight">{cod}</div>
         <div className="text-[11px] opacity-80 leading-tight">{profShort}</div>
       </div>
@@ -138,7 +248,7 @@ export default function GradeTurma({ turma, resultado, periodosPorDia, maps = {}
 
   const diasDinamicos = Object.keys(periodosPorDia || {})
     .map(Number)
-    .filter(n => n >= 1 && n <= 6)
+    .filter((n) => n >= 1 && n <= 6)
     .sort((a, b) => a - b);
 
   return (

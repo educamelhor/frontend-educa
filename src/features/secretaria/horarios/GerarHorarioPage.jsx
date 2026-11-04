@@ -1,20 +1,22 @@
 // src/features/secretaria/horarios/GerarHorarioPage.jsx
-// ============================================================
-// Tela de Geração de Horários — aba ⚡ Gerar Horário (Solver 2.0)
-// Fluxo:
-//   1) Carrega turmas do turno selecionado
-//   2) POST /api/grade/solver-payload → busca dados consolidados (< 200ms)
-//   3) Executa Motor Solver 2.0 em Web Worker no navegador (Kempe Chains + Tabu Search)
-//      com telemetria em tempo real e botão "Parar e Usar Melhor Grade"
-//   4) Exibe grade por Turma / por Professor (destacando aulas fixas 📌 do Horário Manual)
-//   5) POST /api/grade/rascunho → salva rascunho preservando aulas fixas
-//   6) POST /api/grade/publicar → promove a publicado
-// ============================================================
-import React, { useState, useEffect, useCallback, useRef } from "react";
+// ============================================================================
+// Tela de Geração e Edição Interativa de Horários — aba ⚡ Gerar Horário
+// Entregas 1 & 2 (Padrão Urânia):
+//   1) Carrega automaticamente a grade salva (Rascunho ou Publicada) ao abrir
+//   2) Executa Motor Solver 2.0 em Web Worker (Kempe Chains + Tabu Search)
+//   3) Edição Interativa Click-to-Swap / Move / Lock direto na grade (Turma e Professor)
+//      com validação instantânea de choques de professor e indisponibilidades
+//   4) Alocação assistida de aulas pendentes (1 clique para encaixar na grade)
+//   5) Salva rascunho e publica garantindo sincronia total do que está em tela
+// ============================================================================
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import api from "../../../services/api";
 import GradeTurma from "./GradeTurma.jsx";
 import GradeProfessor from "./GradeProfessor.jsx";
 import { runSolverInWebWorker } from "./solverEngine.js";
+
+const DIAS_LABEL = { 1: "Segunda", 2: "Terça", 3: "Quarta", 4: "Quinta", 5: "Sexta", 6: "Sábado" };
+const DIAS_CURTO = { 1: "Seg", 2: "Ter", 3: "Qua", 4: "Qui", 5: "Sex", 6: "Sáb" };
 
 const ESTRATEGIA_LABELS = {
   dsatur_slack: "DSATUR (Folga Mínima)",
@@ -39,8 +41,157 @@ function normalizeResultado(raw) {
     payload_summary:     src.payload_summary     || {},
     warnings_payload:    src.warnings_payload    || [],
     solver_telemetry:    src.solver_telemetry    || null,
+    origem_carregamento: src.origem_carregamento || null, // 'rascunho' | 'publicado' | 'solver'
+    meta_persistencia:   src.meta_persistencia   || null,
     traceId:             src.traceId             || raw.traceId           || null,
   };
+}
+
+// ── Recalcula métricas e aulas não alocadas com base na grade atual e no payload ──
+function recalcularMetricasEDiagnostico(gradePorTurma, solverPayload, metricsAtuais = {}) {
+  const contagensAlocadas = new Map();
+  let totalAlocadas = 0;
+  let totalFixas = 0;
+
+  for (const [tIdStr, diasObj] of Object.entries(gradePorTurma || {})) {
+    const tId = Number(tIdStr);
+    for (const perObj of Object.values(diasObj || {})) {
+      for (const cell of Object.values(perObj || {})) {
+        if (cell && cell.professor_id && cell.disciplina_id) {
+          totalAlocadas++;
+          if (cell.locked) totalFixas++;
+          const k = `${tId}|${Number(cell.disciplina_id)}`;
+          contagensAlocadas.set(k, (contagensAlocadas.get(k) || 0) + 1);
+        }
+      }
+    }
+  }
+
+  const demandas = Array.isArray(solverPayload?.demanda) ? solverPayload.demanda : [];
+  const modulacao = Array.isArray(solverPayload?.modulacao) ? solverPayload.modulacao : [];
+
+  if (demandas.length === 0) {
+    const demFallback = Math.max(Number(metricsAtuais.aulas_demanda) || 0, totalAlocadas);
+    const naoAlocFallback = Math.max(0, demFallback - totalAlocadas);
+    const cobFallback = demFallback > 0 ? Math.round((totalAlocadas / demFallback) * 10000) / 100 : 100;
+    return {
+      metrics: {
+        ...metricsAtuais,
+        aulas_demanda: demFallback,
+        aulas_alocadas: totalAlocadas,
+        aulas_fixas_manuais: totalFixas,
+        aulas_nao_alocadas: naoAlocFallback,
+        cobertura_percentual: cobFallback,
+      },
+      nao_alocadas: [],
+    };
+  }
+
+  const modIdx = new Map();
+  for (const m of modulacao) {
+    const k = `${Number(m.turma_id)}|${Number(m.disciplina_id)}`;
+    if (!modIdx.has(k)) modIdx.set(k, Number(m.professor_id));
+  }
+
+  let demandaTotal = 0;
+  const naoAlocadasList = [];
+
+  for (const d of demandas) {
+    const tId = Number(d.turma_id);
+    const dId = Number(d.disciplina_id);
+    const carga = Number(d.carga || d.aulas_semanais || 0);
+    const pId = Number(d.professor_id || modIdx.get(`${tId}|${dId}`) || 0);
+    if (!tId || !dId || !pId || carga <= 0) continue;
+
+    demandaTotal += carga;
+    const aloc = contagensAlocadas.get(`${tId}|${dId}`) || 0;
+    const faltam = Math.max(0, carga - aloc);
+    for (let i = 0; i < faltam; i++) {
+      naoAlocadasList.push({
+        turma_id: tId,
+        disciplina_id: dId,
+        professor_id: pId,
+        motivo: "PENDENTE_ALOCACAO",
+      });
+    }
+  }
+
+  demandaTotal = Math.max(demandaTotal, totalAlocadas + naoAlocadasList.length);
+  const cobertura = demandaTotal > 0 ? Math.round((totalAlocadas / demandaTotal) * 10000) / 100 : 100;
+
+  return {
+    metrics: {
+      ...metricsAtuais,
+      aulas_demanda: demandaTotal,
+      aulas_alocadas: totalAlocadas,
+      aulas_fixas_manuais: totalFixas,
+      aulas_nao_alocadas: naoAlocadasList.length,
+      cobertura_percentual: cobertura,
+    },
+    nao_alocadas: naoAlocadasList,
+  };
+}
+
+// ── Reconstrói grade_por_turma e grade_por_professor a partir de slots salvos no banco ──
+function construirGradesDeSlotsSalvos(slots, turmasList, solverPayload) {
+  const diasSemana =
+    Array.isArray(solverPayload?.dias_semana) && solverPayload.dias_semana.length > 0
+      ? solverPayload.dias_semana.map(Number)
+      : [1, 2, 3, 4, 5];
+  const periodosPorDia = Number(solverPayload?.periodos_por_dia) || 6;
+
+  const initEmpty = () => {
+    const g = {};
+    for (const d of diasSemana) {
+      g[d] = {};
+      for (let p = 1; p <= periodosPorDia; p++) g[d][p] = null;
+    }
+    return g;
+  };
+
+  const gradePorTurma = {};
+  for (const t of turmasList || []) {
+    gradePorTurma[t.id] = initEmpty();
+  }
+
+  const gradePorProfessor = {};
+  for (const m of solverPayload?.modulacao || []) {
+    if (m.professor_id && !gradePorProfessor[m.professor_id]) {
+      gradePorProfessor[m.professor_id] = initEmpty();
+    }
+  }
+
+  for (const s of slots || []) {
+    const tId = Number(s.turma_id);
+    const dia = Number(s.dia ?? s.dia_semana);
+    const ord = Number(s.ordem ?? s.periodo_ordem);
+    const dId = Number(s.disciplina_id);
+    const pId = Number(s.professor_id);
+    if (!tId || !dia || !ord || !dId || !pId) continue;
+
+    if (!gradePorTurma[tId]) gradePorTurma[tId] = initEmpty();
+    if (!gradePorProfessor[pId]) gradePorProfessor[pId] = initEmpty();
+    if (!gradePorTurma[tId][dia]) gradePorTurma[tId][dia] = {};
+    if (!gradePorProfessor[pId][dia]) gradePorProfessor[pId][dia] = {};
+
+    const isLocked = Boolean(s.locked) || String(s.origem || "").toLowerCase() === "manual";
+
+    gradePorTurma[tId][dia][ord] = {
+      disciplina_id: dId,
+      professor_id: pId,
+      locked: isLocked,
+      origem: s.origem || (isLocked ? "manual" : "solver"),
+    };
+
+    gradePorProfessor[pId][dia][ord] = {
+      turma_id: tId,
+      disciplina_id: dId,
+      locked: isLocked,
+      origem: s.origem || (isLocked ? "manual" : "solver"),
+    };
+  }
+
+  return { gradePorTurma, gradePorProfessor };
 }
 
 // ── Medidor de cobertura ───────────────────────────────────────
@@ -91,16 +242,26 @@ function MetricCard({ label, value, sub, icon, color = "#1e3a5f" }) {
   );
 }
 
-// ── Converte grade { [dia]: { [ordem]: cell } } → periodosPorDia ──
-function buildPeriodosPorDia(grade) {
-  if (!grade || typeof grade !== "object") return {};
+// ── Converte grade { [dia]: { [ordem]: cell } } → periodosPorDia completo ──
+function buildPeriodosPorDia(grade, diasPadrao = [1, 2, 3, 4, 5], maxPeriodosPadrao = 6) {
   const out = {};
-  for (const [diaStr, porOrdem] of Object.entries(grade)) {
-    const dia = Number(diaStr);
-    out[dia] = Object.keys(porOrdem || {})
-      .map(Number)
-      .sort((a, b) => a - b)
-      .map(ordem => ({ ordem }));
+  const diasChaves = Object.keys(grade || {}).map(Number).filter(n => n >= 1 && n <= 6);
+  const diasFinal = diasChaves.length > 0 ? Array.from(new Set([...diasPadrao, ...diasChaves])).sort((a, b) => a - b) : diasPadrao;
+
+  let maxOrd = maxPeriodosPadrao;
+  for (const porOrdem of Object.values(grade || {})) {
+    for (const k of Object.keys(porOrdem || {})) {
+      const n = Number(k);
+      if (n > maxOrd) maxOrd = n;
+    }
+  }
+
+  for (const dia of diasFinal) {
+    const arr = [];
+    for (let o = 1; o <= maxOrd; o++) {
+      arr.push({ ordem: o });
+    }
+    out[dia] = arr;
   }
   return out;
 }
@@ -110,18 +271,30 @@ export default function GerarHorarioPage({ config }) {
   const turnos = config?.turnos || ["matutino", "vespertino"];
   const [turno, setTurno] = useState(turnos[0] || "matutino");
   const [turmas, setTurmas] = useState([]);
-  const [carregandoTurmas, setCarregandoTurmas] = useState(false);
+  const [carregandoInicial, setCarregandoInicial] = useState(false);
 
   // Opções do Motor Solver 2.0
   const [respeitarHorarioManual, setRespeitarHorarioManual] = useState(true);
   const [tempoMaximoMs, setTempoMaximoMs] = useState(15000);
+
+  // Payload enriquecido (demanda, modulacao, disponibilidades, config) para validação em tempo real
+  const [solverPayload, setSolverPayload] = useState(null);
+
+  // Grades salvas no banco (para permitir alternar entre Rascunho e Publicado se ambos existirem)
+  const [dadosRascunhoSalvo, setDadosRascunhoSalvo] = useState(null);
+  const [dadosPublicadoSalvo, setDadosPublicadoSalvo] = useState(null);
 
   // Estado do solver e telemetria Web Worker
   const [rodando, setRodando] = useState(false);
   const [progressoSolver, setProgressoSolver] = useState(null);
   const [resultado, setResultado] = useState(null);
   const [erroSolver, setErroSolver] = useState(null);
+  const [temAlteracoesNaoSalvas, setTemAlteracoesNaoSalvas] = useState(false);
   const stopWorkerRef = useRef(null);
+
+  // Estado de Edição Interativa (Click-to-Swap / Move / Alocar Pendente)
+  // { tipo: 'slot' | 'nao_alocada', turmaId, dia?, ordem?, disciplina_id, professor_id, locked? }
+  const [selecao, setSelecao] = useState(null);
 
   // Nomes para lookup
   const [nomesDisciplinas, setNomesDisciplinas] = useState({});
@@ -135,59 +308,162 @@ export default function GerarHorarioPage({ config }) {
   const [msgAcao, setMsgAcao] = useState("");
   const [showModalPublicar, setShowModalPublicar] = useState(false);
 
-  // Cleanup do Worker ao desmontar
+  // Cleanup do Worker ao desmontar e atalho ESC para cancelar seleção
   useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.key === "Escape") {
+        setSelecao(null);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
     return () => {
+      window.removeEventListener("keydown", onKeyDown);
       if (stopWorkerRef.current) {
         try { stopWorkerRef.current(); } catch {}
       }
     };
   }, []);
 
-  // ── Carrega turmas do turno ──────────────────────────────────
-  const carregarTurmas = useCallback(async () => {
-    setCarregandoTurmas(true);
+  // Índice rápido de disponibilidades dos professores (`profId|dia|ordem` -> 'indisponivel' | 'evitar')
+  const dispoIndex = useMemo(() => {
+    const map = new Map();
+    const list = Array.isArray(solverPayload?.disponibilidades) ? solverPayload.disponibilidades : [];
+    for (const d of list) {
+      const pId = Number(d.professor_id);
+      const dia = Number(d.dia ?? d.dia_semana);
+      const ord = Number(d.ordem ?? d.periodo ?? d.periodo_ordem);
+      const st = String(d.status || "indisponivel").toLowerCase();
+      if (!pId || !dia || !ord) continue;
+      if (st === "indisponivel" || st === "bloqueado" || st === "excluir") {
+        map.set(`${pId}|${dia}|${ord}`, "indisponivel");
+      } else if (st === "evitar" && map.get(`${pId}|${dia}|${ord}`) !== "indisponivel") {
+        map.set(`${pId}|${dia}|${ord}`, "evitar");
+      }
+    }
+    return map;
+  }, [solverPayload]);
+
+  // ── Aplica uma grade salva (rascunho ou publicado) na tela ────
+  const aplicarGradeDoBanco = useCallback((registroBanco, origemLabel, listaTurmas, payloadInfo) => {
+    if (!registroBanco || !Array.isArray(registroBanco.slots) || registroBanco.slots.length === 0) {
+      return false;
+    }
+    const pl = payloadInfo?.payload || null;
+    const { gradePorTurma, gradePorProfessor } = construirGradesDeSlotsSalvos(
+      registroBanco.slots,
+      listaTurmas,
+      pl
+    );
+    const { metrics, nao_alocadas } = recalcularMetricasEDiagnostico(gradePorTurma, pl, {});
+
+    setResultado(
+      normalizeResultado({
+        grade_por_turma: gradePorTurma,
+        grade_por_professor: gradePorProfessor,
+        metrics,
+        nao_alocadas,
+        diagnostico: { nao_alocadas_detalhado: nao_alocadas },
+        warnings_payload: payloadInfo?.warnings_payload || [],
+        payload_summary: payloadInfo?.payload_summary || {
+          turmas: listaTurmas.length,
+          professores: Object.keys(gradePorProfessor).length,
+        },
+        origem_carregamento: origemLabel,
+        meta_persistencia: registroBanco.resultado || null,
+      })
+    );
+    setTemAlteracoesNaoSalvas(false);
+    setSelecao(null);
+    return true;
+  }, []);
+
+  // ── Carrega turmas, nomes e grade salva do turno ao abrir ────
+  const inicializarTurno = useCallback(async () => {
+    setCarregandoInicial(true);
+    setResultado(null);
+    setErroSolver(null);
+    setSelecao(null);
+    setTemAlteracoesNaoSalvas(false);
+
     try {
       const hoje = new Date();
       const anoAtual = hoje.getMonth() === 0 ? hoje.getFullYear() - 1 : hoje.getFullYear();
-      const { data } = await api.get("/api/turmas", { params: { turno, ano: anoAtual } });
-      const lista = Array.isArray(data) ? data : (Array.isArray(data?.turmas) ? data.turmas : []);
-      setTurmas(lista);
-      const map = {};
-      for (const t of lista) {
-        map[t.id] = t.turma || t.nome || String(t.id);
-      }
-      setNomesTurmas(map);
-    } catch {
-      setTurmas([]);
-    } finally {
-      setCarregandoTurmas(false);
-    }
-  }, [turno]);
 
-  // ── Carrega nomes de disciplinas e professores ───────────────
-  const carregarNomes = useCallback(async () => {
-    try {
-      const [rDisc, rProf] = await Promise.all([
-        api.get("/api/disciplinas"),
-        api.get("/api/professores", { params: { turno } }),
+      const [rTurmas, rDisc, rProf, rRascunho, rPublicado] = await Promise.all([
+        api.get("/api/turmas", { params: { turno, ano: anoAtual } }).catch(() => ({ data: [] })),
+        api.get("/api/disciplinas").catch(() => ({ data: [] })),
+        api.get("/api/professores", { params: { turno } }).catch(() => ({ data: [] })),
+        api.get("/api/grade/rascunho", { params: { turno: turno.toLowerCase() } }).catch(() => ({ data: null })),
+        api.get("/api/grade/publicado", { params: { turno: turno.toLowerCase() } }).catch(() => ({ data: null })),
       ]);
-      const disc = Array.isArray(rDisc.data) ? rDisc.data : [];
-      const prof = Array.isArray(rProf.data) ? rProf.data : [];
-      const dMap = {}, pMap = {};
-      for (const d of disc) dMap[d.id] = d.nome || `Disc ${d.id}`;
-      for (const p of prof) pMap[p.id] = p.nome || `Prof ${p.id}`;
+
+      const listaTurmas = Array.isArray(rTurmas.data)
+        ? rTurmas.data
+        : Array.isArray(rTurmas.data?.turmas)
+          ? rTurmas.data.turmas
+          : [];
+      setTurmas(listaTurmas);
+
+      const tMap = {};
+      for (const t of listaTurmas) tMap[t.id] = t.turma || t.nome || String(t.id);
+      setNomesTurmas(tMap);
+
+      const dMap = {};
+      for (const d of Array.isArray(rDisc.data) ? rDisc.data : []) {
+        dMap[d.id] = d.nome || d.disciplina || `Disc ${d.id}`;
+      }
       setNomesDisciplinas(dMap);
+
+      const pMap = {};
+      for (const p of Array.isArray(rProf.data) ? rProf.data : []) {
+        pMap[p.id] = p.nome || `Prof ${p.id}`;
+      }
       setNomesProfessores(pMap);
-    } catch { /* silencioso */ }
-  }, [turno]);
+
+      const rascunhoObj = rRascunho?.data?.slots?.length > 0 ? rRascunho.data : null;
+      const publicadoObj = rPublicado?.data?.slots?.length > 0 ? rPublicado.data : null;
+      setDadosRascunhoSalvo(rascunhoObj);
+      setDadosPublicadoSalvo(publicadoObj);
+
+      // Busca o solver-payload do turno para enriquecer métricas e validação de trocas
+      let payloadInfo = null;
+      if (listaTurmas.length > 0) {
+        try {
+          const { data: plData } = await api.post("/api/grade/solver-payload", {
+            turno: turno.toLowerCase(),
+            turma_ids: listaTurmas.map(t => t.id),
+            respeitar_horario_manual: true,
+          });
+          if (plData?.ok && plData?.payload) {
+            payloadInfo = plData;
+            setSolverPayload(plData.payload);
+            // Garante nomes dos professores da modulação também no mapa
+            for (const m of plData.payload.modulacao || []) {
+              if (m.professor_id && m.professor_nome && !pMap[m.professor_id]) {
+                pMap[m.professor_id] = m.professor_nome;
+              }
+            }
+            setNomesProfessores({ ...pMap });
+          }
+        } catch {
+          /* silencioso */
+        }
+      }
+
+      // Prioriza exibir Rascunho salvo; se não houver, exibe Grade Publicada
+      if (rascunhoObj) {
+        aplicarGradeDoBanco(rascunhoObj, "rascunho", listaTurmas, payloadInfo);
+      } else if (publicadoObj) {
+        aplicarGradeDoBanco(publicadoObj, "publicado", listaTurmas, payloadInfo);
+      }
+    } finally {
+      setCarregandoInicial(false);
+    }
+  }, [turno, aplicarGradeDoBanco]);
 
   useEffect(() => {
-    setResultado(null);
-    setErroSolver(null);
-    carregarTurmas();
-    carregarNomes();
-  }, [carregarTurmas, carregarNomes]);
+    inicializarTurno();
+  }, [inicializarTurno]);
 
   // ── Parar Solver antecipadamente e usar a melhor grade ────────
   function pararSolverAgora() {
@@ -201,7 +477,7 @@ export default function GerarHorarioPage({ config }) {
     if (!turmas.length) return;
     setRodando(true);
     setErroSolver(null);
-    setResultado(null);
+    setSelecao(null);
     setMsgAcao("");
     setProgressoSolver({
       iter: 0,
@@ -217,7 +493,6 @@ export default function GerarHorarioPage({ config }) {
     const ids = turmas.map(t => t.id);
 
     try {
-      // 1) Busca o payload enriquecido do backend (< 200ms)
       let payloadData = null;
       try {
         const { data } = await api.post("/api/grade/solver-payload", {
@@ -227,12 +502,12 @@ export default function GerarHorarioPage({ config }) {
         });
         if (data?.ok && data?.payload) {
           payloadData = data;
+          setSolverPayload(data.payload);
         }
       } catch (errPayload) {
         console.warn("[Solver 2.0] Fallback para /api/grade/run-mock:", errPayload?.message);
       }
 
-      // 2) Se obteve o payload, roda no Web Worker no navegador sem limite de timeout HTTP
       if (payloadData?.payload) {
         const { promise, stop } = runSolverInWebWorker({
           payload: payloadData.payload,
@@ -251,16 +526,18 @@ export default function GerarHorarioPage({ config }) {
             ...workerResult,
             warnings_payload: payloadData.warnings_payload || [],
             payload_summary: payloadData.payload_summary || {},
+            origem_carregamento: "solver",
           })
         );
+        setTemAlteracoesNaoSalvas(true);
       } else {
-        // Fallback: executa no servidor
         const { data } = await api.post("/api/grade/run-mock", {
           turno: turno.toLowerCase(),
           turma_ids: ids,
           respeitar_horario_manual: respeitarHorarioManual,
         });
-        setResultado(normalizeResultado(data));
+        setResultado(normalizeResultado({ ...data, origem_carregamento: "solver" }));
+        setTemAlteracoesNaoSalvas(true);
       }
     } catch (e) {
       setErroSolver(e?.response?.data?.error || e?.message || "Erro ao executar o solver. Tente novamente.");
@@ -270,38 +547,455 @@ export default function GerarHorarioPage({ config }) {
     }
   }
 
+  // ── Avaliador em tempo real de viabilidade de troca/movimento ──
+  const avaliarDestino = useCallback(
+    (turmaId, diaDestino, ordemDestino) => {
+      if (!selecao || !resultado) return null;
+      if (Number(selecao.turmaId) !== Number(turmaId)) return null;
+
+      const tId = Number(turmaId);
+      const dDest = Number(diaDestino);
+      const oDest = Number(ordemDestino);
+      const profA = Number(selecao.professor_id);
+      const nomeProfA = nomesProfessores[profA] || `Prof. ${profA}`;
+
+      // Se for o próprio slot de origem
+      if (
+        selecao.tipo === "slot" &&
+        Number(selecao.dia) === dDest &&
+        Number(selecao.ordem) === oDest
+      ) {
+        return {
+          status: "origem",
+          label: "Selecionada",
+          motivo: "Aula selecionada para movimentação. Clique novamente para cancelar.",
+        };
+      }
+
+      const gpt = resultado.grade_por_turma || {};
+      const gpp = resultado.grade_por_professor || {};
+      const slotDestino = gpt[tId]?.[dDest]?.[oDest] || null;
+
+      // 1) Verifica se Prof A tem colisão em OUTRA turma no horário de destino (dDest, oDest)
+      const ocupProfAEmDest = gpp[profA]?.[dDest]?.[oDest] || null;
+      if (ocupProfAEmDest && Number(ocupProfAEmDest.turma_id) !== tId) {
+        const outraTurmaNome =
+          nomesTurmas[ocupProfAEmDest.turma_id] || `Turma ${ocupProfAEmDest.turma_id}`;
+        return {
+          status: "bloqueado",
+          label: "Choque",
+          resumoCurto: `Em ${outraTurmaNome}`,
+          motivo: `🚫 Bloqueado: ${nomeProfA} já está alocado(a) na ${outraTurmaNome} em ${DIAS_CURTO[dDest]} #${oDest}ª aula.`,
+        };
+      }
+
+      // 2) Verifica disponibilidade de Prof A no destino
+      const statusDispoA = dispoIndex.get(`${profA}|${dDest}|${oDest}`);
+      if (statusDispoA === "indisponivel") {
+        return {
+          status: "indisponivel",
+          label: "Indisponível",
+          resumoCurto: `${nomeProfA.split(" ")[0]} indisp.`,
+          motivo: `🚫 Indisponibilidade: ${nomeProfA} marcou indisponibilidade em ${DIAS_CURTO[dDest]} #${oDest}ª aula.`,
+        };
+      }
+
+      // Caso A: Slot de destino está VAZIO na turma
+      if (!slotDestino) {
+        if (statusDispoA === "evitar") {
+          return {
+            status: "aviso",
+            label: "Evitar",
+            motivo: `🟡 Horário livre, porém marcado como 'Evitar' por ${nomeProfA}. Clique para mover mesmo assim.`,
+          };
+        }
+        return {
+          status: "livre",
+          label: "Mover cá",
+          motivo: `🟢 Mover ${nomesDisciplinas[selecao.disciplina_id] || "aula"} (${nomeProfA}) para ${DIAS_CURTO[dDest]} #${oDest}ª aula.`,
+        };
+      }
+
+      // Caso B: Slot de destino está OCUPADO por (profB, discB)
+      const profB = Number(slotDestino.professor_id);
+      const discB = Number(slotDestino.disciplina_id);
+      const nomeProfB = nomesProfessores[profB] || `Prof. ${profB}`;
+      const nomeDiscB = nomesDisciplinas[discB] || `Disc. ${discB}`;
+
+      // Se estamos alocando uma aula pendente (nao_alocada) em cima de um slot ocupado:
+      if (selecao.tipo === "nao_alocada") {
+        if (slotDestino.locked) {
+          return {
+            status: "aviso",
+            label: "Fixo 📌",
+            ocupanteProfNome: nomeProfB.split(" ")[0],
+            motivo: `🟡 Substituir ${nomeDiscB} (${nomeProfB} — fixado manualmente) por esta aula pendente.`,
+          };
+        }
+        return {
+          status: "aviso",
+          label: "Substituir",
+          ocupanteProfNome: nomeProfB.split(" ")[0],
+          motivo: `🟡 Colocar esta aula aqui e devolver ${nomeDiscB} (${nomeProfB}) para a lista de pendentes.`,
+        };
+      }
+
+      // Se estamos trocando 2 slots (dOrig, oOrig) <-> (dDest, oDest):
+      const dOrig = Number(selecao.dia);
+      const oOrig = Number(selecao.ordem);
+
+      // Verifica se Prof B tem colisão em OUTRA turma no horário de origem (dOrig, oOrig)
+      const ocupProfBEmOrig = gpp[profB]?.[dOrig]?.[oOrig] || null;
+      if (ocupProfBEmOrig && Number(ocupProfBEmOrig.turma_id) !== tId) {
+        const outraTurmaB =
+          nomesTurmas[ocupProfBEmOrig.turma_id] || `Turma ${ocupProfBEmOrig.turma_id}`;
+        return {
+          status: "bloqueado",
+          label: "Choque Volta",
+          resumoCurto: `${nomeProfB.split(" ")[0]} em ${outraTurmaB}`,
+          motivo: `🚫 Bloqueado na troca: ${nomeProfB} (${nomeDiscB}) já está na ${outraTurmaB} em ${DIAS_CURTO[dOrig]} #${oOrig}ª aula.`,
+        };
+      }
+
+      // Verifica disponibilidade de Prof B no horário de origem (dOrig, oOrig)
+      const statusDispoB = dispoIndex.get(`${profB}|${dOrig}|${oOrig}`);
+      if (statusDispoB === "indisponivel") {
+        return {
+          status: "indisponivel",
+          label: "Indisp. Volta",
+          resumoCurto: `${nomeProfB.split(" ")[0]} indisp.`,
+          motivo: `🚫 Indisponibilidade na troca: ${nomeProfB} (${nomeDiscB}) está indisponível em ${DIAS_CURTO[dOrig]} #${oOrig}ª aula.`,
+        };
+      }
+
+      if (slotDestino.locked) {
+        return {
+          status: "aviso",
+          label: "Fixo 📌",
+          ocupanteProfNome: nomeProfB.split(" ")[0],
+          motivo: `🟡 ${nomeDiscB} (${nomeProfB}) está fixado manualmente (📌). Clique se desejar trocar mesmo assim.`,
+        };
+      }
+
+      if (statusDispoA === "evitar" || statusDispoB === "evitar") {
+        return {
+          status: "aviso",
+          label: "Evitar",
+          ocupanteProfNome: nomeProfB.split(" ")[0],
+          motivo: `🟡 Troca sem colisão, mas envolve horário marcado como 'Evitar'. Clique para confirmar a troca.`,
+        };
+      }
+
+      return {
+        status: "livre",
+        label: "Trocar ⇄",
+        ocupanteProfNome: nomeProfB.split(" ")[0],
+        motivo: `🟢 Trocar ${nomesDisciplinas[selecao.disciplina_id] || "aula"} (${nomeProfA}) ⇄ ${nomeDiscB} (${nomeProfB}).`,
+      };
+    },
+    [selecao, resultado, nomesProfessores, nomesTurmas, nomesDisciplinas, dispoIndex]
+  );
+
+  // ── Atualiza estado da grade após edição interativa ───────────
+  function atualizarGradePosEdicao(novoGpt, novoGpp, mensagemFeedback) {
+    const { metrics: novasMetricas, nao_alocadas: novasNaoAlocadas } =
+      recalcularMetricasEDiagnostico(novoGpt, solverPayload, resultado?.metrics);
+
+    setResultado((prev) => ({
+      ...prev,
+      grade_por_turma: novoGpt,
+      grade_por_professor: novoGpp,
+      metrics: novasMetricas,
+      nao_alocadas: novasNaoAlocadas,
+      diagnostico: {
+        ...(prev?.diagnostico || {}),
+        nao_alocadas_detalhado: novasNaoAlocadas,
+      },
+    }));
+    setTemAlteracoesNaoSalvas(true);
+    if (mensagemFeedback) {
+      setMsgAcao(mensagemFeedback);
+      setTimeout(() => setMsgAcao(""), 4500);
+    }
+  }
+
+  // ── Clique em qualquer célula da grade (Turma ou Professor) ───
+  function handleCellClick({ turmaId, dia, ordem, slot }) {
+    if (!resultado) return;
+    const tId = Number(turmaId);
+    const dNum = Number(dia);
+    const oNum = Number(ordem);
+
+    // 1) Se não há seleção ativa (ou clicou em outra turma diferente da selecionada):
+    if (!selecao || Number(selecao.turmaId) !== tId) {
+      if (!slot) return; // clicar em célula vazia sem seleção não faz nada
+      setSelecao({
+        tipo: "slot",
+        turmaId: tId,
+        dia: dNum,
+        ordem: oNum,
+        disciplina_id: Number(slot.disciplina_id),
+        professor_id: Number(slot.professor_id),
+        locked: Boolean(slot.locked),
+      });
+      return;
+    }
+
+    // 2) Se clicou no próprio slot de origem, cancela a seleção
+    if (
+      selecao.tipo === "slot" &&
+      Number(selecao.dia) === dNum &&
+      Number(selecao.ordem) === oNum
+    ) {
+      setSelecao(null);
+      return;
+    }
+
+    // 3) Avalia a viabilidade do destino clicado
+    const aval = avaliarDestino(tId, dNum, oNum);
+    if (!aval) return;
+
+    if (aval.status === "bloqueado" || aval.status === "indisponivel") {
+      setMsgAcao(aval.motivo || "⚠️ Movimento bloqueado por conflito de horário.");
+      setTimeout(() => setMsgAcao(""), 5000);
+      return;
+    }
+
+    // 4) Executa a movimentação ou troca!
+    const novoGpt = structuredClone
+      ? structuredClone(resultado.grade_por_turma || {})
+      : JSON.parse(JSON.stringify(resultado.grade_por_turma || {}));
+    const novoGpp = structuredClone
+      ? structuredClone(resultado.grade_por_professor || {})
+      : JSON.parse(JSON.stringify(resultado.grade_por_professor || {}));
+
+    const ensure = (obj, k1, k2) => {
+      if (!obj[k1]) obj[k1] = {};
+      if (!obj[k1][k2]) obj[k1][k2] = {};
+    };
+
+    const profA = Number(selecao.professor_id);
+    const discA = Number(selecao.disciplina_id);
+    const slotDest = novoGpt[tId]?.[dNum]?.[oNum] || null;
+
+    if (selecao.tipo === "nao_alocada") {
+      // Se havia aula no destino, limpa do professor B
+      if (slotDest && slotDest.professor_id) {
+        const profB = Number(slotDest.professor_id);
+        if (novoGpp[profB]?.[dNum]) novoGpp[profB][dNum][oNum] = null;
+      }
+      ensure(novoGpt, tId, dNum);
+      ensure(novoGpp, profA, dNum);
+      novoGpt[tId][dNum][oNum] = {
+        disciplina_id: discA,
+        professor_id: profA,
+        locked: false,
+        origem: "manual",
+      };
+      novoGpp[profA][dNum][oNum] = {
+        turma_id: tId,
+        disciplina_id: discA,
+        locked: false,
+        origem: "manual",
+      };
+
+      setSelecao(null);
+      atualizarGradePosEdicao(
+        novoGpt,
+        novoGpp,
+        `✅ Aula de ${nomesDisciplinas[discA] || "disciplina"} alocada em ${DIAS_CURTO[dNum]} #${oNum}ª aula! Clique em 📋 Salvar Rascunho para gravar.`
+      );
+      return;
+    }
+
+    // Caso padrão: troca ou movimento entre (dOrig, oOrig) e (dNum, oNum) na mesma turma
+    const dOrig = Number(selecao.dia);
+    const oOrig = Number(selecao.ordem);
+    const slotOrig = novoGpt[tId]?.[dOrig]?.[oOrig] || {
+      disciplina_id: discA,
+      professor_id: profA,
+      locked: Boolean(selecao.locked),
+    };
+
+    // Limpa origem
+    if (novoGpt[tId]?.[dOrig]) novoGpt[tId][dOrig][oOrig] = null;
+    if (novoGpp[profA]?.[dOrig]) novoGpp[profA][dOrig][oOrig] = null;
+
+    if (slotDest && slotDest.professor_id) {
+      const profB = Number(slotDest.professor_id);
+      const discB = Number(slotDest.disciplina_id);
+
+      // Limpa destino de Prof B
+      if (novoGpp[profB]?.[dNum]) novoGpp[profB][dNum][oNum] = null;
+
+      // Coloca B na origem
+      ensure(novoGpt, tId, dOrig);
+      ensure(novoGpp, profB, dOrig);
+      novoGpt[tId][dOrig][oOrig] = {
+        disciplina_id: discB,
+        professor_id: profB,
+        locked: Boolean(slotDest.locked),
+        origem: slotDest.origem || "solver",
+      };
+      novoGpp[profB][dOrig][oOrig] = {
+        turma_id: tId,
+        disciplina_id: discB,
+        locked: Boolean(slotDest.locked),
+        origem: slotDest.origem || "solver",
+      };
+    }
+
+    // Coloca A no destino
+    ensure(novoGpt, tId, dNum);
+    ensure(novoGpp, profA, dNum);
+    novoGpt[tId][dNum][oNum] = {
+      disciplina_id: discA,
+      professor_id: profA,
+      locked: Boolean(slotOrig.locked),
+      origem: slotOrig.origem || "solver",
+    };
+    novoGpp[profA][dNum][oNum] = {
+      turma_id: tId,
+      disciplina_id: discA,
+      locked: Boolean(slotOrig.locked),
+      origem: slotOrig.origem || "solver",
+    };
+
+    setSelecao(null);
+    atualizarGradePosEdicao(
+      novoGpt,
+      novoGpp,
+      slotDest
+        ? `✅ Troca realizada (${DIAS_CURTO[dOrig]} #${oOrig} ⇄ ${DIAS_CURTO[dNum]} #${oNum})! Clique em 📋 Salvar Rascunho para gravar.`
+        : `✅ Aula movida para ${DIAS_CURTO[dNum]} #${oNum}ª aula! Clique em 📋 Salvar Rascunho para gravar.`
+    );
+  }
+
+  // ── Fixar / Desafixar (📌) um horário diretamente na grade ─────
+  function handleToggleLock({ turmaId, dia, ordem, slot }) {
+    if (!resultado || !slot) return;
+    const tId = Number(turmaId);
+    const dNum = Number(dia);
+    const oNum = Number(ordem);
+    const pId = Number(slot.professor_id);
+    const novoLocked = !slot.locked;
+
+    const novoGpt = structuredClone
+      ? structuredClone(resultado.grade_por_turma || {})
+      : JSON.parse(JSON.stringify(resultado.grade_por_turma || {}));
+    const novoGpp = structuredClone
+      ? structuredClone(resultado.grade_por_professor || {})
+      : JSON.parse(JSON.stringify(resultado.grade_por_professor || {}));
+
+    if (novoGpt[tId]?.[dNum]?.[oNum]) {
+      novoGpt[tId][dNum][oNum].locked = novoLocked;
+      novoGpt[tId][dNum][oNum].origem = novoLocked ? "manual" : "solver";
+    }
+    if (novoGpp[pId]?.[dNum]?.[oNum]) {
+      novoGpp[pId][dNum][oNum].locked = novoLocked;
+      novoGpp[pId][dNum][oNum].origem = novoLocked ? "manual" : "solver";
+    }
+
+    if (
+      selecao &&
+      selecao.tipo === "slot" &&
+      Number(selecao.turmaId) === tId &&
+      Number(selecao.dia) === dNum &&
+      Number(selecao.ordem) === oNum
+    ) {
+      setSelecao((prev) => (prev ? { ...prev, locked: novoLocked } : null));
+    }
+
+    atualizarGradePosEdicao(
+      novoGpt,
+      novoGpp,
+      novoLocked
+        ? `📌 Aula fixada em ${DIAS_CURTO[dNum]} #${oNum}ª aula! O solver não moverá este horário.`
+        : `🔓 Aula desafixada em ${DIAS_CURTO[dNum]} #${oNum}ª aula.`
+    );
+  }
+
+  // ── Remover aula selecionada do slot (esvaziar horário) ───────
+  function removerAulaSelecionada() {
+    if (!resultado || !selecao || selecao.tipo !== "slot") return;
+    const tId = Number(selecao.turmaId);
+    const dNum = Number(selecao.dia);
+    const oNum = Number(selecao.ordem);
+    const pId = Number(selecao.professor_id);
+
+    const novoGpt = structuredClone
+      ? structuredClone(resultado.grade_por_turma || {})
+      : JSON.parse(JSON.stringify(resultado.grade_por_turma || {}));
+    const novoGpp = structuredClone
+      ? structuredClone(resultado.grade_por_professor || {})
+      : JSON.parse(JSON.stringify(resultado.grade_por_professor || {}));
+
+    if (novoGpt[tId]?.[dNum]) novoGpt[tId][dNum][oNum] = null;
+    if (novoGpp[pId]?.[dNum]) novoGpp[pId][dNum][oNum] = null;
+
+    setSelecao(null);
+    atualizarGradePosEdicao(
+      novoGpt,
+      novoGpp,
+      `🗑️ Horário ${DIAS_CURTO[dNum]} #${oNum}ª aula esvaziado.`
+    );
+  }
+
+  // ── Iniciar alocação de uma aula pendente (da lista de não-alocadas) ──
+  function iniciarAlocacaoPendente(na) {
+    setViewMode("turma");
+    setSelecao({
+      tipo: "nao_alocada",
+      turmaId: Number(na.turma_id),
+      disciplina_id: Number(na.disciplina_id),
+      professor_id: Number(na.professor_id),
+    });
+    setTimeout(() => {
+      const el = document.getElementById(`card-turma-${na.turma_id}`);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 100);
+  }
+
+  // ── Extrai array de slots da grade em tela ───────────────────
+  function extrairSlotsDaGradeAtual() {
+    const slots = [];
+    const gpt = resultado?.grade_por_turma || {};
+    for (const [turmaId, porDia] of Object.entries(gpt)) {
+      for (const [dia, porOrdem] of Object.entries(porDia || {})) {
+        for (const [ordem, cell] of Object.entries(porOrdem || {})) {
+          if (cell && cell.professor_id && cell.disciplina_id) {
+            slots.push({
+              turma_id:      Number(turmaId),
+              dia:           Number(dia),
+              ordem:         Number(ordem),
+              dia_semana:    Number(dia),
+              periodo_ordem: Number(ordem),
+              professor_id:  Number(cell.professor_id),
+              disciplina_id: Number(cell.disciplina_id),
+              locked:        Boolean(cell.locked),
+              origem:        cell.locked ? "manual" : "solver",
+            });
+          }
+        }
+      }
+    }
+    return slots;
+  }
+
   // ── Salvar rascunho ──────────────────────────────────────────
   async function salvarRascunho() {
     if (!resultado) return;
     setSalvando(true);
     setMsgAcao("");
     try {
-      const slots = [];
-      const gpt = resultado.grade_por_turma || {};
-      for (const [turmaId, porDia] of Object.entries(gpt)) {
-        for (const [dia, porOrdem] of Object.entries(porDia || {})) {
-          for (const [ordem, cell] of Object.entries(porOrdem || {})) {
-            if (cell && cell.professor_id) {
-              slots.push({
-                turma_id:      Number(turmaId),
-                dia:           Number(dia),
-                ordem:         Number(ordem),
-                dia_semana:    Number(dia),
-                periodo_ordem: Number(ordem),
-                professor_id:  Number(cell.professor_id),
-                disciplina_id: Number(cell.disciplina_id),
-                locked:        Boolean(cell.locked),
-                origem:        cell.locked ? "manual" : "solver",
-              });
-            }
-          }
-        }
-      }
+      const slots = extrairSlotsDaGradeAtual();
       await api.post("/api/grade/rascunho", {
         turno: turno.toLowerCase(),
         turma_ids: turmas.map(t => t.id),
         slots,
       });
+      setTemAlteracoesNaoSalvas(false);
+      setResultado((prev) => (prev ? { ...prev, origem_carregamento: "rascunho" } : prev));
       setMsgAcao("✅ Rascunho salvo com sucesso!");
     } catch (e) {
       setMsgAcao(`⚠️ Erro ao salvar rascunho: ${e?.response?.data?.error || "tente novamente"}`);
@@ -311,7 +1005,7 @@ export default function GerarHorarioPage({ config }) {
     }
   }
 
-  // ── Publicar grade ───────────────────────────────────────────
+  // ── Publicar grade (salva rascunho atual automaticamente antes de promover) ──
   function publicarGrade() {
     setShowModalPublicar(true);
   }
@@ -321,13 +1015,25 @@ export default function GerarHorarioPage({ config }) {
     setPublicando(true);
     setMsgAcao("");
     try {
+      // 1) Garante que a grade em tela está salva no rascunho antes de publicar
+      const slots = extrairSlotsDaGradeAtual();
+      if (slots.length > 0) {
+        await api.post("/api/grade/rascunho", {
+          turno: turno.toLowerCase(),
+          turma_ids: turmas.map(t => t.id),
+          slots,
+        });
+      }
+      // 2) Promove o rascunho para publicado
       await api.post("/api/grade/publicar", {
         turno: turno.toLowerCase(),
-        descricao: `Grade ${turno} — gerada em ${new Date().toLocaleDateString("pt-BR")}`,
+        descricao: `Grade ${turno} — publicada em ${new Date().toLocaleDateString("pt-BR")}`,
       });
+      setTemAlteracoesNaoSalvas(false);
+      setResultado((prev) => (prev ? { ...prev, origem_carregamento: "publicado" } : prev));
       setMsgAcao("🎉 Grade publicada com sucesso!");
     } catch (e) {
-      setMsgAcao(`⚠️ ${e?.response?.data?.error || "Erro ao publicar. Salve o rascunho primeiro."}`);
+      setMsgAcao(`⚠️ ${e?.response?.data?.error || "Erro ao publicar a grade."}`);
     } finally {
       setPublicando(false);
       setTimeout(() => setMsgAcao(""), 5000);
@@ -347,12 +1053,18 @@ export default function GerarHorarioPage({ config }) {
   const aulasFixas = metrics.aulas_fixas_manuais ?? resultado?.payload_summary?.slots_fixos_count ?? 0;
   const telemetry = resultado?.solver_telemetry || null;
 
+  const diasPadrao =
+    Array.isArray(solverPayload?.dias_semana) && solverPayload.dias_semana.length > 0
+      ? solverPayload.dias_semana.map(Number)
+      : [1, 2, 3, 4, 5];
+  const periodosPadrao = Number(solverPayload?.periodos_por_dia) || 6;
+
   // ── Render ───────────────────────────────────────────────────
   return (
     <div style={{
       fontFamily: "'Montserrat', sans-serif",
       display: "flex", flexDirection: "column", flex: 1, minHeight: 0,
-      overflowY: "auto",
+      overflowY: "auto", position: "relative",
     }}>
       {/* ── Barra superior ── */}
       <div style={{
@@ -360,14 +1072,47 @@ export default function GerarHorarioPage({ config }) {
         padding: "14px 24px", borderBottom: "1px solid #e2e8f0",
         background: "#fff", flexWrap: "wrap", gap: 12,
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <span style={{ fontSize: 22 }}>⚡</span>
           <div>
-            <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#1e3a5f" }}>
-              Gerar Horário
-            </h2>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#1e3a5f" }}>
+                Gerar Horário
+              </h2>
+              {resultado && !rodando && (
+                <span style={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  padding: "3px 10px",
+                  borderRadius: 999,
+                  background: temAlteracoesNaoSalvas
+                    ? "#fef3c7"
+                    : resultado.origem_carregamento === "publicado"
+                      ? "#dcfce7"
+                      : "#e0f2fe",
+                  color: temAlteracoesNaoSalvas
+                    ? "#b45309"
+                    : resultado.origem_carregamento === "publicado"
+                      ? "#15803d"
+                      : "#0369a1",
+                  border: `1px solid ${
+                    temAlteracoesNaoSalvas
+                      ? "#fcd34d"
+                      : resultado.origem_carregamento === "publicado"
+                        ? "#86efac"
+                        : "#bae6fd"
+                  }`,
+                }}>
+                  {temAlteracoesNaoSalvas
+                    ? "✨ Alterações não salvas"
+                    : resultado.origem_carregamento === "publicado"
+                      ? `🌐 Grade Publicada${resultado.meta_persistencia?.version ? ` (v${resultado.meta_persistencia.version})` : ""}`
+                      : "📝 Rascunho Salvo"}
+                </span>
+              )}
+            </div>
             <span style={{ fontSize: 11, color: "#64748b", fontWeight: 500 }}>
-              Motor Solver 2.0 (Kempe Chains + Tabu Ejection)
+              Motor Solver 2.0 • Clique em qualquer aula da grade para mover ou trocar horários
             </span>
           </div>
         </div>
@@ -389,7 +1134,7 @@ export default function GerarHorarioPage({ config }) {
               cursor: rodando ? "not-allowed" : "pointer",
               userSelect: "none",
             }}
-            title="Mantém intactas as aulas cadastradas na aba ✍️ Horário Manual e gera apenas as aulas restantes"
+            title="Mantém intactas as aulas fixadas (📌) e gera apenas as aulas restantes"
           >
             <input
               type="checkbox"
@@ -398,7 +1143,7 @@ export default function GerarHorarioPage({ config }) {
               onChange={(e) => setRespeitarHorarioManual(e.target.checked)}
               style={{ accentColor: "#2563eb", cursor: "pointer" }}
             />
-            📌 Respeitar Horário Manual
+            📌 Respeitar Aulas Fixas
           </label>
 
           {/* Seletor de Tempo Limite do Motor */}
@@ -445,12 +1190,12 @@ export default function GerarHorarioPage({ config }) {
             ))}
           </div>
 
-          {/* Botão principal: Gerar */}
+          {/* Botão principal: Gerar / Recalcular */}
           <button
             onClick={executarSolver}
-            disabled={rodando || carregandoTurmas || turmas.length === 0}
+            disabled={rodando || carregandoInicial || turmas.length === 0}
             style={{
-              padding: "9px 22px", borderRadius: 8, border: "none",
+              padding: "9px 20px", borderRadius: 8, border: "none",
               background: rodando ? "#93c5fd" : "#2563eb",
               color: "#fff", fontWeight: 700, fontSize: 13,
               cursor: (rodando || turmas.length === 0) ? "not-allowed" : "pointer",
@@ -463,18 +1208,28 @@ export default function GerarHorarioPage({ config }) {
                 <span style={{ display: "inline-block", animation: "spin 1s linear infinite" }}>⚙️</span>
                 Gerando…
               </>
-            ) : "⚡ Gerar Horário"}
+            ) : resultado ? "⚡ Gerar Novamente" : "⚡ Gerar Horário"}
           </button>
 
           {/* Ações pós-geração */}
           {resultado && !rodando && (
             <>
-              <button onClick={salvarRascunho} disabled={salvando || publicando} style={{
-                padding: "9px 18px", borderRadius: 8,
-                border: "1px solid #0284c7", background: "#f0f9ff",
-                color: "#0284c7", fontWeight: 700, fontSize: 13,
-                cursor: "pointer", transition: "all 0.18s",
-              }}>
+              <button
+                onClick={salvarRascunho}
+                disabled={salvando || publicando}
+                style={{
+                  padding: "9px 18px",
+                  borderRadius: 8,
+                  border: temAlteracoesNaoSalvas ? "2px solid #0284c7" : "1px solid #0284c7",
+                  background: temAlteracoesNaoSalvas ? "#e0f2fe" : "#f0f9ff",
+                  color: "#0369a1",
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: "pointer",
+                  transition: "all 0.18s",
+                  boxShadow: temAlteracoesNaoSalvas ? "0 0 0 3px rgba(2,132,199,0.15)" : "none",
+                }}
+              >
                 {salvando ? "Salvando…" : "📋 Salvar Rascunho"}
               </button>
               <button onClick={publicarGrade} disabled={salvando || publicando} style={{
@@ -490,18 +1245,144 @@ export default function GerarHorarioPage({ config }) {
 
         {msgAcao && (
           <div style={{
-            width: "100%", textAlign: "center", fontSize: 13, fontWeight: 600,
-            color: msgAcao.startsWith("✅") || msgAcao.startsWith("🎉") ? "#15803d" : "#b45309",
+            width: "100%",
+            padding: "8px 14px",
+            borderRadius: 8,
+            background: msgAcao.startsWith("✅") || msgAcao.startsWith("🎉") || msgAcao.startsWith("📌")
+              ? "#f0fdf4"
+              : "#fffbeb",
+            border: `1px solid ${
+              msgAcao.startsWith("✅") || msgAcao.startsWith("🎉") || msgAcao.startsWith("📌")
+                ? "#bbf7d0"
+                : "#fde68a"
+            }`,
+            textAlign: "center",
+            fontSize: 13,
+            fontWeight: 600,
+            color: msgAcao.startsWith("✅") || msgAcao.startsWith("🎉") || msgAcao.startsWith("📌")
+              ? "#15803d"
+              : "#b45309",
           }}>
             {msgAcao}
           </div>
         )}
       </div>
 
+      {/* ── Barra Flutuante de Edição Interativa (quando uma aula está selecionada) ── */}
+      {selecao && !rodando && (
+        <div style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 50,
+          background: "linear-gradient(90deg, #1e3a8a, #1d4ed8)",
+          color: "#fff",
+          padding: "10px 24px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: 12,
+          boxShadow: "0 4px 12px rgba(15, 23, 42, 0.22)",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <span style={{
+              background: "rgba(255,255,255,0.2)",
+              padding: "4px 10px",
+              borderRadius: 6,
+              fontSize: 12,
+              fontWeight: 800,
+            }}>
+              {selecao.tipo === "nao_alocada" ? "🎯 ALOCANDO PENDENTE" : "🔄 MODO TROCA / MOVER"}
+            </span>
+            <span style={{ fontSize: 13, fontWeight: 600 }}>
+              <strong>{nomesDisciplinas[selecao.disciplina_id] || `Disc ${selecao.disciplina_id}`}</strong>
+              {" • "}
+              {nomesProfessores[selecao.professor_id] || `Prof ${selecao.professor_id}`}
+              {" • "}
+              <span style={{ opacity: 0.9 }}>
+                {nomesTurmas[selecao.turmaId] || `Turma ${selecao.turmaId}`}
+                {selecao.tipo === "slot" ? ` (${DIAS_LABEL[selecao.dia]} — ${selecao.ordem}ª aula)` : ""}
+              </span>
+            </span>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 11, opacity: 0.9, marginRight: 4 }}>
+              Clique em um slot <strong>🟢 Verde</strong> (livre/troca válida) ou <strong>🟡 Amarelo</strong>:
+            </span>
+
+            {selecao.tipo === "slot" && (
+              <>
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleToggleLock({
+                      turmaId: selecao.turmaId,
+                      dia: selecao.dia,
+                      ordem: selecao.ordem,
+                      slot: {
+                        disciplina_id: selecao.disciplina_id,
+                        professor_id: selecao.professor_id,
+                        locked: selecao.locked,
+                      },
+                    })
+                  }
+                  style={{
+                    padding: "5px 12px",
+                    borderRadius: 6,
+                    border: "1px solid rgba(255,255,255,0.35)",
+                    background: "rgba(255,255,255,0.15)",
+                    color: "#fff",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  {selecao.locked ? "🔓 Desafixar" : "📌 Fixar Horário"}
+                </button>
+                <button
+                  type="button"
+                  onClick={removerAulaSelecionada}
+                  style={{
+                    padding: "5px 12px",
+                    borderRadius: 6,
+                    border: "1px solid rgba(252,165,165,0.5)",
+                    background: "rgba(239,68,68,0.25)",
+                    color: "#fee2e2",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  🗑️ Esvaziar Slot
+                </button>
+              </>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setSelecao(null)}
+              style={{
+                padding: "5px 12px",
+                borderRadius: 6,
+                border: "none",
+                background: "#fff",
+                color: "#1e3a8a",
+                fontSize: 12,
+                fontWeight: 800,
+                cursor: "pointer",
+              }}
+            >
+              ✖ Cancelar (ESC)
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── Conteúdo ── */}
       <div style={{ flex: 1, padding: "24px 24px 40px", overflowY: "auto" }}>
 
-        {/* Estado inicial */}
+        {/* Estado inicial (quando ainda não há rascunho nem publicado no banco) */}
         {!resultado && !rodando && !erroSolver && (
           <div style={{
             display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
@@ -512,13 +1393,13 @@ export default function GerarHorarioPage({ config }) {
               Motor de Geração de Horários 2.0
             </h3>
             <p style={{ color: "#64748b", fontSize: 14, maxWidth: 480, lineHeight: 1.6 }}>
-              {carregandoTurmas
-                ? "Carregando turmas…"
+              {carregandoInicial
+                ? "Verificando turmas e horários salvos para este turno…"
                 : turmas.length === 0
                   ? "Nenhuma turma encontrada para o turno selecionado."
-                  : `${turmas.length} turmas prontas para o turno ${turno}. O motor utiliza Cadeias de Kempe multi-turma e Busca Tabu em segundo plano, respeitando disponibilidades e horários manuais fixos.`}
+                  : `${turmas.length} turmas prontas para o turno ${turno}. Clique em ⚡ Gerar Horário para calcular a grade usando Cadeias de Kempe e Busca Tabu.`}
             </p>
-            {turmas.length > 0 && (
+            {turmas.length > 0 && !carregandoInicial && (
               <button onClick={executarSolver} style={{
                 marginTop: 24, padding: "12px 32px", borderRadius: 10, border: "none",
                 background: "linear-gradient(135deg, #2563eb, #1d4ed8)",
@@ -589,7 +1470,6 @@ export default function GerarHorarioPage({ config }) {
               </div>
             </div>
 
-            {/* Barra de progresso temporal */}
             <div style={{
               width: "100%", height: 8, background: "#e2e8f0", borderRadius: 999,
               overflow: "hidden", marginBottom: 20,
@@ -653,7 +1533,13 @@ export default function GerarHorarioPage({ config }) {
                 <MetricCard
                   label="Aulas Alocadas"
                   value={metrics.aulas_alocadas}
-                  sub={telemetry ? `em ${telemetry.iteracoes} iteração(ões) (${(telemetry.tempo_ms / 1000).toFixed(1)}s)` : null}
+                  sub={
+                    telemetry
+                      ? `em ${telemetry.iteracoes} ciclo(s) (${(telemetry.tempo_ms / 1000).toFixed(1)}s)`
+                      : resultado.origem_carregamento === "publicado"
+                        ? "Grade Publicada"
+                        : "Grade Carregada"
+                  }
                   icon="✅"
                   color="#16a34a"
                 />
@@ -680,38 +1566,83 @@ export default function GerarHorarioPage({ config }) {
                 />
                 <MetricCard
                   label="Turmas"
-                  value={resultado.payload_summary?.turmas}
+                  value={resultado.payload_summary?.turmas || Object.keys(resultado.grade_por_turma || {}).length}
                   icon="🏫"
                   color="#1e3a5f"
                 />
                 <MetricCard
                   label="Professores"
-                  value={resultado.payload_summary?.professores}
+                  value={resultado.payload_summary?.professores || Object.keys(resultado.grade_por_professor || {}).length}
                   icon="👨‍🏫"
                   color="#1e3a5f"
                 />
               </div>
             </div>
 
-            {/* ── Alertas de não-alocadas ── */}
+            {/* ── Alertas de não-alocadas (com botão interativo de Alocar na Grade!) ── */}
             {naoAloc > 0 && (
               <div style={{
                 background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 10,
-                padding: "12px 16px", marginBottom: 16, fontSize: 13, color: "#92400e",
+                padding: "14px 18px", marginBottom: 16, fontSize: 13, color: "#92400e",
               }}>
-                <strong style={{ display: "block", marginBottom: 8 }}>⚠️ {naoAloc} aula(s) não alocada(s)</strong>
-                <ul style={{ margin: 0, paddingLeft: 20, listStyleType: "disc" }}>
-                  {naoAlocLista.slice(0, 12).map((na, i) => (
-                    <li key={i}>
-                      {String(nomesTurmas[na.turma_id] || na.turma_id).toUpperCase().includes("TURMA") ? "" : "Turma "}
-                      {nomesTurmas[na.turma_id] || na.turma_id} — {nomesDisciplinas[na.disciplina_id] || na.disciplina_id} ({nomesProfessores[na.professor_id] || na.professor_id})
-                      {na.motivo && <strong style={{ color: "#b71c1c", marginLeft: 6 }}>({na.motivo})</strong>}
-                    </li>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
+                  <strong>⚠️ {naoAloc} aula(s) pendente(s) de alocação</strong>
+                  <span style={{ fontSize: 11, color: "#b45309" }}>
+                    Dica: clique em <strong>🎯 Alocar na Grade</strong> ao lado da aula para encaixá-la manualmente na turma.
+                  </span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {naoAlocLista.slice(0, 15).map((na, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        background: "rgba(255,255,255,0.65)",
+                        padding: "6px 10px",
+                        borderRadius: 8,
+                        border: "1px solid #fde68a",
+                        gap: 8,
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <span>
+                        <strong>
+                          {String(nomesTurmas[na.turma_id] || na.turma_id).toUpperCase().includes("TURMA") ? "" : "Turma "}
+                          {nomesTurmas[na.turma_id] || na.turma_id}
+                        </strong>
+                        {" — "}
+                        {nomesDisciplinas[na.disciplina_id] || na.disciplina_id} (
+                        {nomesProfessores[na.professor_id] || na.professor_id})
+                        {na.motivo && na.motivo !== "PENDENTE_ALOCACAO" && (
+                          <strong style={{ color: "#b71c1c", marginLeft: 6 }}>({na.motivo})</strong>
+                        )}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => iniciarAlocacaoPendente(na)}
+                        style={{
+                          padding: "4px 10px",
+                          borderRadius: 6,
+                          border: "1px solid #d97706",
+                          background: "#fef3c7",
+                          color: "#92400e",
+                          fontSize: 11,
+                          fontWeight: 700,
+                          cursor: "pointer",
+                        }}
+                      >
+                        🎯 Alocar na Grade
+                      </button>
+                    </div>
                   ))}
-                  {naoAlocLista.length > 12 && (
-                    <li>... e mais {naoAlocLista.length - 12} aulas</li>
+                  {naoAlocLista.length > 15 && (
+                    <div style={{ fontSize: 12, paddingLeft: 4 }}>
+                      ... e mais {naoAlocLista.length - 15} aula(s) pendente(s)
+                    </div>
                   )}
-                </ul>
+                </div>
               </div>
             )}
 
@@ -740,14 +1671,76 @@ export default function GerarHorarioPage({ config }) {
               </div>
             )}
 
-            {/* ── Toggle de visão ── */}
+            {/* ── Toggle de visão e alternância Rascunho/Publicado ── */}
             <div style={{
               display: "flex", alignItems: "center", justifyContent: "space-between",
               marginBottom: 16, flexWrap: "wrap", gap: 10,
             }}>
-              <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#1e3a5f" }}>
-                Grade Gerada — {turno}
-              </h3>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                <h3 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#1e3a5f" }}>
+                  Grade Horária — {turno}
+                </h3>
+                <span style={{
+                  fontSize: 11,
+                  color: "#475569",
+                  background: "#f1f5f9",
+                  padding: "4px 10px",
+                  borderRadius: 6,
+                  border: "1px solid #e2e8f0",
+                }}>
+                  💡 <strong>Edição Rápida:</strong> Clique em qualquer aula para mover/trocar ou no pino <strong>📌</strong> para travar
+                </span>
+
+                {dadosRascunhoSalvo && dadosPublicadoSalvo && !temAlteracoesNaoSalvas && (
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        aplicarGradeDoBanco(dadosRascunhoSalvo, "rascunho", turmas, {
+                          payload: solverPayload,
+                          warnings_payload: resultado.warnings_payload,
+                          payload_summary: resultado.payload_summary,
+                        })
+                      }
+                      style={{
+                        padding: "4px 10px",
+                        borderRadius: 6,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        border: "1px solid #0284c7",
+                        background: resultado.origem_carregamento === "rascunho" ? "#0284c7" : "#fff",
+                        color: resultado.origem_carregamento === "rascunho" ? "#fff" : "#0284c7",
+                      }}
+                    >
+                      Ver Rascunho
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        aplicarGradeDoBanco(dadosPublicadoSalvo, "publicado", turmas, {
+                          payload: solverPayload,
+                          warnings_payload: resultado.warnings_payload,
+                          payload_summary: resultado.payload_summary,
+                        })
+                      }
+                      style={{
+                        padding: "4px 10px",
+                        borderRadius: 6,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                        border: "1px solid #16a34a",
+                        background: resultado.origem_carregamento === "publicado" ? "#16a34a" : "#fff",
+                        color: resultado.origem_carregamento === "publicado" ? "#fff" : "#16a34a",
+                      }}
+                    >
+                      Ver Publicada
+                    </button>
+                  </div>
+                )}
+              </div>
+
               <div style={{ display: "flex", gap: 0, borderRadius: 8, overflow: "hidden", border: "1px solid #e2e8f0" }}>
                 {[
                   { id: "turma",     label: "🏫 Por Turma" },
@@ -777,29 +1770,61 @@ export default function GerarHorarioPage({ config }) {
                       const nB = (nomesTurmas[idB] || String(idB)).toUpperCase();
                       return nA.localeCompare(nB, "pt-BR", { numeric: true });
                     })
-                    .map(([turmaId, grade]) => (
-                      <div key={turmaId} style={{
-                        background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12,
-                        overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
-                      }}>
-                        <div style={{
-                          padding: "10px 16px", borderBottom: "1px solid #e2e8f0",
-                          background: "#f8fafc", fontWeight: 700, fontSize: 14, color: "#1e3a5f",
-                        }}>
-                          🏫 {String(nomesTurmas[turmaId] || turmaId).toUpperCase().includes("TURMA") ? "" : "Turma "}
-                          {nomesTurmas[turmaId] || turmaId}
+                    .map(([turmaId, grade]) => {
+                      const isTurmaAtiva = selecao && Number(selecao.turmaId) === Number(turmaId);
+                      return (
+                        <div
+                          key={turmaId}
+                          id={`card-turma-${turmaId}`}
+                          style={{
+                            background: "#fff",
+                            border: isTurmaAtiva ? "2px solid #2563eb" : "1px solid #e2e8f0",
+                            borderRadius: 12,
+                            overflow: "hidden",
+                            boxShadow: isTurmaAtiva
+                              ? "0 4px 20px rgba(37,99,235,0.15)"
+                              : "0 1px 3px rgba(0,0,0,0.06)",
+                            transition: "all 0.2s",
+                          }}
+                        >
+                          <div style={{
+                            padding: "10px 16px",
+                            borderBottom: "1px solid #e2e8f0",
+                            background: isTurmaAtiva ? "#eff6ff" : "#f8fafc",
+                            fontWeight: 700,
+                            fontSize: 14,
+                            color: "#1e3a5f",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                          }}>
+                            <span>
+                              🏫 {String(nomesTurmas[turmaId] || turmaId).toUpperCase().includes("TURMA") ? "" : "Turma "}
+                              {nomesTurmas[turmaId] || turmaId}
+                            </span>
+                            {isTurmaAtiva && (
+                              <span style={{ fontSize: 11, color: "#1d4ed8", fontWeight: 700 }}>
+                                🎯 Selecione o horário de destino nesta turma
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ padding: 12 }}>
+                            <GradeTurma
+                              turma={{ id: Number(turmaId), nome: nomesTurmas[turmaId] || turmaId }}
+                              resultado={resultado}
+                              periodosPorDia={buildPeriodosPorDia(grade, diasPadrao, periodosPadrao)}
+                              maps={{ disciplinaById: nomesDisciplinas, professorById: nomesProfessores }}
+                              layoutMode="dias-colunas"
+                              interativo={true}
+                              selecao={selecao}
+                              avaliarDestino={avaliarDestino}
+                              onCellClick={handleCellClick}
+                              onToggleLock={handleToggleLock}
+                            />
+                          </div>
                         </div>
-                        <div style={{ padding: 12 }}>
-                          <GradeTurma
-                            turma={{ id: Number(turmaId), nome: nomesTurmas[turmaId] || turmaId }}
-                            resultado={resultado}
-                            periodosPorDia={buildPeriodosPorDia(grade)}
-                            maps={{ disciplinaById: nomesDisciplinas, professorById: nomesProfessores }}
-                            layoutMode="dias-colunas"
-                          />
-                        </div>
-                      </div>
-                    ))
+                      );
+                    })
                 )}
               </div>
             )}
@@ -816,28 +1841,57 @@ export default function GerarHorarioPage({ config }) {
                       const nB = (nomesProfessores[idB] || String(idB)).toUpperCase();
                       return nA.localeCompare(nB, "pt-BR", { numeric: true });
                     })
-                    .map(([profId, grade]) => (
-                      <div key={profId} style={{
-                        background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12,
-                        overflow: "hidden", boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
-                      }}>
-                        <div style={{
-                          padding: "10px 16px", borderBottom: "1px solid #e2e8f0",
-                          background: "#f8fafc", fontWeight: 700, fontSize: 14, color: "#1e3a5f",
-                        }}>
-                          👨‍🏫 {nomesProfessores[profId] || `Professor ${profId}`}
+                    .map(([profId, grade]) => {
+                      const isProfAtivo = selecao && Number(selecao.professor_id) === Number(profId);
+                      return (
+                        <div
+                          key={profId}
+                          style={{
+                            background: "#fff",
+                            border: isProfAtivo ? "2px solid #2563eb" : "1px solid #e2e8f0",
+                            borderRadius: 12,
+                            overflow: "hidden",
+                            boxShadow: isProfAtivo
+                              ? "0 4px 20px rgba(37,99,235,0.15)"
+                              : "0 1px 3px rgba(0,0,0,0.06)",
+                          }}
+                        >
+                          <div style={{
+                            padding: "10px 16px",
+                            borderBottom: "1px solid #e2e8f0",
+                            background: isProfAtivo ? "#eff6ff" : "#f8fafc",
+                            fontWeight: 700,
+                            fontSize: 14,
+                            color: "#1e3a5f",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                          }}>
+                            <span>👨‍🏫 {nomesProfessores[profId] || `Professor ${profId}`}</span>
+                            {isProfAtivo && (
+                              <span style={{ fontSize: 11, color: "#1d4ed8", fontWeight: 700 }}>
+                                🎯 Clique em um horário livre (🟢) para mover/trocar a aula na turma{" "}
+                                {nomesTurmas[selecao.turmaId] || selecao.turmaId}
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ padding: 12 }}>
+                            <GradeProfessor
+                              professor={{ id: Number(profId), nome: nomesProfessores[profId] || `Professor ${profId}` }}
+                              resultado={resultado}
+                              periodosPorDia={buildPeriodosPorDia(grade, diasPadrao, periodosPadrao)}
+                              maps={{ disciplinaById: nomesDisciplinas, turmaById: nomesTurmas }}
+                              layoutMode="dias-colunas"
+                              interativo={true}
+                              selecao={selecao}
+                              avaliarDestino={avaliarDestino}
+                              onCellClick={handleCellClick}
+                              onToggleLock={handleToggleLock}
+                            />
+                          </div>
                         </div>
-                        <div style={{ padding: 12 }}>
-                          <GradeProfessor
-                            professor={{ id: Number(profId), nome: nomesProfessores[profId] || `Professor ${profId}` }}
-                            resultado={resultado}
-                            periodosPorDia={buildPeriodosPorDia(grade)}
-                            maps={{ disciplinaById: nomesDisciplinas, turmaById: nomesTurmas }}
-                            layoutMode="dias-colunas"
-                          />
-                        </div>
-                      </div>
-                    ))
+                      );
+                    })
                 )}
               </div>
             )}
@@ -871,7 +1925,7 @@ export default function GerarHorarioPage({ config }) {
             </div>
 
             <p style={{ margin: "0 0 24px 0", color: "#475569", fontSize: 14, lineHeight: 1.5 }}>
-              Publicar a grade irá torná-la oficial e acessível a todos os professores e alunos. Você tem certeza de que deseja continuar?
+              A grade atualmente exibida na tela será salva e promovida a oficial, ficando acessível a todos os professores e alunos. Deseja confirmar a publicação?
             </p>
 
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>

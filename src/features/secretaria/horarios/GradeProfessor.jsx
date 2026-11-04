@@ -1,33 +1,28 @@
 // ==================================================================================
 // frontend/src/features/secretaria/horarios/GradeProfessor.jsx
-// Renderiza a grade por professor (mock/real) com nomes amigáveis + rótulo compacto
-// e cor por disciplina (estilo Urânia).
-// Agora aceita prop `layoutMode` e a repassa para o GradeBase como `layout`.
+// Renderiza a grade por professor com nomes amigáveis, rótulo compacto, cor por disciplina
+// (estilo Urânia) e suporte a Edição Interativa (Click-to-Swap / Move / Lock).
 // ==================================================================================
 
 import React from "react";
 import GradeBase from "./GradeBase.jsx";
 
-/**
- * Props
- * - professor: { id, nome }
- * - resultado: { grade_por_professor: { [profId]: { [dia]: { [ordem]: slot } } } }
- *   onde slot contém ao menos: { turma_id, disciplina_id }
- * - periodosPorDia: { [dia]: [{ ordem }] }
- * - maps?: {
- *     disciplinaById?: { [id]: string },
- *     turmaById?: { [id]: string }        // opcional (fallback mostra "Turma {id}")
- *   }
- * - layoutMode?: "dias-linhas" | "dias-colunas"   // visual da malha (default controlado fora)
- */
-export default function GradeProfessor({ professor, resultado, periodosPorDia, maps = {}, layoutMode }) {
+export default function GradeProfessor({
+  professor,
+  resultado,
+  periodosPorDia,
+  maps = {},
+  layoutMode,
+  interativo = false,
+  selecao = null,
+  avaliarDestino = null,
+  onCellClick = null,
+  onToggleLock = null,
+}) {
   const dadosProf = resultado?.grade_por_professor?.[professor.id] || {};
   const disciplinaById = maps.disciplinaById || {};
   const turmaById = maps.turmaById || {};
 
-  // ---------------------------------------------------------------------------
-  // Helper: pega o slot funcionando com os dois formatos (dia→ordem ou ordem→dia)
-  // ---------------------------------------------------------------------------
   function getSlot(dia, ordem) {
     const d = dadosProf?.[dia] || dadosProf?.[String(dia)];
     const o = dadosProf?.[ordem] || dadosProf?.[String(ordem)];
@@ -36,10 +31,6 @@ export default function GradeProfessor({ professor, resultado, periodosPorDia, m
     const b = o?.[dia] || o?.[String(dia)];
     return b || null;
   }
-
-  // ---------------------------------------------------------------------------
-  // Helpers de rótulo compacto (iguais ao GradeTurma para consistência visual)
-  // ---------------------------------------------------------------------------
 
   function sansAccent(s) {
     return (s || "")
@@ -55,7 +46,8 @@ export default function GradeProfessor({ professor, resultado, periodosPorDia, m
     const palavras = n.split(" ").filter(Boolean);
     const compostas = ["EDUCACAO", "ED.", "ED", "CIENCIAS", "CIENCIA", "L. PORTUGUESA", "LINGUA"];
     const ehComposta =
-      palavras.length >= 2 && (compostas.includes(palavras[0].toUpperCase()) || palavras[0].length <= 2);
+      palavras.length >= 2 &&
+      (compostas.includes(palavras[0].toUpperCase()) || palavras[0].length <= 2);
 
     if (ehComposta) {
       const iniciais = palavras
@@ -69,40 +61,119 @@ export default function GradeProfessor({ professor, resultado, periodosPorDia, m
     return base.length <= 4 ? base : base.slice(0, 4);
   }
 
-  // Turma: usa nome se houver; senão "Turma {id}"
   function turmaCompacta(nome, id) {
     if (!nome) return id != null ? `Turma ${id}` : "—";
-    // O usuário solicitou o nome completo (ex: 8º ANO C) ao invés de abreviado
     return String(nome).toUpperCase();
   }
 
-  // Paleta determinística por disciplina_id (mesma do GradeTurma)
   const PALETA = [
-    { bg: "bg-indigo-50",   text: "text-indigo-800",   ring: "ring-indigo-200" },
-    { bg: "bg-amber-50",    text: "text-amber-800",    ring: "ring-amber-200" },
-    { bg: "bg-emerald-50",  text: "text-emerald-800",  ring: "ring-emerald-200" },
-    { bg: "bg-sky-50",      text: "text-sky-800",      ring: "ring-sky-200" },
-    { bg: "bg-rose-50",     text: "text-rose-800",     ring: "ring-rose-200" },
-    { bg: "bg-violet-50",   text: "text-violet-800",   ring: "ring-violet-200" },
-    { bg: "bg-lime-50",     text: "text-lime-800",     ring: "ring-lime-200" },
-    { bg: "bg-orange-50",   text: "text-orange-800",   ring: "ring-orange-200" },
-    { bg: "bg-cyan-50",     text: "text-cyan-800",     ring: "ring-cyan-200" },
-    { bg: "bg-fuchsia-50",  text: "text-fuchsia-800",  ring: "ring-fuchsia-200" },
+    { bg: "bg-indigo-50",  text: "text-indigo-800",  ring: "ring-indigo-200" },
+    { bg: "bg-amber-50",   text: "text-amber-800",   ring: "ring-amber-200" },
+    { bg: "bg-emerald-50", text: "text-emerald-800", ring: "ring-emerald-200" },
+    { bg: "bg-sky-50",     text: "text-sky-800",     ring: "ring-sky-200" },
+    { bg: "bg-rose-50",    text: "text-rose-800",    ring: "ring-rose-200" },
+    { bg: "bg-violet-50",  text: "text-violet-800",  ring: "ring-violet-200" },
+    { bg: "bg-lime-50",    text: "text-lime-800",    ring: "ring-lime-200" },
+    { bg: "bg-orange-50",  text: "text-orange-800",  ring: "ring-orange-200" },
+    { bg: "bg-cyan-50",    text: "text-cyan-800",    ring: "ring-cyan-200" },
+    { bg: "bg-fuchsia-50", text: "text-fuchsia-800", ring: "ring-fuchsia-200" },
   ];
+
   function corDisciplina(discId) {
     const i = Math.abs(Number(discId) || 0) % PALETA.length;
     return PALETA[i];
   }
 
-  // ---------------------------------------------------------------------------
-  // Renderização da célula (compacta + colorida)
-  // ---------------------------------------------------------------------------
+  const selecaoNesteProf =
+    interativo && selecao && Number(selecao.professor_id) === Number(professor.id);
+
   const celulaRender = ({ dia, ordem }) => {
     const slot = getSlot(dia, ordem);
-    if (!slot) return <div className="text-gray-300 text-xs">—</div>;
+    const aval =
+      selecaoNesteProf && typeof avaliarDestino === "function"
+        ? avaliarDestino(selecao.turmaId, dia, ordem)
+        : null;
 
+    // 1) Célula vazia na agenda do professor
+    if (!slot) {
+      if (selecaoNesteProf && aval) {
+        const nomeTurmaSel = turmaCompacta(
+          turmaById[String(selecao.turmaId)] || turmaById[selecao.turmaId],
+          selecao.turmaId
+        );
+        if (aval.status === "livre") {
+          return (
+            <div
+              onClick={() =>
+                onCellClick &&
+                onCellClick({
+                  professorId: professor.id,
+                  turmaId: selecao.turmaId,
+                  dia,
+                  ordem,
+                  slot: null,
+                })
+              }
+              title={aval.motivo || `Mover/trocar aula da ${nomeTurmaSel} para este horário`}
+              className="rounded-xl px-2 py-2 text-center border-2 border-dashed border-emerald-500 bg-emerald-50/90 text-emerald-800 hover:bg-emerald-100 cursor-pointer transition-all shadow-sm"
+            >
+              <div className="text-[11px] font-bold leading-tight">🟢 {nomeTurmaSel}</div>
+              <div className="text-[10px] opacity-85 leading-tight">
+                {aval.ocupanteProfNome ? `⇄ c/ ${aval.ocupanteProfNome}` : "Mover p/ cá"}
+              </div>
+            </div>
+          );
+        }
+        if (aval.status === "aviso") {
+          return (
+            <div
+              onClick={() =>
+                onCellClick &&
+                onCellClick({
+                  professorId: professor.id,
+                  turmaId: selecao.turmaId,
+                  dia,
+                  ordem,
+                  slot: null,
+                })
+              }
+              title={aval.motivo}
+              className="rounded-xl px-2 py-2 text-center border-2 border-dashed border-amber-500 bg-amber-50/90 text-amber-800 hover:bg-amber-100 cursor-pointer transition-all shadow-sm"
+            >
+              <div className="text-[11px] font-bold leading-tight">🟡 {nomeTurmaSel}</div>
+              <div className="text-[10px] opacity-85 leading-tight">{aval.label || "Ressalva"}</div>
+            </div>
+          );
+        }
+        if (aval.status === "bloqueado" || aval.status === "indisponivel") {
+          return (
+            <div
+              onClick={() =>
+                onCellClick &&
+                onCellClick({
+                  professorId: professor.id,
+                  turmaId: selecao.turmaId,
+                  dia,
+                  ordem,
+                  slot: null,
+                })
+              }
+              title={aval.motivo}
+              className="rounded-xl px-2 py-2 text-center border border-dashed border-red-300 bg-red-50/60 text-red-700 cursor-not-allowed opacity-70"
+            >
+              <div className="text-[10px] font-bold leading-tight">🚫 {aval.label || "Conflito"}</div>
+              <div className="text-[9px] truncate opacity-85 leading-tight">{aval.resumoCurto || "Bloqueado"}</div>
+            </div>
+          );
+        }
+      }
+
+      return <div className="text-gray-300 text-xs py-2 text-center select-none">—</div>;
+    }
+
+    // 2) Célula ocupada na agenda do professor
     const turmaId = slot.turma_id ?? slot.turma ?? null;
-    const discId  = slot.disciplina_id ?? slot.disciplina ?? null;
+    const discId = slot.disciplina_id ?? slot.disciplina ?? null;
 
     const turmaNomeFull =
       (turmaId != null && (turmaById[String(turmaId)] || turmaById[turmaId])) ||
@@ -117,19 +188,76 @@ export default function GradeProfessor({ professor, resultado, periodosPorDia, m
     const { bg, text, ring } = corDisciplina(discId);
     const isLocked = Boolean(slot.locked);
 
+    const isSelectedOrigin =
+      selecaoNesteProf &&
+      Number(selecao.dia) === Number(dia) &&
+      Number(selecao.ordem) === Number(ordem) &&
+      Number(selecao.turmaId) === Number(turmaId);
+
+    let extraClasses = interativo
+      ? "cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all group"
+      : "";
+    let statusBadge = null;
+    let tooltipText = `${turmaNomeFull} — ${discNome}${isLocked ? " (Fixado 📌)" : ""}`;
+
+    if (isSelectedOrigin) {
+      extraClasses =
+        "cursor-pointer ring-2 ring-blue-600 bg-blue-100 text-blue-950 shadow-md scale-[1.02] transition-all";
+      statusBadge = (
+        <div className="text-[9px] font-extrabold uppercase tracking-wider text-blue-700 bg-blue-200/80 rounded px-1 mb-0.5 inline-block">
+          🎯 Selecionada
+        </div>
+      );
+      tooltipText = "Clique novamente para cancelar a seleção";
+    } else if (interativo) {
+      tooltipText += " — Clique para mover para outro horário livre do professor";
+    }
+
     return (
       <div
-        className={`relative rounded-xl px-2 py-1.5 text-center ${bg} ${text} ring-1 ${ring} shadow-[inset_0_0_0_1px_rgba(255,255,255,0.6)]`}
-        title={`${turmaNomeFull} — ${discNome}${isLocked ? " (Fixado no Horário Manual)" : ""}`}
+        onClick={() =>
+          onCellClick &&
+          onCellClick({
+            professorId: professor.id,
+            turmaId,
+            dia,
+            ordem,
+            slot,
+          })
+        }
+        className={`relative rounded-xl px-2 py-1.5 text-center ${bg} ${text} ring-1 ${ring} shadow-[inset_0_0_0_1px_rgba(255,255,255,0.6)] ${extraClasses}`}
+        title={tooltipText}
       >
-        {isLocked && (
-          <span
-            style={{ position: "absolute", top: 2, right: 4, fontSize: 10, lineHeight: 1 }}
-            title="Aula fixa (Horário Manual)"
+        {(isLocked || (interativo && !selecaoNesteProf)) && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onToggleLock) onToggleLock({ turmaId, dia, ordem, slot });
+            }}
+            style={{
+              position: "absolute",
+              top: 2,
+              right: 3,
+              fontSize: 10,
+              lineHeight: 1,
+              background: "transparent",
+              border: "none",
+              padding: 2,
+              cursor: interativo ? "pointer" : "default",
+            }}
+            className={isLocked ? "opacity-100" : "opacity-0 group-hover:opacity-60 hover:!opacity-100"}
+            title={
+              isLocked
+                ? "Aula fixada (Horário Manual). Clique no pino para desafixar."
+                : "Clique no pino para fixar (travar) esta aula neste horário."
+            }
           >
             📌
-          </span>
+          </button>
         )}
+
+        {statusBadge}
         <div className="text-sm font-semibold leading-tight">{turmaShort}</div>
         <div className="text-[11px] opacity-80 leading-tight">{cod}</div>
       </div>
@@ -138,7 +266,7 @@ export default function GradeProfessor({ professor, resultado, periodosPorDia, m
 
   const diasDinamicos = Object.keys(periodosPorDia || {})
     .map(Number)
-    .filter(n => n >= 1 && n <= 6)
+    .filter((n) => n >= 1 && n <= 6)
     .sort((a, b) => a - b);
 
   return (

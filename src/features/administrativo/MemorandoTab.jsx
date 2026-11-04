@@ -1612,7 +1612,7 @@ export default function MemorandoTab({
                     />
                   </div>
 
-                  <div className="sm:col-span-6">
+                  <div className="sm:col-span-8">
                     <label className="block text-[11px] font-bold text-slate-700 mb-1">
                       Destinatário — Ao(À)
                     </label>
@@ -1629,7 +1629,7 @@ export default function MemorandoTab({
                     />
                   </div>
 
-                  <div className="sm:col-span-3">
+                  <div className="sm:col-span-4">
                     <label className="block text-[11px] font-bold text-slate-700 mb-1">
                       Código da Unidade
                     </label>
@@ -1644,27 +1644,6 @@ export default function MemorandoTab({
                       }
                       className="w-full px-3 py-2 rounded-xl bg-white border border-emerald-300 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
                     />
-                  </div>
-
-                  <div className="sm:col-span-3">
-                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                      Emblema do Cabeçalho
-                    </label>
-                    <select
-                      value={formMemo.estilo_logo || "buriti_classico"}
-                      onChange={(e) =>
-                        setFormMemo((p) => ({
-                          ...p,
-                          estilo_logo: e.target.value,
-                        }))
-                      }
-                      className="w-full px-3 py-2 rounded-xl bg-white border border-emerald-300 text-xs font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 outline-none"
-                    >
-                      <option value="buriti_classico">
-                        Coluna do Buriti P&B (Padrão Memo)
-                      </option>
-                      <option value="brasao_gdf">Brasão GDF Colorido</option>
-                    </select>
                   </div>
                 </div>
               </div>

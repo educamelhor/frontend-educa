@@ -182,7 +182,15 @@ export default function MemorandoDevolucaoOficialSEEDF({
       ? String(memorando.observacao_complementar)
       : "A professora efetiva retornara as atividades.";
 
-  const usarBrasaoColorido = memorando.estilo_logo === "brasao_gdf";
+  // Usa exatamente o mesmo logo das folhas de ponto (brasao-df.png ou logo personalizado da unidade)
+  const modoLogoCabecalho = dadosUnidade?.modoLogoCabecalho || "brasao_gdf";
+  const srcLogoEsquerda =
+    modoLogoCabecalho === "ocultar"
+      ? null
+      : modoLogoCabecalho === "personalizado" &&
+        String(dadosUnidade?.logoEsquerdaDataUrl || "").trim()
+      ? String(dadosUnidade.logoEsquerdaDataUrl).trim()
+      : brasaoDfImg;
 
   return (
     <div
@@ -214,7 +222,7 @@ export default function MemorandoDevolucaoOficialSEEDF({
             boxSizing: "border-box",
           }}
         >
-          {/* Topo: Emblema GDF à esquerda + Título Central + Linha MEMO nº / Data */}
+          {/* Topo: Brasão Oficial GDF à esquerda + Título Central + Linha MEMO nº / Data */}
           <div
             style={{
               position: "relative",
@@ -227,28 +235,21 @@ export default function MemorandoDevolucaoOficialSEEDF({
               boxSizing: "border-box",
             }}
           >
-            {/* Emblema no canto superior esquerdo */}
-            <div
-              style={{
-                position: "absolute",
-                left: "18px",
-                top: "5px",
-              }}
-            >
-              {usarBrasaoColorido ? (
-                <img
-                  src={brasaoDfImg}
-                  alt="Brasão DF"
-                  style={{
-                    width: "52px",
-                    height: "54px",
-                    objectFit: "contain",
-                  }}
-                />
-              ) : (
-                <EmblemaBuritiSEEDF />
-              )}
-            </div>
+            {/* Mesmo logo usado nas folhas de ponto no canto superior esquerdo */}
+            {srcLogoEsquerda && (
+              <img
+                src={srcLogoEsquerda}
+                alt="Brasão / Logo Institucional"
+                style={{
+                  position: "absolute",
+                  left: "18px",
+                  top: "6px",
+                  width: "54px",
+                  height: "54px",
+                  objectFit: "contain",
+                }}
+              />
+            )}
 
             {/* Título centralizado */}
             <div

@@ -1,0 +1,1531 @@
+// src/features/secretaria/horarios/solverEngine.js
+// ============================================================================
+// MOTOR SOLVER 2.0 (Urânia-Engine) — Web Worker + Multi-Start + Kempe Chains + Tabu Search
+// Executa 100% em background thread no navegador do usuário (sem timeout HTTP),
+// enviando telemetria em tempo real (iterações, cobertura, estratégia ativa, melhor grade)
+// e permitindo parada imediata ("Parar e Usar Melhor Grade") a qualquer momento.
+// ============================================================================
+
+function solverWorkerBootstrap(workerScope) {
+  function toInt(v, def = 0) {
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.trunc(n) : def;
+  }
+
+  function clamp(n, min, max) {
+    return Math.max(min, Math.min(max, n));
+  }
+
+  function uniq(arr) {
+    return Array.from(new Set(arr));
+  }
+
+  function ensurePath(obj, k1, k2) {
+    if (!obj[k1]) obj[k1] = {};
+    if (!obj[k1][k2]) obj[k1][k2] = {};
+    return obj[k1][k2];
+  }
+
+  function cloneGradeMap(gradeMap) {
+    const out = {};
+    for (const [id, diasObj] of Object.entries(gradeMap || {})) {
+      out[id] = {};
+      for (const [d, perObj] of Object.entries(diasObj || {})) {
+        out[id][d] = {};
+        for (const [p, cell] of Object.entries(perObj || {})) {
+          out[id][d][p] = cell ? { ...cell } : null;
+        }
+      }
+    }
+    return out;
+  }
+
+  function buildDisponibilidadeIndex(disponibilidades, diasList, periodosPorDia) {
+    const idx = new Map();
+    const list = Array.isArray(disponibilidades) ? disponibilidades : [];
+
+    for (const d of list) {
+      const profId = toInt(d?.professor_id ?? d?.professorId, 0);
+      const dia = toInt(d?.dia ?? d?.dia_semana ?? d?.diaSemana, 0);
+      const per = toInt(d?.ordem ?? d?.periodo ?? d?.aula ?? d?.periodo_ordem, 0);
+      const status = String(d?.status || "indisponivel").trim().toLowerCase();
+
+      if (!profId || !dia || !per) continue;
+      if (!diasList.includes(dia)) continue;
+      if (per < 1 || per > periodosPorDia) continue;
+
+      if (status === "indisponivel" || status === "bloqueado" || status === "excluir") {
+        idx.set(`${profId}|${dia}|${per}`, "indisponivel");
+      } else if (status === "evitar") {
+        if (idx.get(`${profId}|${dia}|${per}`) !== "indisponivel") {
+          idx.set(`${profId}|${dia}|${per}`, "evitar");
+        }
+      }
+    }
+    return idx;
+  }
+
+  function professorPode(dispoIdx, professorId, dia, periodo) {
+    if (!dispoIdx || dispoIdx.size === 0) return true;
+    return dispoIdx.get(`${professorId}|${dia}|${periodo}`) !== "indisponivel";
+  }
+
+  function professorEvita(dispoIdx, professorId, dia, periodo) {
+    if (!dispoIdx || dispoIdx.size === 0) return false;
+    return dispoIdx.get(`${professorId}|${dia}|${periodo}`) === "evitar";
+  }
+
+  function countProfessorAvailableSlots(dispoIdx, professorId, diasList, periodosPorDia) {
+    let available = 0;
+    for (const d of diasList) {
+      for (let p = 1; p <= periodosPorDia; p++) {
+        if (professorPode(dispoIdx, professorId, d, p)) {
+          available += professorEvita(dispoIdx, professorId, d, p) ? 0.5 : 1;
+        }
+      }
+    }
+    return available;
+  }
+
+  function readRc01MaxConsecutivas(configPedagogica) {
+    const raw =
+      configPedagogica?.regras?.rc01_distribuicao_disciplina?.max_consecutivas ??
+      configPedagogica?.rc01_distribuicao_disciplina?.max_consecutivas ??
+      configPedagogica?.max_consecutivas ??
+      2;
+    return clamp(toInt(raw, 2), 1, 6);
+  }
+
+  function readRc02Config(configPedagogica) {
+    const r =
+      configPedagogica?.regras?.rc02_max_por_dia_disciplina ??
+      configPedagogica?.regras?.rc02_max_aulas_por_dia_disciplina ??
+      configPedagogica?.rc02_max_por_dia_disciplina ??
+      configPedagogica?.rc02_max_aulas_por_dia_disciplina ??
+      null;
+
+    const modoRaw = String(r?.modo ?? "soft").toLowerCase();
+    const modo = modoRaw === "hard" ? "hard" : "soft";
+    const maxPadrao = clamp(toInt(r?.max_por_dia_padrao ?? r?.maxPorDiaPadrao ?? 2, 2), 1, 6);
+    const bloqueioHard = Boolean(r?.bloqueio_hard ?? r?.bloqueioHard ?? true);
+    const maxHardPadrao = clamp(toInt(r?.max_hard_padrao ?? r?.maxHardPadrao ?? 3, 3), maxPadrao, 6);
+    const strictCapMock = Boolean(r?.strict_cap_mock ?? r?.strictCapMock ?? (modo === "hard"));
+
+    const porDiscRaw = r?.por_disciplina ?? r?.porDisciplina ?? {};
+    const porDisciplina = {};
+    if (porDiscRaw && typeof porDiscRaw === "object") {
+      for (const [k, v] of Object.entries(porDiscRaw)) {
+        const discId = toInt(k, 0);
+        if (!discId) continue;
+        const cap =
+          typeof v === "number"
+            ? v
+            : toInt(v?.max_por_dia ?? v?.maxPorDia ?? v?.max ?? maxPadrao, maxPadrao);
+        porDisciplina[discId] = clamp(toInt(cap, maxPadrao), 1, 6);
+      }
+    }
+
+    return {
+      modo,
+      maxPadrao,
+      bloqueioHard,
+      maxHardPadrao,
+      porDisciplina,
+      strictCapMock,
+    };
+  }
+
+  function getRc02MaxForDisc(rc02Cfg, disciplinaId) {
+    if (!rc02Cfg) return 2;
+    const override = rc02Cfg.porDisciplina?.[disciplinaId];
+    return clamp(toInt(override ?? rc02Cfg.maxPadrao ?? 2, 2), 1, 6);
+  }
+
+  function countDiscInDay(turmaGrade, dia, disciplinaId) {
+    let count = 0;
+    const row = turmaGrade?.[dia] || {};
+    for (const p of Object.keys(row)) {
+      const cell = row[p];
+      if (cell && Number(cell.disciplina_id) === Number(disciplinaId)) count++;
+    }
+    return count;
+  }
+
+  function consecutiveRunIfPut(turmaGrade, dia, periodo, disciplinaId, periodosPorDia) {
+    let left = 0;
+    for (let p = periodo - 1; p >= 1; p--) {
+      const cell = turmaGrade?.[dia]?.[p];
+      if (cell && Number(cell.disciplina_id) === Number(disciplinaId)) left++;
+      else break;
+    }
+    let right = 0;
+    for (let p = periodo + 1; p <= periodosPorDia; p++) {
+      const cell = turmaGrade?.[dia]?.[p];
+      if (cell && Number(cell.disciplina_id) === Number(disciplinaId)) right++;
+      else break;
+    }
+    return left + 1 + right;
+  }
+
+  function computeSlotScore({
+    turmaGrade,
+    profGrade,
+    dispoIdx,
+    dia,
+    periodo,
+    periodosPorDia,
+    professorId,
+    disciplinaId,
+    rc01MaxConsecutivas,
+    rc02Cfg,
+    regrasGerais,
+    turno,
+    preferenciasProfessor,
+  }) {
+    let score = 0;
+
+    if (professorEvita(dispoIdx, professorId, dia, periodo)) {
+      score += 1800;
+    }
+
+    const turmaDayCount = Object.values(turmaGrade?.[dia] || {}).filter(Boolean).length;
+    score += turmaDayCount * 1.0;
+
+    if (periodo === 1 || periodo === periodosPorDia) {
+      score += 0.35;
+    }
+
+    const consec = consecutiveRunIfPut(turmaGrade, dia, periodo, disciplinaId, periodosPorDia);
+    if (consec > rc01MaxConsecutivas) {
+      score += 50000 + (consec - rc01MaxConsecutivas) * 10000;
+    }
+
+    const leftCell = periodo > 1 ? turmaGrade?.[dia]?.[periodo - 1] : null;
+    const rightCell = periodo < periodosPorDia ? turmaGrade?.[dia]?.[periodo + 1] : null;
+    const leftSame = leftCell && Number(leftCell.disciplina_id) === Number(disciplinaId);
+    const rightSame = rightCell && Number(rightCell.disciplina_id) === Number(disciplinaId);
+
+    const prefDuplas = regrasGerais ? Boolean(regrasGerais.preferencia_aulas_duplas) : true;
+
+    if (!prefDuplas) {
+      if (leftSame || rightSame) score += 2000;
+    } else {
+      if (leftSame || rightSame) {
+        if (consec <= rc01MaxConsecutivas) score -= 2600;
+      } else {
+        score += 450;
+      }
+    }
+
+    const maxDia = getRc02MaxForDisc(rc02Cfg, disciplinaId);
+    const inDay = countDiscInDay(turmaGrade, dia, disciplinaId);
+    const strictCap = !!rc02Cfg?.strictCapMock;
+
+    if (inDay >= maxDia) {
+      if (strictCap || rc02Cfg.modo === "hard" || (rc02Cfg.bloqueioHard && maxDia === rc02Cfg.maxHardPadrao)) {
+        score += 100000;
+      } else {
+        score += 20000 + (inDay - maxDia + 1) * 5000;
+      }
+    }
+
+    let profDayCount = 0;
+    let hasEarlyClasses = false;
+    let hasLateClasses = false;
+    const profRow = profGrade?.[dia] || {};
+    for (const p of Object.keys(profRow)) {
+      if (profRow[p]) {
+        profDayCount++;
+        if (Number(p) < periodo) hasEarlyClasses = true;
+        if (Number(p) > periodo) hasLateClasses = true;
+      }
+    }
+    if (profDayCount > 0) score -= 0.3;
+
+    if (preferenciasProfessor?.evitar_janela_interna) {
+      const profLeftOcc = periodo > 1 && !!profGrade?.[dia]?.[periodo - 1];
+      const profRightOcc = periodo < periodosPorDia && !!profGrade?.[dia]?.[periodo + 1];
+
+      if (profDayCount > 0 && !profLeftOcc && !profRightOcc) {
+        if (hasEarlyClasses && hasLateClasses) score -= 5000;
+        else score += 3000;
+      } else if (profDayCount > 0 && (profLeftOcc || profRightOcc)) {
+        score -= 500;
+      }
+    }
+
+    score += dia * 0.04;
+
+    if (regrasGerais) {
+      if (!regrasGerais.aulas_duplas_separar_recreio) {
+        const isNoturno = String(turno || "").toLowerCase().includes("noturno");
+        const intAfter = isNoturno ? 2 : 3;
+        if (
+          (periodo === intAfter && rightSame) ||
+          (periodo === intAfter + 1 && leftSame)
+        ) {
+          score += 3500;
+        }
+      }
+      if (regrasGerais.limite_aulas_seguidas_prof) {
+        const maxSeguidasProf = Number(regrasGerais.limite_aulas_seguidas_prof) || 4;
+        let pLeft = 0;
+        for (let p = periodo - 1; p >= 1; p--) {
+          if (profGrade?.[dia]?.[p]) pLeft++;
+          else break;
+        }
+        let pRight = 0;
+        for (let p = periodo + 1; p <= periodosPorDia; p++) {
+          if (profGrade?.[dia]?.[p]) pRight++;
+          else break;
+        }
+        if (pLeft + 1 + pRight > maxSeguidasProf) score += 8000;
+      }
+    }
+
+    if (preferenciasProfessor) {
+      if (
+        Array.isArray(preferenciasProfessor.dias_evitar) &&
+        preferenciasProfessor.dias_evitar.includes(dia)
+      ) {
+        score += 1200;
+      }
+      if (preferenciasProfessor.evitar_extremos) {
+        if (periodo === 1 || periodo === periodosPorDia) score += 800;
+      } else {
+        if (preferenciasProfessor.evitar_primeira_aula && periodo === 1) score += 800;
+        if (preferenciasProfessor.evitar_ultima_aula && periodo === periodosPorDia) score += 800;
+      }
+      const maxConsecProf = Number(preferenciasProfessor.max_consecutivas_prof) || 0;
+      if (maxConsecProf > 0) {
+        let pLeft = 0;
+        for (let p = periodo - 1; p >= 1; p--) {
+          if (profGrade?.[dia]?.[p]) pLeft++;
+          else break;
+        }
+        let pRight = 0;
+        for (let p = periodo + 1; p <= periodosPorDia; p++) {
+          if (profGrade?.[dia]?.[p]) pRight++;
+          else break;
+        }
+        if (pLeft + 1 + pRight > maxConsecProf) score += 6000;
+      }
+    }
+
+    return score;
+  }
+
+  function normalizeTurmaIds(payload) {
+    const raw =
+      payload?.turma_ids ??
+      payload?.turmaIds ??
+      (Array.isArray(payload?.turmas) ? payload.turmas.map(t => t?.id ?? t?.turma_id ?? t) : null) ??
+      [];
+    return uniq((Array.isArray(raw) ? raw : []).map(x => toInt(x, 0)).filter(Boolean));
+  }
+
+  function buildModIndex(payload) {
+    const mod = Array.isArray(payload?.modulacao) ? payload.modulacao : [];
+    const idx = new Map();
+    for (const m of mod) {
+      const turmaId = toInt(m?.turma_id ?? m?.turmaId, 0);
+      const discId = toInt(m?.disciplina_id ?? m?.disciplinaId, 0);
+      const profId = toInt(m?.professor_id ?? m?.professorId, 0);
+      if (!turmaId || !discId || !profId) continue;
+      const key = `${turmaId}|${discId}`;
+      if (!idx.has(key)) idx.set(key, profId);
+    }
+    return idx;
+  }
+
+  function normalizeDemandas(payload) {
+    const raw =
+      payload?.demandas ??
+      payload?.demanda ??
+      payload?.itens_demanda ??
+      payload?.grade_demanda ??
+      payload?.cargas ??
+      [];
+
+    const list = Array.isArray(raw) ? raw : [];
+    const modIdx = buildModIndex(payload);
+    const out = [];
+
+    for (const it of list) {
+      const turmaId = toInt(it?.turma_id ?? it?.turmaId, 0);
+      const discId = toInt(it?.disciplina_id ?? it?.disciplinaId, 0);
+      let profId = toInt(it?.professor_id ?? it?.professorId, 0);
+      if (!profId && turmaId && discId) {
+        profId = toInt(modIdx.get(`${turmaId}|${discId}`), 0);
+      }
+      const carga = toInt(
+        it?.aulas_semanais ?? it?.carga ?? it?.carga_semanal ?? it?.qtd ?? it?.quantidade ?? 0,
+        0
+      );
+      if (!turmaId || !discId || !profId || carga <= 0) continue;
+      out.push({
+        turma_id: turmaId,
+        disciplina_id: discId,
+        professor_id: profId,
+        aulas_semanais: carga,
+      });
+    }
+    return out;
+  }
+
+  function expandDemandasToLessons(
+    demandasNorm,
+    randomize = false,
+    strategy = "default",
+    dispoIdx = null,
+    diasList = [1, 2, 3, 4, 5],
+    periodosPorDia = 6
+  ) {
+    const lessons = [];
+    const profTotalLoad = new Map();
+    const profTurmasCount = new Map();
+
+    for (const d of demandasNorm) {
+      const pId = d.professor_id;
+      const load = d.aulas_restantes !== undefined ? d.aulas_restantes : d.aulas_semanais;
+      profTotalLoad.set(pId, (profTotalLoad.get(pId) || 0) + load);
+      if (!profTurmasCount.has(pId)) profTurmasCount.set(pId, new Set());
+      profTurmasCount.get(pId).add(d.turma_id);
+    }
+
+    const profSlackMap = new Map();
+    for (const [pId, load] of profTotalLoad.entries()) {
+      const avail = countProfessorAvailableSlots(dispoIdx, pId, diasList, periodosPorDia);
+      profSlackMap.set(pId, avail - load);
+    }
+
+    for (const d of demandasNorm) {
+      const count = d.aulas_restantes !== undefined ? d.aulas_restantes : d.aulas_semanais;
+      if (count <= 0) continue;
+
+      const pLoad = profTotalLoad.get(d.professor_id) || 0;
+      const pSlack = profSlackMap.get(d.professor_id) ?? 30;
+      const pTurmas = profTurmasCount.get(d.professor_id)?.size || 1;
+      const groupJitter = randomize ? Math.random() * 5.0 : 0;
+
+      for (let i = 0; i < count; i++) {
+        let weight = 0;
+        const lessonJitter = randomize ? Math.random() * 1.5 : 0;
+
+        if (strategy === "dsatur_slack") {
+          weight = (40 - pSlack) * 500 + pTurmas * 80 + count * 15 + groupJitter * 20;
+        } else if (strategy === "group_turma") {
+          weight = pLoad * 250 + (d.turma_id % 50) * 10 + groupJitter * 10 + count;
+        } else if (strategy === "weight_desc") {
+          weight = count * 100 + pLoad * 2 + lessonJitter;
+        } else if (strategy === "reverse_weight") {
+          weight = (20 - count) * 100 + pLoad * 2 + lessonJitter;
+        } else if (strategy === "random") {
+          weight = Math.random() * 1000;
+        } else {
+          weight = pLoad * 120 + (35 - pSlack) * 80 + count * 10 + lessonJitter;
+        }
+
+        lessons.push({
+          turma_id: d.turma_id,
+          disciplina_id: d.disciplina_id,
+          professor_id: d.professor_id,
+          _weight: weight,
+        });
+      }
+    }
+
+    lessons.sort((a, b) => {
+      if (b._weight !== a._weight) return b._weight - a._weight;
+      if (a.turma_id !== b.turma_id) return a.turma_id - b.turma_id;
+      return a.disciplina_id - b.disciplina_id;
+    });
+
+    return lessons;
+  }
+
+  function initEmptyGridForEntity(diasList, periodosPorDia) {
+    const g = {};
+    for (const d of diasList) {
+      g[d] = {};
+      for (let p = 1; p <= periodosPorDia; p++) {
+        g[d][p] = null;
+      }
+    }
+    return g;
+  }
+
+  function initGradePorTurma(turmaIds, diasList, periodosPorDia) {
+    const out = {};
+    for (const id of turmaIds) out[id] = initEmptyGridForEntity(diasList, periodosPorDia);
+    return out;
+  }
+
+  function initGradePorProfessor(profIds, diasList, periodosPorDia) {
+    const out = {};
+    for (const id of profIds) out[id] = initEmptyGridForEntity(diasList, periodosPorDia);
+    return out;
+  }
+
+  function isCellLocked(gradePorTurma, gradePorProfessor, turmaId, profId, d, p) {
+    if (turmaId && gradePorTurma?.[turmaId]?.[d]?.[p]?.locked) return true;
+    if (profId && gradePorProfessor?.[profId]?.[d]?.[p]?.locked) return true;
+    return false;
+  }
+
+  function clearSlot(gradePorTurma, gradePorProfessor, turmaId, profId, d, p) {
+    if (gradePorTurma[turmaId]?.[d]) gradePorTurma[turmaId][d][p] = null;
+    if (gradePorProfessor[profId]?.[d]) gradePorProfessor[profId][d][p] = null;
+  }
+
+  function setSlot(gradePorTurma, gradePorProfessor, turmaId, profId, d, p, discId, locked = false) {
+    ensurePath(gradePorTurma, turmaId, d);
+    ensurePath(gradePorProfessor, profId, d);
+    const cellT = { disciplina_id: discId, professor_id: profId };
+    const cellP = { turma_id: turmaId, disciplina_id: discId };
+    if (locked) {
+      cellT.locked = true;
+      cellP.locked = true;
+    }
+    gradePorTurma[turmaId][d][p] = cellT;
+    gradePorProfessor[profId][d][p] = cellP;
+  }
+
+  function findBestFreeSlot({
+    gradePorTurma,
+    gradePorProfessor,
+    dispoIdx,
+    diasList,
+    periodosPorDia,
+    turmaId,
+    professorId,
+    disciplinaId,
+    rc01MaxConsecutivas,
+    rc02Cfg,
+    regrasGerais,
+    turno,
+    preferencias,
+  }) {
+    const turmaGrade = gradePorTurma[turmaId];
+    const profGrade = gradePorProfessor[professorId];
+    let best = null;
+
+    for (const dia of diasList) {
+      for (let periodo = 1; periodo <= periodosPorDia; periodo++) {
+        if (turmaGrade?.[dia]?.[periodo]) continue;
+        if (profGrade?.[dia]?.[periodo]) continue;
+        if (!professorPode(dispoIdx, professorId, dia, periodo)) continue;
+
+        const score = computeSlotScore({
+          turmaGrade,
+          profGrade,
+          dispoIdx,
+          dia,
+          periodo,
+          periodosPorDia,
+          professorId,
+          disciplinaId,
+          rc01MaxConsecutivas,
+          rc02Cfg,
+          regrasGerais,
+          turno,
+          preferenciasProfessor: preferencias?.[professorId] || {},
+        });
+
+        if (best === null || score < best.score) {
+          best = { dia, periodo, score };
+        }
+      }
+    }
+    return best;
+  }
+
+  function trySingleSwap(
+    gradePorTurma,
+    gradePorProfessor,
+    dispoIdx,
+    turmaId,
+    professorId,
+    disciplinaId,
+    diasList,
+    periodosPorDia
+  ) {
+    const turmaGrade = gradePorTurma[turmaId];
+    const profGrade = gradePorProfessor[professorId];
+
+    const freeInTurma = [];
+    for (const d of diasList) {
+      for (let p = 1; p <= periodosPorDia; p++) {
+        if (!turmaGrade?.[d]?.[p]) freeInTurma.push({ d, p });
+      }
+    }
+    if (freeInTurma.length === 0) return null;
+
+    const freeForProf = [];
+    for (const d of diasList) {
+      for (let p = 1; p <= periodosPorDia; p++) {
+        if (!profGrade?.[d]?.[p] && professorPode(dispoIdx, professorId, d, p)) {
+          freeForProf.push({ d, p });
+        }
+      }
+    }
+
+    for (const cand of freeForProf) {
+      const occ = turmaGrade?.[cand.d]?.[cand.p];
+      if (!occ || occ.locked) continue;
+      const otherProf = occ.professor_id;
+      const otherDisc = occ.disciplina_id;
+      if (isCellLocked(gradePorTurma, gradePorProfessor, turmaId, otherProf, cand.d, cand.p)) continue;
+
+      for (const empty of freeInTurma) {
+        if (!gradePorProfessor[otherProf]?.[empty.d]?.[empty.p]) {
+          if (professorPode(dispoIdx, otherProf, empty.d, empty.p)) {
+            clearSlot(gradePorTurma, gradePorProfessor, turmaId, otherProf, cand.d, cand.p);
+            setSlot(gradePorTurma, gradePorProfessor, turmaId, otherProf, empty.d, empty.p, otherDisc);
+            setSlot(gradePorTurma, gradePorProfessor, turmaId, professorId, cand.d, cand.p, disciplinaId);
+            return { dia: cand.d, periodo: cand.p };
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  function tryDoubleSwap(
+    gradePorTurma,
+    gradePorProfessor,
+    dispoIdx,
+    turmaId,
+    professorId,
+    disciplinaId,
+    diasList,
+    periodosPorDia
+  ) {
+    const turmaGrade = gradePorTurma[turmaId];
+    const profGrade = gradePorProfessor[professorId];
+
+    const freeInTurma = [];
+    for (const d of diasList) {
+      for (let p = 1; p <= periodosPorDia; p++) {
+        if (!turmaGrade?.[d]?.[p]) freeInTurma.push({ d, p });
+      }
+    }
+    if (freeInTurma.length === 0) return null;
+
+    const freeForProf = [];
+    for (const d of diasList) {
+      for (let p = 1; p <= periodosPorDia; p++) {
+        if (!profGrade?.[d]?.[p] && professorPode(dispoIdx, professorId, d, p)) {
+          freeForProf.push({ d, p });
+        }
+      }
+    }
+
+    for (const s1 of freeForProf) {
+      const occB = turmaGrade?.[s1.d]?.[s1.p];
+      if (!occB || occB.locked) continue;
+      const profB = occB.professor_id;
+      const discB = occB.disciplina_id;
+      if (isCellLocked(gradePorTurma, gradePorProfessor, turmaId, profB, s1.d, s1.p)) continue;
+
+      for (const d2 of diasList) {
+        for (let p2 = 1; p2 <= periodosPorDia; p2++) {
+          if (d2 === s1.d && p2 === s1.p) continue;
+          if (gradePorProfessor[profB]?.[d2]?.[p2]) continue;
+          if (!professorPode(dispoIdx, profB, d2, p2)) continue;
+
+          const occC = turmaGrade?.[d2]?.[p2];
+          if (!occC || occC.locked) continue;
+          const profC = occC.professor_id;
+          const discC = occC.disciplina_id;
+          if (profC === profB || profC === professorId) continue;
+          if (isCellLocked(gradePorTurma, gradePorProfessor, turmaId, profC, d2, p2)) continue;
+
+          for (const s3 of freeInTurma) {
+            if (!gradePorProfessor[profC]?.[s3.d]?.[s3.p]) {
+              if (professorPode(dispoIdx, profC, s3.d, s3.p)) {
+                clearSlot(gradePorTurma, gradePorProfessor, turmaId, profC, d2, p2);
+                setSlot(gradePorTurma, gradePorProfessor, turmaId, profC, s3.d, s3.p, discC);
+
+                clearSlot(gradePorTurma, gradePorProfessor, turmaId, profB, s1.d, s1.p);
+                setSlot(gradePorTurma, gradePorProfessor, turmaId, profB, d2, p2, discB);
+
+                setSlot(gradePorTurma, gradePorProfessor, turmaId, professorId, s1.d, s1.p, disciplinaId);
+                return { dia: s1.d, periodo: s1.p };
+              }
+            }
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  function tryTripleSwap(
+    gradePorTurma,
+    gradePorProfessor,
+    dispoIdx,
+    turmaId,
+    professorId,
+    disciplinaId,
+    diasList,
+    periodosPorDia
+  ) {
+    const turmaGrade = gradePorTurma[turmaId];
+    const profGrade = gradePorProfessor[professorId];
+
+    const freeInTurma = [];
+    for (const d of diasList) {
+      for (let p = 1; p <= periodosPorDia; p++) {
+        if (!turmaGrade?.[d]?.[p]) freeInTurma.push({ d, p });
+      }
+    }
+    if (freeInTurma.length === 0) return null;
+
+    const freeForProf = [];
+    for (const d of diasList) {
+      for (let p = 1; p <= periodosPorDia; p++) {
+        if (!profGrade?.[d]?.[p] && professorPode(dispoIdx, professorId, d, p)) {
+          freeForProf.push({ d, p });
+        }
+      }
+    }
+
+    for (const s1 of freeForProf) {
+      const occB = turmaGrade?.[s1.d]?.[s1.p];
+      if (!occB || occB.locked) continue;
+      const profB = occB.professor_id;
+      const discB = occB.disciplina_id;
+      if (isCellLocked(gradePorTurma, gradePorProfessor, turmaId, profB, s1.d, s1.p)) continue;
+
+      for (const d2 of diasList) {
+        for (let p2 = 1; p2 <= periodosPorDia; p2++) {
+          if (d2 === s1.d && p2 === s1.p) continue;
+          if (gradePorProfessor[profB]?.[d2]?.[p2]) continue;
+          if (!professorPode(dispoIdx, profB, d2, p2)) continue;
+
+          const occC = turmaGrade?.[d2]?.[p2];
+          if (!occC || occC.locked) continue;
+          const profC = occC.professor_id;
+          const discC = occC.disciplina_id;
+          if (profC === profB || profC === professorId) continue;
+          if (isCellLocked(gradePorTurma, gradePorProfessor, turmaId, profC, d2, p2)) continue;
+
+          for (const d3 of diasList) {
+            for (let p3 = 1; p3 <= periodosPorDia; p3++) {
+              if ((d3 === s1.d && p3 === s1.p) || (d3 === d2 && p3 === p2)) continue;
+              if (gradePorProfessor[profC]?.[d3]?.[p3]) continue;
+              if (!professorPode(dispoIdx, profC, d3, p3)) continue;
+
+              const occD = turmaGrade?.[d3]?.[p3];
+              if (!occD || occD.locked) continue;
+              const profD = occD.professor_id;
+              const discD = occD.disciplina_id;
+              if (profD === profC || profD === profB || profD === professorId) continue;
+              if (isCellLocked(gradePorTurma, gradePorProfessor, turmaId, profD, d3, p3)) continue;
+
+              for (const s4 of freeInTurma) {
+                if (!gradePorProfessor[profD]?.[s4.d]?.[s4.p]) {
+                  if (professorPode(dispoIdx, profD, s4.d, s4.p)) {
+                    clearSlot(gradePorTurma, gradePorProfessor, turmaId, profD, d3, p3);
+                    setSlot(gradePorTurma, gradePorProfessor, turmaId, profD, s4.d, s4.p, discD);
+
+                    clearSlot(gradePorTurma, gradePorProfessor, turmaId, profC, d2, p2);
+                    setSlot(gradePorTurma, gradePorProfessor, turmaId, profC, d3, p3, discC);
+
+                    clearSlot(gradePorTurma, gradePorProfessor, turmaId, profB, s1.d, s1.p);
+                    setSlot(gradePorTurma, gradePorProfessor, turmaId, profB, d2, p2, discB);
+
+                    setSlot(gradePorTurma, gradePorProfessor, turmaId, professorId, s1.d, s1.p, disciplinaId);
+                    return { dia: s1.d, periodo: s1.p };
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  function tryCrossTurmaKempeChain(
+    gradePorTurma,
+    gradePorProfessor,
+    dispoIdx,
+    turmaId,
+    professorId,
+    disciplinaId,
+    diasList,
+    periodosPorDia
+  ) {
+    const turmaGrade = gradePorTurma[turmaId];
+    const profGrade = gradePorProfessor[professorId];
+
+    const freeInTurma = [];
+    const freeForProf = [];
+
+    for (const d of diasList) {
+      for (let p = 1; p <= periodosPorDia; p++) {
+        if (!turmaGrade?.[d]?.[p]) freeInTurma.push({ d, p });
+        if (!profGrade?.[d]?.[p] && professorPode(dispoIdx, professorId, d, p)) {
+          freeForProf.push({ d, p });
+        }
+      }
+    }
+
+    if (freeInTurma.length === 0) return null;
+
+    // Caso 1: Turma T está livre em (d1, p1), mas o Professor P está dando aula em outra turma T2 nesse mesmo horário
+    for (const s1 of freeInTurma) {
+      if (!professorPode(dispoIdx, professorId, s1.d, s1.p)) continue;
+      const conflictCell = profGrade?.[s1.d]?.[s1.p];
+      if (!conflictCell || conflictCell.locked) continue;
+
+      const t2Id = conflictCell.turma_id;
+      const discInT2 = conflictCell.disciplina_id;
+      if (Number(t2Id) === Number(turmaId)) continue;
+      if (!gradePorTurma[t2Id]) continue;
+      if (isCellLocked(gradePorTurma, gradePorProfessor, t2Id, professorId, s1.d, s1.p)) continue;
+
+      const t2Grade = gradePorTurma[t2Id];
+
+      for (const s2 of freeForProf) {
+        if (!t2Grade?.[s2.d]?.[s2.p]) {
+          clearSlot(gradePorTurma, gradePorProfessor, t2Id, professorId, s1.d, s1.p);
+          setSlot(gradePorTurma, gradePorProfessor, t2Id, professorId, s2.d, s2.p, discInT2);
+          setSlot(gradePorTurma, gradePorProfessor, turmaId, professorId, s1.d, s1.p, disciplinaId);
+          return { dia: s1.d, periodo: s1.p };
+        }
+      }
+
+      for (const s2 of freeForProf) {
+        const occT2 = t2Grade?.[s2.d]?.[s2.p];
+        if (!occT2 || occT2.locked) continue;
+        const profQ = occT2.professor_id;
+        const discQ = occT2.disciplina_id;
+        if (profQ === professorId) continue;
+        if (isCellLocked(gradePorTurma, gradePorProfessor, t2Id, profQ, s2.d, s2.p)) continue;
+
+        if (!gradePorProfessor[profQ]?.[s1.d]?.[s1.p] && professorPode(dispoIdx, profQ, s1.d, s1.p)) {
+          clearSlot(gradePorTurma, gradePorProfessor, t2Id, professorId, s1.d, s1.p);
+          clearSlot(gradePorTurma, gradePorProfessor, t2Id, profQ, s2.d, s2.p);
+          setSlot(gradePorTurma, gradePorProfessor, t2Id, profQ, s1.d, s1.p, discQ);
+          setSlot(gradePorTurma, gradePorProfessor, t2Id, professorId, s2.d, s2.p, discInT2);
+          setSlot(gradePorTurma, gradePorProfessor, turmaId, professorId, s1.d, s1.p, disciplinaId);
+          return { dia: s1.d, periodo: s1.p };
+        }
+
+        for (const d3 of diasList) {
+          for (let p3 = 1; p3 <= periodosPorDia; p3++) {
+            if (!t2Grade?.[d3]?.[p3] && !gradePorProfessor[profQ]?.[d3]?.[p3]) {
+              if (professorPode(dispoIdx, profQ, d3, p3)) {
+                clearSlot(gradePorTurma, gradePorProfessor, t2Id, professorId, s1.d, s1.p);
+                clearSlot(gradePorTurma, gradePorProfessor, t2Id, profQ, s2.d, s2.p);
+                setSlot(gradePorTurma, gradePorProfessor, t2Id, profQ, d3, p3, discQ);
+                setSlot(gradePorTurma, gradePorProfessor, t2Id, professorId, s2.d, s2.p, discInT2);
+                setSlot(gradePorTurma, gradePorProfessor, turmaId, professorId, s1.d, s1.p, disciplinaId);
+                return { dia: s1.d, periodo: s1.p };
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Caso 2: Professor P está livre em s1, Turma T tem profB em s1, e profB quer ir para emptyInT onde está em T3
+    for (const s1 of freeForProf) {
+      const occT = turmaGrade?.[s1.d]?.[s1.p];
+      if (!occT || occT.locked) continue;
+      const profB = occT.professor_id;
+      const discB = occT.disciplina_id;
+      if (isCellLocked(gradePorTurma, gradePorProfessor, turmaId, profB, s1.d, s1.p)) continue;
+
+      for (const emptyT of freeInTurma) {
+        if (!professorPode(dispoIdx, profB, emptyT.d, emptyT.p)) continue;
+        const conflictB = gradePorProfessor[profB]?.[emptyT.d]?.[emptyT.p];
+        if (!conflictB || conflictB.locked) continue;
+
+        const t3Id = conflictB.turma_id;
+        const discBInT3 = conflictB.disciplina_id;
+        if (Number(t3Id) === Number(turmaId)) continue;
+        if (!gradePorTurma[t3Id]) continue;
+        if (isCellLocked(gradePorTurma, gradePorProfessor, t3Id, profB, emptyT.d, emptyT.p)) continue;
+
+        if (!gradePorTurma[t3Id]?.[s1.d]?.[s1.p] && professorPode(dispoIdx, profB, s1.d, s1.p)) {
+          clearSlot(gradePorTurma, gradePorProfessor, t3Id, profB, emptyT.d, emptyT.p);
+          clearSlot(gradePorTurma, gradePorProfessor, turmaId, profB, s1.d, s1.p);
+          setSlot(gradePorTurma, gradePorProfessor, t3Id, profB, s1.d, s1.p, discBInT3);
+          setSlot(gradePorTurma, gradePorProfessor, turmaId, profB, emptyT.d, emptyT.p, discB);
+          setSlot(gradePorTurma, gradePorProfessor, turmaId, professorId, s1.d, s1.p, disciplinaId);
+          return { dia: s1.d, periodo: s1.p };
+        }
+      }
+    }
+
+    return null;
+  }
+
+  function tryPlaceWithAllOperators({
+    gradePorTurma,
+    gradePorProfessor,
+    dispoIdx,
+    diasList,
+    periodosPorDia,
+    turmaId,
+    professorId,
+    disciplinaId,
+    rc01MaxConsecutivas,
+    rc02Cfg,
+    regrasGerais,
+    turno,
+    preferencias,
+  }) {
+    const best = findBestFreeSlot({
+      gradePorTurma,
+      gradePorProfessor,
+      dispoIdx,
+      diasList,
+      periodosPorDia,
+      turmaId,
+      professorId,
+      disciplinaId,
+      rc01MaxConsecutivas,
+      rc02Cfg,
+      regrasGerais,
+      turno,
+      preferencias,
+    });
+
+    if (best) {
+      setSlot(gradePorTurma, gradePorProfessor, turmaId, professorId, best.dia, best.periodo, disciplinaId);
+      return true;
+    }
+
+    if (trySingleSwap(gradePorTurma, gradePorProfessor, dispoIdx, turmaId, professorId, disciplinaId, diasList, periodosPorDia)) {
+      return true;
+    }
+    if (tryCrossTurmaKempeChain(gradePorTurma, gradePorProfessor, dispoIdx, turmaId, professorId, disciplinaId, diasList, periodosPorDia)) {
+      return true;
+    }
+    if (tryDoubleSwap(gradePorTurma, gradePorProfessor, dispoIdx, turmaId, professorId, disciplinaId, diasList, periodosPorDia)) {
+      return true;
+    }
+    if (tryTripleSwap(gradePorTurma, gradePorProfessor, dispoIdx, turmaId, professorId, disciplinaId, diasList, periodosPorDia)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  function runTabuEjectionRepair({
+    gradePorTurma,
+    gradePorProfessor,
+    unplacedLessons,
+    dispoIdx,
+    diasList,
+    periodosPorDia,
+    rc01MaxConsecutivas,
+    rc02Cfg,
+    regrasGerais,
+    turno,
+    preferencias,
+    maxSteps = 90,
+  }) {
+    if (!unplacedLessons || unplacedLessons.length === 0) return [];
+
+    let bestTurmaSnap = cloneGradeMap(gradePorTurma);
+    let bestProfSnap = cloneGradeMap(gradePorProfessor);
+    let bestQueue = unplacedLessons.map(x => ({ ...x }));
+
+    const queue = unplacedLessons.map(x => ({ ...x }));
+    const tabuMap = new Map();
+    const TABU_TENURE = 7;
+
+    for (let step = 0; step < maxSteps && queue.length > 0; step++) {
+      const target = queue.shift();
+      const { turma_id: tId, disciplina_id: dId, professor_id: pId } = target;
+
+      const placedDirect = tryPlaceWithAllOperators({
+        gradePorTurma,
+        gradePorProfessor,
+        dispoIdx,
+        diasList,
+        periodosPorDia,
+        turmaId: tId,
+        professorId: pId,
+        disciplinaId: dId,
+        rc01MaxConsecutivas,
+        rc02Cfg,
+        regrasGerais,
+        turno,
+        preferencias,
+      });
+
+      if (placedDirect) {
+        if (queue.length < bestQueue.length) {
+          bestQueue = queue.map(x => ({ ...x }));
+          bestTurmaSnap = cloneGradeMap(gradePorTurma);
+          bestProfSnap = cloneGradeMap(gradePorProfessor);
+        }
+        continue;
+      }
+
+      const candidates = [];
+      for (const d of diasList) {
+        for (let p = 1; p <= periodosPorDia; p++) {
+          if (!professorPode(dispoIdx, pId, d, p)) continue;
+
+          const cellT = gradePorTurma[tId]?.[d]?.[p];
+          const cellP = gradePorProfessor[pId]?.[d]?.[p];
+          if (cellT?.locked || cellP?.locked) continue;
+
+          const tabuKey = `${tId}|${pId}|${d}|${p}`;
+          const isTabu = (tabuMap.get(tabuKey) || 0) > step;
+
+          let blockersCount = 0;
+          if (cellT) blockersCount++;
+          if (cellP && Number(cellP.turma_id) !== Number(tId)) blockersCount++;
+          if (blockersCount === 0) continue;
+
+          const cost = (isTabu ? 500 : 0) + blockersCount * 100 + Math.random() * 25;
+          candidates.push({ d, p, cellT, cellP, cost });
+        }
+      }
+
+      if (candidates.length === 0) {
+        queue.push(target);
+        continue;
+      }
+
+      candidates.sort((a, b) => a.cost - b.cost);
+      const { d, p, cellT, cellP } = candidates[0];
+
+      const ejected = [];
+      if (cellT) {
+        const oldProf = cellT.professor_id;
+        const oldDisc = cellT.disciplina_id;
+        clearSlot(gradePorTurma, gradePorProfessor, tId, oldProf, d, p);
+        tabuMap.set(`${tId}|${oldProf}|${d}|${p}`, step + TABU_TENURE);
+        ejected.push({ turma_id: tId, disciplina_id: oldDisc, professor_id: oldProf });
+      }
+      if (cellP && Number(cellP.turma_id) !== Number(tId)) {
+        const oldTurma = cellP.turma_id;
+        const oldDisc = cellP.disciplina_id;
+        if (gradePorTurma[oldTurma]?.[d]?.[p]) {
+          clearSlot(gradePorTurma, gradePorProfessor, oldTurma, pId, d, p);
+          tabuMap.set(`${oldTurma}|${pId}|${d}|${p}`, step + TABU_TENURE);
+          ejected.push({ turma_id: oldTurma, disciplina_id: oldDisc, professor_id: pId });
+        }
+      }
+
+      setSlot(gradePorTurma, gradePorProfessor, tId, pId, d, p, dId);
+      tabuMap.set(`${tId}|${pId}|${d}|${p}`, step + TABU_TENURE);
+
+      for (const ej of ejected) {
+        const okEj = tryPlaceWithAllOperators({
+          gradePorTurma,
+          gradePorProfessor,
+          dispoIdx,
+          diasList,
+          periodosPorDia,
+          turmaId: ej.turma_id,
+          professorId: ej.professor_id,
+          disciplinaId: ej.disciplina_id,
+          rc01MaxConsecutivas,
+          rc02Cfg,
+          regrasGerais,
+          turno,
+          preferencias,
+        });
+        if (!okEj) queue.push(ej);
+      }
+
+      if (queue.length < bestQueue.length) {
+        bestQueue = queue.map(x => ({ ...x }));
+        bestTurmaSnap = cloneGradeMap(gradePorTurma);
+        bestProfSnap = cloneGradeMap(gradePorProfessor);
+        if (bestQueue.length === 0) break;
+      }
+    }
+
+    for (const k of Object.keys(gradePorTurma)) delete gradePorTurma[k];
+    for (const [k, v] of Object.entries(bestTurmaSnap)) gradePorTurma[k] = v;
+
+    for (const k of Object.keys(gradePorProfessor)) delete gradePorProfessor[k];
+    for (const [k, v] of Object.entries(bestProfSnap)) gradePorProfessor[k] = v;
+
+    return bestQueue;
+  }
+
+  function inferirMotivoNaoAlocacao({
+    turmaGrade,
+    profGrade,
+    dispoIdx,
+    professorId,
+    periodosPorDia,
+    diasList,
+  }) {
+    let livresTurma = 0;
+    let livresProf = 0;
+    let livresDispo = 0;
+
+    for (const dia of diasList) {
+      for (let periodo = 1; periodo <= periodosPorDia; periodo++) {
+        if (!turmaGrade?.[dia]?.[periodo]) {
+          livresTurma++;
+          if (!profGrade?.[dia]?.[periodo]) {
+            livresProf++;
+            if (professorPode(dispoIdx, professorId, dia, periodo)) livresDispo++;
+          }
+        }
+      }
+    }
+
+    if (livresTurma === 0) return "SEM_SLOT_LIVRE_TURMA";
+    if (livresProf === 0) return "COLISAO_PROFESSOR";
+    if (livresDispo === 0) return "SEM_DISPONIBILIDADE_PROFESSOR";
+    return "OUTRO";
+  }
+
+  function validateAndCleanGrade(gradePorTurma, gradePorProfessor, demandasNorm) {
+    const demandLookup = new Map();
+    for (const d of demandasNorm) {
+      const k = `${d.turma_id}|${d.disciplina_id}|${d.professor_id}`;
+      demandLookup.set(k, (demandLookup.get(k) || 0) + d.aulas_semanais);
+    }
+
+    const allocatedCount = new Map();
+    for (const [turmaIdStr, diasObj] of Object.entries(gradePorTurma)) {
+      const turmaId = toInt(turmaIdStr, 0);
+      for (const [diaStr, perObj] of Object.entries(diasObj)) {
+        const dia = toInt(diaStr, 0);
+        for (const [perStr, cell] of Object.entries(perObj)) {
+          if (!cell) continue;
+          const per = toInt(perStr, 0);
+          const discId = toInt(cell.disciplina_id, 0);
+          const profId = toInt(cell.professor_id, 0);
+          const k = `${turmaId}|${discId}|${profId}`;
+          const maxAllowed = demandLookup.get(k) || 0;
+          const current = allocatedCount.get(k) || 0;
+
+          if (cell.locked) {
+            allocatedCount.set(k, current + 1);
+            continue;
+          }
+
+          if (maxAllowed === 0 || current >= maxAllowed) {
+            gradePorTurma[turmaId][dia][per] = null;
+            if (gradePorProfessor[profId]?.[dia]) gradePorProfessor[profId][dia][per] = null;
+          } else {
+            allocatedCount.set(k, current + 1);
+          }
+        }
+      }
+    }
+  }
+
+  function runGreedySolver(payload, randomize = false, strategy = "default") {
+    const diasList =
+      Array.isArray(payload?.dias_semana) && payload.dias_semana.length > 0
+        ? payload.dias_semana.map(Number).filter(n => n >= 1 && n <= 6)
+        : [1, 2, 3, 4, 5];
+
+    const periodosPorDia = clamp(toInt(payload?.periodos_por_dia, 6), 1, 10);
+    const configPedagogica = payload?.config_pedagogica || payload?.configPedagogica || null;
+
+    const rc01MaxConsecutivas = readRc01MaxConsecutivas(configPedagogica);
+    const rc02Cfg = readRc02Config(configPedagogica);
+    const regrasGerais = configPedagogica?.regras_gerais || null;
+    const turno = payload?.turno || "matutino";
+
+    const turmaIds = normalizeTurmaIds(payload);
+    const demandasNorm = normalizeDemandas(payload);
+    const dispoIdx = buildDisponibilidadeIndex(payload?.disponibilidades, diasList, periodosPorDia);
+
+    const slotsFixos = Array.isArray(payload?.slots_fixos) ? payload.slots_fixos : [];
+    const turmaIdsSet = new Set(turmaIds.map(Number));
+
+    const fixosCountMap = new Map();
+    const validFixos = [];
+    const externalProfFixos = [];
+    const diasSet = new Set(diasList);
+
+    for (const sf of slotsFixos) {
+      const tId = toInt(sf.turma_id, 0);
+      const dId = toInt(sf.disciplina_id, 0);
+      const pId = toInt(sf.professor_id, 0);
+      const dia = toInt(sf.dia ?? sf.dia_semana, 0);
+      const ord = toInt(sf.ordem ?? sf.periodo_ordem, 0);
+      if (!tId || !dId || !pId || !diasSet.has(dia) || ord < 1 || ord > periodosPorDia) continue;
+
+      if (turmaIdsSet.size === 0 || turmaIdsSet.has(tId)) {
+        validFixos.push({ turma_id: tId, disciplina_id: dId, professor_id: pId, dia, ordem: ord });
+        const k = `${tId}|${dId}|${pId}`;
+        fixosCountMap.set(k, (fixosCountMap.get(k) || 0) + 1);
+      } else {
+        externalProfFixos.push({ turma_id: tId, disciplina_id: dId, professor_id: pId, dia, ordem: ord });
+      }
+    }
+
+    const demandasAjustadas = demandasNorm.map(d => {
+      const k = `${d.turma_id}|${d.disciplina_id}|${d.professor_id}`;
+      const jaFixadas = fixosCountMap.get(k) || 0;
+      return {
+        ...d,
+        aulas_restantes: Math.max(0, d.aulas_semanais - jaFixadas),
+      };
+    });
+
+    const lessons = expandDemandasToLessons(
+      demandasAjustadas,
+      randomize,
+      strategy,
+      dispoIdx,
+      diasList,
+      periodosPorDia
+    );
+
+    const allProfIds = uniq([
+      ...demandasNorm.map(d => d.professor_id),
+      ...validFixos.map(f => f.professor_id),
+      ...externalProfFixos.map(f => f.professor_id),
+    ]);
+
+    const gradePorTurma = initGradePorTurma(turmaIds, diasList, periodosPorDia);
+    const gradePorProfessor = initGradePorProfessor(allProfIds, diasList, periodosPorDia);
+
+    for (const ef of externalProfFixos) {
+      if (!gradePorProfessor[ef.professor_id]) {
+        gradePorProfessor[ef.professor_id] = initEmptyGridForEntity(diasList, periodosPorDia);
+      }
+      ensurePath(gradePorProfessor, ef.professor_id, ef.dia);
+      gradePorProfessor[ef.professor_id][ef.dia][ef.ordem] = {
+        turma_id: ef.turma_id,
+        disciplina_id: ef.disciplina_id,
+        locked: true,
+      };
+    }
+
+    let alocadasFixas = 0;
+    for (const sf of validFixos) {
+      if (!gradePorTurma[sf.turma_id]) {
+        gradePorTurma[sf.turma_id] = initEmptyGridForEntity(diasList, periodosPorDia);
+      }
+      if (!gradePorProfessor[sf.professor_id]) {
+        gradePorProfessor[sf.professor_id] = initEmptyGridForEntity(diasList, periodosPorDia);
+      }
+      if (!gradePorTurma[sf.turma_id]?.[sf.dia]?.[sf.ordem] && !gradePorProfessor[sf.professor_id]?.[sf.dia]?.[sf.ordem]) {
+        setSlot(gradePorTurma, gradePorProfessor, sf.turma_id, sf.professor_id, sf.dia, sf.ordem, sf.disciplina_id, true);
+        alocadasFixas++;
+      }
+    }
+
+    let unplaced = [];
+    for (const lesson of lessons) {
+      const { turma_id: turmaId, disciplina_id: disciplinaId, professor_id: professorId } = lesson;
+
+      if (!gradePorTurma[turmaId]) {
+        gradePorTurma[turmaId] = initEmptyGridForEntity(diasList, periodosPorDia);
+      }
+      if (!gradePorProfessor[professorId]) {
+        gradePorProfessor[professorId] = initEmptyGridForEntity(diasList, periodosPorDia);
+      }
+
+      const ok = tryPlaceWithAllOperators({
+        gradePorTurma,
+        gradePorProfessor,
+        dispoIdx,
+        diasList,
+        periodosPorDia,
+        turmaId,
+        professorId,
+        disciplinaId,
+        rc01MaxConsecutivas,
+        rc02Cfg,
+        regrasGerais,
+        turno,
+        preferencias: payload?.preferencias,
+      });
+
+      if (!ok) unplaced.push(lesson);
+    }
+
+    if (unplaced.length > 0 && unplaced.length <= 18) {
+      unplaced = runTabuEjectionRepair({
+        gradePorTurma,
+        gradePorProfessor,
+        unplacedLessons: unplaced,
+        dispoIdx,
+        diasList,
+        periodosPorDia,
+        rc01MaxConsecutivas,
+        rc02Cfg,
+        regrasGerais,
+        turno,
+        preferencias: payload?.preferencias,
+        maxSteps: unplaced.length <= 6 ? 110 : 65,
+      });
+    }
+
+    const diagnosticoNaoAlocadas = [];
+    const diagnosticoContadores = {
+      SEM_SLOT_LIVRE_TURMA: 0,
+      COLISAO_PROFESSOR: 0,
+      SEM_DISPONIBILIDADE_PROFESSOR: 0,
+      OUTRO: 0,
+    };
+
+    for (const na of unplaced) {
+      const motivo = inferirMotivoNaoAlocacao({
+        turmaGrade: gradePorTurma[na.turma_id],
+        profGrade: gradePorProfessor[na.professor_id],
+        dispoIdx,
+        professorId: na.professor_id,
+        periodosPorDia,
+        diasList,
+      });
+      diagnosticoNaoAlocadas.push({
+        turma_id: na.turma_id,
+        disciplina_id: na.disciplina_id,
+        professor_id: na.professor_id,
+        motivo,
+      });
+      const k = diagnosticoContadores[motivo] !== undefined ? motivo : "OUTRO";
+      diagnosticoContadores[k] = (diagnosticoContadores[k] || 0) + 1;
+    }
+
+    validateAndCleanGrade(gradePorTurma, gradePorProfessor, demandasNorm);
+
+    let totalAlocadasReal = 0;
+    for (const diasObj of Object.values(gradePorTurma)) {
+      for (const perObj of Object.values(diasObj || {})) {
+        for (const cell of Object.values(perObj || {})) {
+          if (cell && cell.professor_id) totalAlocadasReal++;
+        }
+      }
+    }
+
+    const demandaTotal = Math.max(
+      demandasNorm.reduce((acc, d) => acc + d.aulas_semanais, 0),
+      totalAlocadasReal + unplaced.length
+    );
+    const cobertura = demandaTotal > 0 ? Math.round((totalAlocadasReal / demandaTotal) * 10000) / 100 : 100;
+
+    return {
+      status: unplaced.length === 0 ? "MOCK_FEASIBLE" : "MOCK_PARTIAL",
+      metrics: {
+        aulas_demanda: demandaTotal,
+        aulas_alocadas: totalAlocadasReal,
+        aulas_fixas_manuais: alocadasFixas,
+        aulas_nao_alocadas: unplaced.length,
+        cobertura_percentual: cobertura,
+        rc01_max_consecutivas: rc01MaxConsecutivas,
+        rc02_modo: rc02Cfg.modo,
+        rc02_max_por_dia_padrao: rc02Cfg.maxPadrao,
+        rc02_bloqueio_hard: rc02Cfg.bloqueioHard,
+        rc02_max_hard_padrao: rc02Cfg.maxHardPadrao,
+        rc02_strict_cap_mock: !!rc02Cfg.strictCapMock,
+      },
+      grade_por_turma: gradePorTurma,
+      grade_por_professor: gradePorProfessor,
+      nao_alocadas: unplaced.map(x => ({
+        turma_id: x.turma_id,
+        disciplina_id: x.disciplina_id,
+        professor_id: x.professor_id,
+      })),
+      diagnostico: {
+        resumo_motivos: diagnosticoContadores,
+        nao_alocadas_detalhado: diagnosticoNaoAlocadas,
+      },
+    };
+  }
+
+  // Se estiver executando dentro de um Web Worker
+  if (workerScope && typeof workerScope.postMessage === "function") {
+    let stopRequested = false;
+
+    workerScope.onmessage = function (ev) {
+      const msg = ev.data || {};
+      if (msg.type === "stop") {
+        stopRequested = true;
+        return;
+      }
+
+      if (msg.type === "start") {
+        stopRequested = false;
+        const payload = msg.payload;
+        const maxTimeMs = Number(msg.maxTimeMs) || 15000;
+        const startTime = Date.now();
+
+        const strategies = [
+          "dsatur_slack",
+          "group_turma",
+          "scarce_first",
+          "dsatur_slack",
+          "weight_desc",
+          "reverse_weight",
+          "random",
+        ];
+
+        let iter = 0;
+        let maxAulas = -1;
+        let bestResult = null;
+        let lastProgressAt = 0;
+
+        function stepBatch() {
+          const batchStart = Date.now();
+
+          // Roda em pequenos slices de 45ms para permitir que mensagens 'stop' sejam processadas imediatamente
+          while (Date.now() - batchStart < 45) {
+            if (stopRequested || Date.now() - startTime >= maxTimeMs) {
+              const finalResult = bestResult || runGreedySolver(payload, false, "dsatur_slack");
+              workerScope.postMessage({
+                type: "done",
+                iter,
+                elapsedMs: Date.now() - startTime,
+                stoppedByUser: stopRequested,
+                result: finalResult,
+              });
+              return;
+            }
+
+            const strategy = strategies[iter % strategies.length];
+            const isRandomized = iter > 0;
+            const res = runGreedySolver(payload, isRandomized, strategy);
+
+            const alocadas = res.metrics.aulas_alocadas || 0;
+            const demanda = res.metrics.aulas_demanda || 1;
+
+            if (alocadas > maxAulas) {
+              maxAulas = alocadas;
+              bestResult = res;
+            }
+
+            iter++;
+
+            // 100% encontrado! Finaliza imediatamente
+            if (alocadas >= demanda) {
+              workerScope.postMessage({
+                type: "done",
+                iter,
+                elapsedMs: Date.now() - startTime,
+                stoppedByUser: false,
+                perfect: true,
+                strategy,
+                result: bestResult,
+              });
+              return;
+            }
+
+            const now = Date.now();
+            if (now - lastProgressAt >= 180) {
+              lastProgressAt = now;
+              workerScope.postMessage({
+                type: "progress",
+                iter,
+                elapsedMs: now - startTime,
+                maxTimeMs,
+                strategy,
+                alocadas: bestResult?.metrics?.aulas_alocadas || 0,
+                demanda: bestResult?.metrics?.aulas_demanda || 0,
+                fixas: bestResult?.metrics?.aulas_fixas_manuais || 0,
+                cobertura: bestResult?.metrics?.cobertura_percentual || 0,
+              });
+            }
+          }
+
+          setTimeout(stepBatch, 0);
+        }
+
+        stepBatch();
+      }
+    };
+  }
+
+  return { runGreedySolver };
+}
+
+const localInstance = solverWorkerBootstrap(null);
+export const runGreedySolverLocal = localInstance.runGreedySolver;
+
+/**
+ * Executa o Motor Solver 2.0 em um Web Worker real (Blob Worker),
+ * retornando { promise, stop } para controle interativo na UI.
+ */
+export function runSolverInWebWorker({ payload, maxTimeMs = 15000, onProgress }) {
+  if (typeof window === "undefined" || typeof Worker === "undefined" || typeof Blob === "undefined") {
+    const start = Date.now();
+    const res = runGreedySolverLocal(payload, false, "dsatur_slack");
+    return {
+      stop: () => {},
+      promise: Promise.resolve({
+        ...res,
+        solver_telemetry: {
+          iteracoes: 1,
+          tempo_ms: Date.now() - start,
+          perfeito: res.metrics.aulas_nao_alocadas === 0,
+        },
+      }),
+    };
+  }
+
+  const workerCode = `(${solverWorkerBootstrap.toString()})(self);`;
+  const blob = new Blob([workerCode], { type: "application/javascript" });
+  const workerUrl = URL.createObjectURL(blob);
+  const worker = new Worker(workerUrl);
+
+  let cleanupDone = false;
+  function cleanup() {
+    if (cleanupDone) return;
+    cleanupDone = true;
+    try {
+      worker.terminate();
+    } catch {}
+    try {
+      URL.revokeObjectURL(workerUrl);
+    } catch {}
+  }
+
+  const promise = new Promise((resolve, reject) => {
+    worker.onmessage = (ev) => {
+      const data = ev.data || {};
+      if (data.type === "progress") {
+        if (typeof onProgress === "function") onProgress(data);
+      } else if (data.type === "done") {
+        cleanup();
+        resolve({
+          ...data.result,
+          solver_telemetry: {
+            iteracoes: data.iter || 1,
+            tempo_ms: data.elapsedMs || 0,
+            perfeito: Boolean(data.perfect),
+            parado_pelo_usuario: Boolean(data.stoppedByUser),
+            estrategia_vencedora: data.strategy || "dsatur_slack",
+          },
+        });
+      }
+    };
+
+    worker.onerror = (err) => {
+      cleanup();
+      reject(err);
+    };
+
+    worker.postMessage({
+      type: "start",
+      payload,
+      maxTimeMs,
+    });
+  });
+
+  function stop() {
+    try {
+      worker.postMessage({ type: "stop" });
+    } catch {
+      cleanup();
+    }
+  }
+
+  return { promise, stop };
+}

@@ -115,25 +115,39 @@ export default function GradeProfessor({ professor, resultado, periodosPorDia, m
     const turmaShort = turmaCompacta(turmaNomeFull, turmaId);
     const cod = codDisciplina(discNome);
     const { bg, text, ring } = corDisciplina(discId);
+    const isLocked = Boolean(slot.locked);
 
     return (
       <div
-        className={`rounded-xl px-2 py-1.5 text-center ${bg} ${text} ring-1 ${ring} shadow-[inset_0_0_0_1px_rgba(255,255,255,0.6)]`}
-        title={`${turmaNomeFull} — ${discNome}`}
+        className={`relative rounded-xl px-2 py-1.5 text-center ${bg} ${text} ring-1 ${ring} shadow-[inset_0_0_0_1px_rgba(255,255,255,0.6)]`}
+        title={`${turmaNomeFull} — ${discNome}${isLocked ? " (Fixado no Horário Manual)" : ""}`}
       >
+        {isLocked && (
+          <span
+            style={{ position: "absolute", top: 2, right: 4, fontSize: 10, lineHeight: 1 }}
+            title="Aula fixa (Horário Manual)"
+          >
+            📌
+          </span>
+        )}
         <div className="text-sm font-semibold leading-tight">{turmaShort}</div>
         <div className="text-[11px] opacity-80 leading-tight">{cod}</div>
       </div>
     );
   };
 
+  const diasDinamicos = Object.keys(periodosPorDia || {})
+    .map(Number)
+    .filter(n => n >= 1 && n <= 6)
+    .sort((a, b) => a - b);
+
   return (
     <GradeBase
       titulo={`Agenda do Prof. ${professor.nome || professor.id}`}
       periodosPorDia={periodosPorDia}
       celulaRender={celulaRender}
-      dias={[1, 2, 3, 4, 5]}
-      layout={layoutMode}  // <<< repassa o modo atual para o GradeBase
+      dias={diasDinamicos.length > 0 ? diasDinamicos : [1, 2, 3, 4, 5]}
+      layout={layoutMode}
     />
   );
 }

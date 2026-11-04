@@ -14,6 +14,10 @@ import api from "../../../services/api";
 import GradeTurma from "./GradeTurma.jsx";
 import GradeProfessor from "./GradeProfessor.jsx";
 import { runSolverInWebWorker } from "./solverEngine.js";
+import ExportarHorarioModal, {
+  imprimirHorarioTurmaUnica,
+  imprimirHorarioProfessorUnico,
+} from "./ExportarHorarioModal.jsx";
 
 const DIAS_LABEL = { 1: "Segunda", 2: "Terça", 3: "Quarta", 4: "Quinta", 5: "Sexta", 6: "Sábado" };
 const DIAS_CURTO = { 1: "Seg", 2: "Ter", 3: "Qua", 4: "Qui", 5: "Sex", 6: "Sáb" };
@@ -307,6 +311,7 @@ export default function GerarHorarioPage({ config }) {
   const [publicando, setPublicando] = useState(false);
   const [msgAcao, setMsgAcao] = useState("");
   const [showModalPublicar, setShowModalPublicar] = useState(false);
+  const [showModalExportar, setShowModalExportar] = useState(false);
 
   // Cleanup do Worker ao desmontar e atalho ESC para cancelar seleção
   useEffect(() => {
@@ -1215,6 +1220,27 @@ export default function GerarHorarioPage({ config }) {
           {resultado && !rodando && (
             <>
               <button
+                type="button"
+                onClick={() => setShowModalExportar(true)}
+                style={{
+                  padding: "9px 16px",
+                  borderRadius: 8,
+                  border: "1px solid #334155",
+                  background: "#f8fafc",
+                  color: "#1e293b",
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: "pointer",
+                  transition: "all 0.18s",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                }}
+                title="Imprimir ou exportar PDF (Quadro Geral do Turno, Por Turma ou Por Professor)"
+              >
+                🖨️ Imprimir / PDF
+              </button>
+              <button
                 onClick={salvarRascunho}
                 disabled={salvando || publicando}
                 style={{
@@ -1802,11 +1828,41 @@ export default function GerarHorarioPage({ config }) {
                               🏫 {String(nomesTurmas[turmaId] || turmaId).toUpperCase().includes("TURMA") ? "" : "Turma "}
                               {nomesTurmas[turmaId] || turmaId}
                             </span>
-                            {isTurmaAtiva && (
-                              <span style={{ fontSize: 11, color: "#1d4ed8", fontWeight: 700 }}>
-                                🎯 Selecione o horário de destino nesta turma
-                              </span>
-                            )}
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                              {isTurmaAtiva && (
+                                <span style={{ fontSize: 11, color: "#1d4ed8", fontWeight: 700 }}>
+                                  🎯 Selecione o horário de destino nesta turma
+                                </span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  imprimirHorarioTurmaUnica({
+                                    turmaId: Number(turmaId),
+                                    gradePorTurma: resultado.grade_por_turma,
+                                    nomesTurmas,
+                                    nomesDisciplinas,
+                                    nomesProfessores,
+                                    diasSemana: diasPadrao,
+                                    periodosPorDia: periodosPadrao,
+                                    turno,
+                                  })
+                                }
+                                style={{
+                                  padding: "4px 10px",
+                                  borderRadius: 6,
+                                  border: "1px solid #cbd5e1",
+                                  background: "#fff",
+                                  color: "#334155",
+                                  fontSize: 11,
+                                  fontWeight: 600,
+                                  cursor: "pointer",
+                                }}
+                                title="Imprimir horário desta turma"
+                              >
+                                🖨️ Imprimir Turma
+                              </button>
+                            </div>
                           </div>
                           <div style={{ padding: 12 }}>
                             <GradeTurma
@@ -1868,12 +1924,42 @@ export default function GerarHorarioPage({ config }) {
                             justifyContent: "space-between",
                           }}>
                             <span>👨‍🏫 {nomesProfessores[profId] || `Professor ${profId}`}</span>
-                            {isProfAtivo && (
-                              <span style={{ fontSize: 11, color: "#1d4ed8", fontWeight: 700 }}>
-                                🎯 Clique em um horário livre (🟢) para mover/trocar a aula na turma{" "}
-                                {nomesTurmas[selecao.turmaId] || selecao.turmaId}
-                              </span>
-                            )}
+                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                              {isProfAtivo && (
+                                <span style={{ fontSize: 11, color: "#1d4ed8", fontWeight: 700 }}>
+                                  🎯 Clique em um horário livre (🟢) para mover/trocar a aula na turma{" "}
+                                  {nomesTurmas[selecao.turmaId] || selecao.turmaId}
+                                </span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  imprimirHorarioProfessorUnico({
+                                    profId: Number(profId),
+                                    gradePorProfessor: resultado.grade_por_professor,
+                                    nomesTurmas,
+                                    nomesDisciplinas,
+                                    nomesProfessores,
+                                    diasSemana: diasPadrao,
+                                    periodosPorDia: periodosPadrao,
+                                    turno,
+                                  })
+                                }
+                                style={{
+                                  padding: "4px 10px",
+                                  borderRadius: 6,
+                                  border: "1px solid #cbd5e1",
+                                  background: "#fff",
+                                  color: "#334155",
+                                  fontSize: 11,
+                                  fontWeight: 600,
+                                  cursor: "pointer",
+                                }}
+                                title="Imprimir horário individual deste professor"
+                              >
+                                🖨️ Imprimir Professor
+                              </button>
+                            </div>
                           </div>
                           <div style={{ padding: 12 }}>
                             <GradeProfessor
@@ -1898,6 +1984,19 @@ export default function GerarHorarioPage({ config }) {
           </>
         )}
       </div>
+
+      {/* 🖨️ Modal de Exportação e Impressão Oficial (Padrão Urânia) */}
+      <ExportarHorarioModal
+        aberto={showModalExportar}
+        onFechar={() => setShowModalExportar(false)}
+        resultado={resultado}
+        turno={turno}
+        nomesTurmas={nomesTurmas}
+        nomesDisciplinas={nomesDisciplinas}
+        nomesProfessores={nomesProfessores}
+        diasSemana={diasPadrao}
+        periodosPorDia={periodosPadrao}
+      />
 
       {/* 🚀 Modal Premium para Publicar Grade */}
       {showModalPublicar && (

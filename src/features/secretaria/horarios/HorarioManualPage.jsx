@@ -15,6 +15,7 @@
 // ============================================================
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import api from "../../../services/api";
+import { imprimirHorarioProfessorUnico } from "./ExportarHorarioModal.jsx";
 
 const DIAS = [
   { num: 1, nome: "Segunda" },
@@ -1316,6 +1317,42 @@ export default function HorarioManualPage({ config, turnoInicial }) {
                   }}
                 >
                   {salvando ? "Salvando…" : isProfAtualDirty ? "💾 Salvar Alterações" : "💾 Salvar Horário"}
+                </button>
+
+                {/* Botão Imprimir Horário Individual do Professor */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const tMap = {};
+                    for (const t of turmasTurno) tMap[t.id] = t.turma || t.nome || `Turma ${t.id}`;
+                    const dMap = {};
+                    for (const d of disciplinas) dMap[d.id] = d.nome || d.disciplina || `Disc ${d.id}`;
+                    const pMap = { [profAtual.id]: profAtual.nome };
+                    imprimirHorarioProfessorUnico({
+                      profId: profAtual.id,
+                      gradePorProfessor: grid,
+                      nomesTurmas: tMap,
+                      nomesDisciplinas: dMap,
+                      nomesProfessores: pMap,
+                      diasSemana: diasLetivos,
+                      periodosPorDia: nPeriodos,
+                      turno,
+                    });
+                  }}
+                  style={{
+                    padding: "7px 14px",
+                    borderRadius: 20,
+                    border: "1px solid rgba(255,255,255,0.4)",
+                    background: "rgba(255,255,255,0.15)",
+                    color: "#fff",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    transition: "all 0.15s",
+                  }}
+                  title="Imprimir horário individual deste professor"
+                >
+                  🖨️ Imprimir
                 </button>
               </div>
             </div>

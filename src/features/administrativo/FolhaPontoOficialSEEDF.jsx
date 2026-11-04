@@ -171,6 +171,18 @@ export function mapearOcorrenciaParaFolhaSEEDF(occ) {
       descricaoCurta: sub,
     };
   }
+  if (
+    sub.includes("FORMAÇÃO CONTINUADA") ||
+    sub.includes("FORMACAO CONTINUADA") ||
+    obs.includes("FORMAÇÃO CONTINUADA") ||
+    obs.includes("FORMACAO CONTINUADA")
+  ) {
+    return {
+      textoAssinatura: "--- FORMACAO CONTINUADA ---",
+      codigoSigep: "",
+      descricaoCurta: "FORMAÇÃO CONTINUADA",
+    };
+  }
   if (tipo === "afastamento") {
     return {
       textoAssinatura: "--- DISPENSA / AFAST. ---",

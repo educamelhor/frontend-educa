@@ -538,6 +538,7 @@ export default function App() {
           <Route path="/administrativo/frequencia" element={<RequireModulo modulo="administrativo"><AdministrativoModule /></RequireModulo>} />
           <Route path="/administrativo/ocorrencias" element={<RequireModulo modulo="administrativo"><AdministrativoModule /></RequireModulo>} />
           <Route path="/administrativo/relatorios" element={<RequireModulo modulo="administrativo"><AdministrativoModule /></RequireModulo>} />
+          <Route path="/administrativo/memorando"  element={<RequireModulo modulo="administrativo"><AdministrativoModule /></RequireModulo>} />
 
           <Route path="*" element={<Navigate to="/home" replace />} />
         </Route>

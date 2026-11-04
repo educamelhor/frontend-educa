@@ -913,6 +913,7 @@ export function useAdministrativoData() {
       overrides: `educa_admin_overrides_v1_${escolaId}`,
       ocorrencias: `educa_admin_ocorrencias_v1_${escolaId}`,
       ponto: `educa_admin_ponto_v1_${escolaId}`,
+      memorandos: `educa_admin_memorandos_v1_${escolaId}`,
       biometria: `educa_admin_biometria_v1_${escolaId}`,
       syncedBackend: `educa_admin_backend_synced_v1_${escolaId}`,
     }),
@@ -977,6 +978,15 @@ export function useAdministrativoData() {
     }
   });
 
+  const [memorandos, setMemorandos] = useState(() => {
+    try {
+      const raw = localStorage.getItem(`educa_admin_memorandos_v1_${escolaId}`);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+
   // Atualizar cache local automaticamente
   useEffect(() => {
     try {
@@ -1001,6 +1011,12 @@ export function useAdministrativoData() {
       localStorage.setItem(STORAGE_KEYS.ponto, JSON.stringify(pontoDiario));
     } catch {}
   }, [pontoDiario, STORAGE_KEYS.ponto]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.memorandos, JSON.stringify(memorandos));
+    } catch {}
+  }, [memorandos, STORAGE_KEYS.memorandos]);
 
   useEffect(() => {
     try {
@@ -1099,6 +1115,9 @@ export function useAdministrativoData() {
         }
         if (admData.pontoDiario && typeof admData.pontoDiario === "object") {
           setPontoDiario((prev) => ({ ...prev, ...admData.pontoDiario }));
+        }
+        if (Array.isArray(admData.memorandos)) {
+          setMemorandos(admData.memorandos);
         }
         if (admData.configUnidade && typeof admData.configUnidade === "object") {
           try {
@@ -1887,10 +1906,77 @@ export function useAdministrativoData() {
     return mapa;
   }, [servidores, ocorrencias]);
 
+  // ── Ações CRUD de Memorandos (Persistidas no MySQL via /api/administrativo/memorandos) ──
+  const salvarMemorando = useCallback(
+    async (dadosMemo) => {
+      const usrLogado = getUsuarioLogadoRastreabilidade();
+      const srv = servidores.find((s) => s.id === dadosMemo.servidor_id);
+      const hojeStr = new Date().toISOString().slice(0, 10);
+      const tsIso = new Date().toISOString();
+
+      const idFinal =
+        dadosMemo.id ||
+        `memo-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+
+      const memoFinal = {
+        ...(memorandos.find((m) => m.id === idFinal) || {}),
+        ...dadosMemo,
+        id: idFinal,
+        tipo_memo: dadosMemo.tipo_memo || "devolucao",
+        servidor_nome:
+          dadosMemo.servidor_nome || srv?.nome || "SERVIDOR(A)",
+        criado_por: dadosMemo.criado_por || usrLogado.resumo,
+        criado_em: dadosMemo.criado_em || hojeStr,
+        atualizado_em: tsIso,
+      };
+
+      setMemorandos((prev) => {
+        const existe = prev.some((m) => m.id === idFinal);
+        if (existe) {
+          return prev.map((m) => (m.id === idFinal ? memoFinal : m));
+        }
+        return [memoFinal, ...prev];
+      });
+
+      if (escolaId && escolaId !== "default") {
+        try {
+          await api.post("/api/administrativo/memorandos", {
+            escola_id: Number(escolaId),
+            memorando: memoFinal,
+          });
+        } catch (err) {
+          console.error("[Administrativo] Erro ao salvar memorando no backend:", err);
+        }
+      }
+
+      return { ok: true, memorando: memoFinal };
+    },
+    [servidores, memorandos, escolaId]
+  );
+
+  const excluirMemorando = useCallback(
+    async (id) => {
+      setMemorandos((prev) => prev.filter((m) => m.id !== id));
+      if (escolaId && escolaId !== "default" && id) {
+        try {
+          await api.delete(
+            `/api/administrativo/memorandos/${encodeURIComponent(
+              id
+            )}?escola_id=${escolaId}`
+          );
+        } catch (err) {
+          console.error("[Administrativo] Erro ao excluir memorando no backend:", err);
+        }
+      }
+    },
+    [escolaId]
+  );
+
   return {
     servidores,
     ocorrencias,
     pontoDiario,
+    memorandos,
     statsPorServidor,
     loading,
     biometriaAtiva,
@@ -1906,5 +1992,7 @@ export function useAdministrativoData() {
     registrarPontoServidor,
     registrarPontoColetivo,
     marcarTodosPresentesNoDia,
+    salvarMemorando,
+    excluirMemorando,
   };
 }

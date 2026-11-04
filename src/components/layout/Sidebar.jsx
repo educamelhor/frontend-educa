@@ -1935,6 +1935,23 @@ export default function Sidebar({ isOpen, onClose }) {
                   </Link>
                 </li>
                 )}
+
+                {(hasModulo('administrativo.memorando') || hasModulo('administrativo')) && (
+                <li>
+                  <Link
+                    to="/administrativo/memorando"
+                    className={getSubmenuLinkClasses('/administrativo/memorando')}
+                    style={{
+                      background: isActive('/administrativo/memorando')
+                        ? 'linear-gradient(90deg, rgba(59,130,246,0.18), transparent)'
+                        : undefined,
+                    }}
+                  >
+                    <ClipboardDocumentListIcon className="h-5 w-5 mr-2" style={{ color: isActive('/administrativo/memorando') ? '#60a5fa' : undefined }} />
+                    <span className="flex-1">Memorando</span>
+                  </Link>
+                </li>
+                )}
               </ul>
             )}
           </>

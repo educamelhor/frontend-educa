@@ -161,6 +161,7 @@ const MODULOS_TREE = [
       { id: 'administrativo.frequencia', label: 'BIOMETRIA' },
       { id: 'administrativo.ocorrencias', label: 'LANÇAMENTOS' },
       { id: 'administrativo.relatorios', label: 'IMPRIMIR / PDF' },
+      { id: 'administrativo.memorando', label: 'MEMORANDO' },
     ]
   },
 ];

@@ -110,6 +110,7 @@ export default function MemorandoDevolucaoOficialSEEDF({
 
   const cidadeUf =
     memorando.cidade_uf ||
+    dadosUnidade.memoCidadeUf ||
     dadosUnidade.cidadeUf ||
     "Planaltina-DF";
 
@@ -120,14 +121,19 @@ export default function MemorandoDevolucaoOficialSEEDF({
 
   const nomeUnidadeEscolar =
     memorando.unidade_escolar ||
+    dadosUnidade.memoUnidadeEscolar ||
     dadosUnidade.nomeEscolaExtensoMemo ||
+    dadosUnidade.nomeEscola ||
     "Centro de Ensino Fundamental 04 de Planaltina - Colégio Cívico-Militar do Distrito Federal";
 
   const destinatario =
-    memorando.destinatario || "UNIDADE REGIONAL DE GESTAO DE PESSOAS";
+    memorando.destinatario ||
+    dadosUnidade.memoDestinatario ||
+    "UNIDADE REGIONAL DE GESTAO DE PESSOAS";
 
   const codigoUnidade =
     memorando.codigo_unidade ||
+    dadosUnidade.memoCodigoUnidade ||
     dadosUnidade.codigoExercicio ||
     "990230000043";
 

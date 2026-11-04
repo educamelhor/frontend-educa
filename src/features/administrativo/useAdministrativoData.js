@@ -1122,7 +1122,6 @@ export function useAdministrativoData() {
         if (admData.configUnidade && typeof admData.configUnidade === "object") {
           try {
             const cfgStr = JSON.stringify(admData.configUnidade);
-            localStorage.setItem("educa_admin_seedf_unidade_cfg_v1", cfgStr);
             localStorage.setItem(
               `educa_admin_seedf_unidade_cfg_v1_${escolaId}`,
               cfgStr

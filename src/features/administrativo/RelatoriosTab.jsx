@@ -122,13 +122,11 @@ export default function RelatoriosTab({
   const [idsSelecionadosLote, setIdsSelecionadosLote] = useState([]);
   const [renderizandoLoteDOM, setRenderizandoLoteDOM] = useState(false);
 
-  // Configuração institucional da Unidade Escolar (UA / CRE / Código SIGEP)
+  // Configuração institucional da Unidade Escolar (UA / CRE / Código SIGEP) — isolada por escola_id
   const [dadosUnidade, setDadosUnidade] = useState(() => {
     try {
       const escId = localStorage.getItem("escola_id") || "default";
-      const salvo =
-        localStorage.getItem(`${STORAGE_KEY_UNIDADE}_${escId}`) ||
-        localStorage.getItem(STORAGE_KEY_UNIDADE);
+      const salvo = localStorage.getItem(`${STORAGE_KEY_UNIDADE}_${escId}`);
       if (salvo) {
         const parsed = JSON.parse(salvo);
         if (
@@ -174,7 +172,6 @@ export default function RelatoriosTab({
     try {
       const escId = localStorage.getItem("escola_id") || "default";
       const cfgStr = JSON.stringify(dadosUnidade);
-      localStorage.setItem(STORAGE_KEY_UNIDADE, cfgStr);
       localStorage.setItem(`${STORAGE_KEY_UNIDADE}_${escId}`, cfgStr);
     } catch {
       // ignore

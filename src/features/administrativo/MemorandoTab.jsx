@@ -33,6 +33,7 @@ import MemorandoDevolucaoOficialSEEDF, {
   formatarLocalDataSEEDF,
 } from "./MemorandoDevolucaoOficialSEEDF";
 import { normalizarTurno } from "./useAdministrativoData";
+import api from "../../services/api";
 
 const STORAGE_KEY_UNIDADE = "educa_admin_seedf_unidade_cfg_v1";
 
@@ -170,25 +171,51 @@ export default function MemorandoTab({
 }) {
   const memoPrintRef = useRef(null);
 
-  // Carrega configuração institucional da unidade escolar
-  const dadosUnidade = useMemo(() => {
+  // Carrega e mantém sincronizada a configuração institucional da unidade escolar (multi-escola por escola_id)
+  const [dadosUnidade, setDadosUnidade] = useState(() => {
     try {
       const escId = localStorage.getItem("escola_id") || "default";
-      const raw =
-        localStorage.getItem(`${STORAGE_KEY_UNIDADE}_${escId}`) ||
-        localStorage.getItem(STORAGE_KEY_UNIDADE);
+      const raw = localStorage.getItem(`${STORAGE_KEY_UNIDADE}_${escId}`);
       if (raw) return JSON.parse(raw);
     } catch {
       // ignore
     }
+    const nomeStorage = (
+      localStorage.getItem("nome_escola") ||
+      localStorage.getItem("escola_nome") ||
+      ""
+    ).trim();
     return {
       codigoExercicio: "990230000043",
-      nomeEscola: "CENTRO DE ENSINO FUNDAMENTAL 04 DE PLANALTINA - COLEGIO CM",
+      nomeEscola:
+        nomeStorage ||
+        "CENTRO DE ENSINO FUNDAMENTAL 04 DE PLANALTINA - COLEGIO CM",
     };
+  });
+
+  // Atualiza automaticamente quando o bootstrap do MySQL (/api/administrativo/bootstrap) terminar de carregar
+  useEffect(() => {
+    const onCfgUpdated = (e) => {
+      if (e?.detail && typeof e.detail === "object") {
+        setDadosUnidade((prev) => ({ ...prev, ...e.detail }));
+      }
+    };
+    window.addEventListener("educa:unidade-cfg-updated", onCfgUpdated);
+    return () =>
+      window.removeEventListener("educa:unidade-cfg-updated", onCfgUpdated);
   }, []);
 
+  // Nome da Unidade Escolar padrão no cabeçalho do Memorando (respeita personalização salva pela escola)
   const nomeEscolaExtensoPadrao = useMemo(() => {
-    const raw = String(dadosUnidade?.nomeEscola || "").trim();
+    const salvoMemo = String(dadosUnidade?.memoUnidadeEscolar || "").trim();
+    if (salvoMemo) return salvoMemo;
+
+    const raw = String(
+      dadosUnidade?.nomeEscola ||
+        localStorage.getItem("nome_escola") ||
+        localStorage.getItem("escola_nome") ||
+        ""
+    ).trim();
     if (
       !raw ||
       raw.toUpperCase().includes("CEF04") ||
@@ -198,6 +225,68 @@ export default function MemorandoTab({
     }
     return raw;
   }, [dadosUnidade]);
+
+  const destinatarioPadrao = useMemo(() => {
+    const salvo = String(dadosUnidade?.memoDestinatario || "").trim();
+    return salvo || "UNIDADE REGIONAL DE GESTAO DE PESSOAS";
+  }, [dadosUnidade]);
+
+  const codigoUnidadePadrao = useMemo(() => {
+    const salvoMemo = String(dadosUnidade?.memoCodigoUnidade || "").trim();
+    if (salvoMemo) return salvoMemo;
+    return String(dadosUnidade?.codigoExercicio || "990230000043").trim();
+  }, [dadosUnidade]);
+
+  const cidadeUfPadrao = useMemo(() => {
+    const salvo = String(dadosUnidade?.memoCidadeUf || "").trim();
+    return salvo || "Planaltina-DF";
+  }, [dadosUnidade]);
+
+  // Persiste o cabeçalho personalizado da escola (Item 4 do modal) no MySQL (por escola_id) e no cache local da escola
+  const salvarCabecalhoPadraoUnidade = async (
+    camposCabecalho = {},
+    exibirToast = false
+  ) => {
+    const escId = localStorage.getItem("escola_id") || "default";
+    const novoCfg = {
+      ...dadosUnidade,
+      ...camposCabecalho,
+    };
+    if (camposCabecalho.memoCodigoUnidade) {
+      novoCfg.codigoExercicio = camposCabecalho.memoCodigoUnidade;
+    }
+
+    setDadosUnidade(novoCfg);
+    try {
+      const cfgStr = JSON.stringify(novoCfg);
+      localStorage.setItem(`${STORAGE_KEY_UNIDADE}_${escId}`, cfgStr);
+      window.dispatchEvent(
+        new CustomEvent("educa:unidade-cfg-updated", { detail: novoCfg })
+      );
+    } catch {
+      // ignore
+    }
+
+    if (escId && escId !== "default") {
+      try {
+        await api.put("/api/administrativo/config-unidade", {
+          escola_id: Number(escId),
+          config: novoCfg,
+        });
+      } catch (err) {
+        console.error(
+          "[Memorando] Erro ao salvar cabeçalho padrão da unidade no backend:",
+          err
+        );
+      }
+    }
+
+    if (exibirToast) {
+      toast.success(
+        "Cabeçalho padrão desta escola salvo para os próximos memorandos!"
+      );
+    }
+  };
 
   const [buscaLista, setBuscaLista] = useState("");
   const [memoSelecionadoId, setMemoSelecionadoId] = useState(
@@ -225,12 +314,12 @@ export default function MemorandoTab({
       id: "",
       tipo_memo: "devolucao",
       numero_memo: `SN/${anoAtual}`,
-      cidade_uf: "Planaltina-DF",
+      cidade_uf: cidadeUfPadrao,
       data_emissao: hojeISO,
       local_data_custom: "",
       unidade_escolar: nomeEscolaExtensoPadrao,
-      destinatario: "UNIDADE REGIONAL DE GESTAO DE PESSOAS",
-      codigo_unidade: dadosUnidade?.codigoExercicio || "990230000043",
+      destinatario: destinatarioPadrao,
+      codigo_unidade: codigoUnidadePadrao,
       estilo_logo: "buriti_classico", // "buriti_classico" | "brasao_gdf"
       servidor_id: srv?.id || "",
       servidor_nome: srv ? String(srv.nome || "").toUpperCase() : "",
@@ -436,6 +525,25 @@ export default function MemorandoTab({
       toast.error("Informe ou selecione o(a) Professor(a) / Servidor(a).");
       return;
     }
+
+    // Salva automaticamente o Cabeçalho da Unidade Escolar & Destinatário (Item 4)
+    // como padrão desta escola (multi-tenant por escola_id no MySQL e cache local)
+    await salvarCabecalhoPadraoUnidade(
+      {
+        memoUnidadeEscolar: String(
+          formMemo.unidade_escolar || nomeEscolaExtensoPadrao
+        ).trim(),
+        memoDestinatario: String(
+          formMemo.destinatario || destinatarioPadrao
+        ).trim(),
+        memoCodigoUnidade: String(
+          formMemo.codigo_unidade || codigoUnidadePadrao
+        ).trim(),
+        memoCidadeUf: String(formMemo.cidade_uf || cidadeUfPadrao).trim(),
+      },
+      false
+    );
+
     const res = await onSalvarMemorando?.(formMemo);
     if (res?.memorando?.id) {
       setMemoSelecionadoId(res.memorando.id);
@@ -484,11 +592,11 @@ export default function MemorandoTab({
         id: "preview-seedf",
         _isPreview: true,
         numero_memo: `SN/${anoAtual}`,
-        cidade_uf: "Planaltina-DF",
+        cidade_uf: cidadeUfPadrao,
         data_emissao: hojeISO,
         unidade_escolar: nomeEscolaExtensoPadrao,
-        destinatario: "UNIDADE REGIONAL DE GESTAO DE PESSOAS",
-        codigo_unidade: dadosUnidade?.codigoExercicio || "990230000043",
+        destinatario: destinatarioPadrao,
+        codigo_unidade: codigoUnidadePadrao,
         estilo_logo: "buriti_classico",
         servidor_id: srvDemo.id,
         servidor_nome: String(srvDemo.nome || "").toUpperCase(),
@@ -520,11 +628,11 @@ export default function MemorandoTab({
       id: "preview-seedf",
       _isPreview: true,
       numero_memo: "SN/2026",
-      cidade_uf: "Planaltina-DF",
+      cidade_uf: cidadeUfPadrao,
       data_emissao: "2026-11-03",
       unidade_escolar: nomeEscolaExtensoPadrao,
-      destinatario: "UNIDADE REGIONAL DE GESTAO DE PESSOAS",
-      codigo_unidade: dadosUnidade?.codigoExercicio || "990230000043",
+      destinatario: destinatarioPadrao,
+      codigo_unidade: codigoUnidadePadrao,
       estilo_logo: "buriti_classico",
       servidor_nome: "KARLA ALVES CAMPOS",
       matricula: "70757690",
@@ -554,7 +662,9 @@ export default function MemorandoTab({
     anoAtual,
     hojeISO,
     nomeEscolaExtensoPadrao,
-    dadosUnidade,
+    destinatarioPadrao,
+    codigoUnidadePadrao,
+    cidadeUfPadrao,
   ]);
 
   // Motor dedicado de Impressão / Salvar PDF A4 1:1
@@ -1587,12 +1697,44 @@ export default function MemorandoTab({
                 </div>
               </div>
 
-              {/* ── SEÇÃO 4: CABEÇALHO DA UNIDADE ESCOLAR E DESTINATÁRIO ── */}
+              {/* ── SEÇÃO 4: CABEÇALHO DA UNIDADE ESCOLAR E DESTINATÁRIO (MULTI-ESCOLA) ── */}
               <div className="p-4 rounded-2xl bg-emerald-50/40 border border-emerald-200 space-y-3">
-                <label className="text-xs font-extrabold text-emerald-950 uppercase tracking-wider flex items-center gap-1.5">
-                  <BuildingLibraryIcon className="h-4 w-4 text-emerald-700" />
-                  <span>4. Cabeçalho da Unidade Escolar & Destinatário</span>
-                </label>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <label className="text-xs font-extrabold text-emerald-950 uppercase tracking-wider flex items-center gap-1.5">
+                      <BuildingLibraryIcon className="h-4 w-4 text-emerald-700" />
+                      <span>4. Cabeçalho da Unidade Escolar & Destinatário</span>
+                    </label>
+                    <p className="text-[11px] text-emerald-800 mt-0.5">
+                      Configuração personalizada desta escola (salva automaticamente no banco para a emissão dos próximos memorandos).
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      salvarCabecalhoPadraoUnidade(
+                        {
+                          memoUnidadeEscolar: String(
+                            formMemo.unidade_escolar || ""
+                          ).trim(),
+                          memoDestinatario: String(
+                            formMemo.destinatario || ""
+                          ).trim(),
+                          memoCodigoUnidade: String(
+                            formMemo.codigo_unidade || ""
+                          ).trim(),
+                          memoCidadeUf: String(formMemo.cidade_uf || "").trim(),
+                        },
+                        true
+                      )
+                    }
+                    className="px-3 py-1.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-extrabold shadow-sm transition inline-flex items-center gap-1.5 self-start sm:self-auto flex-shrink-0"
+                  >
+                    <CheckCircleIcon className="h-3.5 w-3.5 stroke-[2.5]" />
+                    <span>Salvar Cabeçalho Padrão da Escola</span>
+                  </button>
+                </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
                   <div className="sm:col-span-12">

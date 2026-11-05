@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import api from "../../../services/api";
 import {
   CalendarDaysIcon,
@@ -1362,6 +1363,26 @@ export default function Chamada() {
                 </span>
               )}
             </button>
+            <Link
+              to="/professores/horario"
+              style={{
+                padding: "0.45rem 0.95rem",
+                borderRadius: "0.55rem",
+                fontSize: "0.76rem",
+                fontWeight: 800,
+                textDecoration: "none",
+                background: "rgba(99, 102, 241, 0.2)",
+                border: "1px solid rgba(129, 140, 248, 0.35)",
+                color: "#c7d2fe",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "5px",
+              }}
+              title="Consultar minha grade semanal de aulas"
+            >
+              <CalendarDaysIcon style={{ width: 15, height: 15 }} />
+              <span>Meu Horário</span>
+            </Link>
           </div>
         </div>
 

@@ -123,6 +123,7 @@ import ConfiguracoesPedagogicas from "./features/secretaria/horarios/Configuraco
 
 // ✅ NOVO IMPORT — EscopoStep (página inicial do módulo Horários)
 import EscopoStep from "./features/secretaria/horarios/EscopoStep.jsx";
+import MeuHorarioProfessor from "./features/professores/horario/MeuHorarioProfessor.jsx";
 
 import MonitoramentoAlertasTeste from "./features/monitoramento/MonitoramentoAlertasTeste.jsx";
 
@@ -466,6 +467,7 @@ export default function App() {
           <Route path="/professores/avaliacoes"   element={<RequireModulo modulo="professores"><Avaliacoes /></RequireModulo>} />
           <Route path="/professores/conteudos"    element={<RequireModulo modulo="professores"><ConteudosProfessor /></RequireModulo>} />
           <Route path="/professores/chamada"      element={<RequireModulo modulo="professores"><ChamadaProfessor /></RequireModulo>} />
+          <Route path="/professores/horario"      element={<RequireModulo modulo="professores"><MeuHorarioProfessor /></RequireModulo>} />
           <Route path="/professores/sala-recurso" element={<RequireModulo modulo="professores"><SalaRecursoProfessor /></RequireModulo>} />
           <Route path="/professores/provas"       element={<RequireModulo modulo="professores"><ProvasEmBreve /></RequireModulo>} />
           <Route path="/pedagogico/provas"      element={<ProvasEmBreve />} />

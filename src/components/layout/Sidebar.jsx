@@ -625,6 +625,26 @@ export default function Sidebar({ isOpen, onClose }) {
                 </Link>
               </li>
               )}
+              {(hasModulo('professores.horario') || hasModulo('professores')) && (
+              <li>
+                <Link
+                  to="/professores/horario"
+                  className={getSubmenuLinkClasses('/professores/horario')}
+                >
+                  <ClockIcon className="h-5 w-5 mr-2" />
+                  <span className="flex-1">Meu Horário</span>
+                  <span style={{
+                    fontSize: '0.5rem',
+                    fontWeight: 800,
+                    background: 'linear-gradient(135deg, #10b981, #059669)',
+                    color: '#fff',
+                    padding: '1px 5px',
+                    borderRadius: '6px',
+                    letterSpacing: '0.5px',
+                  }}>NOVO</span>
+                </Link>
+              </li>
+              )}
               {hasModulo('professores.conteudos') && (
               <li>
                 <Link
@@ -728,6 +748,26 @@ export default function Sidebar({ isOpen, onClose }) {
                       fontSize: '0.5rem',
                       fontWeight: 800,
                       background: 'linear-gradient(135deg, #06b6d4, #3b82f6)',
+                      color: '#fff',
+                      padding: '1px 5px',
+                      borderRadius: '6px',
+                      letterSpacing: '0.5px',
+                    }}>NOVO</span>
+                  </Link>
+                </li>
+                )}
+                {(hasModulo('professores.horario') || hasModulo('professores')) && (
+                <li>
+                  <Link
+                    to="/professores/horario"
+                    className={getSubmenuLinkClasses('/professores/horario')}
+                  >
+                    <ClockIcon className="h-5 w-5 mr-2" />
+                    <span className="flex-1">Meu Horário</span>
+                    <span style={{
+                      fontSize: '0.5rem',
+                      fontWeight: 800,
+                      background: 'linear-gradient(135deg, #10b981, #059669)',
                       color: '#fff',
                       padding: '1px 5px',
                       borderRadius: '6px',

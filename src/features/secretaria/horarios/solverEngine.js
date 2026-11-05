@@ -324,18 +324,23 @@ function solverWorkerBootstrap(workerScope) {
     return uniq((Array.isArray(raw) ? raw : []).map(x => toInt(x, 0)).filter(Boolean));
   }
 
-  function buildModIndex(payload) {
+  function buildModListMap(payload) {
     const mod = Array.isArray(payload?.modulacao) ? payload.modulacao : [];
-    const idx = new Map();
+    const map = new Map();
     for (const m of mod) {
       const turmaId = toInt(m?.turma_id ?? m?.turmaId, 0);
       const discId = toInt(m?.disciplina_id ?? m?.disciplinaId, 0);
       const profId = toInt(m?.professor_id ?? m?.professorId, 0);
+      const aulas = clamp(toInt(m?.aulas_semanais ?? m?.aulas ?? m?.carga ?? 0, 0), 0, 60);
       if (!turmaId || !discId || !profId) continue;
       const key = `${turmaId}|${discId}`;
-      if (!idx.has(key)) idx.set(key, profId);
+      if (!map.has(key)) map.set(key, []);
+      const list = map.get(key);
+      if (!list.some(it => it.professor_id === profId)) {
+        list.push({ professor_id: profId, aulas });
+      }
     }
-    return idx;
+    return map;
   }
 
   function normalizeDemandas(payload) {
@@ -348,27 +353,68 @@ function solverWorkerBootstrap(workerScope) {
       [];
 
     const list = Array.isArray(raw) ? raw : [];
-    const modIdx = buildModIndex(payload);
+    const modListMap = buildModListMap(payload);
     const out = [];
 
     for (const it of list) {
       const turmaId = toInt(it?.turma_id ?? it?.turmaId, 0);
       const discId = toInt(it?.disciplina_id ?? it?.disciplinaId, 0);
-      let profId = toInt(it?.professor_id ?? it?.professorId, 0);
-      if (!profId && turmaId && discId) {
-        profId = toInt(modIdx.get(`${turmaId}|${discId}`), 0);
-      }
       const carga = toInt(
         it?.aulas_semanais ?? it?.carga ?? it?.carga_semanal ?? it?.qtd ?? it?.quantidade ?? 0,
         0
       );
-      if (!turmaId || !discId || !profId || carga <= 0) continue;
-      out.push({
-        turma_id: turmaId,
-        disciplina_id: discId,
-        professor_id: profId,
-        aulas_semanais: carga,
-      });
+      if (!turmaId || !discId || carga <= 0) continue;
+
+      const explicitProf = toInt(it?.professor_id ?? it?.professorId, 0);
+      if (explicitProf > 0) {
+        out.push({
+          turma_id: turmaId,
+          disciplina_id: discId,
+          professor_id: explicitProf,
+          aulas_semanais: carga,
+          co_professores: [],
+        });
+        continue;
+      }
+
+      const mods = modListMap.get(`${turmaId}|${discId}`) || [];
+      if (mods.length === 0) continue;
+
+      if (mods.length === 1) {
+        out.push({
+          turma_id: turmaId,
+          disciplina_id: discId,
+          professor_id: mods[0].professor_id,
+          aulas_semanais: carga,
+          co_professores: [],
+        });
+      } else {
+        const sumAulas = mods.reduce((acc, m) => acc + (m.aulas || 0), 0);
+        if (sumAulas > 0 && sumAulas <= carga) {
+          let allocated = 0;
+          mods.forEach((m, idx) => {
+            const qtd = idx === mods.length - 1 ? Math.max(0, carga - allocated) : Math.min(m.aulas || 1, carga - allocated);
+            if (qtd > 0) {
+              out.push({
+                turma_id: turmaId,
+                disciplina_id: discId,
+                professor_id: m.professor_id,
+                aulas_semanais: qtd,
+                co_professores: [],
+              });
+              allocated += qtd;
+            }
+          });
+        } else {
+          out.push({
+            turma_id: turmaId,
+            disciplina_id: discId,
+            professor_id: mods[0].professor_id,
+            aulas_semanais: carga,
+            co_professores: mods.slice(1).map(m => m.professor_id),
+          });
+        }
+      }
     }
     return out;
   }
@@ -389,6 +435,9 @@ function solverWorkerBootstrap(workerScope) {
       const pId = d.professor_id;
       const load = d.aulas_restantes !== undefined ? d.aulas_restantes : d.aulas_semanais;
       profTotalLoad.set(pId, (profTotalLoad.get(pId) || 0) + load);
+      for (const cp of d.co_professores || []) {
+        profTotalLoad.set(cp, (profTotalLoad.get(cp) || 0) + load);
+      }
       if (!profTurmasCount.has(pId)) profTurmasCount.set(pId, new Set());
       profTurmasCount.get(pId).add(d.turma_id);
     }
@@ -403,8 +452,13 @@ function solverWorkerBootstrap(workerScope) {
       const count = d.aulas_restantes !== undefined ? d.aulas_restantes : d.aulas_semanais;
       if (count <= 0) continue;
 
+      const coProfs = Array.isArray(d.co_professores) ? d.co_professores : [];
       const pLoad = profTotalLoad.get(d.professor_id) || 0;
-      const pSlack = profSlackMap.get(d.professor_id) ?? 30;
+      const baseSlack = profSlackMap.get(d.professor_id) ?? 30;
+      const pSlack =
+        coProfs.length > 0
+          ? Math.min(baseSlack, ...coProfs.map(cp => profSlackMap.get(cp) ?? 30)) - 8
+          : baseSlack;
       const pTurmas = profTurmasCount.get(d.professor_id)?.size || 1;
       const groupJitter = randomize ? Math.random() * 5.0 : 0;
 
@@ -430,6 +484,7 @@ function solverWorkerBootstrap(workerScope) {
           turma_id: d.turma_id,
           disciplina_id: d.disciplina_id,
           professor_id: d.professor_id,
+          co_professores: coProfs,
           _weight: weight,
         });
       }
@@ -474,11 +529,17 @@ function solverWorkerBootstrap(workerScope) {
   }
 
   function clearSlot(gradePorTurma, gradePorProfessor, turmaId, profId, d, p) {
+    const cellT = gradePorTurma?.[turmaId]?.[d]?.[p];
+    if (Array.isArray(cellT?.co_professores)) {
+      for (const cp of cellT.co_professores) {
+        if (gradePorProfessor[cp]?.[d]) gradePorProfessor[cp][d][p] = null;
+      }
+    }
     if (gradePorTurma[turmaId]?.[d]) gradePorTurma[turmaId][d][p] = null;
     if (gradePorProfessor[profId]?.[d]) gradePorProfessor[profId][d][p] = null;
   }
 
-  function setSlot(gradePorTurma, gradePorProfessor, turmaId, profId, d, p, discId, locked = false) {
+  function setSlot(gradePorTurma, gradePorProfessor, turmaId, profId, d, p, discId, locked = false, coProfessores = []) {
     ensurePath(gradePorTurma, turmaId, d);
     ensurePath(gradePorProfessor, profId, d);
     const cellT = { disciplina_id: discId, professor_id: profId };
@@ -486,6 +547,18 @@ function solverWorkerBootstrap(workerScope) {
     if (locked) {
       cellT.locked = true;
       cellP.locked = true;
+    }
+    if (Array.isArray(coProfessores) && coProfessores.length > 0) {
+      cellT.co_professores = coProfessores;
+      for (const cp of coProfessores) {
+        ensurePath(gradePorProfessor, cp, d);
+        gradePorProfessor[cp][d][p] = {
+          turma_id: turmaId,
+          disciplina_id: discId,
+          co_docencia: true,
+          ...(locked ? { locked: true } : {}),
+        };
+      }
     }
     gradePorTurma[turmaId][d][p] = cellT;
     gradePorProfessor[profId][d][p] = cellP;
@@ -500,6 +573,7 @@ function solverWorkerBootstrap(workerScope) {
     turmaId,
     professorId,
     disciplinaId,
+    coProfessores = [],
     rc01MaxConsecutivas,
     rc02Cfg,
     regrasGerais,
@@ -515,6 +589,17 @@ function solverWorkerBootstrap(workerScope) {
         if (turmaGrade?.[dia]?.[periodo]) continue;
         if (profGrade?.[dia]?.[periodo]) continue;
         if (!professorPode(dispoIdx, professorId, dia, periodo)) continue;
+
+        if (Array.isArray(coProfessores) && coProfessores.length > 0) {
+          let coOk = true;
+          for (const cp of coProfessores) {
+            if (gradePorProfessor?.[cp]?.[dia]?.[periodo] || !professorPode(dispoIdx, cp, dia, periodo)) {
+              coOk = false;
+              break;
+            }
+          }
+          if (!coOk) continue;
+        }
 
         const score = computeSlotScore({
           turmaGrade,
@@ -880,6 +965,7 @@ function solverWorkerBootstrap(workerScope) {
     regrasGerais,
     turno,
     preferencias,
+    coProfessores = null,
   }) {
     const best = findBestFreeSlot({
       gradePorTurma,
@@ -895,11 +981,16 @@ function solverWorkerBootstrap(workerScope) {
       regrasGerais,
       turno,
       preferencias,
+      coProfessores,
     });
 
     if (best) {
-      setSlot(gradePorTurma, gradePorProfessor, turmaId, professorId, best.dia, best.periodo, disciplinaId);
+      setSlot(gradePorTurma, gradePorProfessor, turmaId, professorId, best.dia, best.periodo, disciplinaId, false, coProfessores);
       return true;
+    }
+
+    if (Array.isArray(coProfessores) && coProfessores.length > 0) {
+      return false;
     }
 
     if (trySingleSwap(gradePorTurma, gradePorProfessor, dispoIdx, turmaId, professorId, disciplinaId, diasList, periodosPorDia)) {
@@ -944,7 +1035,7 @@ function solverWorkerBootstrap(workerScope) {
 
     for (let step = 0; step < maxSteps && queue.length > 0; step++) {
       const target = queue.shift();
-      const { turma_id: tId, disciplina_id: dId, professor_id: pId } = target;
+      const { turma_id: tId, disciplina_id: dId, professor_id: pId, co_professores: coProfs } = target;
 
       const placedDirect = tryPlaceWithAllOperators({
         gradePorTurma,
@@ -960,6 +1051,7 @@ function solverWorkerBootstrap(workerScope) {
         regrasGerais,
         turno,
         preferencias,
+        coProfessores: coProfs || null,
       });
 
       if (placedDirect) {
@@ -968,6 +1060,11 @@ function solverWorkerBootstrap(workerScope) {
           bestTurmaSnap = cloneGradeMap(gradePorTurma);
           bestProfSnap = cloneGradeMap(gradePorProfessor);
         }
+        continue;
+      }
+
+      if (Array.isArray(coProfs) && coProfs.length > 0) {
+        queue.push(target);
         continue;
       }
 
@@ -1005,21 +1102,24 @@ function solverWorkerBootstrap(workerScope) {
       if (cellT) {
         const oldProf = cellT.professor_id;
         const oldDisc = cellT.disciplina_id;
+        const oldCo = cellT.co_professores || null;
         clearSlot(gradePorTurma, gradePorProfessor, tId, oldProf, d, p);
         tabuMap.set(`${tId}|${oldProf}|${d}|${p}`, step + TABU_TENURE);
-        ejected.push({ turma_id: tId, disciplina_id: oldDisc, professor_id: oldProf });
+        ejected.push({ turma_id: tId, disciplina_id: oldDisc, professor_id: oldProf, co_professores: oldCo });
       }
       if (cellP && Number(cellP.turma_id) !== Number(tId)) {
         const oldTurma = cellP.turma_id;
         const oldDisc = cellP.disciplina_id;
-        if (gradePorTurma[oldTurma]?.[d]?.[p]) {
-          clearSlot(gradePorTurma, gradePorProfessor, oldTurma, pId, d, p);
+        const oldCell = gradePorTurma[oldTurma]?.[d]?.[p];
+        if (oldCell) {
+          const oldCo = oldCell.co_professores || null;
+          clearSlot(gradePorTurma, gradePorProfessor, oldTurma, oldCell.professor_id, d, p);
           tabuMap.set(`${oldTurma}|${pId}|${d}|${p}`, step + TABU_TENURE);
-          ejected.push({ turma_id: oldTurma, disciplina_id: oldDisc, professor_id: pId });
+          ejected.push({ turma_id: oldTurma, disciplina_id: oldDisc, professor_id: oldCell.professor_id, co_professores: oldCo });
         }
       }
 
-      setSlot(gradePorTurma, gradePorProfessor, tId, pId, d, p, dId);
+      setSlot(gradePorTurma, gradePorProfessor, tId, pId, d, p, dId, false, coProfs || null);
       tabuMap.set(`${tId}|${pId}|${d}|${p}`, step + TABU_TENURE);
 
       for (const ej of ejected) {
@@ -1037,6 +1137,7 @@ function solverWorkerBootstrap(workerScope) {
           regrasGerais,
           turno,
           preferencias,
+          coProfessores: ej.co_professores || null,
         });
         if (!okEj) queue.push(ej);
       }
@@ -1188,6 +1289,7 @@ function solverWorkerBootstrap(workerScope) {
 
     const allProfIds = uniq([
       ...demandasNorm.map(d => d.professor_id),
+      ...demandasNorm.flatMap(d => Array.isArray(d.co_professores) ? d.co_professores : []),
       ...validFixos.map(f => f.professor_id),
       ...externalProfFixos.map(f => f.professor_id),
     ]);
@@ -1223,7 +1325,7 @@ function solverWorkerBootstrap(workerScope) {
 
     let unplaced = [];
     for (const lesson of lessons) {
-      const { turma_id: turmaId, disciplina_id: disciplinaId, professor_id: professorId } = lesson;
+      const { turma_id: turmaId, disciplina_id: disciplinaId, professor_id: professorId, co_professores: coProfessores } = lesson;
 
       if (!gradePorTurma[turmaId]) {
         gradePorTurma[turmaId] = initEmptyGridForEntity(diasList, periodosPorDia);
@@ -1246,6 +1348,7 @@ function solverWorkerBootstrap(workerScope) {
         regrasGerais,
         turno,
         preferencias: payload?.preferencias,
+        coProfessores: coProfessores || null,
       });
 
       if (!ok) unplaced.push(lesson);

@@ -1800,7 +1800,24 @@ function solverWorkerBootstrap(workerScope) {
                 clearSlot(gradePorTurma, gradePorProfessor, tId, profN, d, swapWith);
                 setSlot(gradePorTurma, gradePorProfessor, tId, profM, d, swapWith, discM);
                 setSlot(gradePorTurma, gradePorProfessor, tId, profN, d, moveFrom, discN);
-                break;
+
+                const okIntra = isTurmaDayPedagogicallyValid({
+                  turmaGrade,
+                  dia: d,
+                  periodosPorDia,
+                  rc01MaxConsecutivas,
+                  rc02Cfg,
+                  regrasGerais,
+                  strictPedagogical: true,
+                });
+                if (okIntra) {
+                  break;
+                }
+                // Reverte caso tenha separado outra disciplina no mesmo dia
+                clearSlot(gradePorTurma, gradePorProfessor, tId, profM, d, swapWith);
+                clearSlot(gradePorTurma, gradePorProfessor, tId, profN, d, moveFrom);
+                setSlot(gradePorTurma, gradePorProfessor, tId, profM, d, moveFrom, discM);
+                setSlot(gradePorTurma, gradePorProfessor, tId, profN, d, swapWith, discN);
               }
             }
           }
@@ -1891,6 +1908,102 @@ function solverWorkerBootstrap(workerScope) {
     }
   }
 
+  function sanitizePedagogicalViolations({
+    gradePorTurma,
+    gradePorProfessor,
+    dispoIdx,
+    diasList,
+    periodosPorDia,
+    rc01MaxConsecutivas,
+    rc02Cfg,
+    regrasGerais,
+    turno,
+    preferencias,
+    unplaced,
+  }) {
+    const proibirSeparadas = regrasGerais ? regrasGerais.proibir_aulas_separadas_mesmo_dia !== false : true;
+    const evicted = [];
+
+    for (const [tIdStr, turmaGrade] of Object.entries(gradePorTurma)) {
+      const tId = toInt(tIdStr, 0);
+      if (!tId || !turmaGrade) continue;
+
+      for (const d of diasList) {
+        const row = turmaGrade[d] || {};
+        const byDisc = new Map();
+
+        for (let p = 1; p <= periodosPorDia; p++) {
+          const cell = row[p];
+          if (!cell || !cell.disciplina_id) continue;
+          const dId = Number(cell.disciplina_id);
+          if (!byDisc.has(dId)) byDisc.set(dId, []);
+          byDisc.get(dId).push({ p, cell });
+        }
+
+        for (const [dId, list] of byDisc.entries()) {
+          if (list.length <= 1) continue;
+          const maxDia = Math.min(getRc02MaxForDisc(rc02Cfg, dId), rc01MaxConsecutivas);
+
+          // 1) Se exceder o máximo diário (ex: 3 aulas no mesmo dia), remove as excedentes não-travadas
+          while (list.length > maxDia) {
+            const idx = list.findLastIndex(x => !x.cell.locked);
+            if (idx === -1) break;
+            const [rem] = list.splice(idx, 1);
+            clearSlot(gradePorTurma, gradePorProfessor, tId, rem.cell.professor_id, d, rem.p);
+            evicted.push({
+              turma_id: tId,
+              disciplina_id: dId,
+              professor_id: rem.cell.professor_id,
+              co_professores: rem.cell.co_professores || null,
+            });
+          }
+
+          // 2) Se restarem 2+ aulas separadas no mesmo dia (ex: 1º e 5º horário), remove a última não-travada para realocar
+          if (proibirSeparadas && list.length >= 2) {
+            const minP = list[0].p;
+            const maxP = list[list.length - 1].p;
+            if (maxP - minP + 1 !== list.length) {
+              const idx = list.findLastIndex(x => !x.cell.locked);
+              if (idx !== -1) {
+                const [rem] = list.splice(idx, 1);
+                clearSlot(gradePorTurma, gradePorProfessor, tId, rem.cell.professor_id, d, rem.p);
+                evicted.push({
+                  turma_id: tId,
+                  disciplina_id: dId,
+                  professor_id: rem.cell.professor_id,
+                  co_professores: rem.cell.co_professores || null,
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+
+    for (const ev of evicted) {
+      const ok = tryPlaceWithAllOperators({
+        gradePorTurma,
+        gradePorProfessor,
+        dispoIdx,
+        diasList,
+        periodosPorDia,
+        turmaId: ev.turma_id,
+        professorId: ev.professor_id,
+        disciplinaId: ev.disciplina_id,
+        rc01MaxConsecutivas,
+        rc02Cfg,
+        regrasGerais,
+        turno,
+        preferencias,
+        coProfessores: ev.co_professores,
+        strictPedagogical: true,
+      });
+      if (!ok) {
+        unplaced.push(ev);
+      }
+    }
+  }
+
   function evaluateGradePedagogicalQuality(gradePorTurma, diasList, periodosPorDia, rc01MaxConsecutivas, rc02Cfg) {
     let violacoesSeparadasMesmoDia = 0;
     let violacoesMaxDia = 0;
@@ -1945,7 +2058,7 @@ function solverWorkerBootstrap(workerScope) {
     };
   }
 
-  function runGreedySolver(payload, randomize = false, strategy = "default", relaxPedagogical = false) {
+  function runGreedySolver(payload, randomize = false, strategy = "dsatur_slack") {
     const diasList =
       Array.isArray(payload?.dias_semana) && payload.dias_semana.length > 0
         ? payload.dias_semana.map(Number).filter(n => n >= 1 && n <= 6)
@@ -2092,32 +2205,6 @@ function solverWorkerBootstrap(workerScope) {
       });
     }
 
-    // Caso extremo de disponibilidade impossível: tenta alocar pendências remanescentes mantendo proibição de aulas separadas
-    if (relaxPedagogical && unplaced.length > 0) {
-      const stillUnplaced = [];
-      for (const lesson of unplaced) {
-        const okRelaxed = tryPlaceWithAllOperators({
-          gradePorTurma,
-          gradePorProfessor,
-          dispoIdx,
-          diasList,
-          periodosPorDia,
-          turmaId: lesson.turma_id,
-          professorId: lesson.professor_id,
-          disciplinaId: lesson.disciplina_id,
-          rc01MaxConsecutivas,
-          rc02Cfg,
-          regrasGerais,
-          turno,
-          preferencias: payload?.preferencias,
-          coProfessores: lesson.co_professores || null,
-          strictPedagogical: false,
-        });
-        if (!okRelaxed) stillUnplaced.push(lesson);
-      }
-      unplaced = stillUnplaced;
-    }
-
     // Polimento pós-alocação para maximizar aulas duplas geminadas e blindar contra aulas separadas
     polishGradePedagogica({
       gradePorTurma,
@@ -2128,6 +2215,21 @@ function solverWorkerBootstrap(workerScope) {
       rc01MaxConsecutivas,
       rc02Cfg,
       regrasGerais,
+    });
+
+    // Blindagem final inviolável: garante zero aulas separadas no mesmo dia e zero dias acima do limite
+    sanitizePedagogicalViolations({
+      gradePorTurma,
+      gradePorProfessor,
+      dispoIdx,
+      diasList,
+      periodosPorDia,
+      rc01MaxConsecutivas,
+      rc02Cfg,
+      regrasGerais,
+      turno,
+      preferencias: payload?.preferencias,
+      unplaced,
     });
 
     const diagnosticoNaoAlocadas = [];
@@ -2183,8 +2285,8 @@ function solverWorkerBootstrap(workerScope) {
     );
     const qualidadeScore =
       totalAlocadasReal * 1000000 -
-      qual.violacoesSeparadasMesmoDia * 50000 -
-      qual.violacoesMaxDia * 20000 +
+      qual.violacoesSeparadasMesmoDia * 5000000 -
+      qual.violacoesMaxDia * 5000000 +
       qual.paresGeminados * 50;
 
     return {
@@ -2272,8 +2374,7 @@ function solverWorkerBootstrap(workerScope) {
 
             const strategy = strategies[iter % strategies.length];
             const isRandomized = iter > 0;
-            const relaxPed = iter > 60 && iter % 12 === 0;
-            const res = runGreedySolver(payload, isRandomized, strategy, relaxPed);
+            const res = runGreedySolver(payload, isRandomized, strategy);
 
             const alocadas = res.metrics.aulas_alocadas || 0;
             const demanda = res.metrics.aulas_demanda || 1;

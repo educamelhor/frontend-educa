@@ -71,6 +71,35 @@ function recalcularMetricasEDiagnostico(gradePorTurma, solverPayload, metricsAtu
     }
   }
 
+  // Calcula violações pedagógicas (aulas separadas no mesmo dia ou excesso > maxDia)
+  const maxDiaPadrao =
+    Number(solverPayload?.config_pedagogica?.regras_gerais?.max_aulas_mesmo_dia) ||
+    Number(solverPayload?.config_pedagogica?.regras?.rc02_max_por_dia_disciplina?.max_por_dia_padrao) ||
+    2;
+  let violacoesSeparadasMesmoDia = 0;
+  let violacoesMaxDia = 0;
+
+  for (const diasObj of Object.values(gradePorTurma || {})) {
+    for (const perObj of Object.values(diasObj || {})) {
+      const byDisc = new Map();
+      for (const [pStr, cell] of Object.entries(perObj || {})) {
+        if (!cell || !cell.disciplina_id) continue;
+        const p = Number(pStr);
+        const dId = Number(cell.disciplina_id);
+        if (!byDisc.has(dId)) byDisc.set(dId, []);
+        byDisc.get(dId).push({ p, locked: Boolean(cell.locked) });
+      }
+      for (const [, arr] of byDisc.entries()) {
+        if (arr.length <= 1 || arr.every((x) => x.locked)) continue;
+        arr.sort((a, b) => a.p - b.p);
+        const minP = arr[0].p;
+        const maxP = arr[arr.length - 1].p;
+        if (maxP - minP + 1 !== arr.length) violacoesSeparadasMesmoDia++;
+        if (arr.length > maxDiaPadrao) violacoesMaxDia++;
+      }
+    }
+  }
+
   const demandas = Array.isArray(solverPayload?.demanda) ? solverPayload.demanda : [];
   const modulacao = Array.isArray(solverPayload?.modulacao) ? solverPayload.modulacao : [];
 
@@ -86,6 +115,8 @@ function recalcularMetricasEDiagnostico(gradePorTurma, solverPayload, metricsAtu
         aulas_fixas_manuais: totalFixas,
         aulas_nao_alocadas: naoAlocFallback,
         cobertura_percentual: cobFallback,
+        violacoes_separadas_mesmo_dia: violacoesSeparadasMesmoDia,
+        violacoes_max_dia: violacoesMaxDia,
       },
       nao_alocadas: [],
     };
@@ -131,6 +162,8 @@ function recalcularMetricasEDiagnostico(gradePorTurma, solverPayload, metricsAtu
       aulas_fixas_manuais: totalFixas,
       aulas_nao_alocadas: naoAlocadasList.length,
       cobertura_percentual: cobertura,
+      violacoes_separadas_mesmo_dia: violacoesSeparadasMesmoDia,
+      violacoes_max_dia: violacoesMaxDia,
     },
     nao_alocadas: naoAlocadasList,
   };
@@ -153,6 +186,7 @@ function construirGradesDeSlotsSalvos(slots, turmasList, solverPayload) {
     return g;
   };
 
+  const turmaIdsTurnoSet = new Set((turmasList || []).map((t) => Number(t.id)));
   const gradePorTurma = {};
   for (const t of turmasList || []) {
     gradePorTurma[t.id] = initEmpty();
@@ -172,6 +206,8 @@ function construirGradesDeSlotsSalvos(slots, turmasList, solverPayload) {
     const dId = Number(s.disciplina_id);
     const pId = Number(s.professor_id);
     if (!tId || !dia || !ord || !dId || !pId) continue;
+    // Ignora qualquer slot que pertença a turma de outro turno
+    if (turmaIdsTurnoSet.size > 0 && !turmaIdsTurnoSet.has(tId)) continue;
 
     if (!gradePorTurma[tId]) gradePorTurma[tId] = initEmpty();
     if (!gradePorProfessor[pId]) gradePorProfessor[pId] = initEmpty();
@@ -402,11 +438,15 @@ export default function GerarHorarioPage({ config }) {
         api.get("/api/grade/publicado", { params: { turno: turno.toLowerCase() } }).catch(() => ({ data: null })),
       ]);
 
-      const listaTurmas = Array.isArray(rTurmas.data)
+      const listaTurmasBruta = Array.isArray(rTurmas.data)
         ? rTurmas.data
         : Array.isArray(rTurmas.data?.turmas)
           ? rTurmas.data.turmas
           : [];
+      const turnoAlvo = String(turno || "").trim().toLowerCase();
+      const listaTurmas = listaTurmasBruta.filter(
+        (t) => !t.turno || String(t.turno).trim().toLowerCase() === turnoAlvo
+      );
       setTurmas(listaTurmas);
 
       const tMap = {};
@@ -1592,7 +1632,7 @@ export default function GerarHorarioPage({ config }) {
                 />
                 <MetricCard
                   label="Turmas"
-                  value={resultado.payload_summary?.turmas || Object.keys(resultado.grade_por_turma || {}).length}
+                  value={turmas.length || Object.keys(resultado.grade_por_turma || {}).length}
                   icon="🏫"
                   color="#1e3a5f"
                 />
@@ -1604,6 +1644,54 @@ export default function GerarHorarioPage({ config }) {
                 />
               </div>
             </div>
+
+            {/* ── Alerta caso a grade carregada (ex: rascunho antigo) possua aulas separadas no mesmo dia ou > limite ── */}
+            {((resultado.metrics?.violacoes_separadas_mesmo_dia || 0) > 0 ||
+              (resultado.metrics?.violacoes_max_dia || 0) > 0) && (
+              <div
+                style={{
+                  background: "#fff7ed",
+                  border: "1.5px solid #fb923c",
+                  borderRadius: 10,
+                  padding: "14px 18px",
+                  marginBottom: 16,
+                  fontSize: 13,
+                  color: "#9a3412",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  flexWrap: "wrap",
+                  gap: 12,
+                }}
+              >
+                <div>
+                  <strong style={{ display: "block", marginBottom: 4, fontSize: 13.5 }}>
+                    ⚠️ Grade com aulas separadas no mesmo dia ({resultado.metrics?.violacoes_separadas_mesmo_dia || 0}) ou acima do limite diário ({resultado.metrics?.violacoes_max_dia || 0})
+                  </strong>
+                  <span style={{ fontSize: 12, color: "#c2410c" }}>
+                    Esta grade foi salva anteriormente ou editada com disciplinas fragmentadas no mesmo dia. Clique ao lado para regerar com geminação estrita.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={executarSolver}
+                  disabled={rodando}
+                  style={{
+                    padding: "8px 16px",
+                    borderRadius: 8,
+                    border: "none",
+                    background: "#ea580c",
+                    color: "#fff",
+                    fontWeight: 700,
+                    fontSize: 12.5,
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  ⚡ Regerar Grade Limpa Agora
+                </button>
+              </div>
+            )}
 
             {/* ── Alertas de não-alocadas (com botão interativo de Alocar na Grade!) ── */}
             {naoAloc > 0 && (
@@ -1791,6 +1879,7 @@ export default function GerarHorarioPage({ config }) {
                   <p style={{ color: "#94a3b8", textAlign: "center" }}>Nenhuma grade gerada.</p>
                 ) : (
                   Object.entries(resultado.grade_por_turma)
+                    .filter(([tId]) => turmas.length === 0 || turmas.some((t) => Number(t.id) === Number(tId)))
                     .sort(([idA], [idB]) => {
                       const nA = (nomesTurmas[idA] || String(idA)).toUpperCase();
                       const nB = (nomesTurmas[idB] || String(idB)).toUpperCase();

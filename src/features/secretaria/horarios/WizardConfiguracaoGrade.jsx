@@ -65,6 +65,61 @@ function ResumoCard({ icon, titulo, children }) {
   );
 }
 
+function gerarParesGovernancaPadrao(maxPeriodos = 6, recreioApos = 3, bloquearRecreio = true, existentes = []) {
+  const totalP = Math.max(2, Number(maxPeriodos) || 6);
+  const rec = Number(recreioApos) || 3;
+
+  const defaultStarts = [];
+  if (totalP >= 2) defaultStarts.push(1);
+  if (rec > 0 && rec + 1 < totalP && !defaultStarts.includes(rec + 1)) {
+    defaultStarts.push(rec + 1);
+  }
+  for (let p = 1; p < totalP; p++) {
+    if (p === rec) continue;
+    if (!defaultStarts.includes(p)) defaultStarts.push(p);
+  }
+  if (rec > 0 && rec < totalP && !defaultStarts.includes(rec)) {
+    defaultStarts.push(rec);
+  }
+
+  const mapExistentes = new Map();
+  const ordered = [];
+
+  if (Array.isArray(existentes)) {
+    for (const it of existentes) {
+      const ini = Number(it?.inicio ?? it?.p1 ?? 0);
+      if (ini >= 1 && ini < totalP && !mapExistentes.has(ini)) {
+        let modo = String(it?.modo || "prioritario").toLowerCase();
+        if (!["obrigatorio", "prioritario", "permitido", "bloqueado"].includes(modo)) {
+          modo = "prioritario";
+        }
+        if (bloquearRecreio && rec > 0 && ini === rec) {
+          modo = "bloqueado";
+        }
+        const obj = { inicio: ini, fim: ini + 1, modo };
+        mapExistentes.set(ini, obj);
+        ordered.push(obj);
+      }
+    }
+  }
+
+  for (const ini of defaultStarts) {
+    if (!mapExistentes.has(ini)) {
+      const cortaRecreio = rec > 0 && ini === rec;
+      const modo = cortaRecreio && bloquearRecreio
+        ? "bloqueado"
+        : ordered.length < 2
+        ? "prioritario"
+        : "permitido";
+      const obj = { inicio: ini, fim: ini + 1, modo };
+      mapExistentes.set(ini, obj);
+      ordered.push(obj);
+    }
+  }
+
+  return ordered;
+}
+
 export default function WizardConfiguracaoGrade({ onConcluir, configInicial }) {
   const [passo, setPasso]       = useState(1);
   const [turnos, setTurnos]     = useState(configInicial?.turnos || ["matutino", "vespertino"]);
@@ -76,12 +131,34 @@ export default function WizardConfiguracaoGrade({ onConcluir, configInicial }) {
   
   // Regras Gerais
   const rg = configInicial?.regras_gerais || {};
+  const initTurnos = configInicial?.turnos || ["matutino", "vespertino"];
+  const initPeriodos = configInicial?.periodos || { matutino: 5, vespertino: 5, noturno: 4 };
+  const initMaxPeriodos = Math.max(4, ...initTurnos.map(t => Number(initPeriodos[t]) || 6));
+  const initRecreioMap = rg.recreio_apos_periodo || { matutino: 3, vespertino: 3, noturno: 2 };
+  const initRecreioRef = Number(initRecreioMap[initTurnos[0]] ?? initRecreioMap.matutino ?? 3);
+
+  // Nota: Se havia par bloqueado no recreio ou bloquear_duplas_no_recreio explícito, respeita;
+  // por padrão ativamos o bloqueio de duplas cortadas pelo recreio (true).
+  const initBloquearRecreio =
+    rg.bloquear_duplas_no_recreio !== undefined
+      ? Boolean(rg.bloquear_duplas_no_recreio)
+      : rg.aulas_duplas_separar_recreio !== undefined
+      ? !rg.aulas_duplas_separar_recreio
+      : true;
+
   const [regrasGerais, setRegrasGerais] = useState({
     preferencia_aulas_duplas: rg.preferencia_aulas_duplas !== undefined ? rg.preferencia_aulas_duplas : true,
     proibir_aulas_separadas_mesmo_dia: rg.proibir_aulas_separadas_mesmo_dia !== undefined ? rg.proibir_aulas_separadas_mesmo_dia : true,
-    aulas_duplas_separar_recreio: rg.aulas_duplas_separar_recreio !== undefined ? rg.aulas_duplas_separar_recreio : false,
+    bloquear_duplas_no_recreio: initBloquearRecreio,
+    aulas_duplas_separar_recreio: !initBloquearRecreio,
     max_aulas_mesmo_dia: rg.max_aulas_mesmo_dia || 2,
-    recreio_apos_periodo: rg.recreio_apos_periodo || { matutino: 3, vespertino: 3, noturno: 2 },
+    recreio_apos_periodo: initRecreioMap,
+    pares_duplas_governanca: gerarParesGovernancaPadrao(
+      initMaxPeriodos,
+      initRecreioRef,
+      initBloquearRecreio,
+      rg.pares_duplas_governanca
+    ),
     disciplinas_excludentes: rg.disciplinas_excludentes || []
   });
 
@@ -93,6 +170,98 @@ export default function WizardConfiguracaoGrade({ onConcluir, configInicial }) {
       setDisciplinasDisponiveis(Array.isArray(res.data) ? res.data : (res.data?.disciplinas || []));
     }).catch(err => console.error("Erro ao carregar disciplinas:", err));
   }, []);
+
+  const maxPeriodosAtivos = Math.max(4, ...turnos.map(t => Number(periodos[t]) || 6));
+  const turnoPrincipal = turnos[0] || "matutino";
+  const recreioPrincipal = Number(regrasGerais.recreio_apos_periodo?.[turnoPrincipal] ?? 3);
+
+  // Sincroniza a lista de pares caso o número máximo de períodos mude no Passo 3 ou o recreio mude no Passo 5
+  useEffect(() => {
+    setRegrasGerais(prev => ({
+      ...prev,
+      pares_duplas_governanca: gerarParesGovernancaPadrao(
+        maxPeriodosAtivos,
+        recreioPrincipal,
+        prev.bloquear_duplas_no_recreio !== false,
+        prev.pares_duplas_governanca
+      ),
+    }));
+  }, [maxPeriodosAtivos, recreioPrincipal]);
+
+  const toggleBloqueioRecreio = (bloquear) => {
+    setRegrasGerais(prev => {
+      const rec = Number(prev.recreio_apos_periodo?.[turnoPrincipal] ?? 3);
+      const novaLista = (prev.pares_duplas_governanca || []).map(p => {
+        if (rec > 0 && p.inicio === rec) {
+          return { ...p, modo: bloquear ? "bloqueado" : (p.modo === "bloqueado" ? "permitido" : p.modo) };
+        }
+        return p;
+      });
+      return {
+        ...prev,
+        bloquear_duplas_no_recreio: bloquear,
+        aulas_duplas_separar_recreio: !bloquear,
+        pares_duplas_governanca: novaLista,
+      };
+    });
+  };
+
+  const moverParPrioridade = (idx, direcao) => {
+    setRegrasGerais(prev => {
+      const lista = [...(prev.pares_duplas_governanca || [])];
+      const novoIdx = idx + direcao;
+      if (novoIdx < 0 || novoIdx >= lista.length) return prev;
+      const temp = lista[idx];
+      lista[idx] = lista[novoIdx];
+      lista[novoIdx] = temp;
+      return { ...prev, pares_duplas_governanca: lista };
+    });
+  };
+
+  const alterarModoPar = (inicio, novoModo) => {
+    setRegrasGerais(prev => {
+      const rec = Number(prev.recreio_apos_periodo?.[turnoPrincipal] ?? 3);
+      const lista = (prev.pares_duplas_governanca || []).map(p =>
+        p.inicio === inicio ? { ...p, modo: novoModo } : p
+      );
+      const cortaRecreio = rec > 0 && inicio === rec;
+      const novoBloquearRecreio = cortaRecreio
+        ? novoModo === "bloqueado"
+        : prev.bloquear_duplas_no_recreio;
+      return {
+        ...prev,
+        bloquear_duplas_no_recreio: novoBloquearRecreio,
+        aulas_duplas_separar_recreio: !novoBloquearRecreio,
+        pares_duplas_governanca: lista,
+      };
+    });
+  };
+
+  const aplicarPresetPares = (preset) => {
+    setRegrasGerais(prev => {
+      const rec = Number(prev.recreio_apos_periodo?.[turnoPrincipal] ?? 3);
+      const base = gerarParesGovernancaPadrao(maxPeriodosAtivos, rec, true, []);
+      const ajustada = base.map(p => {
+        if (rec > 0 && p.inicio === rec) return { ...p, modo: "bloqueado" };
+        if (preset === "obrigatorio_1_2") {
+          if (p.inicio === 1) return { ...p, modo: "obrigatorio" };
+          if (p.inicio === rec + 1) return { ...p, modo: "prioritario" };
+          return { ...p, modo: "permitido" };
+        }
+        if (preset === "obrigatorio_1_2_e_pos_recreio") {
+          if (p.inicio === 1 || p.inicio === rec + 1) return { ...p, modo: "obrigatorio" };
+          return { ...p, modo: "permitido" };
+        }
+        return p;
+      });
+      return {
+        ...prev,
+        bloquear_duplas_no_recreio: true,
+        aulas_duplas_separar_recreio: false,
+        pares_duplas_governanca: ajustada,
+      };
+    });
+  };
 
   const toggleTurno = (id) =>
     setTurnos(prev => prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]);
@@ -144,10 +313,14 @@ export default function WizardConfiguracaoGrade({ onConcluir, configInicial }) {
     try {
       const periodosAtivos = {};
       turnos.forEach(t => { periodosAtivos[t] = periodos[t] || 5; });
+      const payloadRegras = {
+        ...regrasGerais,
+        aulas_duplas_separar_recreio: !regrasGerais.bloquear_duplas_no_recreio,
+      };
       await api.post("/api/escola/configuracao-grade", {
-        turnos, dias_semana: dias, periodos: periodosAtivos, regras_gerais: regrasGerais
+        turnos, dias_semana: dias, periodos: periodosAtivos, regras_gerais: payloadRegras
       });
-      onConcluir({ turnos, dias_semana: dias, periodos: periodosAtivos, regras_gerais: regrasGerais });
+      onConcluir({ turnos, dias_semana: dias, periodos: periodosAtivos, regras_gerais: payloadRegras });
     } catch {
       setErro("Erro ao salvar. Verifique sua conexão e tente novamente.");
     } finally {
@@ -293,24 +466,24 @@ export default function WizardConfiguracaoGrade({ onConcluir, configInicial }) {
           {/* PASSO 4: Regras de Aulas */}
           {passo === 4 && (
             <div>
-              <h2 style={{ textAlign: "center", fontSize: 17, fontWeight: 700, color: "#e2e8f0", marginBottom: 20 }}>
-                Regras e Padrões de Alocação
+              <h2 style={{ textAlign: "center", fontSize: 17, fontWeight: 700, color: "#e2e8f0", marginBottom: 16 }}>
+                Regras e Governança de Aulas Duplas (Geminadas)
               </h2>
               
-              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                <div style={{ background: "rgba(255,255,255,0.05)", padding: 16, borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)" }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                <div style={{ background: "rgba(255,255,255,0.05)", padding: 14, borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)" }}>
                   <label style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}>
                     <input type="checkbox" checked={regrasGerais.preferencia_aulas_duplas}
                       onChange={e => setRegrasGerais({...regrasGerais, preferencia_aulas_duplas: e.target.checked})}
                       style={{ width: 20, height: 20, accentColor: "#3b82f6" }} />
                     <div>
-                      <div style={{ fontWeight: 600, fontSize: 14 }}>Preferencialmente Aulas Duplas</div>
-                      <div style={{ fontSize: 11, color: "#94a3b8" }}>O algoritmo tentará sempre juntar aulas da mesma disciplina de forma geminada (duas seguidas).</div>
+                      <div style={{ fontWeight: 600, fontSize: 14 }}>Preferencialmente Aulas Duplas (Geminadas)</div>
+                      <div style={{ fontSize: 11, color: "#94a3b8" }}>O algoritmo agrupará aulas da mesma disciplina em blocos consecutivos segundo a ordem de prioridade da escola abaixo.</div>
                     </div>
                   </label>
                 </div>
 
-                <div style={{ background: "rgba(16,185,129,0.08)", padding: 16, borderRadius: 12, border: "1px solid rgba(16,185,129,0.28)" }}>
+                <div style={{ background: "rgba(16,185,129,0.08)", padding: 14, borderRadius: 12, border: "1px solid rgba(16,185,129,0.28)" }}>
                   <label style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}>
                     <input type="checkbox" checked={regrasGerais.proibir_aulas_separadas_mesmo_dia !== false}
                       onChange={e => setRegrasGerais({...regrasGerais, proibir_aulas_separadas_mesmo_dia: e.target.checked})}
@@ -322,21 +495,250 @@ export default function WizardConfiguracaoGrade({ onConcluir, configInicial }) {
                   </label>
                 </div>
 
-                <div style={{ background: "rgba(255,255,255,0.05)", padding: 16, borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)" }}>
+                <div style={{ background: "rgba(245,158,11,0.08)", padding: 14, borderRadius: 12, border: "1px solid rgba(245,158,11,0.32)" }}>
                   <label style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}>
-                    <input type="checkbox" checked={regrasGerais.aulas_duplas_separar_recreio}
-                      onChange={e => setRegrasGerais({...regrasGerais, aulas_duplas_separar_recreio: e.target.checked})}
+                    <input type="checkbox" checked={regrasGerais.bloquear_duplas_no_recreio !== false}
+                      onChange={e => toggleBloqueioRecreio(e.target.checked)}
                       style={{ width: 20, height: 20, accentColor: "#f59e0b" }} />
                     <div>
-                      <div style={{ fontWeight: 600, fontSize: 14 }}>Permitir separar aulas pelo Recreio/Intervalo</div>
-                      <div style={{ fontSize: 11, color: "#94a3b8" }}>Se marcado, uma aula dupla pode ter a 1ª parte antes do recreio e a 2ª parte depois. Se desmarcado, o algoritmo bloqueia essa divisão.</div>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: "#fde68a" }}>
+                        Proibir que o Recreio/Intervalo corte Aulas Duplas ao meio {recreioPrincipal > 0 ? `(Bloquear par #${recreioPrincipal}-#${recreioPrincipal + 1})` : ""}
+                      </div>
+                      <div style={{ fontSize: 11, color: "#cbd5e1" }}>
+                        Quando marcado (recomendado), o algoritmo bloqueia estritamente que uma aula dupla comece antes do intervalo e termine depois do intervalo.
+                      </div>
                     </div>
                   </label>
                 </div>
 
-                <div style={{ background: "rgba(255,255,255,0.05)", padding: 16, borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)" }}>
-                  <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>Máximo de aulas do professor no mesmo dia (RC02)</div>
-                  <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 10 }}>O mesmo professor não entrará na mesma turma mais do que X vezes num mesmo dia.</div>
+                {/* Painel de Governança Multi-Escola de Pares de Aulas Duplas */}
+                {regrasGerais.preferencia_aulas_duplas && (
+                  <div style={{
+                    background: "rgba(15,23,42,0.65)",
+                    padding: "16px",
+                    borderRadius: 14,
+                    border: "1px solid rgba(59,130,246,0.35)",
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+                      <div>
+                        <div style={{ fontWeight: 800, fontSize: 13.5, color: "#93c5fd", display: "flex", alignItems: "center", gap: 6 }}>
+                          <span>🎯</span> Governança de Combinações para Aulas Duplas (Ordem de Prioridade)
+                        </div>
+                        <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>
+                          Ordene os pares consecutivos da maior prioridade (1ª opção) para a menor. Cada escola pode definir blocos <b>Obrigatórios</b>, <b>Prioritários</b>, <b>Permitidos</b> ou <b>Bloqueados</b>.
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Botões rápidos de Preset */}
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+                      <button
+                        type="button"
+                        onClick={() => aplicarPresetPares("padrao")}
+                        style={{
+                          padding: "5px 10px", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer",
+                          background: "rgba(59,130,246,0.16)", border: "1px solid rgba(59,130,246,0.4)", color: "#93c5fd",
+                        }}
+                      >
+                        ⚡ Padrão Recomendado
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => aplicarPresetPares("obrigatorio_1_2")}
+                        style={{
+                          padding: "5px 10px", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer",
+                          background: "rgba(16,185,129,0.16)", border: "1px solid rgba(16,185,129,0.4)", color: "#6ee7b7",
+                        }}
+                      >
+                        🔒 Exigir (#1-#2) Obrigatório
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => aplicarPresetPares("obrigatorio_1_2_e_pos_recreio")}
+                        style={{
+                          padding: "5px 10px", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer",
+                          background: "rgba(139,92,246,0.16)", border: "1px solid rgba(139,92,246,0.45)", color: "#c4b5fd",
+                        }}
+                      >
+                        🔒 Exigir (#1-#2) e (#{recreioPrincipal + 1}-#{recreioPrincipal + 2}) Obrigatórios
+                      </button>
+                    </div>
+
+                    {/* Lista Ordenável de Pares */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {(regrasGerais.pares_duplas_governanca || [])
+                        .filter(par => par.inicio < maxPeriodosAtivos)
+                        .map((par, idx, arr) => {
+                          const cortaRecreio = recreioPrincipal > 0 && par.inicio === recreioPrincipal;
+                          const isBlocked = par.modo === "bloqueado";
+                          const isMandatory = par.modo === "obrigatorio";
+                          const isPriority = par.modo === "prioritario";
+
+                          // Calcula a posição entre os pares ativos (não bloqueados)
+                          const activeRank = arr.slice(0, idx).filter(x => x.modo !== "bloqueado").length + 1;
+
+                          const borderColor = isBlocked
+                            ? "rgba(239,68,68,0.4)"
+                            : isMandatory
+                            ? "rgba(16,185,129,0.55)"
+                            : isPriority
+                            ? "rgba(59,130,246,0.45)"
+                            : "rgba(255,255,255,0.12)";
+
+                          const bgColor = isBlocked
+                            ? "rgba(239,68,68,0.08)"
+                            : isMandatory
+                            ? "rgba(16,185,129,0.12)"
+                            : isPriority
+                            ? "rgba(59,130,246,0.1)"
+                            : "rgba(255,255,255,0.03)";
+
+                          return (
+                            <div
+                              key={`${par.inicio}-${par.fim}`}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                gap: 8,
+                                padding: "8px 10px",
+                                borderRadius: 10,
+                                background: bgColor,
+                                border: `1px solid ${borderColor}`,
+                                flexWrap: "wrap",
+                              }}
+                            >
+                              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                                {/* Badge de Ordem de Prioridade */}
+                                <span style={{
+                                  minWidth: 74,
+                                  textAlign: "center",
+                                  padding: "3px 8px",
+                                  borderRadius: 6,
+                                  fontSize: 10.5,
+                                  fontWeight: 800,
+                                  background: isBlocked
+                                    ? "rgba(239,68,68,0.22)"
+                                    : isMandatory
+                                    ? "#059669"
+                                    : isPriority
+                                    ? "#2563eb"
+                                    : "rgba(148,163,184,0.2)",
+                                  color: isBlocked ? "#fca5a5" : "#fff",
+                                }}>
+                                  {isBlocked ? "🚫 BLOQUEADO" : `${activeRank}ª OPÇÃO`}
+                                </span>
+
+                                {/* Rótulo do Par (#1-#2) */}
+                                <span style={{
+                                  fontWeight: 800,
+                                  fontSize: 13.5,
+                                  color: isBlocked ? "#fca5a5" : "#f8fafc",
+                                  letterSpacing: 0.3,
+                                }}>
+                                  (#{par.inicio}–#{par.fim})
+                                </span>
+
+                                {/* Contexto Pedagógico do Par */}
+                                {cortaRecreio ? (
+                                  <span style={{
+                                    fontSize: 10,
+                                    fontWeight: 700,
+                                    padding: "2px 7px",
+                                    borderRadius: 6,
+                                    background: "rgba(245,158,11,0.2)",
+                                    border: "1px solid rgba(245,158,11,0.45)",
+                                    color: "#fde68a",
+                                  }}>
+                                    ☕ Corta o Recreio ({par.inicio}ª / {par.fim}ª aula)
+                                  </span>
+                                ) : par.inicio === 1 ? (
+                                  <span style={{ fontSize: 10.5, color: "#93c5fd", fontWeight: 600 }}>
+                                    🌅 Início do Turno
+                                  </span>
+                                ) : par.inicio === recreioPrincipal + 1 ? (
+                                  <span style={{ fontSize: 10.5, color: "#6ee7b7", fontWeight: 600 }}>
+                                    🔔 Pós-Intervalo
+                                  </span>
+                                ) : (
+                                  <span style={{ fontSize: 10.5, color: "#94a3b8" }}>
+                                    {par.inicio}º e {par.fim}º horários
+                                  </span>
+                                )}
+                              </div>
+
+                              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                {/* Seletor de Modo de Governança */}
+                                <select
+                                  value={par.modo}
+                                  onChange={e => alterarModoPar(par.inicio, e.target.value)}
+                                  style={{
+                                    background: "#0f172a",
+                                    border: `1px solid ${borderColor}`,
+                                    padding: "5px 8px",
+                                    color: "#f8fafc",
+                                    borderRadius: 6,
+                                    fontSize: 11.5,
+                                    fontWeight: 700,
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  <option value="obrigatorio">🔒 Obrigatório (Exigir Dupla)</option>
+                                  <option value="prioritario">⭐ Prioritário (Alta Prioridade)</option>
+                                  <option value="permitido">✅ Permitido (Menor Prioridade)</option>
+                                  <option value="bloqueado">🚫 Bloqueado (Proibir Dupla)</option>
+                                </select>
+
+                                {/* Botões Subir / Descer Prioridade */}
+                                <div style={{ display: "flex", gap: 3 }}>
+                                  <button
+                                    type="button"
+                                    title="Aumentar prioridade (subir)"
+                                    disabled={idx === 0}
+                                    onClick={() => moverParPrioridade(idx, -1)}
+                                    style={{
+                                      width: 26, height: 26, borderRadius: 6,
+                                      border: "1px solid rgba(255,255,255,0.15)",
+                                      background: idx === 0 ? "rgba(255,255,255,0.03)" : "rgba(255,255,255,0.1)",
+                                      color: idx === 0 ? "#475569" : "#f8fafc",
+                                      cursor: idx === 0 ? "not-allowed" : "pointer",
+                                      fontSize: 11, fontWeight: 800,
+                                    }}
+                                  >
+                                    ▲
+                                  </button>
+                                  <button
+                                    type="button"
+                                    title="Diminuir prioridade (descer)"
+                                    disabled={idx === arr.length - 1}
+                                    onClick={() => moverParPrioridade(idx, 1)}
+                                    style={{
+                                      width: 26, height: 26, borderRadius: 6,
+                                      border: "1px solid rgba(255,255,255,0.15)",
+                                      background: idx === arr.length - 1 ? "rgba(255,255,255,0.03)" : "rgba(255,255,255,0.1)",
+                                      color: idx === arr.length - 1 ? "#475569" : "#f8fafc",
+                                      cursor: idx === arr.length - 1 ? "not-allowed" : "pointer",
+                                      fontSize: 11, fontWeight: 800,
+                                    }}
+                                  >
+                                    ▼
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+
+                    <div style={{ marginTop: 10, fontSize: 11, color: "#94a3b8", lineHeight: 1.45 }}>
+                      💡 <b>Flexibilização Inteligente:</b> Os blocos marcados como <b>🔒 Obrigatório</b> recebem força máxima de geminação. Caso a disponibilidade de algum professor ou carga ímpar impeça 100% dos blocos obrigatórios, o motor prioriza não deixar aulas sem alocar e informa a direção para eventual flexibilização.
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ background: "rgba(255,255,255,0.05)", padding: 14, borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)" }}>
+                  <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 4 }}>Máximo de aulas da mesma disciplina no mesmo dia (RC02)</div>
+                  <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 10 }}>A mesma disciplina não entrará na mesma turma mais do que X vezes num mesmo dia.</div>
                   <select 
                     value={regrasGerais.max_aulas_mesmo_dia}
                     onChange={e => setRegrasGerais({...regrasGerais, max_aulas_mesmo_dia: parseInt(e.target.value)})}
@@ -447,9 +849,39 @@ export default function WizardConfiguracaoGrade({ onConcluir, configInicial }) {
               <ResumoCard icon="⚙️" titulo="Regras Pedagógicas">
                 <Pill color={regrasGerais.preferencia_aulas_duplas ? "#10b981" : "#64748b"}>Aulas Duplas</Pill>
                 <Pill color={regrasGerais.max_aulas_mesmo_dia ? "#3b82f6" : "#64748b"}>Max {regrasGerais.max_aulas_mesmo_dia}/dia</Pill>
-                {!regrasGerais.aulas_duplas_separar_recreio && <Pill color="#f59e0b">Recreio não quebra duplas</Pill>}
+                {regrasGerais.bloquear_duplas_no_recreio !== false && <Pill color="#f59e0b">Recreio protegido (sem duplas cortadas)</Pill>}
                 {regrasGerais.disciplinas_excludentes.length > 0 && <Pill color="#ef4444">{regrasGerais.disciplinas_excludentes.length} Conflitos</Pill>}
               </ResumoCard>
+
+              {regrasGerais.preferencia_aulas_duplas && (
+                <ResumoCard icon="🎯" titulo="Prioridade de Pares de Aulas Duplas">
+                  {(regrasGerais.pares_duplas_governanca || [])
+                    .filter(p => p.inicio < maxPeriodosAtivos)
+                    .map((p, idx) => {
+                      const cor =
+                        p.modo === "obrigatorio"
+                          ? "#10b981"
+                          : p.modo === "prioritario"
+                          ? "#3b82f6"
+                          : p.modo === "permitido"
+                          ? "#94a3b8"
+                          : "#ef4444";
+                      const icone =
+                        p.modo === "obrigatorio"
+                          ? "🔒"
+                          : p.modo === "prioritario"
+                          ? "⭐"
+                          : p.modo === "permitido"
+                          ? "✅"
+                          : "🚫";
+                      return (
+                        <Pill key={`${p.inicio}-${p.fim}`} color={cor}>
+                          {p.modo === "bloqueado" ? `${icone} (#${p.inicio}-#${p.fim}) Bloqueado` : `${idx + 1}º ${icone} (#${p.inicio}-#${p.fim})`}
+                        </Pill>
+                      );
+                    })}
+                </ResumoCard>
+              )}
 
               {erro && <p style={{ color: "#f87171", textAlign: "center", marginTop: 16, fontSize: 13 }}>{erro}</p>}
             </div>

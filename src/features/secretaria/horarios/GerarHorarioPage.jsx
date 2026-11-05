@@ -71,13 +71,37 @@ function recalcularMetricasEDiagnostico(gradePorTurma, solverPayload, metricsAtu
     }
   }
 
-  // Calcula violações pedagógicas (aulas separadas no mesmo dia ou excesso > maxDia)
+  // Calcula violações pedagógicas (aulas separadas no mesmo dia, excesso > maxDia ou dupla cortada pelo recreio/par bloqueado)
+  const rg = solverPayload?.config_pedagogica?.regras_gerais || {};
   const maxDiaPadrao =
-    Number(solverPayload?.config_pedagogica?.regras_gerais?.max_aulas_mesmo_dia) ||
+    Number(rg.max_aulas_mesmo_dia) ||
     Number(solverPayload?.config_pedagogica?.regras?.rc02_max_por_dia_disciplina?.max_por_dia_padrao) ||
     2;
+  const turnoKey = String(solverPayload?.turno || "matutino").toLowerCase();
+  const recreioApos =
+    rg?.recreio_apos_periodo?.[turnoKey] !== undefined
+      ? Number(rg.recreio_apos_periodo[turnoKey])
+      : turnoKey.includes("noturno")
+      ? 2
+      : 3;
+  const bloquearRecreio =
+    rg?.bloquear_duplas_no_recreio !== undefined
+      ? Boolean(rg.bloquear_duplas_no_recreio)
+      : rg?.aulas_duplas_separar_recreio !== undefined
+      ? !rg.aulas_duplas_separar_recreio
+      : true;
+  const paresBloqueadosSet = new Set();
+  if (bloquearRecreio && recreioApos > 0) paresBloqueadosSet.add(recreioApos);
+  for (const item of Array.isArray(rg?.pares_duplas_governanca) ? rg.pares_duplas_governanca : []) {
+    if (String(item?.modo || "").toLowerCase() === "bloqueado" && Number(item?.inicio) > 0) {
+      paresBloqueadosSet.add(Number(item.inicio));
+    }
+  }
+
   let violacoesSeparadasMesmoDia = 0;
   let violacoesMaxDia = 0;
+  let violacoesParesBloqueados = 0;
+  let paresGeminados = 0;
 
   for (const diasObj of Object.values(gradePorTurma || {})) {
     for (const perObj of Object.values(diasObj || {})) {
@@ -86,6 +110,13 @@ function recalcularMetricasEDiagnostico(gradePorTurma, solverPayload, metricsAtu
         if (!cell || !cell.disciplina_id) continue;
         const p = Number(pStr);
         const dId = Number(cell.disciplina_id);
+        const nextCell = perObj?.[p + 1];
+        if (nextCell && Number(nextCell.disciplina_id) === dId) {
+          paresGeminados++;
+          if (paresBloqueadosSet.has(p) && (!cell.locked || !nextCell.locked)) {
+            violacoesParesBloqueados++;
+          }
+        }
         if (!byDisc.has(dId)) byDisc.set(dId, []);
         byDisc.get(dId).push({ p, locked: Boolean(cell.locked) });
       }
@@ -117,6 +148,8 @@ function recalcularMetricasEDiagnostico(gradePorTurma, solverPayload, metricsAtu
         cobertura_percentual: cobFallback,
         violacoes_separadas_mesmo_dia: violacoesSeparadasMesmoDia,
         violacoes_max_dia: violacoesMaxDia,
+        violacoes_pares_bloqueados: violacoesParesBloqueados,
+        pares_geminados: paresGeminados,
       },
       nao_alocadas: [],
     };
@@ -164,6 +197,8 @@ function recalcularMetricasEDiagnostico(gradePorTurma, solverPayload, metricsAtu
       cobertura_percentual: cobertura,
       violacoes_separadas_mesmo_dia: violacoesSeparadasMesmoDia,
       violacoes_max_dia: violacoesMaxDia,
+      violacoes_pares_bloqueados: violacoesParesBloqueados,
+      pares_geminados: paresGeminados,
     },
     nao_alocadas: naoAlocadasList,
   };
@@ -1630,6 +1665,19 @@ export default function GerarHorarioPage({ config }) {
                   icon={naoAloc > 0 ? "⚠️" : "🎉"}
                   color={naoAloc > 0 ? "#b45309" : "#16a34a"}
                 />
+                {metrics.pares_geminados !== undefined && (
+                  <MetricCard
+                    label="Duplas Geminadas"
+                    value={metrics.pares_geminados}
+                    sub={
+                      (metrics.violacoes_pares_bloqueados || 0) === 0
+                        ? "0 cortadas pelo recreio"
+                        : `${metrics.violacoes_pares_bloqueados} em par bloqueado`
+                    }
+                    icon="🔗"
+                    color={(metrics.violacoes_pares_bloqueados || 0) === 0 ? "#0284c7" : "#d97706"}
+                  />
+                )}
                 <MetricCard
                   label="Turmas"
                   value={turmas.length || Object.keys(resultado.grade_por_turma || {}).length}
@@ -1645,9 +1693,10 @@ export default function GerarHorarioPage({ config }) {
               </div>
             </div>
 
-            {/* ── Alerta caso a grade carregada (ex: rascunho antigo) possua aulas separadas no mesmo dia ou > limite ── */}
+            {/* ── Alerta caso a grade carregada (ex: rascunho antigo) possua aulas separadas no mesmo dia, > limite ou cortadas pelo recreio ── */}
             {((resultado.metrics?.violacoes_separadas_mesmo_dia || 0) > 0 ||
-              (resultado.metrics?.violacoes_max_dia || 0) > 0) && (
+              (resultado.metrics?.violacoes_max_dia || 0) > 0 ||
+              (resultado.metrics?.violacoes_pares_bloqueados || 0) > 0) && (
               <div
                 style={{
                   background: "#fff7ed",
@@ -1666,10 +1715,10 @@ export default function GerarHorarioPage({ config }) {
               >
                 <div>
                   <strong style={{ display: "block", marginBottom: 4, fontSize: 13.5 }}>
-                    ⚠️ Grade com aulas separadas no mesmo dia ({resultado.metrics?.violacoes_separadas_mesmo_dia || 0}) ou acima do limite diário ({resultado.metrics?.violacoes_max_dia || 0})
+                    ⚠️ Grade com divergências de governança: {resultado.metrics?.violacoes_separadas_mesmo_dia || 0} separada(s) no dia • {resultado.metrics?.violacoes_max_dia || 0} acima do limite • {resultado.metrics?.violacoes_pares_bloqueados || 0} dupla(s) cortada(s) pelo recreio/par bloqueado
                   </strong>
                   <span style={{ fontSize: 12, color: "#c2410c" }}>
-                    Esta grade foi salva anteriormente ou editada com disciplinas fragmentadas no mesmo dia. Clique ao lado para regerar com geminação estrita.
+                    Esta grade foi gerada antes das novas regras de governança de pares/recreio. Clique ao lado para regerar respeitando 100% os blocos da escola.
                   </span>
                 </div>
                 <button

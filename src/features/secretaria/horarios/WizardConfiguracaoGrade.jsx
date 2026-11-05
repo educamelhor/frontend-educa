@@ -78,6 +78,7 @@ export default function WizardConfiguracaoGrade({ onConcluir, configInicial }) {
   const rg = configInicial?.regras_gerais || {};
   const [regrasGerais, setRegrasGerais] = useState({
     preferencia_aulas_duplas: rg.preferencia_aulas_duplas !== undefined ? rg.preferencia_aulas_duplas : true,
+    proibir_aulas_separadas_mesmo_dia: rg.proibir_aulas_separadas_mesmo_dia !== undefined ? rg.proibir_aulas_separadas_mesmo_dia : true,
     aulas_duplas_separar_recreio: rg.aulas_duplas_separar_recreio !== undefined ? rg.aulas_duplas_separar_recreio : false,
     max_aulas_mesmo_dia: rg.max_aulas_mesmo_dia || 2,
     recreio_apos_periodo: rg.recreio_apos_periodo || { matutino: 3, vespertino: 3, noturno: 2 },
@@ -305,6 +306,18 @@ export default function WizardConfiguracaoGrade({ onConcluir, configInicial }) {
                     <div>
                       <div style={{ fontWeight: 600, fontSize: 14 }}>Preferencialmente Aulas Duplas</div>
                       <div style={{ fontSize: 11, color: "#94a3b8" }}>O algoritmo tentará sempre juntar aulas da mesma disciplina de forma geminada (duas seguidas).</div>
+                    </div>
+                  </label>
+                </div>
+
+                <div style={{ background: "rgba(16,185,129,0.08)", padding: 16, borderRadius: 12, border: "1px solid rgba(16,185,129,0.28)" }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}>
+                    <input type="checkbox" checked={regrasGerais.proibir_aulas_separadas_mesmo_dia !== false}
+                      onChange={e => setRegrasGerais({...regrasGerais, proibir_aulas_separadas_mesmo_dia: e.target.checked})}
+                      style={{ width: 20, height: 20, accentColor: "#10b981" }} />
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: "#6ee7b7" }}>Proibir aulas separadas da mesma disciplina no mesmo dia (Exigir Geminação)</div>
+                      <div style={{ fontSize: 11, color: "#cbd5e1" }}>Impede que uma disciplina apareça duas vezes no mesmo dia em horários distantes (ex.: 1º e 6º horário). Se houver 2 aulas no dia, elas serão obrigatoriamente consecutivas.</div>
                     </div>
                   </label>
                 </div>

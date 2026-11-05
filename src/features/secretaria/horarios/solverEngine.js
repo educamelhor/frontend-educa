@@ -88,10 +88,12 @@ function solverWorkerBootstrap(workerScope) {
   }
 
   function readRc01MaxConsecutivas(configPedagogica) {
+    const rgMax = configPedagogica?.regras_gerais?.max_aulas_mesmo_dia;
     const raw =
       configPedagogica?.regras?.rc01_distribuicao_disciplina?.max_consecutivas ??
       configPedagogica?.rc01_distribuicao_disciplina?.max_consecutivas ??
       configPedagogica?.max_consecutivas ??
+      rgMax ??
       2;
     return clamp(toInt(raw, 2), 1, 6);
   }
@@ -104,12 +106,13 @@ function solverWorkerBootstrap(workerScope) {
       configPedagogica?.rc02_max_aulas_por_dia_disciplina ??
       null;
 
-    const modoRaw = String(r?.modo ?? "soft").toLowerCase();
-    const modo = modoRaw === "hard" ? "hard" : "soft";
-    const maxPadrao = clamp(toInt(r?.max_por_dia_padrao ?? r?.maxPorDiaPadrao ?? 2, 2), 1, 6);
+    const rgMax = configPedagogica?.regras_gerais?.max_aulas_mesmo_dia;
+    const modoRaw = String(r?.modo ?? "hard").toLowerCase();
+    const modo = modoRaw === "soft" && !rgMax ? "soft" : "hard";
+    const maxPadrao = clamp(toInt(rgMax ?? r?.max_por_dia_padrao ?? r?.maxPorDiaPadrao ?? 2, 2), 1, 6);
     const bloqueioHard = Boolean(r?.bloqueio_hard ?? r?.bloqueioHard ?? true);
-    const maxHardPadrao = clamp(toInt(r?.max_hard_padrao ?? r?.maxHardPadrao ?? 3, 3), maxPadrao, 6);
-    const strictCapMock = Boolean(r?.strict_cap_mock ?? r?.strictCapMock ?? (modo === "hard"));
+    const maxHardPadrao = clamp(toInt(r?.max_hard_padrao ?? r?.maxHardPadrao ?? maxPadrao, maxPadrao), maxPadrao, 6);
+    const strictCapMock = Boolean(r?.strict_cap_mock ?? r?.strictCapMock ?? true);
 
     const porDiscRaw = r?.por_disciplina ?? r?.porDisciplina ?? {};
     const porDisciplina = {};
@@ -167,6 +170,108 @@ function solverWorkerBootstrap(workerScope) {
     return left + 1 + right;
   }
 
+  /**
+   * Valida se alocar `disciplinaId` em `(dia, periodo)` da `turmaGrade` respeita:
+   * 1. Proibição de aulas separadas da mesma disciplina no mesmo dia (ex.: 1º e 6º horário)
+   * 2. Limite máximo de aulas da mesma disciplina no mesmo dia (RC-02 / max_aulas_mesmo_dia)
+   * 3. Limite máximo de aulas consecutivas (RC-01)
+   */
+  function canPlaceDiscInTurmaSlot({
+    turmaGrade,
+    dia,
+    periodo,
+    disciplinaId,
+    periodosPorDia,
+    rc01MaxConsecutivas = 2,
+    rc02Cfg = null,
+    regrasGerais = null,
+    strictPedagogical = true,
+  }) {
+    const row = turmaGrade?.[dia] || {};
+    let countExisting = 0;
+    let minP = periodo;
+    let maxP = periodo;
+
+    for (let p = 1; p <= periodosPorDia; p++) {
+      if (p === periodo) continue;
+      const cell = row[p];
+      if (cell && Number(cell.disciplina_id) === Number(disciplinaId)) {
+        countExisting++;
+        if (p < minP) minP = p;
+        if (p > maxP) maxP = p;
+      }
+    }
+
+    if (countExisting === 0) return true;
+
+    const totalAfter = countExisting + 1;
+    const maxDia = getRc02MaxForDisc(rc02Cfg, disciplinaId);
+    const proibirSeparadas = regrasGerais ? regrasGerais.proibir_aulas_separadas_mesmo_dia !== false : true;
+
+    // Regra 1: Jamais permitir aulas separadas da mesma disciplina no mesmo dia (ex: 1º e 6º horário)
+    if (proibirSeparadas && maxP - minP + 1 !== totalAfter) {
+      return false;
+    }
+
+    // Regra 2: Respeitar máximo de aulas por dia e máximo de consecutivas
+    if (strictPedagogical) {
+      if (totalAfter > maxDia) return false;
+      if (totalAfter > rc01MaxConsecutivas) return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Verifica se o dia inteiro `dia` de uma `turmaGrade` está pedagogicamente válido
+   * após uma permutação (Swap / Kempe Chain / Tabu Ejection).
+   */
+  function isTurmaDayPedagogicallyValid({
+    turmaGrade,
+    dia,
+    periodosPorDia,
+    rc01MaxConsecutivas = 2,
+    rc02Cfg = null,
+    regrasGerais = null,
+    strictPedagogical = true,
+  }) {
+    const row = turmaGrade?.[dia] || {};
+    const byDisc = new Map();
+
+    for (let p = 1; p <= periodosPorDia; p++) {
+      const cell = row[p];
+      if (!cell || !cell.disciplina_id) continue;
+      const dId = Number(cell.disciplina_id);
+      let st = byDisc.get(dId);
+      if (!st) {
+        st = { count: 0, minP: p, maxP: p, allLocked: true };
+        byDisc.set(dId, st);
+      }
+      st.count++;
+      if (p < st.minP) st.minP = p;
+      if (p > st.maxP) st.maxP = p;
+      if (!cell.locked) st.allLocked = false;
+    }
+
+    const proibirSeparadas = regrasGerais ? regrasGerais.proibir_aulas_separadas_mesmo_dia !== false : true;
+
+    for (const [dId, st] of byDisc.entries()) {
+      if (st.count <= 1 || st.allLocked) continue;
+
+      if (proibirSeparadas && st.maxP - st.minP + 1 !== st.count) {
+        return false;
+      }
+
+      if (strictPedagogical) {
+        const maxDia = getRc02MaxForDisc(rc02Cfg, dId);
+        if (st.count > maxDia) return false;
+        if (st.count > rc01MaxConsecutivas) return false;
+      }
+    }
+
+    return true;
+  }
+
   function computeSlotScore({
     turmaGrade,
     profGrade,
@@ -197,7 +302,7 @@ function solverWorkerBootstrap(workerScope) {
 
     const consec = consecutiveRunIfPut(turmaGrade, dia, periodo, disciplinaId, periodosPorDia);
     if (consec > rc01MaxConsecutivas) {
-      score += 50000 + (consec - rc01MaxConsecutivas) * 10000;
+      score += 80000 + (consec - rc01MaxConsecutivas) * 20000;
     }
 
     const leftCell = periodo > 1 ? turmaGrade?.[dia]?.[periodo - 1] : null;
@@ -206,26 +311,61 @@ function solverWorkerBootstrap(workerScope) {
     const rightSame = rightCell && Number(rightCell.disciplina_id) === Number(disciplinaId);
 
     const prefDuplas = regrasGerais ? Boolean(regrasGerais.preferencia_aulas_duplas) : true;
+    const proibirSeparadas = regrasGerais ? regrasGerais.proibir_aulas_separadas_mesmo_dia !== false : true;
+    const maxDia = getRc02MaxForDisc(rc02Cfg, disciplinaId);
+    const inDay = countDiscInDay(turmaGrade, dia, disciplinaId);
+    const strictCap = !!rc02Cfg?.strictCapMock;
+
+    const isNoturno = String(turno || "").toLowerCase().includes("noturno");
+    const turnoKey = String(turno || "matutino").toLowerCase();
+    const intAfter =
+      regrasGerais?.recreio_apos_periodo?.[turnoKey] !== undefined
+        ? Number(regrasGerais.recreio_apos_periodo[turnoKey])
+        : isNoturno
+        ? 2
+        : 3;
+    const evitaSepararRecreio = regrasGerais ? !regrasGerais.aulas_duplas_separar_recreio : true;
+
+    if (inDay >= 1 && !leftSame && !rightSame) {
+      // Penalidade severíssima para aulas separadas da mesma disciplina no mesmo dia (ex.: 1º e 6º horário)
+      score += proibirSeparadas ? 150000 : 45000;
+    }
 
     if (!prefDuplas) {
       if (leftSame || rightSame) score += 2000;
     } else {
       if (leftSame || rightSame) {
-        if (consec <= rc01MaxConsecutivas) score -= 2600;
-      } else {
-        score += 450;
+        if (consec <= rc01MaxConsecutivas && inDay < maxDia) {
+          score -= 4500;
+        }
+      } else if (inDay === 0) {
+        // Verifica se este slot possui vizinho imediato livre (na turma e no professor) para formar aula dupla depois
+        const canPairLeft =
+          periodo > 1 &&
+          !turmaGrade?.[dia]?.[periodo - 1] &&
+          !profGrade?.[dia]?.[periodo - 1] &&
+          professorPode(dispoIdx, professorId, dia, periodo - 1) &&
+          (!evitaSepararRecreio || periodo - 1 !== intAfter);
+        const canPairRight =
+          periodo < periodosPorDia &&
+          !turmaGrade?.[dia]?.[periodo + 1] &&
+          !profGrade?.[dia]?.[periodo + 1] &&
+          professorPode(dispoIdx, professorId, dia, periodo + 1) &&
+          (!evitaSepararRecreio || periodo !== intAfter);
+
+        if (canPairLeft || canPairRight) {
+          score -= 600;
+        } else {
+          score += 650;
+        }
       }
     }
 
-    const maxDia = getRc02MaxForDisc(rc02Cfg, disciplinaId);
-    const inDay = countDiscInDay(turmaGrade, dia, disciplinaId);
-    const strictCap = !!rc02Cfg?.strictCapMock;
-
     if (inDay >= maxDia) {
       if (strictCap || rc02Cfg.modo === "hard" || (rc02Cfg.bloqueioHard && maxDia === rc02Cfg.maxHardPadrao)) {
-        score += 100000;
+        score += 150000;
       } else {
-        score += 20000 + (inDay - maxDia + 1) * 5000;
+        score += 35000 + (inDay - maxDia + 1) * 10000;
       }
     }
 
@@ -257,14 +397,12 @@ function solverWorkerBootstrap(workerScope) {
     score += dia * 0.04;
 
     if (regrasGerais) {
-      if (!regrasGerais.aulas_duplas_separar_recreio) {
-        const isNoturno = String(turno || "").toLowerCase().includes("noturno");
-        const intAfter = isNoturno ? 2 : 3;
+      if (evitaSepararRecreio && intAfter > 0) {
         if (
           (periodo === intAfter && rightSame) ||
           (periodo === intAfter + 1 && leftSame)
         ) {
-          score += 3500;
+          score += 5500;
         }
       }
       if (regrasGerais.limite_aulas_seguidas_prof) {
@@ -579,6 +717,7 @@ function solverWorkerBootstrap(workerScope) {
     regrasGerais,
     turno,
     preferencias,
+    strictPedagogical = true,
   }) {
     const turmaGrade = gradePorTurma[turmaId];
     const profGrade = gradePorProfessor[professorId];
@@ -589,6 +728,22 @@ function solverWorkerBootstrap(workerScope) {
         if (turmaGrade?.[dia]?.[periodo]) continue;
         if (profGrade?.[dia]?.[periodo]) continue;
         if (!professorPode(dispoIdx, professorId, dia, periodo)) continue;
+
+        if (
+          !canPlaceDiscInTurmaSlot({
+            turmaGrade,
+            dia,
+            periodo,
+            disciplinaId,
+            periodosPorDia,
+            rc01MaxConsecutivas,
+            rc02Cfg,
+            regrasGerais,
+            strictPedagogical,
+          })
+        ) {
+          continue;
+        }
 
         if (Array.isArray(coProfessores) && coProfessores.length > 0) {
           let coOk = true;
@@ -633,7 +788,11 @@ function solverWorkerBootstrap(workerScope) {
     professorId,
     disciplinaId,
     diasList,
-    periodosPorDia
+    periodosPorDia,
+    rc01MaxConsecutivas = 2,
+    rc02Cfg = null,
+    regrasGerais = null,
+    strictPedagogical = true
   ) {
     const turmaGrade = gradePorTurma[turmaId];
     const profGrade = gradePorProfessor[professorId];
@@ -657,7 +816,7 @@ function solverWorkerBootstrap(workerScope) {
 
     for (const cand of freeForProf) {
       const occ = turmaGrade?.[cand.d]?.[cand.p];
-      if (!occ || occ.locked) continue;
+      if (!occ || occ.locked || occ.co_professores?.length) continue;
       const otherProf = occ.professor_id;
       const otherDisc = occ.disciplina_id;
       if (isCellLocked(gradePorTurma, gradePorProfessor, turmaId, otherProf, cand.d, cand.p)) continue;
@@ -668,7 +827,36 @@ function solverWorkerBootstrap(workerScope) {
             clearSlot(gradePorTurma, gradePorProfessor, turmaId, otherProf, cand.d, cand.p);
             setSlot(gradePorTurma, gradePorProfessor, turmaId, otherProf, empty.d, empty.p, otherDisc);
             setSlot(gradePorTurma, gradePorProfessor, turmaId, professorId, cand.d, cand.p, disciplinaId);
-            return { dia: cand.d, periodo: cand.p };
+
+            const validCand = isTurmaDayPedagogicallyValid({
+              turmaGrade,
+              dia: cand.d,
+              periodosPorDia,
+              rc01MaxConsecutivas,
+              rc02Cfg,
+              regrasGerais,
+              strictPedagogical,
+            });
+            const validEmpty =
+              empty.d === cand.d ||
+              isTurmaDayPedagogicallyValid({
+                turmaGrade,
+                dia: empty.d,
+                periodosPorDia,
+                rc01MaxConsecutivas,
+                rc02Cfg,
+                regrasGerais,
+                strictPedagogical,
+              });
+
+            if (validCand && validEmpty) {
+              return { dia: cand.d, periodo: cand.p };
+            }
+
+            // Reverte caso viole regra pedagógica (ex.: aulas separadas no mesmo dia ou excesso no dia)
+            clearSlot(gradePorTurma, gradePorProfessor, turmaId, professorId, cand.d, cand.p);
+            clearSlot(gradePorTurma, gradePorProfessor, turmaId, otherProf, empty.d, empty.p);
+            setSlot(gradePorTurma, gradePorProfessor, turmaId, otherProf, cand.d, cand.p, otherDisc);
           }
         }
       }
@@ -684,7 +872,11 @@ function solverWorkerBootstrap(workerScope) {
     professorId,
     disciplinaId,
     diasList,
-    periodosPorDia
+    periodosPorDia,
+    rc01MaxConsecutivas = 2,
+    rc02Cfg = null,
+    regrasGerais = null,
+    strictPedagogical = true
   ) {
     const turmaGrade = gradePorTurma[turmaId];
     const profGrade = gradePorProfessor[professorId];
@@ -708,7 +900,7 @@ function solverWorkerBootstrap(workerScope) {
 
     for (const s1 of freeForProf) {
       const occB = turmaGrade?.[s1.d]?.[s1.p];
-      if (!occB || occB.locked) continue;
+      if (!occB || occB.locked || occB.co_professores?.length) continue;
       const profB = occB.professor_id;
       const discB = occB.disciplina_id;
       if (isCellLocked(gradePorTurma, gradePorProfessor, turmaId, profB, s1.d, s1.p)) continue;
@@ -720,7 +912,7 @@ function solverWorkerBootstrap(workerScope) {
           if (!professorPode(dispoIdx, profB, d2, p2)) continue;
 
           const occC = turmaGrade?.[d2]?.[p2];
-          if (!occC || occC.locked) continue;
+          if (!occC || occC.locked || occC.co_professores?.length) continue;
           const profC = occC.professor_id;
           const discC = occC.disciplina_id;
           if (profC === profB || profC === professorId) continue;
@@ -736,7 +928,36 @@ function solverWorkerBootstrap(workerScope) {
                 setSlot(gradePorTurma, gradePorProfessor, turmaId, profB, d2, p2, discB);
 
                 setSlot(gradePorTurma, gradePorProfessor, turmaId, professorId, s1.d, s1.p, disciplinaId);
-                return { dia: s1.d, periodo: s1.p };
+
+                const daysToCheck = uniq([s1.d, d2, s3.d]);
+                let allValid = true;
+                for (const dCheck of daysToCheck) {
+                  if (
+                    !isTurmaDayPedagogicallyValid({
+                      turmaGrade,
+                      dia: dCheck,
+                      periodosPorDia,
+                      rc01MaxConsecutivas,
+                      rc02Cfg,
+                      regrasGerais,
+                      strictPedagogical,
+                    })
+                  ) {
+                    allValid = false;
+                    break;
+                  }
+                }
+
+                if (allValid) {
+                  return { dia: s1.d, periodo: s1.p };
+                }
+
+                // Reverte
+                clearSlot(gradePorTurma, gradePorProfessor, turmaId, professorId, s1.d, s1.p);
+                clearSlot(gradePorTurma, gradePorProfessor, turmaId, profB, d2, p2);
+                clearSlot(gradePorTurma, gradePorProfessor, turmaId, profC, s3.d, s3.p);
+                setSlot(gradePorTurma, gradePorProfessor, turmaId, profB, s1.d, s1.p, discB);
+                setSlot(gradePorTurma, gradePorProfessor, turmaId, profC, d2, p2, discC);
               }
             }
           }
@@ -754,7 +975,11 @@ function solverWorkerBootstrap(workerScope) {
     professorId,
     disciplinaId,
     diasList,
-    periodosPorDia
+    periodosPorDia,
+    rc01MaxConsecutivas = 2,
+    rc02Cfg = null,
+    regrasGerais = null,
+    strictPedagogical = true
   ) {
     const turmaGrade = gradePorTurma[turmaId];
     const profGrade = gradePorProfessor[professorId];
@@ -778,7 +1003,7 @@ function solverWorkerBootstrap(workerScope) {
 
     for (const s1 of freeForProf) {
       const occB = turmaGrade?.[s1.d]?.[s1.p];
-      if (!occB || occB.locked) continue;
+      if (!occB || occB.locked || occB.co_professores?.length) continue;
       const profB = occB.professor_id;
       const discB = occB.disciplina_id;
       if (isCellLocked(gradePorTurma, gradePorProfessor, turmaId, profB, s1.d, s1.p)) continue;
@@ -790,7 +1015,7 @@ function solverWorkerBootstrap(workerScope) {
           if (!professorPode(dispoIdx, profB, d2, p2)) continue;
 
           const occC = turmaGrade?.[d2]?.[p2];
-          if (!occC || occC.locked) continue;
+          if (!occC || occC.locked || occC.co_professores?.length) continue;
           const profC = occC.professor_id;
           const discC = occC.disciplina_id;
           if (profC === profB || profC === professorId) continue;
@@ -803,7 +1028,7 @@ function solverWorkerBootstrap(workerScope) {
               if (!professorPode(dispoIdx, profC, d3, p3)) continue;
 
               const occD = turmaGrade?.[d3]?.[p3];
-              if (!occD || occD.locked) continue;
+              if (!occD || occD.locked || occD.co_professores?.length) continue;
               const profD = occD.professor_id;
               const discD = occD.disciplina_id;
               if (profD === profC || profD === profB || profD === professorId) continue;
@@ -822,7 +1047,38 @@ function solverWorkerBootstrap(workerScope) {
                     setSlot(gradePorTurma, gradePorProfessor, turmaId, profB, d2, p2, discB);
 
                     setSlot(gradePorTurma, gradePorProfessor, turmaId, professorId, s1.d, s1.p, disciplinaId);
-                    return { dia: s1.d, periodo: s1.p };
+
+                    const daysToCheck = uniq([s1.d, d2, d3, s4.d]);
+                    let allValid = true;
+                    for (const dCheck of daysToCheck) {
+                      if (
+                        !isTurmaDayPedagogicallyValid({
+                          turmaGrade,
+                          dia: dCheck,
+                          periodosPorDia,
+                          rc01MaxConsecutivas,
+                          rc02Cfg,
+                          regrasGerais,
+                          strictPedagogical,
+                        })
+                      ) {
+                        allValid = false;
+                        break;
+                      }
+                    }
+
+                    if (allValid) {
+                      return { dia: s1.d, periodo: s1.p };
+                    }
+
+                    // Reverte
+                    clearSlot(gradePorTurma, gradePorProfessor, turmaId, professorId, s1.d, s1.p);
+                    clearSlot(gradePorTurma, gradePorProfessor, turmaId, profB, d2, p2);
+                    clearSlot(gradePorTurma, gradePorProfessor, turmaId, profC, d3, p3);
+                    clearSlot(gradePorTurma, gradePorProfessor, turmaId, profD, s4.d, s4.p);
+                    setSlot(gradePorTurma, gradePorProfessor, turmaId, profB, s1.d, s1.p, discB);
+                    setSlot(gradePorTurma, gradePorProfessor, turmaId, profC, d2, p2, discC);
+                    setSlot(gradePorTurma, gradePorProfessor, turmaId, profD, d3, p3, discD);
                   }
                 }
               }
@@ -842,7 +1098,11 @@ function solverWorkerBootstrap(workerScope) {
     professorId,
     disciplinaId,
     diasList,
-    periodosPorDia
+    periodosPorDia,
+    rc01MaxConsecutivas = 2,
+    rc02Cfg = null,
+    regrasGerais = null,
+    strictPedagogical = true
   ) {
     const turmaGrade = gradePorTurma[turmaId];
     const profGrade = gradePorProfessor[professorId];
@@ -864,8 +1124,24 @@ function solverWorkerBootstrap(workerScope) {
     // Caso 1: Turma T está livre em (d1, p1), mas o Professor P está dando aula em outra turma T2 nesse mesmo horário
     for (const s1 of freeInTurma) {
       if (!professorPode(dispoIdx, professorId, s1.d, s1.p)) continue;
+      if (
+        !canPlaceDiscInTurmaSlot({
+          turmaGrade,
+          dia: s1.d,
+          periodo: s1.p,
+          disciplinaId,
+          periodosPorDia,
+          rc01MaxConsecutivas,
+          rc02Cfg,
+          regrasGerais,
+          strictPedagogical,
+        })
+      ) {
+        continue;
+      }
+
       const conflictCell = profGrade?.[s1.d]?.[s1.p];
-      if (!conflictCell || conflictCell.locked) continue;
+      if (!conflictCell || conflictCell.locked || conflictCell.co_docencia) continue;
 
       const t2Id = conflictCell.turma_id;
       const discInT2 = conflictCell.disciplina_id;
@@ -874,19 +1150,57 @@ function solverWorkerBootstrap(workerScope) {
       if (isCellLocked(gradePorTurma, gradePorProfessor, t2Id, professorId, s1.d, s1.p)) continue;
 
       const t2Grade = gradePorTurma[t2Id];
+      if (t2Grade?.[s1.d]?.[s1.p]?.co_professores?.length) continue;
 
       for (const s2 of freeForProf) {
         if (!t2Grade?.[s2.d]?.[s2.p]) {
           clearSlot(gradePorTurma, gradePorProfessor, t2Id, professorId, s1.d, s1.p);
           setSlot(gradePorTurma, gradePorProfessor, t2Id, professorId, s2.d, s2.p, discInT2);
           setSlot(gradePorTurma, gradePorProfessor, turmaId, professorId, s1.d, s1.p, disciplinaId);
-          return { dia: s1.d, periodo: s1.p };
+
+          const okT1 = isTurmaDayPedagogicallyValid({
+            turmaGrade,
+            dia: s1.d,
+            periodosPorDia,
+            rc01MaxConsecutivas,
+            rc02Cfg,
+            regrasGerais,
+            strictPedagogical,
+          });
+          const okT2a = isTurmaDayPedagogicallyValid({
+            turmaGrade: t2Grade,
+            dia: s1.d,
+            periodosPorDia,
+            rc01MaxConsecutivas,
+            rc02Cfg,
+            regrasGerais,
+            strictPedagogical,
+          });
+          const okT2b =
+            s2.d === s1.d ||
+            isTurmaDayPedagogicallyValid({
+              turmaGrade: t2Grade,
+              dia: s2.d,
+              periodosPorDia,
+              rc01MaxConsecutivas,
+              rc02Cfg,
+              regrasGerais,
+              strictPedagogical,
+            });
+
+          if (okT1 && okT2a && okT2b) {
+            return { dia: s1.d, periodo: s1.p };
+          }
+
+          clearSlot(gradePorTurma, gradePorProfessor, turmaId, professorId, s1.d, s1.p);
+          clearSlot(gradePorTurma, gradePorProfessor, t2Id, professorId, s2.d, s2.p);
+          setSlot(gradePorTurma, gradePorProfessor, t2Id, professorId, s1.d, s1.p, discInT2);
         }
       }
 
       for (const s2 of freeForProf) {
         const occT2 = t2Grade?.[s2.d]?.[s2.p];
-        if (!occT2 || occT2.locked) continue;
+        if (!occT2 || occT2.locked || occT2.co_professores?.length) continue;
         const profQ = occT2.professor_id;
         const discQ = occT2.disciplina_id;
         if (profQ === professorId) continue;
@@ -898,7 +1212,46 @@ function solverWorkerBootstrap(workerScope) {
           setSlot(gradePorTurma, gradePorProfessor, t2Id, profQ, s1.d, s1.p, discQ);
           setSlot(gradePorTurma, gradePorProfessor, t2Id, professorId, s2.d, s2.p, discInT2);
           setSlot(gradePorTurma, gradePorProfessor, turmaId, professorId, s1.d, s1.p, disciplinaId);
-          return { dia: s1.d, periodo: s1.p };
+
+          const okT1 = isTurmaDayPedagogicallyValid({
+            turmaGrade,
+            dia: s1.d,
+            periodosPorDia,
+            rc01MaxConsecutivas,
+            rc02Cfg,
+            regrasGerais,
+            strictPedagogical,
+          });
+          const okT2a = isTurmaDayPedagogicallyValid({
+            turmaGrade: t2Grade,
+            dia: s1.d,
+            periodosPorDia,
+            rc01MaxConsecutivas,
+            rc02Cfg,
+            regrasGerais,
+            strictPedagogical,
+          });
+          const okT2b =
+            s2.d === s1.d ||
+            isTurmaDayPedagogicallyValid({
+              turmaGrade: t2Grade,
+              dia: s2.d,
+              periodosPorDia,
+              rc01MaxConsecutivas,
+              rc02Cfg,
+              regrasGerais,
+              strictPedagogical,
+            });
+
+          if (okT1 && okT2a && okT2b) {
+            return { dia: s1.d, periodo: s1.p };
+          }
+
+          clearSlot(gradePorTurma, gradePorProfessor, turmaId, professorId, s1.d, s1.p);
+          clearSlot(gradePorTurma, gradePorProfessor, t2Id, profQ, s1.d, s1.p);
+          clearSlot(gradePorTurma, gradePorProfessor, t2Id, professorId, s2.d, s2.p);
+          setSlot(gradePorTurma, gradePorProfessor, t2Id, professorId, s1.d, s1.p, discInT2);
+          setSlot(gradePorTurma, gradePorProfessor, t2Id, profQ, s2.d, s2.p, discQ);
         }
 
         for (const d3 of diasList) {
@@ -910,7 +1263,44 @@ function solverWorkerBootstrap(workerScope) {
                 setSlot(gradePorTurma, gradePorProfessor, t2Id, profQ, d3, p3, discQ);
                 setSlot(gradePorTurma, gradePorProfessor, t2Id, professorId, s2.d, s2.p, discInT2);
                 setSlot(gradePorTurma, gradePorProfessor, turmaId, professorId, s1.d, s1.p, disciplinaId);
-                return { dia: s1.d, periodo: s1.p };
+
+                const okT1 = isTurmaDayPedagogicallyValid({
+                  turmaGrade,
+                  dia: s1.d,
+                  periodosPorDia,
+                  rc01MaxConsecutivas,
+                  rc02Cfg,
+                  regrasGerais,
+                  strictPedagogical,
+                });
+                const daysT2 = uniq([s1.d, s2.d, d3]);
+                let okT2 = true;
+                for (const dCheck of daysT2) {
+                  if (
+                    !isTurmaDayPedagogicallyValid({
+                      turmaGrade: t2Grade,
+                      dia: dCheck,
+                      periodosPorDia,
+                      rc01MaxConsecutivas,
+                      rc02Cfg,
+                      regrasGerais,
+                      strictPedagogical,
+                    })
+                  ) {
+                    okT2 = false;
+                    break;
+                  }
+                }
+
+                if (okT1 && okT2) {
+                  return { dia: s1.d, periodo: s1.p };
+                }
+
+                clearSlot(gradePorTurma, gradePorProfessor, turmaId, professorId, s1.d, s1.p);
+                clearSlot(gradePorTurma, gradePorProfessor, t2Id, profQ, d3, p3);
+                clearSlot(gradePorTurma, gradePorProfessor, t2Id, professorId, s2.d, s2.p);
+                setSlot(gradePorTurma, gradePorProfessor, t2Id, professorId, s1.d, s1.p, discInT2);
+                setSlot(gradePorTurma, gradePorProfessor, t2Id, profQ, s2.d, s2.p, discQ);
               }
             }
           }
@@ -921,7 +1311,7 @@ function solverWorkerBootstrap(workerScope) {
     // Caso 2: Professor P está livre em s1, Turma T tem profB em s1, e profB quer ir para emptyInT onde está em T3
     for (const s1 of freeForProf) {
       const occT = turmaGrade?.[s1.d]?.[s1.p];
-      if (!occT || occT.locked) continue;
+      if (!occT || occT.locked || occT.co_professores?.length) continue;
       const profB = occT.professor_id;
       const discB = occT.disciplina_id;
       if (isCellLocked(gradePorTurma, gradePorProfessor, turmaId, profB, s1.d, s1.p)) continue;
@@ -929,7 +1319,7 @@ function solverWorkerBootstrap(workerScope) {
       for (const emptyT of freeInTurma) {
         if (!professorPode(dispoIdx, profB, emptyT.d, emptyT.p)) continue;
         const conflictB = gradePorProfessor[profB]?.[emptyT.d]?.[emptyT.p];
-        if (!conflictB || conflictB.locked) continue;
+        if (!conflictB || conflictB.locked || conflictB.co_docencia) continue;
 
         const t3Id = conflictB.turma_id;
         const discBInT3 = conflictB.disciplina_id;
@@ -937,13 +1327,63 @@ function solverWorkerBootstrap(workerScope) {
         if (!gradePorTurma[t3Id]) continue;
         if (isCellLocked(gradePorTurma, gradePorProfessor, t3Id, profB, emptyT.d, emptyT.p)) continue;
 
-        if (!gradePorTurma[t3Id]?.[s1.d]?.[s1.p] && professorPode(dispoIdx, profB, s1.d, s1.p)) {
+        const t3Grade = gradePorTurma[t3Id];
+        if (t3Grade?.[emptyT.d]?.[emptyT.p]?.co_professores?.length) continue;
+
+        if (!t3Grade?.[s1.d]?.[s1.p] && professorPode(dispoIdx, profB, s1.d, s1.p)) {
           clearSlot(gradePorTurma, gradePorProfessor, t3Id, profB, emptyT.d, emptyT.p);
           clearSlot(gradePorTurma, gradePorProfessor, turmaId, profB, s1.d, s1.p);
           setSlot(gradePorTurma, gradePorProfessor, t3Id, profB, s1.d, s1.p, discBInT3);
           setSlot(gradePorTurma, gradePorProfessor, turmaId, profB, emptyT.d, emptyT.p, discB);
           setSlot(gradePorTurma, gradePorProfessor, turmaId, professorId, s1.d, s1.p, disciplinaId);
-          return { dia: s1.d, periodo: s1.p };
+
+          const daysT1 = uniq([s1.d, emptyT.d]);
+          const daysT3 = uniq([s1.d, emptyT.d]);
+          let okAll = true;
+          for (const dCheck of daysT1) {
+            if (
+              !isTurmaDayPedagogicallyValid({
+                turmaGrade,
+                dia: dCheck,
+                periodosPorDia,
+                rc01MaxConsecutivas,
+                rc02Cfg,
+                regrasGerais,
+                strictPedagogical,
+              })
+            ) {
+              okAll = false;
+              break;
+            }
+          }
+          if (okAll) {
+            for (const dCheck of daysT3) {
+              if (
+                !isTurmaDayPedagogicallyValid({
+                  turmaGrade: t3Grade,
+                  dia: dCheck,
+                  periodosPorDia,
+                  rc01MaxConsecutivas,
+                  rc02Cfg,
+                  regrasGerais,
+                  strictPedagogical,
+                })
+              ) {
+                okAll = false;
+                break;
+              }
+            }
+          }
+
+          if (okAll) {
+            return { dia: s1.d, periodo: s1.p };
+          }
+
+          clearSlot(gradePorTurma, gradePorProfessor, turmaId, professorId, s1.d, s1.p);
+          clearSlot(gradePorTurma, gradePorProfessor, turmaId, profB, emptyT.d, emptyT.p);
+          clearSlot(gradePorTurma, gradePorProfessor, t3Id, profB, s1.d, s1.p);
+          setSlot(gradePorTurma, gradePorProfessor, turmaId, profB, s1.d, s1.p, discB);
+          setSlot(gradePorTurma, gradePorProfessor, t3Id, profB, emptyT.d, emptyT.p, discBInT3);
         }
       }
     }
@@ -966,6 +1406,7 @@ function solverWorkerBootstrap(workerScope) {
     turno,
     preferencias,
     coProfessores = null,
+    strictPedagogical = true,
   }) {
     const best = findBestFreeSlot({
       gradePorTurma,
@@ -982,6 +1423,7 @@ function solverWorkerBootstrap(workerScope) {
       turno,
       preferencias,
       coProfessores,
+      strictPedagogical,
     });
 
     if (best) {
@@ -993,16 +1435,76 @@ function solverWorkerBootstrap(workerScope) {
       return false;
     }
 
-    if (trySingleSwap(gradePorTurma, gradePorProfessor, dispoIdx, turmaId, professorId, disciplinaId, diasList, periodosPorDia)) {
+    if (
+      trySingleSwap(
+        gradePorTurma,
+        gradePorProfessor,
+        dispoIdx,
+        turmaId,
+        professorId,
+        disciplinaId,
+        diasList,
+        periodosPorDia,
+        rc01MaxConsecutivas,
+        rc02Cfg,
+        regrasGerais,
+        strictPedagogical
+      )
+    ) {
       return true;
     }
-    if (tryCrossTurmaKempeChain(gradePorTurma, gradePorProfessor, dispoIdx, turmaId, professorId, disciplinaId, diasList, periodosPorDia)) {
+    if (
+      tryCrossTurmaKempeChain(
+        gradePorTurma,
+        gradePorProfessor,
+        dispoIdx,
+        turmaId,
+        professorId,
+        disciplinaId,
+        diasList,
+        periodosPorDia,
+        rc01MaxConsecutivas,
+        rc02Cfg,
+        regrasGerais,
+        strictPedagogical
+      )
+    ) {
       return true;
     }
-    if (tryDoubleSwap(gradePorTurma, gradePorProfessor, dispoIdx, turmaId, professorId, disciplinaId, diasList, periodosPorDia)) {
+    if (
+      tryDoubleSwap(
+        gradePorTurma,
+        gradePorProfessor,
+        dispoIdx,
+        turmaId,
+        professorId,
+        disciplinaId,
+        diasList,
+        periodosPorDia,
+        rc01MaxConsecutivas,
+        rc02Cfg,
+        regrasGerais,
+        strictPedagogical
+      )
+    ) {
       return true;
     }
-    if (tryTripleSwap(gradePorTurma, gradePorProfessor, dispoIdx, turmaId, professorId, disciplinaId, diasList, periodosPorDia)) {
+    if (
+      tryTripleSwap(
+        gradePorTurma,
+        gradePorProfessor,
+        dispoIdx,
+        turmaId,
+        professorId,
+        disciplinaId,
+        diasList,
+        periodosPorDia,
+        rc01MaxConsecutivas,
+        rc02Cfg,
+        regrasGerais,
+        strictPedagogical
+      )
+    ) {
       return true;
     }
 
@@ -1022,6 +1524,7 @@ function solverWorkerBootstrap(workerScope) {
     turno,
     preferencias,
     maxSteps = 90,
+    strictPedagogical = true,
   }) {
     if (!unplacedLessons || unplacedLessons.length === 0) return [];
 
@@ -1052,6 +1555,7 @@ function solverWorkerBootstrap(workerScope) {
         turno,
         preferencias,
         coProfessores: coProfs || null,
+        strictPedagogical,
       });
 
       if (placedDirect) {
@@ -1073,9 +1577,25 @@ function solverWorkerBootstrap(workerScope) {
         for (let p = 1; p <= periodosPorDia; p++) {
           if (!professorPode(dispoIdx, pId, d, p)) continue;
 
+          if (
+            !canPlaceDiscInTurmaSlot({
+              turmaGrade: gradePorTurma[tId],
+              dia: d,
+              periodo: p,
+              disciplinaId: dId,
+              periodosPorDia,
+              rc01MaxConsecutivas,
+              rc02Cfg,
+              regrasGerais,
+              strictPedagogical,
+            })
+          ) {
+            continue;
+          }
+
           const cellT = gradePorTurma[tId]?.[d]?.[p];
           const cellP = gradePorProfessor[pId]?.[d]?.[p];
-          if (cellT?.locked || cellP?.locked) continue;
+          if (cellT?.locked || cellP?.locked || cellT?.co_professores?.length || cellP?.co_docencia) continue;
 
           const tabuKey = `${tId}|${pId}|${d}|${p}`;
           const isTabu = (tabuMap.get(tabuKey) || 0) > step;
@@ -1138,6 +1658,7 @@ function solverWorkerBootstrap(workerScope) {
           turno,
           preferencias,
           coProfessores: ej.co_professores || null,
+          strictPedagogical,
         });
         if (!okEj) queue.push(ej);
       }
@@ -1226,7 +1747,205 @@ function solverWorkerBootstrap(workerScope) {
     }
   }
 
-  function runGreedySolver(payload, randomize = false, strategy = "default") {
+  function polishGradePedagogica({
+    gradePorTurma,
+    gradePorProfessor,
+    dispoIdx,
+    diasList,
+    periodosPorDia,
+    rc01MaxConsecutivas,
+    rc02Cfg,
+    regrasGerais,
+  }) {
+    const prefDuplas = regrasGerais ? Boolean(regrasGerais.preferencia_aulas_duplas) : true;
+
+    for (const [tIdStr, turmaGrade] of Object.entries(gradePorTurma)) {
+      const tId = toInt(tIdStr, 0);
+      if (!tId || !turmaGrade) continue;
+
+      // 1) Compactação intra-dia: se por qualquer motivo houver 2 aulas da mesma disciplina no mesmo dia separadas,
+      // tenta permutar dentro do próprio dia para colá-las como aula dupla
+      for (const d of diasList) {
+        const row = turmaGrade[d] || {};
+        for (let p1 = 1; p1 <= periodosPorDia; p1++) {
+          const c1 = row[p1];
+          if (!c1 || c1.locked || c1.co_professores?.length) continue;
+          for (let p2 = p1 + 2; p2 <= periodosPorDia; p2++) {
+            const c2 = row[p2];
+            if (!c2 || c2.locked || c2.co_professores?.length) continue;
+            if (Number(c1.disciplina_id) !== Number(c2.disciplina_id)) continue;
+
+            // Tenta trocar p2 com p1 + 1 (ou p1 com p2 - 1)
+            const targets = [
+              { moveFrom: p2, swapWith: p1 + 1 },
+              { moveFrom: p1, swapWith: p2 - 1 },
+            ];
+            for (const { moveFrom, swapWith } of targets) {
+              const cellMove = row[moveFrom];
+              const cellNeighbor = row[swapWith];
+              if (!cellMove || !cellNeighbor || cellNeighbor.locked || cellNeighbor.co_professores?.length) continue;
+
+              const profM = cellMove.professor_id;
+              const discM = cellMove.disciplina_id;
+              const profN = cellNeighbor.professor_id;
+              const discN = cellNeighbor.disciplina_id;
+
+              if (
+                !gradePorProfessor[profM]?.[d]?.[swapWith] &&
+                professorPode(dispoIdx, profM, d, swapWith) &&
+                !gradePorProfessor[profN]?.[d]?.[moveFrom] &&
+                professorPode(dispoIdx, profN, d, moveFrom)
+              ) {
+                clearSlot(gradePorTurma, gradePorProfessor, tId, profM, d, moveFrom);
+                clearSlot(gradePorTurma, gradePorProfessor, tId, profN, d, swapWith);
+                setSlot(gradePorTurma, gradePorProfessor, tId, profM, d, swapWith, discM);
+                setSlot(gradePorTurma, gradePorProfessor, tId, profN, d, moveFrom, discN);
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      // 2) Polimento de Geminação entre dias: se preferencia_aulas_duplas estiver ativa,
+      // procura disciplinas com aulas isoladas em 2 dias diferentes e tenta juntá-las num par geminado
+      if (prefDuplas) {
+        for (const d1 of diasList) {
+          for (let p1 = 1; p1 <= periodosPorDia; p1++) {
+            const c1 = turmaGrade[d1]?.[p1];
+            if (!c1 || c1.locked || c1.co_professores?.length) continue;
+            if (countDiscInDay(turmaGrade, d1, c1.disciplina_id) !== 1) continue;
+
+            const adjPeriods = [p1 - 1, p1 + 1].filter(p => p >= 1 && p <= periodosPorDia);
+            for (const pAdj of adjPeriods) {
+              const cAdj = turmaGrade[d1]?.[pAdj];
+              if (!cAdj || cAdj.locked || cAdj.co_professores?.length) continue;
+              if (Number(cAdj.disciplina_id) === Number(c1.disciplina_id)) continue;
+              // Não quebra uma aula que já faz parte de uma dupla!
+              if (countDiscInDay(turmaGrade, d1, cAdj.disciplina_id) > 1) continue;
+
+              let paired = false;
+              for (const d2 of diasList) {
+                if (d2 === d1) continue;
+                if (countDiscInDay(turmaGrade, d2, c1.disciplina_id) !== 1) continue;
+
+                for (let p2 = 1; p2 <= periodosPorDia; p2++) {
+                  const c2 = turmaGrade[d2]?.[p2];
+                  if (!c2 || c2.locked || c2.co_professores?.length) continue;
+                  if (Number(c2.disciplina_id) !== Number(c1.disciplina_id)) continue;
+
+                  const prof1 = c2.professor_id;
+                  const disc1 = c2.disciplina_id;
+                  const profAdj = cAdj.professor_id;
+                  const discAdj = cAdj.disciplina_id;
+
+                  if (
+                    !gradePorProfessor[prof1]?.[d1]?.[pAdj] &&
+                    professorPode(dispoIdx, prof1, d1, pAdj) &&
+                    !gradePorProfessor[profAdj]?.[d2]?.[p2] &&
+                    professorPode(dispoIdx, profAdj, d2, p2)
+                  ) {
+                    clearSlot(gradePorTurma, gradePorProfessor, tId, profAdj, d1, pAdj);
+                    clearSlot(gradePorTurma, gradePorProfessor, tId, prof1, d2, p2);
+                    setSlot(gradePorTurma, gradePorProfessor, tId, prof1, d1, pAdj, disc1);
+                    setSlot(gradePorTurma, gradePorProfessor, tId, profAdj, d2, p2, discAdj);
+
+                    const okD1 = isTurmaDayPedagogicallyValid({
+                      turmaGrade,
+                      dia: d1,
+                      periodosPorDia,
+                      rc01MaxConsecutivas,
+                      rc02Cfg,
+                      regrasGerais,
+                      strictPedagogical: true,
+                    });
+                    const okD2 = isTurmaDayPedagogicallyValid({
+                      turmaGrade,
+                      dia: d2,
+                      periodosPorDia,
+                      rc01MaxConsecutivas,
+                      rc02Cfg,
+                      regrasGerais,
+                      strictPedagogical: true,
+                    });
+
+                    if (okD1 && okD2) {
+                      paired = true;
+                      break;
+                    }
+
+                    // Reverte se violar
+                    clearSlot(gradePorTurma, gradePorProfessor, tId, prof1, d1, pAdj);
+                    clearSlot(gradePorTurma, gradePorProfessor, tId, profAdj, d2, p2);
+                    setSlot(gradePorTurma, gradePorProfessor, tId, profAdj, d1, pAdj, discAdj);
+                    setSlot(gradePorTurma, gradePorProfessor, tId, prof1, d2, p2, disc1);
+                  }
+                }
+                if (paired) break;
+              }
+              if (paired) break;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  function evaluateGradePedagogicalQuality(gradePorTurma, diasList, periodosPorDia, rc01MaxConsecutivas, rc02Cfg) {
+    let violacoesSeparadasMesmoDia = 0;
+    let violacoesMaxDia = 0;
+    let paresGeminados = 0;
+
+    for (const turmaGrade of Object.values(gradePorTurma)) {
+      if (!turmaGrade) continue;
+      for (const d of diasList) {
+        const row = turmaGrade[d] || {};
+        const byDisc = new Map();
+
+        for (let p = 1; p <= periodosPorDia; p++) {
+          const cell = row[p];
+          if (!cell || !cell.disciplina_id) continue;
+          const dId = Number(cell.disciplina_id);
+
+          if (p < periodosPorDia) {
+            const nextCell = row[p + 1];
+            if (nextCell && Number(nextCell.disciplina_id) === dId) {
+              paresGeminados++;
+            }
+          }
+
+          let st = byDisc.get(dId);
+          if (!st) {
+            st = { count: 0, minP: p, maxP: p, allLocked: true };
+            byDisc.set(dId, st);
+          }
+          st.count++;
+          if (p < st.minP) st.minP = p;
+          if (p > st.maxP) st.maxP = p;
+          if (!cell.locked) st.allLocked = false;
+        }
+
+        for (const [dId, st] of byDisc.entries()) {
+          if (st.count <= 1 || st.allLocked) continue;
+          if (st.maxP - st.minP + 1 !== st.count) {
+            violacoesSeparadasMesmoDia++;
+          }
+          const maxDia = getRc02MaxForDisc(rc02Cfg, dId);
+          if (st.count > maxDia || st.count > rc01MaxConsecutivas) {
+            violacoesMaxDia++;
+          }
+        }
+      }
+    }
+
+    return {
+      violacoesSeparadasMesmoDia,
+      violacoesMaxDia,
+      paresGeminados,
+    };
+  }
+
+  function runGreedySolver(payload, randomize = false, strategy = "default", relaxPedagogical = false) {
     const diasList =
       Array.isArray(payload?.dias_semana) && payload.dias_semana.length > 0
         ? payload.dias_semana.map(Number).filter(n => n >= 1 && n <= 6)
@@ -1349,6 +2068,7 @@ function solverWorkerBootstrap(workerScope) {
         turno,
         preferencias: payload?.preferencias,
         coProfessores: coProfessores || null,
+        strictPedagogical: true,
       });
 
       if (!ok) unplaced.push(lesson);
@@ -1368,8 +2088,47 @@ function solverWorkerBootstrap(workerScope) {
         turno,
         preferencias: payload?.preferencias,
         maxSteps: unplaced.length <= 6 ? 110 : 65,
+        strictPedagogical: true,
       });
     }
+
+    // Caso extremo de disponibilidade impossível: tenta alocar pendências remanescentes mantendo proibição de aulas separadas
+    if (relaxPedagogical && unplaced.length > 0) {
+      const stillUnplaced = [];
+      for (const lesson of unplaced) {
+        const okRelaxed = tryPlaceWithAllOperators({
+          gradePorTurma,
+          gradePorProfessor,
+          dispoIdx,
+          diasList,
+          periodosPorDia,
+          turmaId: lesson.turma_id,
+          professorId: lesson.professor_id,
+          disciplinaId: lesson.disciplina_id,
+          rc01MaxConsecutivas,
+          rc02Cfg,
+          regrasGerais,
+          turno,
+          preferencias: payload?.preferencias,
+          coProfessores: lesson.co_professores || null,
+          strictPedagogical: false,
+        });
+        if (!okRelaxed) stillUnplaced.push(lesson);
+      }
+      unplaced = stillUnplaced;
+    }
+
+    // Polimento pós-alocação para maximizar aulas duplas geminadas e blindar contra aulas separadas
+    polishGradePedagogica({
+      gradePorTurma,
+      gradePorProfessor,
+      dispoIdx,
+      diasList,
+      periodosPorDia,
+      rc01MaxConsecutivas,
+      rc02Cfg,
+      regrasGerais,
+    });
 
     const diagnosticoNaoAlocadas = [];
     const diagnosticoContadores = {
@@ -1415,6 +2174,19 @@ function solverWorkerBootstrap(workerScope) {
     );
     const cobertura = demandaTotal > 0 ? Math.round((totalAlocadasReal / demandaTotal) * 10000) / 100 : 100;
 
+    const qual = evaluateGradePedagogicalQuality(
+      gradePorTurma,
+      diasList,
+      periodosPorDia,
+      rc01MaxConsecutivas,
+      rc02Cfg
+    );
+    const qualidadeScore =
+      totalAlocadasReal * 1000000 -
+      qual.violacoesSeparadasMesmoDia * 50000 -
+      qual.violacoesMaxDia * 20000 +
+      qual.paresGeminados * 50;
+
     return {
       status: unplaced.length === 0 ? "MOCK_FEASIBLE" : "MOCK_PARTIAL",
       metrics: {
@@ -1429,6 +2201,10 @@ function solverWorkerBootstrap(workerScope) {
         rc02_bloqueio_hard: rc02Cfg.bloqueioHard,
         rc02_max_hard_padrao: rc02Cfg.maxHardPadrao,
         rc02_strict_cap_mock: !!rc02Cfg.strictCapMock,
+        violacoes_separadas_mesmo_dia: qual.violacoesSeparadasMesmoDia,
+        violacoes_max_dia: qual.violacoesMaxDia,
+        pares_geminados: qual.paresGeminados,
+        qualidade_score: qualidadeScore,
       },
       grade_por_turma: gradePorTurma,
       grade_por_professor: gradePorProfessor,
@@ -1472,9 +2248,10 @@ function solverWorkerBootstrap(workerScope) {
         ];
 
         let iter = 0;
-        let maxAulas = -1;
+        let maxQualidade = -Infinity;
         let bestResult = null;
         let lastProgressAt = 0;
+        let cleanPerfectFoundCount = 0;
 
         function stepBatch() {
           const batchStart = Date.now();
@@ -1495,30 +2272,40 @@ function solverWorkerBootstrap(workerScope) {
 
             const strategy = strategies[iter % strategies.length];
             const isRandomized = iter > 0;
-            const res = runGreedySolver(payload, isRandomized, strategy);
+            const relaxPed = iter > 60 && iter % 12 === 0;
+            const res = runGreedySolver(payload, isRandomized, strategy, relaxPed);
 
             const alocadas = res.metrics.aulas_alocadas || 0;
             const demanda = res.metrics.aulas_demanda || 1;
+            const qScore = res.metrics.qualidade_score ?? alocadas * 1000000;
 
-            if (alocadas > maxAulas) {
-              maxAulas = alocadas;
+            if (qScore > maxQualidade) {
+              maxQualidade = qScore;
               bestResult = res;
             }
 
             iter++;
 
-            // 100% encontrado! Finaliza imediatamente
-            if (alocadas >= demanda) {
-              workerScope.postMessage({
-                type: "done",
-                iter,
-                elapsedMs: Date.now() - startTime,
-                stoppedByUser: false,
-                perfect: true,
-                strategy,
-                result: bestResult,
-              });
-              return;
+            // 100% encontrado sem nenhuma violação pedagógica!
+            // Roda até 15 variações rápidas (~80ms) para escolher a grade com mais aulas duplas geminadas
+            if (
+              alocadas >= demanda &&
+              (res.metrics.violacoes_separadas_mesmo_dia || 0) === 0 &&
+              (res.metrics.violacoes_max_dia || 0) === 0
+            ) {
+              cleanPerfectFoundCount++;
+              if (cleanPerfectFoundCount >= 15) {
+                workerScope.postMessage({
+                  type: "done",
+                  iter,
+                  elapsedMs: Date.now() - startTime,
+                  stoppedByUser: false,
+                  perfect: true,
+                  strategy,
+                  result: bestResult,
+                });
+                return;
+              }
             }
 
             const now = Date.now();

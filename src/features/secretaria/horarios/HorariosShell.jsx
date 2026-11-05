@@ -22,6 +22,7 @@ const ABAS = [
 
 export default function HorariosShell() {
   const [config, setConfig]         = useState(null);   // null = carregando, false = não configurado
+  const [reconfigurando, setReconfigurando] = useState(false);
   const [carregando, setCarregando] = useState(true);
   const [abaAtiva, setAbaAtiva]     = useState("disponibilidade");
   const [highlightProf, setHighlightProf] = useState(null); // prof destacado ao vir do diagnóstico
@@ -42,7 +43,7 @@ export default function HorariosShell() {
 
   function handleWizardConcluir(novaConfig) {
     setConfig(novaConfig);
-    setAbaAtiva("disponibilidade");
+    setReconfigurando(false);
   }
 
   function irParaDisponibilidade(profId = null) {
@@ -63,12 +64,12 @@ export default function HorariosShell() {
     );
   }
 
-  // ── Escola sem configuração → Wizard ──
-  if (!config) {
-    return <WizardConfiguracaoGrade onConcluir={handleWizardConcluir} />;
+  // ── Escola sem configuração ou Reconfigurando → Wizard ──
+  if (!config || reconfigurando) {
+    return <WizardConfiguracaoGrade configInicial={config || undefined} onConcluir={handleWizardConcluir} />;
   }
 
-  // ── Escola com configuração → 3 Abas ──
+  // ── Escola com configuração → 4 Abas ──
   return (
     <div style={{ fontFamily: "'Montserrat', sans-serif", display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
       {/* Tab bar */}
@@ -102,7 +103,7 @@ export default function HorariosShell() {
         <div style={{ flex: 1 }} />
         {/* Link discreto de reconfiguração */}
         <button
-          onClick={() => setConfig(false)}
+          onClick={() => setReconfigurando(true)}
           title="Reconfigurar grade horária da escola"
           style={{
             padding: "16px 16px", border: "none", background: "transparent",

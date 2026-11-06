@@ -71,7 +71,7 @@ function recalcularMetricasEDiagnostico(gradePorTurma, solverPayload, metricsAtu
     }
   }
 
-  // Calcula violações pedagógicas (aulas separadas no mesmo dia, excesso > maxDia ou dupla cortada pelo recreio/par bloqueado)
+  // Calcula violações pedagógicas (aulas separadas no mesmo dia, excesso > maxDia, dupla cortada pelo recreio/par bloqueado e pares obrigatórios)
   const rg = solverPayload?.config_pedagogica?.regras_gerais || {};
   const maxDiaPadrao =
     Number(rg.max_aulas_mesmo_dia) ||
@@ -91,19 +91,58 @@ function recalcularMetricasEDiagnostico(gradePorTurma, solverPayload, metricsAtu
       ? !rg.aulas_duplas_separar_recreio
       : true;
   const paresBloqueadosSet = new Set();
+  const paresObrigatoriosSet = new Set();
   if (bloquearRecreio && recreioApos > 0) paresBloqueadosSet.add(recreioApos);
   for (const item of Array.isArray(rg?.pares_duplas_governanca) ? rg.pares_duplas_governanca : []) {
-    if (String(item?.modo || "").toLowerCase() === "bloqueado" && Number(item?.inicio) > 0) {
-      paresBloqueadosSet.add(Number(item.inicio));
+    const modo = String(item?.modo || "").toLowerCase();
+    const ini = Number(item?.inicio);
+    if (ini > 0) {
+      if (modo === "bloqueado") paresBloqueadosSet.add(ini);
+      if (modo === "obrigatorio" && !paresBloqueadosSet.has(ini)) paresObrigatoriosSet.add(ini);
     }
   }
+
+  const diasSemana =
+    Array.isArray(solverPayload?.dias_semana) && solverPayload.dias_semana.length > 0
+      ? solverPayload.dias_semana.map(Number)
+      : [1, 2, 3, 4, 5];
 
   let violacoesSeparadasMesmoDia = 0;
   let violacoesMaxDia = 0;
   let violacoesParesBloqueados = 0;
   let paresGeminados = 0;
+  let paresObrigatoriosAtendidos = 0;
+  const divergenciasParesObrigatorios = [];
 
-  for (const diasObj of Object.values(gradePorTurma || {})) {
+  const turmaEntries = Object.entries(gradePorTurma || {}).filter(([, g]) => Boolean(g));
+  const paresObrigatoriosMeta = paresObrigatoriosSet.size * turmaEntries.length * diasSemana.length;
+
+  for (const [tIdStr, diasObj] of turmaEntries) {
+    const tId = Number(tIdStr);
+    for (const dNum of diasSemana) {
+      const perObj = diasObj?.[dNum] || {};
+      for (const pOb of paresObrigatoriosSet) {
+        const c1 = perObj?.[pOb];
+        const c2 = perObj?.[pOb + 1];
+        const isGeminatedOb =
+          c1 && c2 && c1.disciplina_id && Number(c1.disciplina_id) === Number(c2.disciplina_id);
+        if (isGeminatedOb) {
+          paresObrigatoriosAtendidos++;
+        } else {
+          divergenciasParesObrigatorios.push({
+            turma_id: tId,
+            dia: Number(dNum),
+            inicio: pOb,
+            fim: pOb + 1,
+            disc_inicio: c1?.disciplina_id ? Number(c1.disciplina_id) : null,
+            prof_inicio: c1?.professor_id ? Number(c1.professor_id) : null,
+            disc_fim: c2?.disciplina_id ? Number(c2.disciplina_id) : null,
+            prof_fim: c2?.professor_id ? Number(c2.professor_id) : null,
+          });
+        }
+      }
+    }
+
     for (const perObj of Object.values(diasObj || {})) {
       const byDisc = new Map();
       for (const [pStr, cell] of Object.entries(perObj || {})) {
@@ -131,6 +170,8 @@ function recalcularMetricasEDiagnostico(gradePorTurma, solverPayload, metricsAtu
     }
   }
 
+  const paresObrigatoriosFaltantes = Math.max(0, paresObrigatoriosMeta - paresObrigatoriosAtendidos);
+
   const demandas = Array.isArray(solverPayload?.demanda) ? solverPayload.demanda : [];
   const modulacao = Array.isArray(solverPayload?.modulacao) ? solverPayload.modulacao : [];
 
@@ -150,8 +191,12 @@ function recalcularMetricasEDiagnostico(gradePorTurma, solverPayload, metricsAtu
         violacoes_max_dia: violacoesMaxDia,
         violacoes_pares_bloqueados: violacoesParesBloqueados,
         pares_geminados: paresGeminados,
+        pares_obrigatorios_meta: paresObrigatoriosMeta,
+        pares_obrigatorios_atendidos: paresObrigatoriosAtendidos,
+        pares_obrigatorios_faltantes: paresObrigatoriosFaltantes,
       },
       nao_alocadas: [],
+      divergencias_pares_obrigatorios: divergenciasParesObrigatorios,
     };
   }
 
@@ -199,8 +244,12 @@ function recalcularMetricasEDiagnostico(gradePorTurma, solverPayload, metricsAtu
       violacoes_max_dia: violacoesMaxDia,
       violacoes_pares_bloqueados: violacoesParesBloqueados,
       pares_geminados: paresGeminados,
+      pares_obrigatorios_meta: paresObrigatoriosMeta,
+      pares_obrigatorios_atendidos: paresObrigatoriosAtendidos,
+      pares_obrigatorios_faltantes: paresObrigatoriosFaltantes,
     },
     nao_alocadas: naoAlocadasList,
+    divergencias_pares_obrigatorios: divergenciasParesObrigatorios,
   };
 }
 
@@ -249,20 +298,20 @@ function construirGradesDeSlotsSalvos(slots, turmasList, solverPayload) {
     if (!gradePorTurma[tId][dia]) gradePorTurma[tId][dia] = {};
     if (!gradePorProfessor[pId][dia]) gradePorProfessor[pId][dia] = {};
 
-    const isLocked = Boolean(s.locked) || String(s.origem || "").toLowerCase() === "manual";
+    const isLocked = Boolean(Number(s.locked));
 
     gradePorTurma[tId][dia][ord] = {
       disciplina_id: dId,
       professor_id: pId,
       locked: isLocked,
-      origem: s.origem || (isLocked ? "manual" : "solver"),
+      origem: isLocked ? "manual" : "solver",
     };
 
     gradePorProfessor[pId][dia][ord] = {
       turma_id: tId,
       disciplina_id: dId,
       locked: isLocked,
-      origem: s.origem || (isLocked ? "manual" : "solver"),
+      origem: isLocked ? "manual" : "solver",
     };
   }
 
@@ -342,7 +391,7 @@ function buildPeriodosPorDia(grade, diasPadrao = [1, 2, 3, 4, 5], maxPeriodosPad
 }
 
 // ── Componente principal ───────────────────────────────────────
-export default function GerarHorarioPage({ config }) {
+export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirReconfiguracao }) {
   const turnos = config?.turnos || ["matutino", "vespertino"];
   const [turno, setTurno] = useState(turnos[0] || "matutino");
   const [turmas, setTurmas] = useState([]);
@@ -376,13 +425,23 @@ export default function GerarHorarioPage({ config }) {
   const [nomesProfessores, setNomesProfessores] = useState({});
   const [nomesTurmas, setNomesTurmas] = useState({});
 
-  // Exibição
+  // Exibição e Modais
   const [viewMode, setViewMode] = useState("turma"); // "turma" | "professor"
   const [salvando, setSalvando] = useState(false);
   const [publicando, setPublicando] = useState(false);
   const [msgAcao, setMsgAcao] = useState("");
   const [showModalPublicar, setShowModalPublicar] = useState(false);
   const [showModalExportar, setShowModalExportar] = useState(false);
+
+  // 🧠 Modal Premium de Viabilidade e Sugestões de Ajuste (Padrão Urânia+)
+  const [showModalDiagnosticoUrania, setShowModalDiagnosticoUrania] = useState(false);
+  const [aplicandoSugestoesUrania, setAplicandoSugestoesUrania] = useState(false);
+  const [sugestoesSelecionadas, setSugestoesSelecionadas] = useState({
+    flexibilizar_obrigatorios: true,
+    bloquear_recreio_pos_recreio: true,
+    busca_exaustiva_60s: true,
+    desafixar_manuais: false,
+  });
 
   // Cleanup do Worker ao desmontar e atalho ESC para cancelar seleção
   useEffect(() => {
@@ -430,7 +489,8 @@ export default function GerarHorarioPage({ config }) {
       listaTurmas,
       pl
     );
-    const { metrics, nao_alocadas } = recalcularMetricasEDiagnostico(gradePorTurma, pl, {});
+    const { metrics, nao_alocadas, divergencias_pares_obrigatorios } =
+      recalcularMetricasEDiagnostico(gradePorTurma, pl, {});
 
     setResultado(
       normalizeResultado({
@@ -438,7 +498,10 @@ export default function GerarHorarioPage({ config }) {
         grade_por_professor: gradePorProfessor,
         metrics,
         nao_alocadas,
-        diagnostico: { nao_alocadas_detalhado: nao_alocadas },
+        diagnostico: {
+          nao_alocadas_detalhado: nao_alocadas,
+          divergencias_pares_obrigatorios: divergencias_pares_obrigatorios || [],
+        },
         warnings_payload: payloadInfo?.warnings_payload || [],
         payload_summary: payloadInfo?.payload_summary || {
           turmas: listaTurmas.length,
@@ -553,16 +616,26 @@ export default function GerarHorarioPage({ config }) {
   }
 
   // ── Executar Solver 2.0 via Web Worker ───────────────────────
-  async function executarSolver() {
+  async function executarSolver(overrideOptions = null) {
     if (!turmas.length) return;
+    const opts =
+      overrideOptions && typeof overrideOptions === "object" && !overrideOptions.nativeEvent
+        ? overrideOptions
+        : null;
+
+    const tempoEfetivoMs = opts?.maxTimeMs ?? tempoMaximoMs;
+    const respeitarManualEfetivo =
+      opts?.respeitarHorarioManual !== undefined ? opts.respeitarHorarioManual : respeitarHorarioManual;
+
     setRodando(true);
     setErroSolver(null);
     setSelecao(null);
     setMsgAcao("");
+    setShowModalDiagnosticoUrania(false);
     setProgressoSolver({
       iter: 0,
       elapsedMs: 0,
-      maxTimeMs: tempoMaximoMs,
+      maxTimeMs: tempoEfetivoMs,
       strategy: "dsatur_slack",
       alocadas: 0,
       demanda: 0,
@@ -578,9 +651,18 @@ export default function GerarHorarioPage({ config }) {
         const { data } = await api.post("/api/grade/solver-payload", {
           turno: turno.toLowerCase(),
           turma_ids: ids,
-          respeitar_horario_manual: respeitarHorarioManual,
+          respeitar_horario_manual: respeitarManualEfetivo,
         });
         if (data?.ok && data?.payload) {
+          if (opts?.customRegrasGerais) {
+            data.payload = {
+              ...data.payload,
+              config_pedagogica: {
+                ...(data.payload.config_pedagogica || {}),
+                regras_gerais: opts.customRegrasGerais,
+              },
+            };
+          }
           payloadData = data;
           setSolverPayload(data.payload);
         }
@@ -588,10 +670,12 @@ export default function GerarHorarioPage({ config }) {
         console.warn("[Solver 2.0] Fallback para /api/grade/run-mock:", errPayload?.message);
       }
 
+      let novoResultadoNorm = null;
+
       if (payloadData?.payload) {
         const { promise, stop } = runSolverInWebWorker({
           payload: payloadData.payload,
-          maxTimeMs: tempoMaximoMs,
+          maxTimeMs: tempoEfetivoMs,
           onProgress: (prog) => {
             setProgressoSolver(prog);
           },
@@ -601,29 +685,161 @@ export default function GerarHorarioPage({ config }) {
         const workerResult = await promise;
         stopWorkerRef.current = null;
 
-        setResultado(
-          normalizeResultado({
-            ...workerResult,
-            warnings_payload: payloadData.warnings_payload || [],
-            payload_summary: payloadData.payload_summary || {},
-            origem_carregamento: "solver",
-          })
-        );
+        novoResultadoNorm = normalizeResultado({
+          ...workerResult,
+          warnings_payload: payloadData.warnings_payload || [],
+          payload_summary: payloadData.payload_summary || {},
+          origem_carregamento: "solver",
+        });
+        setResultado(novoResultadoNorm);
         setTemAlteracoesNaoSalvas(true);
       } else {
         const { data } = await api.post("/api/grade/run-mock", {
           turno: turno.toLowerCase(),
           turma_ids: ids,
-          respeitar_horario_manual: respeitarHorarioManual,
+          respeitar_horario_manual: respeitarManualEfetivo,
         });
-        setResultado(normalizeResultado({ ...data, origem_carregamento: "solver" }));
+        novoResultadoNorm = normalizeResultado({ ...data, origem_carregamento: "solver" });
+        setResultado(novoResultadoNorm);
         setTemAlteracoesNaoSalvas(true);
+      }
+
+      // 🧠 Gatilho automático do Assistente Urânia+: se não foi possível atender 100% da configuração
+      // exigida pelo usuário (aulas pendentes, pares obrigatórios não geminados ou violações de governança),
+      // abre o Modal Premium de Diagnóstico & Sugestões de Ajuste para Fechamento!
+      if (novoResultadoNorm) {
+        const m = novoResultadoNorm.metrics || {};
+        const temPendenciaEstrita =
+          (m.aulas_nao_alocadas || 0) > 0 ||
+          (m.pares_obrigatorios_faltantes || 0) > 0 ||
+          (m.violacoes_pares_bloqueados || 0) > 0 ||
+          (m.violacoes_separadas_mesmo_dia || 0) > 0 ||
+          (m.violacoes_max_dia || 0) > 0;
+
+        if (temPendenciaEstrita) {
+          setSugestoesSelecionadas({
+            flexibilizar_obrigatorios: (m.pares_obrigatorios_faltantes || 0) > 0,
+            bloquear_recreio_pos_recreio: true,
+            busca_exaustiva_60s: tempoEfetivoMs < 60000,
+            desafixar_manuais: false,
+          });
+          setShowModalDiagnosticoUrania(true);
+        }
       }
     } catch (e) {
       setErroSolver(e?.response?.data?.error || e?.message || "Erro ao executar o solver. Tente novamente.");
     } finally {
       stopWorkerRef.current = null;
       setRodando(false);
+    }
+  }
+
+  // ── Aplica as sugestões selecionadas no Modal Urânia+ e regera o horário ──
+  async function aplicarSugestoesERegerar() {
+    setAplicandoSugestoesUrania(true);
+    try {
+      const rgAtual =
+        solverPayload?.config_pedagogica?.regras_gerais ||
+        config?.regras_gerais ||
+        {};
+      const turnoKey = String(turno || "matutino").toLowerCase();
+      const recreioRef =
+        rgAtual?.recreio_apos_periodo?.[turnoKey] !== undefined
+          ? Number(rgAtual.recreio_apos_periodo[turnoKey])
+          : turnoKey.includes("noturno")
+          ? 2
+          : 3;
+
+      let novaListaPares = Array.isArray(rgAtual.pares_duplas_governanca)
+        ? rgAtual.pares_duplas_governanca.map(p => ({ ...p }))
+        : [
+            { inicio: 1, fim: 2, modo: "prioritario", ordem: 1 },
+            { inicio: 4, fim: 5, modo: "prioritario", ordem: 2 },
+            { inicio: 2, fim: 3, modo: "permitido", ordem: 3 },
+            { inicio: 5, fim: 6, modo: "permitido", ordem: 4 },
+            { inicio: 3, fim: 4, modo: "bloqueado", ordem: 5 },
+          ];
+
+      let novoBloquearRecreio =
+        rgAtual.bloquear_duplas_no_recreio !== undefined
+          ? Boolean(rgAtual.bloquear_duplas_no_recreio)
+          : true;
+
+      // 1) Se marcou flexibilizar pares obrigatórios -> converte 'obrigatorio' para 'prioritario' mantendo na 1ª posição
+      if (sugestoesSelecionadas.flexibilizar_obrigatorios) {
+        novaListaPares = novaListaPares.map(p =>
+          String(p.modo || "").toLowerCase() === "obrigatorio"
+            ? { ...p, modo: "prioritario" }
+            : p
+        );
+      }
+
+      // 2) Se marcou blindar recreio e priorizar pós-recreio (#4-#5)
+      if (sugestoesSelecionadas.bloquear_recreio_pos_recreio) {
+        novoBloquearRecreio = true;
+        novaListaPares = novaListaPares.map(p => {
+          if (recreioRef > 0 && Number(p.inicio) === recreioRef) {
+            return { ...p, modo: "bloqueado" };
+          }
+          if (recreioRef > 0 && Number(p.inicio) === recreioRef + 1 && p.modo === "permitido") {
+            return { ...p, modo: "prioritario" };
+          }
+          return p;
+        });
+      }
+
+      // Reordena colocando obrigatórios/prioritários no topo e bloqueados no fim
+      const pesoModo = { obrigatorio: 0, prioritario: 1, permitido: 2, bloqueado: 3 };
+      novaListaPares.sort((a, b) => {
+        const pa = pesoModo[a.modo] ?? 2;
+        const pb = pesoModo[b.modo] ?? 2;
+        if (pa !== pb) return pa - pb;
+        return (Number(a.ordem) || 99) - (Number(b.ordem) || 99);
+      });
+      novaListaPares = novaListaPares.map((p, idx) => ({ ...p, ordem: idx + 1 }));
+
+      const novasRegrasGerais = {
+        ...rgAtual,
+        preferencia_aulas_duplas: true,
+        proibir_aulas_separadas_mesmo_dia: true,
+        bloquear_duplas_no_recreio: novoBloquearRecreio,
+        aulas_duplas_separar_recreio: !novoBloquearRecreio,
+        pares_duplas_governanca: novaListaPares,
+      };
+
+      // Salva no backend para que a escola já fique com a governança atualizada
+      const novaConfigCompleta = {
+        turnos: config?.turnos || ["matutino", "vespertino"],
+        dias_semana: config?.dias_semana || [1, 2, 3, 4, 5],
+        periodos: config?.periodos || { matutino: 6, vespertino: 6 },
+        regras_gerais: novasRegrasGerais,
+      };
+
+      try {
+        await api.post("/api/escola/configuracao-grade", novaConfigCompleta);
+        if (typeof onAtualizarConfig === "function") {
+          onAtualizarConfig(novaConfigCompleta);
+        }
+      } catch (errSave) {
+        console.warn("[Urânia+] Falha ao persistir config, aplicando em memória:", errSave?.message);
+      }
+
+      const novoTempo = sugestoesSelecionadas.busca_exaustiva_60s ? 60000 : tempoMaximoMs;
+      const novoRespeitarManual = sugestoesSelecionadas.desafixar_manuais
+        ? false
+        : respeitarHorarioManual;
+
+      if (sugestoesSelecionadas.busca_exaustiva_60s) setTempoMaximoMs(60000);
+      if (sugestoesSelecionadas.desafixar_manuais) setRespeitarHorarioManual(false);
+
+      setShowModalDiagnosticoUrania(false);
+      await executarSolver({
+        maxTimeMs: novoTempo,
+        respeitarHorarioManual: novoRespeitarManual,
+        customRegrasGerais: novasRegrasGerais,
+      });
+    } finally {
+      setAplicandoSugestoesUrania(false);
     }
   }
 
@@ -778,8 +994,11 @@ export default function GerarHorarioPage({ config }) {
 
   // ── Atualiza estado da grade após edição interativa ───────────
   function atualizarGradePosEdicao(novoGpt, novoGpp, mensagemFeedback) {
-    const { metrics: novasMetricas, nao_alocadas: novasNaoAlocadas } =
-      recalcularMetricasEDiagnostico(novoGpt, solverPayload, resultado?.metrics);
+    const {
+      metrics: novasMetricas,
+      nao_alocadas: novasNaoAlocadas,
+      divergencias_pares_obrigatorios: novasDivergenciasObrigatorios,
+    } = recalcularMetricasEDiagnostico(novoGpt, solverPayload, resultado?.metrics);
 
     setResultado((prev) => ({
       ...prev,
@@ -790,6 +1009,7 @@ export default function GerarHorarioPage({ config }) {
       diagnostico: {
         ...(prev?.diagnostico || {}),
         nao_alocadas_detalhado: novasNaoAlocadas,
+        divergencias_pares_obrigatorios: novasDivergenciasObrigatorios || [],
       },
     }));
     setTemAlteracoesNaoSalvas(true);
@@ -1678,6 +1898,19 @@ export default function GerarHorarioPage({ config }) {
                     color={(metrics.violacoes_pares_bloqueados || 0) === 0 ? "#0284c7" : "#d97706"}
                   />
                 )}
+                {(metrics.pares_obrigatorios_meta || 0) > 0 && (
+                  <MetricCard
+                    label="Pares Obrigatórios"
+                    value={`${metrics.pares_obrigatorios_atendidos || 0}/${metrics.pares_obrigatorios_meta}`}
+                    sub={
+                      (metrics.pares_obrigatorios_faltantes || 0) === 0
+                        ? "100% atendidos 🔒"
+                        : `${metrics.pares_obrigatorios_faltantes} janela(s) c/ simples`
+                    }
+                    icon="🔒"
+                    color={(metrics.pares_obrigatorios_faltantes || 0) === 0 ? "#7c3aed" : "#dc2626"}
+                  />
+                )}
                 <MetricCard
                   label="Turmas"
                   value={turmas.length || Object.keys(resultado.grade_por_turma || {}).length}
@@ -1693,16 +1926,17 @@ export default function GerarHorarioPage({ config }) {
               </div>
             </div>
 
-            {/* ── Alerta caso a grade carregada (ex: rascunho antigo) possua aulas separadas no mesmo dia, > limite ou cortadas pelo recreio ── */}
-            {((resultado.metrics?.violacoes_separadas_mesmo_dia || 0) > 0 ||
+            {/* ── Banner Urânia+: Pares Obrigatórios não fechados 100% ou Divergências de Governança ── */}
+            {((resultado.metrics?.pares_obrigatorios_faltantes || 0) > 0 ||
+              (resultado.metrics?.violacoes_separadas_mesmo_dia || 0) > 0 ||
               (resultado.metrics?.violacoes_max_dia || 0) > 0 ||
               (resultado.metrics?.violacoes_pares_bloqueados || 0) > 0) && (
               <div
                 style={{
-                  background: "#fff7ed",
-                  border: "1.5px solid #fb923c",
-                  borderRadius: 10,
-                  padding: "14px 18px",
+                  background: "linear-gradient(135deg, #fff1f2 0%, #fff7ed 100%)",
+                  border: "1.5px solid #f97316",
+                  borderRadius: 12,
+                  padding: "16px 20px",
                   marginBottom: 16,
                   fontSize: 13,
                   color: "#9a3412",
@@ -1710,35 +1944,60 @@ export default function GerarHorarioPage({ config }) {
                   alignItems: "center",
                   justifyContent: "space-between",
                   flexWrap: "wrap",
-                  gap: 12,
+                  gap: 14,
+                  boxShadow: "0 4px 12px rgba(249, 115, 22, 0.08)",
                 }}
               >
-                <div>
-                  <strong style={{ display: "block", marginBottom: 4, fontSize: 13.5 }}>
-                    ⚠️ Grade com divergências de governança: {resultado.metrics?.violacoes_separadas_mesmo_dia || 0} separada(s) no dia • {resultado.metrics?.violacoes_max_dia || 0} acima do limite • {resultado.metrics?.violacoes_pares_bloqueados || 0} dupla(s) cortada(s) pelo recreio/par bloqueado
+                <div style={{ flex: 1, minWidth: 280 }}>
+                  <strong style={{ display: "block", marginBottom: 4, fontSize: 14, color: "#7c2d12" }}>
+                    {(resultado.metrics?.pares_obrigatorios_faltantes || 0) > 0
+                      ? `🔒 Atenção: ${resultado.metrics.pares_obrigatorios_atendidos}/${resultado.metrics.pares_obrigatorios_meta} janelas de Pares Obrigatórios atendidas (${resultado.metrics.pares_obrigatorios_faltantes} janela(s) ficaram com aulas simples)`
+                      : `⚠️ Grade com divergências de governança: ${resultado.metrics?.violacoes_separadas_mesmo_dia || 0} separada(s) no dia • ${resultado.metrics?.violacoes_max_dia || 0} acima do limite • ${resultado.metrics?.violacoes_pares_bloqueados || 0} dupla(s) cortada(s) pelo recreio`}
                   </strong>
-                  <span style={{ fontSize: 12, color: "#c2410c" }}>
-                    Esta grade foi gerada antes das novas regras de governança de pares/recreio. Clique ao lado para regerar respeitando 100% os blocos da escola.
+                  <span style={{ fontSize: 12.5, color: "#9a3412", lineHeight: 1.5 }}>
+                    {(resultado.metrics?.pares_obrigatorios_faltantes || 0) > 0
+                      ? "Devido à combinação de disciplinas com carga ímpar (5h/3h/1h) e professores com 30/30 aulas, não foi matematicamente possível geminar 100% dos blocos obrigatórios sem desassistir turmas. Abra o Assistente Urânia+ para ver as janelas exatas ou aplicar sugestões de fechamento."
+                      : "Esta grade possui divergências em relação às regras atuais de governança de pares/recreio. Utilize o Assistente Urânia+ ou regere a grade."}
                   </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={executarSolver}
-                  disabled={rodando}
-                  style={{
-                    padding: "8px 16px",
-                    borderRadius: 8,
-                    border: "none",
-                    background: "#ea580c",
-                    color: "#fff",
-                    fontWeight: 700,
-                    fontSize: 12.5,
-                    cursor: "pointer",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  ⚡ Regerar Grade Limpa Agora
-                </button>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowModalDiagnosticoUrania(true)}
+                    style={{
+                      padding: "9px 16px",
+                      borderRadius: 8,
+                      border: "1.5px solid #7c3aed",
+                      background: "linear-gradient(135deg, #7c3aed, #6d28d9)",
+                      color: "#fff",
+                      fontWeight: 700,
+                      fontSize: 12.5,
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                      boxShadow: "0 3px 10px rgba(124, 58, 237, 0.25)",
+                    }}
+                  >
+                    🧠 Assistente de Fechamento (Urânia+)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => executarSolver()}
+                    disabled={rodando}
+                    style={{
+                      padding: "9px 16px",
+                      borderRadius: 8,
+                      border: "1px solid #ea580c",
+                      background: "#fff",
+                      color: "#ea580c",
+                      fontWeight: 700,
+                      fontSize: 12.5,
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    ⚡ Tentar Regerar (Fase 0 Bipartida)
+                  </button>
+                </div>
               </div>
             )}
 
@@ -2135,6 +2394,574 @@ export default function GerarHorarioPage({ config }) {
         diasSemana={diasPadrao}
         periodosPorDia={periodosPadrao}
       />
+
+      {/* 🧠 Modal Premium de Viabilidade e Sugestões de Ajuste para Fechamento (Padrão Urânia+) */}
+      {showModalDiagnosticoUrania && resultado && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            width: "100vw",
+            height: "100vh",
+            background: "rgba(15, 23, 42, 0.72)",
+            backdropFilter: "blur(6px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 10000,
+            padding: 20,
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              width: "100%",
+              maxWidth: 780,
+              maxHeight: "90vh",
+              borderRadius: 18,
+              overflow: "hidden",
+               display: "flex",
+              flexDirection: "column",
+              boxShadow: "0 25px 50px -12px rgba(15, 23, 42, 0.45)",
+              animation: "modalFadeIn 0.22s ease-out forwards",
+              border: "1px solid #cbd5e1",
+            }}
+          >
+            {/* Header Urânia+ */}
+            <div
+              style={{
+                background: "linear-gradient(135deg, #1e1b4b 0%, #312e81 55%, #4c1d95 100%)",
+                padding: "20px 26px",
+                color: "#fff",
+                display: "flex",
+                alignItems: "flex-start",
+                justifyContent: "space-between",
+                gap: 16,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
+                <div
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 14,
+                    background: "rgba(255, 255, 255, 0.14)",
+                    border: "1px solid rgba(255, 255, 255, 0.25)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 25,
+                    flexShrink: 0,
+                  }}
+                >
+                  🧠
+                </div>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
+                    <span
+                      style={{
+                        background: "#f59e0b",
+                        color: "#fff",
+                        fontSize: 10,
+                        fontWeight: 800,
+                        padding: "2px 8px",
+                        borderRadius: 999,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.05em",
+                      }}
+                    >
+                      Diagnóstico de Fechamento • Urânia+
+                    </span>
+                    <span style={{ fontSize: 11, color: "#c7d2fe", fontWeight: 600 }}>
+                      Turno {turno}
+                    </span>
+                  </div>
+                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#fff" }}>
+                    Não foi possível atender 100% das restrições estritas exigidas
+                  </h3>
+                  <p style={{ margin: "4px 0 0", fontSize: 12.5, color: "#e0e7ff", lineHeight: 1.45 }}>
+                    O Motor Solver 2.0 gerou a melhor grade matematicamente viável, mas encontrou gargalos estruturais que impediram o fechamento total das regras obrigatórias. Confira o diagnóstico e selecione os ajustes abaixo para tentar novamente.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowModalDiagnosticoUrania(false)}
+                style={{
+                  background: "rgba(255,255,255,0.12)",
+                  border: "none",
+                  color: "#fff",
+                  width: 32,
+                  height: 32,
+                  borderRadius: 8,
+                  cursor: "pointer",
+                  fontSize: 16,
+                  fontWeight: 700,
+                  flexShrink: 0,
+                }}
+                title="Fechar diagnóstico"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Corpo rolável */}
+            <div style={{ padding: "20px 26px", overflowY: "auto", flex: 1, display: "flex", flexDirection: "column", gap: 18 }}>
+              {/* Faixa de KPIs do Diagnóstico */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(155px, 1fr))", gap: 10 }}>
+                <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10, padding: "10px 12px" }}>
+                  <div style={{ fontSize: 11, color: "#64748b", fontWeight: 600 }}>Aulas Alocadas</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: naoAloc === 0 ? "#16a34a" : "#d97706", marginTop: 2 }}>
+                    {metrics.aulas_alocadas || 0} / {metrics.aulas_demanda || 0} ({coberturaVal}%)
+                  </div>
+                  <div style={{ fontSize: 10.5, color: "#64748b", marginTop: 2 }}>
+                    {naoAloc === 0 ? "✅ Zero aulas faltantes" : `⚠️ ${naoAloc} aula(s) pendente(s)`}
+                  </div>
+                </div>
+
+                {(metrics.pares_obrigatorios_meta || 0) > 0 && (
+                  <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: "10px 12px" }}>
+                    <div style={{ fontSize: 11, color: "#991b1b", fontWeight: 700 }}>🔒 Pares Obrigatórios</div>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: "#dc2626", marginTop: 2 }}>
+                      {metrics.pares_obrigatorios_atendidos || 0} / {metrics.pares_obrigatorios_meta} (
+                      {Math.round(((metrics.pares_obrigatorios_atendidos || 0) / metrics.pares_obrigatorios_meta) * 100)}%)
+                    </div>
+                    <div style={{ fontSize: 10.5, color: "#b91c1c", marginTop: 2 }}>
+                      {metrics.pares_obrigatorios_faltantes || 0} janela(s) ficaram c/ aulas simples
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 10, padding: "10px 12px" }}>
+                  <div style={{ fontSize: 11, color: "#0369a1", fontWeight: 600 }}>🔗 Total Duplas Geminadas</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: "#0284c7", marginTop: 2 }}>
+                    {metrics.pares_geminados || 0} pares
+                  </div>
+                  <div style={{ fontSize: 10.5, color: "#0369a1", marginTop: 2 }}>
+                    {(metrics.violacoes_pares_bloqueados || 0) === 0
+                      ? "✅ 0 cortadas pelo recreio"
+                      : `⚠️ ${metrics.violacoes_pares_bloqueados} em par bloqueado`}
+                  </div>
+                </div>
+
+                <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 10, padding: "10px 12px" }}>
+                  <div style={{ fontSize: 11, color: "#92400e", fontWeight: 600 }}>👨‍🏫 Professores no Limite</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: "#b45309", marginTop: 2 }}>
+                    {(resultado.warnings_payload || []).length} prof(s)
+                  </div>
+                  <div style={{ fontSize: 10.5, color: "#92400e", marginTop: 2 }}>
+                    Com 100% da grade ocupada (30/30)
+                  </div>
+                </div>
+              </div>
+
+              {/* Explicação Técnica do Gargalo */}
+              <div
+                style={{
+                  background: "#f8fafc",
+                  border: "1px solid #cbd5e1",
+                  borderLeft: "4px solid #4f46e5",
+                  borderRadius: 10,
+                  padding: "12px 16px",
+                  fontSize: 12.5,
+                  color: "#334155",
+                  lineHeight: 1.55,
+                }}
+              >
+                <strong style={{ color: "#1e1b4b", display: "block", marginBottom: 4, fontSize: 13 }}>
+                  🔍 Por que a configuração exigida não fechou 100%?
+                </strong>
+                <ul style={{ margin: 0, paddingLeft: 18 }}>
+                  {(metrics.pares_obrigatorios_faltantes || 0) > 0 && (
+                    <li style={{ marginBottom: 4 }}>
+                      <strong>Conflito entre Par Obrigatório (🔒) + Disciplinas de Carga Ímpar + Professores 30/30:</strong>{" "}
+                      Cada turma possui disciplinas com número ímpar de aulas semanais (ex.: <em>Português 5h, História 3h, Geografia 3h, Prática Estudantil 1h</em>), gerando obrigatoriamente <strong>6 aulas simples (avulsas) por turma</strong>. Como há{" "}
+                      <strong>{(resultado.warnings_payload || []).length || 10} professores com 30/30 aulas</strong> (sem nenhuma janela livre), em{" "}
+                      <strong>{metrics.pares_obrigatorios_faltantes} de {metrics.pares_obrigatorios_meta} janelas</strong> o algoritmo precisou alocar 2 aulas simples no bloco obrigatório para não deixar nenhuma turma sem aula.
+                    </li>
+                  )}
+                  {(metrics.violacoes_pares_bloqueados || 0) > 0 && (
+                    <li style={{ marginBottom: 4 }}>
+                      <strong>Par do Recreio (#3-#4) desbloqueado:</strong> O par que atravessa o intervalo estava marcado como permitido na configuração salva, permitindo {metrics.violacoes_pares_bloqueados} aula(s) dupla(s) cortada(s) pelo recreio.
+                    </li>
+                  )}
+                  {naoAloc > 0 && (
+                    <li>
+                      <strong>{naoAloc} aula(s) sem encaixe simultâneo (Turma × Professor):</strong> Restrições estritas de blocos ou indisponibilidades impediram a permutação final.
+                    </li>
+                  )}
+                </ul>
+              </div>
+
+              {/* Lista das janelas que não ficaram geminadas no Par Obrigatório */}
+              {Array.isArray(resultado?.diagnostico?.divergencias_pares_obrigatorios) &&
+                resultado.diagnostico.divergencias_pares_obrigatorios.length > 0 && (
+                  <div
+                    style={{
+                      border: "1px solid #e2e8f0",
+                      borderRadius: 10,
+                      overflow: "hidden",
+                    }}
+                  >
+                    <div
+                      style={{
+                        background: "#f1f5f9",
+                        padding: "8px 14px",
+                        fontSize: 12,
+                        fontWeight: 700,
+                        color: "#334155",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <span>
+                        📋 Janelas com Aulas Simples nos Pares 🔒 Obrigatórios ({resultado.diagnostico.divergencias_pares_obrigatorios.length})
+                      </span>
+                      <span style={{ fontSize: 11, fontWeight: 500, color: "#64748b" }}>
+                        Clique em "Ver Turma" para inspecionar na grade
+                      </span>
+                    </div>
+                    <div
+                      style={{
+                        maxHeight: 135,
+                        overflowY: "auto",
+                        padding: "8px 12px",
+                        display: "grid",
+                        gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
+                        gap: 6,
+                        background: "#fff",
+                      }}
+                    >
+                      {resultado.diagnostico.divergencias_pares_obrigatorios.map((div, i) => {
+                        const tNome = nomesTurmas[div.turma_id] || `Turma ${div.turma_id}`;
+                        const d1Nome = div.disc_inicio ? (nomesDisciplinas[div.disc_inicio] || `Disc ${div.disc_inicio}`) : "Vazio";
+                        const d2Nome = div.disc_fim ? (nomesDisciplinas[div.disc_fim] || `Disc ${div.disc_fim}`) : "Vazio";
+                        return (
+                          <div
+                            key={i}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              padding: "5px 8px",
+                              borderRadius: 6,
+                              background: "#f8fafc",
+                              border: "1px solid #e2e8f0",
+                              fontSize: 11.5,
+                              gap: 8,
+                            }}
+                          >
+                            <span style={{ color: "#1e293b" }}>
+                              <strong>{tNome}</strong> • {DIAS_CURTO[div.dia] || `Dia ${div.dia}`} (#{div.inicio}-#{div.fim}):{" "}
+                              <span style={{ color: "#475569" }}>
+                                {d1Nome} + {d2Nome}
+                              </span>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowModalDiagnosticoUrania(false);
+                                setViewMode("turma");
+                                setTimeout(() => {
+                                  const el = document.getElementById(`card-turma-${div.turma_id}`);
+                                  if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+                                }, 120);
+                              }}
+                              style={{
+                                padding: "2px 7px",
+                                borderRadius: 5,
+                                border: "1px solid #cbd5e1",
+                                background: "#fff",
+                                color: "#2563eb",
+                                fontSize: 10.5,
+                                fontWeight: 700,
+                                cursor: "pointer",
+                                flexShrink: 0,
+                              }}
+                            >
+                              Ver Turma
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+              {/* Seção de Sugestões Acionáveis (Padrão Urânia+) */}
+              <div>
+                <div style={{ fontSize: 13.5, fontWeight: 800, color: "#0f172a", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                  <span>💡 Sugestões de Ajuste para o Horário Fechar</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: "#64748b" }}>
+                    (Marque os ajustes que deseja aceitar para tentar novamente)
+                  </span>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {/* Sugestão 1: Converter Obrigatório -> Prioritário */}
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: 12,
+                      padding: "11px 14px",
+                      borderRadius: 10,
+                      border: sugestoesSelecionadas.flexibilizar_obrigatorios
+                        ? "1.5px solid #4f46e5"
+                        : "1px solid #cbd5e1",
+                      background: sugestoesSelecionadas.flexibilizar_obrigatorios ? "#eef2ff" : "#fff",
+                      cursor: "pointer",
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={sugestoesSelecionadas.flexibilizar_obrigatorios}
+                      onChange={(e) =>
+                        setSugestoesSelecionadas((prev) => ({
+                          ...prev,
+                          flexibilizar_obrigatorios: e.target.checked,
+                        }))
+                      }
+                      style={{ marginTop: 3, width: 16, height: 16, accentColor: "#4f46e5", cursor: "pointer" }}
+                    />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                        <strong style={{ fontSize: 13, color: "#1e1b4b" }}>
+                          Flexibilizar par(es) 🔒 Obrigatório(s) para ⭐ Prioritário (1ª Opção de Alta Prioridade)
+                        </strong>
+                        <span
+                          style={{
+                            background: "#4f46e5",
+                            color: "#fff",
+                            fontSize: 10,
+                            fontWeight: 700,
+                            padding: "1px 7px",
+                            borderRadius: 999,
+                          }}
+                        >
+                          Recomendado (Urânia)
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 12, color: "#475569", marginTop: 3, lineHeight: 1.4 }}>
+                        Mantém o algoritmo forçando ao máximo aulas geminadas no <strong>(#1-#2)</strong> na 1ª posição da fila, mas permite acomodar as aulas simples das disciplinas de carga ímpar (5h/3h/1h) sem travar o fechamento.
+                      </div>
+                    </div>
+                  </label>
+
+                  {/* Sugestão 2: Bloquear recreio #3-#4 e priorizar #4-#5 */}
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: 12,
+                      padding: "11px 14px",
+                      borderRadius: 10,
+                      border: sugestoesSelecionadas.bloquear_recreio_pos_recreio
+                        ? "1.5px solid #0284c7"
+                        : "1px solid #cbd5e1",
+                      background: sugestoesSelecionadas.bloquear_recreio_pos_recreio ? "#f0f9ff" : "#fff",
+                      cursor: "pointer",
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={sugestoesSelecionadas.bloquear_recreio_pos_recreio}
+                      onChange={(e) =>
+                        setSugestoesSelecionadas((prev) => ({
+                          ...prev,
+                          bloquear_recreio_pos_recreio: e.target.checked,
+                        }))
+                      }
+                      style={{ marginTop: 3, width: 16, height: 16, accentColor: "#0284c7", cursor: "pointer" }}
+                    />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                        <strong style={{ fontSize: 13, color: "#0c4a6e" }}>
+                          Blindar Recreio (🚫 Bloquear #3-#4) e priorizar (#4-#5) Pós-Recreio como 2ª Opção ⭐
+                        </strong>
+                        <span
+                          style={{
+                            background: "#0284c7",
+                            color: "#fff",
+                            fontSize: 10,
+                            fontWeight: 700,
+                            padding: "1px 7px",
+                            borderRadius: 999,
+                          }}
+                        >
+                          Qualidade Pedagógica
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 12, color: "#475569", marginTop: 3, lineHeight: 1.4 }}>
+                        Garante <strong>zero aulas duplas cortadas pelo intervalo</strong> e direciona automaticamente o segundo bloco de aulas geminadas do dia para <strong>(#4-#5)</strong>.
+                      </div>
+                    </div>
+                  </label>
+
+                  {/* Sugestão 3: Busca Exaustiva 60s com Fase 0 Bipartida */}
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: 12,
+                      padding: "11px 14px",
+                      borderRadius: 10,
+                      border: sugestoesSelecionadas.busca_exaustiva_60s
+                        ? "1.5px solid #16a34a"
+                        : "1px solid #cbd5e1",
+                      background: sugestoesSelecionadas.busca_exaustiva_60s ? "#f0fdf4" : "#fff",
+                      cursor: "pointer",
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={sugestoesSelecionadas.busca_exaustiva_60s}
+                      onChange={(e) =>
+                        setSugestoesSelecionadas((prev) => ({
+                          ...prev,
+                          busca_exaustiva_60s: e.target.checked,
+                        }))
+                      }
+                      style={{ marginTop: 3, width: 16, height: 16, accentColor: "#16a34a", cursor: "pointer" }}
+                    />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                        <strong style={{ fontSize: 13, color: "#14532d" }}>
+                          Executar Busca Exaustiva (60s) com Emparelhamento Bipartido (Fase 0 + Permutação 3C)
+                        </strong>
+                      </div>
+                      <div style={{ fontSize: 12, color: "#475569", marginTop: 3, lineHeight: 1.4 }}>
+                        Amplia o tempo limite de busca para explorar dezenas de árvores de Emparelhamento Bipartido (Algoritmo de Kuhn) e permutações de blocos entre dias.
+                      </div>
+                    </div>
+                  </label>
+
+                  {/* Sugestão 4: Desafixar aulas manuais (se houver) */}
+                  {aulasFixas > 0 && respeitarHorarioManual && (
+                    <label
+                      style={{
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: 12,
+                        padding: "11px 14px",
+                        borderRadius: 10,
+                        border: sugestoesSelecionadas.desafixar_manuais
+                          ? "1.5px solid #d97706"
+                          : "1px solid #cbd5e1",
+                        background: sugestoesSelecionadas.desafixar_manuais ? "#fffbeb" : "#fff",
+                        cursor: "pointer",
+                        transition: "all 0.15s",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={sugestoesSelecionadas.desafixar_manuais}
+                        onChange={(e) =>
+                          setSugestoesSelecionadas((prev) => ({
+                            ...prev,
+                            desafixar_manuais: e.target.checked,
+                          }))
+                        }
+                        style={{ marginTop: 3, width: 16, height: 16, accentColor: "#d97706", cursor: "pointer" }}
+                      />
+                      <div style={{ flex: 1 }}>
+                        <strong style={{ fontSize: 13, color: "#78350f", display: "block" }}>
+                          Destravar temporariamente as {aulasFixas} aula(s) fixada(s) manualmente (📌)
+                        </strong>
+                        <div style={{ fontSize: 12, color: "#475569", marginTop: 3, lineHeight: 1.4 }}>
+                          Permite ao algoritmo permutar também os horários que haviam sido travados manualmente caso estejam bloqueando um par obrigatório.
+                        </div>
+                      </div>
+                    </label>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Rodapé de Ação do Modal Urânia+ */}
+            <div
+              style={{
+                padding: "16px 26px",
+                background: "#f8fafc",
+                borderTop: "1px solid #e2e8f0",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                flexWrap: "wrap",
+                gap: 10,
+              }}
+            >
+              <div>
+                {typeof onAbrirReconfiguracao === "function" && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowModalDiagnosticoUrania(false);
+                      onAbrirReconfiguracao();
+                    }}
+                    style={{
+                      padding: "9px 14px",
+                      borderRadius: 8,
+                      border: "1px solid #cbd5e1",
+                      background: "#fff",
+                      color: "#334155",
+                      fontWeight: 600,
+                      fontSize: 12.5,
+                      cursor: "pointer",
+                    }}
+                  >
+                    ⚙️ Reconfigurar Pares Manualmente
+                  </button>
+                )}
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  onClick={() => setShowModalDiagnosticoUrania(false)}
+                  style={{
+                    padding: "10px 16px",
+                    borderRadius: 9,
+                    border: "1px solid #cbd5e1",
+                    background: "#fff",
+                    color: "#475569",
+                    fontWeight: 700,
+                    fontSize: 13,
+                    cursor: "pointer",
+                  }}
+                >
+                  ✅ Manter Este Horário Assim Mesmo
+                </button>
+                <button
+                  type="button"
+                  disabled={aplicandoSugestoesUrania}
+                  onClick={aplicarSugestoesERegerar}
+                  style={{
+                    padding: "10px 20px",
+                    borderRadius: 9,
+                    border: "none",
+                    background: "linear-gradient(135deg, #4f46e5, #7c3aed)",
+                    color: "#fff",
+                    fontWeight: 800,
+                    fontSize: 13.5,
+                    cursor: aplicandoSugestoesUrania ? "wait" : "pointer",
+                    boxShadow: "0 4px 14px rgba(79, 70, 229, 0.35)",
+                  }}
+                >
+                  {aplicandoSugestoesUrania
+                    ? "⏳ Aplicando e Regerando…"
+                    : "⚡ Aceitar Sugestões e Tentar Novamente"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 🚀 Modal Premium para Publicar Grade */}
       {showModalPublicar && (

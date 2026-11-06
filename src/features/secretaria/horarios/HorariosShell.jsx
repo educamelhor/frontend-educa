@@ -130,7 +130,11 @@ export default function HorariosShell() {
           />
         )}
         {abaAtiva === "gerar" && (
-          <GerarHorarioPage config={config} />
+          <GerarHorarioPage
+            config={config}
+            onAtualizarConfig={setConfig}
+            onAbrirReconfiguracao={() => setReconfigurando(true)}
+          />
         )}
         {abaAtiva === "manual" && (
           <HorarioManualPage

@@ -2320,6 +2320,22 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
                     })
                     .map(([profId, grade]) => {
                       const isProfAtivo = selecao && Number(selecao.professor_id) === Number(profId);
+                      let totalAlocadasProf = 0;
+                      let totalFixasProf = 0;
+                      for (const diaKey of diasPadrao) {
+                        const row = grade?.[diaKey] || grade?.[String(diaKey)] || {};
+                        for (let ord = 1; ord <= periodosPadrao; ord++) {
+                          const cell = row?.[ord] ?? row?.[String(ord)] ?? null;
+                          if (cell && (cell.turma_id || cell.disciplina_id)) {
+                            totalAlocadasProf++;
+                            if (cell.locked) totalFixasProf++;
+                          }
+                        }
+                      }
+                      const totalSlotsGradeProf = diasPadrao.length * periodosPadrao;
+                      const totalVagosProf = Math.max(0, totalSlotsGradeProf - totalAlocadasProf);
+                      const todasFixasProf = totalAlocadasProf > 0 && totalFixasProf === totalAlocadasProf;
+
                       return (
                         <div
                           key={profId}
@@ -2343,8 +2359,42 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "space-between",
+                            flexWrap: "wrap",
+                            gap: 8,
                           }}>
-                            <span>👨‍🏫 {nomesProfessores[profId] || `Professor ${profId}`}</span>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                              <span>👨‍🏫 {nomesProfessores[profId] || `Professor ${profId}`}</span>
+                              <span
+                                style={{
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  padding: "2px 9px",
+                                  borderRadius: 999,
+                                  background: "#e0f2fe",
+                                  color: "#0369a1",
+                                  border: "1px solid #bae6fd",
+                                }}
+                              >
+                                {totalAlocadasProf} aulas alocadas • {totalVagosProf} vago{totalVagosProf === 1 ? "" : "s"}
+                              </span>
+                              {totalFixasProf > 0 && (
+                                <span
+                                  style={{
+                                    fontSize: 10.5,
+                                    fontWeight: 800,
+                                    padding: "2px 9px",
+                                    borderRadius: 999,
+                                    background: todasFixasProf
+                                      ? "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)"
+                                      : "#fef3c7",
+                                    color: todasFixasProf ? "#fff" : "#92400e",
+                                    border: todasFixasProf ? "1px solid #b45309" : "1px solid #fcd34d",
+                                  }}
+                                >
+                                  📌 {todasFixasProf ? `FIXADO (${totalFixasProf}/${totalAlocadasProf})` : `${totalFixasProf} fixa(s)`}
+                                </span>
+                              )}
+                            </div>
                             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                               {isProfAtivo && (
                                 <span style={{ fontSize: 11, color: "#1d4ed8", fontWeight: 700 }}>

@@ -24,12 +24,9 @@ export default function GradeTurma({
   const professorById = maps.professorById || {};
 
   function getSlot(dia, ordem) {
-    const d = dadosTurma?.[dia] || dadosTurma?.[String(dia)];
-    const o = dadosTurma?.[ordem] || dadosTurma?.[String(ordem)];
-    const a = d?.[ordem] || d?.[String(ordem)];
-    if (a) return a;
-    const b = o?.[dia] || o?.[String(dia)];
-    return b || null;
+    const d = dadosTurma?.[dia] ?? dadosTurma?.[String(dia)];
+    if (!d || typeof d !== "object") return null;
+    return d?.[ordem] ?? d?.[String(ordem)] ?? null;
   }
 
   function sansAccent(s) {

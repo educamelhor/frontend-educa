@@ -206,10 +206,10 @@ export default function GradeTurma({
     return (
       <div
         onClick={() => onCellClick && onCellClick({ turmaId: turma.id, dia, ordem, slot })}
-        className={`relative rounded-xl px-2 py-1.5 text-center ${bg} ${text} ring-1 ${ring} shadow-[inset_0_0_0_1px_rgba(255,255,255,0.6)] ${extraClasses}`}
+        className={`relative rounded-xl px-2 py-1.5 text-center ${bg} ${text} ${isLocked ? "ring-2 ring-amber-500/90 shadow-sm" : `ring-1 ${ring}`} shadow-[inset_0_0_0_1px_rgba(255,255,255,0.6)] ${extraClasses}`}
         title={tooltipText}
       >
-        {/* Botão de fixar/desafixar rápido (pino) */}
+        {/* Botão de fixar/desafixar rápido (badge / alfinete) */}
         {(isLocked || (interativo && !selecaoNestaTurma)) && (
           <button
             type="button"
@@ -217,25 +217,49 @@ export default function GradeTurma({
               e.stopPropagation();
               if (onToggleLock) onToggleLock({ turmaId: turma.id, dia, ordem, slot });
             }}
-            style={{
-              position: "absolute",
-              top: 2,
-              right: 3,
-              fontSize: 10,
-              lineHeight: 1,
-              background: "transparent",
-              border: "none",
-              padding: 2,
-              cursor: interativo ? "pointer" : "default",
-            }}
-            className={isLocked ? "opacity-100" : "opacity-0 group-hover:opacity-60 hover:!opacity-100"}
+            style={
+              isLocked
+                ? {
+                    position: "absolute",
+                    top: -6,
+                    right: -4,
+                    fontSize: 9,
+                    fontWeight: 800,
+                    lineHeight: 1,
+                    background: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+                    color: "#fff",
+                    border: "1.5px solid #fff",
+                    borderRadius: 999,
+                    padding: "2px 5px",
+                    boxShadow: "0 2px 4px rgba(217, 119, 6, 0.35)",
+                    cursor: interativo ? "pointer" : "default",
+                    zIndex: 5,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 2,
+                    letterSpacing: "0.02em",
+                  }
+                : {
+                    position: "absolute",
+                    top: 2,
+                    right: 3,
+                    fontSize: 10,
+                    lineHeight: 1,
+                    background: "rgba(255,255,255,0.75)",
+                    borderRadius: 999,
+                    border: "none",
+                    padding: "2px 4px",
+                    cursor: interativo ? "pointer" : "default",
+                  }
+            }
+            className={isLocked ? "opacity-100 hover:brightness-110 transition-all" : "opacity-0 group-hover:opacity-75 hover:!opacity-100 transition-opacity"}
             title={
               isLocked
-                ? "Aula fixada (Horário Manual). Clique no pino para desafixar."
-                : "Clique no pino para fixar (travar) esta aula neste horário."
+                ? "Aula FIXADA (Horário Manual). Não sofre alterações ao gerar novo horário. Clique para desafixar."
+                : "Clique no alfinete para FIXAR (travar) esta aula neste horário."
             }
           >
-            📌
+            {isLocked ? "📌 FIXO" : "📌"}
           </button>
         )}
 

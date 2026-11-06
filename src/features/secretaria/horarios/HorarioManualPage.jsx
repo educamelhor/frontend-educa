@@ -63,13 +63,14 @@ function SlotTurmaCombobox({
   ordem,
   diaNome,
   disabled,
-  value,           // { turma_id, disciplina_id, turma_nome, disciplina_nome } | null
+  value,           // { turma_id, disciplina_id, turma_nome, disciplina_nome, locked, origem } | null
   opcoesModuladas, // [{ key, turma_id, turma_nome, disciplina_id, disciplina_nome, aulas_previstas }]
   opcoesDemais,    // [{ key, turma_id, turma_nome, disciplina_id, disciplina_nome }]
   alocadosCountMap,// { "turmaId-discId": count }
   ocupacaoMap,     // { turmaId: { professor_id, professor_nome, disciplina_nome } } (outro prof neste dia/ordem)
   mostrarDiscNoCard,
   onSelect,        // (opt | null) => void
+  onToggleLock,    // () => void
 }) {
   const [aberto, setAberto] = useState(false);
   const [filtro, setFiltro] = useState("");
@@ -153,8 +154,9 @@ function SlotTurmaCombobox({
   }
 
   const temValor = !!(value && value.turma_id);
+  const isLocked = !!(temValor && value?.locked);
 
-  // Cores do card conforme estado
+  // Cores do card conforme estado (Fixo Manual vs Espelho do Solver vs Conflito vs Vazio)
   let cardBg = "#f8fafc";
   let cardBorder = "1.5px dashed #cbd5e1";
   let badgeBg = "#e2e8f0";
@@ -165,6 +167,11 @@ function SlotTurmaCombobox({
       cardBg = "#fef2f2";
       cardBorder = "1.5px solid #ef4444";
       badgeBg = "#ef4444";
+      badgeColor = "#fff";
+    } else if (isLocked) {
+      cardBg = "linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)";
+      cardBorder = "2px solid #d97706";
+      badgeBg = "#d97706";
       badgeColor = "#fff";
     } else {
       cardBg = "#eff6ff";
@@ -198,24 +205,28 @@ function SlotTurmaCombobox({
             : conflitoAtual
             ? `⚠️ Conflito: ${value?.turma_nome} já está ocupada por ${conflitoAtual.professor_nome} neste horário`
             : temValor
-            ? `${diaNome} · ${ordem}º horário · ${value.turma_nome}${value.disciplina_nome ? ` (${value.disciplina_nome})` : ""}`
+            ? `${diaNome} · ${ordem}º horário · ${value.turma_nome}${value.disciplina_nome ? ` (${value.disciplina_nome})` : ""}${
+                isLocked ? " — 📌 HORÁRIO FIXADO (protegido contra alterações no Solver)" : " — Espelho do Rascunho (ainda não fixado)"
+              }`
             : `${diaNome} · ${ordem}º horário · Clique para selecionar ou digitar a turma`
         }
         style={{
           width: "100%",
-          minHeight: 42,
+          minHeight: 44,
           borderRadius: 12,
           border: cardBorder,
           background: disabled ? "#f1f5f9" : cardBg,
           display: "flex",
           alignItems: "center",
           gap: 6,
-          padding: "4px 8px",
+          padding: "4px 7px",
           boxSizing: "border-box",
           cursor: disabled ? "not-allowed" : "pointer",
           transition: "all 0.15s ease",
           boxShadow: aberto
             ? "0 0 0 3px rgba(37, 99, 235, 0.15)"
+            : isLocked
+            ? "0 2px 8px rgba(217, 119, 6, 0.22)"
             : temValor
             ? "0 2px 6px rgba(37, 99, 235, 0.10)"
             : "none",
@@ -263,21 +274,24 @@ function SlotTurmaCombobox({
         ) : temValor ? (
           <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", justifyContent: "center" }}>
             <div style={{
-              fontSize: 12,
+              fontSize: 11.5,
               fontWeight: 800,
-              color: conflitoAtual ? "#b91c1c" : "#1e3a5f",
+              color: conflitoAtual ? "#b91c1c" : isLocked ? "#78350f" : "#1e3a5f",
               whiteSpace: "nowrap",
               overflow: "hidden",
               textOverflow: "ellipsis",
               lineHeight: 1.2,
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
             }}>
-              {conflitoAtual ? "⚠️ " : ""}{value.turma_nome}
+              <span>{conflitoAtual ? "⚠️ " : ""}{value.turma_nome}</span>
             </div>
             {(mostrarDiscNoCard || conflitoAtual) && (
               <div style={{
                 fontSize: 10,
                 fontWeight: 600,
-                color: conflitoAtual ? "#dc2626" : "#2563eb",
+                color: conflitoAtual ? "#dc2626" : isLocked ? "#b45309" : "#2563eb",
                 whiteSpace: "nowrap",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -304,6 +318,44 @@ function SlotTurmaCombobox({
           </span>
         )}
 
+        {/* Badge / Botão de Alfinete (📌 FIXO) quando há turma alocada */}
+        {temValor && !aberto && (
+          <button
+            type="button"
+            title={
+              isLocked
+                ? "📌 Aula FIXADA manualmente! Clique para desafixar apenas este horário."
+                : "Clique para fixar (📌) este horário individualmente."
+            }
+            onClick={e => {
+              e.stopPropagation();
+              if (onToggleLock) onToggleLock();
+            }}
+            style={{
+              border: isLocked ? "1px solid #d97706" : "1px dashed #cbd5e1",
+              background: isLocked ? "#f59e0b" : "rgba(255,255,255,0.75)",
+              color: isLocked ? "#fff" : "#64748b",
+              height: 20,
+              padding: isLocked ? "0 5px" : "0 4px",
+              borderRadius: 6,
+              fontSize: 9.5,
+              fontWeight: 800,
+              lineHeight: 1,
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 2,
+              flexShrink: 0,
+              boxShadow: isLocked ? "0 1px 3px rgba(180,83,9,0.3)" : "none",
+              transition: "all 0.15s ease",
+            }}
+          >
+            <span>📌</span>
+            {isLocked && <span style={{ letterSpacing: 0.2 }}>FIXO</span>}
+          </button>
+        )}
+
         {/* Botão limpar (×) ou seta do listbox (▾) */}
         {temValor && !aberto ? (
           <button
@@ -315,12 +367,12 @@ function SlotTurmaCombobox({
             }}
             style={{
               border: "none",
-              background: "rgba(15, 23, 42, 0.07)",
-              color: "#475569",
-              width: 20,
-              height: 20,
+              background: "rgba(15, 23, 42, 0.08)",
+              color: isLocked ? "#78350f" : "#475569",
+              width: 19,
+              height: 19,
               borderRadius: "50%",
-              fontSize: 13,
+              fontSize: 12,
               fontWeight: 700,
               lineHeight: 1,
               cursor: "pointer",
@@ -335,8 +387,8 @@ function SlotTurmaCombobox({
               e.currentTarget.style.color = "#dc2626";
             }}
             onMouseLeave={e => {
-              e.currentTarget.style.background = "rgba(15, 23, 42, 0.07)";
-              e.currentTarget.style.color = "#475569";
+              e.currentTarget.style.background = "rgba(15, 23, 42, 0.08)";
+              e.currentTarget.style.color = isLocked ? "#78350f" : "#475569";
             }}
           >
             ×
@@ -591,7 +643,7 @@ export default function HorarioManualPage({ config, turnoInicial }) {
   const [alocacoesMod, setAlocacoesMod] = useState([]); // registros vindos de /api/modulacao
 
   const [profSel, setProfSel]         = useState(null);
-  // grid: { [profId]: { [dia]: { [ordem]: { turma_id, disciplina_id, turma_nome, disciplina_nome } | null } } }
+  // grid: { [profId]: { [dia]: { [ordem]: { turma_id, disciplina_id, turma_nome, disciplina_nome, locked, origem } | null } } }
   const [grid, setGrid]               = useState({});
   const [dirty, setDirty]             = useState({});
   const [salvando, setSalvando]       = useState(false);
@@ -599,6 +651,7 @@ export default function HorarioManualPage({ config, turnoInicial }) {
   const [carregando, setCarregando]   = useState(true);
   const [busca, setBusca]             = useState("");
   const [conflitoModal, setConflitoModal] = useState(null); // { message, conflicts }
+  const [fixadoModal, setFixadoModal] = useState(null);     // { profNome, totalFixadas }
 
   const nPeriodos = periodosPorTurno[turno] || 5;
   const dias      = DIAS.filter(d => diasLetivos.includes(d.num));
@@ -682,11 +735,14 @@ export default function HorarioManualPage({ config, turnoInicial }) {
         if (!pId || !diaNum || !ordNum || !tId) continue;
         if (!g[pId]) g[pId] = {};
         if (!g[pId][diaNum]) g[pId][diaNum] = {};
+        const isLockedSlot = Boolean(Number(s.locked));
         g[pId][diaNum][ordNum] = {
           turma_id: tId,
           disciplina_id: dId,
           turma_nome: s.turma_nome || turmaMap[tId] || `Turma ${tId}`,
           disciplina_nome: s.disciplina_nome || discMap[dId] || "",
+          locked: isLockedSlot,
+          origem: s.origem || (isLockedSlot ? "manual" : "solver"),
         };
       }
 
@@ -848,11 +904,12 @@ export default function HorarioManualPage({ config, turnoInicial }) {
     };
   }, [profAtual, alocacoesMod, turmasTurno, getDisciplinasObj, disciplinas]);
 
-  // ── Contagem de aulas alocadas por professor e por (turma, disc) ──
+  // ── Contagem de aulas alocadas e fixadas por professor e por (turma, disc) ──
   const statsPorProfessor = useMemo(() => {
     const map = {};
     for (const p of professores) {
       let totalAlocadas = 0;
+      let totalFixadas = 0;
       const porTurmaDisc = {};
       const pGrid = grid[p.id] || {};
       for (const d of dias) {
@@ -860,6 +917,7 @@ export default function HorarioManualPage({ config, turnoInicial }) {
           const cell = pGrid[d.num]?.[o];
           if (cell && cell.turma_id) {
             totalAlocadas++;
+            if (cell.locked) totalFixadas++;
             const k = `${cell.turma_id}-${cell.disciplina_id}`;
             porTurmaDisc[k] = (porTurmaDisc[k] || 0) + 1;
           }
@@ -873,6 +931,8 @@ export default function HorarioManualPage({ config, turnoInicial }) {
 
       map[p.id] = {
         totalAlocadas,
+        totalFixadas,
+        todasFixadas: totalAlocadas > 0 && totalFixadas === totalAlocadas,
         previstasMod,
         porTurmaDisc,
       };
@@ -925,12 +985,58 @@ export default function HorarioManualPage({ config, turnoInicial }) {
                 disciplina_id: Number(opcao.disciplina_id),
                 turma_nome: opcao.turma_nome,
                 disciplina_nome: opcao.disciplina_nome,
+                locked: true,
+                origem: "manual",
               }
             : null,
         },
       },
     }));
     setDirty(prev => ({ ...prev, [profSel]: true }));
+  }
+
+  // ── Alternar fixação (📌) de um único slot diretamente no card ──
+  async function handleToggleSlotLock(diaNum, ordem) {
+    if (!profSel) return;
+    const cell = grid[profSel]?.[diaNum]?.[ordem];
+    if (!cell || !cell.turma_id || !cell.disciplina_id) return;
+
+    const novoLocked = !cell.locked;
+    setGrid(prev => ({
+      ...prev,
+      [profSel]: {
+        ...(prev[profSel] || {}),
+        [diaNum]: {
+          ...(prev[profSel]?.[diaNum] || {}),
+          [ordem]: {
+            ...cell,
+            locked: novoLocked,
+            origem: novoLocked ? "manual" : "solver",
+          },
+        },
+      },
+    }));
+
+    try {
+      await api.post("/api/grade/slot/upsert", {
+        turno: turno.toLowerCase(),
+        turma_id: Number(cell.turma_id),
+        dia: diaNum,
+        ordem,
+        disciplina_id: Number(cell.disciplina_id),
+        professor_id: profSel,
+        origem: novoLocked ? "manual" : "solver",
+        locked: novoLocked,
+      });
+      setMsg(
+        novoLocked
+          ? `📌 Aula de ${cell.turma_nome} (${ordem}º horário) fixada individualmente!`
+          : `🔓 Aula de ${cell.turma_nome} (${ordem}º horário) desafixada.`
+      );
+      setTimeout(() => setMsg(""), 3500);
+    } catch {
+      setDirty(prev => ({ ...prev, [profSel]: true }));
+    }
   }
 
   // ── Limpar grade apenas do professor selecionado ─────────────
@@ -947,11 +1053,12 @@ export default function HorarioManualPage({ config, turnoInicial }) {
       return { ...prev, [profSel]: limpo };
     });
     setDirty(prev => ({ ...prev, [profSel]: true }));
-    setMsg("ℹ️ Grade limpa na tela. Clique em 'Salvar Horário' para confirmar.");
+    const primeiroNome = profAtual?.nome?.split(" ")[0] || "Professor";
+    setMsg(`ℹ️ Grade limpa na tela. Clique em '📌 Fixar Horário ${primeiroNome}' para confirmar.`);
   }
 
-  // ── Salvar Horário do Professor Selecionado ──────────────────
-  async function salvarProfessorAtual(substituirConflitos = false) {
+  // ── Fixar (ou Desafixar) Horário Completo do Professor Selecionado ──
+  async function salvarProfessorAtual(substituirConflitos = false, lockFlag = true) {
     if (!profSel) return;
     setSalvando(true);
     setMsg("");
@@ -979,12 +1086,32 @@ export default function HorarioManualPage({ config, turnoInicial }) {
         professor_id: profSel,
         slots: slotsPayload,
         substituir_conflitos: substituirConflitos,
+        locked: lockFlag,
       });
 
       // Se substituiu conflitos, recarrega do backend para refletir a remoção no outro professor
       if (substituirConflitos) {
         await carregar();
       } else {
+        // Atualiza imediatamente os cards na tela com o status locked = lockFlag (📌 FIXO)
+        setGrid(prev => {
+          const profMap = { ...(prev[profSel] || {}) };
+          for (const d of dias) {
+            profMap[d.num] = { ...(profMap[d.num] || {}) };
+            for (let o = 1; o <= nPeriodos; o++) {
+              const c = profMap[d.num][o];
+              if (c && c.turma_id) {
+                profMap[d.num][o] = {
+                  ...c,
+                  locked: Boolean(lockFlag),
+                  origem: lockFlag ? "manual" : "solver",
+                };
+              }
+            }
+          }
+          return { ...prev, [profSel]: profMap };
+        });
+
         setDirty(prev => {
           const copia = { ...prev };
           delete copia[profSel];
@@ -992,9 +1119,22 @@ export default function HorarioManualPage({ config, turnoInicial }) {
         });
       }
 
-      const primeiroNome = profAtual?.nome?.split(" ")[0] || "Professor";
-      setMsg(`✅ Horário de ${primeiroNome} salvo com sucesso! (${slotsPayload.length} aulas)`);
-      setTimeout(() => setMsg(""), 4000);
+      const nomeCompleto = profAtual?.nome || "Professor";
+      const primeiroNome = nomeCompleto.split(" ")[0];
+
+      if (lockFlag && slotsPayload.length > 0) {
+        setFixadoModal({
+          profNome: nomeCompleto,
+          primeiroNome,
+          totalFixadas: slotsPayload.length,
+        });
+      } else if (!lockFlag) {
+        setMsg(`🔓 Todas as ${slotsPayload.length} aulas de ${primeiroNome} foram desafixadas (liberadas para o Solver).`);
+        setTimeout(() => setMsg(""), 4500);
+      } else {
+        setMsg(`✅ Horário de ${primeiroNome} atualizado com sucesso!`);
+        setTimeout(() => setMsg(""), 4000);
+      }
     } catch (e) {
       const status = e?.response?.status;
       const data = e?.response?.data;
@@ -1004,7 +1144,7 @@ export default function HorarioManualPage({ config, turnoInicial }) {
           conflicts: data.conflicts || [],
         });
       } else {
-        setMsg(`⚠️ ${data?.error || "Erro ao salvar horário do professor."}`);
+        setMsg(`⚠️ ${data?.error || "Erro ao fixar horário do professor."}`);
       }
     } finally {
       setSalvando(false);
@@ -1019,9 +1159,12 @@ export default function HorarioManualPage({ config, turnoInicial }) {
   const isProfAtualDirty = !!(profSel && dirty[profSel]);
   const statsAtual = (profSel && statsPorProfessor[profSel]) || {
     totalAlocadas: 0,
+    totalFixadas: 0,
+    todasFixadas: false,
     previstasMod: 0,
     porTurmaDisc: {},
   };
+  const primeiroNomeProfAtual = profAtual ? profAtual.nome.split(" ")[0] : "Professor";
 
   return (
     <div style={{ fontFamily: "'Montserrat', sans-serif", display: "flex", flexDirection: "column", gap: 0, flex: 1, minHeight: 0 }}>
@@ -1039,7 +1182,7 @@ export default function HorarioManualPage({ config, turnoInicial }) {
               Horário Manual dos Professores
             </h2>
             <div style={{ fontSize: 11, color: "#64748b", fontWeight: 500 }}>
-              Selecione o professor à esquerda e informe a turma em cada horário (digite para filtrar ou use a lista)
+              Espelha o último horário salvo • Ajuste aulas manualmente ou clique em <b>📌 Fixar Horário</b> para blindar o professor no Solver
             </div>
           </div>
         </div>
@@ -1070,7 +1213,7 @@ export default function HorarioManualPage({ config, turnoInicial }) {
             disabled={salvando || !profSel}
             title="Limpa os horários preenchidos para o professor selecionado"
             style={{
-              padding: "8px 16px", borderRadius: 8,
+              padding: "8px 14px", borderRadius: 8,
               border: "1px solid #fca5a5",
               background: salvando || !profSel ? "#f1f5f9" : "#fff1f2",
               color: salvando || !profSel ? "#94a3b8" : "#dc2626",
@@ -1082,35 +1225,72 @@ export default function HorarioManualPage({ config, turnoInicial }) {
             🧹 Limpar Professor
           </button>
 
-          {/* Salvar Horário do Professor Selecionado */}
+          {/* Desafixar Horário do Professor (aparece quando o professor possui aulas fixadas) */}
+          {statsAtual.totalFixadas > 0 && (
+            <button
+              onClick={() => salvarProfessorAtual(false, false)}
+              disabled={salvando || !profSel}
+              title={`Remove a fixação (📌) das aulas de ${primeiroNomeProfAtual} sem apagar o horário`}
+              style={{
+                padding: "8px 14px",
+                borderRadius: 8,
+                border: "1px solid #cbd5e1",
+                background: "#f8fafc",
+                color: "#475569",
+                fontWeight: 700,
+                fontSize: 12,
+                cursor: salvando || !profSel ? "not-allowed" : "pointer",
+                transition: "all 0.18s",
+              }}
+            >
+              🔓 Desafixar {primeiroNomeProfAtual}
+            </button>
+          )}
+
+          {/* Botão Único e Claro: Fixar Horário do Professor Selecionado */}
           <button
-            onClick={() => salvarProfessorAtual(false)}
+            onClick={() => salvarProfessorAtual(false, true)}
             disabled={salvando || !profSel}
+            title={`Salva e fixa (📌) todas as aulas em tela do(a) professor(a) ${profAtual?.nome || ""}`}
             style={{
-              padding: "8px 20px", borderRadius: 8, border: "none",
+              padding: "9px 20px",
+              borderRadius: 8,
+              border: statsAtual.todasFixadas && !isProfAtualDirty ? "1.5px solid #b45309" : "none",
               background: !profSel
                 ? "#e2e8f0"
                 : isProfAtualDirty
-                ? "#2563eb"
-                : "#1e3a5f",
+                ? "linear-gradient(135deg, #2563eb, #1d4ed8)"
+                : statsAtual.todasFixadas
+                ? "linear-gradient(135deg, #d97706, #b45309)"
+                : "linear-gradient(135deg, #1e3a5f, #0f172a)",
               color: !profSel ? "#94a3b8" : "#fff",
-              fontWeight: 700, fontSize: 13,
+              fontWeight: 800,
+              fontSize: 13,
               cursor: salvando || !profSel ? "not-allowed" : "pointer",
               transition: "all 0.18s",
-              boxShadow: isProfAtualDirty ? "0 4px 12px rgba(37,99,235,0.3)" : "none",
+              boxShadow: isProfAtualDirty
+                ? "0 4px 12px rgba(37,99,235,0.35)"
+                : statsAtual.todasFixadas
+                ? "0 3px 10px rgba(217,119,6,0.3)"
+                : "0 2px 8px rgba(15,23,42,0.2)",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
             }}
           >
             {salvando
-              ? "Salvando…"
-              : `💾 Salvar ${profAtual ? profAtual.nome.split(" ")[0] : "Horário"}`}
+              ? "Fixando…"
+              : statsAtual.todasFixadas && !isProfAtualDirty
+              ? `📌 Horário ${primeiroNomeProfAtual} Fixado ✓`
+              : `📌 Fixar Horário ${primeiroNomeProfAtual}`}
           </button>
         </div>
 
         {msg && (
           <div style={{
             width: "100%", textAlign: "center", fontSize: 13, fontWeight: 600,
-            color: msg.startsWith("✅") ? "#15803d" : msg.startsWith("⚠️") ? "#b45309" : "#1d4ed8",
-            background: msg.startsWith("✅") ? "#f0fdf4" : msg.startsWith("⚠️") ? "#fffbeb" : "#eff6ff",
+            color: msg.startsWith("✅") || msg.startsWith("📌") ? "#15803d" : msg.startsWith("⚠️") ? "#b45309" : "#1d4ed8",
+            background: msg.startsWith("✅") || msg.startsWith("📌") ? "#f0fdf4" : msg.startsWith("⚠️") ? "#fffbeb" : "#eff6ff",
             padding: "6px 12px", borderRadius: 8,
           }}>
             {msg}
@@ -1123,7 +1303,7 @@ export default function HorarioManualPage({ config, turnoInicial }) {
 
         {/* ── Painel esquerdo — Lista de professores ── */}
         <div style={{
-          width: 255, flexShrink: 0,
+          width: 265, flexShrink: 0,
           borderRight: "1px solid #e2e8f0",
           background: "#f8fafc",
           display: "flex", flexDirection: "column",
@@ -1154,7 +1334,7 @@ export default function HorarioManualPage({ config, turnoInicial }) {
             ) : profsFiltrados.map(p => {
               const sel = p.id === profSel;
               const isDirty = !!dirty[p.id];
-              const st = statsPorProfessor[p.id] || { totalAlocadas: 0, previstasMod: 0 };
+              const st = statsPorProfessor[p.id] || { totalAlocadas: 0, totalFixadas: 0, todasFixadas: false, previstasMod: 0 };
               const completo = st.previstasMod > 0 && st.totalAlocadas >= st.previstasMod;
 
               return (
@@ -1164,14 +1344,22 @@ export default function HorarioManualPage({ config, turnoInicial }) {
                   style={{
                     width: "100%", textAlign: "left",
                     padding: "10px 12px", borderRadius: 9, marginBottom: 4,
-                    border: sel ? "2px solid #2563eb" : "2px solid transparent",
-                    background: sel ? "#eff6ff" : "transparent",
+                    border: sel
+                      ? "2px solid #2563eb"
+                      : st.todasFixadas
+                      ? "1.5px solid #f59e0b"
+                      : "2px solid transparent",
+                    background: sel
+                      ? "#eff6ff"
+                      : st.todasFixadas
+                      ? "#fffbeb"
+                      : "transparent",
                     cursor: "pointer", transition: "all 0.15s",
                     position: "relative",
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 6 }}>
-                    <div style={{ fontSize: 13, fontWeight: sel ? 700 : 600, color: sel ? "#1d4ed8" : "#1e293b", lineHeight: 1.3 }}>
+                    <div style={{ fontSize: 12.5, fontWeight: sel ? 700 : 600, color: sel ? "#1d4ed8" : "#1e293b", lineHeight: 1.3 }}>
                       {p.nome}
                     </div>
                     {/* Contador de aulas alocadas */}
@@ -1190,7 +1378,7 @@ export default function HorarioManualPage({ config, turnoInicial }) {
                     )}
                   </div>
 
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 5 }}>
+                  <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 4, marginTop: 5 }}>
                     {getDisciplinasNomes(p).map(d => (
                       <span
                         key={d}
@@ -1206,6 +1394,31 @@ export default function HorarioManualPage({ config, turnoInicial }) {
                         {d}
                       </span>
                     ))}
+
+                    {/* Badge nítido de Horário Fixado (📌) na lista lateral */}
+                    {st.totalFixadas > 0 && (
+                      <span
+                        title={
+                          st.todasFixadas
+                            ? `Todas as ${st.totalFixadas} aulas deste professor estão fixadas (📌) e protegidas no Solver`
+                            : `${st.totalFixadas} de ${st.totalAlocadas} aulas fixadas manualmente (📌)`
+                        }
+                        style={{
+                          background: st.todasFixadas ? "#f59e0b" : "#fef3c7",
+                          color: st.todasFixadas ? "#fff" : "#b45309",
+                          border: "1px solid #d97706",
+                          padding: "1px 6px",
+                          borderRadius: 6,
+                          fontSize: 9.5,
+                          fontWeight: 800,
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 3,
+                        }}
+                      >
+                        📌 {st.todasFixadas ? "FIXADO" : `${st.totalFixadas} fixa(s)`}
+                      </span>
+                    )}
                   </div>
 
                   {isDirty && (
@@ -1226,15 +1439,26 @@ export default function HorarioManualPage({ config, turnoInicial }) {
           {/* Legenda */}
           <div style={{ padding: "12px 14px", borderTop: "1px solid #e2e8f0", display: "flex", flexDirection: "column", gap: 6 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-              <div style={{ width: 14, height: 14, borderRadius: 4, background: "#2563eb", flexShrink: 0 }} />
-              <span style={{ fontSize: 11, color: "#64748b" }}>Turma Alocada</span>
+              <div style={{
+                width: 16, height: 16, borderRadius: 4,
+                background: "#f59e0b", border: "1.5px solid #b45309",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 9, color: "#fff", flexShrink: 0,
+              }}>
+                📌
+              </div>
+              <span style={{ fontSize: 11, fontWeight: 700, color: "#92400e" }}>Aula Fixada (Protegida)</span>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-              <div style={{ width: 14, height: 14, borderRadius: 4, border: "1.5px dashed #cbd5e1", background: "#f8fafc", flexShrink: 0 }} />
+              <div style={{ width: 16, height: 16, borderRadius: 4, background: "#2563eb", flexShrink: 0 }} />
+              <span style={{ fontSize: 11, color: "#64748b" }}>Alocada (Espelho Solver)</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+              <div style={{ width: 16, height: 16, borderRadius: 4, border: "1.5px dashed #cbd5e1", background: "#f8fafc", flexShrink: 0 }} />
               <span style={{ fontSize: 11, color: "#64748b" }}>Horário Vago / Coord.</span>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-              <div style={{ width: 14, height: 14, borderRadius: 4, background: "#ef4444", flexShrink: 0 }} />
+              <div style={{ width: 16, height: 16, borderRadius: 4, background: "#ef4444", flexShrink: 0 }} />
               <span style={{ fontSize: 11, color: "#64748b" }}>Choque de Turma</span>
             </div>
           </div>
@@ -1243,7 +1467,7 @@ export default function HorarioManualPage({ config, turnoInicial }) {
         {/* ── Área principal — Cabeçalho do Professor + Cards dos Dias ── */}
         <div style={{ flex: 1, overflowX: "auto", overflowY: "auto", background: "#f1f5f9", padding: "20px 16px" }}>
 
-          {/* Pílula do professor selecionado + Botão de Salvar direto */}
+          {/* Pílula do professor selecionado + Status de Fixação + Imprimir */}
           {profAtual ? (
             <div style={{
               display: "flex", justifyContent: "center", alignItems: "center", gap: 14, flexWrap: "wrap", marginBottom: 20,
@@ -1257,13 +1481,16 @@ export default function HorarioManualPage({ config, turnoInicial }) {
               }}>
                 <div style={{
                   width: 34, height: 34, borderRadius: "50%",
-                  background: "#2563eb", display: "flex", alignItems: "center", justifyContent: "center",
+                  background: statsAtual.todasFixadas ? "#d97706" : "#2563eb",
+                  display: "flex", alignItems: "center", justifyContent: "center",
                   fontSize: 15, fontWeight: 800,
                 }}>
                   {profAtual.nome?.[0] || "?"}
                 </div>
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 700 }}>{profAtual.nome}</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>
+                    <span>{profAtual.nome}</span>
+                  </div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
                     {getDisciplinasNomes(profAtual).map(d => (
                       <span key={d} style={{
@@ -1291,33 +1518,82 @@ export default function HorarioManualPage({ config, turnoInicial }) {
                 </div>
 
                 <div style={{
-                  background: "rgba(255,255,255,0.15)", borderRadius: 20, padding: "4px 12px", fontSize: 11, fontWeight: 700,
+                  background: "rgba(255,255,255,0.15)", borderRadius: 20, padding: "5px 12px", fontSize: 11, fontWeight: 700,
                 }}>
                   {statsAtual.previstasMod > 0
                     ? `${statsAtual.totalAlocadas} / ${statsAtual.previstasMod} aulas alocadas`
                     : `${statsAtual.totalAlocadas} aulas alocadas`}
                 </div>
 
-                {/* Botão Salvar embutido na barra do professor selecionado */}
-                <button
-                  type="button"
-                  onClick={() => salvarProfessorAtual(false)}
-                  disabled={salvando}
-                  style={{
-                    padding: "7px 16px",
-                    borderRadius: 20,
-                    border: "none",
-                    background: isProfAtualDirty ? "#22c55e" : "#2563eb",
-                    color: "#fff",
-                    fontSize: 12,
-                    fontWeight: 800,
-                    cursor: salvando ? "not-allowed" : "pointer",
-                    boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
-                    transition: "all 0.15s",
-                  }}
-                >
-                  {salvando ? "Salvando…" : isProfAtualDirty ? "💾 Salvar Alterações" : "💾 Salvar Horário"}
-                </button>
+                {/* Selo Nítido de Status de Fixação no Cabeçalho Central (substitui o antigo botão Salvar duplicado) */}
+                {isProfAtualDirty ? (
+                  <button
+                    type="button"
+                    onClick={() => salvarProfessorAtual(false, true)}
+                    disabled={salvando}
+                    style={{
+                      padding: "6px 14px",
+                      borderRadius: 20,
+                      border: "1px solid #fcd34d",
+                      background: "linear-gradient(135deg, #f59e0b, #d97706)",
+                      color: "#fff",
+                      fontSize: 11.5,
+                      fontWeight: 800,
+                      cursor: salvando ? "not-allowed" : "pointer",
+                      boxShadow: "0 2px 8px rgba(245,158,11,0.35)",
+                    }}
+                  >
+                    {salvando ? "Fixando…" : `📌 Confirmar e Fixar Alterações`}
+                  </button>
+                ) : statsAtual.todasFixadas ? (
+                  <span
+                    title="Todas as aulas deste professor estão fixadas manualmente e protegidas contra alterações no Solver"
+                    style={{
+                      background: "linear-gradient(135deg, #f59e0b, #d97706)",
+                      color: "#fff",
+                      border: "1px solid #fde68a",
+                      borderRadius: 20,
+                      padding: "5px 14px",
+                      fontSize: 11.5,
+                      fontWeight: 800,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 5,
+                      boxShadow: "0 2px 8px rgba(217,119,6,0.35)",
+                    }}
+                  >
+                    📌 HORÁRIO FIXADO ({statsAtual.totalFixadas}/{statsAtual.totalAlocadas})
+                  </span>
+                ) : statsAtual.totalFixadas > 0 ? (
+                  <span
+                    style={{
+                      background: "rgba(245, 158, 11, 0.25)",
+                      color: "#fde68a",
+                      border: "1px solid rgba(253, 230, 138, 0.5)",
+                      borderRadius: 20,
+                      padding: "5px 12px",
+                      fontSize: 11,
+                      fontWeight: 700,
+                    }}
+                  >
+                    📌 {statsAtual.totalFixadas} de {statsAtual.totalAlocadas} aulas fixadas
+                  </span>
+                ) : (
+                  <span
+                    title="Horário espelhado da última geração do Solver. Clique em '📌 Fixar Horário' no topo se quiser blindar este professor."
+                    style={{
+                      background: "rgba(255,255,255,0.12)",
+                      color: "#cbd5e1",
+                      border: "1px dashed rgba(255,255,255,0.3)",
+                      borderRadius: 20,
+                      padding: "5px 12px",
+                      fontSize: 11,
+                      fontWeight: 600,
+                    }}
+                  >
+                    🔓 Espelho do Rascunho (Não fixado)
+                  </span>
+                )}
 
                 {/* Botão Imprimir Horário Individual do Professor */}
                 <button
@@ -1362,7 +1638,7 @@ export default function HorarioManualPage({ config, turnoInicial }) {
               background: "#fff", borderRadius: 12, padding: "16px 24px",
               border: "2px dashed #e2e8f0",
             }}>
-              ← Selecione um professor na lista para lançar o horário manual
+              ← Selecione um professor na lista para visualizar ou fixar o horário manual
             </div>
           )}
 
@@ -1415,6 +1691,7 @@ export default function HorarioManualPage({ config, turnoInicial }) {
                         ocupacaoMap={ocupacaoSlot}
                         mostrarDiscNoCard={mostrarDiscNoCard}
                         onSelect={op => handleSelectSlot(d.num, ordem, op)}
+                        onToggleLock={() => handleToggleSlotLock(d.num, ordem)}
                       />
                     );
                   })}
@@ -1434,7 +1711,7 @@ export default function HorarioManualPage({ config, turnoInicial }) {
                   <span>📊</span> Conferência de Modulação — {profAtual.nome.split(" ")[0]}
                 </h3>
                 <span style={{ fontSize: 11, color: "#64748b" }}>
-                  Clique em qualquer card acima e digite o número/letra da turma (ex: <b>9c</b>) ou selecione na lista
+                  Clique em qualquer card acima para alterar a turma, no ícone <b>📌</b> para fixar uma aula isolada ou em <b>📌 Fixar Horário {primeiroNomeProfAtual}</b> para fixar todas
                 </span>
               </div>
 
@@ -1490,6 +1767,179 @@ export default function HorarioManualPage({ config, turnoInicial }) {
         </div>
       </div>
 
+      {/* ── Modal Premium de Confirmação de Fixação de Horário (📌) ── */}
+      {fixadoModal && (
+        <div
+          onClick={() => setFixadoModal(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15, 23, 42, 0.68)",
+            backdropFilter: "blur(6px)",
+            zIndex: 10000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: "#fff",
+              width: "100%",
+              maxWidth: 520,
+              borderRadius: 20,
+              overflow: "hidden",
+              boxShadow: "0 25px 50px -12px rgba(15, 23, 42, 0.45)",
+              border: "1px solid #fde68a",
+            }}
+          >
+            {/* Header Premium */}
+            <div
+              style={{
+                background: "linear-gradient(135deg, #1e3a5f 0%, #0f172a 60%, #78350f 100%)",
+                padding: "22px 26px",
+                color: "#fff",
+                display: "flex",
+                alignItems: "center",
+                gap: 16,
+              }}
+            >
+              <div
+                style={{
+                  width: 54,
+                  height: 54,
+                  borderRadius: 16,
+                  background: "linear-gradient(135deg, #f59e0b, #d97706)",
+                  border: "2px solid #fde68a",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: 26,
+                  flexShrink: 0,
+                  boxShadow: "0 4px 14px rgba(245, 158, 11, 0.4)",
+                }}
+              >
+                📌
+              </div>
+              <div>
+                <span
+                  style={{
+                    background: "rgba(245, 158, 11, 0.25)",
+                    border: "1px solid rgba(253, 230, 138, 0.5)",
+                    color: "#fde68a",
+                    fontSize: 10,
+                    fontWeight: 800,
+                    padding: "2px 9px",
+                    borderRadius: 999,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.06em",
+                    display: "inline-block",
+                    marginBottom: 5,
+                  }}
+                >
+                  Horário Blindado no Solver • Turno {turno.toUpperCase()}
+                </span>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#fff", lineHeight: 1.25 }}>
+                  Horário de {fixadoModal.primeiroNome} Fixado!
+                </h3>
+              </div>
+            </div>
+
+            {/* Corpo do Modal */}
+            <div style={{ padding: "24px 26px" }}>
+              <p style={{ margin: "0 0 18px", fontSize: 14, color: "#334155", lineHeight: 1.6, fontWeight: 500 }}>
+                Todas as <strong>{fixadoModal.totalFixadas} aulas</strong> do(a) professor(a){" "}
+                <strong style={{ color: "#1e3a5f" }}>{fixadoModal.profNome}</strong> foram{" "}
+                <strong style={{ color: "#b45309" }}>fixadas manualmente (📌)</strong>.
+              </p>
+
+              <div
+                style={{
+                  background: "linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%)",
+                  border: "1.5px solid #f59e0b",
+                  borderRadius: 12,
+                  padding: "14px 16px",
+                  marginBottom: 18,
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 12,
+                }}
+              >
+                <span style={{ fontSize: 20, lineHeight: 1 }}>🛡️</span>
+                <div style={{ fontSize: 12.5, color: "#78350f", lineHeight: 1.5, fontWeight: 600 }}>
+                  Mesmo em uma nova tentativa de geração de horário na aba <b>⚡ Gerar Horário</b> (com a opção{" "}
+                  <i>"📌 Respeitar Aulas Fixas"</i> ativa), o horário deste(a) professor(a){" "}
+                  <b>não sofrerá alterações</b>.
+                </div>
+              </div>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 10,
+                  marginBottom: 22,
+                }}
+              >
+                <div
+                  style={{
+                    background: "#f8fafc",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: 10,
+                    padding: "10px 12px",
+                  }}
+                >
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>
+                    Aulas Protegidas
+                  </div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: "#b45309", marginTop: 2 }}>
+                    📌 {fixadoModal.totalFixadas} aulas fixas
+                  </div>
+                </div>
+                <div
+                  style={{
+                    background: "#f8fafc",
+                    border: "1px solid #e2e8f0",
+                    borderRadius: 10,
+                    padding: "10px 12px",
+                  }}
+                >
+                  <div style={{ fontSize: 10, fontWeight: 700, color: "#64748b", textTransform: "uppercase" }}>
+                    Como Desafixar?
+                  </div>
+                  <div style={{ fontSize: 11.5, fontWeight: 700, color: "#334155", marginTop: 3 }}>
+                    Botão 🔓 Desafixar {fixadoModal.primeiroNome}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                <button
+                  type="button"
+                  onClick={() => setFixadoModal(null)}
+                  style={{
+                    width: "100%",
+                    padding: "12px 24px",
+                    borderRadius: 10,
+                    border: "none",
+                    background: "linear-gradient(135deg, #1e3a5f, #2563eb)",
+                    color: "#fff",
+                    fontWeight: 800,
+                    fontSize: 14,
+                    cursor: "pointer",
+                    boxShadow: "0 4px 12px rgba(37, 99, 235, 0.3)",
+                  }}
+                >
+                  ✅ Entendido
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Modal de Conflito de Turma (opção de revisar ou substituir) ── */}
       {conflitoModal && (
         <div style={{
@@ -1528,13 +1978,13 @@ export default function HorarioManualPage({ config, turnoInicial }) {
                 Revisar Horário
               </button>
               <button
-                onClick={() => salvarProfessorAtual(true)}
+                onClick={() => salvarProfessorAtual(true, true)}
                 style={{
                   padding: "9px 20px", borderRadius: 8, border: "none",
                   background: "#dc2626", color: "#fff", fontWeight: 700, fontSize: 13, cursor: "pointer",
                 }}
               >
-                Substituir e Salvar
+                Substituir e Fixar
               </button>
             </div>
           </div>

@@ -110,9 +110,21 @@ function recalcularMetricasEDiagnostico(gradePorTurma, solverPayload, metricsAtu
   let violacoesSeparadasMesmoDia = 0;
   let violacoesMaxDia = 0;
   let violacoesParesBloqueados = 0;
+  let violacoesIndisponibilidade = 0;
   let paresGeminados = 0;
   let paresObrigatoriosAtendidos = 0;
   const divergenciasParesObrigatorios = [];
+
+  const dispoBloqueadaSet = new Set();
+  for (const disp of Array.isArray(solverPayload?.disponibilidades) ? solverPayload.disponibilidades : []) {
+    const st = String(disp?.status || "indisponivel").toLowerCase();
+    if (st === "indisponivel" || st === "bloqueado" || st === "excluir") {
+      const pId = Number(disp.professor_id);
+      const dia = Number(disp.dia ?? disp.dia_semana);
+      const ord = Number(disp.ordem ?? disp.periodo ?? disp.periodo_ordem);
+      if (pId && dia && ord) dispoBloqueadaSet.add(`${pId}|${dia}|${ord}`);
+    }
+  }
 
   const turmaEntries = Object.entries(gradePorTurma || {}).filter(([, g]) => Boolean(g));
   const paresObrigatoriosMeta = paresObrigatoriosSet.size * turmaEntries.length * diasSemana.length;
@@ -143,12 +155,16 @@ function recalcularMetricasEDiagnostico(gradePorTurma, solverPayload, metricsAtu
       }
     }
 
-    for (const perObj of Object.values(diasObj || {})) {
+    for (const [dKey, perObj] of Object.entries(diasObj || {})) {
+      const dNum = Number(dKey);
       const byDisc = new Map();
       for (const [pStr, cell] of Object.entries(perObj || {})) {
         if (!cell || !cell.disciplina_id) continue;
         const p = Number(pStr);
         const dId = Number(cell.disciplina_id);
+        if (cell.professor_id && dispoBloqueadaSet.has(`${Number(cell.professor_id)}|${dNum}|${p}`)) {
+          violacoesIndisponibilidade++;
+        }
         const nextCell = perObj?.[p + 1];
         if (nextCell && Number(nextCell.disciplina_id) === dId) {
           paresGeminados++;
@@ -187,6 +203,7 @@ function recalcularMetricasEDiagnostico(gradePorTurma, solverPayload, metricsAtu
         aulas_fixas_manuais: totalFixas,
         aulas_nao_alocadas: naoAlocFallback,
         cobertura_percentual: cobFallback,
+        violacoes_indisponibilidade: violacoesIndisponibilidade,
         violacoes_separadas_mesmo_dia: violacoesSeparadasMesmoDia,
         violacoes_max_dia: violacoesMaxDia,
         violacoes_pares_bloqueados: violacoesParesBloqueados,
@@ -240,6 +257,7 @@ function recalcularMetricasEDiagnostico(gradePorTurma, solverPayload, metricsAtu
       aulas_fixas_manuais: totalFixas,
       aulas_nao_alocadas: naoAlocadasList.length,
       cobertura_percentual: cobertura,
+      violacoes_indisponibilidade: violacoesIndisponibilidade,
       violacoes_separadas_mesmo_dia: violacoesSeparadasMesmoDia,
       violacoes_max_dia: violacoesMaxDia,
       violacoes_pares_bloqueados: violacoesParesBloqueados,
@@ -711,6 +729,7 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
         const m = novoResultadoNorm.metrics || {};
         const temPendenciaEstrita =
           (m.aulas_nao_alocadas || 0) > 0 ||
+          (m.violacoes_indisponibilidade || 0) > 0 ||
           (m.pares_obrigatorios_faltantes || 0) > 0 ||
           (m.violacoes_pares_bloqueados || 0) > 0 ||
           (m.violacoes_separadas_mesmo_dia || 0) > 0 ||
@@ -1927,7 +1946,8 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
             </div>
 
             {/* ── Banner Urânia+: Pares Obrigatórios não fechados 100% ou Divergências de Governança ── */}
-            {((resultado.metrics?.pares_obrigatorios_faltantes || 0) > 0 ||
+            {((resultado.metrics?.violacoes_indisponibilidade || 0) > 0 ||
+              (resultado.metrics?.pares_obrigatorios_faltantes || 0) > 0 ||
               (resultado.metrics?.violacoes_separadas_mesmo_dia || 0) > 0 ||
               (resultado.metrics?.violacoes_max_dia || 0) > 0 ||
               (resultado.metrics?.violacoes_pares_bloqueados || 0) > 0) && (
@@ -1950,12 +1970,16 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
               >
                 <div style={{ flex: 1, minWidth: 280 }}>
                   <strong style={{ display: "block", marginBottom: 4, fontSize: 14, color: "#7c2d12" }}>
-                    {(resultado.metrics?.pares_obrigatorios_faltantes || 0) > 0
+                    {(resultado.metrics?.violacoes_indisponibilidade || 0) > 0
+                      ? `⛔ Atenção: ${resultado.metrics.violacoes_indisponibilidade} aula(s) estão em horários marcados como EXCLUIR na Disponibilidade dos Professores!`
+                      : (resultado.metrics?.pares_obrigatorios_faltantes || 0) > 0
                       ? `🔒 Atenção: ${resultado.metrics.pares_obrigatorios_atendidos}/${resultado.metrics.pares_obrigatorios_meta} janelas de Pares Obrigatórios atendidas (${resultado.metrics.pares_obrigatorios_faltantes} janela(s) ficaram com aulas simples)`
                       : `⚠️ Grade com divergências de governança: ${resultado.metrics?.violacoes_separadas_mesmo_dia || 0} separada(s) no dia • ${resultado.metrics?.violacoes_max_dia || 0} acima do limite • ${resultado.metrics?.violacoes_pares_bloqueados || 0} dupla(s) cortada(s) pelo recreio`}
                   </strong>
                   <span style={{ fontSize: 12.5, color: "#9a3412", lineHeight: 1.5 }}>
-                    {(resultado.metrics?.pares_obrigatorios_faltantes || 0) > 0
+                    {(resultado.metrics?.violacoes_indisponibilidade || 0) > 0
+                      ? "A disponibilidade de algum professor foi alterada para 'Excluir' após a geração deste rascunho. Clique em '⚡ Tentar Regerar' para realocar automaticamente todas as aulas respeitando 100% os horários excluídos."
+                      : (resultado.metrics?.pares_obrigatorios_faltantes || 0) > 0
                       ? "Devido à combinação de disciplinas com carga ímpar (5h/3h/1h) e professores com 30/30 aulas, não foi matematicamente possível geminar 100% dos blocos obrigatórios sem desassistir turmas. Abra o Assistente Urânia+ para ver as janelas exatas ou aplicar sugestões de fechamento."
                       : "Esta grade possui divergências em relação às regras atuais de governança de pares/recreio. Utilize o Assistente Urânia+ ou regere a grade."}
                   </span>

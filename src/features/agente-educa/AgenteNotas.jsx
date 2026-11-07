@@ -476,9 +476,12 @@ export default function AgenteNotas() {
     // 6. Credenciais
     if (m.includes('login') || m.includes('senha') || m.includes('credencial'))
       return '🔑 Falha no login do EDUCADF. Verifique suas credenciais em Agente EDUCA > Configurações.';
-    // 7. Turma não encontrada (genuíno — após descartar timeout)
-    if (m.includes('turma') || m.includes('calendário') || m.includes('calendario'))
-      return '🔍 Turma não localizada no EDUCADF. Verifique se o Mapeamento Global de Turmas foi preenchido pela secretaria.';
+    // 7. Calendário sem eventos / aulas registradas no bimestre ou semestre
+    if (m.includes('nenhum evento') || m.includes('calendário') || m.includes('calendario'))
+      return '📅 A turma foi selecionada no EDUCADF, mas não foram encontradas aulas lançadas no calendário para os meses deste bimestre/semestre. Verifique se há registros de aula no Diário de Classe do EDUCADF para esta turma.';
+    // 7b. Turma não encontrada no seletor (genuíno — após descartar timeout e calendário)
+    if (m.includes('turma'))
+      return '🔍 Turma não localizada no EDUCADF. Verifique se o Mapeamento Global de Turmas foi preenchido pela secretaria ou se a turma pertence ao semestre atual.';
     // 8. Erro ao preencher notas
     if (m.includes('nota') || m.includes('aluno') || m.includes('coluna'))
       return 'Erro ao preencher notas no EDUCADF. Verifique se a estrutura (Etapa 1) foi exportada corretamente.';

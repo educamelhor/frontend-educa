@@ -454,8 +454,10 @@ export default function AgentePlanos() {
       return 'O portal EDUCADF exibiu uma janela de alerta que bloqueou a operação. Tente novamente — o agente agora fecha esse alerta automaticamente.';
     if (m.includes('login') || m.includes('senha') || m.includes('credencial'))
       return 'Falha no login do EDUCADF. Verifique suas credenciais em Agente EDUCA > Configurações.';
-    if (m.includes('turma') || m.includes('calendário') || m.includes('calendario'))
-      return `🔍 Turma não localizada no EDUCADF: "${msg.match(/"([^"]+)"/) ?.[1] || 'ver detalhes'}". Verifique se o Mapeamento Global de Turmas foi preenchido pela secretaria.`;
+    if (m.includes('nenhum evento') || m.includes('não retornou aulas') || m.includes('nenhum evento do calendario'))
+      return `📅 A turma "${msg.match(/"([^"]+)"/)?.[1] || 'selecionada'}" foi localizada e filtrada no EDUCADF, porém não foram encontradas aulas registradas no calendário para o período deste plano. Verifique se existem aulas lançadas no EDUCADF para esta turma neste bimestre/semestre.`;
+    if (m.includes('turma'))
+      return `🔍 Turma não localizada no EDUCADF: "${msg.match(/"([^"]+)"/) ?.[1] || 'ver detalhes'}". Verifique se a turma pertence ao seu diário neste semestre ou se o Mapeamento Global de Turmas foi preenchido pela secretaria.`;
     if (m.includes('filtrar') || m.includes('filtro'))
       return 'Falha ao aplicar filtros no EDUCADF. O portal pode estar lento — tente novamente em alguns minutos.';
     if (m.includes('aba') || m.includes('procedimento'))

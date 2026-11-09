@@ -161,6 +161,41 @@ export default function DisponibilidadePage({ config, turnoInicial, highlightPro
     setDirty(prev => ({ ...prev, [profSel]: true }));
   }
 
+  // ── Próximo status em lote do dia inteiro (Amarelo=Evitar → Vermelho=Excluir → Verde=Livre) ──
+  function getProxStatusDia(dia) {
+    if (!profSel) return "evitar";
+    const slotsDia = grid[profSel]?.[dia] || {};
+    let todosEvitar = true;
+    let todosIndisponivel = true;
+    for (let o = 1; o <= nPeriodos; o++) {
+      const st = slotsDia[o] || "livre";
+      if (st !== "evitar") todosEvitar = false;
+      if (st !== "indisponivel") todosIndisponivel = false;
+    }
+    if (todosEvitar) return "indisponivel";
+    if (todosIndisponivel) return "livre";
+    return "evitar";
+  }
+
+  function toggleDiaInteiro(dia) {
+    if (!profSel) return;
+    const novoStatus = getProxStatusDia(dia);
+    setGrid(prev => {
+      const novoDia = {};
+      for (let o = 1; o <= nPeriodos; o++) {
+        novoDia[o] = novoStatus;
+      }
+      return {
+        ...prev,
+        [profSel]: {
+          ...(prev[profSel] || {}),
+          [dia]: novoDia,
+        },
+      };
+    });
+    setDirty(prev => ({ ...prev, [profSel]: true }));
+  }
+
   // ── Salvar ────────────────────────────────────────────────────
   async function salvarTudo() {
     const ids = Object.keys(dirty).map(Number);
@@ -518,14 +553,55 @@ export default function DisponibilidadePage({ config, turnoInicial, highlightPro
                   display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
                   minWidth: 0,
                 }}>
-                  {/* Nome do dia */}
-                  <div style={{
-                    fontSize: 12, fontWeight: 800, color: "#1e3a5f",
-                    textTransform: "uppercase", letterSpacing: 0.8,
-                    paddingBottom: 8, borderBottom: "2px solid #e2e8f0", width: "100%", textAlign: "center",
-                  }}>
-                    {d.nome}
-                  </div>
+                  {/* Nome do dia + Badge rápido de alternância do dia inteiro */}
+                  {(() => {
+                    const proxDia = getProxStatusDia(d.num);
+                    const scDia   = STATUS_STYLE[proxDia];
+                    const ativo   = !!profSel;
+                    return (
+                      <div style={{
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        paddingBottom: 8, borderBottom: "2px solid #e2e8f0", width: "100%",
+                      }}>
+                        <span style={{ width: 22, flexShrink: 0 }} />
+                        <span style={{
+                          fontSize: 12, fontWeight: 800, color: "#1e3a5f",
+                          textTransform: "uppercase", letterSpacing: 0.8, textAlign: "center",
+                        }}>
+                          {d.nome}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => toggleDiaInteiro(d.num)}
+                          disabled={!ativo}
+                          style={{
+                            width: 22,
+                            height: 14,
+                            borderRadius: 999,
+                            border: "none",
+                            padding: 0,
+                            flexShrink: 0,
+                            background: ativo ? scDia.bg : "#cbd5e1",
+                            cursor: ativo ? "pointer" : "not-allowed",
+                            boxShadow: ativo ? `0 1px 5px ${scDia.bg}88` : "none",
+                            transition: "all 0.15s ease",
+                          }}
+                          onMouseEnter={e => {
+                            if (ativo) {
+                              e.currentTarget.style.background = scDia.hover;
+                              e.currentTarget.style.transform = "scale(1.12)";
+                            }
+                          }}
+                          onMouseLeave={e => {
+                            if (ativo) {
+                              e.currentTarget.style.background = scDia.bg;
+                              e.currentTarget.style.transform = "scale(1)";
+                            }
+                          }}
+                        />
+                      </div>
+                    );
+                  })()}
 
                   {/* Botões de slot */}
                   {Array.from({ length: nPeriodos }, (_, i) => i + 1).map(ordem => {

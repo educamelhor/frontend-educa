@@ -18,6 +18,7 @@ import ExportarHorarioModal, {
   imprimirHorarioTurmaUnica,
   imprimirHorarioProfessorUnico,
 } from "./ExportarHorarioModal.jsx";
+import BadgeVigenciaHorario, { resolverVigenciaFrontend } from "./BadgeVigenciaHorario.jsx";
 
 const DIAS_LABEL = { 1: "Segunda", 2: "Terça", 3: "Quarta", 4: "Quinta", 5: "Sexta", 6: "Sábado" };
 const DIAS_CURTO = { 1: "Seg", 2: "Ter", 3: "Qua", 4: "Qui", 5: "Sex", 6: "Sáb" };
@@ -411,6 +412,7 @@ function buildPeriodosPorDia(grade, diasPadrao = [1, 2, 3, 4, 5], maxPeriodosPad
 // ── Componente principal ───────────────────────────────────────
 export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirReconfiguracao }) {
   const turnos = config?.turnos || ["matutino", "vespertino"];
+  const vigencia = resolverVigenciaFrontend(config);
   const [turno, setTurno] = useState(turnos[0] || "matutino");
   const [turmas, setTurmas] = useState([]);
   const [carregandoInicial, setCarregandoInicial] = useState(false);
@@ -593,6 +595,7 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
           const { data: plData } = await api.post("/api/grade/solver-payload", {
             turno: turno.toLowerCase(),
             turma_ids: listaTurmas.map(t => t.id),
+            semestre: vigencia.semestre_atual,
             respeitar_horario_manual: true,
           });
           if (plData?.ok && plData?.payload) {
@@ -669,6 +672,7 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
         const { data } = await api.post("/api/grade/solver-payload", {
           turno: turno.toLowerCase(),
           turma_ids: ids,
+          semestre: vigencia.semestre_atual,
           respeitar_horario_manual: respeitarManualEfetivo,
         });
         if (data?.ok && data?.payload) {
@@ -715,6 +719,7 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
         const { data } = await api.post("/api/grade/run-mock", {
           turno: turno.toLowerCase(),
           turma_ids: ids,
+          semestre: vigencia.semestre_atual,
           respeitar_horario_manual: respeitarManualEfetivo,
         });
         novoResultadoNorm = normalizeResultado({ ...data, origem_carregamento: "solver" });
@@ -1394,10 +1399,11 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <span style={{ fontSize: 22 }}>⚡</span>
           <div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#1e3a5f" }}>
                 Gerar Horário
               </h2>
+              <BadgeVigenciaHorario config={config} variant="inline" showSubtext={false} />
               {resultado && !rodando && (
                 <span style={{
                   fontSize: 11,

@@ -16,6 +16,11 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import api from "../../../services/api";
 import { imprimirHorarioProfessorUnico } from "./ExportarHorarioModal.jsx";
+import BadgeVigenciaHorario, {
+  resolverVigenciaFrontend,
+  filtrarProfessoresVigentesNoTurno,
+  filtrarVinculosVigentesNoTurno,
+} from "./BadgeVigenciaHorario.jsx";
 
 const DIAS = [
   { num: 1, nome: "Segunda" },
@@ -655,6 +660,7 @@ export default function HorarioManualPage({ config, turnoInicial }) {
 
   const nPeriodos = periodosPorTurno[turno] || 5;
   const dias      = DIAS.filter(d => diasLetivos.includes(d.num));
+  const vigencia  = resolverVigenciaFrontend(config);
 
   // ── Carga de dados do turno ──────────────────────────────────
   const carregar = useCallback(async () => {
@@ -666,23 +672,16 @@ export default function HorarioManualPage({ config, turnoInicial }) {
         api.get("/api/professores", { params: { turno } }).catch(() => ({ data: [] })),
         api.get("/api/turmas", { params: { turno, ano: anoAtual } }).catch(() => ({ data: [] })),
         api.get("/api/disciplinas").catch(() => ({ data: [] })),
-        api.get("/api/modulacao", { params: { turno } }).catch(() => ({ data: { turmas: [], alocacoes: [] } })),
+        api.get("/api/modulacao", { params: { turno, semestre: vigencia.semestre_atual } }).catch(() => ({ data: { turmas: [], alocacoes: [] } })),
         api.get("/api/grade/manual", { params: { turno: turno.toLowerCase() } }).catch(() => ({ data: { slots: [] } })),
       ]);
 
-      // 1) Professores ativos no turno
+      // 1) Professores ativos no turno e semestre vigente
       const listaProfs = Array.isArray(resProfs.data)
         ? resProfs.data
         : (resProfs.data?.professores || []);
 
-      const ativos = listaProfs.filter(p => {
-        if (String(p.status || "ativo").toLowerCase() === "inativo") return false;
-        const vinculos = Array.isArray(p.vinculos) ? p.vinculos : [];
-        if (vinculos.length > 0) {
-          return vinculos.some(v => String(v.turno || "").toLowerCase() === turno.toLowerCase());
-        }
-        return String(p.turno || "").toLowerCase() === turno.toLowerCase();
-      });
+      const ativos = filtrarProfessoresVigentesNoTurno(listaProfs, turno, vigencia.semestre_atual);
       ativos.sort((a, b) => naturalCompare(a.nome, b.nome));
       setProfessores(ativos);
 
@@ -778,15 +777,13 @@ export default function HorarioManualPage({ config, turnoInicial }) {
         }
       }
 
-      // 2) A partir de p.vinculos no turno
-      if (Array.isArray(p.vinculos)) {
-        for (const v of p.vinculos) {
-          if (
-            String(v.turno || "").toLowerCase() === String(turno).toLowerCase() &&
-            v.disciplina_id
-          ) {
-            map.set(Number(v.disciplina_id), v.disciplina_nome || `Disc ${v.disciplina_id}`);
-          }
+      // 2) A partir de p.vinculos vigentes no turno e semestre
+      const vincVigentes = Array.isArray(p.vinculos_vigentes) && p.vinculos_vigentes.length > 0
+        ? p.vinculos_vigentes
+        : filtrarVinculosVigentesNoTurno(p.vinculos, turno, vigencia.semestre_atual);
+      for (const v of vincVigentes) {
+        if (v.disciplina_id) {
+          map.set(Number(v.disciplina_id), v.disciplina_nome || `Disc ${v.disciplina_id}`);
         }
       }
 
@@ -1178,9 +1175,12 @@ export default function HorarioManualPage({ config, turnoInicial }) {
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <span style={{ fontSize: 20 }}>✍️</span>
           <div>
-            <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#1e3a5f" }}>
-              Horário Manual dos Professores
-            </h2>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#1e3a5f" }}>
+                Horário Manual dos Professores
+              </h2>
+              <BadgeVigenciaHorario config={config} variant="inline" showSubtext={false} />
+            </div>
             <div style={{ fontSize: 11, color: "#64748b", fontWeight: 500 }}>
               Espelha o último horário salvo • Ajuste aulas manualmente ou clique em <b>📌 Fixar Horário</b> para blindar o professor no Solver
             </div>

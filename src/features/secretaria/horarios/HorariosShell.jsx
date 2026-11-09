@@ -12,6 +12,7 @@ import DisponibilidadePage from "./DisponibilidadePage";
 import DiagnosticoPreGeracaoPage from "./DiagnosticoPreGeracaoPage";
 import GerarHorarioPage from "./GerarHorarioPage";
 import HorarioManualPage from "./HorarioManualPage";
+import BadgeVigenciaHorario from "./BadgeVigenciaHorario";
 
 const ABAS = [
   { id: "disponibilidade", label: "📅 Disponibilidade", desc: "Configure a disponibilidade dos professores" },
@@ -101,16 +102,19 @@ export default function HorariosShell() {
           );
         })}
         <div style={{ flex: 1 }} />
-        {/* Link discreto de reconfiguração */}
-        <button
-          onClick={() => setReconfigurando(true)}
-          title="Reconfigurar grade horária da escola"
-          style={{
-            padding: "16px 16px", border: "none", background: "transparent",
-            color: "#94a3b8", fontSize: 12, cursor: "pointer",
-            fontFamily: "inherit", marginBottom: -2,
-          }}
-        >⚙️ Reconfigurar</button>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, paddingRight: 16 }}>
+          <BadgeVigenciaHorario config={config} variant="shell" />
+          {/* Link discreto de reconfiguração */}
+          <button
+            onClick={() => setReconfigurando(true)}
+            title="Reconfigurar grade horária da escola"
+            style={{
+              padding: "16px 8px", border: "none", background: "transparent",
+              color: "#94a3b8", fontSize: 12, cursor: "pointer",
+              fontFamily: "inherit", marginBottom: -2,
+            }}
+          >⚙️ Reconfigurar</button>
+        </div>
       </div>
 
       {/* Conteúdo da aba */}
@@ -125,6 +129,7 @@ export default function HorariosShell() {
         )}
         {abaAtiva === "diagnostico" && (
           <DiagnosticoPreGeracaoPage
+            config={config}
             onIrParaDisponibilidade={irParaDisponibilidade}
             onIrParaGerar={() => setAbaAtiva("gerar")}
           />

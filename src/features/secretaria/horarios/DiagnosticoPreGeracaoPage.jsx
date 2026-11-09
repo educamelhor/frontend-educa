@@ -11,6 +11,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../../services/api";
+import BadgeVigenciaHorario, { resolverVigenciaFrontend } from "./BadgeVigenciaHorario";
 
 // ─── Paleta por severidade ───────────────────────────────────────────────────
 const SEV = {
@@ -221,7 +222,7 @@ function CoberturaLista({ resumo }) {
 }
 
 // ─── Componente de Diagnóstico por Turno ──────────────────────────────────────
-function DiagnosticoTurno({ turno, onIrParaDisponibilidade, onIrParaGerar }) {
+function DiagnosticoTurno({ turno, semestre, onIrParaDisponibilidade, onIrParaGerar }) {
   const [cobertura, setCobertura] = useState(null);
   const [disponib, setDisponib] = useState(null);
   const [turmasDisc, setTurmasDisc] = useState(null);
@@ -236,24 +237,24 @@ function DiagnosticoTurno({ turno, onIrParaDisponibilidade, onIrParaGerar }) {
       setLoadC(true); setLoadD(true); setLoadT(true);
 
       // Cobertura
-      api.get("/api/modulacao/diagnostico", { params: { turno } })
+      api.get("/api/modulacao/diagnostico", { params: { turno, semestre } })
         .then(({ data }) => { if (!cancelled) { setCobertura(data); setLoadC(false); } })
         .catch(() => { if (!cancelled) { setCobertura(null); setLoadC(false); } });
 
       // Disponibilidade
-      api.get("/api/modulacao/diagnostico/disponibilidade", { params: { turno } })
+      api.get("/api/modulacao/diagnostico/disponibilidade", { params: { turno, semestre } })
         .then(({ data }) => { if (!cancelled) { setDisponib(data); setLoadD(false); } })
         .catch(() => { if (!cancelled) { setDisponib(null); setLoadD(false); } });
 
       // Turmas descobertas
-      api.get("/api/modulacao/diagnostico/turmas-descobertas", { params: { turno } })
+      api.get("/api/modulacao/diagnostico/turmas-descobertas", { params: { turno, semestre } })
         .then(({ data }) => { if (!cancelled) { setTurmasDisc(data); setLoadT(false); } })
         .catch(() => { if (!cancelled) { setTurmasDisc(null); setLoadT(false); } });
     }
 
     fetchAll();
     return () => { cancelled = true; };
-  }, [turno]);
+  }, [turno, semestre]);
 
   // ── Calcular score do turno ─────────────────────────────────────────────────
   const score = React.useMemo(() => {
@@ -406,9 +407,10 @@ function DiagnosticoTurno({ turno, onIrParaDisponibilidade, onIrParaGerar }) {
 // ─── Página Principal ─────────────────────────────────────────────────────────
 const TURNOS = ["Matutino", "Vespertino", "Noturno"];
 
-export default function DiagnosticoPreGeracaoPage({ onIrParaDisponibilidade, onIrParaGerar }) {
+export default function DiagnosticoPreGeracaoPage({ config, onIrParaDisponibilidade, onIrParaGerar }) {
   const [abaAtiva, setAbaAtiva] = useState("Matutino");
   const [turnos, setTurnos] = useState(TURNOS);
+  const vigencia = resolverVigenciaFrontend(config);
 
   // Opcional: buscar turnos reais da API
   useEffect(() => {
@@ -431,9 +433,12 @@ export default function DiagnosticoPreGeracaoPage({ onIrParaDisponibilidade, onI
     <div className="p-6 bg-slate-50 min-h-screen">
       {/* Cabeçalho */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-800">
-          🔍 Diagnóstico Pré-Geração de Horários
-        </h1>
+        <div className="flex items-center gap-3 flex-wrap">
+          <h1 className="text-2xl font-bold text-slate-800">
+            🔍 Diagnóstico Pré-Geração de Horários
+          </h1>
+          <BadgeVigenciaHorario config={config} variant="inline" />
+        </div>
         <p className="text-sm text-slate-500 mt-1">
           Verifique a prontidão de cada turno antes de gerar o quadro de horários.
           O sistema bloqueia a geração quando o <strong>Índice de Prontidão for inferior a 50%</strong>.
@@ -459,8 +464,9 @@ export default function DiagnosticoPreGeracaoPage({ onIrParaDisponibilidade, onI
 
       {/* Conteúdo da aba */}
       <DiagnosticoTurno 
-        key={abaAtiva} 
+        key={`${abaAtiva}-${vigencia.semestre_atual}`} 
         turno={abaAtiva} 
+        semestre={vigencia.semestre_atual}
         onIrParaDisponibilidade={onIrParaDisponibilidade} 
         onIrParaGerar={onIrParaGerar}
       />

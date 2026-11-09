@@ -4,6 +4,11 @@
 // ============================================================
 import React, { useState, useEffect, useCallback } from "react";
 import api from "../../../services/api";
+import BadgeVigenciaHorario, {
+  resolverVigenciaFrontend,
+  filtrarProfessoresVigentesNoTurno,
+  filtrarVinculosVigentesNoTurno,
+} from "./BadgeVigenciaHorario";
 
 // ── Constantes ────────────────────────────────────────────────
 const DIAS = [
@@ -51,6 +56,7 @@ export default function DisponibilidadePage({ config, turnoInicial, highlightPro
 
   const nPeriodos = periodosPorTurno[turno] || 5;
   const dias      = DIAS.filter(d => diasLetivos.includes(d.num));
+  const vigencia  = resolverVigenciaFrontend(config);
 
   // ── Carga de dados ───────────────────────────────────────────
   const carregar = useCallback(async () => {
@@ -65,17 +71,8 @@ export default function DisponibilidadePage({ config, turnoInicial, highlightPro
         ? resProfs.data
         : (resProfs.data?.professores || []);
 
-      // NOVO: professor pode ter vínculos em múltiplos turnos.
-      // Filtra quem tem pelo menos 1 vínculo no turno selecionado.
-      const ativos = lista.filter(p => {
-        if (String(p.status || "ativo").toLowerCase() === "inativo") return false;
-        const vinculos = Array.isArray(p.vinculos) ? p.vinculos : [];
-        if (vinculos.length > 0) {
-          return vinculos.some(v => String(v.turno || "").toLowerCase() === turno.toLowerCase());
-        }
-        // fallback para modelo legado (p.turno)
-        return String(p.turno || "").toLowerCase() === turno.toLowerCase();
-      });
+      // Filtra professores com vínculo ativo no turno e no semestre vigente (Anual ou Semestre Atual)
+      const ativos = filtrarProfessoresVigentesNoTurno(lista, turno, vigencia.semestre_atual);
       setProfessores(ativos);
 
       // monta grid zerado (tudo livre)
@@ -252,12 +249,15 @@ export default function DisponibilidadePage({ config, turnoInicial, highlightPro
   }
 
   // ── Helpers ───────────────────────────────────────────────────
-  // Helper para extrair disciplinas únicas do professor no turno
+  // Helper para extrair disciplinas únicas do professor no turno e semestre vigente
   const getDisciplinas = (p) => {
     if (!p) return [];
-    if (p.vinculos && p.vinculos.length > 0) {
-      const d = p.vinculos
-        .filter(v => String(v.turno || "").toLowerCase() === String(turno).toLowerCase() && v.disciplina_nome)
+    const vincSource = Array.isArray(p.vinculos_vigentes) && p.vinculos_vigentes.length > 0
+      ? p.vinculos_vigentes
+      : filtrarVinculosVigentesNoTurno(p.vinculos, turno, vigencia.semestre_atual);
+    if (vincSource.length > 0) {
+      const d = vincSource
+        .filter(v => v.disciplina_nome)
         .map(v => v.disciplina_nome);
       if (d.length > 0) return [...new Set(d)];
     }
@@ -266,7 +266,7 @@ export default function DisponibilidadePage({ config, turnoInicial, highlightPro
   };
 
   const profsFiltrados = professores.filter(p =>
-    !busca || `${p.nome} ${p.disciplina_nome || ""}`.toLowerCase().includes(busca.toLowerCase())
+    !busca || `${p.nome} ${getDisciplinas(p).join(" ")}`.toLowerCase().includes(busca.toLowerCase())
   );
 
   const profAtual = professores.find(p => p.id === profSel);
@@ -286,11 +286,14 @@ export default function DisponibilidadePage({ config, turnoInicial, highlightPro
         padding: "14px 24px", borderBottom: "1px solid #e2e8f0",
         background: "#fff", flexWrap: "wrap", gap: 12,
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 20 }}>📅</span>
-          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#1e3a5f" }}>
-            Disponibilidade dos Professores
-          </h2>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 20 }}>📅</span>
+            <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700, color: "#1e3a5f" }}>
+              Disponibilidade dos Professores
+            </h2>
+          </div>
+          <BadgeVigenciaHorario config={config} variant="inline" />
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>

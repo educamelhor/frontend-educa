@@ -141,7 +141,10 @@ function filtraPorTurno(lista, turnoAlvo) {
 export default function Modulacao() {
   // Turno e dados
   const [turnoSelecionado, setTurnoSelecionado] = useState("");
-  const [semestreSelecionado, setSemestreSelecionado] = useState(1); // 1 = 1º Semestre, 2 = 2º Semestre
+  const [semestreSelecionado, setSemestreSelecionado] = useState(() => {
+    const m = new Date().getMonth() + 1;
+    return m === 1 || m >= 7 ? 2 : 1;
+  }); // Inicializa automaticamente no semestre vigente (1º ou 2º Semestre)
   const [turmasTurno, setTurmasTurno] = useState([]);
   const [turmasAviso, setTurmasAviso] = useState("");
 

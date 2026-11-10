@@ -15,7 +15,7 @@
 // ============================================================
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import api from "../../../services/api";
-import { imprimirHorarioProfessorUnico } from "./ExportarHorarioModal.jsx";
+import ExportarHorarioModal, { imprimirHorarioProfessorUnico } from "./ExportarHorarioModal.jsx";
 import BadgeVigenciaHorario, {
   resolverVigenciaFrontend,
   filtrarProfessoresVigentesNoTurno,
@@ -74,6 +74,7 @@ function SlotTurmaCombobox({
   alocadosCountMap,// { "turmaId-discId": count }
   ocupacaoMap,     // { turmaId: { professor_id, professor_nome, disciplina_nome } } (outro prof neste dia/ordem)
   mostrarDiscNoCard,
+  horarioInfo,     // { inicio, fim } opcional vindo da Governança
   onSelect,        // (opt | null) => void
   onToggleLock,    // () => void
 }) {
@@ -252,6 +253,11 @@ function SlotTurmaCombobox({
             justifyContent: "center",
             flexShrink: 0,
           }}
+          title={
+            horarioInfo?.inicio && horarioInfo?.fim
+              ? `${ordem}º Horário (${horarioInfo.inicio} – ${horarioInfo.fim})`
+              : `${ordem}º Horário`
+          }
         >
           {ordem}º
         </span>
@@ -319,7 +325,7 @@ function SlotTurmaCombobox({
             overflow: "hidden",
             textOverflow: "ellipsis",
           }}>
-            Turma…
+            {horarioInfo?.inicio ? `${horarioInfo.inicio} · Turma…` : "Turma…"}
           </span>
         )}
 
@@ -657,10 +663,71 @@ export default function HorarioManualPage({ config, turnoInicial }) {
   const [busca, setBusca]             = useState("");
   const [conflitoModal, setConflitoModal] = useState(null); // { message, conflicts }
   const [fixadoModal, setFixadoModal] = useState(null);     // { profNome, totalFixadas }
+  const [showModalExportar, setShowModalExportar] = useState(false);
 
   const nPeriodos = periodosPorTurno[turno] || 5;
   const dias      = DIAS.filter(d => diasLetivos.includes(d.num));
   const vigencia  = resolverVigenciaFrontend(config);
+  const horariosTurnoAtivo = config?.horarios_por_turno?.[String(turno || "").toLowerCase()] || {};
+
+  // Estrutura consolidada para a Central de Impressão e Exportação PDF em Lote
+  const dadosExportacao = useMemo(() => {
+    const tMap = {};
+    for (const t of turmasTurno) {
+      tMap[t.id] = t.turma || t.nome || `Turma ${t.id}`;
+    }
+    const dMap = {};
+    for (const d of disciplinas) {
+      dMap[d.id] = d.nome || d.disciplina || `Disc ${d.id}`;
+    }
+    const pMap = {};
+    for (const p of professores) {
+      pMap[p.id] = p.nome || `Professor ${p.id}`;
+    }
+
+    const gradePorTurma = {};
+    for (const t of turmasTurno) {
+      gradePorTurma[t.id] = {};
+    }
+
+    let totalSlotsTurno = 0;
+    for (const [pIdStr, diasObj] of Object.entries(grid || {})) {
+      const pId = Number(pIdStr);
+      for (const [diaStr, ordObj] of Object.entries(diasObj || {})) {
+        const diaNum = Number(diaStr);
+        for (const [ordStr, cell] of Object.entries(ordObj || {})) {
+          const ordNum = Number(ordStr);
+          if (!cell || !cell.turma_id) continue;
+          totalSlotsTurno++;
+          const tId = Number(cell.turma_id);
+          if (cell.turma_nome && !tMap[tId]) tMap[tId] = cell.turma_nome;
+          if (cell.disciplina_nome && cell.disciplina_id && !dMap[cell.disciplina_id]) {
+            dMap[cell.disciplina_id] = cell.disciplina_nome;
+          }
+          if (!gradePorTurma[tId]) gradePorTurma[tId] = {};
+          if (!gradePorTurma[tId][diaNum]) gradePorTurma[tId][diaNum] = {};
+          gradePorTurma[tId][diaNum][ordNum] = {
+            turma_id: tId,
+            disciplina_id: cell.disciplina_id,
+            professor_id: pId,
+            locked: Boolean(cell.locked),
+            origem: cell.origem || "manual",
+          };
+        }
+      }
+    }
+
+    return {
+      resultado: {
+        grade_por_professor: grid,
+        grade_por_turma: gradePorTurma,
+      },
+      nomesTurmas: tMap,
+      nomesDisciplinas: dMap,
+      nomesProfessores: pMap,
+      totalSlotsTurno,
+    };
+  }, [grid, turmasTurno, disciplinas, professores]);
 
   // ── Carga de dados do turno ──────────────────────────────────
   const carregar = useCallback(async () => {
@@ -1201,6 +1268,30 @@ export default function HorarioManualPage({ config, turnoInicial }) {
             ))}
           </div>
 
+          {/* Central de Impressão e Exportação PDF em Lote (Todos os Professores / Turmas / Mural) */}
+          <button
+            type="button"
+            onClick={() => setShowModalExportar(true)}
+            disabled={carregando || dadosExportacao.totalSlotsTurno === 0}
+            title="Imprimir ou baixar PDF em lote (Mosaico 10/folha, 2/folha c/ assinatura, Turmas ou Mural)"
+            style={{
+              padding: "8px 14px",
+              borderRadius: 8,
+              border: "1px solid #cbd5e1",
+              background: carregando || dadosExportacao.totalSlotsTurno === 0 ? "#f8fafc" : "#fff",
+              color: carregando || dadosExportacao.totalSlotsTurno === 0 ? "#94a3b8" : "#1e3a8a",
+              fontWeight: 700,
+              fontSize: 12,
+              cursor: carregando || dadosExportacao.totalSlotsTurno === 0 ? "not-allowed" : "pointer",
+              transition: "all 0.18s",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            🖨️ Imprimir / PDF
+          </button>
+
           {/* Limpar grade do professor selecionado */}
           <button
             onClick={limparProfessorAtual}
@@ -1604,20 +1695,16 @@ export default function HorarioManualPage({ config, turnoInicial }) {
                 <button
                   type="button"
                   onClick={() => {
-                    const tMap = {};
-                    for (const t of turmasTurno) tMap[t.id] = t.turma || t.nome || `Turma ${t.id}`;
-                    const dMap = {};
-                    for (const d of disciplinas) dMap[d.id] = d.nome || d.disciplina || `Disc ${d.id}`;
-                    const pMap = { [profAtual.id]: profAtual.nome };
                     imprimirHorarioProfessorUnico({
                       profId: profAtual.id,
                       gradePorProfessor: grid,
-                      nomesTurmas: tMap,
-                      nomesDisciplinas: dMap,
-                      nomesProfessores: pMap,
+                      nomesTurmas: dadosExportacao.nomesTurmas,
+                      nomesDisciplinas: dadosExportacao.nomesDisciplinas,
+                      nomesProfessores: dadosExportacao.nomesProfessores,
                       diasSemana: diasLetivos,
                       periodosPorDia: nPeriodos,
                       turno,
+                      config,
                     });
                   }}
                   style={{
@@ -1695,6 +1782,7 @@ export default function HorarioManualPage({ config, turnoInicial }) {
                         alocadosCountMap={statsAtual.porTurmaDisc}
                         ocupacaoMap={ocupacaoSlot}
                         mostrarDiscNoCard={mostrarDiscNoCard}
+                        horarioInfo={horariosTurnoAtivo?.[ordem] || horariosTurnoAtivo?.[String(ordem)] || null}
                         onSelect={op => handleSelectSlot(d.num, ordem, op)}
                         onToggleLock={() => handleToggleSlotLock(d.num, ordem)}
                       />
@@ -1995,6 +2083,21 @@ export default function HorarioManualPage({ config, turnoInicial }) {
           </div>
         </div>
       )}
+
+      {/* ── Central Oficial de Impressão e Exportação PDF (Individual e Lote Mosaico) ── */}
+      <ExportarHorarioModal
+        aberto={showModalExportar}
+        onFechar={() => setShowModalExportar(false)}
+        resultado={dadosExportacao.resultado}
+        turno={turno}
+        nomesTurmas={dadosExportacao.nomesTurmas}
+        nomesDisciplinas={dadosExportacao.nomesDisciplinas}
+        nomesProfessores={dadosExportacao.nomesProfessores}
+        diasSemana={diasLetivos}
+        periodosPorDia={nPeriodos}
+        config={config}
+        modoInicial="por_professor"
+      />
     </div>
   );
 }

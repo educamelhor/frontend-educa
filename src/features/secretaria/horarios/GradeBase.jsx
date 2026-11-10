@@ -88,10 +88,22 @@ export default function GradeBase({
           <tbody>
             {[...Array(maxPeriodos)].map((_, i) => {
               const ordem = i + 1;
+              const infoPer = periodosPorDia?.[dias[0]]?.[i] || null;
+              const horarioStr =
+                infoPer?.inicio && infoPer?.fim
+                  ? `${infoPer.inicio}–${infoPer.fim}`
+                  : infoPer?.inicio || null;
               return (
                 <tr key={ordem}>
-                  {/* coluna fixa com o número do período */}
-                  <td className="sticky left-0 bg-white z-10 border-b p-2 font-medium">#{ordem}</td>
+                  {/* coluna fixa com o número do período e horário real (se configurado na Governança) */}
+                  <td className="sticky left-0 bg-white z-10 border-b p-2 font-medium whitespace-nowrap">
+                    <div className="font-bold text-slate-800">#{ordem}</div>
+                    {horarioStr && (
+                      <div className="text-[10px] font-semibold text-slate-500 leading-tight mt-0.5">
+                        {horarioStr}
+                      </div>
+                    )}
+                  </td>
                   {dias.map((d) => (
                     <td key={d} className="border-b p-2 align-top">
                       {celulaRender ? celulaRender({ dia: d, ordem }) : null}

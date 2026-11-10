@@ -608,18 +608,23 @@ export default function DisponibilidadePage({ config, turnoInicial, highlightPro
                     const status  = (profSel && grid[profSel]?.[d.num]?.[ordem]) || "livre";
                     const sc      = STATUS_STYLE[status];
                     const ativo   = !!profSel;
+                    const hTurno  = config?.horarios_por_turno?.[String(turno || "").toLowerCase()] || {};
+                    const hSlot   = hTurno[ordem] || hTurno[String(ordem)] || null;
+                    const hIni    = hSlot?.inicio || "";
+                    const hRange  = hSlot?.inicio && hSlot?.fim ? ` (${hSlot.inicio}–${hSlot.fim})` : "";
+                    const labelBase = hIni ? `${ord(ordem)} · ${hIni}` : ord(ordem);
                     return (
                       <button
                         key={ordem}
                         onClick={() => toggle(d.num, ordem)}
                         disabled={!ativo}
-                        title={ativo ? `${d.nome} · ${ord(ordem)} aula · ${sc.label}` : "Selecione um professor"}
+                        title={ativo ? `${d.nome} · ${ord(ordem)} aula${hRange} · ${sc.label}` : "Selecione um professor"}
                         style={{
                           width: "100%", height: 38, borderRadius: 20,
                           border: "none",
                           background: ativo ? sc.bg : "#e2e8f0",
                           color: ativo ? sc.text : "#94a3b8",
-                          fontWeight: 700, fontSize: 13,
+                          fontWeight: 700, fontSize: hIni && status !== "livre" ? 12 : 13,
                           cursor: ativo ? "pointer" : "not-allowed",
                           transition: "all 0.15s",
                           boxShadow: ativo ? `0 2px 8px ${sc.bg}88` : "none",
@@ -627,7 +632,7 @@ export default function DisponibilidadePage({ config, turnoInicial, highlightPro
                         onMouseEnter={e => { if (ativo) e.currentTarget.style.background = sc.hover; }}
                         onMouseLeave={e => { if (ativo) e.currentTarget.style.background = sc.bg; }}
                       >
-                        {status === "livre" ? ord(ordem) : `${ord(ordem)} - ${sc.label}`}
+                        {status === "livre" ? labelBase : `${labelBase} - ${sc.label}`}
                       </button>
                     );
                   })}

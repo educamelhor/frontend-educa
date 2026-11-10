@@ -386,7 +386,7 @@ function MetricCard({ label, value, sub, icon, color = "#1e3a5f" }) {
 }
 
 // ── Converte grade { [dia]: { [ordem]: cell } } → periodosPorDia completo ──
-function buildPeriodosPorDia(grade, diasPadrao = [1, 2, 3, 4, 5], maxPeriodosPadrao = 6) {
+function buildPeriodosPorDia(grade, diasPadrao = [1, 2, 3, 4, 5], maxPeriodosPadrao = 6, horariosTurno = null) {
   const out = {};
   const diasChaves = Object.keys(grade || {}).map(Number).filter(n => n >= 1 && n <= 6);
   const diasFinal = diasChaves.length > 0 ? Array.from(new Set([...diasPadrao, ...diasChaves])).sort((a, b) => a - b) : diasPadrao;
@@ -402,7 +402,12 @@ function buildPeriodosPorDia(grade, diasPadrao = [1, 2, 3, 4, 5], maxPeriodosPad
   for (const dia of diasFinal) {
     const arr = [];
     for (let o = 1; o <= maxOrd; o++) {
-      arr.push({ ordem: o });
+      const h = horariosTurno?.[o] || horariosTurno?.[String(o)] || null;
+      arr.push({
+        ordem: o,
+        inicio: h?.inicio || null,
+        fim: h?.fim || null,
+      });
     }
     out[dia] = arr;
   }
@@ -2273,6 +2278,7 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
                                     diasSemana: diasPadrao,
                                     periodosPorDia: periodosPadrao,
                                     turno,
+                                    config,
                                   })
                                 }
                                 style={{
@@ -2295,7 +2301,12 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
                             <GradeTurma
                               turma={{ id: Number(turmaId), nome: nomesTurmas[turmaId] || turmaId }}
                               resultado={resultado}
-                              periodosPorDia={buildPeriodosPorDia(grade, diasPadrao, periodosPadrao)}
+                              periodosPorDia={buildPeriodosPorDia(
+                                grade,
+                                diasPadrao,
+                                periodosPadrao,
+                                config?.horarios_por_turno?.[String(turno || "").toLowerCase()]
+                              )}
                               maps={{ disciplinaById: nomesDisciplinas, professorById: nomesProfessores }}
                               layoutMode="dias-colunas"
                               interativo={true}
@@ -2420,6 +2431,7 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
                                     diasSemana: diasPadrao,
                                     periodosPorDia: periodosPadrao,
                                     turno,
+                                    config,
                                   })
                                 }
                                 style={{
@@ -2442,7 +2454,12 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
                             <GradeProfessor
                               professor={{ id: Number(profId), nome: nomesProfessores[profId] || `Professor ${profId}` }}
                               resultado={resultado}
-                              periodosPorDia={buildPeriodosPorDia(grade, diasPadrao, periodosPadrao)}
+                              periodosPorDia={buildPeriodosPorDia(
+                                grade,
+                                diasPadrao,
+                                periodosPadrao,
+                                config?.horarios_por_turno?.[String(turno || "").toLowerCase()]
+                              )}
                               maps={{ disciplinaById: nomesDisciplinas, turmaById: nomesTurmas }}
                               layoutMode="dias-colunas"
                               interativo={true}
@@ -2462,7 +2479,7 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
         )}
       </div>
 
-      {/* 🖨️ Modal de Exportação e Impressão Oficial (Padrão Urânia) */}
+      {/* 🖨️ Modal de Exportação e Impressão Oficial (Padrão Urânia+) */}
       <ExportarHorarioModal
         aberto={showModalExportar}
         onFechar={() => setShowModalExportar(false)}
@@ -2473,6 +2490,7 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
         nomesProfessores={nomesProfessores}
         diasSemana={diasPadrao}
         periodosPorDia={periodosPadrao}
+        config={config}
       />
 
       {/* 🧠 Modal Premium de Viabilidade e Sugestões de Ajuste para Fechamento (Padrão Urânia+) */}

@@ -73,16 +73,63 @@ export default function MeuHorarioProfessor() {
       const params = {};
       if (profIdParam) params.professor_id = profIdParam;
       const { data } = await api.get('/api/grade/meu-horario', { params });
-      setDados(data);
+      const rawTurnos = Array.isArray(data?.turnos)
+        ? data.turnos
+        : Object.values(data?.turnos || {});
 
-      if (data?.professor?.id && !profIdParam) {
-        setSelectedProfId(String(data.professor.id));
+      const turnosNormalizados = rawTurnos.map((t) => {
+        const qtdPer = Number(t.periodos_por_dia) || 6;
+        const hp = t.horarios_periodos || {};
+        const periodosArr =
+          Array.isArray(t.periodos) && t.periodos.length > 0
+            ? t.periodos
+            : Array.from({ length: qtdPer }, (_, i) => {
+                const ord = i + 1;
+                const h = hp[ord] || hp[String(ord)] || null;
+                return {
+                  ordem: ord,
+                  rotulo: `${ord}ª Aula`,
+                  inicio: h?.inicio || null,
+                  fim: h?.fim || null,
+                };
+              });
+        const slotsArr = (t.slots || []).map((s) => ({
+          ...s,
+          dia_semana: Number(s.dia_semana ?? s.dia),
+          periodo_ordem: Number(s.periodo_ordem ?? s.ordem),
+        }));
+        return {
+          ...t,
+          dias_semana:
+            Array.isArray(t.dias_semana) && t.dias_semana.length > 0
+              ? t.dias_semana
+              : Array.isArray(data?.dias_semana) && data.dias_semana.length > 0
+              ? data.dias_semana
+              : [1, 2, 3, 4, 5],
+          periodos: periodosArr,
+          total_aulas: Number(t.total_aulas ?? slotsArr.length),
+          slots: slotsArr,
+        };
+      });
+
+      const dataNormalizada = {
+        ...data,
+        turnos: turnosNormalizados,
+        total_aulas_semanais:
+          data?.total_aulas_semanais ??
+          turnosNormalizados.reduce((acc, t) => acc + (t.total_aulas || 0), 0),
+      };
+
+      setDados(dataNormalizada);
+
+      if (dataNormalizada?.professor?.id && !profIdParam) {
+        setSelectedProfId(String(dataNormalizada.professor.id));
       }
 
-      if (Array.isArray(data?.turnos) && data.turnos.length > 0) {
+      if (turnosNormalizados.length > 0) {
         setTurnoAtivo((prev) => {
-          const existe = data.turnos.some((t) => t.turno === prev);
-          return existe ? prev : data.turnos[0].turno;
+          const existe = turnosNormalizados.some((t) => t.turno === prev);
+          return existe ? prev : turnosNormalizados[0].turno;
         });
       } else {
         setTurnoAtivo('');
@@ -234,6 +281,16 @@ export default function MeuHorarioProfessor() {
               })
               .join('');
 
+            const intervaloApos = Number(tObj?.intervalo?.apos_periodo || 0);
+            const labelIntervalo =
+              tObj?.intervalo?.inicio && tObj?.intervalo?.fim
+                ? `INTERVALO (${tObj.intervalo.inicio} – ${tObj.intervalo.fim})`
+                : 'INTERVALO / RECREIO';
+            const linhaIntervalo =
+              intervaloApos > 0 && pOrd === intervaloApos && pOrd < periodos.length
+                ? `<tr><td colspan="${dias.length + 1}" style="border:1px solid #cbd5e1; background:#e2e8f0; color:#334155; text-align:center; font-size:9.5px; font-weight:800; letter-spacing:1.2px; padding:3px;">${labelIntervalo}</td></tr>`
+                : '';
+
             return `
               <tr>
                 <td style="border:1px solid #cbd5e1; padding:8px; background:#f8fafc; text-align:center; font-weight:700; font-size:11px; color:#1e293b; width:115px;">
@@ -242,6 +299,7 @@ export default function MeuHorarioProfessor() {
                 </td>
                 ${colsHtml}
               </tr>
+              ${linhaIntervalo}
             `;
           })
           .join('');
@@ -648,8 +706,18 @@ export default function MeuHorarioProfessor() {
                   <tbody className="divide-y divide-slate-200">
                     {(turnoObj.periodos || []).map((per) => {
                       const pOrd = Number(per.ordem);
+                      const intervaloApos = Number(turnoObj?.intervalo?.apos_periodo || 0);
+                      const mostrarIntervalo =
+                        intervaloApos > 0 &&
+                        pOrd === intervaloApos &&
+                        pOrd < (turnoObj.periodos || []).length;
+                      const labelIntervalo =
+                        turnoObj?.intervalo?.inicio && turnoObj?.intervalo?.fim
+                          ? `Intervalo (${turnoObj.intervalo.inicio} – ${turnoObj.intervalo.fim})`
+                          : 'Intervalo / Recreio';
                       return (
-                        <tr key={pOrd} className="hover:bg-slate-50/60 transition">
+                        <React.Fragment key={pOrd}>
+                        <tr className="hover:bg-slate-50/60 transition">
                           {/* Coluna do Período / Horário */}
                           <td className="p-3.5 bg-slate-50 border-r border-slate-200 align-middle">
                             <div className="font-extrabold text-xs text-slate-800 uppercase">
@@ -719,6 +787,17 @@ export default function MeuHorarioProfessor() {
                             );
                           })}
                         </tr>
+                        {mostrarIntervalo && (
+                          <tr className="bg-slate-100/90">
+                            <td
+                              colSpan={(turnoObj.dias_semana || [1, 2, 3, 4, 5]).length + 1}
+                              className="py-1.5 px-4 text-center text-[11px] font-extrabold uppercase tracking-widest text-slate-500 border-y border-slate-200"
+                            >
+                              {labelIntervalo}
+                            </td>
+                          </tr>
+                        )}
+                        </React.Fragment>
                       );
                     })}
                   </tbody>

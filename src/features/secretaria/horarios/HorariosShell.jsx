@@ -45,6 +45,7 @@ export default function HorariosShell() {
   function handleWizardConcluir(novaConfig) {
     setConfig(novaConfig);
     setReconfigurando(false);
+    carregarConfig();
   }
 
   function irParaDisponibilidade(profId = null) {

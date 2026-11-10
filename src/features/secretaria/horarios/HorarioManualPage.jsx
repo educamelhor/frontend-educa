@@ -1025,12 +1025,6 @@ export default function HorarioManualPage({ config, turnoInicial }) {
         origem: novoLocked ? "manual" : "solver",
         locked: novoLocked,
       });
-      setMsg(
-        novoLocked
-          ? `📌 Aula de ${cell.turma_nome} (${ordem}º horário) fixada individualmente!`
-          : `🔓 Aula de ${cell.turma_nome} (${ordem}º horário) desafixada.`
-      );
-      setTimeout(() => setMsg(""), 3500);
     } catch {
       setDirty(prev => ({ ...prev, [profSel]: true }));
     }
@@ -1565,7 +1559,11 @@ export default function HorarioManualPage({ config, turnoInicial }) {
                     📌 HORÁRIO FIXADO ({statsAtual.totalFixadas}/{statsAtual.totalAlocadas})
                   </span>
                 ) : statsAtual.totalFixadas > 0 ? (
-                  <span
+                  <button
+                    type="button"
+                    onClick={() => salvarProfessorAtual(false, true)}
+                    disabled={salvando}
+                    title={`Clique para salvar e fixar todas as aulas de ${primeiroNomeProfAtual}`}
                     style={{
                       background: "rgba(245, 158, 11, 0.25)",
                       color: "#fde68a",
@@ -1574,13 +1572,18 @@ export default function HorarioManualPage({ config, turnoInicial }) {
                       padding: "5px 12px",
                       fontSize: 11,
                       fontWeight: 700,
+                      cursor: salvando ? "not-allowed" : "pointer",
+                      transition: "all 0.15s",
                     }}
                   >
                     📌 {statsAtual.totalFixadas} de {statsAtual.totalAlocadas} aulas fixadas
-                  </span>
+                  </button>
                 ) : (
-                  <span
-                    title="Horário espelhado da última geração do Solver. Clique em '📌 Fixar Horário' no topo se quiser blindar este professor."
+                  <button
+                    type="button"
+                    onClick={() => salvarProfessorAtual(false, true)}
+                    disabled={salvando}
+                    title={`Clique para salvar e fixar o horário de ${primeiroNomeProfAtual}`}
                     style={{
                       background: "rgba(255,255,255,0.12)",
                       color: "#cbd5e1",
@@ -1589,10 +1592,12 @@ export default function HorarioManualPage({ config, turnoInicial }) {
                       padding: "5px 12px",
                       fontSize: 11,
                       fontWeight: 600,
+                      cursor: salvando ? "not-allowed" : "pointer",
+                      transition: "all 0.15s",
                     }}
                   >
                     🔓 Espelho do Rascunho (Não fixado)
-                  </span>
+                  </button>
                 )}
 
                 {/* Botão Imprimir Horário Individual do Professor */}

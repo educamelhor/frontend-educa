@@ -1265,16 +1265,35 @@ export default function Modulacao() {
     // ─────────────────────────────────────────────────────────────
     // (ii) TURMA SEM PROFESSOR EM DISCIPLINA OBRIGATÓRIA
     // ─────────────────────────────────────────────────────────────
-    // Base: detalhe_por_turma (de onde vêm as disciplinas/carga necessárias)
+    // Base: detalhe_por_turma (de onde vêm as disciplinas/carga necessárias do semestre ativo)
+    // Também considera disciplinas moduladas via Turmas de Agrupamento (IFAs/Itinerários)
+    const setDiscAgrupamentoCobertas = new Set();
+    try {
+      const { data: resAgr } = await api.get("/api/agrupamentos/modulacao/resumo", {
+        params: { turno, semestre: semestreSelecionado },
+      });
+      const itensAgr = Array.isArray(resAgr?.itens) ? resAgr.itens : [];
+      for (const item of itensAgr) {
+        if (Number(item.total_professores) > 0) {
+          if (item.disciplina_id) setDiscAgrupamentoCobertas.add(Number(item.disciplina_id));
+          if (item.origem_disciplina_legada_id) setDiscAgrupamentoCobertas.add(Number(item.origem_disciplina_legada_id));
+        }
+      }
+    } catch {
+      // ignora erro se rota de agrupamentos não estiver disponível
+    }
+
     const setTDComProfessor = new Set(Array.from(mapTD.keys()));
     const faltandoProfessor = [];
     for (const d of detalhe) {
-      const k = keyTD(Number(d.turma_id), Number(d.disciplina_id));
-      if (!setTDComProfessor.has(k)) {
+      const tId = Number(d.turma_id);
+      const dId = Number(d.disciplina_id);
+      const k = keyTD(tId, dId);
+      if (!setTDComProfessor.has(k) && !setDiscAgrupamentoCobertas.has(dId)) {
         faltandoProfessor.push({
-          turma_id: Number(d.turma_id),
+          turma_id: tId,
           turma_nome: String(d.turma_nome || "").toUpperCase(),
-          disciplina_id: Number(d.disciplina_id),
+          disciplina_id: dId,
           disciplina_nome: String(d.disciplina_nome || "").toUpperCase(),
         });
       }

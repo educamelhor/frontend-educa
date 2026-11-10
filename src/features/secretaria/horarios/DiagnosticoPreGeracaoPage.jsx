@@ -222,10 +222,12 @@ function CoberturaLista({ resumo }) {
 }
 
 // ─── Componente de Diagnóstico por Turno ──────────────────────────────────────
-function DiagnosticoTurno({ turno, semestre, onIrParaDisponibilidade, onIrParaGerar }) {
+function DiagnosticoTurno({ turno, semestre, vigencia, onIrParaDisponibilidade, onIrParaGerar }) {
   const [cobertura, setCobertura] = useState(null);
   const [disponib, setDisponib] = useState(null);
-  const [turmasDisc, setTurmasDisc] = useState(null);
+  const [turmasDiscRaw, setTurmasDiscRaw] = useState(null);
+  const [modTurno, setModTurno] = useState(null);
+  const [agrResumo, setAgrResumo] = useState(null);
   const [loadC, setLoadC] = useState(true);
   const [loadD, setLoadD] = useState(true);
   const [loadT, setLoadT] = useState(true);
@@ -236,7 +238,7 @@ function DiagnosticoTurno({ turno, semestre, onIrParaDisponibilidade, onIrParaGe
     async function fetchAll() {
       setLoadC(true); setLoadD(true); setLoadT(true);
 
-      // Cobertura
+      // Cobertura (inclui detalhe_por_turma filtrado estritamente pelo semestre ativo)
       api.get("/api/modulacao/diagnostico", { params: { turno, semestre } })
         .then(({ data }) => { if (!cancelled) { setCobertura(data); setLoadC(false); } })
         .catch(() => { if (!cancelled) { setCobertura(null); setLoadC(false); } });
@@ -246,15 +248,124 @@ function DiagnosticoTurno({ turno, semestre, onIrParaDisponibilidade, onIrParaGe
         .then(({ data }) => { if (!cancelled) { setDisponib(data); setLoadD(false); } })
         .catch(() => { if (!cancelled) { setDisponib(null); setLoadD(false); } });
 
-      // Turmas descobertas
-      api.get("/api/modulacao/diagnostico/turmas-descobertas", { params: { turno, semestre } })
-        .then(({ data }) => { if (!cancelled) { setTurmasDisc(data); setLoadT(false); } })
-        .catch(() => { if (!cancelled) { setTurmasDisc(null); setLoadT(false); } });
+      // Turmas descobertas + cruzamento com Modulação do semestre e Agrupamentos (IFA/Eletivas)
+      Promise.all([
+        api.get("/api/modulacao/diagnostico/turmas-descobertas", { params: { turno, semestre } }).catch(() => ({ data: null })),
+        api.get("/api/modulacao", { params: { turno, semestre } }).catch(() => ({ data: null })),
+        api.get("/api/agrupamentos/modulacao/resumo", { params: { turno, semestre } }).catch(() => ({ data: null })),
+      ]).then(([resTurmasDisc, resMod, resAgr]) => {
+        if (cancelled) return;
+        setTurmasDiscRaw(resTurmasDisc?.data || null);
+        setModTurno(resMod?.data || null);
+        setAgrResumo(resAgr?.data || null);
+        setLoadT(false);
+      });
     }
 
     fetchAll();
     return () => { cancelled = true; };
   }, [turno, semestre]);
+
+  // ── Reconciliação inteligente de Semestralidade (Blocos) + Agrupamentos (IFA) ──
+  const turmasDisc = React.useMemo(() => {
+    if (!turmasDiscRaw && !cobertura) return null;
+
+    const semNum = Number(semestre) === 2 ? 2 : 1;
+    const detalheAtivo = Array.isArray(cobertura?.detalhe_por_turma)
+      ? cobertura.detalhe_por_turma
+      : [];
+
+    // 1) Matriz curricular vigente no semestre atual (ex.: bloco de Exatas ou Humanas da turma no semestre)
+    const validosNoSemestreSet = new Set();
+    const turmasAtivasSet = new Set();
+    for (const d of detalheAtivo) {
+      const tid = Number(d.turma_id);
+      const did = Number(d.disciplina_id);
+      if (tid && did) {
+        validosNoSemestreSet.add(`${tid}|${did}`);
+        turmasAtivasSet.add(tid);
+      }
+    }
+
+    // 2) Alocações já moduladas nas turmas regulares para o semestre ativo
+    const cobertosModSet = new Set();
+    const alocs = Array.isArray(modTurno?.alocacoes) ? modTurno.alocacoes : [];
+    for (const a of alocs) {
+      if (Number(a.aulas) > 0 && a.turma_id != null && a.disciplina_id != null) {
+        cobertosModSet.add(`${Number(a.turma_id)}|${Number(a.disciplina_id)}`);
+      }
+    }
+
+    // 3) Disciplinas moduladas via Turmas de Agrupamento / Itinerários Formativos (IFA / Eletivas)
+    const cobertosAgrupDiscSet = new Set();
+    const agrItens = Array.isArray(agrResumo?.itens) ? agrResumo.itens : [];
+    for (const item of agrItens) {
+      const aulasAgr = Number(item.aulas_agrupamento ?? item.aulas ?? 1);
+      if (aulasAgr > 0 && item.disciplina_id != null) {
+        cobertosAgrupDiscSet.add(Number(item.disciplina_id));
+      }
+    }
+
+    // 4) Filtra lacunas descartando disciplinas do outro bloco semestral e IFAs já cobertos em agrupamentos
+    const rawLacunas = Array.isArray(turmasDiscRaw?.lacunas) ? turmasDiscRaw.lacunas : [];
+    let filtradasPorSemestralidade = 0;
+
+    const lacunasFiltradas = rawLacunas.filter((l) => {
+      const tid = Number(l.turma_id);
+      const did = Number(l.disciplina_id);
+      const key = `${tid}|${did}`;
+
+      // Se o registro vier com semestre explícito de outro bloco semestral, descarta
+      if (
+        String(l.regime || "").toLowerCase() === "semestral" &&
+        l.semestre != null &&
+        Number(l.semestre) !== 0 &&
+        Number(l.semestre) !== semNum
+      ) {
+        filtradasPorSemestralidade++;
+        return false;
+      }
+
+      // Se a matriz ativa do semestre (detalhe_por_turma) já carregou e não contém este par (turma, disciplina),
+      // trata-se de disciplina vinculada exclusivamente ao outro semestre (ex.: bloco Humanas vs Exatas)
+      if (validosNoSemestreSet.size > 0 && !validosNoSemestreSet.has(key)) {
+        filtradasPorSemestralidade++;
+        return false;
+      }
+
+      // Se já está coberta na modulação regular do semestre ou em Turma de Agrupamento (IFA)
+      if (cobertosModSet.has(key) || cobertosAgrupDiscSet.has(did)) {
+        filtradasPorSemestralidade++;
+        return false;
+      }
+
+      return true;
+    });
+
+    const totalTurmas =
+      turmasAtivasSet.size > 0
+        ? turmasAtivasSet.size
+        : Number(turmasDiscRaw?.total_turmas) || 0;
+    const turmasComGap = new Set(lacunasFiltradas.map((l) => Number(l.turma_id))).size;
+    const turmasCompletas = Math.max(0, totalTurmas - turmasComGap);
+
+    const possuiTurmasSemestrais =
+      Boolean(vigencia?.possui_semestral) ||
+      filtradasPorSemestralidade > 0 ||
+      (Array.isArray(modTurno?.turmas) &&
+        modTurno.turmas.some((t) => String(t?.regime || "").toLowerCase() === "semestral")) ||
+      detalheAtivo.some((d) => String(d?.regime || "").toLowerCase() === "semestral");
+
+    return {
+      ...(turmasDiscRaw || {}),
+      total_turmas: totalTurmas,
+      turmas_completas: turmasCompletas,
+      turmas_com_gap: turmasComGap,
+      lacunas: lacunasFiltradas,
+      possui_semestralidade: possuiTurmasSemestrais,
+      filtradas_outro_semestre: filtradasPorSemestralidade,
+    };
+  }, [turmasDiscRaw, cobertura, modTurno, agrResumo, semestre, vigencia]);
 
   // ── Calcular score do turno ─────────────────────────────────────────────────
   const score = React.useMemo(() => {
@@ -392,6 +503,14 @@ function DiagnosticoTurno({ turno, semestre, onIrParaDisponibilidade, onIrParaGe
 
         {/* Card 3: Turmas descobertas */}
         <Card title="Turmas sem Professor" icon="🏫" loading={loadT}>
+          {turmasDisc?.possui_semestralidade && (
+            <div className="mb-2.5 px-2.5 py-1.5 rounded-lg bg-indigo-50 border border-indigo-100 text-[11px] text-indigo-700 flex items-center gap-1.5">
+              <span>📅</span>
+              <span>
+                <strong>Semestralidade por blocos ({semestre || 1}º Semestre):</strong> disciplinas exclusivas do outro bloco semestral são filtradas automaticamente.
+              </span>
+            </div>
+          )}
           <TurmasDescobertasLista lacunas={turmasDisc?.lacunas} />
           {turmasDisc && turmasDisc.total_turmas > 0 && (
             <p className="text-xs text-slate-400 mt-2 pt-2 border-t">
@@ -467,6 +586,7 @@ export default function DiagnosticoPreGeracaoPage({ config, onIrParaDisponibilid
         key={`${abaAtiva}-${vigencia.semestre_atual}`} 
         turno={abaAtiva} 
         semestre={vigencia.semestre_atual}
+        vigencia={vigencia}
         onIrParaDisponibilidade={onIrParaDisponibilidade} 
         onIrParaGerar={onIrParaGerar}
       />

@@ -33,7 +33,9 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {}, a
   // Estados dos campos
   // ────────────────────────────────────────────────────────────────
   const [codigo, setCodigo] = useState(initialData.codigo || "");
-  const [estudante, setEstudante] = useState(initialData.estudante || "");
+  const [estudante, setEstudante] = useState(
+    initialData.nome_registro || initialData.estudante || ""
+  );
   const [dataNascimento, setDataNascimento] = useState(
     initialData.data_nascimento ? normalizeDate(initialData.data_nascimento) : ""
   );
@@ -44,6 +46,10 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {}, a
   const [atendimentoDiferencial, setAtendimentoDiferencial] = useState(
     initialData.atendimento_diferencial === 1 || initialData.atendimento_diferencial === true
   );
+  const [usaNomeSocial, setUsaNomeSocial] = useState(
+    initialData.usa_nome_social === 1 || initialData.usa_nome_social === true
+  );
+  const [nomeSocial, setNomeSocial] = useState(initialData.nome_social || "");
   const [turmas, setTurmas] = useState([]);
   const [modalAtivarOpen, setModalAtivarOpen] = useState(false);
 
@@ -64,13 +70,17 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {}, a
   useEffect(() => {
     if (open) {
       setCodigo(initialData.codigo || "");
-      setEstudante(initialData.estudante || "");
+      setEstudante(initialData.nome_registro || initialData.estudante || "");
       setDataNascimento(normalizeDate(initialData.data_nascimento));
       setTurmaId(initialData.turma_id ? String(initialData.turma_id) : "");
       setCpf(initialData.cpf || "");
       setAtendimentoDiferencial(
         initialData.atendimento_diferencial === 1 || initialData.atendimento_diferencial === true
       );
+      setUsaNomeSocial(
+        initialData.usa_nome_social === 1 || initialData.usa_nome_social === true
+      );
+      setNomeSocial(initialData.nome_social || "");
     }
   }, [open, initialData]);
 
@@ -96,19 +106,32 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {}, a
   }, [open, initialData, turmas]);
 
   // ────────────────────────────────────────────────────────────────
-  // Submit (mantido exatamente como já estava)
+  // Submit (mantido + suporte a Nome Social)
   // ────────────────────────────────────────────────────────────────
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    const payload = {
+  const buildPayload = () => {
+    const nomeRegistroTrim = String(estudante || "").trim();
+    const nomeSocialTrim = String(nomeSocial || "").trim();
+    return {
       codigo,
-      estudante,
+      estudante: usaNomeSocial ? nomeSocialTrim : nomeRegistroTrim,
+      nome_registro: nomeRegistroTrim,
+      usa_nome_social: usaNomeSocial ? 1 : 0,
+      nome_social: usaNomeSocial ? nomeSocialTrim : null,
       data_nascimento: dataNascimento,
       turma_id: Number(turmaId),
       cpf,
       atendimento_diferencial: atendimentoDiferencial ? 1 : 0,
     };
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (usaNomeSocial && !String(nomeSocial || "").trim()) {
+      return;
+    }
+
+    const payload = buildPayload();
 
     let sucesso = false;
 
@@ -131,14 +154,12 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {}, a
   // Ativação explícita
   // ────────────────────────────────────────────────────────────────
   const handleConfirmarAtivacao = async () => {
-    const payload = {
-      codigo,
-      estudante,
-      data_nascimento: dataNascimento,
-      turma_id: Number(turmaId),
-      cpf,
-      atendimento_diferencial: atendimentoDiferencial ? 1 : 0,
-    };
+    if (usaNomeSocial && !String(nomeSocial || "").trim()) {
+      setModalAtivarOpen(false);
+      return;
+    }
+
+    const payload = buildPayload();
 
     const sucesso = await onSubmit({
       ...initialData,
@@ -159,12 +180,12 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {}, a
     <Dialog
       open={open}
       onClose={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
     >
       <Dialog.Overlay className="fixed inset-0 bg-black/30" />
-      <div className="bg-white rounded-lg w-full max-w-md p-6 z-10">
+      <div className="bg-white rounded-lg w-full max-w-md max-h-[92vh] overflow-y-auto p-6 z-10">
         <Dialog.Title className="text-xl font-semibold mb-4">
-          Adicionar Estudante
+          {initialData?.id ? "Editar Estudante" : "Adicionar Estudante"}
         </Dialog.Title>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -181,9 +202,11 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {}, a
             />
           </div>
 
-          {/* Estudante */}
+          {/* Estudante (Nome Civil / Registro) */}
           <div>
-            <label className="block font-medium mb-1">Estudante</label>
+            <label className="block font-medium mb-1">
+              {usaNomeSocial ? "Estudante (Nome de Registro)" : "Estudante"}
+            </label>
             <Input
               value={estudante}
               onChange={(e) => setEstudante(e.target.value)}
@@ -216,6 +239,43 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {}, a
               Estudante com Atendimento Diferencial (AEE)
             </label>
           </div>
+
+          {/* Nome Social — Res. CNE/CP nº 1/2018 · Lei nº 9.394/96 · Dec. 8.727/2016 · Dec. DF 37.982/2017 */}
+          <div className="flex items-center space-x-2 mt-2 bg-slate-50 p-3 rounded border border-slate-200">
+            <input
+              type="checkbox"
+              id="usa_nome_social"
+              checked={usaNomeSocial}
+              onChange={(e) => setUsaNomeSocial(e.target.checked)}
+              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+            />
+            <label
+              htmlFor="usa_nome_social"
+              className="font-medium text-slate-700 cursor-pointer text-sm sm:text-base"
+              title="Resolução CNE/CP nº 1/2018 (MEC), Lei nº 9.394/1996 (LDB), Decreto Federal nº 8.727/2016 e Decreto Distrital nº 37.982/2017"
+            >
+              Nome Social — Res. CNE/CP nº 1/2018 (Lei nº 9.394/96)
+            </label>
+          </div>
+
+          {/* Campo condicional para inserir o Nome Social */}
+          {usaNomeSocial && (
+            <div className="bg-blue-50/60 p-3 rounded border border-blue-200 space-y-1">
+              <label className="block font-medium text-slate-800 mb-1">
+                Nome Social do Estudante
+              </label>
+              <Input
+                value={nomeSocial}
+                onChange={(e) => setNomeSocial(e.target.value)}
+                placeholder="Informe o nome social do estudante"
+                required={usaNomeSocial}
+                className="w-full"
+              />
+              <p className="text-xs text-slate-500">
+                Exibido em todas as listas, chamadas, diários, boletins e aplicativo.
+              </p>
+            </div>
+          )}
 
           {/* Data de Nascimento */}
           <div>
@@ -286,7 +346,8 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {}, a
         <div className="bg-white rounded-lg w-full max-w-sm p-6 z-10 text-center shadow-xl">
           <h3 className="text-lg font-bold text-gray-800 mb-3">Confirmar Ativação</h3>
           <p className="text-gray-600 mb-6">
-            Deseja reativar o estudante <strong>{estudante}</strong>?
+            Deseja reativar o estudante{" "}
+            <strong>{usaNomeSocial && nomeSocial.trim() ? nomeSocial.trim() : estudante}</strong>?
           </p>
           <div className="flex justify-center gap-3">
             <Button

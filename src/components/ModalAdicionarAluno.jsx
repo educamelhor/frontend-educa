@@ -13,7 +13,10 @@ export default function ModalAdicionarAluno({
   const [aluno, setAluno] = useState({
     id: alunoSelecionado?.id || null,
     codigo: alunoSelecionado?.codigo || "",
-    estudante: alunoSelecionado?.estudante || "",
+    estudante: alunoSelecionado?.nome_registro || alunoSelecionado?.estudante || "",
+    usa_nome_social:
+      alunoSelecionado?.usa_nome_social === 1 || alunoSelecionado?.usa_nome_social === true,
+    nome_social: alunoSelecionado?.nome_social || "",
     data_nascimento: alunoSelecionado?.data_nascimento?.split("T")[0] || "",
     sexo: alunoSelecionado?.sexo || "",
     turma_id: alunoSelecionado?.turma_id || "",
@@ -34,7 +37,10 @@ export default function ModalAdicionarAluno({
     setAluno({
       id: alunoSelecionado?.id || null,
       codigo: alunoSelecionado?.codigo || "",
-      estudante: alunoSelecionado?.estudante || "",
+      estudante: alunoSelecionado?.nome_registro || alunoSelecionado?.estudante || "",
+      usa_nome_social:
+        alunoSelecionado?.usa_nome_social === 1 || alunoSelecionado?.usa_nome_social === true,
+      nome_social: alunoSelecionado?.nome_social || "",
       data_nascimento:
         alunoSelecionado?.data_nascimento?.split("T")[0] || "",
       sexo: alunoSelecionado?.sexo || "",
@@ -67,10 +73,16 @@ export default function ModalAdicionarAluno({
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const nomeRegistroTrim = String(aluno.estudante || "").trim();
+    const nomeSocialTrim = String(aluno.nome_social || "").trim();
+    if (aluno.usa_nome_social && !nomeSocialTrim) return;
     const payload = {
       id: aluno.id, // para o back saber edição
       codigo: aluno.codigo,
-      estudante: aluno.estudante,
+      estudante: aluno.usa_nome_social ? nomeSocialTrim : nomeRegistroTrim,
+      nome_registro: nomeRegistroTrim,
+      usa_nome_social: aluno.usa_nome_social ? 1 : 0,
+      nome_social: aluno.usa_nome_social ? nomeSocialTrim : null,
       data_nascimento: aluno.data_nascimento,
       sexo: aluno.sexo,
       turma_id: Number(aluno.turma_id),
@@ -105,10 +117,39 @@ export default function ModalAdicionarAluno({
               name="estudante"
               value={aluno.estudante}
               onChange={handleChange}
-              placeholder="Nome do estudante"
+              placeholder={aluno.usa_nome_social ? "Nome de registro do estudante" : "Nome do estudante"}
               className="w-full border px-3 py-2 rounded"
               required
             />
+            <div className="flex items-center space-x-2 bg-slate-50 p-3 rounded border border-slate-200">
+              <input
+                type="checkbox"
+                id="modal_usa_nome_social"
+                checked={!!aluno.usa_nome_social}
+                onChange={(e) =>
+                  setAluno((prev) => ({ ...prev, usa_nome_social: e.target.checked }))
+                }
+                className="w-4 h-4 text-blue-600 border-gray-300 rounded"
+              />
+              <label
+                htmlFor="modal_usa_nome_social"
+                className="text-sm font-medium text-slate-700 cursor-pointer"
+                title="Resolução CNE/CP nº 1/2018 (MEC), Lei nº 9.394/1996 (LDB), Decreto Federal nº 8.727/2016 e Decreto Distrital nº 37.982/2017"
+              >
+                Nome Social — Res. CNE/CP nº 1/2018 (Lei nº 9.394/96)
+              </label>
+            </div>
+            {aluno.usa_nome_social && (
+              <input
+                type="text"
+                name="nome_social"
+                value={aluno.nome_social}
+                onChange={handleChange}
+                placeholder="Informe o nome social do estudante"
+                className="w-full border border-blue-300 bg-blue-50/50 px-3 py-2 rounded"
+                required
+              />
+            )}
             <input
               type="date"
               name="data_nascimento"

@@ -145,6 +145,14 @@ export default function Alunos() {
     return q.toLowerCase() === "aee";
   }
 
+  // Helper: detectar atalho por estudantes com Nome Social
+  function isBuscaNomeSocial(termo) {
+    const q = String(termo || "").trim();
+    if (!q) return false;
+    const norm = q.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+    return norm === "nome social";
+  }
+
   // ────────────────────────────────────────────────────────────────
   // Buscar alunos (com backend filtrando por status quando necessário)
   // ────────────────────────────────────────────────────────────────
@@ -154,15 +162,18 @@ export default function Alunos() {
       setLoading(true);
 
       const escolaId = localStorage.getItem("escola_id") || undefined;
-      const somenteInativos = isBuscaInativos(debouncedFiltro);
-      const somenteAEE     = isBuscaAEE(debouncedFiltro);
+      const somenteInativos   = isBuscaInativos(debouncedFiltro);
+      const somenteAEE        = isBuscaAEE(debouncedFiltro);
+      const somenteNomeSocial = isBuscaNomeSocial(debouncedFiltro);
 
       // Quando INATIVOS: envia status=inativo, limpa filtro textual.
       // Quando AEE: envia aee=1, limpa filtro textual.
+      // Quando NOME SOCIAL: envia nome_social=1, limpa filtro textual.
       const params = {
-        filtro: (somenteInativos || somenteAEE) ? "" : debouncedFiltro,
+        filtro: (somenteInativos || somenteAEE || somenteNomeSocial) ? "" : debouncedFiltro,
         status: somenteInativos ? "inativo" : "",
         aee:    somenteAEE ? "1" : "",
+        nome_social: somenteNomeSocial ? "1" : "",
         ano_letivo: anoLetivo || undefined,
         limit,
         offset: (page - 1) * limit,
@@ -226,7 +237,7 @@ export default function Alunos() {
       return true;
     } catch (err) {
       console.error("❌ Erro ao salvar aluno:", err);
-      setErro("Erro ao salvar aluno.");
+      setErro(err?.response?.data?.message || "Erro ao salvar aluno.");
       return false;
     }
   }
@@ -382,10 +393,10 @@ export default function Alunos() {
           </label>
 
           <Input
-            placeholder="🔍 Buscar aluno"
+            placeholder="🔍 Buscar por nome, nome social, RE ou turma"
             value={filtro}
             onChange={(e) => setFiltro(e.target.value)}
-            className="w-72"
+            className="w-80"
           />
         </div>
       </div>

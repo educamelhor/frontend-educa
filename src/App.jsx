@@ -117,6 +117,7 @@ import VisitantesHistorico from "./features/monitoramento/Visitantes/VisitantesH
 // ✅ SECRETARIA — Agente e Sincronizar SEEDF
 import AgenteSecretaria from "./features/secretaria/agente/index.jsx";
 import SincronizarSEEDF from "./features/secretaria/sincronizar-seedf/index.jsx";
+import MatriculasModule from "./features/secretaria/matriculas/index.jsx";
 
 // ✅ NOVO IMPORT — Configurações Pedagógicas
 import ConfiguracoesPedagogicas from "./features/secretaria/horarios/ConfiguracoesPedagogicas.jsx";
@@ -411,6 +412,9 @@ export default function App() {
           <Route path="/questoes" element={<RequireModulo modulo="questoes"><RequireBancoQuestoes><BancoQuestoes /></RequireBancoQuestoes></RequireModulo>} />
 
           {/* ── Secretaria ───────────────────────────────────────────────── */}
+          <Route path="/secretaria/matriculas"          element={<RequireModulo modulo="secretaria.matriculas"><MatriculasModule /></RequireModulo>} />
+          <Route path="/secretaria/matriculas/nova"     element={<RequireModulo modulo="secretaria.matriculas"><MatriculasModule /></RequireModulo>} />
+          <Route path="/secretaria/matriculas/projetos" element={<RequireModulo modulo="secretaria.matriculas"><MatriculasModule /></RequireModulo>} />
           <Route path="/secretaria/professores" element={<RequireModulo modulo="secretaria"><Professores /></RequireModulo>} />
           <Route path="/secretaria/professores/:id/ficha" element={<RequireModulo modulo="secretaria"><FichaProfessor /></RequireModulo>} />
           <Route path="/secretaria/boletim"    element={<RequireModulo modulo="secretaria"><BoletimEdicao /></RequireModulo>} />

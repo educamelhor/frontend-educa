@@ -11,6 +11,7 @@ const MODULOS_TREE = [
   {
     id: 'secretaria', label: 'Secretaria', icon: '📋',
     filhos: [
+      { id: 'secretaria.matriculas', label: 'Matrículas' },
       { id: 'secretaria.alunos', label: 'Alunos' },
       { id: 'secretaria.responsaveis', label: 'Responsáveis' },
       { id: 'secretaria.cargas_horarias', label: 'Cargas Horárias' },

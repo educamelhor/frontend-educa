@@ -18,6 +18,7 @@ import ListaResponsaveis from "./responsaveis";
 import SincronizarSEEDF from "./sincronizar-seedf";
 import AgenteSecretaria from "./agente";
 import FaltasPage from "./faltas";
+import MatriculasModule from "./matriculas";
 
 // ============================================================================
 // Componente principal da Secretaria
@@ -25,6 +26,9 @@ import FaltasPage from "./faltas";
 export default function Secretaria() {
   return (
     <Routes>
+      {/* Matrículas (Hub: NOVA & PROJETOS) */}
+      <Route path="matriculas/*" element={<MatriculasModule />} />
+
       {/* Professores */}
       <Route path="professores" element={<ListaProfessores />} />
 

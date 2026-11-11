@@ -1598,6 +1598,17 @@ export default function Sidebar({ isOpen, onClose }) {
 
             {openGroup === 'secretaria' && (
               <ul className="ml-4 mb-2">
+                {hasModulo('secretaria.matriculas') && (
+                <li>
+                  <Link
+                    to="/secretaria/matriculas"
+                    className={getSubmenuLinkClasses('/secretaria/matriculas')}
+                  >
+                    <ClipboardDocumentListIcon className="h-5 w-5 mr-2" /> Matrículas
+                  </Link>
+                </li>
+                )}
+
                 {hasModulo('secretaria.alunos') && (
                 <li>
                   <Link

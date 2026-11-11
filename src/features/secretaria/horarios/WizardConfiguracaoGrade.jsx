@@ -96,7 +96,12 @@ function gerarParesGovernancaPadrao(maxPeriodos = 6, recreioApos = 3, bloquearRe
         if (bloquearRecreio && rec > 0 && ini === rec) {
           modo = "bloqueado";
         }
-        const obj = { inicio: ini, fim: ini + 1, modo };
+        const obj = {
+          inicio: ini,
+          fim: ini + 1,
+          modo,
+          bloqueado_por_recreio: Boolean(rec > 0 && ini === rec && modo === "bloqueado"),
+        };
         mapExistentes.set(ini, obj);
         ordered.push(obj);
       }
@@ -111,7 +116,12 @@ function gerarParesGovernancaPadrao(maxPeriodos = 6, recreioApos = 3, bloquearRe
         : ordered.length < 2
         ? "prioritario"
         : "permitido";
-      const obj = { inicio: ini, fim: ini + 1, modo };
+      const obj = {
+        inicio: ini,
+        fim: ini + 1,
+        modo,
+        bloqueado_por_recreio: Boolean(cortaRecreio && modo === "bloqueado"),
+      };
       mapExistentes.set(ini, obj);
       ordered.push(obj);
     }
@@ -134,7 +144,12 @@ export default function WizardConfiguracaoGrade({ onConcluir, configInicial }) {
   const initTurnos = configInicial?.turnos || ["matutino", "vespertino"];
   const initPeriodos = configInicial?.periodos || { matutino: 5, vespertino: 5, noturno: 4 };
   const initMaxPeriodos = Math.max(4, ...initTurnos.map(t => Number(initPeriodos[t]) || 6));
-  const initRecreioMap = rg.recreio_apos_periodo || { matutino: 3, vespertino: 3, noturno: 2 };
+  const govIntervalos = configInicial?.intervalos_por_turno || {};
+  const initRecreioMap = rg.recreio_apos_periodo || {
+    matutino: govIntervalos?.matutino?.apos_periodo ?? 3,
+    vespertino: govIntervalos?.vespertino?.apos_periodo ?? 3,
+    noturno: govIntervalos?.noturno?.apos_periodo ?? ((Number(initPeriodos.noturno) || 4) >= 5 ? 3 : 2),
+  };
   const initRecreioRef = Number(initRecreioMap[initTurnos[0]] ?? initRecreioMap.matutino ?? 3);
 
   // Nota: Se havia par bloqueado no recreio ou bloquear_duplas_no_recreio explícito, respeita;

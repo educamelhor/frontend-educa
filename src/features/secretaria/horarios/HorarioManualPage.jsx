@@ -98,10 +98,34 @@ function SlotTurmaCombobox({
   }, [aberto]);
 
   const modFiltradas = useMemo(() => {
-    return opcoesModuladas.filter(op =>
+    const getPesoSaldo = (op) => {
+      const aloc = alocadosCountMap?.[`${op.turma_id}-${op.disciplina_id}`] || 0;
+      const prev = Number(op.aulas_previstas) || 0;
+      if (prev > 0 && aloc < prev) return 0; // Prioridade máxima: disciplina ainda com saldo pendente na turma
+      if (prev === 0) return 1;
+      if (aloc === prev) return 2;           // Já completou 100% da carga prevista
+      return 3;                              // Acima da carga prevista (excesso)
+    };
+
+    const temFiltro = Boolean(String(filtro || "").trim());
+    const filtradas = opcoesModuladas.filter(op =>
       compactSearchMatch(`${op.turma_nome} ${op.disciplina_nome || ""}`, filtro)
     );
-  }, [opcoesModuladas, filtro]);
+
+    return [...filtradas].sort((a, b) => {
+      if (temFiltro || Number(a.turma_id) === Number(b.turma_id)) {
+        const pa = getPesoSaldo(a);
+        const pb = getPesoSaldo(b);
+        if (pa !== pb) return pa - pb;
+      }
+      const cmpTurma = naturalCompare(a.turma_nome, b.turma_nome);
+      if (cmpTurma !== 0) return cmpTurma;
+      const pa = getPesoSaldo(a);
+      const pb = getPesoSaldo(b);
+      if (pa !== pb) return pa - pb;
+      return naturalCompare(a.disciplina_nome || "", b.disciplina_nome || "");
+    });
+  }, [opcoesModuladas, filtro, alocadosCountMap]);
 
   const demaisFiltradas = useMemo(() => {
     return opcoesDemais.filter(op =>
@@ -161,6 +185,15 @@ function SlotTurmaCombobox({
 
   const temValor = !!(value && value.turma_id);
   const isLocked = !!(temValor && value?.locked);
+  const opAtualMod = useMemo(() => {
+    if (!temValor) return null;
+    return opcoesModuladas.find(
+      op => Number(op.turma_id) === Number(value.turma_id) && Number(op.disciplina_id) === Number(value.disciplina_id)
+    ) || null;
+  }, [temValor, opcoesModuladas, value]);
+  const alocadasSlotAtual = temValor ? (alocadosCountMap?.[`${value.turma_id}-${value.disciplina_id}`] || 0) : 0;
+  const previstasSlotAtual = Number(opAtualMod?.aulas_previstas) || 0;
+  const excessoSlotAtual = previstasSlotAtual > 0 && alocadasSlotAtual > previstasSlotAtual;
 
   // Cores do card conforme estado (Fixo Manual vs Espelho do Solver vs Conflito vs Vazio)
   let cardBg = "#f8fafc";
@@ -212,6 +245,10 @@ function SlotTurmaCombobox({
             ? `⚠️ Conflito: ${value?.turma_nome} já está ocupada por ${conflitoAtual.professor_nome} neste horário`
             : temValor
             ? `${diaNome} · ${ordem}º horário · ${value.turma_nome}${value.disciplina_nome ? ` (${value.disciplina_nome})` : ""}${
+                excessoSlotAtual
+                  ? ` — ⚠️ EXCESSO DE CARGA (${alocadasSlotAtual}/${previstasSlotAtual} aulas alocadas nesta disciplina)`
+                  : ""
+              }${
                 isLocked ? " — 📌 HORÁRIO FIXADO (protegido contra alterações no Solver)" : " — Espelho do Rascunho (ainda não fixado)"
               }`
             : `${diaNome} · ${ordem}º horário · Clique para selecionar ou digitar a turma`
@@ -297,6 +334,22 @@ function SlotTurmaCombobox({
               gap: 4,
             }}>
               <span>{conflitoAtual ? "⚠️ " : ""}{value.turma_nome}</span>
+              {excessoSlotAtual && !conflitoAtual && (
+                <span
+                  style={{
+                    fontSize: 9,
+                    fontWeight: 800,
+                    padding: "0 4px",
+                    borderRadius: 4,
+                    background: "#fee2e2",
+                    color: "#dc2626",
+                    border: "1px solid #fca5a5",
+                    flexShrink: 0,
+                  }}
+                >
+                  {alocadasSlotAtual}/{previstasSlotAtual} ⚠️
+                </span>
+              )}
             </div>
             {(mostrarDiscNoCard || conflitoAtual) && (
               <div style={{
@@ -497,7 +550,8 @@ function SlotTurmaCombobox({
                 const ocupadaPorOutro = ocupacaoMap?.[Number(op.turma_id)];
                 const alocadas = alocadosCountMap?.[`${op.turma_id}-${op.disciplina_id}`] || 0;
                 const previstas = Number(op.aulas_previstas) || 0;
-                const completa = previstas > 0 && alocadas >= previstas;
+                const completa = previstas > 0 && alocadas === previstas;
+                const excesso = previstas > 0 && alocadas > previstas;
 
                 return (
                   <div
@@ -507,8 +561,12 @@ function SlotTurmaCombobox({
                     style={{
                       padding: "8px 12px",
                       cursor: "pointer",
-                      background: isHighlighted ? "#eff6ff" : isSelected ? "#f0fdf4" : "#fff",
-                      borderLeft: isSelected ? "3px solid #22c55e" : "3px solid transparent",
+                      background: isHighlighted ? "#eff6ff" : excesso ? "#fef2f2" : isSelected ? "#f0fdf4" : "#fff",
+                      borderLeft: excesso
+                        ? "3px solid #ef4444"
+                        : isSelected
+                        ? "3px solid #22c55e"
+                        : "3px solid transparent",
                       display: "flex",
                       flexDirection: "column",
                       gap: 2,
@@ -525,11 +583,13 @@ function SlotTurmaCombobox({
                             fontWeight: 700,
                             padding: "1px 6px",
                             borderRadius: 10,
-                            background: completa ? "#dcfce7" : "#dbeafe",
-                            color: completa ? "#15803d" : "#1d4ed8",
+                            background: excesso ? "#fee2e2" : completa ? "#dcfce7" : "#dbeafe",
+                            color: excesso ? "#dc2626" : completa ? "#15803d" : "#1d4ed8",
+                            border: excesso ? "1px solid #fca5a5" : "none",
                           }}
                         >
-                          {alocadas}/{previstas} {completa ? "✓" : "aulas"}
+                          {alocadas}/{previstas}{" "}
+                          {excesso ? `⚠️ +${alocadas - previstas}` : completa ? "✓" : "aulas"}
                         </span>
                       )}
                     </div>
@@ -988,10 +1048,21 @@ export default function HorarioManualPage({ config, turnoInicial }) {
         }
       }
 
-      // Total previsto na modulação para este professor no turno
-      const previstasMod = alocacoesMod
-        .filter(a => Number(a.professor_id) === Number(p.id) && a.turma_id != null)
-        .reduce((acc, cur) => acc + (Number(cur.aulas) || 0), 0);
+      // Total previsto na modulação para este professor no turno + detecção de excesso por (turma, disciplina)
+      const modDoProf = alocacoesMod.filter(
+        a => Number(a.professor_id) === Number(p.id) && a.turma_id != null
+      );
+      const previstasMod = modDoProf.reduce((acc, cur) => acc + (Number(cur.aulas) || 0), 0);
+      let excedenteDisc = 0;
+      for (const m of modDoProf) {
+        const k = `${Number(m.turma_id)}-${Number(m.disciplina_id)}`;
+        const aloc = porTurmaDisc[k] || 0;
+        const prev = Number(m.aulas) || 0;
+        if (prev > 0 && aloc > prev) {
+          excedenteDisc += aloc - prev;
+        }
+      }
+      const temExcesso = (previstasMod > 0 && totalAlocadas > previstasMod) || excedenteDisc > 0;
 
       map[p.id] = {
         totalAlocadas,
@@ -999,6 +1070,8 @@ export default function HorarioManualPage({ config, turnoInicial }) {
         todasFixadas: totalAlocadas > 0 && totalFixadas === totalAlocadas,
         previstasMod,
         porTurmaDisc,
+        temExcesso,
+        excedenteDisc,
       };
     }
     return map;
@@ -1419,8 +1492,9 @@ export default function HorarioManualPage({ config, turnoInicial }) {
             ) : profsFiltrados.map(p => {
               const sel = p.id === profSel;
               const isDirty = !!dirty[p.id];
-              const st = statsPorProfessor[p.id] || { totalAlocadas: 0, totalFixadas: 0, todasFixadas: false, previstasMod: 0 };
-              const completo = st.previstasMod > 0 && st.totalAlocadas >= st.previstasMod;
+              const st = statsPorProfessor[p.id] || { totalAlocadas: 0, totalFixadas: 0, todasFixadas: false, previstasMod: 0, temExcesso: false };
+              const temExcesso = Boolean(st.temExcesso);
+              const completo = !temExcesso && st.previstasMod > 0 && st.totalAlocadas === st.previstasMod;
 
               return (
                 <button
@@ -1449,16 +1523,40 @@ export default function HorarioManualPage({ config, turnoInicial }) {
                     </div>
                     {/* Contador de aulas alocadas */}
                     {(st.totalAlocadas > 0 || st.previstasMod > 0) && (
-                      <span style={{
-                        fontSize: 10,
-                        fontWeight: 700,
-                        padding: "2px 6px",
-                        borderRadius: 10,
-                        flexShrink: 0,
-                        background: completo ? "#dcfce7" : st.totalAlocadas > 0 ? "#dbeafe" : "#f1f5f9",
-                        color: completo ? "#15803d" : st.totalAlocadas > 0 ? "#1d4ed8" : "#64748b",
-                      }}>
-                        {st.previstasMod > 0 ? `${st.totalAlocadas}/${st.previstasMod}` : `${st.totalAlocadas}a`}
+                      <span
+                        title={
+                          temExcesso
+                            ? `⚠️ Atenção: há excesso de aulas alocadas neste professor (${st.totalAlocadas}/${st.previstasMod}${
+                                st.excedenteDisc > 0 ? ` • +${st.excedenteDisc} aula(s) acima da carga em alguma turma/disciplina` : ""
+                              })`
+                            : undefined
+                        }
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          padding: "2px 6px",
+                          borderRadius: 10,
+                          flexShrink: 0,
+                          background: temExcesso
+                            ? "#fee2e2"
+                            : completo
+                            ? "#dcfce7"
+                            : st.totalAlocadas > 0
+                            ? "#dbeafe"
+                            : "#f1f5f9",
+                          color: temExcesso
+                            ? "#dc2626"
+                            : completo
+                            ? "#15803d"
+                            : st.totalAlocadas > 0
+                            ? "#1d4ed8"
+                            : "#64748b",
+                          border: temExcesso ? "1px solid #fca5a5" : "none",
+                        }}
+                      >
+                        {st.previstasMod > 0
+                          ? `${st.totalAlocadas}/${st.previstasMod}${temExcesso ? " ⚠️" : ""}`
+                          : `${st.totalAlocadas}a`}
                       </span>
                     )}
                   </div>
@@ -1819,6 +1917,7 @@ export default function HorarioManualPage({ config, turnoInicial }) {
                     const previstas = Number(op.aulas_previstas) || 0;
                     const ok = previstas > 0 && alocadas === previstas;
                     const excesso = previstas > 0 && alocadas > previstas;
+                    const faltam = previstas > 0 && alocadas < previstas ? previstas - alocadas : 0;
 
                     return (
                       <div
@@ -1832,23 +1931,23 @@ export default function HorarioManualPage({ config, turnoInicial }) {
                           border: ok
                             ? "1px solid #86efac"
                             : excesso
-                            ? "1px solid #fcd34d"
+                            ? "1.5px solid #ef4444"
                             : "1px solid #cbd5e1",
-                          background: ok ? "#f0fdf4" : excesso ? "#fffbeb" : "#f8fafc",
+                          background: ok ? "#f0fdf4" : excesso ? "#fef2f2" : "#f8fafc",
                           fontSize: 12,
                         }}
                       >
-                        <span style={{ fontWeight: 700, color: "#1e293b" }}>{op.turma_nome}</span>
-                        <span style={{ fontSize: 10, color: "#64748b", fontWeight: 600 }}>({op.disciplina_nome})</span>
+                        <span style={{ fontWeight: 700, color: excesso ? "#991b1b" : "#1e293b" }}>{op.turma_nome}</span>
+                        <span style={{ fontSize: 10, color: excesso ? "#b91c1c" : "#64748b", fontWeight: 600 }}>({op.disciplina_nome})</span>
                         <span style={{
                           fontWeight: 800,
                           fontSize: 11,
                           padding: "1px 7px",
                           borderRadius: 8,
-                          background: ok ? "#22c55e" : excesso ? "#f59e0b" : "#e2e8f0",
+                          background: ok ? "#22c55e" : excesso ? "#dc2626" : "#e2e8f0",
                           color: ok || excesso ? "#fff" : "#475569",
                         }}>
-                          {alocadas}/{previstas} {ok ? "✓" : ""}
+                          {alocadas}/{previstas} {ok ? "✓" : excesso ? `⚠️ +${alocadas - previstas} excedente` : faltam > 0 ? `(faltam ${faltam})` : ""}
                         </span>
                       </div>
                     );

@@ -55,6 +55,7 @@ function normalizeResultado(raw) {
 // ── Recalcula métricas e aulas não alocadas com base na grade atual e no payload ──
 function recalcularMetricasEDiagnostico(gradePorTurma, solverPayload, metricsAtuais = {}) {
   const contagensAlocadas = new Map();
+  const contagensFixasPorChave = new Map();
   let totalAlocadas = 0;
   let totalFixas = 0;
 
@@ -64,27 +65,56 @@ function recalcularMetricasEDiagnostico(gradePorTurma, solverPayload, metricsAtu
       for (const cell of Object.values(perObj || {})) {
         if (cell && cell.professor_id && cell.disciplina_id) {
           totalAlocadas++;
-          if (cell.locked) totalFixas++;
-          const k = `${tId}|${Number(cell.disciplina_id)}`;
+          const dId = Number(cell.disciplina_id);
+          const pId = Number(cell.professor_id);
+          if (cell.locked) {
+            totalFixas++;
+            const kf = `${tId}|${dId}|${pId}`;
+            contagensFixasPorChave.set(kf, (contagensFixasPorChave.get(kf) || 0) + 1);
+          }
+          const k = `${tId}|${dId}`;
           contagensAlocadas.set(k, (contagensAlocadas.get(k) || 0) + 1);
         }
       }
     }
   }
 
-  // Calcula violações pedagógicas (aulas separadas no mesmo dia, excesso > maxDia, dupla cortada pelo recreio/par bloqueado e pares obrigatórios)
+  // Calcula violações pedagógicas (respeitando a Hierarquia Soberana das fixações manuais 📌)
   const rg = solverPayload?.config_pedagogica?.regras_gerais || {};
+  const periodosPorDia = Number(solverPayload?.periodos_por_dia) || 6;
   const maxDiaPadrao =
     Number(rg.max_aulas_mesmo_dia) ||
     Number(solverPayload?.config_pedagogica?.regras?.rc02_max_por_dia_disciplina?.max_por_dia_padrao) ||
     2;
   const turnoKey = String(solverPayload?.turno || "matutino").toLowerCase();
-  const recreioApos =
-    rg?.recreio_apos_periodo?.[turnoKey] !== undefined
-      ? Number(rg.recreio_apos_periodo[turnoKey])
-      : turnoKey.includes("noturno")
-      ? 2
-      : 3;
+  const isNoturno = turnoKey.includes("noturno");
+  const govApos = Number(
+    solverPayload?.intervalos_por_turno?.[turnoKey]?.apos_periodo ??
+      rg?._intervalos_governanca?.[turnoKey]?.apos_periodo ??
+      0
+  );
+  const cfgAposRaw = rg?.recreio_apos_periodo?.[turnoKey];
+  const cfgApos = cfgAposRaw !== undefined ? Number(cfgAposRaw) : null;
+
+  let recreioApos = 3;
+  if (govApos > 0 && govApos < periodosPorDia) {
+    recreioApos = govApos;
+  } else if (cfgApos !== null && Number.isFinite(cfgApos) && cfgApos >= 0 && cfgApos < periodosPorDia) {
+    recreioApos = isNoturno && cfgApos === 2 && periodosPorDia >= 5 ? 3 : cfgApos;
+  } else {
+    recreioApos = isNoturno ? (periodosPorDia >= 5 ? 3 : 2) : 3;
+  }
+
+  const otherShiftRecesses = new Set();
+  if (rg?.recreio_apos_periodo && typeof rg.recreio_apos_periodo === "object") {
+    for (const [tk, val] of Object.entries(rg.recreio_apos_periodo)) {
+      if (String(tk).toLowerCase() !== turnoKey) {
+        const rv = Number(val) || 0;
+        if (rv > 0 && rv !== recreioApos) otherShiftRecesses.add(rv);
+      }
+    }
+  }
+
   const bloquearRecreio =
     rg?.bloquear_duplas_no_recreio !== undefined
       ? Boolean(rg.bloquear_duplas_no_recreio)
@@ -93,13 +123,32 @@ function recalcularMetricasEDiagnostico(gradePorTurma, solverPayload, metricsAtu
       : true;
   const paresBloqueadosSet = new Set();
   const paresObrigatoriosSet = new Set();
-  if (bloquearRecreio && recreioApos > 0) paresBloqueadosSet.add(recreioApos);
+  if (bloquearRecreio && recreioApos > 0 && recreioApos < periodosPorDia) {
+    paresBloqueadosSet.add(recreioApos);
+  }
   for (const item of Array.isArray(rg?.pares_duplas_governanca) ? rg.pares_duplas_governanca : []) {
-    const modo = String(item?.modo || "").toLowerCase();
+    let modo = String(item?.modo || "").toLowerCase();
     const ini = Number(item?.inicio);
-    if (ini > 0) {
+    if (ini > 0 && ini < periodosPorDia) {
+      if (
+        modo === "bloqueado" &&
+        ini !== recreioApos &&
+        (item?.bloqueado_por_recreio || otherShiftRecesses.has(ini))
+      ) {
+        modo = ini === recreioApos + 1 ? "prioritario" : "permitido";
+      }
       if (modo === "bloqueado") paresBloqueadosSet.add(ini);
       if (modo === "obrigatorio" && !paresBloqueadosSet.has(ini)) paresObrigatoriosSet.add(ini);
+    }
+  }
+
+  // Mapa de disciplinas excludentes no mesmo dia
+  const excludentesPairs = [];
+  for (const pair of Array.isArray(rg?.disciplinas_excludentes) ? rg.disciplinas_excludentes : []) {
+    if (Array.isArray(pair) && pair.length >= 2) {
+      const d1 = Number(pair[0]);
+      const d2 = Number(pair[1]);
+      if (d1 && d2 && d1 !== d2) excludentesPairs.push([d1, d2]);
     }
   }
 
@@ -112,8 +161,11 @@ function recalcularMetricasEDiagnostico(gradePorTurma, solverPayload, metricsAtu
   let violacoesMaxDia = 0;
   let violacoesParesBloqueados = 0;
   let violacoesIndisponibilidade = 0;
+  let violacoesDisciplinasExcludentes = 0;
   let paresGeminados = 0;
+  let paresObrigatoriosMeta = 0;
   let paresObrigatoriosAtendidos = 0;
+  let paresObrigatoriosIsentosManual = 0;
   const divergenciasParesObrigatorios = [];
 
   const dispoBloqueadaSet = new Set();
@@ -128,7 +180,6 @@ function recalcularMetricasEDiagnostico(gradePorTurma, solverPayload, metricsAtu
   }
 
   const turmaEntries = Object.entries(gradePorTurma || {}).filter(([, g]) => Boolean(g));
-  const paresObrigatoriosMeta = paresObrigatoriosSet.size * turmaEntries.length * diasSemana.length;
 
   for (const [tIdStr, diasObj] of turmaEntries) {
     const tId = Number(tIdStr);
@@ -140,8 +191,13 @@ function recalcularMetricasEDiagnostico(gradePorTurma, solverPayload, metricsAtu
         const isGeminatedOb =
           c1 && c2 && c1.disciplina_id && Number(c1.disciplina_id) === Number(c2.disciplina_id);
         if (isGeminatedOb) {
+          paresObrigatoriosMeta++;
           paresObrigatoriosAtendidos++;
+        } else if (c1?.locked || c2?.locked) {
+          // HIERARQUIA SOBERANA: janelas travadas manualmente ficam isentas de pendência de par obrigatório
+          paresObrigatoriosIsentosManual++;
         } else {
+          paresObrigatoriosMeta++;
           divergenciasParesObrigatorios.push({
             turma_id: tId,
             dia: Number(dNum),
@@ -163,7 +219,12 @@ function recalcularMetricasEDiagnostico(gradePorTurma, solverPayload, metricsAtu
         if (!cell || !cell.disciplina_id) continue;
         const p = Number(pStr);
         const dId = Number(cell.disciplina_id);
-        if (cell.professor_id && dispoBloqueadaSet.has(`${Number(cell.professor_id)}|${dNum}|${p}`)) {
+        // HIERARQUIA SOBERANA: aula fixada manualmente prevalece sobre disponibilidade
+        if (
+          !cell.locked &&
+          cell.professor_id &&
+          dispoBloqueadaSet.has(`${Number(cell.professor_id)}|${dNum}|${p}`)
+        ) {
           violacoesIndisponibilidade++;
         }
         const nextCell = perObj?.[p + 1];
@@ -183,6 +244,14 @@ function recalcularMetricasEDiagnostico(gradePorTurma, solverPayload, metricsAtu
         const maxP = arr[arr.length - 1].p;
         if (maxP - minP + 1 !== arr.length) violacoesSeparadasMesmoDia++;
         if (arr.length > maxDiaPadrao) violacoesMaxDia++;
+      }
+      for (const [dA, dB] of excludentesPairs) {
+        const arrA = byDisc.get(dA);
+        const arrB = byDisc.get(dB);
+        if (arrA && arrB) {
+          const bothLocked = arrA.every((x) => x.locked) && arrB.every((x) => x.locked);
+          if (!bothLocked) violacoesDisciplinasExcludentes++;
+        }
       }
     }
   }
@@ -208,13 +277,17 @@ function recalcularMetricasEDiagnostico(gradePorTurma, solverPayload, metricsAtu
         violacoes_separadas_mesmo_dia: violacoesSeparadasMesmoDia,
         violacoes_max_dia: violacoesMaxDia,
         violacoes_pares_bloqueados: violacoesParesBloqueados,
+        violacoes_disciplinas_excludentes: violacoesDisciplinasExcludentes,
         pares_geminados: paresGeminados,
         pares_obrigatorios_meta: paresObrigatoriosMeta,
         pares_obrigatorios_atendidos: paresObrigatoriosAtendidos,
+        pares_obrigatorios_isentos_manual: paresObrigatoriosIsentosManual,
         pares_obrigatorios_faltantes: paresObrigatoriosFaltantes,
       },
       nao_alocadas: [],
       divergencias_pares_obrigatorios: divergenciasParesObrigatorios,
+      excessos_fixados: [],
+      turmas_acima_capacidade: [],
     };
   }
 
@@ -226,6 +299,9 @@ function recalcularMetricasEDiagnostico(gradePorTurma, solverPayload, metricsAtu
 
   let demandaTotal = 0;
   const naoAlocadasList = [];
+  const cargaPorTurmaMap = new Map();
+  const matchedFixoKeys = new Set();
+  const excessosFixados = [];
 
   for (const d of demandas) {
     const tId = Number(d.turma_id);
@@ -235,6 +311,22 @@ function recalcularMetricasEDiagnostico(gradePorTurma, solverPayload, metricsAtu
     if (!tId || !dId || !pId || carga <= 0) continue;
 
     demandaTotal += carga;
+    cargaPorTurmaMap.set(tId, (cargaPorTurmaMap.get(tId) || 0) + carga);
+
+    const kf = `${tId}|${dId}|${pId}`;
+    matchedFixoKeys.add(kf);
+    const qtdFixa = contagensFixasPorChave.get(kf) || 0;
+    if (qtdFixa > carga) {
+      excessosFixados.push({
+        turma_id: tId,
+        disciplina_id: dId,
+        professor_id: pId,
+        fixadas: qtdFixa,
+        previstas: carga,
+        excedente: qtdFixa - carga,
+      });
+    }
+
     const aloc = contagensAlocadas.get(`${tId}|${dId}`) || 0;
     const faltam = Math.max(0, carga - aloc);
     for (let i = 0; i < faltam; i++) {
@@ -243,6 +335,32 @@ function recalcularMetricasEDiagnostico(gradePorTurma, solverPayload, metricsAtu
         disciplina_id: dId,
         professor_id: pId,
         motivo: "PENDENTE_ALOCACAO",
+      });
+    }
+  }
+
+  for (const [kf, qtdFixa] of contagensFixasPorChave.entries()) {
+    if (matchedFixoKeys.has(kf) || qtdFixa <= 0) continue;
+    const [tIdStr, dIdStr, pIdStr] = kf.split("|");
+    excessosFixados.push({
+      turma_id: Number(tIdStr),
+      disciplina_id: Number(dIdStr),
+      professor_id: Number(pIdStr),
+      fixadas: qtdFixa,
+      previstas: 0,
+      excedente: qtdFixa,
+    });
+  }
+
+  const capacidadeFisicaTurma = diasSemana.length * periodosPorDia;
+  const turmasAcimaCapacidade = [];
+  for (const [tId, cargaTot] of cargaPorTurmaMap.entries()) {
+    if (cargaTot > capacidadeFisicaTurma) {
+      turmasAcimaCapacidade.push({
+        turma_id: Number(tId),
+        carga_total: cargaTot,
+        capacidade_turno: capacidadeFisicaTurma,
+        excedente: cargaTot - capacidadeFisicaTurma,
       });
     }
   }
@@ -262,13 +380,17 @@ function recalcularMetricasEDiagnostico(gradePorTurma, solverPayload, metricsAtu
       violacoes_separadas_mesmo_dia: violacoesSeparadasMesmoDia,
       violacoes_max_dia: violacoesMaxDia,
       violacoes_pares_bloqueados: violacoesParesBloqueados,
+      violacoes_disciplinas_excludentes: violacoesDisciplinasExcludentes,
       pares_geminados: paresGeminados,
       pares_obrigatorios_meta: paresObrigatoriosMeta,
       pares_obrigatorios_atendidos: paresObrigatoriosAtendidos,
+      pares_obrigatorios_isentos_manual: paresObrigatoriosIsentosManual,
       pares_obrigatorios_faltantes: paresObrigatoriosFaltantes,
     },
     nao_alocadas: naoAlocadasList,
     divergencias_pares_obrigatorios: divergenciasParesObrigatorios,
+    excessos_fixados: excessosFixados,
+    turmas_acima_capacidade: turmasAcimaCapacidade,
   };
 }
 
@@ -514,8 +636,13 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
       listaTurmas,
       pl
     );
-    const { metrics, nao_alocadas, divergencias_pares_obrigatorios } =
-      recalcularMetricasEDiagnostico(gradePorTurma, pl, {});
+    const {
+      metrics,
+      nao_alocadas,
+      divergencias_pares_obrigatorios,
+      excessos_fixados,
+      turmas_acima_capacidade,
+    } = recalcularMetricasEDiagnostico(gradePorTurma, pl, {});
 
     setResultado(
       normalizeResultado({
@@ -526,6 +653,8 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
         diagnostico: {
           nao_alocadas_detalhado: nao_alocadas,
           divergencias_pares_obrigatorios: divergencias_pares_obrigatorios || [],
+          excessos_fixados: excessos_fixados || [],
+          turmas_acima_capacidade: turmas_acima_capacidade || [],
         },
         warnings_payload: payloadInfo?.warnings_payload || [],
         payload_summary: payloadInfo?.payload_summary || {
@@ -743,12 +872,13 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
           (m.pares_obrigatorios_faltantes || 0) > 0 ||
           (m.violacoes_pares_bloqueados || 0) > 0 ||
           (m.violacoes_separadas_mesmo_dia || 0) > 0 ||
-          (m.violacoes_max_dia || 0) > 0;
+          (m.violacoes_max_dia || 0) > 0 ||
+          (m.violacoes_disciplinas_excludentes || 0) > 0;
 
         if (temPendenciaEstrita) {
           setSugestoesSelecionadas({
             flexibilizar_obrigatorios: (m.pares_obrigatorios_faltantes || 0) > 0,
-            bloquear_recreio_pos_recreio: true,
+            bloquear_recreio_pos_recreio: (m.violacoes_pares_bloqueados || 0) > 0,
             busca_exaustiva_60s: tempoEfetivoMs < 60000,
             desafixar_manuais: false,
           });
@@ -772,11 +902,28 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
         config?.regras_gerais ||
         {};
       const turnoKey = String(turno || "matutino").toLowerCase();
-      const recreioRef =
+      const perTurnoRef =
+        Number(solverPayload?.periodos_por_dia) ||
+        Number(config?.periodos?.[turnoKey]) ||
+        (turnoKey.includes("noturno") ? 5 : 6);
+      const govAposRef = Number(
+        solverPayload?.intervalos_por_turno?.[turnoKey]?.apos_periodo ??
+          rgAtual?._intervalos_governanca?.[turnoKey]?.apos_periodo ??
+          0
+      );
+      const cfgAposRef =
         rgAtual?.recreio_apos_periodo?.[turnoKey] !== undefined
           ? Number(rgAtual.recreio_apos_periodo[turnoKey])
+          : null;
+      const recreioRef =
+        govAposRef > 0 && govAposRef < perTurnoRef
+          ? govAposRef
+          : cfgAposRef !== null && cfgAposRef >= 0 && cfgAposRef < perTurnoRef
+          ? turnoKey.includes("noturno") && cfgAposRef === 2 && perTurnoRef >= 5
+            ? 3
+            : cfgAposRef
           : turnoKey.includes("noturno")
-          ? 2
+          ? perTurnoRef >= 5 ? 3 : 2
           : 3;
 
       let novaListaPares = Array.isArray(rgAtual.pares_duplas_governanca)
@@ -786,7 +933,7 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
             { inicio: 4, fim: 5, modo: "prioritario", ordem: 2 },
             { inicio: 2, fim: 3, modo: "permitido", ordem: 3 },
             { inicio: 5, fim: 6, modo: "permitido", ordem: 4 },
-            { inicio: 3, fim: 4, modo: "bloqueado", ordem: 5 },
+            { inicio: 3, fim: 4, modo: "bloqueado", bloqueado_por_recreio: true, ordem: 5 },
           ];
 
       let novoBloquearRecreio =
@@ -803,12 +950,12 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
         );
       }
 
-      // 2) Se marcou blindar recreio e priorizar pós-recreio (#4-#5)
+      // 2) Se marcou blindar recreio e priorizar pós-recreio
       if (sugestoesSelecionadas.bloquear_recreio_pos_recreio) {
         novoBloquearRecreio = true;
         novaListaPares = novaListaPares.map(p => {
           if (recreioRef > 0 && Number(p.inicio) === recreioRef) {
-            return { ...p, modo: "bloqueado" };
+            return { ...p, modo: "bloqueado", bloqueado_por_recreio: true };
           }
           if (recreioRef > 0 && Number(p.inicio) === recreioRef + 1 && p.modo === "permitido") {
             return { ...p, modo: "prioritario" };
@@ -1027,6 +1174,8 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
       metrics: novasMetricas,
       nao_alocadas: novasNaoAlocadas,
       divergencias_pares_obrigatorios: novasDivergenciasObrigatorios,
+      excessos_fixados: novosExcessosFixados,
+      turmas_acima_capacidade: novasTurmasAcimaCapacidade,
     } = recalcularMetricasEDiagnostico(novoGpt, solverPayload, resultado?.metrics);
 
     setResultado((prev) => ({
@@ -1039,6 +1188,8 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
         ...(prev?.diagnostico || {}),
         nao_alocadas_detalhado: novasNaoAlocadas,
         divergencias_pares_obrigatorios: novasDivergenciasObrigatorios || [],
+        excessos_fixados: novosExcessosFixados || [],
+        turmas_acima_capacidade: novasTurmasAcimaCapacidade || [],
       },
     }));
     setTemAlteracoesNaoSalvas(true);
@@ -1387,6 +1538,46 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
       ? solverPayload.dias_semana.map(Number)
       : [1, 2, 3, 4, 5];
   const periodosPadrao = Number(solverPayload?.periodos_por_dia) || 6;
+  const capacidadeTurnoSlots = diasPadrao.length * periodosPadrao;
+
+  const turnoKeyRender = String(turno || "matutino").toLowerCase();
+  const rgRender = solverPayload?.config_pedagogica?.regras_gerais || config?.regras_gerais || {};
+  const govAposRender = Number(
+    solverPayload?.intervalos_por_turno?.[turnoKeyRender]?.apos_periodo ??
+      rgRender?._intervalos_governanca?.[turnoKeyRender]?.apos_periodo ??
+      0
+  );
+  const cfgAposRender =
+    rgRender?.recreio_apos_periodo?.[turnoKeyRender] !== undefined
+      ? Number(rgRender.recreio_apos_periodo[turnoKeyRender])
+      : null;
+  const recreioModalRef =
+    govAposRender > 0 && govAposRender < periodosPadrao
+      ? govAposRender
+      : cfgAposRender !== null && cfgAposRender >= 0 && cfgAposRender < periodosPadrao
+      ? turnoKeyRender.includes("noturno") && cfgAposRender === 2 && periodosPadrao >= 5
+        ? 3
+        : cfgAposRender
+      : turnoKeyRender.includes("noturno")
+      ? periodosPadrao >= 5 ? 3 : 2
+      : 3;
+
+  const turmasAcimaCapacidadeLista = Array.isArray(diag.turmas_acima_capacidade)
+    ? diag.turmas_acima_capacidade
+    : [];
+  const excessosFixadosLista = Array.isArray(diag.excessos_fixados)
+    ? diag.excessos_fixados
+    : [];
+  const temExcessoFisicoOuManual =
+    turmasAcimaCapacidadeLista.length > 0 || excessosFixadosLista.length > 0;
+
+  const MOTIVO_NAO_ALOCADA_LABELS = {
+    SEM_SLOT_LIVRE_TURMA: "Turma já está com 100% dos horários do turno ocupados",
+    COLISAO_PROFESSOR: "Professor ocupado em outra turma nos horários vagos desta turma",
+    INDISPONIBILIDADE_PROFESSOR: "Professor indisponível nos horários vagos desta turma",
+    LIMITE_DIARIO_DISCIPLINA: "Limite máximo diário da disciplina atingido",
+    LIMITE_CONSECUTIVAS: "Limite de aulas consecutivas atingido",
+  };
 
   // ── Render ───────────────────────────────────────────────────
   return (
@@ -1961,7 +2152,8 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
               (resultado.metrics?.pares_obrigatorios_faltantes || 0) > 0 ||
               (resultado.metrics?.violacoes_separadas_mesmo_dia || 0) > 0 ||
               (resultado.metrics?.violacoes_max_dia || 0) > 0 ||
-              (resultado.metrics?.violacoes_pares_bloqueados || 0) > 0) && (
+              (resultado.metrics?.violacoes_pares_bloqueados || 0) > 0 ||
+              (resultado.metrics?.violacoes_disciplinas_excludentes || 0) > 0) && (
               <div
                 style={{
                   background: "linear-gradient(135deg, #fff1f2 0%, #fff7ed 100%)",
@@ -1982,17 +2174,21 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
                 <div style={{ flex: 1, minWidth: 280 }}>
                   <strong style={{ display: "block", marginBottom: 4, fontSize: 14, color: "#7c2d12" }}>
                     {(resultado.metrics?.violacoes_indisponibilidade || 0) > 0
-                      ? `⛔ Atenção: ${resultado.metrics.violacoes_indisponibilidade} aula(s) estão em horários marcados como EXCLUIR na Disponibilidade dos Professores!`
+                      ? `⛔ Atenção: ${resultado.metrics.violacoes_indisponibilidade} aula(s) automática(s) estão em horários marcados como EXCLUIR na Disponibilidade!`
                       : (resultado.metrics?.pares_obrigatorios_faltantes || 0) > 0
-                      ? `🔒 Atenção: ${resultado.metrics.pares_obrigatorios_atendidos}/${resultado.metrics.pares_obrigatorios_meta} janelas de Pares Obrigatórios atendidas (${resultado.metrics.pares_obrigatorios_faltantes} janela(s) ficaram com aulas simples)`
-                      : `⚠️ Grade com divergências de governança: ${resultado.metrics?.violacoes_separadas_mesmo_dia || 0} separada(s) no dia • ${resultado.metrics?.violacoes_max_dia || 0} acima do limite • ${resultado.metrics?.violacoes_pares_bloqueados || 0} dupla(s) cortada(s) pelo recreio`}
+                      ? `🔒 Atenção: ${resultado.metrics.pares_obrigatorios_atendidos}/${resultado.metrics.pares_obrigatorios_meta} janelas automáticas de Pares Obrigatórios atendidas (${resultado.metrics.pares_obrigatorios_faltantes} c/ aulas simples)`
+                      : `⚠️ Grade com divergências de governança: ${resultado.metrics?.violacoes_separadas_mesmo_dia || 0} separada(s) no dia • ${resultado.metrics?.violacoes_max_dia || 0} acima do limite • ${resultado.metrics?.violacoes_pares_bloqueados || 0} dupla(s) cortada(s) pelo recreio${
+                          (resultado.metrics?.violacoes_disciplinas_excludentes || 0) > 0
+                            ? ` • ${resultado.metrics.violacoes_disciplinas_excludentes} par(es) excludente(s) no mesmo dia`
+                            : ""
+                        }`}
                   </strong>
                   <span style={{ fontSize: 12.5, color: "#9a3412", lineHeight: 1.5 }}>
                     {(resultado.metrics?.violacoes_indisponibilidade || 0) > 0
-                      ? "A disponibilidade de algum professor foi alterada para 'Excluir' após a geração deste rascunho. Clique em '⚡ Tentar Regerar' para realocar automaticamente todas as aulas respeitando 100% os horários excluídos."
+                      ? "A disponibilidade de algum professor foi alterada para 'Excluir' em aulas não fixadas. Clique em '⚡ Tentar Regerar' para realocar automaticamente respeitando os horários excluídos (aulas fixas 📌 permanecem soberanas)."
                       : (resultado.metrics?.pares_obrigatorios_faltantes || 0) > 0
-                      ? "Devido à combinação de disciplinas com carga ímpar (5h/3h/1h) e professores com 30/30 aulas, não foi matematicamente possível geminar 100% dos blocos obrigatórios sem desassistir turmas. Abra o Assistente Urânia+ para ver as janelas exatas ou aplicar sugestões de fechamento."
-                      : "Esta grade possui divergências em relação às regras atuais de governança de pares/recreio. Utilize o Assistente Urânia+ ou regere a grade."}
+                      ? `Devido à combinação de disciplinas com carga ímpar (5h/3h/1h) e professores no limite (${capacidadeTurnoSlots}/${capacidadeTurnoSlots} aulas), não foi matematicamente possível geminar 100% dos blocos automáticos sem desassistir turmas. Abra o Assistente Urânia+ para inspecionar ou flexibilizar.`
+                      : "Esta grade possui divergências em aulas não fixadas em relação às regras atuais de governança. Utilize o Assistente Urânia+ ou regere a grade."}
                   </span>
                 </div>
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
@@ -2036,6 +2232,43 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
               </div>
             )}
 
+            {/* ── Diagnóstico Cirúrgico: Excesso de Carga Física ou Aulas Fixadas Acima da Modulação ── */}
+            {temExcessoFisicoOuManual && (
+              <div
+                style={{
+                  background: "#fef2f2",
+                  border: "1.5px solid #f87171",
+                  borderRadius: 12,
+                  padding: "14px 18px",
+                  marginBottom: 16,
+                  fontSize: 12.5,
+                  color: "#7f1d1d",
+                }}
+              >
+                <strong style={{ display: "block", fontSize: 13.5, color: "#991b1b", marginBottom: 6 }}>
+                  🔎 Diagnóstico de Capacidade Física & Fixações Manuais (Causa exata das aulas pendentes)
+                </strong>
+                <ul style={{ margin: 0, paddingLeft: 18, lineHeight: 1.55 }}>
+                  {turmasAcimaCapacidadeLista.map((tc, idx) => (
+                    <li key={`tc-${idx}`} style={{ marginBottom: 3 }}>
+                      <strong>{nomesTurmas[tc.turma_id] || `Turma ${tc.turma_id}`}:</strong> possui{" "}
+                      <strong>{tc.carga_total} aulas semanais</strong> cadastradas em <em>Cargas Horárias</em>, mas o turno comporta no máximo{" "}
+                      <strong>{tc.capacidade_turno} horários físicos</strong> (+{tc.excedente} aula excedente além da grade).
+                    </li>
+                  ))}
+                  {excessosFixadosLista.map((ex, idx) => (
+                    <li key={`ex-${idx}`} style={{ marginBottom: 3 }}>
+                      <strong>{nomesProfessores[ex.professor_id] || `Prof ${ex.professor_id}`}</strong> em{" "}
+                      <strong>{nomesTurmas[ex.turma_id] || `Turma ${ex.turma_id}`}</strong> —{" "}
+                      <strong>{nomesDisciplinas[ex.disciplina_id] || `Disc ${ex.disciplina_id}`}</strong>:{" "}
+                      <strong>{ex.fixadas} aula(s) fixada(s) 📌</strong> para{" "}
+                      <strong>{ex.previstas} prevista(s)</strong> na modulação (+{ex.excedente} aula fixada acima da carga, ocupando vaga na turma).
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             {/* ── Alertas de não-alocadas (com botão interativo de Alocar na Grade!) ── */}
             {naoAloc > 0 && (
               <div style={{
@@ -2045,7 +2278,7 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
                   <strong>⚠️ {naoAloc} aula(s) pendente(s) de alocação</strong>
                   <span style={{ fontSize: 11, color: "#b45309" }}>
-                    Dica: clique em <strong>🎯 Alocar na Grade</strong> ao lado da aula para encaixá-la manualmente na turma.
+                    Dica: clique em <strong>🎯 Alocar na Grade</strong> ao lado da aula para encaixá-la ou substituir na turma.
                   </span>
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -2073,7 +2306,9 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
                         {nomesDisciplinas[na.disciplina_id] || na.disciplina_id} (
                         {nomesProfessores[na.professor_id] || na.professor_id})
                         {na.motivo && na.motivo !== "PENDENTE_ALOCACAO" && (
-                          <strong style={{ color: "#b71c1c", marginLeft: 6 }}>({na.motivo})</strong>
+                          <strong style={{ color: "#b71c1c", marginLeft: 6 }}>
+                            — {MOTIVO_NAO_ALOCADA_LABELS[na.motivo] || na.motivo}
+                          </strong>
                         )}
                       </span>
                       <button
@@ -2576,10 +2811,10 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
                     </span>
                   </div>
                   <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: "#fff" }}>
-                    Não foi possível atender 100% das restrições estritas exigidas
+                    Grade Gerada ({coberturaVal}%) — Resumo de Alocação e Restrições
                   </h3>
                   <p style={{ margin: "4px 0 0", fontSize: 12.5, color: "#e0e7ff", lineHeight: 1.45 }}>
-                    O Motor Solver 2.0 gerou a melhor grade matematicamente viável, mas encontrou gargalos estruturais que impediram o fechamento total das regras obrigatórias. Confira o diagnóstico e selecione os ajustes abaixo para tentar novamente.
+                    A melhor grade viável já está montada na tela respeitando 100% as fixações manuais soberanas (📌). Confira abaixo os itens que não puderam ser encaixados e salve o rascunho ou aplique ajustes.
                   </p>
                 </div>
               </div>
@@ -2605,7 +2840,31 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
             </div>
 
             {/* Corpo rolável */}
-            <div style={{ padding: "20px 26px", overflowY: "auto", flex: 1, display: "flex", flexDirection: "column", gap: 18 }}>
+            <div style={{ padding: "20px 26px", overflowY: "auto", flex: 1, display: "flex", flexDirection: "column", gap: 16 }}>
+              {/* Faixa de Confirmação Tranquilizadora */}
+              <div
+                style={{
+                  background: "#f0fdf4",
+                  border: "1.5px solid #86efac",
+                  borderRadius: 10,
+                  padding: "10px 14px",
+                  fontSize: 12.5,
+                  color: "#14532d",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 10,
+                  flexWrap: "wrap",
+                }}
+              >
+                <span>
+                  ✅ <strong>O horário ({metrics.aulas_alocadas || 0} aulas) já foi gerado e está na tela!</strong>{" "}
+                  {aulasFixas > 0
+                    ? `Todas as ${aulasFixas} aulas fixadas manualmente (📌) tiveram prioridade máxima sobre as regras automáticas.`
+                    : "Você pode salvá-lo como rascunho agora mesmo ou ajustar os pontos abaixo."}
+                </span>
+              </div>
+
               {/* Faixa de KPIs do Diagnóstico */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(155px, 1fr))", gap: 10 }}>
                 <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 10, padding: "10px 12px" }}>
@@ -2626,7 +2885,7 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
                       {Math.round(((metrics.pares_obrigatorios_atendidos || 0) / metrics.pares_obrigatorios_meta) * 100)}%)
                     </div>
                     <div style={{ fontSize: 10.5, color: "#b91c1c", marginTop: 2 }}>
-                      {metrics.pares_obrigatorios_faltantes || 0} janela(s) ficaram c/ aulas simples
+                      {metrics.pares_obrigatorios_faltantes || 0} janela(s) automática(s) c/ simples
                     </div>
                   </div>
                 )}
@@ -2649,10 +2908,50 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
                     {(resultado.warnings_payload || []).length} prof(s)
                   </div>
                   <div style={{ fontSize: 10.5, color: "#92400e", marginTop: 2 }}>
-                    Com 100% da grade ocupada (30/30)
+                    Com 100% da grade ocupada ({capacidadeTurnoSlots}/{capacidadeTurnoSlots})
                   </div>
                 </div>
               </div>
+
+              {/* Diagnóstico Cirúrgico de Excesso Físico ou Manual */}
+              {temExcessoFisicoOuManual && (
+                <div
+                  style={{
+                    background: "#fef2f2",
+                    border: "1.5px solid #f87171",
+                    borderLeft: "5px solid #dc2626",
+                    borderRadius: 10,
+                    padding: "12px 16px",
+                    fontSize: 12.5,
+                    color: "#7f1d1d",
+                    lineHeight: 1.55,
+                  }}
+                >
+                  <strong style={{ color: "#991b1b", display: "block", marginBottom: 5, fontSize: 13 }}>
+                    🚨 Causa Raiz Identificada: Excesso de Carga ou Fixação Manual Acima do Previsto
+                  </strong>
+                  <ul style={{ margin: "0 0 6px", paddingLeft: 18 }}>
+                    {turmasAcimaCapacidadeLista.map((tc, idx) => (
+                      <li key={`mod-tc-${idx}`} style={{ marginBottom: 3 }}>
+                        <strong>{nomesTurmas[tc.turma_id] || `Turma ${tc.turma_id}`}:</strong>{" "}
+                        <strong>{tc.carga_total}h previstas</strong> em <em>Cargas Horárias</em> para apenas{" "}
+                        <strong>{tc.capacidade_turno} horários físicos</strong> no turno (+{tc.excedente} excedente).
+                      </li>
+                    ))}
+                    {excessosFixadosLista.map((ex, idx) => (
+                      <li key={`mod-ex-${idx}`} style={{ marginBottom: 3 }}>
+                        <strong>{nomesProfessores[ex.professor_id] || `Prof ${ex.professor_id}`}</strong> em{" "}
+                        <strong>{nomesTurmas[ex.turma_id] || `Turma ${ex.turma_id}`}</strong> —{" "}
+                        <strong>{nomesDisciplinas[ex.disciplina_id] || `Disc ${ex.disciplina_id}`}</strong>:{" "}
+                        <strong>{ex.fixadas} fixada(s) 📌</strong> para <strong>{ex.previstas} prevista(s)</strong> na modulação (+{ex.excedente} aula além da carga, tomando lugar de outra disciplina da turma).
+                      </li>
+                    ))}
+                  </ul>
+                  <div style={{ fontSize: 11.5, color: "#991b1b", background: "rgba(255,255,255,0.65)", padding: "6px 10px", borderRadius: 6 }}>
+                    💡 <strong>Importante:</strong> Como as fixações manuais são soberanas e uma turma de {capacidadeTurnoSlots} horários não comporta {capacidadeTurnoSlots + 1} aulas, flexibilizar regras pedagógicas abaixo não eliminará essas pendências enquanto a carga ou a aula extra fixada não for ajustada em <em>Horário Manual</em> ou <em>Cargas Horárias</em>.
+                  </div>
+                </div>
+              )}
 
               {/* Explicação Técnica do Gargalo */}
               <div
@@ -2668,25 +2967,36 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
                 }}
               >
                 <strong style={{ color: "#1e1b4b", display: "block", marginBottom: 4, fontSize: 13 }}>
-                  🔍 Por que a configuração exigida não fechou 100%?
+                  🔍 Diagnóstico Detalhado das Restrições
                 </strong>
                 <ul style={{ margin: 0, paddingLeft: 18 }}>
                   {(metrics.pares_obrigatorios_faltantes || 0) > 0 && (
                     <li style={{ marginBottom: 4 }}>
-                      <strong>Conflito entre Par Obrigatório (🔒) + Disciplinas de Carga Ímpar + Professores 30/30:</strong>{" "}
-                      Cada turma possui disciplinas com número ímpar de aulas semanais (ex.: <em>Português 5h, História 3h, Geografia 3h, Prática Estudantil 1h</em>), gerando obrigatoriamente <strong>6 aulas simples (avulsas) por turma</strong>. Como há{" "}
-                      <strong>{(resultado.warnings_payload || []).length || 10} professores com 30/30 aulas</strong> (sem nenhuma janela livre), em{" "}
-                      <strong>{metrics.pares_obrigatorios_faltantes} de {metrics.pares_obrigatorios_meta} janelas</strong> o algoritmo precisou alocar 2 aulas simples no bloco obrigatório para não deixar nenhuma turma sem aula.
+                      <strong>Conflito entre Par Obrigatório (🔒) + Disciplinas de Carga Ímpar:</strong>{" "}
+                      Em <strong>{metrics.pares_obrigatorios_faltantes} de {metrics.pares_obrigatorios_meta} janelas não-fixadas</strong> o algoritmo precisou alocar aulas simples para não deixar nenhuma turma sem aula.
                     </li>
                   )}
                   {(metrics.violacoes_pares_bloqueados || 0) > 0 && (
                     <li style={{ marginBottom: 4 }}>
-                      <strong>Par do Recreio (#3-#4) desbloqueado:</strong> O par que atravessa o intervalo estava marcado como permitido na configuração salva, permitindo {metrics.violacoes_pares_bloqueados} aula(s) dupla(s) cortada(s) pelo recreio.
+                      <strong>Par do Intervalo (#{recreioModalRef}-#{recreioModalRef + 1}) desbloqueado:</strong> O par que atravessa o intervalo permitiu {metrics.violacoes_pares_bloqueados} aula(s) dupla(s) não-fixada(s) cortada(s) pelo recreio.
+                    </li>
+                  )}
+                  {(metrics.violacoes_disciplinas_excludentes || 0) > 0 && (
+                    <li style={{ marginBottom: 4 }}>
+                      <strong>Disciplinas Excludentes no mesmo dia:</strong> {metrics.violacoes_disciplinas_excludentes} ocorrência(s) não-fixada(s) precisaram dividir o mesmo dia por falta de janela livre.
                     </li>
                   )}
                   {naoAloc > 0 && (
                     <li>
-                      <strong>{naoAloc} aula(s) sem encaixe simultâneo (Turma × Professor):</strong> Restrições estritas de blocos ou indisponibilidades impediram a permutação final.
+                      <strong>{naoAloc} aula(s) pendente(s) de encaixe:</strong>{" "}
+                      {naoAlocLista.slice(0, 6).map((na, idx) => (
+                        <span key={idx}>
+                          {idx > 0 ? "; " : ""}
+                          <strong>{nomesTurmas[na.turma_id] || na.turma_id}</strong>/{nomesDisciplinas[na.disciplina_id] || na.disciplina_id} (
+                          {MOTIVO_NAO_ALOCADA_LABELS[na.motivo] || na.motivo || "sem janela livre"})
+                        </span>
+                      ))}
+                      {naoAlocLista.length > 6 ? ` (+${naoAlocLista.length - 6} mais)` : "."}
                     </li>
                   )}
                 </ul>
@@ -2715,7 +3025,7 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
                       }}
                     >
                       <span>
-                        📋 Janelas com Aulas Simples nos Pares 🔒 Obrigatórios ({resultado.diagnostico.divergencias_pares_obrigatorios.length})
+                        📋 Janelas Automáticas com Aulas Simples nos Pares 🔒 Obrigatórios ({resultado.diagnostico.divergencias_pares_obrigatorios.length})
                       </span>
                       <span style={{ fontSize: 11, fontWeight: 500, color: "#64748b" }}>
                         Clique em "Ver Turma" para inspecionar na grade
@@ -2791,9 +3101,9 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
               {/* Seção de Sugestões Acionáveis (Padrão Urânia+) */}
               <div>
                 <div style={{ fontSize: 13.5, fontWeight: 800, color: "#0f172a", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
-                  <span>💡 Sugestões de Ajuste para o Horário Fechar</span>
+                  <span>💡 Sugestões Opcionais para Tentar Novamente</span>
                   <span style={{ fontSize: 11, fontWeight: 600, color: "#64748b" }}>
-                    (Marque os ajustes que deseja aceitar para tentar novamente)
+                    (Para aulas não-fixadas)
                   </span>
                 </div>
 
@@ -2844,61 +3154,69 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
                         </span>
                       </div>
                       <div style={{ fontSize: 12, color: "#475569", marginTop: 3, lineHeight: 1.4 }}>
-                        Mantém o algoritmo forçando ao máximo aulas geminadas no <strong>(#1-#2)</strong> na 1ª posição da fila, mas permite acomodar as aulas simples das disciplinas de carga ímpar (5h/3h/1h) sem travar o fechamento.
+                        Mantém o algoritmo priorizando aulas geminadas no <strong>(#1-#2)</strong> na 1ª posição da fila, mas permite acomodar aulas simples de carga ímpar (5h/3h/1h) sem travar o fechamento.
                       </div>
                     </div>
                   </label>
 
-                  {/* Sugestão 2: Bloquear recreio #3-#4 e priorizar #4-#5 */}
-                  <label
-                    style={{
-                      display: "flex",
-                      alignItems: "flex-start",
-                      gap: 12,
-                      padding: "11px 14px",
-                      borderRadius: 10,
-                      border: sugestoesSelecionadas.bloquear_recreio_pos_recreio
-                        ? "1.5px solid #0284c7"
-                        : "1px solid #cbd5e1",
-                      background: sugestoesSelecionadas.bloquear_recreio_pos_recreio ? "#f0f9ff" : "#fff",
-                      cursor: "pointer",
-                      transition: "all 0.15s",
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={sugestoesSelecionadas.bloquear_recreio_pos_recreio}
-                      onChange={(e) =>
-                        setSugestoesSelecionadas((prev) => ({
-                          ...prev,
-                          bloquear_recreio_pos_recreio: e.target.checked,
-                        }))
-                      }
-                      style={{ marginTop: 3, width: 16, height: 16, accentColor: "#0284c7", cursor: "pointer" }}
-                    />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                        <strong style={{ fontSize: 13, color: "#0c4a6e" }}>
-                          Blindar Recreio (🚫 Bloquear #3-#4) e priorizar (#4-#5) Pós-Recreio como 2ª Opção ⭐
-                        </strong>
-                        <span
-                          style={{
-                            background: "#0284c7",
-                            color: "#fff",
-                            fontSize: 10,
-                            fontWeight: 700,
-                            padding: "1px 7px",
-                            borderRadius: 999,
-                          }}
-                        >
-                          Qualidade Pedagógica
-                        </span>
+                  {/* Sugestão 2: Bloquear intervalo real do turno e priorizar pós-recreio */}
+                  {recreioModalRef > 0 && recreioModalRef < periodosPadrao && (
+                    <label
+                      style={{
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: 12,
+                        padding: "11px 14px",
+                        borderRadius: 10,
+                        border: sugestoesSelecionadas.bloquear_recreio_pos_recreio
+                          ? "1.5px solid #0284c7"
+                          : "1px solid #cbd5e1",
+                        background: sugestoesSelecionadas.bloquear_recreio_pos_recreio ? "#f0f9ff" : "#fff",
+                        cursor: "pointer",
+                        transition: "all 0.15s",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={sugestoesSelecionadas.bloquear_recreio_pos_recreio}
+                        onChange={(e) =>
+                          setSugestoesSelecionadas((prev) => ({
+                            ...prev,
+                            bloquear_recreio_pos_recreio: e.target.checked,
+                          }))
+                        }
+                        style={{ marginTop: 3, width: 16, height: 16, accentColor: "#0284c7", cursor: "pointer" }}
+                      />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                          <strong style={{ fontSize: 13, color: "#0c4a6e" }}>
+                            Blindar Intervalo (🚫 Bloquear #{recreioModalRef}-#{recreioModalRef + 1})
+                            {recreioModalRef + 1 < periodosPadrao
+                              ? ` e priorizar (#${recreioModalRef + 1}-#${recreioModalRef + 2}) Pós-Intervalo ⭐`
+                              : " no turno atual"}
+                          </strong>
+                          <span
+                            style={{
+                              background: "#0284c7",
+                              color: "#fff",
+                              fontSize: 10,
+                              fontWeight: 700,
+                              padding: "1px 7px",
+                              borderRadius: 999,
+                            }}
+                          >
+                            Qualidade Pedagógica
+                          </span>
+                        </div>
+                        <div style={{ fontSize: 12, color: "#475569", marginTop: 3, lineHeight: 1.4 }}>
+                          Garante <strong>zero aulas duplas automáticas cortadas pelo intervalo</strong> do turno {turno}
+                          {recreioModalRef + 1 < periodosPadrao
+                            ? ` e direciona o segundo bloco geminado para (#${recreioModalRef + 1}-#${recreioModalRef + 2}).`
+                            : "."}
+                        </div>
                       </div>
-                      <div style={{ fontSize: 12, color: "#475569", marginTop: 3, lineHeight: 1.4 }}>
-                        Garante <strong>zero aulas duplas cortadas pelo intervalo</strong> e direciona automaticamente o segundo bloco de aulas geminadas do dia para <strong>(#4-#5)</strong>.
-                      </div>
-                    </div>
-                  </label>
+                    </label>
+                  )}
 
                   {/* Sugestão 3: Busca Exaustiva 60s com Fase 0 Bipartida */}
                   <label
@@ -2969,10 +3287,10 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
                       />
                       <div style={{ flex: 1 }}>
                         <strong style={{ fontSize: 13, color: "#78350f", display: "block" }}>
-                          Destravar temporariamente as {aulasFixas} aula(s) fixada(s) manualmente (📌)
+                          Ignorar nesta tentativa as {aulasFixas} aula(s) fixada(s) manualmente (📌)
                         </strong>
                         <div style={{ fontSize: 12, color: "#475569", marginTop: 3, lineHeight: 1.4 }}>
-                          Permite ao algoritmo permutar também os horários que haviam sido travados manualmente caso estejam bloqueando um par obrigatório.
+                          Permite ao algoritmo recalcular o turno do zero (sem sobrescrever no banco até que você clique em Salvar Rascunho).
                         </div>
                       </div>
                     </label>
@@ -3018,35 +3336,55 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
                 )}
               </div>
 
-              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                 <button
                   type="button"
                   onClick={() => setShowModalDiagnosticoUrania(false)}
                   style={{
-                    padding: "10px 16px",
+                    padding: "10px 14px",
                     borderRadius: 9,
                     border: "1px solid #cbd5e1",
                     background: "#fff",
                     color: "#475569",
                     fontWeight: 700,
-                    fontSize: 13,
+                    fontSize: 12.5,
                     cursor: "pointer",
                   }}
                 >
-                  ✅ Manter Este Horário Assim Mesmo
+                  👁️ Ver na Tela
+                </button>
+                <button
+                  type="button"
+                  disabled={salvando || aplicandoSugestoesUrania}
+                  onClick={async () => {
+                    await salvarRascunho();
+                    setShowModalDiagnosticoUrania(false);
+                  }}
+                  style={{
+                    padding: "10px 16px",
+                    borderRadius: 9,
+                    border: "1.5px solid #0284c7",
+                    background: "#e0f2fe",
+                    color: "#0369a1",
+                    fontWeight: 800,
+                    fontSize: 12.5,
+                    cursor: salvando ? "wait" : "pointer",
+                  }}
+                >
+                  {salvando ? "⏳ Salvando…" : "💾 Salvar Rascunho Agora"}
                 </button>
                 <button
                   type="button"
                   disabled={aplicandoSugestoesUrania}
                   onClick={aplicarSugestoesERegerar}
                   style={{
-                    padding: "10px 20px",
+                    padding: "10px 18px",
                     borderRadius: 9,
                     border: "none",
                     background: "linear-gradient(135deg, #4f46e5, #7c3aed)",
                     color: "#fff",
                     fontWeight: 800,
-                    fontSize: 13.5,
+                    fontSize: 13,
                     cursor: aplicandoSugestoesUrania ? "wait" : "pointer",
                     boxShadow: "0 4px 14px rgba(79, 70, 229, 0.35)",
                   }}

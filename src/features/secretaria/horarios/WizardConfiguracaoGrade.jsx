@@ -27,11 +27,11 @@ const S = {
     minHeight: "100vh"
   },
   card: {
-    width: "100%", maxWidth: 680,
+    width: "100%", maxWidth: 780,
     background: "rgba(255,255,255,0.05)",
     backdropFilter: "blur(20px)",
     border: "1px solid rgba(255,255,255,0.12)",
-    borderRadius: 20, padding: "32px",
+    borderRadius: 20, padding: "28px 32px",
     boxShadow: "0 15px 40px rgba(0,0,0,0.5)",
     color: "#f1f5f9",
   },
@@ -174,16 +174,67 @@ export default function WizardConfiguracaoGrade({ onConcluir, configInicial }) {
       initBloquearRecreio,
       rg.pares_duplas_governanca
     ),
-    disciplinas_excludentes: rg.disciplinas_excludentes || []
+    disciplinas_excludentes: rg.disciplinas_excludentes || [],
+    blocos_simultaneos: Array.isArray(rg.blocos_simultaneos) ? rg.blocos_simultaneos : [],
+    recursos_fisicos: Array.isArray(rg.recursos_fisicos) ? rg.recursos_fisicos : [],
+    interturno_regras: {
+      ativo: rg.interturno_regras?.ativo !== false,
+      interjornada_min_horas:
+        rg.interturno_regras?.interjornada_min_horas !== undefined
+          ? Number(rg.interturno_regras.interjornada_min_horas)
+          : 11,
+      interjornada_modo: rg.interturno_regras?.interjornada_modo === "soft" ? "soft" : "hard",
+      transicao_turno_min_minutos:
+        rg.interturno_regras?.transicao_turno_min_minutos !== undefined
+          ? Number(rg.interturno_regras.transicao_turno_min_minutos)
+          : 30,
+      transicao_turno_modo: rg.interturno_regras?.transicao_turno_modo === "hard" ? "hard" : "soft",
+      max_aulas_dia_cpf:
+        rg.interturno_regras?.max_aulas_dia_cpf !== undefined
+          ? Number(rg.interturno_regras.max_aulas_dia_cpf)
+          : 12,
+      max_aulas_dia_modo: rg.interturno_regras?.max_aulas_dia_modo === "soft" ? "soft" : "hard",
+    },
   });
 
   const [selDisc1, setSelDisc1] = useState("");
   const [selDisc2, setSelDisc2] = useState("");
+  const [turmasDisponiveis, setTurmasDisponiveis] = useState([]);
+  const [agrupamentosAtivosCount, setAgrupamentosAtivosCount] = useState(0);
+  const [feedbackEtapa3, setFeedbackEtapa3] = useState("");
+
+  // Estado do criador de Bloco Simultâneo (Passo 7)
+  const [novoBlocoNome, setNovoBlocoNome] = useState("");
+  const [novoBlocoTurno, setNovoBlocoTurno] = useState(initTurnos[0] || "matutino");
+  const [novoBlocoTurmaIds, setNovoBlocoTurmaIds] = useState([]);
+  const [novoBlocoDiscIds, setNovoBlocoDiscIds] = useState([]);
+  const [novoBlocoMesmoProf, setNovoBlocoMesmoProf] = useState(true);
+
+  // Estado do criador de Sala / Recurso Físico (Passo 8)
+  const [novaSalaIcone, setNovaSalaIcone] = useState("🏛️");
+  const [novaSalaNome, setNovaSalaNome] = useState("");
+  const [novaSalaCap, setNovaSalaCap] = useState(1);
+  const [novaSalaModo, setNovaSalaModo] = useState("hard");
+  const [novaSalaDiscIds, setNovaSalaDiscIds] = useState([]);
 
   useEffect(() => {
+    const hoje = new Date();
+    const anoRef = hoje.getMonth() === 0 ? hoje.getFullYear() - 1 : hoje.getFullYear();
+
     api.get("/api/disciplinas").then(res => {
       setDisciplinasDisponiveis(Array.isArray(res.data) ? res.data : (res.data?.disciplinas || []));
     }).catch(err => console.error("Erro ao carregar disciplinas:", err));
+
+    api.get("/api/turmas", { params: { ano: anoRef } }).then(res => {
+      const lista = Array.isArray(res.data) ? res.data : (res.data?.turmas || []);
+      setTurmasDisponiveis(lista);
+    }).catch(() => {});
+
+    api.get("/api/agrupamentos").then(res => {
+      const ags = Array.isArray(res.data) ? res.data : (res.data?.agrupamentos || []);
+      const validos = ags.filter(a => a && a.ativo !== false && Array.isArray(a.turmas_ids || a.turmas) && (a.turmas_ids || a.turmas).length >= 2);
+      setAgrupamentosAtivosCount(validos.length);
+    }).catch(() => {});
   }, []);
 
   const maxPeriodosAtivos = Math.max(4, ...turnos.map(t => Number(periodos[t]) || 6));
@@ -313,15 +364,229 @@ export default function WizardConfiguracaoGrade({ onConcluir, configInicial }) {
 
   const getDiscNome = (idStr) => {
     const idNum = parseInt(idStr, 10);
-    const d = disciplinasDisponiveis.find(x => x.id === idNum || String(x.id) === idStr);
+    const d = disciplinasDisponiveis.find(x => x.id === idNum || String(x.id) === String(idStr));
     return d ? (d.nome || d.descricao || String(idStr)) : String(idStr);
+  };
+
+  const getTurmaNome = (idVal) => {
+    const idNum = Number(idVal);
+    const t = turmasDisponiveis.find(x => Number(x.id ?? x.turma_id) === idNum);
+    return t ? String(t.nome || t.turma || t.sigla || `Turma ${idNum}`) : `Turma ${idVal}`;
+  };
+
+  const normAscii = (str) =>
+    String(str || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toUpperCase();
+
+  // Auto-detector 1-clique de IFAs / Eletivas / Trilhas por Turno + Série
+  const autoDetectarBlocosIfa = () => {
+    const regexIfa = /(IFA|ELETIV|ITINER|TRILHA|PROJETO DE VIDA|SEGREDO|APROFUND|OFICINA)/i;
+    const discsIfa = disciplinasDisponiveis.filter(d => regexIfa.test(normAscii(d.nome || d.descricao)));
+    if (discsIfa.length === 0) {
+      setFeedbackEtapa3("ℹ️ Nenhuma disciplina com nomenclatura IFA / Eletiva / Trilha encontrada. Você pode criar blocos manualmente abaixo.");
+      setTimeout(() => setFeedbackEtapa3(""), 5000);
+      return;
+    }
+
+    const grupos = new Map();
+    for (const t of turmasDisponiveis) {
+      const tId = Number(t.id ?? t.turma_id);
+      const tNome = String(t.nome || t.turma || "");
+      const tTurno = String(t.turno || "").trim().toLowerCase();
+      if (!tId || !tTurno || !turnos.includes(tTurno)) continue;
+      const matchSerie = normAscii(tNome).match(/\b([1236789])\s*(?:O|º|ª)?\s*(ANO|SERIE)\b/) || normAscii(tNome).match(/\b([123])\b/);
+      const serieKey = matchSerie ? matchSerie[1] : "GERAL";
+      // Apenas Ensino Médio (1º, 2º, 3º) por padrão para IFA, exceto se só houver outras séries
+      if (!["1", "2", "3"].includes(serieKey)) continue;
+      const gKey = `${tTurno}|${serieKey}`;
+      if (!grupos.has(gKey)) grupos.set(gKey, { turno: tTurno, serie: serieKey, turmaIds: [] });
+      grupos.get(gKey).turmaIds.push(tId);
+    }
+
+    const novosBlocos = [];
+    const discIdsIfa = discsIfa.map(d => Number(d.id)).filter(Boolean);
+    for (const [, g] of grupos.entries()) {
+      if (g.turmaIds.length < 2) continue;
+      const bId = `auto_ifa_${g.turno}_${g.serie}serie`;
+      novosBlocos.push({
+        id: bId,
+        nome: `IFA / Eletivas — ${g.serie}ª Série (${g.turno})`,
+        turno: g.turno,
+        turma_ids: g.turmaIds,
+        disciplina_ids: discIdsIfa,
+        permitir_mesmo_prof_simultaneo: true,
+        modo: "hard",
+        ativo: true,
+      });
+    }
+
+    if (novosBlocos.length === 0) {
+      setFeedbackEtapa3("ℹ️ Não há 2+ turmas da mesma série de Ensino Médio nos turnos ativos para agrupar automaticamente.");
+      setTimeout(() => setFeedbackEtapa3(""), 5000);
+      return;
+    }
+
+    setRegrasGerais(prev => {
+      const existentes = Array.isArray(prev.blocos_simultaneos) ? prev.blocos_simultaneos : [];
+      const idsExistentes = new Set(existentes.map(b => b.id));
+      const mesclados = [...existentes, ...novosBlocos.filter(b => !idsExistentes.has(b.id))];
+      return { ...prev, blocos_simultaneos: mesclados };
+    });
+    setFeedbackEtapa3(`✨ ${novosBlocos.length} bloco(s) simultâneo(s) de IFA detectado(s) com ${discIdsIfa.length} disciplina(s)!`);
+    setTimeout(() => setFeedbackEtapa3(""), 5000);
+  };
+
+  const adicionarBlocoSimultaneoManual = () => {
+    if (novoBlocoTurmaIds.length < 2 || novoBlocoDiscIds.length < 1) return;
+    const nomeLimpo =
+      String(novoBlocoNome || "").trim() ||
+      `Super-Aula (${novoBlocoTurmaIds.length} turmas • ${novoBlocoTurno})`;
+    const novo = {
+      id: `bloco_${Date.now()}`,
+      nome: nomeLimpo,
+      turno: novoBlocoTurno,
+      turma_ids: [...novoBlocoTurmaIds],
+      disciplina_ids: [...novoBlocoDiscIds],
+      permitir_mesmo_prof_simultaneo: Boolean(novoBlocoMesmoProf),
+      modo: "hard",
+      ativo: true,
+    };
+    setRegrasGerais(prev => ({
+      ...prev,
+      blocos_simultaneos: [...(prev.blocos_simultaneos || []), novo],
+    }));
+    setNovoBlocoNome("");
+    setNovoBlocoTurmaIds([]);
+    setNovoBlocoDiscIds([]);
+  };
+
+  const removerBlocoSimultaneo = (id) => {
+    setRegrasGerais(prev => ({
+      ...prev,
+      blocos_simultaneos: (prev.blocos_simultaneos || []).filter(b => b.id !== id),
+    }));
+  };
+
+  const toggleMesmoProfBloco = (id) => {
+    setRegrasGerais(prev => ({
+      ...prev,
+      blocos_simultaneos: (prev.blocos_simultaneos || []).map(b =>
+        b.id === id ? { ...b, permitir_mesmo_prof_simultaneo: !b.permitir_mesmo_prof_simultaneo } : b
+      ),
+    }));
+  };
+
+  const adicionarPresetRecursoFisico = (tipo) => {
+    const presets = {
+      quadra: {
+        id: "preset_quadra",
+        icone: "🏀",
+        nome: "Quadra Poliesportiva",
+        regex: /(EDUCACAO FISICA|ED\.?\s*FISICA|ESPORTE)/i,
+      },
+      lab_ciencias: {
+        id: "preset_lab_ciencias",
+        icone: "🔬",
+        nome: "Lab. Ciências / Química / Física / Biologia",
+        regex: /(CIENCIA|QUIMICA|FISICA|BIOLOGIA|LABORATORIO)/i,
+      },
+      lab_info: {
+        id: "preset_lab_info",
+        icone: "💻",
+        nome: "Laboratório de Informática",
+        regex: /(INFORMATICA|COMPUTACAO|ROBOTICA|TECNOLOGIA)/i,
+      },
+      sala_artes: {
+        id: "preset_sala_artes",
+        icone: "🎭",
+        nome: "Sala de Artes / Auditório",
+        regex: /(ARTE|MUSICA|TEATRO|DANCA)/i,
+      },
+    };
+    const cfg = presets[tipo];
+    if (!cfg) return;
+
+    const matchedIds = disciplinasDisponiveis
+      .filter(d => {
+        const nm = normAscii(d.nome || d.descricao);
+        if (tipo === "lab_ciencias" && /EDUCACAO FISICA|ED\.?\s*FISICA/.test(nm)) return false;
+        return cfg.regex.test(nm);
+      })
+      .map(d => Number(d.id))
+      .filter(Boolean);
+
+    if (matchedIds.length === 0) {
+      setNovaSalaIcone(cfg.icone);
+      setNovaSalaNome(cfg.nome);
+      setFeedbackEtapa3(`ℹ️ Selecione abaixo qual disciplina utiliza "${cfg.nome}" e clique em + Adicionar.`);
+      setTimeout(() => setFeedbackEtapa3(""), 4500);
+      return;
+    }
+
+    setRegrasGerais(prev => {
+      const lista = Array.isArray(prev.recursos_fisicos) ? prev.recursos_fisicos : [];
+      if (lista.some(r => r.id === cfg.id || normAscii(r.nome) === normAscii(cfg.nome))) {
+        return prev;
+      }
+      return {
+        ...prev,
+        recursos_fisicos: [
+          ...lista,
+          {
+            id: `${cfg.id}_${Date.now()}`,
+            icone: cfg.icone,
+            nome: cfg.nome,
+            capacidade: 1,
+            disciplina_ids: matchedIds,
+            modo: "hard",
+            ativo: true,
+          },
+        ],
+      };
+    });
+  };
+
+  const adicionarSalaManual = () => {
+    if (!String(novaSalaNome || "").trim() || novaSalaDiscIds.length === 0) return;
+    const novo = {
+      id: `rec_${Date.now()}`,
+      icone: novaSalaIcone || "🏛️",
+      nome: String(novaSalaNome).trim(),
+      capacidade: Math.max(1, Number(novaSalaCap) || 1),
+      disciplina_ids: [...novaSalaDiscIds],
+      modo: novaSalaModo === "soft" ? "soft" : "hard",
+      ativo: true,
+    };
+    setRegrasGerais(prev => ({
+      ...prev,
+      recursos_fisicos: [...(prev.recursos_fisicos || []), novo],
+    }));
+    setNovaSalaNome("");
+    setNovaSalaDiscIds([]);
+    setNovaSalaCap(1);
+  };
+
+  const atualizarRecursoFisico = (id, patch) => {
+    setRegrasGerais(prev => ({
+      ...prev,
+      recursos_fisicos: (prev.recursos_fisicos || []).map(r => (r.id === id ? { ...r, ...patch } : r)),
+    }));
+  };
+
+  const removerRecursoFisico = (id) => {
+    setRegrasGerais(prev => ({
+      ...prev,
+      recursos_fisicos: (prev.recursos_fisicos || []).filter(r => r.id !== id),
+    }));
   };
 
   const podeAvancar =
     (passo === 1 && turnos.length > 0) ||
     (passo === 2 && dias.length > 0)   ||
     (passo === 3 && turnos.every(t => (periodos[t] || 0) > 0)) ||
-    passo === 4 || passo === 5 || passo === 6 || passo === 7;
+    passo >= 4;
 
   async function confirmar() {
     setSalvando(true); setErro("");
@@ -343,47 +608,61 @@ export default function WizardConfiguracaoGrade({ onConcluir, configInicial }) {
     }
   }
 
-  const passoLabels = ["Turnos", "Dias", "Períodos", "Regras", "Recreio", "Conflitos", "Revisão"];
+  const passoLabels = [
+    "Turnos",
+    "Dias",
+    "Períodos",
+    "Regras",
+    "Recreio",
+    "Conflitos",
+    "Super-Aulas",
+    "CPF & Salas",
+    "Revisão",
+  ];
 
   return (
     <div style={S.outer}>
       <div style={S.card}>
-        <div style={{ textAlign: "center", marginBottom: 24 }}>
+        <div style={{ textAlign: "center", marginBottom: 22 }}>
           <div style={{ fontSize: 32, marginBottom: 6 }}>⚙️</div>
           <h1 style={{ fontSize: 22, fontWeight: 800, color: "#fff", margin: "0 0 4px" }}>
             Configuração da Grade Horária
           </h1>
           <p style={{ color: "#94a3b8", fontSize: 13, margin: 0 }}>
-            Configure regras globais e a inteligência do algoritmo.
+            Configure regras globais, Super-Aulas (IFA), Interjornada por CPF e Salas Especiais.
           </p>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 28 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 26, flexWrap: "wrap", rowGap: 8 }}>
           {passoLabels.map((label, idx) => {
             const num = idx + 1;
             const ativo = num === passo;
             const concluido = num < passo;
             return (
               <React.Fragment key={num}>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                <div
+                  onClick={() => turnos.length > 0 && dias.length > 0 && setPasso(num)}
+                  title={`Ir direto para ${num}. ${label}`}
+                  style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, cursor: "pointer" }}
+                >
                   <div style={{
-                    width: 28, height: 28, borderRadius: "50%",
+                    width: 26, height: 26, borderRadius: "50%",
                     background: concluido ? "#10b981" : ativo ? "#3b82f6" : "rgba(255,255,255,0.08)",
                     border: ativo ? "2px solid #60a5fa" : "2px solid transparent",
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 12, fontWeight: 800, color: "#fff",
+                    fontSize: 11, fontWeight: 800, color: "#fff",
                     boxShadow: ativo ? "0 0 12px rgba(59,130,246,0.5)" : "none",
                     transition: "all 0.3s",
                   }}>
                     {concluido ? "✓" : num}
                   </div>
-                  <span style={{ fontSize: 9, color: ativo ? "#93c5fd" : "#475569", fontWeight: ativo ? 700 : 400 }}>
+                  <span style={{ fontSize: 8.5, color: ativo ? "#93c5fd" : "#64748b", fontWeight: ativo ? 700 : 500 }}>
                     {label}
                   </span>
                 </div>
                 {idx < passoLabels.length - 1 && (
                   <div style={{
-                    height: 2, width: 14, margin: "0 2px", marginBottom: 18,
+                    height: 2, width: 10, margin: "0 2px", marginBottom: 16,
                     background: concluido ? "#10b981" : "rgba(255,255,255,0.08)",
                     transition: "background 0.3s",
                   }} />
@@ -848,8 +1127,630 @@ export default function WizardConfiguracaoGrade({ onConcluir, configInicial }) {
             </div>
           )}
 
-          {/* PASSO 7: Revisão */}
+          {/* PASSO 7: Super-Aulas / IFA Simultâneo & Turmas Unidas */}
           {passo === 7 && (
+            <div>
+              <h2 style={{ textAlign: "center", fontSize: 17, fontWeight: 700, color: "#e2e8f0", marginBottom: 4 }}>
+                🔗 Super-Aulas Simultâneas (IFA / Eletivas / Turmas Unidas)
+              </h2>
+              <p style={{ textAlign: "center", color: "#94a3b8", fontSize: 12, marginBottom: 14 }}>
+                Sincroniza 2 ou mais turmas exatamente no mesmo dia e horário (ex.: rodízio de Itinerários Formativos ou turmas unidas com o mesmo professor).
+              </p>
+
+              {agrupamentosAtivosCount > 0 && (
+                <div style={{
+                  background: "rgba(16, 185, 129, 0.12)",
+                  border: "1px solid rgba(16, 185, 129, 0.35)",
+                  borderRadius: 10,
+                  padding: "10px 14px",
+                  marginBottom: 12,
+                  fontSize: 12,
+                  color: "#a7f3d0",
+                }}>
+                  ✅ <strong>Integração Automática Ativa:</strong> {agrupamentosAtivosCount} agrupamento(s) cadastrado(s) em <em>Modulação &gt; Agrupamentos</em> já são sincronizados automaticamente pelo Solver 2.0.
+                </div>
+              )}
+
+              {feedbackEtapa3 && (
+                <div style={{
+                  background: "rgba(59, 130, 246, 0.16)",
+                  border: "1px solid rgba(96, 165, 250, 0.45)",
+                  borderRadius: 10,
+                  padding: "9px 14px",
+                  marginBottom: 12,
+                  fontSize: 12,
+                  color: "#bfdbfe",
+                }}>
+                  {feedbackEtapa3}
+                </div>
+              )}
+
+              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
+                <button
+                  type="button"
+                  onClick={autoDetectarBlocosIfa}
+                  style={{
+                    padding: "7px 14px",
+                    borderRadius: 8,
+                    border: "1px solid #60a5fa",
+                    background: "rgba(59, 130, 246, 0.2)",
+                    color: "#bfdbfe",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: "pointer",
+                  }}
+                >
+                  ✨ Auto-Detectar IFAs / Eletivas por Série
+                </button>
+              </div>
+
+              {/* Criador de Bloco Simultâneo */}
+              <div style={{
+                background: "rgba(255,255,255,0.05)",
+                border: "1px solid rgba(255,255,255,0.12)",
+                borderRadius: 12,
+                padding: 14,
+                marginBottom: 14,
+              }}>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+                  <input
+                    value={novoBlocoNome}
+                    onChange={e => setNovoBlocoNome(e.target.value)}
+                    placeholder="Nome do bloco (ex.: IFA 2ª Série ou Ed. Física Unida)"
+                    style={{
+                      flex: 2,
+                      minWidth: 210,
+                      background: "#0f172a",
+                      border: "1px solid rgba(255,255,255,0.2)",
+                      borderRadius: 6,
+                      padding: "7px 10px",
+                      color: "#fff",
+                      fontSize: 12,
+                    }}
+                  />
+                  <select
+                    value={novoBlocoTurno}
+                    onChange={e => {
+                      setNovoBlocoTurno(e.target.value);
+                      setNovoBlocoTurmaIds([]);
+                    }}
+                    style={{
+                      flex: 1,
+                      minWidth: 120,
+                      background: "#0f172a",
+                      border: "1px solid rgba(255,255,255,0.2)",
+                      borderRadius: 6,
+                      padding: "7px 10px",
+                      color: "#fff",
+                      fontSize: 12,
+                    }}
+                  >
+                    {TURNOS_CONFIG.filter(t => turnos.includes(t.id)).map(t => (
+                      <option key={t.id} value={t.id}>{t.emoji} {t.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 700, marginBottom: 6 }}>
+                  1) Selecione 2 ou mais Turmas ({novoBlocoTurno}):
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, maxHeight: 92, overflowY: "auto", marginBottom: 10 }}>
+                  {turmasDisponiveis
+                    .filter(t => String(t.turno || "").trim().toLowerCase() === novoBlocoTurno)
+                    .map(t => {
+                      const tId = Number(t.id ?? t.turma_id);
+                      const sel = novoBlocoTurmaIds.includes(tId);
+                      return (
+                        <button
+                          key={tId}
+                          type="button"
+                          onClick={() =>
+                            setNovoBlocoTurmaIds(prev =>
+                              prev.includes(tId) ? prev.filter(x => x !== tId) : [...prev, tId]
+                            )
+                          }
+                          style={{
+                            padding: "4px 10px",
+                            borderRadius: 999,
+                            border: sel ? "1px solid #3b82f6" : "1px solid rgba(255,255,255,0.15)",
+                            background: sel ? "rgba(59,130,246,0.3)" : "rgba(15,23,42,0.6)",
+                            color: sel ? "#fff" : "#cbd5e1",
+                            fontSize: 11,
+                            fontWeight: sel ? 700 : 500,
+                            cursor: "pointer",
+                          }}
+                        >
+                          {sel ? "✓ " : ""}{t.nome || t.turma}
+                        </button>
+                      );
+                    })}
+                </div>
+
+                <div style={{ fontSize: 11, color: "#94a3b8", fontWeight: 700, marginBottom: 6 }}>
+                  2) Selecione a(s) Disciplina(s) que caminham juntas neste bloco:
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, maxHeight: 96, overflowY: "auto", marginBottom: 10 }}>
+                  {disciplinasDisponiveis.map(d => {
+                    const dId = Number(d.id);
+                    const sel = novoBlocoDiscIds.includes(dId);
+                    return (
+                      <button
+                        key={dId}
+                        type="button"
+                        onClick={() =>
+                          setNovoBlocoDiscIds(prev =>
+                            prev.includes(dId) ? prev.filter(x => x !== dId) : [...prev, dId]
+                          )
+                        }
+                        style={{
+                          padding: "4px 10px",
+                          borderRadius: 999,
+                          border: sel ? "1px solid #10b981" : "1px solid rgba(255,255,255,0.15)",
+                          background: sel ? "rgba(16,185,129,0.28)" : "rgba(15,23,42,0.6)",
+                          color: sel ? "#ecfdf5" : "#cbd5e1",
+                          fontSize: 11,
+                          fontWeight: sel ? 700 : 500,
+                          cursor: "pointer",
+                        }}
+                      >
+                        {sel ? "✓ " : ""}{d.nome || d.descricao}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 11.5, color: "#cbd5e1", cursor: "pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={novoBlocoMesmoProf}
+                      onChange={e => setNovoBlocoMesmoProf(e.target.checked)}
+                      style={{ accentColor: "#10b981" }}
+                    />
+                    🤝 Permitir <strong>Turmas Unidas</strong> (mesmo professor nas turmas simultâneas sem acusar choque)
+                  </label>
+                  <button
+                    type="button"
+                    disabled={novoBlocoTurmaIds.length < 2 || novoBlocoDiscIds.length < 1}
+                    onClick={adicionarBlocoSimultaneoManual}
+                    style={{
+                      padding: "7px 14px",
+                      borderRadius: 8,
+                      border: "none",
+                      background:
+                        novoBlocoTurmaIds.length >= 2 && novoBlocoDiscIds.length >= 1
+                          ? "#10b981"
+                          : "rgba(255,255,255,0.1)",
+                      color: "#fff",
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor:
+                        novoBlocoTurmaIds.length >= 2 && novoBlocoDiscIds.length >= 1
+                          ? "pointer"
+                          : "not-allowed",
+                    }}
+                  >
+                    + Adicionar Bloco
+                  </button>
+                </div>
+              </div>
+
+              {/* Lista de blocos configurados */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 175, overflowY: "auto" }}>
+                {(regrasGerais.blocos_simultaneos || []).map(b => (
+                  <div
+                    key={b.id}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: 10,
+                      background: "rgba(255,255,255,0.04)",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      padding: "9px 12px",
+                      borderRadius: 8,
+                    }}
+                  >
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: 12.5, fontWeight: 700, color: "#f8fafc" }}>
+                        🔗 {b.nome}{" "}
+                        <span style={{ fontSize: 10.5, color: "#93c5fd", fontWeight: 600 }}>
+                          ({b.turno || "todos"})
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>
+                        Turmas: {(b.turma_ids || []).map(getTurmaNome).join(", ")} • Disc.:{" "}
+                        {(b.disciplina_ids || []).map(getDiscNome).join(", ")}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => toggleMesmoProfBloco(b.id)}
+                      title="Alternar permissão de Turmas Unidas (mesmo professor simultâneo)"
+                      style={{
+                        padding: "4px 8px",
+                        borderRadius: 6,
+                        border: "1px solid rgba(255,255,255,0.18)",
+                        background: b.permitir_mesmo_prof_simultaneo ? "rgba(16,185,129,0.22)" : "rgba(255,255,255,0.05)",
+                        color: b.permitir_mesmo_prof_simultaneo ? "#6ee7b7" : "#94a3b8",
+                        fontSize: 10.5,
+                        fontWeight: 700,
+                        cursor: "pointer",
+                      }}
+                    >
+                      {b.permitir_mesmo_prof_simultaneo ? "🤝 Unidas OK" : "Profs Distintos"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removerBlocoSimultaneo(b.id)}
+                      style={{ background: "transparent", border: "none", color: "#ef4444", cursor: "pointer", fontSize: 17, fontWeight: 700 }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                {(regrasGerais.blocos_simultaneos || []).length === 0 && (
+                  <div style={{ textAlign: "center", fontSize: 12, color: "#64748b", padding: "6px 0" }}>
+                    Nenhum bloco extra manual cadastrado (opcional).
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* PASSO 8: Controle Inter-Turnos por CPF & Capacidade Física de Salas/Laboratórios */}
+          {passo === 8 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <h2 style={{ textAlign: "center", fontSize: 17, fontWeight: 700, color: "#e2e8f0", margin: 0 }}>
+                🔄 Interjornada por CPF & 🏛️ Salas / Laboratórios
+              </h2>
+
+              {feedbackEtapa3 && (
+                <div style={{
+                  background: "rgba(59, 130, 246, 0.16)",
+                  border: "1px solid rgba(96, 165, 250, 0.45)",
+                  borderRadius: 10,
+                  padding: "8px 12px",
+                  fontSize: 11.5,
+                  color: "#bfdbfe",
+                }}>
+                  {feedbackEtapa3}
+                </div>
+              )}
+
+              {/* Card A: Controle Inter-Turnos por CPF */}
+              <div style={{
+                background: "rgba(255,255,255,0.05)",
+                border: "1px solid rgba(255,255,255,0.12)",
+                borderRadius: 12,
+                padding: "12px 14px",
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                  <div>
+                    <div style={{ fontSize: 13.5, fontWeight: 700, color: "#f8fafc" }}>
+                      🔄 Cruzamento Inter-Turnos & Interjornada (CPF)
+                    </div>
+                    <div style={{ fontSize: 11, color: "#94a3b8" }}>
+                      Identifica o mesmo professor em Matutino/Vespertino/Noturno pelo CPF e protege descanso legal.
+                    </div>
+                  </div>
+                  <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, color: "#6ee7b7", cursor: "pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={regrasGerais.interturno_regras?.ativo !== false}
+                      onChange={e =>
+                        setRegrasGerais(prev => ({
+                          ...prev,
+                          interturno_regras: { ...(prev.interturno_regras || {}), ativo: e.target.checked },
+                        }))
+                      }
+                      style={{ accentColor: "#10b981", width: 16, height: 16 }}
+                    />
+                    Ativo
+                  </label>
+                </div>
+
+                {regrasGerais.interturno_regras?.ativo !== false && (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 10 }}>
+                    <div>
+                      <div style={{ fontSize: 11, color: "#cbd5e1", fontWeight: 600, marginBottom: 4 }}>
+                        🌙 Descanso Noite → Manhã (Interjornada)
+                      </div>
+                      <div style={{ display: "flex", gap: 4 }}>
+                        <select
+                          value={regrasGerais.interturno_regras?.interjornada_min_horas ?? 11}
+                          onChange={e =>
+                            setRegrasGerais(prev => ({
+                              ...prev,
+                              interturno_regras: {
+                                ...(prev.interturno_regras || {}),
+                                interjornada_min_horas: Number(e.target.value),
+                              },
+                            }))
+                          }
+                          style={{ flex: 1, background: "#0f172a", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "6px", color: "#fff", fontSize: 11.5 }}
+                        >
+                          <option value={0}>Desativado (0h)</option>
+                          <option value={9}>Mínimo 9h</option>
+                          <option value={10}>Mínimo 10h</option>
+                          <option value={11}>11h (CLT / SEEDF)</option>
+                          <option value={12}>Mínimo 12h</option>
+                        </select>
+                        <select
+                          value={regrasGerais.interturno_regras?.interjornada_modo || "hard"}
+                          onChange={e =>
+                            setRegrasGerais(prev => ({
+                              ...prev,
+                              interturno_regras: {
+                                ...(prev.interturno_regras || {}),
+                                interjornada_modo: e.target.value,
+                              },
+                            }))
+                          }
+                          style={{ background: "#0f172a", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "6px", color: "#fff", fontSize: 11 }}
+                        >
+                          <option value="hard">🔒 Estrito</option>
+                          <option value="soft">⭐ Evitar</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ fontSize: 11, color: "#cbd5e1", fontWeight: 600, marginBottom: 4 }}>
+                        ⏱️ Transição entre Turnos Adjacentes
+                      </div>
+                      <div style={{ display: "flex", gap: 4 }}>
+                        <select
+                          value={regrasGerais.interturno_regras?.transicao_turno_min_minutos ?? 30}
+                          onChange={e =>
+                            setRegrasGerais(prev => ({
+                              ...prev,
+                              interturno_regras: {
+                                ...(prev.interturno_regras || {}),
+                                transicao_turno_min_minutos: Number(e.target.value),
+                              },
+                            }))
+                          }
+                          style={{ flex: 1, background: "#0f172a", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "6px", color: "#fff", fontSize: 11.5 }}
+                        >
+                          <option value={0}>Sem folga (0 min)</option>
+                          <option value={20}>Mín. 20 min</option>
+                          <option value={30}>Mín. 30 min</option>
+                          <option value={45}>Mín. 45 min</option>
+                          <option value={60}>Mín. 60 min</option>
+                        </select>
+                        <select
+                          value={regrasGerais.interturno_regras?.transicao_turno_modo || "soft"}
+                          onChange={e =>
+                            setRegrasGerais(prev => ({
+                              ...prev,
+                              interturno_regras: {
+                                ...(prev.interturno_regras || {}),
+                                transicao_turno_modo: e.target.value,
+                              },
+                            }))
+                          }
+                          style={{ background: "#0f172a", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "6px", color: "#fff", fontSize: 11 }}
+                        >
+                          <option value="soft">⭐ Evitar</option>
+                          <option value="hard">🔒 Estrito</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <div style={{ fontSize: 11, color: "#cbd5e1", fontWeight: 600, marginBottom: 4 }}>
+                        📊 Teto Diário por CPF (Todos os Turnos)
+                      </div>
+                      <div style={{ display: "flex", gap: 4 }}>
+                        <select
+                          value={regrasGerais.interturno_regras?.max_aulas_dia_cpf ?? 12}
+                          onChange={e =>
+                            setRegrasGerais(prev => ({
+                              ...prev,
+                              interturno_regras: {
+                                ...(prev.interturno_regras || {}),
+                                max_aulas_dia_cpf: Number(e.target.value),
+                              },
+                            }))
+                          }
+                          style={{ flex: 1, background: "#0f172a", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "6px", color: "#fff", fontSize: 11.5 }}
+                        >
+                          <option value={0}>Sem limite</option>
+                          <option value={8}>Máx. 8 aulas/dia</option>
+                          <option value={10}>Máx. 10 aulas/dia</option>
+                          <option value={12}>Máx. 12 aulas/dia</option>
+                          <option value={15}>Máx. 15 aulas/dia</option>
+                        </select>
+                        <select
+                          value={regrasGerais.interturno_regras?.max_aulas_dia_modo || "hard"}
+                          onChange={e =>
+                            setRegrasGerais(prev => ({
+                              ...prev,
+                              interturno_regras: {
+                                ...(prev.interturno_regras || {}),
+                                max_aulas_dia_modo: e.target.value,
+                              },
+                            }))
+                          }
+                          style={{ background: "#0f172a", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "6px", color: "#fff", fontSize: 11 }}
+                        >
+                          <option value="hard">🔒 Estrito</option>
+                          <option value="soft">⭐ Evitar</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Card B: Capacidade Física de Salas / Quadras / Laboratórios */}
+              <div style={{
+                background: "rgba(255,255,255,0.05)",
+                border: "1px solid rgba(255,255,255,0.12)",
+                borderRadius: 12,
+                padding: "12px 14px",
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+                  <div>
+                    <div style={{ fontSize: 13.5, fontWeight: 700, color: "#f8fafc" }}>
+                      🏛️ Limite de Salas Especiais, Quadras & Laboratórios
+                    </div>
+                    <div style={{ fontSize: 11, color: "#94a3b8" }}>
+                      Impede que mais turmas do que a capacidade física ocupem o mesmo espaço no mesmo horário.
+                    </div>
+                  </div>
+                </div>
+
+                {/* Botões rápidos de Presets */}
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
+                  <button type="button" onClick={() => adicionarPresetRecursoFisico("quadra")} style={{ padding: "5px 10px", borderRadius: 7, border: "1px solid rgba(245,158,11,0.45)", background: "rgba(245,158,11,0.16)", color: "#fde68a", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                    + 🏀 Quadra (Ed. Física)
+                  </button>
+                  <button type="button" onClick={() => adicionarPresetRecursoFisico("lab_ciencias")} style={{ padding: "5px 10px", borderRadius: 7, border: "1px solid rgba(16,185,129,0.45)", background: "rgba(16,185,129,0.16)", color: "#a7f3d0", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                    + 🔬 Lab. Ciências/Exatas
+                  </button>
+                  <button type="button" onClick={() => adicionarPresetRecursoFisico("lab_info")} style={{ padding: "5px 10px", borderRadius: 7, border: "1px solid rgba(59,130,246,0.45)", background: "rgba(59,130,246,0.16)", color: "#bfdbfe", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                    + 💻 Lab. Informática
+                  </button>
+                  <button type="button" onClick={() => adicionarPresetRecursoFisico("sala_artes")} style={{ padding: "5px 10px", borderRadius: 7, border: "1px solid rgba(168,85,247,0.45)", background: "rgba(168,85,247,0.16)", color: "#e9d5ff", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+                    + 🎭 Sala de Artes
+                  </button>
+                </div>
+
+                {/* Criador customizado compacto */}
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+                  <input
+                    value={novaSalaNome}
+                    onChange={e => setNovaSalaNome(e.target.value)}
+                    placeholder="Outro espaço (ex.: Piscina, Auditório)..."
+                    style={{ flex: 2, minWidth: 180, background: "#0f172a", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "6px 10px", color: "#fff", fontSize: 11.5 }}
+                  />
+                  <select
+                    value={novaSalaCap}
+                    onChange={e => setNovaSalaCap(Number(e.target.value))}
+                    style={{ background: "#0f172a", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "6px 8px", color: "#fff", fontSize: 11.5 }}
+                  >
+                    {[1, 2, 3, 4, 5].map(n => <option key={n} value={n}>Cap: {n} turma(s)</option>)}
+                  </select>
+                  <select
+                    value={novaSalaModo}
+                    onChange={e => setNovaSalaModo(e.target.value)}
+                    style={{ background: "#0f172a", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "6px 8px", color: "#fff", fontSize: 11.5 }}
+                  >
+                    <option value="hard">🔒 Estrito</option>
+                    <option value="soft">⭐ Preferencial</option>
+                  </select>
+                  <button
+                    type="button"
+                    disabled={!String(novaSalaNome || "").trim() || novaSalaDiscIds.length === 0}
+                    onClick={adicionarSalaManual}
+                    style={{
+                      padding: "6px 12px",
+                      borderRadius: 6,
+                      border: "none",
+                      background: String(novaSalaNome || "").trim() && novaSalaDiscIds.length > 0 ? "#3b82f6" : "rgba(255,255,255,0.1)",
+                      color: "#fff",
+                      fontSize: 11.5,
+                      fontWeight: 700,
+                      cursor: String(novaSalaNome || "").trim() && novaSalaDiscIds.length > 0 ? "pointer" : "not-allowed",
+                    }}
+                  >
+                    + Adicionar
+                  </button>
+                </div>
+
+                {String(novaSalaNome || "").trim() && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 5, maxHeight: 74, overflowY: "auto", marginBottom: 10 }}>
+                    {disciplinasDisponiveis.map(d => {
+                      const dId = Number(d.id);
+                      const sel = novaSalaDiscIds.includes(dId);
+                      return (
+                        <button
+                          key={dId}
+                          type="button"
+                          onClick={() =>
+                            setNovaSalaDiscIds(prev =>
+                              prev.includes(dId) ? prev.filter(x => x !== dId) : [...prev, dId]
+                            )
+                          }
+                          style={{
+                            padding: "3px 8px",
+                            borderRadius: 999,
+                            border: sel ? "1px solid #3b82f6" : "1px solid rgba(255,255,255,0.14)",
+                            background: sel ? "rgba(59,130,246,0.3)" : "rgba(15,23,42,0.5)",
+                            color: "#fff",
+                            fontSize: 10.5,
+                            cursor: "pointer",
+                          }}
+                        >
+                          {sel ? "✓ " : ""}{d.nome || d.descricao}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Lista de Salas configuradas */}
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 145, overflowY: "auto" }}>
+                  {(regrasGerais.recursos_fisicos || []).map(r => (
+                    <div
+                      key={r.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 8,
+                        background: "rgba(15,23,42,0.55)",
+                        border: "1px solid rgba(255,255,255,0.1)",
+                        padding: "7px 10px",
+                        borderRadius: 8,
+                      }}
+                    >
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: "#f8fafc" }}>
+                          {r.icone || "🏛️"} {r.nome}
+                        </div>
+                        <div style={{ fontSize: 10.5, color: "#94a3b8", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {(r.disciplina_ids || []).map(getDiscNome).join(", ")}
+                        </div>
+                      </div>
+                      <select
+                        value={r.capacidade || 1}
+                        onChange={e => atualizarRecursoFisico(r.id, { capacidade: Number(e.target.value) })}
+                        style={{ background: "#0f172a", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 6px", color: "#fff", fontSize: 11 }}
+                      >
+                        {[1, 2, 3, 4, 5].map(n => <option key={n} value={n}>{n} turma(s)/horário</option>)}
+                      </select>
+                      <select
+                        value={r.modo || "hard"}
+                        onChange={e => atualizarRecursoFisico(r.id, { modo: e.target.value })}
+                        style={{ background: "#0f172a", border: "1px solid rgba(255,255,255,0.2)", borderRadius: 6, padding: "4px 6px", color: "#fff", fontSize: 11 }}
+                      >
+                        <option value="hard">🔒 Estrito</option>
+                        <option value="soft">⭐ Evitar</option>
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => removerRecursoFisico(r.id)}
+                        style={{ background: "transparent", border: "none", color: "#ef4444", cursor: "pointer", fontSize: 16, fontWeight: 700 }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  {(regrasGerais.recursos_fisicos || []).length === 0 && (
+                    <div style={{ textAlign: "center", fontSize: 11.5, color: "#64748b" }}>
+                      Nenhum limite de sala/quadra ativo (sem restrição de espaço físico).
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* PASSO 9: Revisão */}
+          {passo === 9 && (
             <div>
               <h2 style={{ textAlign: "center", fontSize: 17, fontWeight: 700, color: "#e2e8f0", marginBottom: 20 }}>
                 Tudo pronto! Revise antes de confirmar.
@@ -866,6 +1767,24 @@ export default function WizardConfiguracaoGrade({ onConcluir, configInicial }) {
                 <Pill color={regrasGerais.max_aulas_mesmo_dia ? "#3b82f6" : "#64748b"}>Max {regrasGerais.max_aulas_mesmo_dia}/dia</Pill>
                 {regrasGerais.bloquear_duplas_no_recreio !== false && <Pill color="#f59e0b">Recreio protegido (sem duplas cortadas)</Pill>}
                 {regrasGerais.disciplinas_excludentes.length > 0 && <Pill color="#ef4444">{regrasGerais.disciplinas_excludentes.length} Conflitos</Pill>}
+              </ResumoCard>
+
+              <ResumoCard icon="🚀" titulo="Super-Aulas, Interjornada CPF & Salas">
+                <Pill color={regrasGerais.interturno_regras?.ativo !== false ? "#10b981" : "#64748b"}>
+                  {regrasGerais.interturno_regras?.ativo !== false
+                    ? `CPF Inter-Turnos (${regrasGerais.interturno_regras?.interjornada_min_horas ?? 11}h descanso)`
+                    : "CPF Inter-Turnos Desativado"}
+                </Pill>
+                {(agrupamentosAtivosCount > 0 || (regrasGerais.blocos_simultaneos || []).length > 0) && (
+                  <Pill color="#3b82f6">
+                    🔗 {(regrasGerais.blocos_simultaneos || []).length + agrupamentosAtivosCount} Bloco(s) Simultâneo(s)
+                  </Pill>
+                )}
+                {(regrasGerais.recursos_fisicos || []).length > 0 && (
+                  <Pill color="#f59e0b">
+                    🏛️ {(regrasGerais.recursos_fisicos || []).length} Espaço(s) c/ Capacidade
+                  </Pill>
+                )}
               </ResumoCard>
 
               {regrasGerais.preferencia_aulas_duplas && (
@@ -903,7 +1822,7 @@ export default function WizardConfiguracaoGrade({ onConcluir, configInicial }) {
           )}
         </div>
 
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 32 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 28 }}>
           <button onClick={() => setPasso(p => p - 1)} disabled={passo === 1} style={{
             padding: "10px 20px", borderRadius: 8,
             border: passo === 1 ? "1px solid rgba(255,255,255,0.05)" : "1px solid rgba(255,255,255,0.2)",
@@ -913,7 +1832,7 @@ export default function WizardConfiguracaoGrade({ onConcluir, configInicial }) {
           }}>← Voltar</button>
 
           <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-            {[1,2,3,4,5,6,7].map(n => (
+            {[1,2,3,4,5,6,7,8,9].map(n => (
               <div key={n} style={{
                 width: n === passo ? 16 : 4, height: 4, borderRadius: 2,
                 background: n <= passo ? "#3b82f6" : "rgba(255,255,255,0.12)", transition: "all 0.3s",
@@ -921,7 +1840,7 @@ export default function WizardConfiguracaoGrade({ onConcluir, configInicial }) {
             ))}
           </div>
 
-          {passo < 7 ? (
+          {passo < 9 ? (
             <button onClick={() => podeAvancar && setPasso(p => p + 1)} disabled={!podeAvancar} style={{
               padding: "10px 24px", borderRadius: 8, background: podeAvancar ? "linear-gradient(135deg, #3b82f6, #2563eb)" : "rgba(255,255,255,0.06)",
               border: "none", color: podeAvancar ? "#fff" : "#64748b", cursor: podeAvancar ? "pointer" : "not-allowed",

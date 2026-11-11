@@ -151,13 +151,18 @@ export default function GradeTurma({
     const profShort = profCompacto(profNome);
     const { bg, text, ring } = corDisciplina(discId);
     const isLocked = Boolean(slot.locked);
+    const isBlocoSimultaneo = Boolean(slot.bloco_simultaneo_id || slot.permitir_turmas_unidas || slot.locked_simultaneo);
 
     // Estilo interativo quando há seleção ativa nesta turma
     let extraClasses = interativo
       ? "cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all group"
       : "";
     let statusBadge = null;
-    let tooltipText = `${discNome} — ${profNome}${isLocked ? " (Fixado 📌)" : ""}`;
+    let tooltipText = `${discNome} — ${profNome}${isLocked ? " (Fixado 📌)" : ""}${
+      isBlocoSimultaneo
+        ? ` — 🔗 Super-Aula Simultânea${slot.bloco_simultaneo_nome ? `: ${slot.bloco_simultaneo_nome}` : ""}`
+        : ""
+    }`;
 
     if (selecaoNestaTurma && aval) {
       if (aval.status === "origem") {
@@ -261,7 +266,14 @@ export default function GradeTurma({
         )}
 
         {statusBadge}
-        <div className="text-sm font-semibold leading-tight">{cod}</div>
+        <div className="text-sm font-semibold leading-tight">
+          {cod}
+          {isBlocoSimultaneo && (
+            <span className="ml-0.5 text-[10px] opacity-85" title="Super-Aula / Bloco Simultâneo Multi-Turma">
+              🔗
+            </span>
+          )}
+        </div>
         <div className="text-[11px] opacity-80 leading-tight">{profShort}</div>
       </div>
     );

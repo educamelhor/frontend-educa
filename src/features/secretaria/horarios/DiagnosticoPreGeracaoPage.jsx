@@ -116,14 +116,28 @@ function LinhaProf({ p, onIrParaDisponibilidade }) {
     >
       <span>{sev.icon}</span>
       <div className="flex-1 min-w-0">
-        <p className="font-semibold truncate" style={{ color: sev.text }}>
-          {p.professor_nome}
+        <p className="font-semibold truncate flex items-center gap-1.5" style={{ color: sev.text }}>
+          <span className="truncate">{p.professor_nome}</span>
+          {p.multiturno && (
+            <span
+              className="shrink-0 px-1.5 py-0.5 rounded text-[9px] font-bold"
+              style={{ background: "#ede9fe", color: "#6d28d9", border: "1px solid #c4b5fd" }}
+              title={`Atua também em outro(s) turno(s): ${(p.multiturno.outros_turnos || []).join(", ")} (${p.multiturno.aulas_outros_turnos || 0}h)`}
+            >
+              🔄 Multi-Turno
+            </span>
+          )}
           {clicavel && onIrParaDisponibilidade && (
-            <span style={{ marginLeft: 6, fontSize: 10, opacity: 0.75 }}>→ corrigir</span>
+            <span style={{ marginLeft: 4, fontSize: 10, opacity: 0.75 }}>→ corrigir</span>
           )}
         </p>
         <p className="text-gray-500">
           {p.disciplina_nome} · {p.turmas_count} turma(s) · {p.aulas_moduladas} aulas/sem
+          {Number(p.desconto_turmas_unidas) > 0 && (
+            <span className="text-teal-700 font-semibold">
+              {` (${p.aulas_fisicas}h físicas · -${p.desconto_turmas_unidas}h unidas 🔗)`}
+            </span>
+          )}
           {p.slots_livres !== null && ` · ${p.slots_livres} slots livres`}
         </p>
       </div>
@@ -459,6 +473,55 @@ function DiagnosticoTurno({ turno, semestre, vigencia, onIrParaDisponibilidade, 
           )}
         </div>
       </div>
+
+      {/* Faixa de Governança Avançada (ETAPA 3: Super-Aulas IFA, Interjornada CPF e Capacidade Física de Salas) */}
+      {disponib?.etapa3_resumo &&
+        ((disponib.etapa3_resumo.blocos_simultaneos?.length || 0) > 0 ||
+          (disponib.etapa3_resumo.professores_multiturno?.length || 0) > 0 ||
+          (disponib.etapa3_resumo.recursos_fisicos?.length || 0) > 0) && (
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-3.5 flex flex-wrap items-center gap-2.5 text-xs">
+            <span className="font-extrabold text-slate-700 uppercase tracking-wide text-[11px] mr-1">
+              🛡️ Governança Avançada:
+            </span>
+
+            {(disponib.etapa3_resumo.blocos_simultaneos?.length || 0) > 0 && (
+              <span
+                className="px-2.5 py-1 rounded-full font-semibold flex items-center gap-1"
+                style={{ background: "#f0fdfa", color: "#0f766e", border: "1px solid #99f6e4" }}
+                title={disponib.etapa3_resumo.blocos_simultaneos.map((b) => `${b.nome} (${b.turmas_count} turmas)`).join(" • ")}
+              >
+                🔗 {disponib.etapa3_resumo.blocos_simultaneos.length} Bloco(s) Simultâneo(s) IFA/Unidas
+              </span>
+            )}
+
+            {(disponib.etapa3_resumo.professores_multiturno?.length || 0) > 0 && (
+              <span
+                className="px-2.5 py-1 rounded-full font-semibold flex items-center gap-1"
+                style={{ background: "#f5f3ff", color: "#5b21b6", border: "1px solid #ddd6fe" }}
+                title={disponib.etapa3_resumo.professores_multiturno
+                  .map((pm) => `${pm.professor_nome} (${(pm.outros_turnos || []).join("/")})`)
+                  .join(" • ")}
+              >
+                🔄 {disponib.etapa3_resumo.professores_multiturno.length} Prof(s) Multi-Turno (Interjornada CPF ativa)
+              </span>
+            )}
+
+            {(disponib.etapa3_resumo.recursos_fisicos || []).map((rf) => (
+              <span
+                key={rf.id}
+                className="px-2.5 py-1 rounded-full font-semibold flex items-center gap-1"
+                style={
+                  rf.gargalo_critico
+                    ? { background: "#fef2f2", color: "#b91c1c", border: "1px solid #fca5a5" }
+                    : { background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe" }
+                }
+                title={`${rf.nome}: demanda de ${rf.aulas_exigidas} aulas/sem para capacidade máxima de ${rf.capacidade_semanal} aulas/sem (${rf.capacidade} espaço(s) simultâneo(s))`}
+              >
+                {rf.gargalo_critico ? "⚠️" : "🏟️"} {rf.nome}: {rf.aulas_exigidas}/{rf.capacidade_semanal}h ({rf.ocupacao_pct}%)
+              </span>
+            ))}
+          </div>
+        )}
 
       {/* 3 Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

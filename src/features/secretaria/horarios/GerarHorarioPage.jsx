@@ -440,20 +440,39 @@ function construirGradesDeSlotsSalvos(slots, turmasList, solverPayload) {
     if (!gradePorProfessor[pId][dia]) gradePorProfessor[pId][dia] = {};
 
     const isLocked = Boolean(Number(s.locked));
+    const prevProfSlot = gradePorProfessor[pId][dia][ord];
+    const isTurmaUnida = Boolean(prevProfSlot && Number(prevProfSlot.turma_id) !== tId);
 
     gradePorTurma[tId][dia][ord] = {
       disciplina_id: dId,
       professor_id: pId,
       locked: isLocked,
       origem: isLocked ? "manual" : "solver",
+      ...(isTurmaUnida ? { permitir_turmas_unidas: true } : {}),
     };
 
-    gradePorProfessor[pId][dia][ord] = {
-      turma_id: tId,
-      disciplina_id: dId,
-      locked: isLocked,
-      origem: isLocked ? "manual" : "solver",
-    };
+    if (isTurmaUnida) {
+      const firstTid = Number(prevProfSlot.turma_id);
+      if (gradePorTurma[firstTid]?.[dia]?.[ord]) {
+        gradePorTurma[firstTid][dia][ord].permitir_turmas_unidas = true;
+      }
+      const unidasIds = Array.from(
+        new Set([...(Array.isArray(prevProfSlot.turmas_unidas) ? prevProfSlot.turmas_unidas : [firstTid]), tId])
+      );
+      gradePorProfessor[pId][dia][ord] = {
+        ...prevProfSlot,
+        locked: Boolean(prevProfSlot.locked || isLocked),
+        permitir_turmas_unidas: true,
+        turmas_unidas: unidasIds,
+      };
+    } else {
+      gradePorProfessor[pId][dia][ord] = {
+        turma_id: tId,
+        disciplina_id: dId,
+        locked: isLocked,
+        origem: isLocked ? "manual" : "solver",
+      };
+    }
   }
 
   return { gradePorTurma, gradePorProfessor };
@@ -587,6 +606,8 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
     flexibilizar_obrigatorios: true,
     bloquear_recreio_pos_recreio: true,
     busca_exaustiva_60s: true,
+    flexibilizar_interturno: false,
+    flexibilizar_salas: false,
     desafixar_manuais: false,
   });
 
@@ -606,7 +627,7 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
     };
   }, []);
 
-  // Índice rápido de disponibilidades dos professores (`profId|dia|ordem` -> 'indisponivel' | 'evitar')
+  // Índice rápido de disponibilidades + restrições Inter-Turnos CPF (`profId|dia|ordem` -> 'indisponivel' | 'evitar')
   const dispoIndex = useMemo(() => {
     const map = new Map();
     const list = Array.isArray(solverPayload?.disponibilidades) ? solverPayload.disponibilidades : [];
@@ -617,6 +638,23 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
       const st = String(d.status || "indisponivel").toLowerCase();
       if (!pId || !dia || !ord) continue;
       if (st === "indisponivel" || st === "bloqueado" || st === "excluir") {
+        map.set(`${pId}|${dia}|${ord}`, "indisponivel");
+      } else if (st === "evitar" && map.get(`${pId}|${dia}|${ord}`) !== "indisponivel") {
+        map.set(`${pId}|${dia}|${ord}`, "evitar");
+      }
+    }
+    const interList = Array.isArray(solverPayload?.restricoes_interturno?.slots)
+      ? solverPayload.restricoes_interturno.slots
+      : Array.isArray(solverPayload?.restricoes_interturno)
+      ? solverPayload.restricoes_interturno
+      : [];
+    for (const it of interList) {
+      const pId = Number(it.professor_id);
+      const dia = Number(it.dia ?? it.dia_semana);
+      const ord = Number(it.ordem ?? it.periodo ?? it.periodo_ordem);
+      const st = String(it.status || "").toLowerCase();
+      if (!pId || !dia || !ord) continue;
+      if (st === "bloqueado" || st === "indisponivel") {
         map.set(`${pId}|${dia}|${ord}`, "indisponivel");
       } else if (st === "evitar" && map.get(`${pId}|${dia}|${ord}`) !== "indisponivel") {
         map.set(`${pId}|${dia}|${ord}`, "evitar");
@@ -866,6 +904,7 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
       // abre o Modal Premium de Diagnóstico & Sugestões de Ajuste para Fechamento!
       if (novoResultadoNorm) {
         const m = novoResultadoNorm.metrics || {};
+        const rm = novoResultadoNorm.diagnostico?.resumo_motivos || {};
         const temPendenciaEstrita =
           (m.aulas_nao_alocadas || 0) > 0 ||
           (m.violacoes_indisponibilidade || 0) > 0 ||
@@ -873,13 +912,18 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
           (m.violacoes_pares_bloqueados || 0) > 0 ||
           (m.violacoes_separadas_mesmo_dia || 0) > 0 ||
           (m.violacoes_max_dia || 0) > 0 ||
-          (m.violacoes_disciplinas_excludentes || 0) > 0;
+          (m.violacoes_disciplinas_excludentes || 0) > 0 ||
+          (m.violacoes_interturno || 0) > 0 ||
+          (m.violacoes_capacidade_salas || 0) > 0 ||
+          (m.violacoes_blocos_simultaneos || 0) > 0;
 
         if (temPendenciaEstrita) {
           setSugestoesSelecionadas({
             flexibilizar_obrigatorios: (m.pares_obrigatorios_faltantes || 0) > 0,
             bloquear_recreio_pos_recreio: (m.violacoes_pares_bloqueados || 0) > 0,
             busca_exaustiva_60s: tempoEfetivoMs < 60000,
+            flexibilizar_interturno: (rm.RESTRICAO_INTERTURNO_CPF || 0) > 0 || (m.violacoes_interturno || 0) > 0,
+            flexibilizar_salas: (rm.SEM_SALA_DISPONIVEL || 0) > 0 || (m.violacoes_capacidade_salas || 0) > 0,
             desafixar_manuais: false,
           });
           setShowModalDiagnosticoUrania(true);
@@ -974,6 +1018,23 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
       });
       novaListaPares = novaListaPares.map((p, idx) => ({ ...p, ordem: idx + 1 }));
 
+      let novoInterturnoRegras = rgAtual.interturno_regras ? { ...rgAtual.interturno_regras } : undefined;
+      if (sugestoesSelecionadas.flexibilizar_interturno) {
+        novoInterturnoRegras = {
+          ...(rgAtual.interturno_regras || {}),
+          modo_interjornada: "soft",
+          modo_max_aulas_dia_cpf: "soft",
+        };
+      }
+
+      let novosRecursosFisicos = Array.isArray(rgAtual.recursos_fisicos)
+        ? rgAtual.recursos_fisicos.map((rf) =>
+            sugestoesSelecionadas.flexibilizar_salas && rf.modo === "hard"
+              ? { ...rf, modo: "soft" }
+              : { ...rf }
+          )
+        : undefined;
+
       const novasRegrasGerais = {
         ...rgAtual,
         preferencia_aulas_duplas: true,
@@ -981,6 +1042,8 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
         bloquear_duplas_no_recreio: novoBloquearRecreio,
         aulas_duplas_separar_recreio: !novoBloquearRecreio,
         pares_duplas_governanca: novaListaPares,
+        ...(novoInterturnoRegras ? { interturno_regras: novoInterturnoRegras } : {}),
+        ...(novosRecursosFisicos ? { recursos_fisicos: novosRecursosFisicos } : {}),
       };
 
       // Salva no backend para que a escola já fique com a governança atualizada
@@ -1575,6 +1638,10 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
     SEM_SLOT_LIVRE_TURMA: "Turma já está com 100% dos horários do turno ocupados",
     COLISAO_PROFESSOR: "Professor ocupado em outra turma nos horários vagos desta turma",
     INDISPONIBILIDADE_PROFESSOR: "Professor indisponível nos horários vagos desta turma",
+    SEM_DISPONIBILIDADE_PROFESSOR: "Professor sem disponibilidade compatível nos horários vagos",
+    RESTRICAO_INTERTURNO_CPF: "Professor em outro turno ou em descanso de interjornada (CPF)",
+    SEM_SALA_DISPONIVEL: "Capacidade máxima da Sala/Quadra/Laboratório atingida nos horários livres",
+    CONFLITO_BLOCO_SIMULTANEO: "Sem horário comum simultâneo livre entre todas as turmas/professores do bloco IFA",
     LIMITE_DIARIO_DISCIPLINA: "Limite máximo diário da disciplina atingido",
     LIMITE_CONSECUTIVAS: "Limite de aulas consecutivas atingido",
   };
@@ -2132,6 +2199,15 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
                     color={(metrics.pares_obrigatorios_faltantes || 0) === 0 ? "#7c3aed" : "#dc2626"}
                   />
                 )}
+                {(metrics.super_aulas_alocadas || 0) > 0 && (
+                  <MetricCard
+                    label="Super-Aulas IFA"
+                    value={metrics.super_aulas_alocadas}
+                    sub="Sincronizadas 🔗"
+                    icon="🧩"
+                    color="#0d9488"
+                  />
+                )}
                 <MetricCard
                   label="Turmas"
                   value={turmas.length || Object.keys(resultado.grade_por_turma || {}).length}
@@ -2153,7 +2229,10 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
               (resultado.metrics?.violacoes_separadas_mesmo_dia || 0) > 0 ||
               (resultado.metrics?.violacoes_max_dia || 0) > 0 ||
               (resultado.metrics?.violacoes_pares_bloqueados || 0) > 0 ||
-              (resultado.metrics?.violacoes_disciplinas_excludentes || 0) > 0) && (
+              (resultado.metrics?.violacoes_disciplinas_excludentes || 0) > 0 ||
+              (resultado.metrics?.violacoes_interturno || 0) > 0 ||
+              (resultado.metrics?.violacoes_capacidade_salas || 0) > 0 ||
+              (resultado.metrics?.violacoes_blocos_simultaneos || 0) > 0) && (
               <div
                 style={{
                   background: "linear-gradient(135deg, #fff1f2 0%, #fff7ed 100%)",
@@ -2986,6 +3065,21 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
                       <strong>Disciplinas Excludentes no mesmo dia:</strong> {metrics.violacoes_disciplinas_excludentes} ocorrência(s) não-fixada(s) precisaram dividir o mesmo dia por falta de janela livre.
                     </li>
                   )}
+                  {(metrics.violacoes_interturno || 0) > 0 && (
+                    <li style={{ marginBottom: 4 }}>
+                      <strong>Conflito Inter-Turnos / Interjornada (CPF):</strong> {metrics.violacoes_interturno} ocorrência(s) não-fixada(s) em janela de descanso ou choque entre turnos.
+                    </li>
+                  )}
+                  {(metrics.violacoes_capacidade_salas || 0) > 0 && (
+                    <li style={{ marginBottom: 4 }}>
+                      <strong>Capacidade de Sala / Quadra / Laboratório excedida:</strong> {metrics.violacoes_capacidade_salas} horário(s) acima da lotação física configurada.
+                    </li>
+                  )}
+                  {(metrics.violacoes_blocos_simultaneos || 0) > 0 && (
+                    <li style={{ marginBottom: 4 }}>
+                      <strong>Bloco Simultâneo / Super-Aula IFA desalinhado:</strong> {metrics.violacoes_blocos_simultaneos} ocorrência(s) sem janela comum simultânea entre todas as turmas e professores do bloco.
+                    </li>
+                  )}
                   {naoAloc > 0 && (
                     <li>
                       <strong>{naoAloc} aula(s) pendente(s) de encaixe:</strong>{" "}
@@ -3256,6 +3350,84 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
                       </div>
                     </div>
                   </label>
+
+                  {/* Sugestão ETAPA 3A: Flexibilizar Interjornada / Limite Diário CPF */}
+                  {((diag.resumo_motivos?.RESTRICAO_INTERTURNO_CPF || 0) > 0 || (metrics.violacoes_interturno || 0) > 0) && (
+                    <label
+                      style={{
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: 12,
+                        padding: "11px 14px",
+                        borderRadius: 10,
+                        border: sugestoesSelecionadas.flexibilizar_interturno
+                          ? "1.5px solid #7c3aed"
+                          : "1px solid #cbd5e1",
+                        background: sugestoesSelecionadas.flexibilizar_interturno ? "#f5f3ff" : "#fff",
+                        cursor: "pointer",
+                        transition: "all 0.15s",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={Boolean(sugestoesSelecionadas.flexibilizar_interturno)}
+                        onChange={(e) =>
+                          setSugestoesSelecionadas((prev) => ({
+                            ...prev,
+                            flexibilizar_interturno: e.target.checked,
+                          }))
+                        }
+                        style={{ marginTop: 3, width: 16, height: 16, accentColor: "#7c3aed", cursor: "pointer" }}
+                      />
+                      <div style={{ flex: 1 }}>
+                        <strong style={{ fontSize: 13, color: "#4c1d95", display: "block" }}>
+                          Flexibilizar Interjornada (11h) e Teto Diário CPF para ⭐ Preferencial (Evitar)
+                        </strong>
+                        <div style={{ fontSize: 12, color: "#475569", marginTop: 3, lineHeight: 1.4 }}>
+                          Mantém o bloqueio absoluto de choque físico de relógio entre turnos, mas permite encaixar aulas na transição Noturno↔Matutino quando não houver outra janela livre.
+                        </div>
+                      </div>
+                    </label>
+                  )}
+
+                  {/* Sugestão ETAPA 3B: Flexibilizar Capacidade Física de Salas/Quadras */}
+                  {((diag.resumo_motivos?.SEM_SALA_DISPONIVEL || 0) > 0 || (metrics.violacoes_capacidade_salas || 0) > 0) && (
+                    <label
+                      style={{
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: 12,
+                        padding: "11px 14px",
+                        borderRadius: 10,
+                        border: sugestoesSelecionadas.flexibilizar_salas
+                          ? "1.5px solid #0d9488"
+                          : "1px solid #cbd5e1",
+                        background: sugestoesSelecionadas.flexibilizar_salas ? "#f0fdfa" : "#fff",
+                        cursor: "pointer",
+                        transition: "all 0.15s",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={Boolean(sugestoesSelecionadas.flexibilizar_salas)}
+                        onChange={(e) =>
+                          setSugestoesSelecionadas((prev) => ({
+                            ...prev,
+                            flexibilizar_salas: e.target.checked,
+                          }))
+                        }
+                        style={{ marginTop: 3, width: 16, height: 16, accentColor: "#0d9488", cursor: "pointer" }}
+                      />
+                      <div style={{ flex: 1 }}>
+                        <strong style={{ fontSize: 13, color: "#115e59", display: "block" }}>
+                          Flexibilizar limite de Sala / Quadra / Laboratório para ⭐ Preferencial
+                        </strong>
+                        <div style={{ fontSize: 12, color: "#475569", marginTop: 3, lineHeight: 1.4 }}>
+                          Evita ao máximo ultrapassar a capacidade simultânea da Quadra/Laboratório, mas permite uso alternativo em sala regular quando todas as janelas já estiverem ocupadas.
+                        </div>
+                      </div>
+                    </label>
+                  )}
 
                   {/* Sugestão 4: Desafixar aulas manuais (se houver) */}
                   {aulasFixas > 0 && respeitarHorarioManual && (

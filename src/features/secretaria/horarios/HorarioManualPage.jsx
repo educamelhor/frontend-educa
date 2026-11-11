@@ -75,6 +75,7 @@ function SlotTurmaCombobox({
   ocupacaoMap,     // { turmaId: { professor_id, professor_nome, disciplina_nome } } (outro prof neste dia/ordem)
   mostrarDiscNoCard,
   horarioInfo,     // { inicio, fim } opcional vindo da Governança
+  interturnoInfo,  // { status: 'bloqueado' | 'evitar', tipo, descricao } opcional (ETAPA 3 CPF)
   onSelect,        // (opt | null) => void
   onToggleLock,    // () => void
 }) {
@@ -185,6 +186,9 @@ function SlotTurmaCombobox({
 
   const temValor = !!(value && value.turma_id);
   const isLocked = !!(temValor && value?.locked);
+  const turmasExtras = Array.isArray(value?.turmas_extras) ? value.turmas_extras : [];
+  const interBloqueado = interturnoInfo?.status === "bloqueado";
+  const interEvitar = !interBloqueado && interturnoInfo?.status === "evitar";
   const opAtualMod = useMemo(() => {
     if (!temValor) return null;
     return opcoesModuladas.find(
@@ -195,11 +199,15 @@ function SlotTurmaCombobox({
   const previstasSlotAtual = Number(opAtualMod?.aulas_previstas) || 0;
   const excessoSlotAtual = previstasSlotAtual > 0 && alocadasSlotAtual > previstasSlotAtual;
 
-  // Cores do card conforme estado (Fixo Manual vs Espelho do Solver vs Conflito vs Vazio)
-  let cardBg = "#f8fafc";
-  let cardBorder = "1.5px dashed #cbd5e1";
-  let badgeBg = "#e2e8f0";
-  let badgeColor = "#475569";
+  // Cores do card conforme estado (Fixo Manual vs Espelho do Solver vs Conflito vs Interturno CPF vs Vazio)
+  let cardBg = interBloqueado ? "#fff1f2" : interEvitar ? "#fffbeb" : "#f8fafc";
+  let cardBorder = interBloqueado
+    ? "1.5px dashed #fda4af"
+    : interEvitar
+    ? "1.5px dashed #fcd34d"
+    : "1.5px dashed #cbd5e1";
+  let badgeBg = interBloqueado ? "#fecdd3" : interEvitar ? "#fde68a" : "#e2e8f0";
+  let badgeColor = interBloqueado ? "#be123c" : interEvitar ? "#92400e" : "#475569";
 
   if (temValor) {
     if (conflitoAtual) {
@@ -244,14 +252,20 @@ function SlotTurmaCombobox({
             : conflitoAtual
             ? `⚠️ Conflito: ${value?.turma_nome} já está ocupada por ${conflitoAtual.professor_nome} neste horário`
             : temValor
-            ? `${diaNome} · ${ordem}º horário · ${value.turma_nome}${value.disciplina_nome ? ` (${value.disciplina_nome})` : ""}${
+            ? `${diaNome} · ${ordem}º horário · ${value.turma_nome}${
+                turmasExtras.length > 0 ? ` + ${turmasExtras.map(t => t.turma_nome).join(" + ")} (Turmas Unidas 🔗)` : ""
+              }${value.disciplina_nome ? ` (${value.disciplina_nome})` : ""}${
                 excessoSlotAtual
                   ? ` — ⚠️ EXCESSO DE CARGA (${alocadasSlotAtual}/${previstasSlotAtual} aulas alocadas nesta disciplina)`
                   : ""
               }${
+                interturnoInfo?.descricao ? ` — 🔄 CPF Multi-Turno: ${interturnoInfo.descricao}` : ""
+              }${
                 isLocked ? " — 📌 HORÁRIO FIXADO (protegido contra alterações no Solver)" : " — Espelho do Rascunho (ainda não fixado)"
               }`
-            : `${diaNome} · ${ordem}º horário · Clique para selecionar ou digitar a turma`
+            : `${diaNome} · ${ordem}º horário${
+                interturnoInfo?.descricao ? ` · ⚠️ ${interturnoInfo.descricao}` : " · Clique para selecionar ou digitar a turma"
+              }`
         }
         style={{
           width: "100%",
@@ -334,6 +348,22 @@ function SlotTurmaCombobox({
               gap: 4,
             }}>
               <span>{conflitoAtual ? "⚠️ " : ""}{value.turma_nome}</span>
+              {turmasExtras.length > 0 && (
+                <span
+                  style={{
+                    fontSize: 9,
+                    fontWeight: 800,
+                    padding: "0 4px",
+                    borderRadius: 4,
+                    background: "#ccfbf1",
+                    color: "#0f766e",
+                    border: "1px solid #5eead4",
+                    flexShrink: 0,
+                  }}
+                >
+                  +{turmasExtras.length} 🔗
+                </span>
+              )}
               {excessoSlotAtual && !conflitoAtual && (
                 <span
                   style={{
@@ -371,14 +401,20 @@ function SlotTurmaCombobox({
           <span style={{
             flex: 1,
             minWidth: 0,
-            fontSize: 11,
-            fontWeight: 500,
-            color: "#94a3b8",
+            fontSize: 10.5,
+            fontWeight: interBloqueado || interEvitar ? 700 : 500,
+            color: interBloqueado ? "#be123c" : interEvitar ? "#b45309" : "#94a3b8",
             whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",
           }}>
-            {horarioInfo?.inicio ? `${horarioInfo.inicio} · Turma…` : "Turma…"}
+            {interBloqueado
+              ? `⛔ ${interturnoInfo?.curto || "Outro turno"}`
+              : interEvitar
+              ? `🌙 ${interturnoInfo?.curto || "Interjornada"}`
+              : horarioInfo?.inicio
+              ? `${horarioInfo.inicio} · Turma…`
+              : "Turma…"}
           </span>
         )}
 
@@ -724,11 +760,48 @@ export default function HorarioManualPage({ config, turnoInicial }) {
   const [conflitoModal, setConflitoModal] = useState(null); // { message, conflicts }
   const [fixadoModal, setFixadoModal] = useState(null);     // { profNome, totalFixadas }
   const [showModalExportar, setShowModalExportar] = useState(false);
+  const [restricoesInterturno, setRestricoesInterturno] = useState(null);
 
   const nPeriodos = periodosPorTurno[turno] || 5;
   const dias      = DIAS.filter(d => diasLetivos.includes(d.num));
   const vigencia  = resolverVigenciaFrontend(config);
   const horariosTurnoAtivo = config?.horarios_por_turno?.[String(turno || "").toLowerCase()] || {};
+
+  // Índices rápidos de Restrições Inter-Turnos / Interjornada CPF (ETAPA 3)
+  const { interturnoSlotMap, multiturnoProfMap } = useMemo(() => {
+    const slotMap = {};
+    const profMap = {};
+    const rawSlots = Array.isArray(restricoesInterturno?.slots) ? restricoesInterturno.slots : [];
+    for (const s of rawSlots) {
+      const pId = Number(s.professor_id);
+      const dia = Number(s.dia);
+      const ord = Number(s.ordem);
+      if (!pId || !dia || !ord) continue;
+      const tipo = String(s.tipo || "");
+      const curto =
+        tipo === "SOBREPOSICAO_INTERTURNO"
+          ? `Aula (${s.outro_turno || "outro turno"})`
+          : tipo === "INTERJORNADA_CLT"
+          ? "Interjornada <11h"
+          : "Transição turno";
+      slotMap[`${pId}|${dia}|${ord}`] = {
+        status: s.status || "evitar",
+        tipo,
+        curto,
+        descricao: s.motivo || s.descricao || curto,
+      };
+    }
+    const rawProfs = Array.isArray(restricoesInterturno?.resumo_professores_multiturno)
+      ? restricoesInterturno.resumo_professores_multiturno
+      : Array.isArray(restricoesInterturno?.professores_multiturno)
+      ? restricoesInterturno.professores_multiturno
+      : [];
+    for (const rp of rawProfs) {
+      const pId = Number(rp.professor_id ?? rp);
+      if (pId) profMap[pId] = typeof rp === "object" ? rp : { professor_id: pId };
+    }
+    return { interturnoSlotMap: slotMap, multiturnoProfMap: profMap };
+  }, [restricoesInterturno]);
 
   // Estrutura consolidada para a Central de Impressão e Exportação PDF em Lote
   const dadosExportacao = useMemo(() => {
@@ -773,6 +846,23 @@ export default function HorarioManualPage({ config, turnoInicial }) {
             locked: Boolean(cell.locked),
             origem: cell.origem || "manual",
           };
+          if (Array.isArray(cell.turmas_extras)) {
+            for (const ex of cell.turmas_extras) {
+              const exTid = Number(ex.turma_id);
+              if (!exTid) continue;
+              totalSlotsTurno++;
+              if (ex.turma_nome && !tMap[exTid]) tMap[exTid] = ex.turma_nome;
+              if (!gradePorTurma[exTid]) gradePorTurma[exTid] = {};
+              if (!gradePorTurma[exTid][diaNum]) gradePorTurma[exTid][diaNum] = {};
+              gradePorTurma[exTid][diaNum][ordNum] = {
+                turma_id: exTid,
+                disciplina_id: ex.disciplina_id || cell.disciplina_id,
+                professor_id: pId,
+                locked: Boolean(ex.locked ?? cell.locked),
+                origem: cell.origem || "manual",
+              };
+            }
+          }
         }
       }
     }
@@ -851,6 +941,7 @@ export default function HorarioManualPage({ config, turnoInicial }) {
         }
       }
 
+      setRestricoesInterturno(resGrade.data?.restricoes_interturno || null);
       const slotsSalvos = Array.isArray(resGrade.data?.slots) ? resGrade.data.slots : [];
       for (const s of slotsSalvos) {
         const pId = Number(s.professor_id);
@@ -862,14 +953,35 @@ export default function HorarioManualPage({ config, turnoInicial }) {
         if (!g[pId]) g[pId] = {};
         if (!g[pId][diaNum]) g[pId][diaNum] = {};
         const isLockedSlot = Boolean(Number(s.locked));
-        g[pId][diaNum][ordNum] = {
-          turma_id: tId,
-          disciplina_id: dId,
-          turma_nome: s.turma_nome || turmaMap[tId] || `Turma ${tId}`,
-          disciplina_nome: s.disciplina_nome || discMap[dId] || "",
-          locked: isLockedSlot,
-          origem: s.origem || (isLockedSlot ? "manual" : "solver"),
-        };
+        const prevSlot = g[pId][diaNum][ordNum];
+        if (prevSlot && Number(prevSlot.turma_id) !== tId) {
+          const extrasAtuais = Array.isArray(prevSlot.turmas_extras) ? prevSlot.turmas_extras : [];
+          if (!extrasAtuais.some(ex => Number(ex.turma_id) === tId)) {
+            prevSlot.turmas_extras = [
+              ...extrasAtuais,
+              {
+                turma_id: tId,
+                disciplina_id: dId,
+                turma_nome: s.turma_nome || turmaMap[tId] || `Turma ${tId}`,
+                disciplina_nome: s.disciplina_nome || discMap[dId] || "",
+                locked: isLockedSlot,
+              },
+            ];
+            prevSlot.turmas_unidas = [
+              Number(prevSlot.turma_id),
+              ...prevSlot.turmas_extras.map(ex => Number(ex.turma_id)),
+            ];
+          }
+        } else {
+          g[pId][diaNum][ordNum] = {
+            turma_id: tId,
+            disciplina_id: dId,
+            turma_nome: s.turma_nome || turmaMap[tId] || `Turma ${tId}`,
+            disciplina_nome: s.disciplina_nome || discMap[dId] || "",
+            locked: isLockedSlot,
+            origem: s.origem || (isLockedSlot ? "manual" : "solver"),
+          };
+        }
       }
 
       setGrid(g);
@@ -1044,6 +1156,14 @@ export default function HorarioManualPage({ config, turnoInicial }) {
             if (cell.locked) totalFixadas++;
             const k = `${cell.turma_id}-${cell.disciplina_id}`;
             porTurmaDisc[k] = (porTurmaDisc[k] || 0) + 1;
+            if (Array.isArray(cell.turmas_extras)) {
+              for (const ex of cell.turmas_extras) {
+                totalAlocadas++;
+                if (ex.locked ?? cell.locked) totalFixadas++;
+                const ke = `${ex.turma_id}-${ex.disciplina_id || cell.disciplina_id}`;
+                porTurmaDisc[ke] = (porTurmaDisc[ke] || 0) + 1;
+              }
+            }
           }
         }
       }
@@ -1208,6 +1328,18 @@ export default function HorarioManualPage({ config, turnoInicial }) {
               turma_id: Number(cell.turma_id),
               disciplina_id: Number(cell.disciplina_id),
             });
+            if (Array.isArray(cell.turmas_extras)) {
+              for (const ex of cell.turmas_extras) {
+                if (ex.turma_id && (ex.disciplina_id || cell.disciplina_id)) {
+                  slotsPayload.push({
+                    dia: d.num,
+                    ordem: o,
+                    turma_id: Number(ex.turma_id),
+                    disciplina_id: Number(ex.disciplina_id || cell.disciplina_id),
+                  });
+                }
+              }
+            }
           }
         }
       }
@@ -1671,8 +1803,24 @@ export default function HorarioManualPage({ config, turnoInicial }) {
                   {profAtual.nome?.[0] || "?"}
                 </div>
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                     <span>{profAtual.nome}</span>
+                    {multiturnoProfMap[profAtual.id] && (
+                      <span
+                        title={`Professor Multi-Turno (CPF): atua também em ${(multiturnoProfMap[profAtual.id].outros_turnos || []).join(", ")}`}
+                        style={{
+                          background: "rgba(196, 181, 253, 0.25)",
+                          border: "1px solid rgba(221, 214, 254, 0.6)",
+                          color: "#ede9fe",
+                          padding: "1px 8px",
+                          borderRadius: 999,
+                          fontSize: 10.5,
+                          fontWeight: 800,
+                        }}
+                      >
+                        🔄 Multi-Turno CPF
+                      </span>
+                    )}
                   </div>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
                     {getDisciplinasNomes(profAtual).map(d => (
@@ -1881,6 +2029,7 @@ export default function HorarioManualPage({ config, turnoInicial }) {
                         ocupacaoMap={ocupacaoSlot}
                         mostrarDiscNoCard={mostrarDiscNoCard}
                         horarioInfo={horariosTurnoAtivo?.[ordem] || horariosTurnoAtivo?.[String(ordem)] || null}
+                        interturnoInfo={profSel ? interturnoSlotMap[`${profSel}|${d.num}|${ordem}`] || null : null}
                         onSelect={op => handleSelectSlot(d.num, ordem, op)}
                         onToggleLock={() => handleToggleSlotLock(d.num, ordem)}
                       />

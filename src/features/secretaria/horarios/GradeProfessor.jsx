@@ -172,18 +172,30 @@ export default function GradeProfessor({
     const turmaId = slot.turma_id ?? slot.turma ?? null;
     const discId = slot.disciplina_id ?? slot.disciplina ?? null;
 
-    const turmaNomeFull =
-      (turmaId != null && (turmaById[String(turmaId)] || turmaById[turmaId])) ||
-      (turmaId != null ? `Turma ${turmaId}` : "—");
+    const turmasUnidasIds = Array.isArray(slot.turmas_unidas) && slot.turmas_unidas.length > 1
+      ? slot.turmas_unidas
+      : null;
+
+    const turmaNomeFull = turmasUnidasIds
+      ? turmasUnidasIds
+          .map((id) => (turmaById[String(id)] || turmaById[id] || `Turma ${id}`))
+          .join(" + ")
+      : ((turmaId != null && (turmaById[String(turmaId)] || turmaById[turmaId])) ||
+        (turmaId != null ? `Turma ${turmaId}` : "—"));
 
     const discNome =
       (discId != null && (disciplinaById[String(discId)] || disciplinaById[discId])) ||
       (discId != null ? `Disc ${discId}` : "—");
 
-    const turmaShort = turmaCompacta(turmaNomeFull, turmaId);
+    const turmaShort = turmasUnidasIds
+      ? turmasUnidasIds
+          .map((id) => turmaCompacta(turmaById[String(id)] || turmaById[id] || `Turma ${id}`, id))
+          .join(" + ")
+      : turmaCompacta(turmaNomeFull, turmaId);
     const cod = codDisciplina(discNome);
     const { bg, text, ring } = corDisciplina(discId);
     const isLocked = Boolean(slot.locked);
+    const isBlocoSimultaneo = Boolean(turmasUnidasIds || slot.bloco_simultaneo_id || slot.permitir_turmas_unidas);
 
     const isSelectedOrigin =
       selecaoNesteProf &&
@@ -195,7 +207,7 @@ export default function GradeProfessor({
       ? "cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all group"
       : "";
     let statusBadge = null;
-    let tooltipText = `${turmaNomeFull} — ${discNome}${isLocked ? " (Fixado 📌)" : ""}`;
+    let tooltipText = `${turmaNomeFull} — ${discNome}${turmasUnidasIds ? " (Turmas Unidas 🔗)" : ""}${isLocked ? " (Fixado 📌)" : ""}`;
 
     if (isSelectedOrigin) {
       extraClasses =
@@ -279,7 +291,14 @@ export default function GradeProfessor({
         )}
 
         {statusBadge}
-        <div className="text-sm font-semibold leading-tight">{turmaShort}</div>
+        <div className="text-sm font-semibold leading-tight">
+          {turmaShort}
+          {isBlocoSimultaneo && (
+            <span className="ml-0.5 text-[10px] opacity-85" title="Turmas Unidas / Super-Aula Simultânea">
+              🔗
+            </span>
+          )}
+        </div>
         <div className="text-[11px] opacity-80 leading-tight">{cod}</div>
       </div>
     );

@@ -12,13 +12,15 @@ import DisponibilidadePage from "./DisponibilidadePage";
 import DiagnosticoPreGeracaoPage from "./DiagnosticoPreGeracaoPage";
 import GerarHorarioPage from "./GerarHorarioPage";
 import HorarioManualPage from "./HorarioManualPage";
+import GestaoAvancadaHorariosPage from "./GestaoAvancadaHorariosPage";
 import BadgeVigenciaHorario from "./BadgeVigenciaHorario";
 
 const ABAS = [
-  { id: "disponibilidade", label: "📅 Disponibilidade", desc: "Configure a disponibilidade dos professores" },
-  { id: "diagnostico",     label: "🔍 Diagnóstico",     desc: "Verifique o Índice de Prontidão antes de gerar" },
-  { id: "gerar",           label: "⚡ Gerar Horário",   desc: "Motor de geração automática do quadro" },
-  { id: "manual",          label: "✍️ Horário Manual",  desc: "Registre manualmente a grade horária de cada professor" },
+  { id: "disponibilidade", label: "📅 Disponibilidade",          desc: "Configure a disponibilidade dos professores" },
+  { id: "diagnostico",     label: "🔍 Diagnóstico",              desc: "Verifique o Índice de Prontidão antes de gerar" },
+  { id: "gerar",           label: "⚡ Gerar Horário",            desc: "Motor de geração automática do quadro" },
+  { id: "manual",          label: "✍️ Horário Manual",           desc: "Registre manualmente a grade horária de cada professor" },
+  { id: "cenarios",        label: "🗂️ Cenários & Substituições", desc: "Compare cenários A/B/C, audite qualidade pedagógica e substitua professores preservando diários" },
 ];
 
 export default function HorariosShell() {
@@ -27,6 +29,8 @@ export default function HorariosShell() {
   const [carregando, setCarregando] = useState(true);
   const [abaAtiva, setAbaAtiva]     = useState("disponibilidade");
   const [highlightProf, setHighlightProf] = useState(null); // prof destacado ao vir do diagnóstico
+  const [turnoCompartilhado, setTurnoCompartilhado] = useState(null);
+  const [subAbaCenarios, setSubAbaCenarios] = useState("comparar");
 
   const carregarConfig = useCallback(async () => {
     setCarregando(true);
@@ -53,6 +57,17 @@ export default function HorariosShell() {
     setAbaAtiva("disponibilidade");
   }
 
+  function irParaCenarios(subAba = "comparar", turnoAlvo = null) {
+    if (turnoAlvo) setTurnoCompartilhado(turnoAlvo);
+    setSubAbaCenarios(subAba || "comparar");
+    setAbaAtiva("cenarios");
+  }
+
+  function irParaGerarComTurno(turnoAlvo = null) {
+    if (turnoAlvo) setTurnoCompartilhado(turnoAlvo);
+    setAbaAtiva("gerar");
+  }
+
   if (carregando) {
     return (
       <div style={{
@@ -71,7 +86,7 @@ export default function HorariosShell() {
     return <WizardConfiguracaoGrade configInicial={config || undefined} onConcluir={handleWizardConcluir} />;
   }
 
-  // ── Escola com configuração → 4 Abas ──
+  // ── Escola com configuração → 5 Abas ──
   return (
     <div style={{ fontFamily: "'Montserrat', sans-serif", display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }}>
       {/* Tab bar */}
@@ -80,6 +95,7 @@ export default function HorariosShell() {
         borderBottom: "2px solid #e2e8f0",
         background: "#fff",
         zIndex: 20,
+        overflowX: "auto",
       }}>
         {ABAS.map(aba => {
           const ativo = abaAtiva === aba.id;
@@ -89,10 +105,10 @@ export default function HorariosShell() {
               onClick={() => setAbaAtiva(aba.id)}
               title={aba.desc}
               style={{
-                padding: "16px 28px", border: "none", background: "transparent",
+                padding: "15px 20px", border: "none", background: "transparent",
                 borderBottom: ativo ? "3px solid #2563eb" : "3px solid transparent",
                 color: ativo ? "#2563eb" : "#64748b",
-                fontWeight: ativo ? 700 : 500, fontSize: 14,
+                fontWeight: ativo ? 700 : 500, fontSize: 13.5,
                 cursor: "pointer", transition: "all 0.2s",
                 fontFamily: "inherit", whiteSpace: "nowrap",
                 marginBottom: -2,
@@ -102,17 +118,17 @@ export default function HorariosShell() {
             </button>
           );
         })}
-        <div style={{ flex: 1 }} />
-        <div style={{ display: "flex", alignItems: "center", gap: 10, paddingRight: 16 }}>
+        <div style={{ flex: 1, minWidth: 8 }} />
+        <div style={{ display: "flex", alignItems: "center", gap: 10, paddingRight: 16, flexShrink: 0 }}>
           <BadgeVigenciaHorario config={config} variant="shell" />
           {/* Link discreto de reconfiguração */}
           <button
             onClick={() => setReconfigurando(true)}
             title="Reconfigurar grade horária da escola"
             style={{
-              padding: "16px 8px", border: "none", background: "transparent",
+              padding: "15px 8px", border: "none", background: "transparent",
               color: "#94a3b8", fontSize: 12, cursor: "pointer",
-              fontFamily: "inherit", marginBottom: -2,
+              fontFamily: "inherit", marginBottom: -2, whiteSpace: "nowrap",
             }}
           >⚙️ Reconfigurar</button>
         </div>
@@ -123,7 +139,7 @@ export default function HorariosShell() {
         {abaAtiva === "disponibilidade" && (
           <DisponibilidadePage
             config={config}
-            turnoInicial={config?.turnos?.[0] || "matutino"}
+            turnoInicial={turnoCompartilhado || config?.turnos?.[0] || "matutino"}
             highlightProfId={highlightProf}
             onVoltar={() => {}}
           />
@@ -138,14 +154,24 @@ export default function HorariosShell() {
         {abaAtiva === "gerar" && (
           <GerarHorarioPage
             config={config}
+            turnoInicial={turnoCompartilhado || config?.turnos?.[0] || "matutino"}
             onAtualizarConfig={setConfig}
             onAbrirReconfiguracao={() => setReconfigurando(true)}
+            onIrParaCenarios={irParaCenarios}
           />
         )}
         {abaAtiva === "manual" && (
           <HorarioManualPage
             config={config}
-            turnoInicial={config?.turnos?.[0] || "matutino"}
+            turnoInicial={turnoCompartilhado || config?.turnos?.[0] || "matutino"}
+          />
+        )}
+        {abaAtiva === "cenarios" && (
+          <GestaoAvancadaHorariosPage
+            config={config}
+            turnoInicial={turnoCompartilhado || config?.turnos?.[0] || "matutino"}
+            subAbaInicial={subAbaCenarios}
+            onIrParaGerar={irParaGerarComTurno}
           />
         )}
       </div>

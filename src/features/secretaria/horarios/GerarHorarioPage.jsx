@@ -556,12 +556,26 @@ function buildPeriodosPorDia(grade, diasPadrao = [1, 2, 3, 4, 5], maxPeriodosPad
 }
 
 // ── Componente principal ───────────────────────────────────────
-export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirReconfiguracao }) {
+export default function GerarHorarioPage({
+  config,
+  turnoInicial,
+  onAtualizarConfig,
+  onAbrirReconfiguracao,
+  onIrParaCenarios,
+}) {
   const turnos = config?.turnos || ["matutino", "vespertino"];
   const vigencia = resolverVigenciaFrontend(config);
-  const [turno, setTurno] = useState(turnos[0] || "matutino");
+  const [turno, setTurno] = useState(
+    turnoInicial && turnos.includes(turnoInicial) ? turnoInicial : (turnos[0] || "matutino")
+  );
   const [turmas, setTurmas] = useState([]);
   const [carregandoInicial, setCarregandoInicial] = useState(false);
+
+  useEffect(() => {
+    if (turnoInicial && turnos.includes(turnoInicial) && turnoInicial !== turno) {
+      setTurno(turnoInicial);
+    }
+  }, [turnoInicial]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Opções do Motor Solver 2.0
   const [respeitarHorarioManual, setRespeitarHorarioManual] = useState(true);
@@ -585,6 +599,18 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
   // Estado de Edição Interativa (Click-to-Swap / Move / Alocar Pendente)
   // { tipo: 'slot' | 'nao_alocada', turmaId, dia?, ordem?, disciplina_id, professor_id, locked? }
   const [selecao, setSelecao] = useState(null);
+
+  // ETAPA 4: Pilhas de Desfazer / Refazer (Undo / Redo) + Salvar Cenário Rápido (A/B/C)
+  const [undoStack, setUndoStack] = useState([]);
+  const [redoStack, setRedoStack] = useState([]);
+  const [showModalSalvarCenario, setShowModalSalvarCenario] = useState(false);
+  const [salvandoCenario, setSalvandoCenario] = useState(false);
+  const [formCenario, setFormCenario] = useState({
+    codigo_cenario: "A",
+    nome: "",
+    descricao: "",
+    favorito: false,
+  });
 
   // Nomes para lookup
   const [nomesDisciplinas, setNomesDisciplinas] = useState({});
@@ -703,6 +729,8 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
         meta_persistencia: registroBanco.resultado || null,
       })
     );
+    setUndoStack([]);
+    setRedoStack([]);
     setTemAlteracoesNaoSalvas(false);
     setSelecao(null);
     return true;
@@ -714,6 +742,8 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
     setResultado(null);
     setErroSolver(null);
     setSelecao(null);
+    setUndoStack([]);
+    setRedoStack([]);
     setTemAlteracoesNaoSalvas(false);
 
     try {
@@ -886,6 +916,8 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
           origem_carregamento: "solver",
         });
         setResultado(novoResultadoNorm);
+        setUndoStack([]);
+        setRedoStack([]);
         setTemAlteracoesNaoSalvas(true);
       } else {
         const { data } = await api.post("/api/grade/run-mock", {
@@ -896,6 +928,8 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
         });
         novoResultadoNorm = normalizeResultado({ ...data, origem_carregamento: "solver" });
         setResultado(novoResultadoNorm);
+        setUndoStack([]);
+        setRedoStack([]);
         setTemAlteracoesNaoSalvas(true);
       }
 
@@ -1231,8 +1265,21 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
     [selecao, resultado, nomesProfessores, nomesTurmas, nomesDisciplinas, dispoIndex]
   );
 
-  // ── Atualiza estado da grade após edição interativa ───────────
-  function atualizarGradePosEdicao(novoGpt, novoGpp, mensagemFeedback) {
+  // ── Atualiza estado da grade após edição interativa (c/ Undo/Redo) ──
+  function atualizarGradePosEdicao(novoGpt, novoGpp, mensagemFeedback, registrarHistorico = true) {
+    if (registrarHistorico && resultado?.grade_por_turma) {
+      const snapAnterior = {
+        gpt: structuredClone
+          ? structuredClone(resultado.grade_por_turma)
+          : JSON.parse(JSON.stringify(resultado.grade_por_turma)),
+        gpp: structuredClone
+          ? structuredClone(resultado.grade_por_professor || {})
+          : JSON.parse(JSON.stringify(resultado.grade_por_professor || {})),
+      };
+      setUndoStack((prev) => [...prev.slice(-24), snapAnterior]);
+      setRedoStack([]);
+    }
+
     const {
       metrics: novasMetricas,
       nao_alocadas: novasNaoAlocadas,
@@ -1261,6 +1308,63 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
       setTimeout(() => setMsgAcao(""), 4500);
     }
   }
+
+  function desfazerEdicao() {
+    if (!resultado || undoStack.length === 0) return;
+    const ultimo = undoStack[undoStack.length - 1];
+    const atualSnap = {
+      gpt: structuredClone
+        ? structuredClone(resultado.grade_por_turma || {})
+        : JSON.parse(JSON.stringify(resultado.grade_por_turma || {})),
+      gpp: structuredClone
+        ? structuredClone(resultado.grade_por_professor || {})
+        : JSON.parse(JSON.stringify(resultado.grade_por_professor || {})),
+    };
+    setUndoStack((prev) => prev.slice(0, -1));
+    setRedoStack((prev) => [...prev.slice(-24), atualSnap]);
+    setSelecao(null);
+    atualizarGradePosEdicao(ultimo.gpt, ultimo.gpp, "↩️ Última alteração desfeita.", false);
+  }
+
+  function refazerEdicao() {
+    if (!resultado || redoStack.length === 0) return;
+    const proximo = redoStack[redoStack.length - 1];
+    const atualSnap = {
+      gpt: structuredClone
+        ? structuredClone(resultado.grade_por_turma || {})
+        : JSON.parse(JSON.stringify(resultado.grade_por_turma || {})),
+      gpp: structuredClone
+        ? structuredClone(resultado.grade_por_professor || {})
+        : JSON.parse(JSON.stringify(resultado.grade_por_professor || {})),
+    };
+    setRedoStack((prev) => prev.slice(0, -1));
+    setUndoStack((prev) => [...prev.slice(-24), atualSnap]);
+    setSelecao(null);
+    atualizarGradePosEdicao(proximo.gpt, proximo.gpp, "↪️ Alteração refeita.", false);
+  }
+
+  useEffect(() => {
+    const onUndoRedoKey = (e) => {
+      const tag = String(e.target?.tagName || "").toUpperCase();
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z") {
+        if (undoStack.length > 0 && !rodando) {
+          e.preventDefault();
+          desfazerEdicao();
+        }
+      } else if (
+        ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") ||
+        ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "z")
+      ) {
+        if (redoStack.length > 0 && !rodando) {
+          e.preventDefault();
+          refazerEdicao();
+        }
+      }
+    };
+    window.addEventListener("keydown", onUndoRedoKey);
+    return () => window.removeEventListener("keydown", onUndoRedoKey);
+  });
 
   // ── Clique em qualquer célula da grade (Turma ou Professor) ───
   function handleCellClick({ turmaId, dia, ordem, slot }) {
@@ -1583,6 +1687,47 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
     }
   }
 
+  // ── ETAPA 4: Salvar a grade atualmente em tela diretamente em Cenário A, B, C ou Extra ──
+  function abrirModalSalvarCenarioRapido() {
+    setFormCenario({
+      codigo_cenario: "A",
+      nome: `Cenário A — ${turno.charAt(0).toUpperCase() + turno.slice(1)}`,
+      descricao: "",
+      favorito: false,
+    });
+    setShowModalSalvarCenario(true);
+  }
+
+  async function executarSalvarCenarioRapido(e) {
+    e?.preventDefault?.();
+    if (!resultado) return;
+    setSalvandoCenario(true);
+    try {
+      const slots = extrairSlotsDaGradeAtual();
+      const { data } = await api.post("/api/grade/cenarios", {
+        turno: turno.toLowerCase(),
+        semestre: vigencia.semestre_atual,
+        codigo_cenario: formCenario.codigo_cenario === "CUSTOM" ? null : formCenario.codigo_cenario,
+        nome: formCenario.nome,
+        descricao: formCenario.descricao || null,
+        favorito: Boolean(formCenario.favorito),
+        origem_dados: "slots_tela",
+        slots,
+        sobrescrever_codigo: true,
+      });
+      setShowModalSalvarCenario(false);
+      setMsgAcao(
+        `✅ "${data.nome}" salvo com Score Pedagógico ${data.score_qualidade}/100! Compare na aba Cenários & Substituições.`
+      );
+      setTimeout(() => setMsgAcao(""), 6000);
+    } catch (err) {
+      setMsgAcao(`⚠️ ${err?.response?.data?.error || "Falha ao salvar cenário."}`);
+      setTimeout(() => setMsgAcao(""), 5000);
+    } finally {
+      setSalvandoCenario(false);
+    }
+  }
+
   // ── Métricas extraídas ───────────────────────────────────────
   const metrics = resultado?.metrics || {};
   const diag = resultado?.diagnostico || {};
@@ -1705,7 +1850,7 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
           </div>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           {/* Checkbox: Respeitar Horário Manual */}
           <label
             style={{
@@ -1783,7 +1928,7 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
             onClick={executarSolver}
             disabled={rodando || carregandoInicial || turmas.length === 0}
             style={{
-              padding: "9px 20px", borderRadius: 8, border: "none",
+              padding: "9px 18px", borderRadius: 8, border: "none",
               background: rodando ? "#93c5fd" : "#2563eb",
               color: "#fff", fontWeight: 700, fontSize: 13,
               cursor: (rodando || turmas.length === 0) ? "not-allowed" : "pointer",
@@ -1802,11 +1947,91 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
           {/* Ações pós-geração */}
           {resultado && !rodando && (
             <>
+              {/* Desfazer / Refazer (Ctrl+Z / Ctrl+Y) */}
+              <div style={{ display: "flex", borderRadius: 8, overflow: "hidden", border: "1px solid #cbd5e1" }}>
+                <button
+                  type="button"
+                  onClick={desfazerEdicao}
+                  disabled={undoStack.length === 0}
+                  title={`Desfazer última edição manual (Ctrl+Z) — ${undoStack.length} passo(s)`}
+                  style={{
+                    padding: "8px 10px",
+                    border: "none",
+                    borderRight: "1px solid #cbd5e1",
+                    background: undoStack.length > 0 ? "#fff" : "#f8fafc",
+                    color: undoStack.length > 0 ? "#1e293b" : "#cbd5e1",
+                    fontWeight: 800,
+                    fontSize: 12.5,
+                    cursor: undoStack.length > 0 ? "pointer" : "not-allowed",
+                  }}
+                >
+                  ↩️
+                </button>
+                <button
+                  type="button"
+                  onClick={refazerEdicao}
+                  disabled={redoStack.length === 0}
+                  title={`Refazer edição manual (Ctrl+Y) — ${redoStack.length} passo(s)`}
+                  style={{
+                    padding: "8px 10px",
+                    border: "none",
+                    background: redoStack.length > 0 ? "#fff" : "#f8fafc",
+                    color: redoStack.length > 0 ? "#1e293b" : "#cbd5e1",
+                    fontWeight: 800,
+                    fontSize: 12.5,
+                    cursor: redoStack.length > 0 ? "pointer" : "not-allowed",
+                  }}
+                >
+                  ↪️
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={abrirModalSalvarCenarioRapido}
+                style={{
+                  padding: "9px 13px",
+                  borderRadius: 8,
+                  border: "1px solid #6d28d9",
+                  background: "#f5f3ff",
+                  color: "#5b21b6",
+                  fontWeight: 700,
+                  fontSize: 12.5,
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                }}
+                title="Salvar esta proposta em Cenário A, B ou C sem sobrescrever o horário oficial"
+              >
+                🗂️ Cenário A/B/C
+              </button>
+
+              {typeof onIrParaCenarios === "function" && (
+                <button
+                  type="button"
+                  onClick={() => onIrParaCenarios("comparar", turno)}
+                  style={{
+                    padding: "9px 13px",
+                    borderRadius: 8,
+                    border: "1px solid #cbd5e1",
+                    background: "#fff",
+                    color: "#334155",
+                    fontWeight: 700,
+                    fontSize: 12.5,
+                    cursor: "pointer",
+                  }}
+                  title="Abrir Painel Comparativo de Qualidade Pedagógica e Substituições"
+                >
+                  ⚖️ Comparar
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={() => setShowModalExportar(true)}
                 style={{
-                  padding: "9px 16px",
+                  padding: "9px 15px",
                   borderRadius: 8,
                   border: "1px solid #334155",
                   background: "#f8fafc",
@@ -1827,7 +2052,7 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
                 onClick={salvarRascunho}
                 disabled={salvando || publicando}
                 style={{
-                  padding: "9px 18px",
+                  padding: "9px 16px",
                   borderRadius: 8,
                   border: temAlteracoesNaoSalvas ? "2px solid #0284c7" : "1px solid #0284c7",
                   background: temAlteracoesNaoSalvas ? "#e0f2fe" : "#f0f9ff",
@@ -1842,7 +2067,7 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
                 {salvando ? "Salvando…" : "📋 Salvar Rascunho"}
               </button>
               <button onClick={publicarGrade} disabled={salvando || publicando} style={{
-                padding: "9px 18px", borderRadius: 8, border: "none",
+                padding: "9px 16px", borderRadius: 8, border: "none",
                 background: "#16a34a", color: "#fff", fontWeight: 700, fontSize: 13,
                 cursor: "pointer", transition: "all 0.18s",
               }}>
@@ -3623,6 +3848,144 @@ export default function GerarHorarioPage({ config, onAtualizarConfig, onAbrirRec
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* 🗂️ Modal Rápido ETAPA 4: Salvar Grade Atual em Cenário A, B, C ou Extra */}
+      {showModalSalvarCenario && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15, 23, 42, 0.6)",
+            backdropFilter: "blur(4px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+            padding: 20,
+          }}
+        >
+          <form
+            onSubmit={executarSalvarCenarioRapido}
+            style={{
+              background: "#fff",
+              width: "100%",
+              maxWidth: 440,
+              borderRadius: 16,
+              padding: "22px 26px",
+              boxShadow: "0 20px 30px rgba(15, 23, 42, 0.22)",
+              display: "flex",
+              flexDirection: "column",
+              gap: 14,
+              animation: "modalFadeIn 0.2s ease-out forwards",
+            }}
+          >
+            <div>
+              <h3 style={{ margin: 0, color: "#0f172a", fontSize: 17, fontWeight: 800 }}>
+                🗂️ Salvar Grade em Cenário ({turno.toUpperCase()})
+              </h3>
+              <p style={{ margin: "4px 0 0", color: "#64748b", fontSize: 12 }}>
+                Salva exatamente os horários exibidos na tela agora para comparar lado a lado sem alterar o horário publicado oficial.
+              </p>
+            </div>
+
+            <div>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#334155", marginBottom: 4 }}>
+                Slot do Cenário
+              </label>
+              <select
+                value={formCenario.codigo_cenario}
+                onChange={(e) => {
+                  const cod = e.target.value;
+                  setFormCenario((prev) => ({
+                    ...prev,
+                    codigo_cenario: cod,
+                    nome:
+                      ["A", "B", "C"].includes(cod)
+                        ? `Cenário ${cod} — ${turno.charAt(0).toUpperCase() + turno.slice(1)}`
+                        : `Proposta Alternativa (${new Date().toLocaleDateString("pt-BR")})`,
+                  }));
+                }}
+                style={{ width: "100%", padding: "9px 10px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13 }}
+              >
+                <option value="A">Cenário A (Proposta Principal)</option>
+                <option value="B">Cenário B (Proposta Alternativa 2)</option>
+                <option value="C">Cenário C (Proposta Alternativa 3)</option>
+                <option value="CUSTOM">Cenário Extra Personalizado</option>
+              </select>
+            </div>
+
+            <div>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#334155", marginBottom: 4 }}>
+                Título do Cenário *
+              </label>
+              <input
+                required
+                type="text"
+                value={formCenario.nome}
+                onChange={(e) => setFormCenario((prev) => ({ ...prev, nome: e.target.value }))}
+                style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13 }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: "block", fontSize: 12, fontWeight: 700, color: "#334155", marginBottom: 4 }}>
+                Observação Pedagógica (opcional)
+              </label>
+              <input
+                type="text"
+                placeholder="Ex.: Menos janelas na equipe de Matemática"
+                value={formCenario.descricao}
+                onChange={(e) => setFormCenario((prev) => ({ ...prev, descricao: e.target.value }))}
+                style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: "1px solid #cbd5e1", fontSize: 13 }}
+              />
+            </div>
+
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={formCenario.favorito}
+                onChange={(e) => setFormCenario((prev) => ({ ...prev, favorito: e.target.checked }))}
+              />
+              ⭐ Destacar como favorito para aprovação da Direção
+            </label>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 4 }}>
+              <button
+                type="button"
+                onClick={() => setShowModalSalvarCenario(false)}
+                style={{
+                  padding: "9px 15px",
+                  borderRadius: 8,
+                  border: "1px solid #cbd5e1",
+                  background: "#fff",
+                  color: "#475569",
+                  fontWeight: 700,
+                  fontSize: 13,
+                  cursor: "pointer",
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={salvandoCenario}
+                style={{
+                  padding: "9px 18px",
+                  borderRadius: 8,
+                  border: "none",
+                  background: "#6d28d9",
+                  color: "#fff",
+                  fontWeight: 800,
+                  fontSize: 13,
+                  cursor: salvandoCenario ? "wait" : "pointer",
+                }}
+              >
+                {salvandoCenario ? "Salvando…" : "💾 Salvar Cenário"}
+              </button>
+            </div>
+          </form>
         </div>
       )}
 

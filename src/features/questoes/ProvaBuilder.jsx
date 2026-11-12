@@ -44,7 +44,7 @@ const TEMPLATES = [
 /* ── Nível labels ────────────────────────────────────────────────────────────── */
 const NIVEL_COLORS = { facil: '#059669', medio: '#d97706', dificil: '#dc2626', enem: '#7c3aed' };
 const NIVEL_LABEL  = { facil: 'Fácil', medio: 'Médio', dificil: 'Difícil', enem: 'ENEM' };
-const TIPO_LABEL   = { objetiva: 'Obj', discursiva: 'Disc', verdadeiro_falso: 'V/F', associacao: 'Assoc', lacuna: 'Lac' };
+const TIPO_LABEL   = { objetiva: 'Obj', afirmativas: 'Afirm', discursiva: 'Disc', verdadeiro_falso: 'V/F', associacao: 'Colunas', lacuna: 'Lac', somatoria: 'Soma' };
 
 /* ── API helpers ────────────────────────────────────────────────────────────── */
 // Usa o apiService (axios) configurado com a base URL correta do backend.
@@ -142,6 +142,9 @@ function BancoQuestaoCard({ questao, onAdd, onDuplicate, jaAdicionada }) {
       <div style={{ flex: 1, minWidth: 0 }}>
         {/* Meta badges */}
         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 4 }}>
+          <span style={{ fontSize: '0.62rem', fontWeight: 800, fontFamily: 'monospace', padding: '1px 6px', borderRadius: 5, background: '#0f172a', color: '#38bdf8' }}>
+            {questao.codigo || `EMQE-${String(questao.numero_q || questao.id).padStart(5, '0')}`}
+          </span>
           {questao.disciplina && (
             <span style={{ fontSize: '0.64rem', fontWeight: 700, padding: '1px 6px', borderRadius: 99, background: '#dbeafe', color: '#1d4ed8' }}>
               {questao.disciplina}
@@ -704,7 +707,7 @@ export default function ProvaBuilder({ onProvasSalvas }) {
             </div>
 
             <input
-              type="search" placeholder="Buscar questão..."
+              type="search" placeholder="Código (EMQE-00001), enunciado, BNCC..."
               value={bancoBusca} onChange={e => setBancoBusca(e.target.value)}
               style={{ padding: '7px 10px', borderRadius: 8, border: '1.5px solid #e2e8f0', fontSize: '0.82rem', fontFamily: 'inherit', width: '100%', boxSizing: 'border-box' }}
             />

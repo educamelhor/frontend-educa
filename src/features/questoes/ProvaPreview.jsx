@@ -4,6 +4,11 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import apiService from '../../services/api';
+import {
+  QuestaoCorpoEstruturado,
+  resumirGabaritoQuestao,
+  renderQuestaoPrintHtml,
+} from './utils/questaoRenderer';
 
 /* ── LaTeX inline renderer ─────────────────────────────────────────────────── */
 function LatexText({ text = '' }) {
@@ -44,17 +49,9 @@ function shuffleArr(arr) {
    QUESTÃO — renderização A4
 ══════════════════════════════════════════════════════════════════════════════ */
 function QuestaoA4({ item, idx, template, modoGabarito }) {
-  let alts = [];
-  try {
-    alts = Array.isArray(item.alternativas_json)
-      ? item.alternativas_json
-      : JSON.parse(item.alternativas_json || '[]');
-  } catch {}
-  const isDisc = template === 'discursiva' || (template === 'mista' && item.tipo === 'discursiva');
-  const correta = alts.find(a => a.correta)?.letra || item.correta;
   const num = String(idx + 1).padStart(2, '0');
   const pontos = Number(item.valor_pontos || 1);
-  const imgSrc = item.imagem_url || item.imagem_base64;
+  const itemNormalizado = template === 'discursiva' ? { ...item, tipo: 'discursiva' } : item;
 
   return (
     <div style={{
@@ -65,6 +62,11 @@ function QuestaoA4({ item, idx, template, modoGabarito }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 3 }}>
         <span style={{ fontWeight: 700, fontSize: '10pt', textTransform: 'uppercase', letterSpacing: '0.02em' }}>
           QUESTÃO {num}
+          {item.fonte && !item.texto_apoio && (
+            <span style={{ fontWeight: 600, fontSize: '8.5pt', textTransform: 'none', color: '#444', marginLeft: 5 }}>
+              ({item.fonte})
+            </span>
+          )}
         </span>
         <span style={{ display: 'flex', gap: 4, alignItems: 'center', fontSize: '7.5pt' }}>
           {item.disciplina && (
@@ -83,66 +85,11 @@ function QuestaoA4({ item, idx, template, modoGabarito }) {
         </span>
       </div>
 
-      {item.texto_apoio && (
-        <blockquote style={{
-          borderLeft: '3px solid #555', paddingLeft: 8, margin: '4px 0',
-          fontStyle: 'italic', fontSize: '9.5pt', color: '#333',
-          background: '#f8f8f8', padding: '4px 8px',
-        }}>
-          <LatexText text={item.texto_apoio} />
-          {item.fonte && <footer style={{ fontSize: '8pt', fontStyle: 'normal', color: '#666', marginTop: 2 }}>— {item.fonte}</footer>}
-        </blockquote>
-      )}
-
-      <p style={{ fontSize: '10.5pt', lineHeight: 1.6, textAlign: 'justify', margin: '3px 0 4px', fontFamily: "'Source Serif 4', 'Times New Roman', serif" }}>
-        <LatexText text={item.conteudo_bruto} />
-      </p>
-
-      {imgSrc && (
-        <div style={{ textAlign: 'center', margin: '8px 0' }}>
-          <img
-            src={imgSrc}
-            alt="Figura"
-            style={{
-              display: 'inline-block',
-              maxWidth: '100%',
-              maxHeight: 180,
-              height: 'auto',
-              objectFit: 'contain',
-              border: '0.5pt solid #ccc',
-            }}
-          />
-        </div>
-      )}
-
-      {isDisc ? (
-        <div style={{ marginTop: 4 }}>
-          {Array.from({ length: 6 }, (_, i) => (
-            <div key={i} style={{ height: 16, borderBottom: '0.6pt dotted #999', marginBottom: 4, width: '100%' }} />
-          ))}
-        </div>
-      ) : (
-        <div style={{ marginTop: 3 }}>
-          {alts.map((a, i) => {
-            const isCorr = modoGabarito && (a.correta || a.letra === correta);
-            return (
-              <div key={i} style={{
-                display: 'flex', gap: 5, padding: '2px 0',
-                fontSize: '10pt', alignItems: 'flex-start',
-                background: isCorr ? '#f0fdf4' : 'transparent',
-              }}>
-                <span style={{ fontWeight: 700, flexShrink: 0, minWidth: 20, color: isCorr ? '#166534' : 'inherit' }}>
-                  ({a.letra})
-                </span>
-                <span style={{ flex: 1 }}>
-                  <LatexText text={a.texto} />
-                  {isCorr && <span style={{ color: '#166534', marginLeft: 6, fontSize: '9pt' }}>✔</span>}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      <QuestaoCorpoEstruturado
+        questao={itemNormalizado}
+        showGabarito={modoGabarito}
+        modoProva={true}
+      />
     </div>
   );
 }
@@ -163,13 +110,7 @@ function GabaritoTabela({ itens }) {
       </thead>
       <tbody>
         {itens.map((it, idx) => {
-          let alts = [];
-          try {
-            alts = Array.isArray(it.alternativas_json)
-              ? it.alternativas_json
-              : JSON.parse(it.alternativas_json || '[]');
-          } catch {}
-          const corr = alts.find(a => a.correta)?.letra || it.correta || '—';
+          const corr = resumirGabaritoQuestao(it);
           const nivel = NIVEL_LABEL[it.nivel] || it.nivel || '—';
           return (
             <tr key={idx} style={{ background: idx % 2 ? '#f5f5f5' : '#fff' }}>
@@ -374,37 +315,14 @@ export default function ProvaPreview({ provaId, onClose }) {
       instrHtml = `<div style="border:1px solid #000;padding:5px 10px;margin-bottom:8px;font-size:8.5pt"><strong>INSTRUÇÕES:</strong><ol style="margin-left:18px;margin-top:3px"><li>Esta avaliação contém <strong>${itens.length} questão(ões)</strong> no total de <strong>${totalPts.toFixed(1)} ponto(s)</strong>.</li><li>Leia cada questão com atenção antes de responder.</li><li>${template==='discursiva'||template==='mista'?'Responda nas linhas abaixo de cada questão.':'Marque apenas uma alternativa por questão.'}</li></ol></div>`;
     }
 
-    const questoesHtml = itens.map((it, idx) => {
-      let alts = [];
-      try {
-        alts = Array.isArray(it.alternativas_json)
-          ? it.alternativas_json
-          : JSON.parse(it.alternativas_json || '[]');
-      } catch {}
-      const num = String(idx + 1).padStart(2, '0');
-      const isDisc = template === 'discursiva' || (template === 'mista' && it.tipo === 'discursiva');
-      const imgSrc = it.imagem_url || it.imagem_base64;
-      const altsHtml = alts.map(a => `<div style="display:flex;gap:5px;padding:1px 0;font-size:10pt"><span style="font-weight:700;min-width:22px">(${a.letra})</span><span>${(a.texto||'').replace(/\$([^$]+)\$/g,'<i>$1</i>')}</span></div>`).join('');
-      const linhasHtml = Array.from({length:6}, () => '<div style="height:16px;border-bottom:0.6pt dotted #999;margin-bottom:4px"></div>').join('');
-      return `<div style="break-inside:avoid;page-break-inside:avoid;margin-bottom:10px;padding-bottom:8px;border-bottom:0.5pt dashed #ccc">
-        <div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-weight:700;font-size:10pt;text-transform:uppercase">QUESTÃO ${num}</span><span style="font-size:7.5pt;color:#666">${it.disciplina||''} ${it.habilidade_bncc?`· ${it.habilidade_bncc}`:''} · ${Number(it.valor_pontos||1).toFixed(1)}pt</span></div>
-        ${it.texto_apoio?`<blockquote style="border-left:3px solid #555;padding:4px 8px;font-style:italic;font-size:9.5pt;margin:4px 0;background:#f8f8f8">${it.texto_apoio}${it.fonte?`<footer style="font-size:8pt;font-style:normal">— ${it.fonte}</footer>`:''}</blockquote>`:''}
-        <p style="font-size:10.5pt;line-height:1.6;text-align:justify;margin:3px 0 4px">${(it.conteudo_bruto||'').replace(/\$([^$]+)\$/g,'<i>$1</i>')}</p>
-        ${imgSrc?`<div style="text-align:center;margin:8px 0"><img src="${imgSrc}" style="display:inline-block;max-width:100%;max-height:180px;height:auto;object-fit:contain;border:0.5pt solid #ccc"/></div>`:''}
-        ${isDisc ? linhasHtml : altsHtml}
-      </div>`;
-    }).join('');
+    const questoesHtml = itens.map((it, idx) => renderQuestaoPrintHtml(it, idx, template, false)).join('');
 
     const gabaritoHtml = incGab ? `<div style="page-break-before:always;margin-top:20px">
       <div style="border:2px solid #000;padding:6px 10px;text-align:center;font-weight:700;font-size:13pt;text-transform:uppercase;margin-bottom:8px">GABARITO — ${prova.titulo||''}</div>
       <table style="width:100%;border-collapse:collapse;font-size:9.5pt">
         <thead><tr>${['Nº','Resp.','Pts','Disciplina','Nível'].map(h=>`<th style="background:#333;color:#fff;padding:4px 6px;text-align:center;font-size:8pt">${h}</th>`).join('')}</tr></thead>
         <tbody>${itens.map((it,i)=>{
-          let a2=[];
-          try {
-            a2 = Array.isArray(it.alternativas_json) ? it.alternativas_json : JSON.parse(it.alternativas_json||'[]');
-          } catch {}
-          const corr=a2.find(a=>a.correta)?.letra||it.correta||'—';
+          const corr=resumirGabaritoQuestao(it);
           const niv={facil:'Fácil',medio:'Médio',dificil:'Difícil',enem:'ENEM'}[it.nivel]||'—';
           return `<tr style="background:${i%2?'#f5f5f5':'#fff'}"><td style="padding:3px 6px;border:0.5pt solid #ccc;text-align:center;font-weight:700">${String(i+1).padStart(2,'0')}</td><td style="padding:3px 6px;border:0.5pt solid #ccc;text-align:center;font-weight:700;color:#166534">${corr}</td><td style="padding:3px 6px;border:0.5pt solid #ccc;text-align:center">${Number(it.valor_pontos||1).toFixed(1)}</td><td style="padding:3px 6px;border:0.5pt solid #ccc;text-align:center;font-size:8.5pt">${it.disciplina||'—'}</td><td style="padding:3px 6px;border:0.5pt solid #ccc;text-align:center">${niv}</td></tr>`;
         }).join('')}

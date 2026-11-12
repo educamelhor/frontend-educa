@@ -172,8 +172,8 @@ function ExclusaoModal({ questao, onArquivar, onExcluir, onCancel }) {
 /* ── Constantes ─────────────────────────────────────────── */
 const NIVEL_LABEL  = { facil: 'Fácil', medio: 'Médio', dificil: 'Difícil', enem: 'ENEM' };
 const TIPO_LABEL   = {
-  objetiva: 'Objetiva', discursiva: 'Discursiva',
-  verdadeiro_falso: 'V/F', associacao: 'Associação', lacuna: 'Lacuna',
+  objetiva: 'Objetiva', afirmativas: 'Afirmativas', discursiva: 'Discursiva',
+  verdadeiro_falso: 'V/F', associacao: 'Colunas', lacuna: 'Lacunas', somatoria: 'Somatória',
 };
 const NIVEL_COLORS = { facil: '#059669', medio: '#d97706', dificil: '#dc2626', enem: '#7c3aed' };
 const LIMIT = 20;
@@ -206,6 +206,25 @@ function QuestaoCard({ questao, onEdit, onDuplicate, onGerenciar, onClick, isAut
       <div className={`bq-question-card-top nivel-${nivel}`} />
 
       <div className="bq-question-card-body">
+        {/* Código Único Identificável */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+          <span style={{
+            fontSize: '0.66rem', fontWeight: 800, fontFamily: 'monospace',
+            padding: '2px 8px', borderRadius: 6, background: '#0f172a', color: '#38bdf8',
+            letterSpacing: '0.05em',
+          }}>
+            {questao.codigo || `EMQE-${String(questao.numero_q || questao.id).padStart(5, '0')}`}
+          </span>
+          {questao.codigo_global && (
+            <span style={{
+              fontSize: '0.62rem', fontWeight: 700, fontFamily: 'monospace',
+              padding: '1px 6px', borderRadius: 6, background: '#ede9fe', color: '#5b21b6',
+            }} title="Publicada no Banco Global">
+              🌐 {questao.codigo_global}
+            </span>
+          )}
+        </div>
+
         {/* Meta */}
         <div className="bq-question-card-meta">
           {questao.disciplina && <span className="bq-badge bq-badge-disc">{questao.disciplina}</span>}
@@ -497,7 +516,7 @@ export default function QuestoesBanco({ onEdit, refreshKey, onRemovida }) {
           </svg>
           <input
             type="search"
-            placeholder="Buscar por enunciado, tags, BNCC..."
+            placeholder="Buscar por código (EMQE-00001), enunciado, fonte, BNCC..."
             value={busca}
             onChange={e => setBusca(e.target.value)}
           />

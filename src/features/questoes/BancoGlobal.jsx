@@ -3,11 +3,12 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../../services/api';
+import { QuestaoCorpoEstruturado } from './utils/questaoRenderer';
 
 /* ── Utilitários ── */
 const NIVEL_LABEL  = { facil: 'Fácil', medio: 'Médio', dificil: 'Difícil', enem: 'ENEM' };
 const NIVEL_COLOR  = { facil: '#059669', medio: '#d97706', dificil: '#dc2626', enem: '#7c3aed' };
-const TIPO_LABEL   = { objetiva: 'Objetiva', discursiva: 'Discursiva', verdadeiro_falso: 'V/F', associacao: 'Assoc.', lacuna: 'Lacuna' };
+const TIPO_LABEL   = { objetiva: 'Objetiva', afirmativas: 'Afirmativas', discursiva: 'Discursiva', verdadeiro_falso: 'V/F', associacao: 'Colunas', lacuna: 'Lacunas', somatoria: 'Somatória' };
 
 function parseTags(raw) {
   if (!raw) return [];
@@ -105,36 +106,10 @@ function DetalhesModal({ q, onUsar, usando, onClose }) {
             {q.habilidade_bncc && <span style={{ fontSize:'0.72rem',fontWeight:700,background:'#fff7ed',color:'#c2410c',borderRadius:99,padding:'2px 10px' }}>{q.habilidade_bncc}</span>}
             {q.uso_count > 0 && <span style={{ fontSize:'0.72rem',fontWeight:700,background:'#f0f9ff',color:'#0369a1',borderRadius:99,padding:'2px 10px',border:'1px solid #bae6fd' }}>📊 {q.uso_count}× usado</span>}
           </div>
-          {/* Texto de apoio */}
-          {q.texto_apoio && (
-            <div style={{ background:'#f8fafc', border:'1px solid #e2e8f0', borderLeft:'3px solid #6366f1', borderRadius:8, padding:'8px 12px', marginBottom:12, fontSize:'0.82rem', color:'#475569', fontStyle:'italic' }}>
-              {q.texto_apoio}
-            </div>
-          )}
-          {/* Enunciado */}
-          <div style={{ fontSize:'0.9rem',color:'#1e293b',lineHeight:1.7,marginBottom:16,fontWeight:500 }}>{q.conteudo_bruto}</div>
-          {/* Imagem */}
-          {(q.imagem_url || q.imagem_base64) && (
-            <div style={{ textAlign:'center', marginBottom:16 }}>
-              <img src={q.imagem_url || q.imagem_base64} alt="Figura da questão" style={{ maxWidth:'100%', maxHeight:240, objectFit:'contain', borderRadius:10, border:'1px solid #e2e8f0' }} />
-            </div>
-          )}
-          {/* Alternativas */}
-          {alts.length > 0 && (
-            <div style={{ display:'flex',flexDirection:'column',gap:6,marginBottom:16 }}>
-              {alts.map((alt, i) => {
-                const letra = String.fromCharCode(65+i);
-                const isCorreta = q.correta === letra;
-                return (
-                  <div key={i} style={{ display:'flex',gap:10,alignItems:'flex-start',padding:'8px 12px',borderRadius:10,background:isCorreta?'#f0fdf4':'#f8fafc',border:`1.5px solid ${isCorreta?'#86efac':'#e2e8f0'}` }}>
-                    <span style={{ fontWeight:800,color:isCorreta?'#059669':'#94a3b8',minWidth:20,fontSize:'0.82rem' }}>{letra}</span>
-                    <span style={{ fontSize:'0.83rem',color:'#334155' }}>{typeof alt === 'object' ? alt.texto||alt.text||JSON.stringify(alt) : alt}</span>
-                    {isCorreta && <span style={{ marginLeft:'auto',fontSize:'0.75rem',color:'#059669',fontWeight:700 }}>✓ Correta</span>}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+          {/* Corpo estruturado universal (7 modelos + KaTeX + Smart Media) */}
+          <div style={{ marginBottom: 16 }}>
+            <QuestaoCorpoEstruturado questao={q} showGabarito={true} />
+          </div>
           {/* Fonte / Tags */}
           {q.fonte && <div style={{ fontSize:'0.75rem',color:'#64748b',marginBottom:8 }}>📖 Fonte: {q.fonte}</div>}
           {tags.length > 0 && <div style={{ display:'flex',gap:5,flexWrap:'wrap',marginBottom:16 }}>{tags.map(t=><span key={t} style={{ fontSize:'0.68rem',background:'#f1f5f9',color:'#64748b',borderRadius:99,padding:'2px 8px',border:'1px solid #e2e8f0' }}>{t}</span>)}</div>}
@@ -337,7 +312,7 @@ export default function BancoGlobal({ onUsada }) {
         {/* Busca */}
         <div style={{ flex:'1 1 220px', position:'relative' }}>
           <span style={{ position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', color:'#94a3b8', fontSize:'0.9rem' }}>🔍</span>
-          <input value={busca} onChange={e=>setBusca(e.target.value)} placeholder="Buscar por enunciado, tags, BNCC..."
+          <input value={busca} onChange={e=>setBusca(e.target.value)} placeholder="Buscar por código (EMQG-00001), enunciado, fonte, BNCC..."
             style={{ width:'100%', padding:'8px 12px 8px 34px', borderRadius:10, border:'1.5px solid #e0e7ff', fontSize:'0.82rem', fontFamily:'inherit', outline:'none', boxSizing:'border-box' }} />
         </div>
 

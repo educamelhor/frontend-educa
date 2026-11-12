@@ -1,31 +1,40 @@
 // src/features/questoes/QuestoesBuilder.jsx
-// 🧩 Construtor de Questões — Puzzle Builder
+// 🧩 EDUCA.STUDIO AI — Estúdio Inteligente de Criação e Clonagem de Questões (7 Modelos Universais)
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api from '../../services/api';
 import TagsInput from './components/TagsInput';
-import ImageUploader from './components/ImageUploader';
+import SmartMediaCard from './components/SmartMediaCard';
+import MathToolbar from './components/MathToolbar';
+import ModelosEditor from './components/ModelosEditor';
 import LatexPreview, { gerarLatex } from './components/LatexPreview';
 import ImagemParaQuestaoModal from './components/ImagemParaQuestaoModal';
 import PublicarResultadoModal from './components/PublicarResultadoModal';
 import ComentarioCorretaModal from './components/ComentarioCorretaModal';
+import {
+  criarEstruturaInicial,
+  parseJsonSafe,
+  resumirGabaritoQuestao,
+} from './utils/questaoRenderer';
 
 /* ── Constantes ─────────────────────────────────────────── */
 const LETRAS = ['A', 'B', 'C', 'D', 'E'];
 
 const TIPOS = [
-  { value: 'objetiva',        label: 'Objetiva (A–E)', emoji: '🔘' },
-  { value: 'discursiva',      label: 'Discursiva',     emoji: '✏️' },
-  { value: 'verdadeiro_falso',label: 'V / F',          emoji: '⚖️' },
-  { value: 'associacao',      label: 'Associação',     emoji: '🔗' },
-  { value: 'lacuna',          label: 'Preencher Lacuna', emoji: '📝' },
+  { value: 'objetiva',         label: 'Objetiva (A–E)',        emoji: '🔘' },
+  { value: 'afirmativas',      label: 'Afirmativas (I, II...)', emoji: '🔢' },
+  { value: 'verdadeiro_falso', label: 'V / F',                 emoji: '⚖️' },
+  { value: 'associacao',       label: 'Colunas',               emoji: '🔗' },
+  { value: 'lacuna',           label: 'Completar Lacunas',     emoji: '📝' },
+  { value: 'somatoria',        label: 'Somatória (01, 02...)', emoji: '➕' },
+  { value: 'discursiva',       label: 'Discursiva / Aberta',   emoji: '✏️' },
 ];
 
 const NIVEIS = [
-  { value: 'facil',   label: '⭐ Fácil'   },
-  { value: 'medio',   label: '⭐⭐ Médio'  },
+  { value: 'facil',   label: '⭐ Fácil' },
+  { value: 'medio',   label: '⭐⭐ Médio' },
   { value: 'dificil', label: '⭐⭐⭐ Difícil' },
-  { value: 'enem',    label: '🏆 ENEM'   },
+  { value: 'enem',    label: '🏆 ENEM' },
 ];
 
 const SERIES = [
@@ -40,32 +49,35 @@ const DISCIPLINAS = [
 ];
 
 const TEXTO_APOIO_FONTES = [
-  'ENEM 2023', 'ENEM 2022', 'ENEM 2021', 'SAEB', 'PISA',
-  'SEEDF', 'Própria', 'Adaptada de livro didático',
+  'ENEM 2024', 'ENEM 2023', 'ENEM 2022', 'PAS-UnB', 'FUVEST', 'UNICAMP',
+  'UECE', 'Acafe-SC', 'SAEB', 'SEEDF', 'Autoral / Própria',
 ];
 
-const mkAlt = (letra) => ({ id: Date.now() + Math.random(), letra, texto: '', correta: false });
+const mkAlt = (letra) => ({ id: Date.now() + Math.random(), letra, texto: '', imagem_url: null, correta: false });
 
-const INITIAL_STATE = {
+const createInitialState = () => ({
   disciplina: '',
   tipo: 'objetiva',
   nivel: 'medio',
   serie: '',
   enunciado: '',
+  comando_final: '',
   texto_apoio: '',
   fonte: '',
   alternativas: LETRAS.map(mkAlt),
+  estrutura: criarEstruturaInicial('objetiva'),
   resposta_aberta: '',
   habilidade_bncc: '',
   explicacao: '',
   tags: [],
-  temas: [],          // Temas/conteúdos para o banco global
+  temas: [],
   imagem: null,
-  compartilhada: false,
-};
+  midia: null,
+  compartilhada: true,
+});
 
 /* ── Bloco colapsável ────────────────────────────────────── */
-function Block({ num, title, subtitle, open, onToggle, children }) {
+function Block({ num, title, subtitle, rightAction, open, onToggle, children }) {
   return (
     <div className={`bq-block${open ? ' bq-block--open' : ''}`}>
       <div className="bq-block-header" onClick={onToggle}>
@@ -74,6 +86,11 @@ function Block({ num, title, subtitle, open, onToggle, children }) {
           <div className="bq-block-title">{title}</div>
           {subtitle && <div className="bq-block-subtitle">{subtitle}</div>}
         </div>
+        {rightAction && (
+          <div onClick={e => e.stopPropagation()} style={{ marginRight: 8 }}>
+            {rightAction}
+          </div>
+        )}
         <svg className={`bq-block-chevron${open ? ' open' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
@@ -85,25 +102,33 @@ function Block({ num, title, subtitle, open, onToggle, children }) {
 
 /* ── Componente principal ────────────────────────────────── */
 export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
-  const [form, setForm] = useState(INITIAL_STATE);
-  const [openBlocks, setOpenBlocks] = useState({ 1: true, 2: true, 3: true, 4: false });
+  const [form, setForm] = useState(createInitialState);
+  const [openBlocks, setOpenBlocks] = useState({ 1: true, 2: true, 3: true, 4: true });
   const [saving, setSaving] = useState(false);
   const [modalResultado, setModalResultado] = useState(null);
   const [showImagemModal, setShowImagemModal] = useState(false);
+  const [pastedFileForModal, setPastedFileForModal] = useState(null);
+
+  // Estados do Copiloto IA
+  const [copilotoLoading, setCopilotoLoading] = useState(''); // '' | 'metadados' | 'latex' | 'distratores' | 'resolver'
+  const [gabaritoPendenteConfirmacao, setGabaritoPendenteConfirmacao] = useState(false);
+
   // Modal de justificativa da alternativa correta
-  const [showComentarioModal, setShowComentarioModal]   = useState(false);
-  const [altCorretaInfoModal, setAltCorretaInfoModal]   = useState(null); // { id, letra, texto }
-  // Rastreia ID de rascunho salvo mas ainda não publicado no banco global
+  const [showComentarioModal, setShowComentarioModal] = useState(false);
+  const [altCorretaInfoModal, setAltCorretaInfoModal] = useState(null);
+
+  // Rastreia rascunho/questão já persistida na sessão atual
   const [savedDraftId, setSavedDraftId] = useState(null);
+  const [savedCodigo, setSavedCodigo]   = useState(null);
+
+  const enunciadoRef = useRef(null);
 
   /* Popula formulário no modo edição */
   useEffect(() => {
     if (editingQuestao) {
       let alts = LETRAS.map(mkAlt);
       try {
-        const parsedAlts = Array.isArray(editingQuestao.alternativas_json)
-          ? editingQuestao.alternativas_json
-          : JSON.parse(editingQuestao.alternativas_json || '[]');
+        const parsedAlts = parseJsonSafe(editingQuestao.alternativas_json, []);
         if (Array.isArray(parsedAlts) && parsedAlts.length > 0) {
           alts = parsedAlts.map((a, idx) => {
             const letra = String(a?.letra || a?.letter || LETRAS[idx] || String.fromCharCode(65 + idx)).toUpperCase();
@@ -111,56 +136,85 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
               id: a?.id || (idx + 1),
               letra,
               texto: typeof a === 'object' ? (a.texto || a.text || a.conteudo || '') : String(a || ''),
+              imagem_url: typeof a === 'object' ? (a.imagem_url || null) : null,
               correta: Boolean(a?.correta || (editingQuestao.correta && letra === String(editingQuestao.correta).toUpperCase())),
             };
           });
         }
       } catch {}
-      // Normaliza alternativas: garante ao menos 5
       while (alts.length < 2) alts.push(mkAlt(LETRAS[alts.length]));
 
-      let tagsArr = [];
-      try {
-        const raw = editingQuestao.tags;
-        tagsArr = Array.isArray(raw) ? raw : (typeof raw === 'string' ? raw.split(',').map(t => t.trim()).filter(Boolean) : []);
-      } catch {}
+      const tagsArr = typeof editingQuestao.tags === 'string'
+        ? editingQuestao.tags.split(',').map(t => t.trim()).filter(Boolean)
+        : (Array.isArray(editingQuestao.tags) ? editingQuestao.tags : []);
 
-      let temasArr = [];
-      try {
-        const rawT = editingQuestao.temas;
-        temasArr = Array.isArray(rawT) ? rawT
-          : (typeof rawT === 'string' ? JSON.parse(rawT) : []);
-      } catch {}
+      const rawTemas = parseJsonSafe(editingQuestao.temas, []);
+      const temasArr = Array.isArray(rawTemas) ? rawTemas : [];
+
+      const tipoEd = editingQuestao.tipo || 'objetiva';
+      const estEd  = parseJsonSafe(editingQuestao.estrutura_json, null) || criarEstruturaInicial(tipoEd);
+      const midEd  = parseJsonSafe(editingQuestao.midia_json, null);
 
       setForm({
-        disciplina:   editingQuestao.disciplina || '',
-        tipo:         editingQuestao.tipo || 'objetiva',
-        nivel:        editingQuestao.nivel || 'medio',
-        serie:        editingQuestao.serie || '',
-        enunciado:    editingQuestao.conteudo_bruto || '',
-        texto_apoio:  editingQuestao.texto_apoio || '',
-        fonte:        editingQuestao.fonte || '',
-        alternativas: alts,
+        disciplina:      editingQuestao.disciplina || '',
+        tipo:            tipoEd,
+        nivel:           editingQuestao.nivel || 'medio',
+        serie:           editingQuestao.serie || '',
+        enunciado:       editingQuestao.conteudo_bruto || '',
+        comando_final:   editingQuestao.comando_final || '',
+        texto_apoio:     editingQuestao.texto_apoio || '',
+        fonte:           editingQuestao.fonte || '',
+        alternativas:    alts,
+        estrutura:       estEd,
         resposta_aberta: editingQuestao.resposta_aberta || '',
         habilidade_bncc: editingQuestao.habilidade_bncc || '',
-        explicacao:   editingQuestao.explicacao || '',
-        tags:         tagsArr,
-        temas:        temasArr,
-        imagem:       editingQuestao.imagem_url || editingQuestao.imagem_base64 || null,
-        compartilhada: editingQuestao.compartilhada || false,
+        explicacao:      editingQuestao.explicacao || '',
+        tags:            tagsArr,
+        temas:           temasArr,
+        imagem:          midEd?.url || editingQuestao.imagem_url || editingQuestao.imagem_base64 || null,
+        midia:           midEd,
+        compartilhada:   editingQuestao.compartilhada !== undefined ? Boolean(editingQuestao.compartilhada) : true,
       });
-      setOpenBlocks({ 1: true, 2: true, 3: true, 4: false });
+      setSavedCodigo(editingQuestao.codigo || `EMQE-${String(editingQuestao.numero_q || editingQuestao.id).padStart(5, '0')}`);
+      setSavedDraftId(null);
+      setGabaritoPendenteConfirmacao(false);
+      setOpenBlocks({ 1: true, 2: true, 3: true, 4: true });
     } else {
-      setForm(INITIAL_STATE);
+      setForm(createInitialState());
+      setSavedCodigo(null);
+      setSavedDraftId(null);
+      setGabaritoPendenteConfirmacao(false);
     }
   }, [editingQuestao]);
 
-  // Guarda de navegação: avisa ao fechar o browser com rascunho pendente
+  /* Atalho Global Ctrl+V na tela Criar Questão: abre o Clonador IA na hora se colar print */
+  useEffect(() => {
+    const onGlobalPaste = (e) => {
+      if (showImagemModal) return;
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of items) {
+        if (item.kind === 'file' && item.type.startsWith('image/')) {
+          const f = item.getAsFile();
+          if (f) {
+            e.preventDefault();
+            setPastedFileForModal(f);
+            setShowImagemModal(true);
+            break;
+          }
+        }
+      }
+    };
+    window.addEventListener('paste', onGlobalPaste);
+    return () => window.removeEventListener('paste', onGlobalPaste);
+  }, [showImagemModal]);
+
+  /* Guarda de navegação para rascunho não finalizado */
   useEffect(() => {
     if (!savedDraftId) return;
     const handler = (e) => {
       e.preventDefault();
-      e.returnValue = 'Você tem uma questão salva como rascunho que ainda não foi publicada.';
+      e.returnValue = 'Você tem um rascunho salvo ainda não ativado.';
     };
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
@@ -168,283 +222,562 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
 
   const toggle = (n) => setOpenBlocks(p => ({ ...p, [n]: !p[n] }));
   const set    = (field, val) => setForm(p => ({ ...p, [field]: val }));
-  const setAlt = (id, field, val) =>
-    setForm(p => ({
-      ...p,
-      alternativas: p.alternativas.map(a => a.id === id ? { ...a, [field]: val } : a),
-    }));
 
-  // ── Preenche form com dados extraídos pelo Gemini ──────────────────────
-  const handleUsarExtracao = (dados) => {
+  const trocarTipo = (novoTipo) => {
     setForm(prev => ({
       ...prev,
-      enunciado:    dados.enunciado   || prev.enunciado,
-      fonte:        dados.fonte       || prev.fonte,
-      tipo:         dados.tipo        || prev.tipo,
-      alternativas: dados.alternativas && dados.alternativas.length >= 2
-        ? dados.alternativas
-        : prev.alternativas,
+      tipo: novoTipo,
+      estrutura: prev.estrutura?.modelo === novoTipo ? prev.estrutura : criarEstruturaInicial(novoTipo),
     }));
-    setOpenBlocks({ 1: true, 2: true, 3: true, 4: false });
-    setModalResultado({
-      tipo: 'success',
-      titulo: 'Imagem importada com sucesso!',
-      mensagem: '✨ O enunciado e as alternativas foram preenchidos automaticamente. Revise os dados antes de publicar.',
-    });
+    setOpenBlocks(p => ({ ...p, 3: true }));
+  };
+
+  /* ── Recebe clonagem completa do Agente Multimodal Gemini 2.5 ── */
+  const handleUsarExtracao = (dados) => {
+    const novoTipo = dados.tipo || 'objetiva';
+    const altsExtraidas = Array.isArray(dados.alternativas) && dados.alternativas.length >= 2
+      ? dados.alternativas.map((a, idx) => ({
+          id: Date.now() + idx,
+          letra: String(a.letra || LETRAS[idx] || String.fromCharCode(65 + idx)).toUpperCase(),
+          texto: a.texto || '',
+          imagem_url: a.imagem_url || null,
+          correta: Boolean(a.correta || (dados.gabarito && String(a.letra).toUpperCase() === String(dados.gabarito).toUpperCase())),
+        }))
+      : LETRAS.map(mkAlt);
+
+    setForm(prev => ({
+      ...prev,
+      tipo:            novoTipo,
+      disciplina:      dados.disciplina || prev.disciplina,
+      serie:           dados.serie      || prev.serie,
+      nivel:           dados.nivel      || prev.nivel,
+      fonte:           dados.fonte      || prev.fonte,
+      habilidade_bncc: dados.habilidade_bncc || prev.habilidade_bncc,
+      temas:           dados.temas?.length ? dados.temas : prev.temas,
+      tags:            dados.tags?.length  ? dados.tags  : prev.tags,
+      texto_apoio:     dados.texto_apoio   || '',
+      enunciado:       dados.enunciado     || prev.enunciado,
+      comando_final:   dados.comando_final || '',
+      alternativas:    altsExtraidas,
+      estrutura:       dados.estrutura_json || criarEstruturaInicial(novoTipo),
+      midia:           dados.midia || null,
+      imagem:          dados.midia?.url || dados.imagem_url || null,
+      resposta_aberta: dados.resposta_aberta || '',
+      explicacao:      dados.explicacao || prev.explicacao,
+    }));
+
+    // Se o gabarito foi resolvido pela IA (sem marcação explícita no print), exige 1 clique de confirmação!
+    const precisaConfirmar = dados.gabarito_origem !== 'marcado_na_imagem' && novoTipo !== 'discursiva';
+    setGabaritoPendenteConfirmacao(precisaConfirmar);
+    setOpenBlocks({ 1: true, 2: true, 3: true, 4: true });
   };
 
   const marcarCorreta = (id) => {
-    // 1. Marca a alternativa como correta no form
+    setGabaritoPendenteConfirmacao(false);
     setForm(p => ({
       ...p,
       alternativas: p.alternativas.map(a => ({ ...a, correta: a.id === id })),
     }));
-    // 2. Abre modal premium pedindo justificativa
     const alt = form.alternativas.find(a => a.id === id);
-    if (alt) {
+    if (alt && !form.explicacao?.trim()) {
       setAltCorretaInfoModal({ id, letra: alt.letra, texto: alt.texto });
       setShowComentarioModal(true);
     }
   };
 
-  const addAlt = () => {
-    if (form.alternativas.length >= 7) return;
-    const proxLetra = LETRAS[form.alternativas.length] || String.fromCharCode(65 + form.alternativas.length);
-    setForm(p => ({
-      ...p,
-      alternativas: [...p.alternativas, mkAlt(proxLetra)],
-    }));
+  /* ── Ações do Copiloto Pedagógico IA ── */
+  const acionarCopilotoMetadados = async () => {
+    if (!form.enunciado.trim()) {
+      setModalResultado({ tipo: 'warning', titulo: 'Enunciado vazio', mensagem: 'Digite o enunciado primeiro para o Copiloto sugerir a classificação e a BNCC.' });
+      return;
+    }
+    setCopilotoLoading('metadados');
+    try {
+      const { data } = await api.post('/api/questoes/copiloto-ia', {
+        acao: 'sugerir_metadados',
+        enunciado: form.enunciado,
+        comando_final: form.comando_final,
+        alternativas: form.alternativas,
+        estrutura_json: form.estrutura,
+      });
+      setForm(p => ({
+        ...p,
+        disciplina:      data.disciplina || p.disciplina,
+        serie:           data.serie      || p.serie,
+        nivel:           ['facil', 'medio', 'dificil', 'enem'].includes(data.nivel) ? data.nivel : p.nivel,
+        habilidade_bncc: data.habilidade_bncc || p.habilidade_bncc,
+        temas:           Array.isArray(data.temas) && data.temas.length ? data.temas : p.temas,
+        tags:            Array.isArray(data.tags) && data.tags.length   ? data.tags  : p.tags,
+      }));
+      setOpenBlocks(p => ({ ...p, 1: true, 4: true }));
+    } catch (err) {
+      setModalResultado({ tipo: 'error', titulo: 'Copiloto IA', mensagem: err.response?.data?.message || 'Falha ao classificar questão.' });
+    } finally {
+      setCopilotoLoading('');
+    }
   };
 
-  const removeAlt = (id) => {
-    if (form.alternativas.length <= 2) return;
-    setForm(p => ({
-      ...p,
-      alternativas: p.alternativas.filter(a => a.id !== id),
-    }));
+  const acionarCopilotoLatex = async () => {
+    if (!form.enunciado.trim()) return;
+    setCopilotoLoading('latex');
+    try {
+      const { data } = await api.post('/api/questoes/copiloto-ia', {
+        acao: 'converter_latex',
+        texto: form.enunciado,
+      });
+      if (data.texto_formatado) set('enunciado', data.texto_formatado);
+    } catch (err) {
+      setModalResultado({ tipo: 'error', titulo: 'Copiloto LaTeX', mensagem: err.response?.data?.message || 'Erro ao formatar fórmulas.' });
+    } finally {
+      setCopilotoLoading('');
+    }
   };
 
-  /* Validação */
-  const validar = () => {
-    if (!form.disciplina) return 'Selecione a disciplina.';
+  const acionarCopilotoDistratores = async () => {
+    const corr = form.alternativas.find(a => a.correta && a.texto?.trim());
+    if (!form.enunciado.trim() || !corr) {
+      setModalResultado({
+        tipo: 'warning',
+        titulo: 'Informe a alternativa correta',
+        mensagem: 'Preencha o enunciado, digite o texto da alternativa correta e marque-a em verde para a IA gerar os 4 distratores.',
+      });
+      return;
+    }
+    setCopilotoLoading('distratores');
+    try {
+      const { data } = await api.post('/api/questoes/copiloto-ia', {
+        acao: 'gerar_distratores',
+        disciplina: form.disciplina,
+        enunciado: form.enunciado,
+        comando_final: form.comando_final,
+        resposta_correta: corr.texto,
+      });
+      const dists = Array.isArray(data.distratores) ? data.distratores : [];
+      let dIdx = 0;
+      const novasAlts = form.alternativas.map(a => {
+        if (a.id === corr.id) return a;
+        const txt = dists[dIdx++] || a.texto;
+        return { ...a, texto: txt, correta: false };
+      });
+      setForm(p => ({
+        ...p,
+        alternativas: novasAlts,
+        explicacao: p.explicacao || data.explicacao || '',
+      }));
+    } catch (err) {
+      setModalResultado({ tipo: 'error', titulo: 'Copiloto IA', mensagem: err.response?.data?.message || 'Erro ao gerar distratores.' });
+    } finally {
+      setCopilotoLoading('');
+    }
+  };
+
+  const acionarCopilotoResolucao = async () => {
+    if (!form.enunciado.trim()) {
+      setModalResultado({ tipo: 'warning', titulo: 'Enunciado obrigatório', mensagem: 'Escreva o enunciado antes de solicitar a resolução passo a passo.' });
+      return;
+    }
+    setCopilotoLoading('resolver');
+    try {
+      const { data } = await api.post('/api/questoes/copiloto-ia', {
+        acao: 'resolver_e_comentar',
+        tipo: form.tipo,
+        enunciado: form.enunciado,
+        comando_final: form.comando_final,
+        alternativas: form.alternativas,
+        estrutura_json: form.estrutura,
+      });
+      setForm(p => ({
+        ...p,
+        explicacao: data.resolucao_comentada || p.explicacao,
+        resposta_aberta: p.tipo === 'discursiva' ? (data.resposta_aberta_espelho || p.resposta_aberta) : p.resposta_aberta,
+      }));
+      setOpenBlocks(p => ({ ...p, 4: true }));
+    } catch (err) {
+      setModalResultado({ tipo: 'error', titulo: 'Copiloto IA', mensagem: err.response?.data?.message || 'Erro ao gerar resolução.' });
+    } finally {
+      setCopilotoLoading('');
+    }
+  };
+
+  /* ── Validação Completa dos 7 Modelos ── */
+  const validar = (exigirTemasGlobal = false) => {
+    if (!form.disciplina) return 'Selecione a disciplina no Bloco ①.';
     if (!form.enunciado.trim()) return 'O enunciado é obrigatório.';
     if (form.imagem && String(form.imagem).startsWith('blob:')) {
-      return 'Aguarde o término do envio da imagem antes de salvar.';
+      return 'Aguarde o término do envio da imagem.';
     }
-    if (form.tipo === 'objetiva') {
-      const preenchidas = form.alternativas.filter(a => a.texto.trim());
-      if (preenchidas.length < 2) return 'Adicione ao menos 2 alternativas.';
-      if (!form.alternativas.some(a => a.correta)) return 'Marque a alternativa correta.';
+
+    const est = form.estrutura || {};
+    const precisaAlts =
+      form.tipo === 'objetiva' ||
+      form.tipo === 'afirmativas' ||
+      (form.tipo === 'verdadeiro_falso' && est.submodo === 'sequencia') ||
+      (form.tipo === 'associacao' && est.submodo === 'sequencia') ||
+      (form.tipo === 'lacuna' && est.submodo === 'alternativas');
+
+    if (form.tipo === 'afirmativas') {
+      const validas = (est.proposicoes || []).filter(p => p.texto?.trim());
+      if (validas.length < 2) return 'Preencha ao menos 2 proposições romanas (I, II...).';
     }
+    if (form.tipo === 'verdadeiro_falso') {
+      const validas = (est.itens || []).filter(i => i.texto?.trim());
+      if (validas.length < 2) return 'Preencha ao menos 2 assertivas de Verdadeiro/Falso.';
+    }
+    if (form.tipo === 'associacao') {
+      const valA = (est.coluna_a || []).filter(a => a.texto?.trim());
+      const valB = (est.coluna_b || []).filter(b => b.texto?.trim());
+      if (valA.length < 2 || valB.length < 2) return 'Preencha ao menos 2 itens em cada coluna da associação.';
+    }
+    if (form.tipo === 'lacuna') {
+      const lacs = [...form.enunciado.matchAll(/\{\{([^}]+)\}\}/g)];
+      if (lacs.length === 0) return 'Marque ao menos uma lacuna no enunciado usando {{resposta}} ou o botão "[ ___ ] Criar Lacuna".';
+    }
+    if (form.tipo === 'somatoria') {
+      const validas = (est.proposicoes || []).filter(p => p.texto?.trim());
+      if (validas.length < 2) return 'Preencha ao menos 2 proposições na somatória.';
+    }
+
+    if (precisaAlts) {
+      const preenchidas = form.alternativas.filter(a => a.texto?.trim() || a.imagem_url);
+      if (preenchidas.length < 2) return 'Adicione ao menos 2 alternativas preenchidas.';
+      if (!form.alternativas.some(a => a.correta)) return 'Marque a alternativa correta em verde.';
+    }
+
+    if (gabaritoPendenteConfirmacao) {
+      return 'Confirme em 1 clique o gabarito sugerido pelo Agente IA no banner amarelo antes de ativar ou publicar.';
+    }
+
+    if (exigirTemasGlobal && (!form.temas || form.temas.length === 0)) {
+      return 'Adicione ao menos 1 Tema/Conteúdo no Bloco ① para publicar no Banco Global.';
+    }
+
     return null;
   };
 
-  /* Monta payload para API */
+  /* ── Monta Payload Canônico para a API ── */
   const buildPayload = (status) => {
-    const correta = form.alternativas.find(a => a.correta);
+    const est = { ...(form.estrutura || criarEstruturaInicial(form.tipo)), modelo: form.tipo };
+    if (form.tipo === 'lacuna') {
+      est.lacunas = [...String(form.enunciado || '').matchAll(/\{\{([^}]+)\}\}/g)].map(m => m[1].trim()).filter(Boolean);
+    }
+
+    const altsFiltradas = form.alternativas.filter(a => a.texto?.trim() || a.imagem_url);
+    const altCorreta = altsFiltradas.find(a => a.correta);
+
+    let corretaFinal = altCorreta?.letra || null;
+    if (form.tipo === 'somatoria') {
+      corretaFinal = String(est.soma_correta ?? 0);
+    } else if (form.tipo === 'verdadeiro_falso' && (est.submodo || 'direto') === 'direto') {
+      corretaFinal = (est.itens || []).filter(i => i.texto?.trim()).map(i => i.gabarito || 'V').join('-').slice(0, 10) || null;
+    }
+
     const latex = gerarLatex(form);
-    const rawImg = form.imagem || null;
+    const rawImg = form.midia?.url || form.imagem || null;
     const isBase64 = Boolean(rawImg && String(rawImg).startsWith('data:'));
+
     return {
       conteudo_bruto:    form.enunciado,
+      comando_final:     form.comando_final || null,
       latex_formatado:   latex,
       tipo:              form.tipo,
       nivel:             form.nivel,
-      serie:             form.serie,
-      disciplina:        form.disciplina,
-      habilidade_bncc:   form.habilidade_bncc,
-      texto_apoio:       form.texto_apoio,
-      fonte:             form.fonte,
-      alternativas_json: JSON.stringify(form.alternativas.filter(a => a.texto.trim())),
-      correta:           correta?.letra || null,
-      resposta_aberta:   form.resposta_aberta,
+      serie:             form.serie || null,
+      disciplina:        form.disciplina || null,
+      habilidade_bncc:   form.habilidade_bncc || null,
+      texto_apoio:       form.texto_apoio || null,
+      fonte:             form.fonte || null,
+      alternativas_json: altsFiltradas.length > 0 ? JSON.stringify(altsFiltradas) : null,
+      estrutura_json:    JSON.stringify(est),
+      correta:           corretaFinal,
+      resposta_aberta:   form.resposta_aberta || null,
       tags:              form.tags.join(','),
       temas:             form.temas.length > 0 ? JSON.stringify(form.temas) : null,
       imagem_url:        !isBase64 ? rawImg : null,
       imagem_base64:     isBase64  ? rawImg : null,
-      explicacao:        form.explicacao,
+      midia_json:        form.midia ? JSON.stringify(form.midia) : null,
+      explicacao:        form.explicacao || null,
       compartilhada:     form.compartilhada ? 1 : 0,
       status,
     };
   };
 
-  /* Limpar tela com confirmação se há rascunho pendente */
-  const handleLimpar = () => {
-    if (savedDraftId) {
-      setModalResultado({
-        tipo: 'warning',
-        titulo: 'Rascunho não publicado',
-        mensagem: 'Você tem uma questão salva como rascunho que ainda não foi publicada no Banco Global. Deseja publicar antes de limpar?',
-        acoes: [
-          { label: '🌐 Publicar Agora', primary: true, onClick: () => { setModalResultado(null); handlePublicar(); } },
-          { label: 'Descartar Rascunho', onClick: () => { setModalResultado(null); setSavedDraftId(null); setForm(INITIAL_STATE); } },
-          { label: 'Cancelar', onClick: () => setModalResultado(null) },
-        ],
-      });
+  /* ── Helper interno que cria ou atualiza no banco local ── */
+  const persistirNoBancoEscola = async (status) => {
+    const targetId = savedDraftId || editingQuestao?.id;
+    if (targetId) {
+      const { data } = await api.put(`/api/questoes/${targetId}`, buildPayload(status));
+      const codigo = data.codigo || savedCodigo || `EMQE-${String(targetId).padStart(5, '0')}`;
+      setSavedCodigo(codigo);
+      return { id: targetId, codigo };
     } else {
-      setForm(INITIAL_STATE);
-      setSavedDraftId(null);
+      const { data } = await api.post('/api/questoes', buildPayload(status));
+      const codigo = data.codigo || `EMQE-${String(data.numero_q || data.id).padStart(5, '0')}`;
+      setSavedCodigo(codigo);
+      return { id: data.id, codigo };
     }
   };
 
-  /* Publicar no banco global (rascunho existente ou novo) */
-  const handlePublicar = async () => {
-    const erro = validar();
-    if (erro) { setModalResultado({ tipo: 'error', titulo: 'Atenção', mensagem: erro }); return; }
+  /* 1) Salvar Rascunho */
+  const handleSaveRascunho = async () => {
+    if (!form.enunciado.trim()) {
+      setModalResultado({ tipo: 'error', titulo: 'Atenção', mensagem: 'Preencha ao menos o enunciado para salvar como rascunho.' });
+      return;
+    }
     setSaving(true);
     try {
-      let questaoId;
-      // Se já existe um rascunho salvo, atualiza-o; senao cria novo
-      const draftId = savedDraftId || (editingQuestao?.id);
-      if (draftId) {
-        await api.put(`/api/questoes/${draftId}`, buildPayload('ativa'));
-        questaoId = draftId;
-      } else {
-        const { data } = await api.post('/api/questoes', buildPayload('ativa'));
-        questaoId = data.id;
-      }
-      // Publica no banco global
-      const { data: pub } = await api.post(`/api/questoes/${questaoId}/publicar`);
+      const { id, codigo } = await persistirNoBancoEscola('rascunho');
+      if (!editingQuestao) setSavedDraftId(id);
+      setModalResultado({
+        tipo: 'success',
+        titulo: 'Rascunho Salvo!',
+        mensagem: 'Sua questão foi salva como rascunho na escola e já recebeu seu código único.',
+        codigo,
+        codigoLabel: 'CÓDIGO DO BANCO DA ESCOLA',
+        acoes: [
+          { label: '🏫 Ativar no Banco da Escola', primary: true, onClick: () => { setModalResultado(null); handleSalvarEscola(); } },
+          { label: 'Continuar Editando', onClick: () => setModalResultado(null) },
+        ],
+      });
+    } catch (err) {
+      setModalResultado({ tipo: 'error', titulo: 'Erro ao Salvar', mensagem: err.response?.data?.message || err.message });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /* 2) Salvar APENAS no Banco da Escola (Ativa local, sem publicar no Global) */
+  const handleSalvarEscola = async () => {
+    const erro = validar(false);
+    if (erro) {
+      setModalResultado({ tipo: 'error', titulo: 'Revisão Necessária', mensagem: erro });
+      return;
+    }
+    setSaving(true);
+    try {
+      const { id, codigo } = await persistirNoBancoEscola('ativa');
       setSavedDraftId(null);
       setModalResultado({
         tipo: 'success',
-        titulo: editingQuestao ? 'Questão Atualizada!' : 'Questão Publicada!',
-        mensagem: editingQuestao
-          ? 'As alterações foram salvas e o banco global foi sincronizado.'
-          : 'Sua questão foi publicada no Banco Global EDUCA.MELHOR. Qualquer escola pode utilizá-la agora!',
-        codigo: pub.codigo,
+        titulo: editingQuestao ? 'Questão Atualizada na Escola!' : 'Salva no Banco da Escola!',
+        mensagem: 'A questão está ativa exclusivamente no acervo da sua instituição e pronta para uso em provas. Use o código abaixo para localizá-la rapidamente.',
+        codigo,
+        codigoLabel: 'CÓDIGO DO BANCO DA ESCOLA',
         acoes: [
           {
-            label: '➕ Nova Questão', primary: true,
+            label: '➕ Criar Nova Questão',
+            primary: true,
             onClick: () => {
               setModalResultado(null);
-              setForm(INITIAL_STATE);
+              setForm(createInitialState());
               setSavedDraftId(null);
-              onSaved?.(); // Chama aqui: após o usuário confirmar, não antes do modal aparecer
+              setSavedCodigo(null);
+              onSaved?.();
+            },
+          },
+          {
+            label: '🌐 Publicar também no Global',
+            onClick: async () => {
+              setModalResultado(null);
+              setSavedDraftId(id);
+              await handlePublicarGlobal(id, codigo);
             },
           },
           { label: 'Fechar', onClick: () => setModalResultado(null) },
         ],
       });
-      // ⚠️ NÃO chamar onSaved() aqui — desmontaria o componente antes do modal renderizar
     } catch (err) {
-      const msg = err.response?.data?.message || err.message || 'Erro ao publicar.';
-      setModalResultado({ tipo: 'error', titulo: 'Erro ao Publicar', mensagem: msg });
+      setModalResultado({ tipo: 'error', titulo: 'Erro ao Salvar na Escola', mensagem: err.response?.data?.message || err.message });
     } finally {
       setSaving(false);
     }
   };
 
-  /* Salvar como Rascunho — mantém formulário preenchido */
-  const handleSaveRascunho = async () => {
-    if (!form.enunciado.trim()) {
-      setModalResultado({ tipo: 'error', titulo: 'Atenção', mensagem: 'Preencha ao menos o enunciado antes de salvar.' });
+  /* 3) Salvar e Publicar no Banco Global EDUCA.MELHOR */
+  const handlePublicarGlobal = async (forcedId = null, forcedCodigoEscola = null) => {
+    const erro = validar(true);
+    if (erro) {
+      setModalResultado({ tipo: 'error', titulo: 'Revisão para Banco Global', mensagem: erro });
       return;
     }
     setSaving(true);
     try {
-      let questaoId;
-      const draftId = savedDraftId || (editingQuestao?.id);
-      if (draftId) {
-        await api.put(`/api/questoes/${draftId}`, buildPayload('rascunho'));
-        questaoId = draftId;
-      } else {
-        const { data } = await api.post('/api/questoes', buildPayload('rascunho'));
-        questaoId = data.id;
-        setSavedDraftId(questaoId); // marca como rascunho pendente
+      let questaoId = forcedId;
+      let codigoEscola = forcedCodigoEscola;
+      if (!questaoId) {
+        const resLocal = await persistirNoBancoEscola('ativa');
+        questaoId = resLocal.id;
+        codigoEscola = resLocal.codigo;
       }
+      const { data: pub } = await api.post(`/api/questoes/${questaoId}/publicar`);
+      setSavedDraftId(null);
       setModalResultado({
         tipo: 'success',
-        titulo: 'Rascunho Salvo!',
-        mensagem: 'Questão salva como rascunho. Continue editando e publique no banco global quando estiver pronta.',
+        titulo: editingQuestao ? 'Questão Sincronizada!' : 'Publicada no Banco Global!',
+        mensagem: 'Questão salva no banco da sua escola e compartilhada no Banco Global EDUCA.MELHOR.',
+        codigo: pub.codigo,
+        codigoLabel: 'CÓDIGO DO BANCO GLOBAL',
+        codigoSecundario: codigoEscola,
+        codigoSecundarioLabel: 'CÓDIGO NA SUA ESCOLA',
         acoes: [
-          { label: '🌐 Publicar Agora', primary: true, onClick: () => { setModalResultado(null); handlePublicar(); } },
-          { label: 'Continuar Editando', onClick: () => setModalResultado(null) },
+          {
+            label: '➕ Criar Nova Questão',
+            primary: true,
+            onClick: () => {
+              setModalResultado(null);
+              setForm(createInitialState());
+              setSavedDraftId(null);
+              setSavedCodigo(null);
+              onSaved?.();
+            },
+          },
+          { label: 'Fechar', onClick: () => setModalResultado(null) },
         ],
       });
-      // Não reseta form, não chama onSaved
     } catch (err) {
-      const msg = err.response?.data?.message || err.message || 'Erro ao salvar rascunho.';
-      setModalResultado({ tipo: 'error', titulo: 'Erro ao Salvar', mensagem: msg });
+      setModalResultado({ tipo: 'error', titulo: 'Erro ao Publicar', mensagem: err.response?.data?.message || err.message });
     } finally {
       setSaving(false);
     }
   };
 
-  // Compat: mantém handleSave para uso legado interno
-  const handleSave = (status) => status === 'rascunho' ? handleSaveRascunho() : handlePublicar();
+  const handleLimpar = () => {
+    setForm(createInitialState());
+    setSavedDraftId(null);
+    setSavedCodigo(null);
+    setGabaritoPendenteConfirmacao(false);
+  };
 
-  const isEditing = !!editingQuestao;
+  const isEditing = Boolean(editingQuestao);
 
   return (
     <div className="bq-builder">
-      {/* ── Coluna esquerda: formulário ── */}
+      {/* ── Coluna esquerda: Estúdio de Criação ── */}
       <div className="bq-builder-form">
 
-        {/* Banner de rascunho pendente */}
-        {savedDraftId && !isEditing && (
+        {/* ── Hub Superior EDUCA.STUDIO AI ── */}
+        <div style={{
+          background: 'linear-gradient(135deg, #0f172a 0%, #0e7490 65%, #0284c7 100%)',
+          borderRadius: 14, padding: '14px 16px', marginBottom: 12, color: '#fff',
+          boxShadow: '0 6px 20px rgba(14,116,144,0.22)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: '0.68rem', fontWeight: 900, letterSpacing: '0.08em', background: 'rgba(255,255,255,0.16)', padding: '2px 8px', borderRadius: 99 }}>
+                  EDUCA.STUDIO AI
+                </span>
+                {savedCodigo && (
+                  <span style={{ fontSize: '0.72rem', fontWeight: 800, fontFamily: 'monospace', background: '#022c22', color: '#6ee7b7', padding: '2px 8px', borderRadius: 6, border: '1px solid #10b981' }}>
+                    {savedCodigo}
+                  </span>
+                )}
+              </div>
+              <h2 style={{ fontSize: '1.02rem', fontWeight: 800, margin: '5px 0 2px', color: '#fff' }}>
+                {isEditing ? `✏️ Editando Questão ${savedCodigo || `#${editingQuestao.id}`}` : '🧩 Estúdio Inteligente de Questões'}
+              </h2>
+              <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.8)' }}>
+                Monte passo a passo nos 7 modelos ou pressione <strong>Ctrl+V</strong> em qualquer lugar para clonar um print/foto com IA
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              {isEditing && (
+                <button
+                  type="button"
+                  onClick={onCancel}
+                  style={{
+                    background: 'rgba(255,255,255,0.14)', color: '#fff', border: '1px solid rgba(255,255,255,0.3)',
+                    borderRadius: 9, padding: '8px 12px', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer',
+                  }}
+                >
+                  ← Cancelar edição
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => { setPastedFileForModal(null); setShowImagemModal(true); }}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 7,
+                  background: '#ffffff', color: '#0f172a', border: 'none', borderRadius: 10,
+                  padding: '9px 15px', fontSize: '0.82rem', fontWeight: 800,
+                  cursor: 'pointer', boxShadow: '0 4px 12px rgba(0,0,0,0.18)',
+                }}
+              >
+                <span>📸</span> Clonar Print / Foto (Ctrl+V)
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Banner de Confirmação Obrigatória do Gabarito IA ── */}
+        {gabaritoPendenteConfirmacao && (
           <div style={{
-            display: 'flex', alignItems: 'center', gap: 10,
-            background: 'linear-gradient(90deg, #78350f, #92400e)',
-            color: '#fff', borderRadius: 10, padding: '10px 14px',
-            marginBottom: 12, fontSize: '0.85rem', fontWeight: 600,
-            boxShadow: '0 2px 8px rgba(120,53,15,0.35)',
+            display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap',
+            background: 'linear-gradient(90deg, #fffbeb, #fef3c7)',
+            border: '1.5px solid #f59e0b', borderRadius: 12,
+            padding: '11px 14px', marginBottom: 12,
           }}>
-            <span style={{ fontSize: '1.1rem' }}>⚠️</span>
-            <span style={{ flex: 1 }}>
-              Rascunho salvo (ID #{savedDraftId}) — questão ainda não publicada no Banco Global.
-            </span>
+            <span style={{ fontSize: '1.3rem' }}>🧠</span>
+            <div style={{ flex: 1, minWidth: 210 }}>
+              <div style={{ fontSize: '0.82rem', fontWeight: 800, color: '#92400e' }}>
+                Gabarito resolvido pelo Agente IA: <span style={{ color: '#065f46' }}>{resumirGabaritoQuestao(form)}</span>
+              </div>
+              <div style={{ fontSize: '0.74rem', color: '#78350f' }}>
+                O print não continha marcação oficial. Confira a resolução no Bloco ④ e confirme em 1 clique (ou altere a resposta).
+              </div>
+            </div>
             <button
-              onClick={() => handlePublicar()}
-              disabled={saving}
+              type="button"
+              onClick={() => setGabaritoPendenteConfirmacao(false)}
               style={{
-                background: '#f59e0b', color: '#1c1917', border: 'none',
-                borderRadius: 8, padding: '5px 14px', fontWeight: 700,
-                fontSize: '0.8rem', cursor: 'pointer', fontFamily: 'inherit',
-                whiteSpace: 'nowrap',
+                background: '#059669', color: '#fff', border: 'none', borderRadius: 8,
+                padding: '7px 14px', fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer',
               }}
             >
-              {saving ? 'Publicando...' : '🌐 Publicar Agora'}
+              ✓ Confirmar Gabarito
             </button>
           </div>
         )}
-        {/* Título da ação */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
-          <h2 style={{ fontSize: '1rem', fontWeight: 800, color: '#0f172a', margin: 0 }}>
-            {isEditing ? `✏️ Editando Questão #${editingQuestao.id}` : '🧩 Nova Questão'}
-          </h2>
-          {isEditing && (
-            <button className="bq-btn bq-btn-ghost" onClick={onCancel} style={{ padding: '4px 10px', fontSize: '0.78rem' }}>
-              ← Cancelar edição
-            </button>
-          )}
-          {/* Botão Gemini Vision */}
-          {!isEditing && (
-            <button
-              type="button"
-              onClick={() => setShowImagemModal(true)}
-              style={{
-                marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6,
-                background: 'linear-gradient(135deg, #0e7490, #0369a1)',
-                color: '#fff', border: 'none', borderRadius: 9,
-                padding: '7px 14px', fontSize: '0.8rem', fontWeight: 700,
-                cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
-                boxShadow: '0 2px 8px rgba(14,116,144,0.3)',
-              }}
-            >
-              📷 Importar da Imagem
-            </button>
-          )}
-        </div>
 
-        {/* ══ BLOCO 1 — Classificação ══ */}
+        {/* ══ BLOCO 1 — Modelo & Classificação ══ */}
         <Block
           num="①"
-          title="Classificação"
-          subtitle="Disciplina, tema, tipo, nível e série"
+          title="Modelo & Classificação Pedagógica"
+          subtitle="Escolha um dos 7 modelos universais, disciplina, nível e temas"
           open={openBlocks[1]}
           onToggle={() => toggle(1)}
+          rightAction={
+            <button
+              type="button"
+              onClick={acionarCopilotoMetadados}
+              disabled={copilotoLoading === 'metadados'}
+              style={{
+                padding: '4px 10px', borderRadius: 7, border: '1px solid #bae6fd',
+                background: '#f0f9ff', color: '#0369a1', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer',
+              }}
+            >
+              {copilotoLoading === 'metadados' ? '⏳ Classificando...' : '✨ Auto-Classificar IA'}
+            </button>
+          }
         >
+          {/* Seletor dos 7 Modelos */}
+          <div className="bq-field" style={{ marginBottom: 14 }}>
+            <label className="bq-label">Modelo Estrutural da Questão</label>
+            <div className="bq-tipo-pills">
+              {TIPOS.map(t => (
+                <button
+                  key={t.value}
+                  type="button"
+                  className={`bq-tipo-pill${form.tipo === t.value ? ' selected' : ''}`}
+                  onClick={() => trocarTipo(t.value)}
+                >
+                  {t.emoji} {t.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Disciplina + Série */}
           <div className="bq-field-row">
             <div className="bq-field">
@@ -463,39 +796,20 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
             </div>
           </div>
 
-          {/* Tema / Conteúdo — obrigatório para publicar no banco global */}
+          {/* Temas */}
           <div className="bq-field" style={{ marginBottom: 12 }}>
             <label className="bq-label">
               Tema / Conteúdo
               <span style={{
-                fontSize: '0.7rem', color: '#0369a1', fontWeight: 600,
-                marginLeft: 8, background: '#e0f2fe', padding: '1px 7px',
-                borderRadius: 99, letterSpacing: '0.01em',
-              }}>obrigatório para o banco global</span>
+                fontSize: '0.68rem', color: '#0369a1', fontWeight: 700,
+                marginLeft: 8, background: '#e0f2fe', padding: '1px 7px', borderRadius: 99,
+              }}>obrigatório p/ Banco Global</span>
             </label>
             <TagsInput
               tags={form.temas}
               onChange={(val) => set('temas', val)}
-              placeholder="Ex: Fotossíntese, Célula... pressione Enter para adicionar"
+              placeholder="Ex: Cinemática, Aminoácidos... pressione Enter"
             />
-            <p className="bq-helper">Adicione os temas/conteúdos desta questão. Pressione Enter para confirmar cada tema.</p>
-          </div>
-
-          {/* Tipo */}
-          <div className="bq-field" style={{ marginBottom: 12 }}>
-            <label className="bq-label">Tipo de Questão</label>
-            <div className="bq-tipo-pills">
-              {TIPOS.map(t => (
-                <button
-                  key={t.value}
-                  type="button"
-                  className={`bq-tipo-pill${form.tipo === t.value ? ' selected' : ''}`}
-                  onClick={() => set('tipo', t.value)}
-                >
-                  {t.emoji} {t.label}
-                </button>
-              ))}
-            </div>
           </div>
 
           {/* Nível */}
@@ -517,181 +831,154 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
           </div>
         </Block>
 
-        {/* ══ BLOCO 2 — Enunciado ══ */}
+        {/* ══ BLOCO 2 — Enunciado, Figura Independente & Comando ══ */}
         <Block
           num="②"
-          title="Enunciado"
-          subtitle="Texto principal + imagem de apoio"
+          title="Enunciado & Mídia Independente"
+          subtitle="Texto principal, fórmulas LaTeX, figura auto-ajustável e comando pós-figura"
           open={openBlocks[2]}
           onToggle={() => toggle(2)}
         >
-          <div className="bq-field" style={{ marginBottom: 12 }}>
-            <label className="bq-label">
-              Texto do enunciado <span className="required">*</span>
-              <span style={{ marginLeft: 8, fontWeight: 400, textTransform: 'none', color: '#94a3b8' }}>
-                — Use $expressão$ para LaTeX inline
-              </span>
-            </label>
-            <textarea
-              className="bq-textarea large"
-              value={form.enunciado}
-              onChange={e => set('enunciado', e.target.value)}
-              placeholder="Ex: Determine o valor de $x$ na equação $2x^2 - 5x + 3 = 0$..."
-            />
-          </div>
-
-          {/* Imagem */}
-          <div className="bq-field" style={{ marginBottom: 12 }}>
-            <label className="bq-label">Imagem do enunciado</label>
-            <ImageUploader
-              value={form.imagem}
-              onChange={(val) => set('imagem', val)}
-            />
-          </div>
-
-          {/* Texto de apoio */}
-          <details>
+          {/* Texto de apoio + Banca/Fonte */}
+          <details open={Boolean(form.texto_apoio || form.fonte)} style={{ marginBottom: 12 }}>
             <summary style={{
-              fontSize: '0.8rem', color: '#475569', cursor: 'pointer',
-              fontWeight: 600, marginBottom: 8, userSelect: 'none',
+              fontSize: '0.8rem', color: '#0e7490', cursor: 'pointer',
+              fontWeight: 700, marginBottom: 8, userSelect: 'none',
             }}>
-              📄 Adicionar texto de apoio / contexto
+              📖 Fonte / Banca & Texto de Apoio (opcional)
             </summary>
-            <div style={{ marginTop: 10 }}>
-              <div className="bq-field" style={{ marginBottom: 8 }}>
-                <label className="bq-label">Texto de apoio</label>
-                <textarea
-                  className="bq-textarea"
-                  value={form.texto_apoio}
-                  onChange={e => set('texto_apoio', e.target.value)}
-                  placeholder="Leia o texto abaixo e responda..."
-                />
-              </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '8px 10px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
               <div className="bq-field">
-                <label className="bq-label">Fonte</label>
+                <label className="bq-label">Fonte / Banca Examinadora</label>
                 <input
                   className="bq-input"
                   value={form.fonte}
                   onChange={e => set('fonte', e.target.value)}
-                  placeholder="Ex: ENEM 2022, Adaptado de IBGE..."
+                  placeholder="Ex: ENEM 2023, UECE, Acafe-SC, Autoral..."
                   list="bq-fonte-list"
                 />
                 <datalist id="bq-fonte-list">
                   {TEXTO_APOIO_FONTES.map(f => <option key={f} value={f} />)}
                 </datalist>
               </div>
+              <div className="bq-field">
+                <label className="bq-label">Texto base / Poema / Tirinha textual (antes do enunciado)</label>
+                <textarea
+                  className="bq-textarea"
+                  value={form.texto_apoio}
+                  onChange={e => set('texto_apoio', e.target.value)}
+                  placeholder="Trecho de reportagem, poema ou texto motivador..."
+                />
+              </div>
             </div>
           </details>
-        </Block>
 
-        {/* ══ BLOCO 3 — Alternativas (condicional) ══ */}
-        {form.tipo === 'objetiva' && (
-          <Block
-            num="③"
-            title="Alternativas"
-            subtitle="Marque a alternativa correta"
-            open={openBlocks[3]}
-            onToggle={() => toggle(3)}
-          >
-            <div className="bq-alt-list">
-              {form.alternativas.map((alt) => (
-                <div
-                  key={alt.id}
-                  className={`bq-alt-item${alt.correta ? ' correct' : ''}`}
-                >
-                  <span className="bq-alt-letra">{alt.letra}</span>
-
-                  <input
-                    className="bq-alt-input"
-                    type="text"
-                    value={alt.texto}
-                    onChange={e => setAlt(alt.id, 'texto', e.target.value)}
-                    placeholder={`Alternativa ${alt.letra}...`}
-                  />
-
-                  {/* Marcar como correta */}
-                  <button
-                    type="button"
-                    className={`bq-alt-correct-btn${alt.correta ? ' active' : ''}`}
-                    onClick={() => marcarCorreta(alt.id)}
-                    title={alt.correta ? 'Alternativa correta' : 'Marcar como correta'}
-                  >
-                    {alt.correta ? (
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                    ) : null}
-                  </button>
-
-                  {/* Remover */}
-                  <button
-                    type="button"
-                    className="bq-alt-remove-btn"
-                    onClick={() => removeAlt(alt.id)}
-                    title="Remover alternativa"
-                    disabled={form.alternativas.length <= 2}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            {form.alternativas.length < 7 && (
-              <button type="button" className="bq-add-alt-btn" onClick={addAlt}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                </svg>
-                Adicionar alternativa
-              </button>
-            )}
-
-            <div className="bq-info-box" style={{ marginTop: 12 }}>
-              <span>💡</span>
-              <span>Clique no círculo da direita para marcar a alternativa correta. Ela ficará destacada em verde.</span>
-            </div>
-          </Block>
-        )}
-
-        {/* Discursiva: gabarito textual */}
-        {form.tipo === 'discursiva' && (
-          <Block
-            num="③"
-            title="Resposta Esperada"
-            subtitle="Gabarito comentado para correção"
-            open={openBlocks[3]}
-            onToggle={() => toggle(3)}
-          >
-            <div className="bq-field">
-              <label className="bq-label">Resposta esperada / modelo de gabarito</label>
-              <textarea
-                className="bq-textarea"
-                value={form.resposta_aberta}
-                onChange={e => set('resposta_aberta', e.target.value)}
-                placeholder="Descreva os pontos essenciais para uma resposta completa..."
-              />
-            </div>
-          </Block>
-        )}
-
-        {/* ══ BLOCO 4 — Metadados ══ */}
-        <Block
-          num="④"
-          title="Metadados e Tags"
-          subtitle="BNCC, tags e resolução comentada"
-          open={openBlocks[4]}
-          onToggle={() => toggle(4)}
-        >
-
-          <div className="bq-field-row">
-            <div className="bq-field" style={{ gridColumn: '1 / -1' }}>
-              <label className="bq-label">Tags</label>
-              <TagsInput tags={form.tags} onChange={(val) => set('tags', val)} />
-            </div>
+          {/* Enunciado + MathToolbar */}
+          <div className="bq-field" style={{ marginBottom: 12 }}>
+            <label className="bq-label">
+              {form.tipo === 'lacuna' ? 'Texto com Lacunas ({{resposta}})' : 'Enunciado Principal'} <span className="required">*</span>
+            </label>
+            <MathToolbar
+              textareaRef={enunciadoRef}
+              value={form.enunciado}
+              onChange={(val) => set('enunciado', val)}
+              onConvertLatex={acionarCopilotoLatex}
+              convertingLatex={copilotoLoading === 'latex'}
+            />
+            <textarea
+              ref={enunciadoRef}
+              className="bq-textarea large"
+              style={{ borderTopLeftRadius: 0, borderTopRightRadius: 0 }}
+              value={form.enunciado}
+              onChange={e => set('enunciado', e.target.value)}
+              placeholder={
+                form.tipo === 'lacuna'
+                  ? 'Ex: A organela responsável pela respiração celular é a {{mitocôndria}}, que produz {{ATP}}.'
+                  : 'Ex: Atente à seguinte representação química-estrutural de um aminoácido...'
+              }
+            />
           </div>
 
+          {/* Estúdio de Mídia Independente */}
+          <div className="bq-field" style={{ marginBottom: 12 }}>
+            <label className="bq-label">Figura / Gráfico / Esquema da Questão (Status Independente)</label>
+            <SmartMediaCard
+              imagem={form.imagem}
+              midia={form.midia}
+              onChange={(url, midiaObj) => {
+                setForm(p => ({ ...p, imagem: url, midia: midiaObj }));
+              }}
+            />
+          </div>
+
+          {/* Comando Final Pós-Figura */}
+          <div className="bq-field">
+            <label className="bq-label">
+              Comando Pós-Figura <span style={{ fontWeight: 400, color: '#64748b', textTransform: 'none' }}>(opcional — aparece logo abaixo da figura)</span>
+            </label>
+            <input
+              className="bq-input"
+              value={form.comando_final}
+              onChange={e => set('comando_final', e.target.value)}
+              placeholder='Ex: "Considerando a figura acima, assinale a afirmação verdadeira."'
+            />
+          </div>
+        </Block>
+
+        {/* ══ BLOCO 3 — Estrutura de Resposta dos 7 Modelos ══ */}
+        <Block
+          num="③"
+          title="Estrutura da Resposta & Gabarito"
+          subtitle="Configure itens, colunas, lacunas, alternativas ou espelho de correção"
+          open={openBlocks[3]}
+          onToggle={() => toggle(3)}
+        >
+          <ModelosEditor
+            tipo={form.tipo}
+            estrutura={form.estrutura}
+            onChangeEstrutura={(novaEst) => {
+              setGabaritoPendenteConfirmacao(false);
+              set('estrutura', novaEst);
+            }}
+            alternativas={form.alternativas}
+            onChangeAlternativas={(novasAlts) => {
+              setGabaritoPendenteConfirmacao(false);
+              set('alternativas', novasAlts);
+            }}
+            onMarcarCorreta={marcarCorreta}
+            respostaAberta={form.resposta_aberta}
+            onChangeRespostaAberta={(val) => set('resposta_aberta', val)}
+            enunciado={form.enunciado}
+            onChangeEnunciado={(val) => set('enunciado', val)}
+            enunciadoRef={enunciadoRef}
+            onGerarDistratoresIA={acionarCopilotoDistratores}
+            gerandoDistratores={copilotoLoading === 'distratores'}
+            onGerarEspelhoIA={acionarCopilotoResolucao}
+            gerandoEspelho={copilotoLoading === 'resolver'}
+          />
+        </Block>
+
+        {/* ══ BLOCO 4 — BNCC, Tags & Resolução Comentada ══ */}
+        <Block
+          num="④"
+          title="BNCC, Tags & Resolução Comentada"
+          subtitle="Indexação curricular e resolução passo a passo exclusiva do professor"
+          open={openBlocks[4]}
+          onToggle={() => toggle(4)}
+          rightAction={
+            <button
+              type="button"
+              onClick={acionarCopilotoResolucao}
+              disabled={copilotoLoading === 'resolver'}
+              style={{
+                padding: '4px 10px', borderRadius: 7, border: '1px solid #86efac',
+                background: '#ecfdf5', color: '#047857', fontSize: '0.72rem', fontWeight: 800, cursor: 'pointer',
+              }}
+            >
+              {copilotoLoading === 'resolver' ? '⏳ Resolvendo...' : '✨ Resolver com IA'}
+            </button>
+          }
+        >
           <div className="bq-field-row">
             <div className="bq-field">
               <label className="bq-label">Habilidade BNCC</label>
@@ -699,13 +986,12 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
                 className="bq-input"
                 value={form.habilidade_bncc}
                 onChange={e => set('habilidade_bncc', e.target.value.toUpperCase())}
-                placeholder="Ex: EF09MA01"
-                maxLength={15}
+                placeholder="Ex: EM13CNT202, EF09MA09"
+                maxLength={18}
               />
-              <p className="bq-helper">Código da habilidade (ex: EF07CI01, EM13MAT102)</p>
             </div>
             <div className="bq-field">
-              <label className="bq-label">Compartilhar</label>
+              <label className="bq-label">Visibilidade Interna na Escola</label>
               <label className="bq-checkbox-label" style={{ marginTop: 8 }}>
                 <input
                   type="checkbox"
@@ -713,74 +999,84 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
                   checked={form.compartilhada}
                   onChange={e => set('compartilhada', e.target.checked)}
                 />
-                Visível para outros professores da escola
+                Compartilhar com demais professores da escola
               </label>
             </div>
           </div>
 
+          <div className="bq-field" style={{ marginBottom: 12 }}>
+            <label className="bq-label">Tags de Busca Rápida</label>
+            <TagsInput tags={form.tags} onChange={(val) => set('tags', val)} />
+          </div>
+
           <div className="bq-field">
-            <label className="bq-label">Resolução comentada</label>
+            <label className="bq-label">Resolução Comentada Passo a Passo (Professor)</label>
             <textarea
               className="bq-textarea"
               value={form.explicacao}
               onChange={e => set('explicacao', e.target.value)}
-              placeholder="Explique passo a passo a resolução desta questão..."
+              placeholder="Resolução passo a passo com fórmulas $LaTeX$ (não sai na folha do aluno)..."
             />
-            <p className="bq-helper">Não aparece na prova. Serve como gabarito detalhado para o professor.</p>
           </div>
         </Block>
 
-        {/* ══ Ações ══ */}
-        <div className="bq-builder-actions">
+        {/* ══ Barra de Ações Separadas (Rascunho | Banco da Escola | Banco Global) ══ */}
+        <div className="bq-builder-actions" style={{ flexWrap: 'wrap', gap: 8 }}>
           <button
             type="button"
             className="bq-btn bq-btn-outline"
             onClick={handleLimpar}
+            disabled={saving}
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
             Limpar
           </button>
 
           <button
             type="button"
             className="bq-btn bq-btn-outline"
-            onClick={() => handleSave('rascunho')}
+            onClick={handleSaveRascunho}
             disabled={saving}
           >
-            {saving ? <span className="bq-spinner" style={{ borderTopColor: '#475569' }} /> : (
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-              </svg>
-            )}
-            Salvar Rascunho
+            💾 Rascunho
+          </button>
+
+          <button
+            type="button"
+            onClick={handleSalvarEscola}
+            disabled={saving}
+            title="Salva a questão ativa apenas no banco interno da sua escola (gera código EMQE)"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 7,
+              padding: '10px 18px', borderRadius: 10,
+              border: '1.5px solid #0e7490',
+              background: 'linear-gradient(135deg, #0f172a, #0e7490)',
+              color: '#fff', fontWeight: 800, fontSize: '0.84rem',
+              cursor: saving ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
+            }}
+          >
+            {saving ? '⏳...' : (isEditing ? '🏫 Salvar no Banco da Escola' : '🏫 Salvar no Banco da Escola')}
           </button>
 
           <button
             type="button"
             className="bq-btn bq-btn-primary"
-            onClick={() => handleSave('ativa')}
+            onClick={() => handlePublicarGlobal()}
             disabled={saving}
-            title={isEditing ? 'Salvar alterações' : 'Salva a questão e publica no Banco Global EDUCA.MELHOR'}
+            title="Salva no Banco da Escola e também publica no Banco Global EDUCA.MELHOR"
           >
-            {saving ? <span className="bq-spinner" /> : (
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
-              </svg>
-            )}
-            {isEditing ? 'Salvar Alterações' : '🌐 Publicar no Banco Global'}
+            {saving ? <span className="bq-spinner" /> : '🌐 Salvar e Publicar no Global'}
           </button>
         </div>
       </div>
 
-      {/* ── Coluna direita: preview ── */}
-      <LatexPreview questao={form} />
+      {/* ── Coluna direita: Espelho Editorial A4 ao Vivo ── */}
+      <LatexPreview questao={form} codigo={savedCodigo || 'NOVO'} />
 
-      {/* ── Modal Importar da Imagem ── */}
+      {/* ── Modal Clonador Multimodal (Print / Foto) ── */}
       {showImagemModal && (
         <ImagemParaQuestaoModal
-          onClose={() => setShowImagemModal(false)}
+          initialFile={pastedFileForModal}
+          onClose={() => { setShowImagemModal(false); setPastedFileForModal(null); }}
           onUsar={handleUsarExtracao}
         />
       )}
@@ -795,7 +1091,6 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
             set('explicacao', texto);
             setShowComentarioModal(false);
             setAltCorretaInfoModal(null);
-            // Abre o bloco 4 para o usuário ver o campo preenchido
             if (texto) setOpenBlocks(p => ({ ...p, 4: true }));
           }}
           onPular={() => {
@@ -805,13 +1100,16 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
         />
       )}
 
-      {/* ── Modal de Resultado Premium ── */}
+      {/* ── Modal Resultado (com Códigos EMQE / EMQG copiáveis) ── */}
       {modalResultado && (
         <PublicarResultadoModal
           tipo={modalResultado.tipo}
           titulo={modalResultado.titulo}
           mensagem={modalResultado.mensagem}
           codigo={modalResultado.codigo}
+          codigoLabel={modalResultado.codigoLabel}
+          codigoSecundario={modalResultado.codigoSecundario}
+          codigoSecundarioLabel={modalResultado.codigoSecundarioLabel}
           acoes={modalResultado.acoes}
           onClose={() => setModalResultado(null)}
         />

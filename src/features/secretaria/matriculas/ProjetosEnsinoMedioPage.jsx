@@ -13,12 +13,17 @@ import {
   UserGroupIcon,
   InformationCircleIcon,
   FunnelIcon,
+  SparklesIcon,
+  DevicePhoneMobileIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import api from "../../../services/api";
 import ModalProjetoEnsinoMedio, {
   CATALOGO_CARDS_EM,
 } from "./ModalProjetoEnsinoMedio";
+import ModalEixoEnsinoMedio, {
+  normalizarCardEixoVisual,
+} from "./ModalEixoEnsinoMedio";
 import ModalMatricularAlunosProjeto from "./ModalMatricularAlunosProjeto";
 
 function calcularAnoLetivoPadrao() {
@@ -43,10 +48,74 @@ function labelSemestre(sem) {
 }
 
 // ============================================================================
+// Subcomponente: Botão Estilo Pill (ON / OFF) vinculado ao App Educa Mobile
+// ============================================================================
+function PillSwitchApp({
+  ativo = true,
+  loading = false,
+  disabled = false,
+  onToggle,
+  titleOn = "Visível no App Educa Mobile (clique para desativar)",
+  titleOff = "Oculto no App Educa Mobile (clique para ativar)",
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={ativo}
+      disabled={disabled || loading}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (!disabled && !loading && onToggle) {
+          onToggle(e);
+        }
+      }}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+      }}
+      title={ativo ? titleOn : titleOff}
+      className={`inline-flex items-center gap-1.5 pl-2 pr-1.5 py-1 rounded-full text-[11px] font-extrabold border transition-all select-none ${
+        disabled || loading
+          ? "opacity-60 cursor-wait"
+          : "cursor-pointer hover:shadow-sm"
+      } ${
+        ativo
+          ? "bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100/80"
+          : "bg-slate-100 text-slate-500 border-slate-300 hover:bg-slate-200/70"
+      }`}
+    >
+      <DevicePhoneMobileIcon
+        className={`w-3.5 h-3.5 shrink-0 ${
+          ativo ? "text-emerald-600" : "text-slate-400"
+        }`}
+      />
+      <span className="tracking-tight leading-none">
+        {loading ? "..." : ativo ? "ON" : "OFF"}
+      </span>
+      <span
+        className={`relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors ${
+          ativo ? "bg-emerald-600" : "bg-slate-400"
+        }`}
+      >
+        <span
+          className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${
+            ativo ? "translate-x-3.5" : "translate-x-0.5"
+          }`}
+        />
+      </span>
+    </button>
+  );
+}
+
+// ============================================================================
 // Subcomponente: Bloco Individual de cada Projeto + Badges das Turmas + Tabela
 // ============================================================================
 function ProjetoTabelaBloco({
   projeto,
+  eixosLista = [],
+  podeAlternarAtivo = true,
+  togglingProjeto = false,
+  onAlternarAtivoProjeto,
   onEditarProjeto,
   onExcluirProjeto,
   onProjetoMutado,
@@ -96,8 +165,18 @@ function ProjetoTabelaBloco({
   }, [turmaAtivaId, carregarAlunosDaTurma]);
 
   const cardMeta =
+    eixosLista.find((c) => c.codigo === projeto.categoria) ||
+    (projeto.categoria_info
+      ? normalizarCardEixoVisual(projeto.categoria_info)
+      : null) ||
     CATALOGO_CARDS_EM.find((c) => c.codigo === projeto.categoria) ||
     CATALOGO_CARDS_EM[0];
+
+  const projetoAtivoMobile = projeto.ativo_mobile !== false;
+  const eixoAtivoMobile =
+    projeto.eixo_ativo !== undefined
+      ? Boolean(projeto.eixo_ativo)
+      : cardMeta.ativo !== false;
 
   const turmaResumoSelecionada =
     turmas.find((t) => t.id === turmaAtivaId) || turmas[0] || null;
@@ -298,7 +377,13 @@ function ProjetoTabelaBloco({
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden transition hover:shadow-md">
+    <div
+      className={`bg-white rounded-2xl border shadow-sm overflow-hidden transition hover:shadow-md ${
+        !projetoAtivoMobile || !eixoAtivoMobile
+          ? "border-dashed border-slate-300"
+          : "border-slate-200"
+      }`}
+    >
       {/* 1. Cabeçalho do Projeto */}
       <div className="p-5 border-b border-slate-200 bg-gradient-to-r from-slate-50 via-white to-slate-50">
         <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
@@ -333,6 +418,21 @@ function ProjetoTabelaBloco({
                     {s}
                   </span>
                 ))}
+
+              {!projetoAtivoMobile && (
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-200/80 text-slate-600 border border-slate-300">
+                  Oculto no Educa Mobile
+                </span>
+              )}
+
+              {projetoAtivoMobile && !eixoAtivoMobile && (
+                <span
+                  className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200"
+                  title="O eixo deste projeto está OFF no topo da página; ative o eixo para exibi-lo no Educa Mobile."
+                >
+                  Eixo OFF no App
+                </span>
+              )}
             </div>
 
             <div className="flex flex-wrap items-baseline gap-2.5">
@@ -392,7 +492,19 @@ function ProjetoTabelaBloco({
               </span>
             </div>
 
-            <div className="flex items-center gap-1.5">
+            <div className="flex flex-wrap items-center justify-end gap-1.5">
+              {podeAlternarAtivo && (
+                <PillSwitchApp
+                  ativo={projetoAtivoMobile}
+                  loading={togglingProjeto}
+                  onToggle={() =>
+                    onAlternarAtivoProjeto && onAlternarAtivoProjeto(projeto)
+                  }
+                  titleOn="Projeto visível no App Educa Mobile (clique para ocultar)"
+                  titleOff="Projeto oculto no App Educa Mobile (clique para exibir)"
+                />
+              )}
+
               <button
                 type="button"
                 onClick={handleAdicionarTurmaExtra}
@@ -746,12 +858,24 @@ export default function ProjetosEnsinoMedioPage() {
 
   const [resumoCategorias, setResumoCategorias] = useState([]);
   const [projetos, setProjetos] = useState([]);
+  const [permissoes, setPermissoes] = useState({
+    pode_gerenciar_eixos: true,
+    pode_alternar_ativo: true,
+  });
   const [carregando, setCarregando] = useState(true);
 
-  // Estado do Modal Premium de Criação / Edição
+  // Estado de carregamento individual dos botões Pill (ON/OFF)
+  const [togglingEixoCodigo, setTogglingEixoCodigo] = useState(null);
+  const [togglingProjetoId, setTogglingProjetoId] = useState(null);
+
+  // Estado do Modal Premium de Criação / Edição de Projeto
   const [modalAberto, setModalAberto] = useState(false);
   const [categoriaModal, setCategoriaModal] = useState("IFA");
   const [projetoEditando, setProjetoEditando] = useState(null);
+
+  // Estado do Modal de Criação / Edição de Eixos de Oferta Semestral
+  const [modalEixoAberto, setModalEixoAberto] = useState(false);
+  const [eixoEditando, setEixoEditando] = useState(null);
 
   useEffect(() => {
     api
@@ -778,6 +902,16 @@ export default function ProjetosEnsinoMedioPage() {
       });
       setResumoCategorias(res.data?.categorias || []);
       setProjetos(res.data?.projetos || []);
+      if (res.data?.permissoes) {
+        setPermissoes({
+          pode_gerenciar_eixos: Boolean(
+            res.data.permissoes.pode_gerenciar_eixos
+          ),
+          pode_alternar_ativo: Boolean(
+            res.data.permissoes.pode_alternar_ativo
+          ),
+        });
+      }
     } catch (err) {
       toast.error(
         err.response?.data?.message ||
@@ -795,6 +929,12 @@ export default function ProjetosEnsinoMedioPage() {
     return () => clearTimeout(t);
   }, [carregarProjetos]);
 
+  const eixosExibidos = (
+    resumoCategorias.length > 0 ? resumoCategorias : CATALOGO_CARDS_EM
+  ).map(normalizarCardEixoVisual);
+
+  const eixosAtivosCount = eixosExibidos.filter((c) => c.ativo).length;
+
   const abrirCriacaoPorCard = (codigoCategoria) => {
     setProjetoEditando(null);
     setCategoriaModal(codigoCategoria);
@@ -805,6 +945,125 @@ export default function ProjetosEnsinoMedioPage() {
     setProjetoEditando(proj);
     setCategoriaModal(proj.categoria);
     setModalAberto(true);
+  };
+
+  const abrirNovoEixo = () => {
+    setEixoEditando(null);
+    setModalEixoAberto(true);
+  };
+
+  const abrirEdicaoEixo = (card, e) => {
+    if (e) e.stopPropagation();
+    setEixoEditando(card);
+    setModalEixoAberto(true);
+  };
+
+  const handleAlternarAtivoEixo = async (card) => {
+    const novoAtivo = !card.ativo;
+    setTogglingEixoCodigo(card.codigo);
+
+    // Atualização otimista
+    setResumoCategorias((prev) =>
+      prev.map((item) =>
+        item.codigo === card.codigo ? { ...item, ativo: novoAtivo } : item
+      )
+    );
+    setProjetos((prev) =>
+      prev.map((p) =>
+        p.categoria === card.codigo ? { ...p, eixo_ativo: novoAtivo } : p
+      )
+    );
+
+    try {
+      const res = await api.patch(
+        `/api/matriculas/projetos/eixos/${encodeURIComponent(card.codigo)}/ativo`,
+        { ativo: novoAtivo }
+      );
+      toast.success(
+        res.data?.message ||
+          (novoAtivo
+            ? `Eixo "${card.titulo}" ativado no Educa Mobile.`
+            : `Eixo "${card.titulo}" ocultado no Educa Mobile.`)
+      );
+    } catch (err) {
+      // Rollback em caso de falha
+      setResumoCategorias((prev) =>
+        prev.map((item) =>
+          item.codigo === card.codigo ? { ...item, ativo: card.ativo } : item
+        )
+      );
+      setProjetos((prev) =>
+        prev.map((p) =>
+          p.categoria === card.codigo ? { ...p, eixo_ativo: card.ativo } : p
+        )
+      );
+      toast.error(
+        err.response?.data?.message ||
+          "Não foi possível alterar a exibição deste eixo."
+      );
+    } finally {
+      setTogglingEixoCodigo(null);
+    }
+  };
+
+  const handleExcluirEixo = async (card, e) => {
+    if (e) e.stopPropagation();
+    const confirmar = window.confirm(
+      `Deseja excluir o eixo personalizado "${card.titulo}"?`
+    );
+    if (!confirmar) return;
+
+    try {
+      const res = await api.delete(
+        `/api/matriculas/projetos/eixos/${encodeURIComponent(card.codigo)}`
+      );
+      toast.success(res.data?.message || "Eixo personalizado excluído.");
+      if (categoriaFiltro === card.codigo) {
+        setCategoriaFiltro("TODAS");
+      }
+      carregarProjetos();
+    } catch (err) {
+      toast.error(
+        err.response?.data?.message || "Não foi possível excluir este eixo."
+      );
+    }
+  };
+
+  const handleAlternarAtivoProjeto = async (proj) => {
+    const atual = proj.ativo_mobile !== false;
+    const novoAtivo = !atual;
+    setTogglingProjetoId(proj.id);
+
+    setProjetos((prev) =>
+      prev.map((p) =>
+        p.id === proj.id ? { ...p, ativo_mobile: novoAtivo } : p
+      )
+    );
+
+    try {
+      const res = await api.patch(
+        `/api/matriculas/projetos/${proj.id}/ativo`,
+        { ativo_mobile: novoAtivo }
+      );
+      toast.success(
+        res.data?.message ||
+          (novoAtivo
+            ? `Projeto "${proj.nome}" ativado no Educa Mobile.`
+            : `Projeto "${proj.nome}" ocultado no Educa Mobile.`)
+      );
+    } catch (err) {
+      setProjetos((prev) =>
+        prev.map((p) =>
+          p.id === proj.id ? { ...p, ativo_mobile: atual } : p
+        )
+      );
+      toast.error(
+        err.response?.data?.message ||
+          "Não foi possível alterar a exibição deste projeto."
+      );
+    } finally {
+      setTogglingProjetoId(null);
+    }
   };
 
   const handleExcluirProjeto = async (proj) => {
@@ -838,45 +1097,52 @@ export default function ProjetosEnsinoMedioPage() {
     }
   };
 
-  const getStatsCard = (codigo) => {
-    return (
-      resumoCategorias.find((r) => r.codigo === codigo) || {
-        total_projetos: 0,
-        total_turmas: 0,
-        vagas_totais: 0,
-        matriculados: 0,
-        vagas_restantes: 0,
-      }
-    );
-  };
-
   return (
     <div className="space-y-7">
-      {/* Seção 1: Os 6 Cards Executivos da Organização do Novo Ensino Médio */}
+      {/* Seção 1: Cards Executivos dos Eixos de Oferta Semestral (Autonomia da Escola) */}
       <div>
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2 mb-4">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-3 mb-4">
           <div>
-            <h2 className="text-lg font-extrabold text-slate-900">
-              Eixos de Oferta Semestral — Novo Ensino Médio
-            </h2>
-            <p className="text-xs text-slate-500">
-              Clique em qualquer um dos 6 eixos abaixo para cadastrar o projeto, definir a sinopse e gerar suas turmas automaticamente.
+            <div className="flex flex-wrap items-center gap-2.5">
+              <h2 className="text-lg font-extrabold text-slate-900">
+                Eixos de Oferta Semestral — Novo Ensino Médio
+              </h2>
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <DevicePhoneMobileIcon className="w-3.5 h-3.5" />
+                {eixosAtivosCount} de {eixosExibidos.length} ativo(s) no Educa Mobile
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Clique em um eixo para criar projetos e turmas. Use a chave <strong>ON/OFF</strong> para controlar diretamente os cards visíveis no app <strong>Educa Mobile</strong>.
             </p>
           </div>
-          {categoriaFiltro !== "TODAS" && (
-            <button
-              type="button"
-              onClick={() => setCategoriaFiltro("TODAS")}
-              className="text-xs font-bold text-indigo-600 hover:text-indigo-800 cursor-pointer"
-            >
-              Limpar filtro de eixo ({categoriaFiltro}) ×
-            </button>
-          )}
+
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            {categoriaFiltro !== "TODAS" && (
+              <button
+                type="button"
+                onClick={() => setCategoriaFiltro("TODAS")}
+                className="text-xs font-bold text-indigo-600 hover:text-indigo-800 cursor-pointer"
+              >
+                Limpar filtro de eixo ×
+              </button>
+            )}
+
+            {permissoes.pode_gerenciar_eixos && (
+              <button
+                type="button"
+                onClick={abrirNovoEixo}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-extrabold text-white bg-indigo-600 hover:bg-indigo-700 shadow-sm transition cursor-pointer"
+              >
+                <SparklesIcon className="w-4 h-4" />
+                + Novo Eixo Semestral
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {CATALOGO_CARDS_EM.map((card) => {
-            const stats = getStatsCard(card.codigo);
+          {eixosExibidos.map((card) => {
             const filtroAtivo = categoriaFiltro === card.codigo;
 
             return (
@@ -891,27 +1157,40 @@ export default function ProjetosEnsinoMedioPage() {
                     abrirCriacaoPorCard(card.codigo);
                   }
                 }}
-                className={`group relative bg-white rounded-2xl border p-5 shadow-sm hover:shadow-xl transition-all duration-200 cursor-pointer flex flex-col justify-between overflow-hidden ${
-                  filtroAtivo
-                    ? `ring-2 ${card.corAnel} ${card.corBorda}`
-                    : "border-slate-200 hover:border-indigo-300"
+                className={`group relative rounded-2xl border p-5 shadow-sm hover:shadow-xl transition-all duration-200 cursor-pointer flex flex-col justify-between overflow-hidden ${
+                  !card.ativo
+                    ? "bg-slate-50/90 border-dashed border-slate-300"
+                    : filtroAtivo
+                    ? `bg-white ring-2 ${card.corAnel} ${card.corBorda}`
+                    : "bg-white border-slate-200 hover:border-indigo-300"
                 }`}
               >
                 {/* Barra superior em gradiente */}
                 <div
-                  className={`absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r ${card.corGradiente}`}
+                  className={`absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r ${
+                    card.ativo
+                      ? card.corGradiente
+                      : "from-slate-300 via-slate-400 to-slate-400"
+                  }`}
                 />
 
                 <div>
-                  <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start justify-between gap-2">
                     <div
-                      className={`w-11 h-11 rounded-xl ${card.corBgSuave} ${card.corBorda} border flex items-center justify-center text-2xl shrink-0 group-hover:scale-105 transition`}
+                      className={`w-11 h-11 rounded-xl border flex items-center justify-center text-2xl shrink-0 group-hover:scale-105 transition ${
+                        card.ativo
+                          ? `${card.corBgSuave} ${card.corBorda}`
+                          : "bg-slate-200/70 border-slate-300 grayscale opacity-75"
+                      }`}
                     >
                       {card.iconeEmoji}
                     </div>
 
-                    <div className="flex items-center gap-1.5">
-                      {stats.total_projetos > 0 && (
+                    <div
+                      className="flex flex-wrap items-center justify-end gap-1.5"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {card.total_projetos > 0 && (
                         <button
                           type="button"
                           onClick={(e) => {
@@ -927,29 +1206,89 @@ export default function ProjetosEnsinoMedioPage() {
                           }`}
                           title="Filtrar listagem abaixo por este eixo"
                         >
-                          {stats.total_projetos} proj • {stats.total_turmas} turma(s)
+                          {card.total_projetos} proj • {card.total_turmas} turma(s)
                         </button>
+                      )}
+
+                      {permissoes.pode_gerenciar_eixos && (
+                        <button
+                          type="button"
+                          onClick={(e) => abrirEdicaoEixo(card, e)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 border border-transparent hover:border-indigo-200 transition cursor-pointer"
+                          title="Personalizar título, rótulo do App, ícone ou cor deste eixo"
+                        >
+                          <PencilSquareIcon className="w-4 h-4" />
+                        </button>
+                      )}
+
+                      {permissoes.pode_gerenciar_eixos &&
+                        !card.padraoSistema &&
+                        card.total_projetos === 0 && (
+                          <button
+                            type="button"
+                            onClick={(e) => handleExcluirEixo(card, e)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition cursor-pointer"
+                            title="Excluir eixo personalizado"
+                          >
+                            <TrashIcon className="w-4 h-4" />
+                          </button>
+                        )}
+
+                      {permissoes.pode_alternar_ativo && (
+                        <PillSwitchApp
+                          ativo={card.ativo}
+                          loading={togglingEixoCodigo === card.codigo}
+                          onToggle={() => handleAlternarAtivoEixo(card)}
+                          titleOn={`Card "${card.labelMobile}" visível no Educa Mobile (clique para desativar)`}
+                          titleOff={`Card "${card.labelMobile}" oculto no Educa Mobile (clique para ativar)`}
+                        />
                       )}
                     </div>
                   </div>
 
-                  <h3 className="text-base font-extrabold text-slate-900 mt-3 group-hover:text-indigo-700 transition">
-                    {card.titulo}
-                  </h3>
+                  <div className="flex flex-wrap items-center gap-2 mt-3">
+                    <h3
+                      className={`text-base font-extrabold transition ${
+                        card.ativo
+                          ? "text-slate-900 group-hover:text-indigo-700"
+                          : "text-slate-600"
+                      }`}
+                    >
+                      {card.titulo}
+                    </h3>
+                    {!card.padraoSistema && (
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-indigo-50 text-indigo-700 border border-indigo-200">
+                        Escola
+                      </span>
+                    )}
+                    {!card.ativo && (
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-slate-200 text-slate-600">
+                        Oculto no App
+                      </span>
+                    )}
+                  </div>
+
                   <p className="text-xs text-slate-500 mt-1 leading-relaxed">
                     {card.descricaoCurta}
                   </p>
                 </div>
 
                 <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                  <span className="text-[11px] font-semibold text-slate-500">
-                    {stats.vagas_totais > 0
-                      ? `${stats.matriculados}/${stats.vagas_totais} vagas preenchidas`
-                      : "Nenhum projeto neste filtro"}
-                  </span>
+                  <div className="flex flex-col">
+                    <span className="text-[11px] font-semibold text-slate-500">
+                      {card.vagas_totais > 0
+                        ? `${card.matriculados}/${card.vagas_totais} vagas preenchidas`
+                        : "Nenhum projeto neste filtro"}
+                    </span>
+                    <span className="text-[10px] text-slate-400">
+                      Card no App: <strong>{card.labelMobile}</strong>
+                    </span>
+                  </div>
 
                   <span
-                    className={`inline-flex items-center gap-1 text-xs font-extrabold ${card.corTexto} group-hover:translate-x-0.5 transition`}
+                    className={`inline-flex items-center gap-1 text-xs font-extrabold ${
+                      card.ativo ? card.corTexto : "text-slate-500"
+                    } group-hover:translate-x-0.5 transition`}
                   >
                     <PlusIcon className="w-4 h-4" />
                     Criar Turmas
@@ -1009,10 +1348,13 @@ export default function ProjetosEnsinoMedioPage() {
             onChange={(e) => setCategoriaFiltro(e.target.value)}
             className="px-3 py-2 text-xs font-bold rounded-xl border border-slate-300 bg-slate-50 text-slate-800 outline-none focus:border-indigo-500 cursor-pointer"
           >
-            <option value="TODAS">Todos os 6 Eixos</option>
-            {CATALOGO_CARDS_EM.map((c) => (
+            <option value="TODAS">
+              Todos os Eixos ({eixosExibidos.length})
+            </option>
+            {eixosExibidos.map((c) => (
               <option key={c.codigo} value={c.codigo}>
                 {c.titulo}
+                {!c.ativo ? " (OFF no App)" : ""}
               </option>
             ))}
           </select>
@@ -1051,7 +1393,7 @@ export default function ProjetosEnsinoMedioPage() {
               Nenhum projeto cadastrado para os filtros selecionados
             </h3>
             <p className="text-xs text-slate-500 max-w-lg mx-auto mt-1">
-              Clique em um dos <strong>6 cards do Novo Ensino Médio</strong> no topo desta página para criar seu primeiro projeto, cadastrar a sinopse e gerar automaticamente as turmas e vagas.
+              Clique em qualquer um dos <strong>cards de Eixos de Oferta Semestral</strong> no topo desta página para criar seu primeiro projeto, cadastrar a sinopse e gerar automaticamente as turmas e vagas.
             </p>
           </div>
         ) : (
@@ -1059,6 +1401,10 @@ export default function ProjetosEnsinoMedioPage() {
             <ProjetoTabelaBloco
               key={projeto.id}
               projeto={projeto}
+              eixosLista={eixosExibidos}
+              podeAlternarAtivo={permissoes.pode_alternar_ativo}
+              togglingProjeto={togglingProjetoId === projeto.id}
+              onAlternarAtivoProjeto={handleAlternarAtivoProjeto}
               onEditarProjeto={abrirEdicaoProjeto}
               onExcluirProjeto={handleExcluirProjeto}
               onProjetoMutado={carregarProjetos}
@@ -1074,10 +1420,22 @@ export default function ProjetosEnsinoMedioPage() {
           setModalAberto(false);
           setProjetoEditando(null);
         }}
+        catalogoEixos={eixosExibidos}
         categoriaInicial={categoriaModal}
         anoLetivoPadrao={anoLetivo}
         semestrePadrao={semestreFiltro === "TODOS" ? 1 : Number(semestreFiltro)}
         projetoEditando={projetoEditando}
+        onSalvo={() => carregarProjetos()}
+      />
+
+      {/* Modal Premium de Criação / Edição de Eixo Semestral */}
+      <ModalEixoEnsinoMedio
+        aberto={modalEixoAberto}
+        onClose={() => {
+          setModalEixoAberto(false);
+          setEixoEditando(null);
+        }}
+        eixoEditando={eixoEditando}
         onSalvo={() => carregarProjetos()}
       />
     </div>

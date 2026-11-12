@@ -10,6 +10,7 @@ import {
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import api from "../../../services/api";
+import { normalizarCardEixoVisual } from "./ModalEixoEnsinoMedio";
 
 export const CATALOGO_CARDS_EM = [
   {
@@ -115,8 +116,13 @@ export default function ModalProjetoEnsinoMedio({
   anoLetivoPadrao = new Date().getFullYear(),
   semestrePadrao = 1,
   projetoEditando = null,
+  catalogoEixos = null,
 }) {
   const isEdicao = Boolean(projetoEditando?.id);
+  const listaEixos =
+    Array.isArray(catalogoEixos) && catalogoEixos.length > 0
+      ? catalogoEixos.map(normalizarCardEixoVisual)
+      : CATALOGO_CARDS_EM;
 
   const [categoria, setCategoria] = useState(categoriaInicial);
   const [nome, setNome] = useState("");
@@ -131,6 +137,7 @@ export default function ModalProjetoEnsinoMedio({
   const [vagasPorTurma, setVagasPorTurma] = useState(35);
   const [sinopse, setSinopse] = useState("");
   const [inscricaoAberta, setInscricaoAberta] = useState(true);
+  const [ativoMobile, setAtivoMobile] = useState(true);
   const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
@@ -160,9 +167,11 @@ export default function ModalProjetoEnsinoMedio({
       setVagasPorTurma(Number(projetoEditando.vagas_por_turma || 35));
       setSinopse(projetoEditando.sinopse || "");
       setInscricaoAberta(projetoEditando.inscricao_aberta !== false);
+      setAtivoMobile(projetoEditando.ativo_mobile !== false);
     } else {
       const card =
-        CATALOGO_CARDS_EM.find((c) => c.codigo === categoriaInicial) ||
+        listaEixos.find((c) => c.codigo === categoriaInicial) ||
+        listaEixos[0] ||
         CATALOGO_CARDS_EM[1];
       setCategoria(card.codigo);
       setNome("");
@@ -177,13 +186,17 @@ export default function ModalProjetoEnsinoMedio({
       setVagasPorTurma(35);
       setSinopse("");
       setInscricaoAberta(true);
+      setAtivoMobile(true);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aberto, projetoEditando, categoriaInicial, anoLetivoPadrao, semestrePadrao]);
 
   if (!aberto) return null;
 
   const cardAtual =
-    CATALOGO_CARDS_EM.find((c) => c.codigo === categoria) || CATALOGO_CARDS_EM[0];
+    listaEixos.find((c) => c.codigo === categoria) ||
+    listaEixos[0] ||
+    CATALOGO_CARDS_EM[0];
 
   const toggleSerie = (serie) => {
     setSeries((prev) => {
@@ -229,6 +242,7 @@ export default function ModalProjetoEnsinoMedio({
         vagas_por_turma: Number(vagasPorTurma),
         sinopse: sinopse.trim(),
         inscricao_aberta: inscricaoAberta,
+        ativo_mobile: ativoMobile,
       };
 
       let res;
@@ -302,7 +316,7 @@ export default function ModalProjetoEnsinoMedio({
               Eixo Curricular do Novo Ensino Médio
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {CATALOGO_CARDS_EM.map((item) => {
+              {listaEixos.map((item) => {
                 const selecionado = item.codigo === categoria;
                 return (
                   <button
@@ -544,23 +558,60 @@ export default function ModalProjetoEnsinoMedio({
             />
           </div>
 
-          {/* Toggle Inscrição Aberta */}
-          <label className="flex items-center justify-between gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200 cursor-pointer hover:bg-slate-100/80 transition">
-            <div>
-              <span className="text-sm font-semibold text-slate-800 block">
-                Projeto aberto para escolha dos estudantes neste semestre
-              </span>
-              <span className="text-xs text-slate-500">
-                Permite enturmação imediata pela Secretaria e sinaliza disponibilidade de vagas.
-              </span>
+          {/* Toggle Inscrição Aberta + Visibilidade Educa Mobile */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <label className="flex items-center justify-between gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200 cursor-pointer hover:bg-slate-100/80 transition">
+              <div>
+                <span className="text-sm font-semibold text-slate-800 block">
+                  Inscrição aberta aos estudantes
+                </span>
+                <span className="text-xs text-slate-500">
+                  Permite confirmação e troca de turma no semestre.
+                </span>
+              </div>
+              <input
+                type="checkbox"
+                checked={inscricaoAberta}
+                onChange={(e) => setInscricaoAberta(e.target.checked)}
+                className="w-5 h-5 accent-indigo-600 rounded cursor-pointer shrink-0"
+              />
+            </label>
+
+            <div className="flex items-center justify-between gap-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+              <div>
+                <span className="text-sm font-semibold text-slate-800 block">
+                  Exibir no app Educa Mobile
+                </span>
+                <span className="text-xs text-slate-500">
+                  Controla se este projeto aparece no card do aplicativo.
+                </span>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={ativoMobile}
+                onClick={() => setAtivoMobile((v) => !v)}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[11px] font-extrabold transition cursor-pointer shrink-0 ${
+                  ativoMobile
+                    ? "bg-emerald-50 border-emerald-300 text-emerald-800"
+                    : "bg-slate-200/70 border-slate-300 text-slate-600"
+                }`}
+              >
+                <span>{ativoMobile ? "ON" : "OFF"}</span>
+                <span
+                  className={`relative inline-flex h-4 w-8 items-center rounded-full transition-colors ${
+                    ativoMobile ? "bg-emerald-500" : "bg-slate-400"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${
+                      ativoMobile ? "translate-x-4" : "translate-x-0.5"
+                    }`}
+                  />
+                </span>
+              </button>
             </div>
-            <input
-              type="checkbox"
-              checked={inscricaoAberta}
-              onChange={(e) => setInscricaoAberta(e.target.checked)}
-              className="w-5 h-5 accent-indigo-600 rounded cursor-pointer"
-            />
-          </label>
+          </div>
 
           {/* Rodapé */}
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200">

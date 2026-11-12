@@ -90,8 +90,8 @@ export const CATALOGO_CARDS_EM = [
   },
   {
     codigo: "PROJETO",
-    sigla: "CLUBES",
-    titulo: "Clubes Juvenis & Projetos Científicos",
+    sigla: "OUTROS",
+    titulo: "Outros projetos",
     subtitulo: "Iniciação Científica, Olimpíadas, Artes, Cultura e Desporto",
     descricaoCurta: "Núcleos de protagonismo estudantil, feiras científicas, teatro, música e esportes.",
     corGradiente: "from-rose-600 via-pink-600 to-fuchsia-700",

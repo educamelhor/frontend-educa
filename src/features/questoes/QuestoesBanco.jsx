@@ -198,7 +198,8 @@ function QuestaoCard({ questao, onEdit, onDuplicate, onGerenciar, onClick, isAut
   const nivel = questao.nivel || 'medio';
   const tags = parseTags(questao.tags);
   let alts = [];
-  try { alts = JSON.parse(questao.alternativas_json || '[]'); } catch {}
+  if (Array.isArray(questao.alternativas_json)) alts = questao.alternativas_json;
+  else { try { alts = JSON.parse(questao.alternativas_json || '[]'); } catch {} }
 
   return (
     <div className="bq-question-card" onClick={() => onClick(questao)}>

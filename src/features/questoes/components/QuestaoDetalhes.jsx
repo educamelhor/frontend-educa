@@ -40,7 +40,8 @@ export default function QuestaoDetalhes({ questao, onClose, onEdit }) {
   if (!questao) return null;
 
   let alts = [];
-  try { alts = JSON.parse(questao.alternativas_json || '[]'); } catch {}
+  if (Array.isArray(questao.alternativas_json)) alts = questao.alternativas_json;
+  else { try { alts = JSON.parse(questao.alternativas_json || '[]'); } catch {} }
 
   let tags = [];
   try {
@@ -221,10 +222,10 @@ export default function QuestaoDetalhes({ questao, onClose, onEdit }) {
           </div>
 
           {/* Imagem */}
-          {questao.imagem_base64 && (
+          {(questao.imagem_url || questao.imagem_base64) && (
             <div style={{ marginBottom: 16, textAlign: 'center' }}>
               <img
-                src={questao.imagem_base64}
+                src={questao.imagem_url || questao.imagem_base64}
                 alt="Imagem da questão"
                 style={{
                   maxWidth: '100%', maxHeight: 280, objectFit: 'contain',

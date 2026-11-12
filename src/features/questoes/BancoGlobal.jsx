@@ -82,7 +82,8 @@ function Toast({ msg, tipo, onClose }) {
 function DetalhesModal({ q, onUsar, usando, onClose }) {
   if (!q) return null;
   let alts = [];
-  try { alts = JSON.parse(q.alternativas_json || '[]'); } catch {}
+  if (Array.isArray(q.alternativas_json)) alts = q.alternativas_json;
+  else { try { alts = JSON.parse(q.alternativas_json || '[]'); } catch {} }
   const tags = parseTags(q.tags);
   return (
     <div style={{ position:'fixed',inset:0,zIndex:9999,display:'flex',alignItems:'center',justifyContent:'center',background:'rgba(15,23,42,0.7)',backdropFilter:'blur(6px)' }}>
@@ -104,8 +105,20 @@ function DetalhesModal({ q, onUsar, usando, onClose }) {
             {q.habilidade_bncc && <span style={{ fontSize:'0.72rem',fontWeight:700,background:'#fff7ed',color:'#c2410c',borderRadius:99,padding:'2px 10px' }}>{q.habilidade_bncc}</span>}
             {q.uso_count > 0 && <span style={{ fontSize:'0.72rem',fontWeight:700,background:'#f0f9ff',color:'#0369a1',borderRadius:99,padding:'2px 10px',border:'1px solid #bae6fd' }}>📊 {q.uso_count}× usado</span>}
           </div>
+          {/* Texto de apoio */}
+          {q.texto_apoio && (
+            <div style={{ background:'#f8fafc', border:'1px solid #e2e8f0', borderLeft:'3px solid #6366f1', borderRadius:8, padding:'8px 12px', marginBottom:12, fontSize:'0.82rem', color:'#475569', fontStyle:'italic' }}>
+              {q.texto_apoio}
+            </div>
+          )}
           {/* Enunciado */}
           <div style={{ fontSize:'0.9rem',color:'#1e293b',lineHeight:1.7,marginBottom:16,fontWeight:500 }}>{q.conteudo_bruto}</div>
+          {/* Imagem */}
+          {(q.imagem_url || q.imagem_base64) && (
+            <div style={{ textAlign:'center', marginBottom:16 }}>
+              <img src={q.imagem_url || q.imagem_base64} alt="Figura da questão" style={{ maxWidth:'100%', maxHeight:240, objectFit:'contain', borderRadius:10, border:'1px solid #e2e8f0' }} />
+            </div>
+          )}
           {/* Alternativas */}
           {alts.length > 0 && (
             <div style={{ display:'flex',flexDirection:'column',gap:6,marginBottom:16 }}>
@@ -179,7 +192,7 @@ function CardGlobal({ q, onVer, onUsar, usando, isAutor, onExcluir }) {
 }
 
 /* ── Componente principal ── */
-export default function BancoGlobal() {
+export default function BancoGlobal({ onUsada }) {
   const { professor_id: meuProfId, perfil: meuPerfil } = decodificarToken();
   const isGestor = ['diretor','coordenador','admin','militar'].includes(meuPerfil);
 
@@ -247,6 +260,7 @@ export default function BancoGlobal() {
       setToast({ msg: `✨ "${(q.conteudo_bruto||'').slice(0,50)}..." adicionada ao seu banco!`, tipo: 'ok' });
       setDetalhe(null);
       carregarStats();
+      onUsada?.();
     } catch (err) {
       setToast({ msg: err?.response?.data?.message || 'Erro ao adicionar questão.', tipo: 'erro' });
     } finally { setUsando(null); }

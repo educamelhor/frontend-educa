@@ -208,7 +208,8 @@ function BancoQuestaoCard({ questao, onAdd, onDuplicate, jaAdicionada }) {
 function ProvaItem({ item, idx, total, onRemove, onChangePontos, onDragStart, onDragOver, onDrop }) {
   const nivel = item.nivel || 'medio';
   let alts = [];
-  try { alts = JSON.parse(item.alternativas_json || '[]'); } catch {}
+  if (Array.isArray(item.alternativas_json)) alts = item.alternativas_json;
+  else { try { alts = JSON.parse(item.alternativas_json || '[]'); } catch {} }
 
   return (
     <div

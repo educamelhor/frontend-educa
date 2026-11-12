@@ -231,7 +231,7 @@ export default function BancoQuestoes() {
 
         {/* Tab: Banco Global EDUCA.MELHOR */}
         {activeTab === 'global' && (
-          <BancoGlobal />
+          <BancoGlobal onUsada={handleSaved} />
         )}
 
         {/* Tab: Criar / Editar */}

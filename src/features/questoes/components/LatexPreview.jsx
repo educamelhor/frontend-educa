@@ -34,7 +34,7 @@ function renderTextWithLatex(text) {
 export default function LatexPreview({ questao }) {
   const { disciplina, tipo, nivel, serie, enunciado, alternativas = [], tags = [], habilidade_bncc, imagem } = questao;
 
-  const hasContent = enunciado || alternativas.some(a => a.texto);
+  const hasContent = enunciado || imagem || alternativas.some(a => a.texto);
   const correta = alternativas.find(a => a.correta);
 
   const nivelLabel = { facil: 'Fácil', medio: 'Médio', dificil: 'Difícil', enem: 'ENEM' };

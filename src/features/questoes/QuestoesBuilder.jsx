@@ -100,7 +100,22 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
   useEffect(() => {
     if (editingQuestao) {
       let alts = LETRAS.map(mkAlt);
-      try { alts = JSON.parse(editingQuestao.alternativas_json || '[]'); } catch {}
+      try {
+        const parsedAlts = Array.isArray(editingQuestao.alternativas_json)
+          ? editingQuestao.alternativas_json
+          : JSON.parse(editingQuestao.alternativas_json || '[]');
+        if (Array.isArray(parsedAlts) && parsedAlts.length > 0) {
+          alts = parsedAlts.map((a, idx) => {
+            const letra = String(a?.letra || a?.letter || LETRAS[idx] || String.fromCharCode(65 + idx)).toUpperCase();
+            return {
+              id: a?.id || (idx + 1),
+              letra,
+              texto: typeof a === 'object' ? (a.texto || a.text || a.conteudo || '') : String(a || ''),
+              correta: Boolean(a?.correta || (editingQuestao.correta && letra === String(editingQuestao.correta).toUpperCase())),
+            };
+          });
+        }
+      } catch {}
       // Normaliza alternativas: garante ao menos 5
       while (alts.length < 2) alts.push(mkAlt(LETRAS[alts.length]));
 
@@ -213,6 +228,9 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
   const validar = () => {
     if (!form.disciplina) return 'Selecione a disciplina.';
     if (!form.enunciado.trim()) return 'O enunciado é obrigatório.';
+    if (form.imagem && String(form.imagem).startsWith('blob:')) {
+      return 'Aguarde o término do envio da imagem antes de salvar.';
+    }
     if (form.tipo === 'objetiva') {
       const preenchidas = form.alternativas.filter(a => a.texto.trim());
       if (preenchidas.length < 2) return 'Adicione ao menos 2 alternativas.';
@@ -225,6 +243,8 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
   const buildPayload = (status) => {
     const correta = form.alternativas.find(a => a.correta);
     const latex = gerarLatex(form);
+    const rawImg = form.imagem || null;
+    const isBase64 = Boolean(rawImg && String(rawImg).startsWith('data:'));
     return {
       conteudo_bruto:    form.enunciado,
       latex_formatado:   latex,
@@ -240,7 +260,8 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
       resposta_aberta:   form.resposta_aberta,
       tags:              form.tags.join(','),
       temas:             form.temas.length > 0 ? JSON.stringify(form.temas) : null,
-      imagem_url:        form.imagem || null,
+      imagem_url:        !isBase64 ? rawImg : null,
+      imagem_base64:     isBase64  ? rawImg : null,
       explicacao:        form.explicacao,
       compartilhada:     form.compartilhada ? 1 : 0,
       status,

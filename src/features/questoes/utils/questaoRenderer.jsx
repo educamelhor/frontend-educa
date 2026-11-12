@@ -96,6 +96,32 @@ export function criarEstruturaInicial(tipo) {
   }
 }
 
+/* ── Normalizador defensivo de escapes LaTeX (cura \t->\text, \f->\frac, \b->\beta e \text{} solto) ── */
+export function normalizarTextoLatex(raw = '') {
+  if (!raw) return '';
+  let s = String(raw);
+  s = s.replace(/\x08/g, '\\b').replace(/\x0c/g, '\\f');
+  s = s.replace(/\x09(?=(?:ext|imes|heta|au\b|an\b|anh\b|o\b|op\b|riangle|ilde|frac|herefore|hickapprox|iny))/g, '\\t');
+  s = s.replace(/\r(?!\n)(?=(?:ight|ho\b|angle|ceil|floor|aise))/g, '\\r');
+  s = s.replace(/\$([^$]+)\$/g, (_full, inner) => {
+    const fixed = inner
+      .replace(/\x09/g, '\\t')
+      .replace(/\r(?!\n)/g, '\\r')
+      .replace(/\n(?=(?:abla|eq\b|u\b|otin|eg\b|atural|leq|geq|mid\b|parallel|sim\b|cong))/g, '\\n');
+    return `$${fixed}$`;
+  });
+  const segs = s.split(/(\$\$[^$]+\$\$|\$[^$]+\$)/g);
+  return segs
+    .map((seg) => {
+      if (seg.startsWith('$')) return seg;
+      return seg.replace(
+        /(?:-\s*)?(?:(?:\\(?:text|mathrm|mathbf)\{[^{}]+\}|\\frac\{[^{}]+\}\{[^{}]+\}|\\sqrt\{[^{}]+\})(?:[_^](?:\{[^{}]+\}|[A-Za-z0-9+-]+))*)+(?:\s*(?:[-+=→⇌]|\\rightarrow)\s*(?:(?:\\(?:text|mathrm|mathbf)\{[^{}]+\}|\\frac\{[^{}]+\}\{[^{}]+\})(?:[_^](?:\{[^{}]+\}|[A-Za-z0-9+-]+))*)+)*/g,
+        (m) => `$${m.trim()}$`
+      );
+    })
+    .join('');
+}
+
 /* ── Renderização Matemática Real via KaTeX (com fallback limpo) ── */
 export function MathText({ text = '', style, className }) {
   const [katexReady, setKatexReady] = useState(() => typeof window !== 'undefined' && Boolean(window.katex));
@@ -113,7 +139,7 @@ export function MathText({ text = '', style, className }) {
   }, [katexReady]);
 
   if (!text) return null;
-  const str = String(text);
+  const str = normalizarTextoLatex(text);
   const parts = str.split(/(\$\$[^$]+\$\$|\$[^$]+\$)/g);
 
   return (

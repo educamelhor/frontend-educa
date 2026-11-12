@@ -1,16 +1,16 @@
 // src/features/questoes/components/SmartMediaCard.jsx
 // EDUCA.STUDIO AI — Card Independente de Mídia Inteligente para Questões
-// Suporta upload HD p/ DO Spaces, Preset de Escala (P/M/G/100%), Posição Semântica,
-// Indicador de Nitidez 300 DPI, Filtro "Scanner Clean" e Recorte Interativo.
+// Suporta upload HD p/ DO Spaces, Composição Multi-Figura (2 Colunas: Lado a Lado / Empilhadas),
+// Preset de Escala (P/M/G/100%), Posição Semântica, Nitidez 300 DPI, Scanner Clean e Recorte Multi-Área.
 
 import React, { useState, useRef } from 'react';
 import api from '../../../services/api';
 import ImageCropperModal from './ImageCropperModal';
 
 const PRESETS = [
-  { key: 'P',    label: 'P (35%)',   desc: 'Compacta / Molécula' },
-  { key: 'M',    label: 'M (55%)',   desc: 'Gráfico / Mapa padrão' },
-  { key: 'G',    label: 'G (84%)',   desc: 'Diagrama largo / 2 quadros' },
+  { key: 'P',    label: 'P (36%)',   desc: 'Compacta / Molécula' },
+  { key: 'M',    label: 'M (56%)',   desc: 'Gráfico / Mapa padrão' },
+  { key: 'G',    label: 'G (84%)',   desc: 'Painel 2 colunas / Diagrama largo' },
   { key: '100%', label: '100%',      desc: 'Tirinha panorâmica' },
 ];
 
@@ -90,30 +90,38 @@ export default function SmartMediaCard({ imagem, midia, onChange }) {
     }
   };
 
-  const toggleScannerClean = async () => {
+  const reprocessarComOpcoes = async (overrides = {}) => {
     const sourceUrl = midia?.original_url || imgUrl;
     if (!sourceUrl || !/^https:\/\/[a-z0-9.-]*digitaloceanspaces\.com\//i.test(sourceUrl)) return;
-    const novoValor = !midia?.scanner_clean;
     setReprocessing(true);
     setErro('');
     try {
+      const usarClean = overrides.scanner_clean !== undefined ? overrides.scanner_clean : Boolean(midia?.scanner_clean);
+      const usarCompLayout = overrides.composicao_layout || midia?.composicao_layout || 'auto';
       const { data } = await api.post('/api/questoes/processar-midia', {
         source_url: sourceUrl,
-        bbox: midia?.bbox ? JSON.stringify(midia.bbox) : undefined,
-        scanner_clean: novoValor ? '1' : '0',
+        bboxes: Array.isArray(midia?.bboxes) && midia.bboxes.length > 0 ? JSON.stringify(midia.bboxes) : undefined,
+        bbox: (!midia?.bboxes || midia.bboxes.length === 0) && midia?.bbox ? JSON.stringify(midia.bbox) : undefined,
+        composicao_layout: usarCompLayout,
+        coluna_divisao_x: midia?.coluna_divisao_x || 0,
+        layout_origem: midia?.layout_origem || 'coluna_unica',
+        scanner_clean: usarClean ? '1' : '0',
         posicao: midia?.posicao || 'entre_enunciado_e_comando',
-        preset: midia?.preset || undefined,
+        preset: overrides.resetPreset ? undefined : (midia?.preset || undefined),
         alinhamento: midia?.alinhamento || 'center',
         legenda: midia?.legenda || '',
         credito: midia?.credito || '',
       });
       onChange(data.url, { ...data.midia, original_url: sourceUrl });
     } catch (err) {
-      setErro(err.response?.data?.message || 'Não foi possível aplicar o filtro Scanner Clean.');
+      setErro(err.response?.data?.message || 'Não foi possível reprocessar a figura.');
     } finally {
       setReprocessing(false);
     }
   };
+
+  const toggleScannerClean = () => reprocessarComOpcoes({ scanner_clean: !midia?.scanner_clean });
+  const trocarLayoutMultiFigura = (novoLayout) => reprocessarComOpcoes({ composicao_layout: novoLayout, resetPreset: true });
 
   const handlePasteZone = (e) => {
     const items = e.clipboardData?.items;
@@ -183,6 +191,8 @@ export default function SmartMediaCard({ imagem, midia, onChange }) {
   const posicaoAtual = midia?.posicao || 'entre_enunciado_e_comando';
   const alignAtual = midia?.alinhamento || 'center';
   const podeReprocessar = /^https:\/\/[a-z0-9.-]*digitaloceanspaces\.com\//i.test(midia?.original_url || imgUrl);
+  const qtdAreas = Array.isArray(midia?.bboxes) ? midia.bboxes.length : (midia?.partes_count || 1);
+  const compLayout = midia?.composicao_layout || 'unico';
 
   return (
     <div style={{
@@ -209,7 +219,7 @@ export default function SmartMediaCard({ imagem, midia, onChange }) {
 
       {/* Header do Estúdio de Mídia */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
           <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0369a1', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
             ✨ Mídia Independente
           </span>
@@ -219,6 +229,14 @@ export default function SmartMediaCard({ imagem, midia, onChange }) {
           }}>
             {dpi.label}{midia?.width && midia?.height ? ` (${midia.width}×${midia.height}px)` : ''}
           </span>
+          {qtdAreas > 1 && (
+            <span style={{
+              fontSize: '0.67rem', fontWeight: 800, color: '#6d28d9', background: '#ede9fe',
+              border: '1px solid #c4b5fd', padding: '2px 8px', borderRadius: 99,
+            }}>
+              🧩 {qtdAreas} Áreas Unidas
+            </span>
+          )}
           {midia?.preset_auto && midia.preset_auto === presetAtual && (
             <span style={{ fontSize: '0.66rem', fontWeight: 700, color: '#0e7490', background: '#e0f2fe', padding: '2px 7px', borderRadius: 99 }}>
               Escala Auto: {presetAtual}
@@ -238,7 +256,7 @@ export default function SmartMediaCard({ imagem, midia, onChange }) {
                   background: '#fff', color: '#0369a1', fontSize: '0.73rem', fontWeight: 700, cursor: 'pointer',
                 }}
               >
-                ✂️ Ajustar Recorte
+                ✂️ Ajustar Recorte{qtdAreas > 1 ? ` (${qtdAreas})` : ''}
               </button>
               <button
                 type="button"
@@ -274,6 +292,39 @@ export default function SmartMediaCard({ imagem, midia, onChange }) {
         </div>
       </div>
 
+      {/* Seletor rápido de arranjo quando houver múltiplas áreas (ex: 2 colunas) */}
+      {podeReprocessar && qtdAreas > 1 && compLayout !== 'unico' && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap',
+          padding: '6px 10px', marginBottom: 8, borderRadius: 8, background: '#f5f3ff', border: '1px solid #ddd6fe',
+        }}>
+          <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#5b21b6' }}>
+            📐 Arranjo das {qtdAreas} figuras extraídas das colunas:
+          </span>
+          <div style={{ display: 'flex', gap: 5 }}>
+            {[
+              { key: 'horizontal', label: '⬌ Lado a Lado' },
+              { key: 'vertical', label: '⬍ Empilhadas' },
+            ].map((opt) => (
+              <button
+                key={opt.key}
+                type="button"
+                disabled={reprocessing}
+                onClick={() => trocarLayoutMultiFigura(opt.key)}
+                style={{
+                  padding: '3px 9px', borderRadius: 6, fontSize: '0.71rem', fontWeight: 800, cursor: 'pointer',
+                  border: `1.5px solid ${compLayout === opt.key ? '#6d28d9' : '#c4b5fd'}`,
+                  background: compLayout === opt.key ? '#6d28d9' : '#fff',
+                  color: compLayout === opt.key ? '#fff' : '#5b21b6',
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Preview proporcional real */}
       <div style={{
         background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10,
@@ -287,7 +338,7 @@ export default function SmartMediaCard({ imagem, midia, onChange }) {
           style={{
             width: { P: '36%', M: '56%', G: '84%', '100%': '100%' }[presetAtual] || '56%',
             maxWidth: '100%',
-            maxHeight: 220,
+            maxHeight: 240,
             objectFit: 'contain',
             borderRadius: 6,
             transition: 'width 0.2s ease',

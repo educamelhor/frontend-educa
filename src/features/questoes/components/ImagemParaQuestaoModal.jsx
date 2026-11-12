@@ -1,7 +1,7 @@
 // src/features/questoes/components/ImagemParaQuestaoModal.jsx
 // EDUCA.STUDIO AI — Clonador Multimodal de Questão por Print / Foto
-// Detecta automaticamente qualquer um dos 7 modelos, isola e recorta figuras via Bounding Box,
-// identifica fonte real, sugere BNCC/Temas e resolve passo a passo.
+// Detecta automaticamente qualquer um dos 7 modelos (em 1 ou 2 colunas), isola e compõe figuras
+// via Multi-Bounding Box, identifica fonte real, sugere BNCC/Temas e resolve passo a passo.
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import api from '../../../services/api';
@@ -38,7 +38,6 @@ export default function ImagemParaQuestaoModal({ onClose, onUsar, initialFile = 
     reader.readAsDataURL(file);
   }, []);
 
-  // Se o usuário colou Ctrl+V direto na tela do Builder, já carrega o arquivo aqui
   useEffect(() => {
     if (initialFile) {
       selecionarArquivo(initialFile);
@@ -114,6 +113,8 @@ export default function ImagemParaQuestaoModal({ onClose, onUsar, initialFile = 
     setErroMsg('');
   };
 
+  const partesCount = resultado?.midia?.partes_count || (Array.isArray(resultado?.midia?.bboxes) ? resultado.midia.bboxes.length : 0);
+
   return (
     <div style={styles.overlay} onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div style={styles.modal}>
@@ -123,8 +124,8 @@ export default function ImagemParaQuestaoModal({ onClose, onUsar, initialFile = 
           <div style={{ flex: 1 }}>
             <div style={styles.headerTitle}>EDUCA.STUDIO AI — Clonar Questão por Print / Foto</div>
             <div style={styles.headerSub}>
-              {etapa === 'upload'    && 'Reconhece os 7 modelos, isola e recorta figuras automaticamente, identifica a banca e resolve passo a passo'}
-              {etapa === 'extraindo' && 'Agente Multimodal Gemini 2.5 analisando texto, fórmulas LaTeX e recortando ilustrações...'}
+              {etapa === 'upload'    && 'Reconhece os 7 modelos (1 ou 2 colunas), une e recorta figuras automaticamente, identifica a banca e resolve'}
+              {etapa === 'extraindo' && 'Agente Multimodal Gemini 2.5 lendo colunas, fórmulas LaTeX e reconstruindo ilustrações...'}
               {etapa === 'revisao'   && 'Confira a clonagem estruturada antes de enviar para o editor'}
               {etapa === 'erro'      && 'Ocorreu um problema ao analisar a imagem'}
             </div>
@@ -167,7 +168,7 @@ export default function ImagemParaQuestaoModal({ onClose, onUsar, initialFile = 
                       Arraste um print/foto de questão ou <span style={styles.dropLink}>clique para selecionar</span>
                     </div>
                     <div style={styles.dropSub}>
-                      Suporta Múltipla Escolha, Afirmativas (I, II, III), V/F, Colunas, Lacunas, Somatória e Discursiva — com ou sem figura!
+                      Suporta questões em 1 ou 2 colunas (ENEM/Fuvest), Múltipla Escolha, Afirmativas, V/F, Colunas, Lacunas, Somatória e Discursiva!
                     </div>
                     <div style={styles.pasteHint}>
                       <span style={styles.kbdKey}>Ctrl</span>
@@ -206,8 +207,8 @@ export default function ImagemParaQuestaoModal({ onClose, onUsar, initialFile = 
               <div style={styles.spinner} />
               <div style={styles.loadingTitle}>Agentes EDUCA.STUDIO em ação...</div>
               <div style={styles.loadingSub}>
-                1. Lendo enunciado, comando pós-figura e fórmulas LaTeX<br />
-                2. Recortando e limpando ilustrações de forma independente (300 DPI)<br />
+                1. Detectando layout (1 ou 2 colunas), enunciado e fórmulas LaTeX<br />
+                2. Recortando e unindo ilustrações de todas as colunas (300 DPI)<br />
                 3. Classificando BNCC/Temas e calculando resolução comentada
               </div>
               {preview && (
@@ -219,7 +220,7 @@ export default function ImagemParaQuestaoModal({ onClose, onUsar, initialFile = 
           {etapa === 'revisao' && resultado && (
             <>
               <div style={styles.revisaoGrid}>
-                {/* Coluna esquerda: Print original + Figura recortada */}
+                {/* Coluna esquerda: Print original + Figura recortada/composta */}
                 <div style={styles.revisaoImagem}>
                   <div style={styles.revisaoLabel}>Print enviado</div>
                   <img src={preview} alt="Original" style={styles.revisaoImg} />
@@ -227,12 +228,12 @@ export default function ImagemParaQuestaoModal({ onClose, onUsar, initialFile = 
                   {resultado.midia?.url && (
                     <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: '#f0f9ff', border: '1px solid #bae6fd' }}>
                       <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#0369a1', marginBottom: 6, textTransform: 'uppercase' }}>
-                        ✂️ Figura Recortada Automaticamente ({resultado.midia.preset})
+                        ✂️ Figura Isolada {partesCount > 1 ? `· ${partesCount} áreas unidas ` : ''}({resultado.midia.preset})
                       </div>
                       <img
                         src={resultado.midia.url}
                         alt="Figura isolada"
-                        style={{ width: '100%', maxHeight: 150, objectFit: 'contain', borderRadius: 6, background: '#fff', border: '1px solid #e2e8f0' }}
+                        style={{ width: '100%', maxHeight: 175, objectFit: 'contain', borderRadius: 6, background: '#fff', border: '1px solid #e2e8f0' }}
                       />
                     </div>
                   )}
@@ -244,6 +245,11 @@ export default function ImagemParaQuestaoModal({ onClose, onUsar, initialFile = 
                     <span style={{ padding: '3px 10px', borderRadius: 99, background: '#0f172a', color: '#fff', fontSize: '0.72rem', fontWeight: 800 }}>
                       {TIPO_META[resultado.tipo]?.emoji} {TIPO_META[resultado.tipo]?.label || resultado.tipo}
                     </span>
+                    {resultado.layout_origem === 'duas_colunas' && (
+                      <span style={{ padding: '3px 10px', borderRadius: 99, background: '#ede9fe', color: '#6d28d9', border: '1px solid #c4b5fd', fontSize: '0.71rem', fontWeight: 800 }}>
+                        📐 2 Colunas Unificadas
+                      </span>
+                    )}
                     {resultado.disciplina && (
                       <span style={{ padding: '3px 10px', borderRadius: 99, background: '#dbeafe', color: '#1d4ed8', fontSize: '0.72rem', fontWeight: 700 }}>
                         {resultado.disciplina}
@@ -287,13 +293,13 @@ export default function ImagemParaQuestaoModal({ onClose, onUsar, initialFile = 
                     background: resultado.gabarito_origem === 'marcado_na_imagem' ? '#ecfdf5' : '#fffbeb',
                     border: `1px solid ${resultado.gabarito_origem === 'marcado_na_imagem' ? '#6ee7b7' : '#fcd34d'}`,
                   }}>
-                    <div style={{ fontSize: '0.76rem', fontWeight: 800, color: resultado.gabarito_origem === 'marcado_na_imagem' ? '#065f46' : '#92400e', marginBottom: 4 }}>
+                    <div style={{ fontSize: '0.76rem', fontWeight: 800, color: resultado.gabarito_origem === 'marcado_na_imagem' ? '#065f46' : '#92400e', marginBottom: 5 }}>
                       {resultado.gabarito_origem === 'marcado_na_imagem'
                         ? `✅ Gabarito identificado na imagem: ${resumirGabaritoQuestao(resultado)}`
                         : `🧠 Gabarito sugerido pelo Agente IA: ${resumirGabaritoQuestao(resultado)} (você confirmará em 1 clique no editor)`}
                     </div>
                     {resultado.explicacao && (
-                      <div style={{ fontSize: '0.8rem', color: '#334155', lineHeight: 1.5 }}>
+                      <div style={{ fontSize: '0.8rem', color: '#334155', lineHeight: 1.6, whiteSpace: 'pre-line' }}>
                         <MathText text={resultado.explicacao} />
                       </div>
                     )}

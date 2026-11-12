@@ -18,7 +18,6 @@ import AlunoForm from "./AlunoForm";
 import ModalExcluirOuInativar from "./ModalExcluirOuInativar";
 import ImportCSV from "./ImportCSV";
 import ImportPDF from "./ImportPDF";
-import Input from "../../../components/ui/Input";
 import styles from "./styles.module.css";
 import api from "../../../services/api";
 import BoletimPrint from "../../boletim/BoletimPrint";
@@ -287,7 +286,7 @@ export default function Alunos() {
       </div>
 
       {/* Controles principais */}
-      <div className="flex justify-between items-start mb-3">
+      <div className="flex flex-wrap justify-between items-start gap-4 mb-3">
         {/* Botões à esquerda */}
         <div className="flex flex-col gap-2">
           {anoLetivo === anoLetivoPadrao() && (
@@ -380,7 +379,7 @@ export default function Alunos() {
         </div>
 
         {/* Busca à direita */}
-        <div className="flex flex-col items-end gap-2">
+        <div className="flex flex-col items-end gap-2 min-w-0">
           <label htmlFor="manter-filtro" className="flex items-center gap-2 text-sm text-gray-700 select-none">
             <input
               id="manter-filtro"
@@ -392,11 +391,12 @@ export default function Alunos() {
             Manter filtro
           </label>
 
-          <Input
-            placeholder="🔍 Buscar por nome, nome social, RE ou turma"
+          <input
+            type="text"
+            placeholder="🔍 Buscar nome, nome social, RE ou turma"
             value={filtro}
             onChange={(e) => setFiltro(e.target.value)}
-            className="w-80"
+            className="border border-gray-300 p-2 rounded w-64 sm:w-72 max-w-full text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
       </div>

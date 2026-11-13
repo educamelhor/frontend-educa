@@ -118,6 +118,7 @@ export function normalizarTextoLatex(raw = '') {
     .map((seg) => {
       if (seg.startsWith('$')) return seg;
       return seg
+        .replace(/([a-zà-ÿ])\|([a-zà-ÿ])/g, '$1$2')
         .replace(/([A-Za-zÀ-ÿ0-9)\]])\|(?=\s|$|[.,;:!?])/g, '$1')
         .replace(
           /(?:-\s*)?(?:(?:\\(?:text|mathrm|mathbf)\{[^{}]+\}|\\frac\{[^{}]+\}\{[^{}]+\}|\\sqrt\{[^{}]+\})(?:[_^](?:\{[^{}]+\}|[A-Za-z0-9+-]+))*)+(?:\s*(?:[-+=→⇌]|\\rightarrow)\s*(?:(?:\\(?:text|mathrm|mathbf)\{[^{}]+\}|\\frac\{[^{}]+\}\{[^{}]+\})(?:[_^](?:\{[^{}]+\}|[A-Za-z0-9+-]+))*)+)*/g,
@@ -458,19 +459,23 @@ export function QuestaoCorpoEstruturado({ questao, showGabarito = true, modoProv
         <SmartFigure midia={midia} imagemUrl={imagemFallback} modoProva={modoProva} />
       )}
 
-      {/* 3. Comando final pós-figura */}
-      {comandoFinal && (
-        <div style={{
-          fontSize: fontBody,
-          lineHeight: 1.55,
-          fontWeight: 600,
-          color: modoProva ? '#000' : '#0f172a',
-          margin: '5px 0 6px',
-          textAlign: 'justify',
-        }}>
-          <MathText text={comandoFinal} />
-        </div>
-      )}
+      {/* 3. Comando final pós-figura (exceto quando deve vir entre a tabela/itens V-F e as alternativas de sequência) */}
+      {(() => {
+        const comandoPosCorpo = (tipo === 'associacao' || tipo === 'verdadeiro_falso') && (est.submodo || 'direto') === 'sequencia';
+        if (!comandoFinal || comandoPosCorpo) return null;
+        return (
+          <div style={{
+            fontSize: fontBody,
+            lineHeight: 1.55,
+            fontWeight: 600,
+            color: modoProva ? '#000' : '#0f172a',
+            margin: '5px 0 6px',
+            textAlign: 'justify',
+          }}>
+            <MathText text={comandoFinal} />
+          </div>
+        );
+      })()}
 
       {/* Figura abaixo do comando */}
       {posicaoFigura === 'abaixo_comando' && (
@@ -484,7 +489,7 @@ export function QuestaoCorpoEstruturado({ questao, showGabarito = true, modoProv
         <div style={{ marginTop: 6 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingLeft: 4, marginBottom: 6 }}>
             {(est.proposicoes || []).filter(p => p.texto?.trim()).map((p, i) => (
-              <div key={p.id || i} style={{ fontSize: modoProva ? '9.6pt' : '0.85rem', color: modoProva ? '#000' : '#1e293b', display: 'flex', gap: 6 }}>
+              <div key={p.id || i} style={{ fontSize: modoProva ? '9.6pt' : '0.85rem', color: modoProva ? '#000' : '#1e293b', display: 'flex', gap: 6, textAlign: 'left' }}>
                 <strong style={{ minWidth: 24 }}>{p.romano || ['I', 'II', 'III', 'IV', 'V'][i]}.</strong>
                 <span style={{ flex: 1 }}><MathText text={p.texto} /></span>
                 {showGabarito && !modoProva && (
@@ -496,7 +501,7 @@ export function QuestaoCorpoEstruturado({ questao, showGabarito = true, modoProv
             ))}
           </div>
           {est.comando_fechamento && (
-            <div style={{ fontSize: fontBody, fontWeight: 600, margin: '4px 0', color: modoProva ? '#000' : '#0f172a' }}>
+            <div style={{ fontSize: fontBody, fontWeight: 600, margin: '4px 0', color: modoProva ? '#000' : '#0f172a', textAlign: 'left' }}>
               <MathText text={est.comando_fechamento} />
             </div>
           )}
@@ -510,7 +515,7 @@ export function QuestaoCorpoEstruturado({ questao, showGabarito = true, modoProv
             {(est.itens || []).filter(it => it.texto?.trim()).map((it, i) => {
               const mostrarDireto = showGabarito && (est.submodo || 'direto') === 'direto';
               return (
-                <div key={it.id || i} style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontSize: modoProva ? '9.6pt' : '0.85rem' }}>
+                <div key={it.id || i} style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontSize: modoProva ? '9.6pt' : '0.85rem', textAlign: 'left' }}>
                   <span style={{
                     fontFamily: 'monospace', fontWeight: 800, whiteSpace: 'nowrap',
                     color: mostrarDireto ? (['V', 'C'].includes(it.gabarito) ? '#059669' : '#dc2626') : 'inherit',
@@ -532,53 +537,77 @@ export function QuestaoCorpoEstruturado({ questao, showGabarito = true, modoProv
               ))}
             </div>
           )}
-          {est.submodo === 'sequencia' && renderBlocoAlternativas()}
-        </div>
-      )}
-
-      {tipo === 'associacao' && (
-        <div style={{ marginTop: 6 }}>
-          {((est.coluna_a || []).some(a => a.texto?.trim()) || (est.coluna_b || []).some(b => b.texto?.trim())) && (
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: modoProva ? '9pt' : '0.82rem', marginBottom: 6 }}>
-              <thead>
-                <tr style={{ background: '#f1f5f9' }}>
-                  <th style={{ border: '1px solid #cbd5e1', padding: '4px 8px', textAlign: 'left', width: '48%' }}>
-                    {est.titulo_coluna_a || 'Coluna A'}
-                  </th>
-                  <th style={{ border: '1px solid #cbd5e1', padding: '4px 8px', textAlign: 'left', width: '52%' }}>
-                    {est.titulo_coluna_b || 'Coluna B'}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {Array.from({ length: Math.max((est.coluna_a || []).length, (est.coluna_b || []).length) }, (_, i) => {
-                  const a = (est.coluna_a || [])[i];
-                  const b = (est.coluna_b || [])[i];
-                  const mostrarCod = showGabarito && (est.submodo || 'direto') === 'direto' && b?.vinculo_codigo;
-                  return (
-                    <tr key={i}>
-                      <td style={{ border: '1px solid #cbd5e1', padding: '4px 8px', verticalAlign: 'top' }}>
-                        {a?.texto ? <><strong>({a.codigo || i + 1})</strong> <MathText text={a.texto} /></> : ''}
-                      </td>
-                      <td style={{ border: '1px solid #cbd5e1', padding: '4px 8px', verticalAlign: 'top' }}>
-                        {b?.texto ? (
-                          <>
-                            <span style={{ fontFamily: 'monospace', fontWeight: 800, color: mostrarCod ? '#059669' : 'inherit' }}>
-                              ({mostrarCod ? ` ${b.vinculo_codigo} ` : '   '})
-                            </span>{' '}
-                            <MathText text={b.texto} />
-                          </>
-                        ) : ''}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          {(est.submodo || 'direto') === 'sequencia' && comandoFinal && (
+            <div style={{ fontSize: fontBody, lineHeight: 1.5, fontWeight: 600, color: modoProva ? '#000' : '#0f172a', margin: '7px 0 4px', textAlign: 'left' }}>
+              <MathText text={comandoFinal} />
+            </div>
           )}
           {est.submodo === 'sequencia' && renderBlocoAlternativas()}
         </div>
       )}
+
+      {tipo === 'associacao' && (() => {
+        const colA = est.coluna_a || [];
+        const colB = est.coluna_b || [];
+        const avgA = colA.length ? colA.reduce((s, x) => s + String(x?.texto || '').length, 0) / colA.length : 25;
+        const avgB = colB.length ? colB.reduce((s, x) => s + String(x?.texto || '').length, 0) / colB.length : 45;
+        const widthColA = avgA <= avgB * 0.58 ? '37%' : '46%';
+        const widthColB = avgA <= avgB * 0.58 ? '63%' : '54%';
+
+        return (
+          <div style={{ marginTop: 6 }}>
+            {(colA.some(a => a.texto?.trim()) || colB.some(b => b.texto?.trim())) && (
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: modoProva ? '9pt' : '0.82rem', marginBottom: 6, textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ background: '#f1f5f9' }}>
+                    <th style={{ border: '1px solid #cbd5e1', padding: '5px 10px', textAlign: 'left', verticalAlign: 'middle', width: widthColA }}>
+                      {est.titulo_coluna_a || 'Coluna A'}
+                    </th>
+                    <th style={{ border: '1px solid #cbd5e1', padding: '5px 10px', textAlign: 'left', verticalAlign: 'middle', width: widthColB }}>
+                      {est.titulo_coluna_b || 'Coluna B'}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Array.from({ length: Math.max(colA.length, colB.length) }, (_, i) => {
+                    const a = colA[i];
+                    const b = colB[i];
+                    const mostrarCod = showGabarito && (est.submodo || 'direto') === 'direto' && b?.vinculo_codigo;
+                    return (
+                      <tr key={i}>
+                        <td style={{ border: '1px solid #cbd5e1', padding: '6px 10px', verticalAlign: 'top', textAlign: 'left', lineHeight: 1.5 }}>
+                          {a?.texto ? (
+                            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, textAlign: 'left' }}>
+                              <strong style={{ flexShrink: 0 }}>({a.codigo || i + 1})</strong>
+                              <span style={{ flex: 1, textAlign: 'left' }}><MathText text={a.texto} /></span>
+                            </div>
+                          ) : ''}
+                        </td>
+                        <td style={{ border: '1px solid #cbd5e1', padding: '6px 10px', verticalAlign: 'top', textAlign: 'left', lineHeight: 1.5 }}>
+                          {b?.texto ? (
+                            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, textAlign: 'left' }}>
+                              <span style={{ fontFamily: 'monospace', fontWeight: 800, whiteSpace: 'nowrap', flexShrink: 0, color: mostrarCod ? '#059669' : 'inherit' }}>
+                                ({mostrarCod ? ` ${b.vinculo_codigo} ` : '   '})
+                              </span>
+                              <span style={{ flex: 1, textAlign: 'left' }}><MathText text={b.texto} /></span>
+                            </div>
+                          ) : ''}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+            {(est.submodo || 'direto') === 'sequencia' && comandoFinal && (
+              <div style={{ fontSize: fontBody, lineHeight: 1.5, fontWeight: 600, color: modoProva ? '#000' : '#0f172a', margin: '7px 0 4px', textAlign: 'left' }}>
+                <MathText text={comandoFinal} />
+              </div>
+            )}
+            {est.submodo === 'sequencia' && renderBlocoAlternativas()}
+          </div>
+        );
+      })()}
 
       {tipo === 'lacuna' && (
         <div style={{ marginTop: 6 }}>
@@ -692,31 +721,39 @@ export function renderQuestaoPrintHtml(it, idx, template, showGabarito = false) 
     return `<div style="display:flex;gap:5px;padding:1.5px 0;font-size:9.8pt;${isCorr ? 'background:#f0fdf4;font-weight:700' : ''}"><span style="font-weight:700;min-width:22px">(${esc(a.letra)})</span><div style="flex:1">${esc(a.texto || '')}${aImg}</div></div>`;
   }).join('');
 
+  const cmdPosCorpoPrint = (tipo === 'associacao' || tipo === 'verdadeiro_falso') && (est.submodo || 'direto') === 'sequencia';
+  const cmdHtml = it.comando_final ? `<p style="font-size:10pt;font-weight:600;line-height:1.5;margin:4px 0;text-align:left">${esc(it.comando_final)}</p>` : '';
+
   let corpo = '';
   if (tipo === 'afirmativas') {
-    const pHtml = (est.proposicoes || []).map((p, i) => `<div style="font-size:9.6pt;margin-bottom:2px"><strong>${esc(p.romano || ['I','II','III','IV','V'][i])}.</strong> ${esc(p.texto || '')}</div>`).join('');
-    const cf = est.comando_fechamento ? `<div style="font-weight:600;margin:4px 0;font-size:9.8pt">${esc(est.comando_fechamento)}</div>` : '';
+    const pHtml = (est.proposicoes || []).map((p, i) => `<div style="font-size:9.6pt;margin-bottom:2px;text-align:left"><strong>${esc(p.romano || ['I','II','III','IV','V'][i])}.</strong> ${esc(p.texto || '')}</div>`).join('');
+    const cf = est.comando_fechamento ? `<div style="font-weight:600;margin:4px 0;font-size:9.8pt;text-align:left">${esc(est.comando_fechamento)}</div>` : '';
     corpo = `${pHtml}${cf}${renderAlts()}`;
   } else if (tipo === 'verdadeiro_falso') {
-    const vHtml = (est.itens || []).map(x => `<div style="font-size:9.6pt;margin-bottom:2px"><span style="font-family:monospace;font-weight:700">( ${showGabarito && (est.submodo || 'direto') === 'direto' ? esc(x.gabarito || 'V') : '&nbsp;&nbsp;'} )</span> ${esc(x.texto || '')}</div>`).join('');
-    corpo = `${vHtml}${est.submodo === 'sequencia' ? renderAlts() : ''}`;
+    const vHtml = (est.itens || []).map(x => `<div style="font-size:9.6pt;margin-bottom:2px;text-align:left"><span style="font-family:monospace;font-weight:700">( ${showGabarito && (est.submodo || 'direto') === 'direto' ? esc(x.gabarito || 'V') : '&nbsp;&nbsp;'} )</span> ${esc(x.texto || '')}</div>`).join('');
+    corpo = `${vHtml}${cmdPosCorpoPrint ? cmdHtml : ''}${est.submodo === 'sequencia' ? renderAlts() : ''}`;
   } else if (tipo === 'associacao') {
     const colA = est.coluna_a || [];
     const colB = est.coluna_b || [];
+    const avgA = colA.length ? colA.reduce((s, x) => s + String(x?.texto || '').length, 0) / colA.length : 25;
+    const avgB = colB.length ? colB.reduce((s, x) => s + String(x?.texto || '').length, 0) / colB.length : 45;
+    const wA = avgA <= avgB * 0.58 ? '37%' : '46%';
+    const wB = avgA <= avgB * 0.58 ? '63%' : '54%';
     const n = Math.max(colA.length, colB.length);
     let rows = '';
     for (let i = 0; i < n; i++) {
       const a = colA[i]; const b = colB[i];
-      rows += `<tr><td style="border:0.5pt solid #666;padding:3px 5px">${a ? `<strong>(${esc(a.codigo || i + 1)})</strong> ${esc(a.texto || '')}` : ''}</td><td style="border:0.5pt solid #666;padding:3px 5px">${b ? `<span style="font-family:monospace;font-weight:700">( ${showGabarito && (est.submodo || 'direto') === 'direto' ? esc(b.vinculo_codigo || '') : '&nbsp;&nbsp;'} )</span> ${esc(b.texto || '')}` : ''}</td></tr>`;
+      rows += `<tr><td style="border:0.5pt solid #666;padding:4px 6px;text-align:left;vertical-align:top;width:${wA}">${a ? `<strong>(${esc(a.codigo || i + 1)})</strong> ${esc(a.texto || '')}` : ''}</td><td style="border:0.5pt solid #666;padding:4px 6px;text-align:left;vertical-align:top;width:${wB}">${b ? `<span style="font-family:monospace;font-weight:700">( ${showGabarito && (est.submodo || 'direto') === 'direto' ? esc(b.vinculo_codigo || '') : '&nbsp;&nbsp;'} )</span> ${esc(b.texto || '')}` : ''}</td></tr>`;
     }
-    corpo = `<table style="width:100%;border-collapse:collapse;font-size:9pt;margin:4px 0">${rows}</table>${est.submodo === 'sequencia' ? renderAlts() : ''}`;
+    const hdr = `<thead><tr style="background:#f3f4f6"><th style="border:0.5pt solid #666;padding:4px 6px;text-align:left;width:${wA}">${esc(est.titulo_coluna_a || 'Coluna A')}</th><th style="border:0.5pt solid #666;padding:4px 6px;text-align:left;width:${wB}">${esc(est.titulo_coluna_b || 'Coluna B')}</th></tr></thead>`;
+    corpo = `<table style="width:100%;border-collapse:collapse;font-size:9pt;margin:4px 0;text-align:left">${hdr}<tbody>${rows}</tbody></table>${cmdPosCorpoPrint ? cmdHtml : ''}${est.submodo === 'sequencia' ? renderAlts() : ''}`;
   } else if (tipo === 'lacuna') {
     const bp = est.submodo === 'banco_palavras'
       ? `<div style="border:0.7pt dashed #555;padding:4px 8px;font-size:9pt;margin:4px 0"><strong>Banco de palavras:</strong> ${[...(est.lacunas || []), ...(est.distratores_banco || [])].filter(Boolean).map(esc).join(' · ')}</div>`
       : '';
     corpo = `${bp}${est.submodo === 'alternativas' ? renderAlts() : ''}`;
   } else if (tipo === 'somatoria') {
-    const sHtml = (est.proposicoes || []).map(p => `<div style="font-size:9.6pt;margin-bottom:2px"><strong>(${esc(p.codigo || String(p.valor).padStart(2, '0'))})</strong> ${esc(p.texto || '')}</div>`).join('');
+    const sHtml = (est.proposicoes || []).map(p => `<div style="font-size:9.6pt;margin-bottom:2px;text-align:left"><strong>(${esc(p.codigo || String(p.valor).padStart(2, '0'))})</strong> ${esc(p.texto || '')}</div>`).join('');
     corpo = `${sHtml}<div style="text-align:right;margin-top:4px;font-weight:700;font-size:9.5pt">SOMA: <span style="border:1pt solid #000;padding:1px 10px">${showGabarito ? esc(String(est.soma_correta ?? 0).padStart(2, '0')) : '&nbsp;&nbsp;&nbsp;&nbsp;'}</span></div>`;
   } else if (tipo === 'discursiva') {
     corpo = (est.formato_espaco || 'linhas') === 'quadro_calculo'
@@ -732,7 +769,7 @@ export function renderQuestaoPrintHtml(it, idx, template, showGabarito = false) 
     ${pos === 'apos_texto_apoio' ? figHtml : ''}
     <p style="font-size:10pt;line-height:1.55;text-align:justify;margin:3px 0 4px">${enuncHtml}</p>
     ${pos === 'entre_enunciado_e_comando' ? figHtml : ''}
-    ${it.comando_final ? `<p style="font-size:10pt;font-weight:600;line-height:1.5;margin:4px 0">${esc(it.comando_final)}</p>` : ''}
+    ${!cmdPosCorpoPrint ? cmdHtml : ''}
     ${pos === 'abaixo_comando' ? figHtml : ''}
     ${corpo}
   </div>`;

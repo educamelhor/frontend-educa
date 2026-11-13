@@ -96,28 +96,33 @@ export function criarEstruturaInicial(tipo) {
   }
 }
 
-/* ── Normalizador defensivo de escapes LaTeX (cura \t->\text, \f->\frac, \b->\beta e \text{} solto) ── */
+/* ── Normalizador defensivo de escapes LaTeX (cura \t->\text, \f->\frac, \b->\beta, cursor Word e \text{} solto) ── */
 export function normalizarTextoLatex(raw = '') {
   if (!raw) return '';
   let s = String(raw);
   s = s.replace(/\x08/g, '\\b').replace(/\x0c/g, '\\f');
   s = s.replace(/\x09(?=(?:ext|imes|heta|au\b|an\b|anh\b|o\b|op\b|riangle|ilde|frac|herefore|hickapprox|iny))/g, '\\t');
   s = s.replace(/\r(?!\n)(?=(?:ight|ho\b|angle|ceil|floor|aise))/g, '\\r');
-  s = s.replace(/\$([^$]+)\$/g, (_full, inner) => {
+  // Casar $$...$$ ANTES de $...$ na mesma passada p/ nunca deslocar delimitadores
+  s = s.replace(/\$\$([^$]+)\$\$|\$([^$]+)\$/g, (_full, dispInner, inlInner) => {
+    const isDisp = dispInner !== undefined;
+    const inner = isDisp ? dispInner : inlInner;
     const fixed = inner
       .replace(/\x09/g, '\\t')
       .replace(/\r(?!\n)/g, '\\r')
       .replace(/\n(?=(?:abla|eq\b|u\b|otin|eg\b|atural|leq|geq|mid\b|parallel|sim\b|cong))/g, '\\n');
-    return `$${fixed}$`;
+    return isDisp ? `$$${fixed}$$` : `$${fixed}$`;
   });
   const segs = s.split(/(\$\$[^$]+\$\$|\$[^$]+\$)/g);
   return segs
     .map((seg) => {
       if (seg.startsWith('$')) return seg;
-      return seg.replace(
-        /(?:-\s*)?(?:(?:\\(?:text|mathrm|mathbf)\{[^{}]+\}|\\frac\{[^{}]+\}\{[^{}]+\}|\\sqrt\{[^{}]+\})(?:[_^](?:\{[^{}]+\}|[A-Za-z0-9+-]+))*)+(?:\s*(?:[-+=→⇌]|\\rightarrow)\s*(?:(?:\\(?:text|mathrm|mathbf)\{[^{}]+\}|\\frac\{[^{}]+\}\{[^{}]+\})(?:[_^](?:\{[^{}]+\}|[A-Za-z0-9+-]+))*)+)*/g,
-        (m) => `$${m.trim()}$`
-      );
+      return seg
+        .replace(/([A-Za-zÀ-ÿ0-9)\]])\|(?=\s|$|[.,;:!?])/g, '$1')
+        .replace(
+          /(?:-\s*)?(?:(?:\\(?:text|mathrm|mathbf)\{[^{}]+\}|\\frac\{[^{}]+\}\{[^{}]+\}|\\sqrt\{[^{}]+\})(?:[_^](?:\{[^{}]+\}|[A-Za-z0-9+-]+))*)+(?:\s*(?:[-+=→⇌]|\\rightarrow)\s*(?:(?:\\(?:text|mathrm|mathbf)\{[^{}]+\}|\\frac\{[^{}]+\}\{[^{}]+\})(?:[_^](?:\{[^{}]+\}|[A-Za-z0-9+-]+))*)+)*/g,
+          (m) => `$${m.trim()}$`
+        );
     })
     .join('');
 }
@@ -185,8 +190,17 @@ export function MathText({ text = '', style, className }) {
           );
         }
 
-        // Preserva quebras de linha no texto comum
-        const lines = part.split('\n');
+        // Preserva quebras de linha no texto comum (removendo \n redundante colado em bloco display $$...$$)
+        let cleanPart = part;
+        const prevPart = idx > 0 ? parts[idx - 1] : '';
+        const nextPart = idx + 1 < parts.length ? parts[idx + 1] : '';
+        if (prevPart.startsWith('$$') && prevPart.endsWith('$$') && prevPart.length > 4) {
+          cleanPart = cleanPart.replace(/^\r?\n/, '');
+        }
+        if (nextPart.startsWith('$$') && nextPart.endsWith('$$') && nextPart.length > 4) {
+          cleanPart = cleanPart.replace(/\r?\n$/, '');
+        }
+        const lines = cleanPart.split('\n');
         return (
           <React.Fragment key={idx}>
             {lines.map((ln, li) => (

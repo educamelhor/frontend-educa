@@ -93,8 +93,10 @@ export default function ImagemParaQuestaoModal({ onClose, onUsar, initialFile = 
       setResultado(data);
       setEtapa('revisao');
     } catch (err) {
-      const msg = err.response?.data?.message || err.message || 'Erro inesperado.';
-      setErroMsg(msg);
+      const dataErr = err.response?.data;
+      const baseMsg = dataErr?.message || err.message || 'Erro inesperado.';
+      const detail = dataErr?.detail && dataErr.detail !== baseMsg ? ` (${dataErr.detail})` : '';
+      setErroMsg(`${baseMsg}${detail}`);
       setEtapa('erro');
     }
   };

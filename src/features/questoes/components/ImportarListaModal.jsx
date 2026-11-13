@@ -167,11 +167,11 @@ function RecortePaginaPreview({ pageSrc, questaoBbox, verPaginaInteira, onToggle
   );
 }
 
-/* ── Renderiza 1 página do PDF em Blob JPEG de alta nitidez (~220 DPI) ── */
-async function renderizarPaginaPdfBlob(pdfDoc, pageNum, targetMaxDim = 2100) {
+/* ── Renderiza 1 página do PDF em Blob JPEG otimizado (~220 DPI, upload leve < 300 KB) ── */
+async function renderizarPaginaPdfBlob(pdfDoc, pageNum, targetMaxDim = 1900) {
   const page = await pdfDoc.getPage(pageNum);
   const vpBase = page.getViewport({ scale: 1 });
-  const idealScale = Math.min(2.6, Math.max(1.8, targetMaxDim / Math.max(vpBase.width, vpBase.height, 1)));
+  const idealScale = Math.min(2.4, Math.max(1.7, targetMaxDim / Math.max(vpBase.width, vpBase.height, 1)));
   const viewport = page.getViewport({ scale: idealScale });
 
   const canvas = document.createElement('canvas');
@@ -183,8 +183,19 @@ async function renderizarPaginaPdfBlob(pdfDoc, pageNum, targetMaxDim = 2100) {
 
   await page.render({ canvasContext: ctx, viewport }).promise;
 
-  const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.9));
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.88));
   return blob;
+}
+
+function formatarCronometro(segundosTotais) {
+  const s = Math.max(0, Math.floor(Number(segundosTotais) || 0));
+  const min = String(Math.floor(s / 60)).padStart(2, '0');
+  const seg = String(s % 60).padStart(2, '0');
+  return `${min}:${seg}`;
+}
+
+function esperarMs(ms) {
+  return new Promise((r) => setTimeout(r, ms));
 }
 
 /* ── Renderiza miniatura leve p/ seletor de páginas do PDF ── */
@@ -231,9 +242,25 @@ export default function ImportarListaModal({
   const [isDrag, setIsDrag] = useState(false);
   const [erroMsg, setErroMsg] = useState('');
 
-  // Progresso em tempo real (página por página)
-  const [progresso, setProgresso] = useState({ atual: 0, total: 0, extraidasAteAgora: 0, descricao: '' });
-  const abortarLoteRef = useRef(false);
+  // Telemetria em tempo real estilo Solver Urânia (Zero Timeout via Background Job + Polling)
+  const [telemetria, setTelemetria] = useState({
+    jobId: null,
+    faseEnvio: false,
+    enviadas: 0,
+    totalPaginas: 0,
+    concluidas: 0,
+    comErro: 0,
+    totalQuestoes: 0,
+    etapaAtual: '',
+    modeloAtivo: '',
+    iniciadoLocalMs: 0,
+    elapsedSegundos: 0,
+    paginas: [],
+    parando: false,
+  });
+  const jobAtivoRef = useRef(null);
+  const mapaPreviewPaginasRef = useRef({});
+  const unmountedRef = useRef(false);
 
   // Fila de Revisão 1 a 1
   const [fila, setFila] = useState([]);
@@ -256,12 +283,26 @@ export default function ImportarListaModal({
   };
 
   useEffect(() => {
+    unmountedRef.current = false;
     return () => {
+      unmountedRef.current = true;
       objectUrlsRef.current.forEach((u) => {
         try { URL.revokeObjectURL(u); } catch { /* ignore */ }
       });
     };
   }, []);
+
+  // Cronômetro suave em tempo real (1s) durante o processamento assíncrono
+  useEffect(() => {
+    if (etapa !== 'processando' || !telemetria.iniciadoLocalMs) return;
+    const timer = setInterval(() => {
+      setTelemetria((prev) => ({
+        ...prev,
+        elapsedSegundos: Math.max(0, Math.floor((Date.now() - prev.iniciadoLocalMs) / 1000)),
+      }));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [etapa, telemetria.iniciadoLocalMs]);
 
   /* ── Carregamento de PDF no Navegador ── */
   const carregarArquivoPdf = useCallback(async (file) => {
@@ -412,127 +453,237 @@ export default function ImportarListaModal({
     };
   };
 
-  /* ── Dispara Extração (Visual por Página OU Texto Bruto) ── */
+  /* ── Abre a Fila de Revisão hidratando cada questão com o preview local da sua página ── */
+  const finalizarJobParaRevisao = useCallback((statusData) => {
+    const mapaLocal = mapaPreviewPaginasRef.current || {};
+    const questoesBrutas = Array.isArray(statusData?.questoes) ? statusData.questoes : [];
+    const lista = questoesBrutas.map((q, idx) =>
+      hidratarItemFila(q, idx, mapaLocal[q.pagina_origem] || null)
+    );
+
+    if (!lista.length) {
+      if (statusData?.status === 'cancelado') {
+        setEtapa('upload');
+        return;
+      }
+      const motivo = statusData?.erro_msg || statusData?.avisos?.[0]
+        || 'Nenhuma questão foi encontrada nas páginas selecionadas. Verifique se contêm exercícios visíveis.';
+      setErroMsg(motivo);
+      setEtapa('upload');
+      return;
+    }
+
+    setFila(lista);
+    setActiveIdx(0);
+    setAbaDireita('preview');
+    setVerPaginaInteira(false);
+    if (Array.isArray(statusData?.avisos) && statusData.avisos.length > 0) {
+      setErroItem(`Aviso parcial: ${statusData.avisos.join(' · ')}. As ${lista.length} questões extraídas estão prontas abaixo.`);
+    } else {
+      setErroItem('');
+    }
+    setEtapa('revisao');
+  }, []);
+
+  /* ── Botão Estilo Urânia: "Parar Agora e Revisar Questões Já Prontas" (ou Cancelar) ── */
+  const pararOuCancelarJob = async () => {
+    const jid = jobAtivoRef.current;
+    setTelemetria((prev) => ({ ...prev, parando: true, etapaAtual: 'Interrompendo fila e consolidando questões já prontas...' }));
+    if (!jid) {
+      setEtapa('upload');
+      return;
+    }
+    try {
+      const { data } = await api.post(`/api/questoes/jobs/${jid}/cancelar`, {}, { timeout: 15000 });
+      jobAtivoRef.current = null;
+      finalizarJobParaRevisao(data);
+    } catch {
+      jobAtivoRef.current = null;
+      setEtapa('upload');
+    }
+  };
+
+  /* ── Dispara Extração Assíncrona em Background (Zero Timeout de 30s/60s + Telemetria ao Vivo) ── */
   const iniciarExtracao = async () => {
     setErroMsg('');
-    abortarLoteRef.current = false;
+    setErroItem('');
 
+    let tarefasPaginas = [];
     if (modoFonte === 'texto') {
       if (textoBruto.trim().length < 20) {
         setErroMsg('Cole o texto contendo ao menos uma questão completa.');
         return;
       }
-      setEtapa('processando');
-      setProgresso({ atual: 1, total: 1, extraidasAteAgora: 0, descricao: 'Individualizando questões e fórmulas LaTeX da lista em texto...' });
-      try {
-        const { data } = await api.post('/api/questoes/extrair-lista-texto', {
-          texto: textoBruto,
-          disciplina: discPadrao,
-          serie: seriePadrao,
-        });
-        const lista = (data.questoes || []).map((q, idx) => hidratarItemFila(q, idx, null));
-        if (!lista.length) {
-          throw new Error('Nenhuma questão pôde ser identificada no texto informado.');
+    } else {
+      if (pdfDoc) {
+        if (!paginasSelecionadas.length) {
+          setErroMsg('Selecione ao menos 1 página do PDF para individualizar.');
+          return;
         }
-        setFila(lista);
-        setActiveIdx(0);
-        setAbaDireita('preview');
-        setEtapa('revisao');
-      } catch (err) {
-        const d = err.response?.data;
-        setErroMsg(d?.message ? `${d.message}${d.detail && d.detail !== d.message ? ` (${d.detail})` : ''}` : (err.message || 'Erro ao processar lista.'));
-        setEtapa('upload');
-      }
-      return;
-    }
-
-    // Modo Visual: PDF (páginas selecionadas) ou Imagens de páginas
-    const tarefasPaginas = [];
-    if (pdfDoc) {
-      if (!paginasSelecionadas.length) {
-        setErroMsg('Selecione ao menos 1 página do PDF para individualizar.');
+        for (const pNum of paginasSelecionadas) {
+          tarefasPaginas.push({ tipo: 'pdf', pageNum: pNum, label: `Página ${pNum}` });
+        }
+      } else if (arquivosImagens.length > 0) {
+        arquivosImagens.forEach((arq, idx) => {
+          tarefasPaginas.push({
+            tipo: 'img',
+            pageNum: idx + 1,
+            file: arq.file,
+            previewUrl: arq.previewUrl,
+            label: `Folha ${idx + 1}`,
+          });
+        });
+      } else {
+        setErroMsg('Envie um arquivo PDF ou adicione fotos/prints das páginas da lista.');
         return;
       }
-      for (const pNum of paginasSelecionadas) {
-        tarefasPaginas.push({ tipo: 'pdf', pageNum: pNum, label: `Página ${pNum} do PDF` });
-      }
-    } else if (arquivosImagens.length > 0) {
-      arquivosImagens.forEach((arq, idx) => {
-        tarefasPaginas.push({
-          tipo: 'img',
-          pageNum: idx + 1,
-          file: arq.file,
-          previewUrl: arq.previewUrl,
-          label: `Folha ${idx + 1} (${arq.nome})`,
-        });
-      });
-    } else {
-      setErroMsg('Envie um arquivo PDF ou adicione fotos/prints das páginas da lista.');
-      return;
     }
 
+    const totalPags = modoFonte === 'texto' ? 1 : tarefasPaginas.length;
+    const inicioMs = Date.now();
+    mapaPreviewPaginasRef.current = {};
+
+    setTelemetria({
+      jobId: null,
+      faseEnvio: modoFonte === 'visual',
+      enviadas: 0,
+      totalPaginas: totalPags,
+      concluidas: 0,
+      comErro: 0,
+      totalQuestoes: 0,
+      etapaAtual: modoFonte === 'texto'
+        ? 'Iniciando individualização da lista em texto no motor assíncrono...'
+        : `Preparando ${totalPags} página(s) em alta nitidez para leitura paralela...`,
+      modeloAtivo: '',
+      iniciadoLocalMs: inicioMs,
+      elapsedSegundos: 0,
+      paginas: tarefasPaginas.map((t, idx) => ({
+        ordem: idx + 1,
+        pagina_numero: t.pageNum,
+        status: 'preparando',
+        etapa: 'Aguardando envio...',
+        questoes_count: 0,
+      })),
+      parando: false,
+    });
     setEtapa('processando');
-    const acumuladas = [];
-    let ultimoTextoCompartilhado = '';
 
     try {
-      for (let i = 0; i < tarefasPaginas.length; i++) {
-        if (abortarLoteRef.current) break;
-        const t = tarefasPaginas[i];
-        setProgresso({
-          atual: i + 1,
-          total: tarefasPaginas.length,
-          extraidasAteAgora: acumuladas.length,
-          descricao: `Analisando ${t.label} com Visão Computacional e recortando figuras...`,
-        });
+      // 1) Cria o Job Assíncrono (HTTP 202 < 150ms)
+      const { data: jobResp } = await api.post(
+        '/api/questoes/jobs',
+        {
+          modo: modoFonte === 'texto' ? 'texto' : 'visual',
+          total_paginas: totalPags,
+          disciplina: discPadrao,
+          serie: seriePadrao,
+          texto: modoFonte === 'texto' ? textoBruto : '',
+        },
+        { timeout: 20000 }
+      );
 
-        let blobEnvio = null;
-        let localPreviewUrl = null;
-        if (t.tipo === 'pdf') {
-          blobEnvio = await renderizarPaginaPdfBlob(pdfDoc, t.pageNum);
-          localPreviewUrl = registrarObjectUrl(URL.createObjectURL(blobEnvio));
-        } else {
-          blobEnvio = t.file;
-          localPreviewUrl = t.previewUrl;
+      const jobId = jobResp?.jobId;
+      if (!jobId) throw new Error('Não foi possível iniciar o motor assíncrono de questões.');
+      jobAtivoRef.current = jobId;
+      setTelemetria((prev) => ({ ...prev, jobId }));
+
+      // 2) Se for visual (PDF/Fotos), rasteriza e despacha cada página em background (< 250ms/pág)
+      //    O servidor já começa a processar na IA a Página 1 e 2 imediatamente enquanto as demais sobem!
+      if (modoFonte === 'visual') {
+        for (let i = 0; i < tarefasPaginas.length; i++) {
+          if (unmountedRef.current || jobAtivoRef.current !== jobId) return;
+          const t = tarefasPaginas[i];
+
+          setTelemetria((prev) => ({
+            ...prev,
+            etapaAtual: `Renderizando e enviando ${t.label} (${i + 1} de ${tarefasPaginas.length})...`,
+          }));
+
+          let blobEnvio = null;
+          let localPreviewUrl = null;
+          if (t.tipo === 'pdf') {
+            blobEnvio = await renderizarPaginaPdfBlob(pdfDoc, t.pageNum);
+            localPreviewUrl = registrarObjectUrl(URL.createObjectURL(blobEnvio));
+          } else {
+            blobEnvio = t.file;
+            localPreviewUrl = t.previewUrl;
+          }
+          mapaPreviewPaginasRef.current[t.pageNum] = localPreviewUrl;
+
+          const fd = new FormData();
+          fd.append('imagem', blobEnvio, `pagina_${t.pageNum}.jpg`);
+          fd.append('pagina_numero', String(t.pageNum));
+          fd.append('ordem_lote', String(i + 1));
+
+          await api.post(`/api/questoes/jobs/${jobId}/pagina`, fd, { timeout: 25000 });
+
+          setTelemetria((prev) => ({
+            ...prev,
+            enviadas: i + 1,
+            faseEnvio: i + 1 < tarefasPaginas.length,
+            paginas: prev.paginas.map((p, pIdx) =>
+              pIdx === i && p.status === 'preparando'
+                ? { ...p, status: 'fila', etapa: 'Na fila de visão...' }
+                : p
+            ),
+          }));
         }
-
-        const fd = new FormData();
-        fd.append('imagem', blobEnvio, `pagina_${t.pageNum}.jpg`);
-        fd.append('pagina_numero', String(t.pageNum));
-        if (discPadrao) fd.append('disciplina', discPadrao);
-        if (seriePadrao) fd.append('serie', seriePadrao);
-        if (ultimoTextoCompartilhado) fd.append('ultimo_texto_apoio', ultimoTextoCompartilhado);
-
-        const { data } = await api.post('/api/questoes/extrair-lista', fd);
-        if (data?.ultimo_texto_apoio) {
-          ultimoTextoCompartilhado = data.ultimo_texto_apoio;
-        }
-        const novas = (data?.questoes || []).map((q, qIdx) =>
-          hidratarItemFila(q, acumuladas.length + qIdx, localPreviewUrl)
-        );
-        acumuladas.push(...novas);
       }
 
-      if (!acumuladas.length) {
-        throw new Error('Nenhuma questão foi encontrada nas páginas selecionadas. Verifique se as páginas selecionadas contêm exercícios.');
-      }
+      // 3) Loop de Telemetria em Tempo Real (Polling leve < 50ms a cada 1.4s — Zero Timeout!)
+      let falhasRedeSeguidas = 0;
+      while (!unmountedRef.current && jobAtivoRef.current === jobId) {
+        await esperarMs(1400);
+        if (unmountedRef.current || jobAtivoRef.current !== jobId) return;
 
-      setFila(acumuladas);
-      setActiveIdx(0);
-      setAbaDireita('preview');
-      setVerPaginaInteira(false);
-      setEtapa('revisao');
+        try {
+          const { data: st } = await api.get(`/api/questoes/jobs/${jobId}`, { timeout: 15000 });
+          falhasRedeSeguidas = 0;
+
+          setTelemetria((prev) => ({
+            ...prev,
+            faseEnvio: false,
+            concluidas: st.paginas_concluidas || 0,
+            comErro: st.paginas_com_erro || 0,
+            totalQuestoes: st.total_questoes || 0,
+            etapaAtual: st.etapa_atual || prev.etapaAtual,
+            modeloAtivo: st.modelo_ativo || prev.modeloAtivo,
+            paginas: Array.isArray(st.paginas) && st.paginas.length > 0 ? st.paginas : prev.paginas,
+          }));
+
+          if (st.status === 'concluido' || st.status === 'cancelado') {
+            jobAtivoRef.current = null;
+            finalizarJobParaRevisao(st);
+            return;
+          }
+
+          if (st.status === 'erro') {
+            jobAtivoRef.current = null;
+            if ((st.questoes || []).length > 0) {
+              finalizarJobParaRevisao(st);
+              return;
+            }
+            throw new Error(st.erro_msg || st.avisos?.[0] || 'Falha ao processar páginas no Agente Multimodal.');
+          }
+        } catch (pollErr) {
+          // Se foi erro definitivo de negócio lançado acima, propaga para o catch externo
+          if (!pollErr.response && !pollErr.code && jobAtivoRef.current === null) {
+            throw pollErr;
+          }
+          falhasRedeSeguidas++;
+          if (falhasRedeSeguidas >= 5) {
+            throw pollErr;
+          }
+        }
+      }
     } catch (err) {
-      // Se já extraiu questões nas páginas anteriores antes do erro, preserva o trabalho na fila!
-      if (acumuladas.length > 0) {
-        setFila(acumuladas);
-        setActiveIdx(0);
-        setErroItem(`Aviso: lote interrompido (${err.response?.data?.message || err.message}). As ${acumuladas.length} questões já extraídas foram preservadas abaixo.`);
-        setEtapa('revisao');
-        return;
-      }
+      jobAtivoRef.current = null;
       const d = err.response?.data;
-      setErroMsg(d?.message ? `${d.message}${d.detail && d.detail !== d.message ? ` (${d.detail})` : ''}` : (err.message || 'Erro ao processar páginas.'));
+      setErroMsg(
+        d?.message
+          ? `${d.message}${d.detail && d.detail !== d.message ? ` (${d.detail})` : ''}`
+          : (err.message || 'Erro ao processar páginas.')
+      );
       setEtapa('upload');
     }
   };
@@ -739,6 +890,11 @@ export default function ImportarListaModal({
   };
 
   const fecharModal = () => {
+    if (jobAtivoRef.current) {
+      const jid = jobAtivoRef.current;
+      jobAtivoRef.current = null;
+      api.post(`/api/questoes/jobs/${jid}/cancelar`).catch(() => {});
+    }
     if (teveAlgumaSalva) onImportado?.({ manterAberto: false });
     onClose?.();
   };
@@ -765,7 +921,7 @@ export default function ImportarListaModal({
               </div>
               <div style={S.headerSubtitle}>
                 {etapa === 'upload' && 'Envie um PDF de prova/lista, fotos de páginas inteiras (1 ou 2 colunas) ou cole o texto para individualizar questão por questão'}
-                {etapa === 'processando' && progresso.descricao}
+                {etapa === 'processando' && (telemetria.etapaAtual || 'Motor Assíncrono EDUCA.STUDIO AI em execução...')}
                 {etapa === 'revisao' && `Fila de Revisão Individual 1 a 1 · ${totalSalvas} salva(s) · ${totalPendentes} pendente(s) de ${fila.length}`}
                 {etapa === 'resumo' && `Importação concluída · ${totalSalvas} questão(ões) catalogada(s) com código único`}
               </div>
@@ -1072,45 +1228,182 @@ export default function ImportarListaModal({
         )}
 
         {/* ══════════════════════════════════════════════════════════════════
-            ETAPA 1.5 — PROCESSAMENTO PÁGINA POR PÁGINA EM TEMPO REAL
+            ETAPA 1.5 — PAINEL DE TELEMETRIA ASSÍNCRONA (ARQUITETURA GERAR HORÁRIOS)
         ══════════════════════════════════════════════════════════════════ */}
-        {etapa === 'processando' && (
-          <div style={{ padding: '48px 32px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
-            <div style={S.spinner} />
-            <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a' }}>
-              {progresso.descricao || 'Individualizando questões...'}
-            </div>
-            <div style={{ width: '100%', maxWidth: 460, background: '#e2e8f0', height: 10, borderRadius: 99, overflow: 'hidden' }}>
-              <div
-                style={{
-                  height: '100%',
-                  width: `${Math.max(12, Math.round((progresso.atual / Math.max(1, progresso.total)) * 100))}%`,
-                  background: 'linear-gradient(90deg, #0e7490, #0284c7, #10b981)',
-                  transition: 'width 0.35s ease',
-                }}
-              />
-            </div>
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center', fontSize: '0.8rem', color: '#475569' }}>
-              <span style={{ background: '#f1f5f9', padding: '4px 12px', borderRadius: 99, fontWeight: 700 }}>
-                📄 Etapa {progresso.atual} de {progresso.total}
-              </span>
-              {progresso.extraidasAteAgora > 0 && (
-                <span style={{ background: '#ecfdf5', color: '#047857', border: '1px solid #6ee7b7', padding: '4px 12px', borderRadius: 99, fontWeight: 800 }}>
-                  ✅ {progresso.extraidasAteAgora} questão(ões) já pronta(s) na fila
-                </span>
+        {etapa === 'processando' && (() => {
+          const totalP = Math.max(1, telemetria.totalPaginas || 1);
+          const emAndamento = (telemetria.paginas || []).filter((p) => p.status === 'processando').length;
+          const pctEnvio = telemetria.faseEnvio
+            ? Math.round((telemetria.enviadas / totalP) * 18)
+            : 18;
+          const pctIA = Math.round(
+            (((telemetria.concluidas + telemetria.comErro) + emAndamento * 0.45) / totalP) * 80
+          );
+          const pctTotal = Math.min(97, Math.max(8, pctEnvio + pctIA));
+
+          return (
+            <div style={{ padding: '26px 28px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* Topo: Spinner + Status ao vivo + Cronômetro */}
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                gap: 14, flexWrap: 'wrap', background: '#f8fafc', padding: '14px 18px',
+                borderRadius: 14, border: '1.5px solid #cbd5e1',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14, flex: 1, minWidth: 240 }}>
+                  <div style={S.spinner} />
+                  <div>
+                    <div style={{ fontSize: '0.96rem', fontWeight: 800, color: '#0f172a' }}>
+                      {telemetria.etapaAtual || 'Individualizando questões em segundo plano...'}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: 3 }}>
+                      Execução assíncrona em segundo plano (sem limite de 30s) · Recorte de figuras 300 DPI + LaTeX + Gabarito IA
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  {telemetria.modeloAtivo && (
+                    <span style={{
+                      background: '#e0f2fe', color: '#0369a1', border: '1px solid #7dd3fc',
+                      borderRadius: 99, padding: '5px 11px', fontSize: '0.73rem', fontWeight: 800,
+                    }}>
+                      ⚡ {telemetria.modeloAtivo}
+                    </span>
+                  )}
+                  <span style={{
+                    background: '#0f172a', color: '#fff', borderRadius: 99,
+                    padding: '6px 13px', fontSize: '0.82rem', fontWeight: 800, fontFamily: 'monospace',
+                  }}>
+                    ⏱️ {formatarCronometro(telemetria.elapsedSegundos)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Barra de Progresso Contínua */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.74rem', fontWeight: 800, color: '#475569', marginBottom: 6 }}>
+                  <span>Progresso global do lote</span>
+                  <span>{pctTotal}%</span>
+                </div>
+                <div style={{ width: '100%', background: '#e2e8f0', height: 11, borderRadius: 99, overflow: 'hidden' }}>
+                  <div
+                    style={{
+                      height: '100%',
+                      width: `${pctTotal}%`,
+                      background: 'linear-gradient(90deg, #0e7490, #0284c7, #10b981)',
+                      transition: 'width 0.45s ease',
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Cards de Telemetria (estilo Gerar Horários) */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(175px, 1fr))', gap: 10 }}>
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 11, padding: '10px 14px' }}>
+                  <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
+                    📄 Páginas Processadas
+                  </div>
+                  <div style={{ fontSize: '1.2rem', fontWeight: 900, color: '#0f172a', marginTop: 2 }}>
+                    {telemetria.concluidas} <span style={{ fontSize: '0.84rem', color: '#64748b', fontWeight: 700 }}>/ {totalP}</span>
+                  </div>
+                </div>
+
+                <div style={{
+                  background: telemetria.totalQuestoes > 0 ? '#ecfdf5' : '#f8fafc',
+                  border: `1.5px solid ${telemetria.totalQuestoes > 0 ? '#6ee7b7' : '#e2e8f0'}`,
+                  borderRadius: 11, padding: '10px 14px',
+                }}>
+                  <div style={{ fontSize: '0.68rem', fontWeight: 800, color: telemetria.totalQuestoes > 0 ? '#047857' : '#64748b', textTransform: 'uppercase' }}>
+                    🎯 Questões Já Prontas
+                  </div>
+                  <div style={{ fontSize: '1.2rem', fontWeight: 900, color: telemetria.totalQuestoes > 0 ? '#065f46' : '#0f172a', marginTop: 2 }}>
+                    {telemetria.totalQuestoes} <span style={{ fontSize: '0.78rem', fontWeight: 700 }}>individualizada(s)</span>
+                  </div>
+                </div>
+
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 11, padding: '10px 14px' }}>
+                  <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', textTransform: 'uppercase' }}>
+                    🚀 Workers Paralelos
+                  </div>
+                  <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#0369a1', marginTop: 5 }}>
+                    {emAndamento > 0 ? `${emAndamento} página(s) lendo simultaneamente` : 'Sincronizando fila...'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Grade de Status por Página em Tempo Real */}
+              {modoFonte === 'visual' && telemetria.paginas.length > 0 && (
+                <div style={{
+                  display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+                  gap: 8, maxHeight: 190, overflowY: 'auto', padding: 2,
+                }}>
+                  {telemetria.paginas.map((p) => {
+                    const stMeta = {
+                      preparando:  { bg: '#f8fafc', border: '#e2e8f0', color: '#64748b', badge: '📤 Enviando' },
+                      fila:        { bg: '#f8fafc', border: '#cbd5e1', color: '#475569', badge: '⏳ Na Fila' },
+                      processando: { bg: '#e0f2fe', border: '#0284c7', color: '#0c4a6e', badge: '🔄 Lendo na IA' },
+                      concluida:   { bg: '#ecfdf5', border: '#10b981', color: '#065f46', badge: `✅ +${p.questoes_count} quest.` },
+                      erro:        { bg: '#fef2f2', border: '#fca5a5', color: '#b91c1c', badge: '⚠️ Aviso' },
+                    }[p.status] || { bg: '#f8fafc', border: '#cbd5e1', color: '#475569', badge: '⏳ Fila' };
+
+                    return (
+                      <div
+                        key={p.ordem}
+                        style={{
+                          background: stMeta.bg,
+                          border: `1.5px solid ${stMeta.border}`,
+                          borderRadius: 10, padding: '8px 10px',
+                          display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6,
+                        }}
+                      >
+                        <span style={{ fontSize: '0.76rem', fontWeight: 800, color: stMeta.color }}>
+                          Pág. {p.pagina_numero}
+                        </span>
+                        <span style={{ fontSize: '0.7rem', fontWeight: 800, color: stMeta.color }}>
+                          {stMeta.badge}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
+
+              {/* Rodapé de Controle Imediato ("Parar e Usar Questões Já Prontas" ou Cancelar) */}
+              <div style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                flexWrap: 'wrap', gap: 10, paddingTop: 10, borderTop: '1px solid #e2e8f0',
+              }}>
+                <button
+                  type="button"
+                  disabled={telemetria.parando}
+                  onClick={pararOuCancelarJob}
+                  style={S.smallGhostBtn}
+                >
+                  ✕ Cancelar importação
+                </button>
+
+                {telemetria.totalQuestoes > 0 && (
+                  <button
+                    type="button"
+                    disabled={telemetria.parando}
+                    onClick={pararOuCancelarJob}
+                    style={{
+                      background: 'linear-gradient(135deg, #059669, #047857)',
+                      color: '#fff', border: 'none', borderRadius: 10,
+                      padding: '10px 18px', fontSize: '0.82rem', fontWeight: 800,
+                      cursor: telemetria.parando ? 'not-allowed' : 'pointer',
+                      boxShadow: '0 4px 12px rgba(5,150,105,0.28)',
+                    }}
+                  >
+                    {telemetria.parando
+                      ? '⏳ Abrindo fila...'
+                      : `⏹️ Parar Agora e Revisar as ${telemetria.totalQuestoes} Questões Já Prontas`}
+                  </button>
+                )}
+              </div>
             </div>
-            {progresso.extraidasAteAgora > 0 && progresso.atual < progresso.total && (
-              <button
-                type="button"
-                onClick={() => { abortarLoteRef.current = true; }}
-                style={{ ...S.smallGhostBtn, marginTop: 8 }}
-              >
-                ⏹️ Concluir leitura após esta página e revisar as questões já extraídas
-              </button>
-            )}
-          </div>
-        )}
+          );
+        })()}
 
         {/* ══════════════════════════════════════════════════════════════════
             ETAPA 2 — FILA DE REVISÃO INDIVIDUAL 1 A 1 (LADO A LADO)

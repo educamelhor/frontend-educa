@@ -18,7 +18,28 @@ export default function ImagemParaQuestaoModal({ onClose, onUsar, initialFile = 
   const [erroMsg, setErroMsg]       = useState('');
   const [isDrag, setIsDrag]         = useState(false);
   const [pasteFlash, setPasteFlash] = useState(false);
+  const [elapsedSeg, setElapsedSeg] = useState(0);
+  const [etapaViva, setEtapaViva]   = useState('');
   const inputRef = useRef();
+  const jobIdRef = useRef(null);
+  const unmountedRef = useRef(false);
+
+  useEffect(() => {
+    unmountedRef.current = false;
+    return () => {
+      unmountedRef.current = true;
+      if (jobIdRef.current) {
+        api.post(`/api/questoes/jobs/${jobIdRef.current}/cancelar`).catch(() => {});
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (etapa !== 'extraindo') return;
+    setElapsedSeg(0);
+    const t = setInterval(() => setElapsedSeg((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [etapa]);
 
   const selecionarArquivo = useCallback((file) => {
     if (!file) return;
@@ -81,18 +102,54 @@ export default function ImagemParaQuestaoModal({ onClose, onUsar, initialFile = 
     if (!arquivo) return;
     setEtapa('extraindo');
     setErroMsg('');
+    setEtapaViva('Enviando print para o motor assíncrono de visão...');
 
     try {
       const fd = new FormData();
       fd.append('imagem', arquivo);
 
-      const { data } = await api.post('/api/questoes/extrair-imagem', fd);
-      if (!data.ok) {
-        throw new Error(data.message || 'Falha ao processar a imagem.');
+      const { data: jobResp } = await api.post('/api/questoes/jobs/print-unico', fd, { timeout: 25000 });
+      const jobId = jobResp?.jobId;
+      if (!jobId) throw new Error('Não foi possível iniciar a clonagem em segundo plano.');
+      jobIdRef.current = jobId;
+
+      let falhasRede = 0;
+      while (!unmountedRef.current && jobIdRef.current === jobId) {
+        await new Promise((r) => setTimeout(r, 1200));
+        if (unmountedRef.current || jobIdRef.current !== jobId) return;
+
+        try {
+          const { data: st } = await api.get(`/api/questoes/jobs/${jobId}`, { timeout: 15000 });
+          falhasRede = 0;
+          if (st.etapa_atual) setEtapaViva(st.etapa_atual);
+
+          if (st.status === 'concluido') {
+            jobIdRef.current = null;
+            const q = st.questoes?.[0];
+            if (!q) throw new Error('Não foi possível estruturar a questão da imagem.');
+            setResultado(q);
+            setEtapa('revisao');
+            return;
+          }
+          if (st.status === 'cancelado') {
+            jobIdRef.current = null;
+            setEtapa('upload');
+            return;
+          }
+          if (st.status === 'erro') {
+            jobIdRef.current = null;
+            throw new Error(st.erro_msg || st.avisos?.[0] || 'Falha ao processar a imagem.');
+          }
+        } catch (pollErr) {
+          if (!pollErr.response && !pollErr.code && jobIdRef.current === null) {
+            throw pollErr;
+          }
+          falhasRede++;
+          if (falhasRede >= 5) throw pollErr;
+        }
       }
-      setResultado(data);
-      setEtapa('revisao');
     } catch (err) {
+      jobIdRef.current = null;
       const dataErr = err.response?.data;
       const baseMsg = dataErr?.message || err.message || 'Erro inesperado.';
       const detail = dataErr?.detail && dataErr.detail !== baseMsg ? ` (${dataErr.detail})` : '';
@@ -207,15 +264,38 @@ export default function ImagemParaQuestaoModal({ onClose, onUsar, initialFile = 
           {etapa === 'extraindo' && (
             <div style={styles.loadingWrap}>
               <div style={styles.spinner} />
-              <div style={styles.loadingTitle}>Agentes EDUCA.STUDIO em ação...</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={styles.loadingTitle}>Agentes EDUCA.STUDIO em ação...</div>
+                <span style={{
+                  background: '#0f172a', color: '#fff', borderRadius: 99,
+                  padding: '3px 10px', fontSize: '0.76rem', fontWeight: 800, fontFamily: 'monospace',
+                }}>
+                  ⏱️ {String(Math.floor(elapsedSeg / 60)).padStart(2, '0')}:{String(elapsedSeg % 60).padStart(2, '0')}
+                </span>
+              </div>
+              {etapaViva && (
+                <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#0369a1' }}>{etapaViva}</div>
+              )}
               <div style={styles.loadingSub}>
                 1. Detectando layout (1 ou 2 colunas), enunciado e fórmulas LaTeX<br />
                 2. Recortando e unindo ilustrações de todas as colunas (300 DPI)<br />
                 3. Classificando BNCC/Temas e calculando resolução comentada
               </div>
               {preview && (
-                <img src={preview} alt="Preview" style={{ ...styles.previewImg, marginTop: 14, maxHeight: 170 }} />
+                <img src={preview} alt="Preview" style={{ ...styles.previewImg, marginTop: 10, maxHeight: 160 }} />
               )}
+              <button
+                type="button"
+                style={{ ...styles.btnSecundario, marginTop: 6 }}
+                onClick={() => {
+                  const jid = jobIdRef.current;
+                  jobIdRef.current = null;
+                  if (jid) api.post(`/api/questoes/jobs/${jid}/cancelar`).catch(() => {});
+                  setEtapa('upload');
+                }}
+              >
+                ✕ Cancelar clonagem
+              </button>
             </div>
           )}
 

@@ -9,6 +9,7 @@ import MathToolbar from './components/MathToolbar';
 import ModelosEditor from './components/ModelosEditor';
 import LatexPreview, { gerarLatex } from './components/LatexPreview';
 import ImagemParaQuestaoModal from './components/ImagemParaQuestaoModal';
+import ImportarListaModal from './components/ImportarListaModal';
 import PublicarResultadoModal from './components/PublicarResultadoModal';
 import ComentarioCorretaModal from './components/ComentarioCorretaModal';
 import {
@@ -107,6 +108,7 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
   const [saving, setSaving] = useState(false);
   const [modalResultado, setModalResultado] = useState(null);
   const [showImagemModal, setShowImagemModal] = useState(false);
+  const [showListaModal, setShowListaModal] = useState(false);
   const [pastedFileForModal, setPastedFileForModal] = useState(null);
 
   // Estados do Copiloto IA
@@ -190,7 +192,7 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
   /* Atalho Global Ctrl+V na tela Criar Questão: abre o Clonador IA na hora se colar print */
   useEffect(() => {
     const onGlobalPaste = (e) => {
-      if (showImagemModal) return;
+      if (showImagemModal || showListaModal) return;
       const items = e.clipboardData?.items;
       if (!items) return;
       for (const item of items) {
@@ -207,7 +209,7 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
     };
     window.addEventListener('paste', onGlobalPaste);
     return () => window.removeEventListener('paste', onGlobalPaste);
-  }, [showImagemModal]);
+  }, [showImagemModal, showListaModal]);
 
   /* Guarda de navegação para rascunho não finalizado */
   useEffect(() => {
@@ -267,7 +269,7 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
     }));
 
     // Se o gabarito foi resolvido pela IA (sem marcação explícita no print), exige 1 clique de confirmação!
-    const precisaConfirmar = dados.gabarito_origem !== 'marcado_na_imagem' && novoTipo !== 'discursiva';
+    const precisaConfirmar = dados.gabarito_origem !== 'marcado_na_imagem' && !dados.gabarito_confirmado && novoTipo !== 'discursiva';
     setGabaritoPendenteConfirmacao(precisaConfirmar);
     setOpenBlocks({ 1: true, 2: true, 3: true, 4: true });
   };
@@ -696,6 +698,21 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
 
               <button
                 type="button"
+                onClick={() => setShowListaModal(true)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 7,
+                  background: 'rgba(255,255,255,0.16)', color: '#ffffff',
+                  border: '1.5px solid rgba(255,255,255,0.42)', borderRadius: 10,
+                  padding: '8px 14px', fontSize: '0.82rem', fontWeight: 800,
+                  cursor: 'pointer', backdropFilter: 'blur(4px)',
+                }}
+                title="Importe um PDF de prova, fotos de páginas inteiras ou lista em texto para revisar 1 a 1"
+              >
+                <span>📚</span> Importar Lista / PDF
+              </button>
+
+              <button
+                type="button"
                 onClick={() => { setPastedFileForModal(null); setShowImagemModal(true); }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 7,
@@ -1078,6 +1095,18 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
           initialFile={pastedFileForModal}
           onClose={() => { setShowImagemModal(false); setPastedFileForModal(null); }}
           onUsar={handleUsarExtracao}
+        />
+      )}
+
+      {/* ── Modal Fase 2: Importador Inteligente de Listas, Páginas e PDFs ── */}
+      {showListaModal && (
+        <ImportarListaModal
+          onClose={() => setShowListaModal(false)}
+          onImportado={() => { onSaved?.(); }}
+          onAbrirNoEstudio={(qExtraida) => {
+            handleUsarExtracao(qExtraida);
+            setShowListaModal(false);
+          }}
         />
       )}
 

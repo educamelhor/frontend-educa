@@ -450,11 +450,16 @@ export default function QuestoesBanco({ onEdit, refreshKey, onRemovida }) {
         onCancel={() => setQuestaoParaExcluir(null)}
       />
 
-      {/* Modal Importação em Massa */}
+      {/* Modal Importador Inteligente de Listas, Páginas e PDFs */}
       {showBulk && (
         <BulkImportModal
           onClose={() => setShowBulk(false)}
-          onImportado={() => { setShowBulk(false); carregar(1); carregarStats(); }}
+          onImportado={(opts) => {
+            if (!opts?.manterAberto) setShowBulk(false);
+            carregar(1);
+            carregarStats();
+            onRemovida?.();
+          }}
         />
       )}
 
@@ -561,13 +566,13 @@ export default function QuestoesBanco({ onEdit, refreshKey, onRemovida }) {
           </button>
         )}
 
-        {/* Botão Importação em Massa */}
+        {/* Botão Importador Inteligente de Listas / PDFs */}
         <button
           className="bq-btn bq-btn-primary"
           onClick={() => setShowBulk(true)}
           style={{ marginLeft: 'auto', padding: '8px 14px', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}
         >
-          📥 Importar em Massa
+          📚 Importar Lista / PDF
         </button>
       </div>
 

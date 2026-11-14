@@ -117,12 +117,39 @@ export default function AlunosDisciplinar() {
         carregarAnos();
     }, []);
 
+    function interpretarAtalhosFiltro(termo) {
+        let texto = String(termo || "").trim();
+        if (!texto) {
+            return { filtroLimpo: "", somenteInativos: false, somenteAEE: false, somenteNomeSocial: false };
+        }
+        if (texto === "000000") {
+            return { filtroLimpo: "", somenteInativos: true, somenteAEE: false, somenteNomeSocial: false };
+        }
+        let somenteInativos = false;
+        let somenteAEE = false;
+        let somenteNomeSocial = false;
+        if (/(?:^|\s)nome\s+social(?=\s|$)/i.test(texto)) {
+            somenteNomeSocial = true;
+            texto = texto.replace(/(?:^|\s)nome\s+social(?=\s|$)/gi, " ").trim();
+        }
+        if (/(?:^|\s)inativos?(?=\s|$)/i.test(texto)) {
+            somenteInativos = true;
+            texto = texto.replace(/(?:^|\s)inativos?(?=\s|$)/gi, " ").trim();
+        }
+        if (/(?:^|\s)aee(?=\s|$)/i.test(texto)) {
+            somenteAEE = true;
+            texto = texto.replace(/(?:^|\s)aee(?=\s|$)/gi, " ").trim();
+        }
+        return {
+            filtroLimpo: texto.replace(/\s+/g, " ").trim(),
+            somenteInativos,
+            somenteAEE,
+            somenteNomeSocial,
+        };
+    }
+
     function isBuscaInativos(termo) {
-        const q = String(termo || "").trim();
-        if (!q) return false;
-        if (q === "000000") return true;
-        const norm = q.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
-        return norm.includes("inativo");
+        return interpretarAtalhosFiltro(termo).somenteInativos;
     }
 
     async function fetchAlunos() {
@@ -131,11 +158,18 @@ export default function AlunosDisciplinar() {
             setLoading(true);
 
             const escolaId = localStorage.getItem("escola_id") || undefined;
-            const somenteInativos = isBuscaInativos(debouncedFiltro);
+            const {
+                filtroLimpo,
+                somenteInativos,
+                somenteAEE,
+                somenteNomeSocial,
+            } = interpretarAtalhosFiltro(debouncedFiltro);
 
             const params = {
-                filtro: somenteInativos ? "" : debouncedFiltro,
+                filtro: filtroLimpo,
                 status: somenteInativos ? "inativo" : "",
+                aee: somenteAEE ? "1" : "",
+                nome_social: somenteNomeSocial ? "1" : "",
                 ano_letivo: anoLetivo || undefined,
                 limit,
                 offset: (page - 1) * limit,

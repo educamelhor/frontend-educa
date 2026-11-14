@@ -127,29 +127,56 @@ export default function Alunos() {
   }, []);
 
   // ────────────────────────────────────────────────────────────────
-  // Helper: detectar busca por inativos
+  // Helper: extrair atalhos especiais preservando termos complementares
+  // Ex.: "inativos 6º ANO A", "aee vespertino", "nome social 2º ANO B"
   // ────────────────────────────────────────────────────────────────
+  function interpretarAtalhosFiltro(termo) {
+    let texto = String(termo || "").trim();
+    if (!texto) {
+      return {
+        filtroLimpo: "",
+        somenteInativos: false,
+        somenteAEE: false,
+        somenteNomeSocial: false,
+      };
+    }
+
+    if (texto === "000000") {
+      return {
+        filtroLimpo: "",
+        somenteInativos: true,
+        somenteAEE: false,
+        somenteNomeSocial: false,
+      };
+    }
+
+    let somenteInativos = false;
+    let somenteAEE = false;
+    let somenteNomeSocial = false;
+
+    if (/(?:^|\s)nome\s+social(?=\s|$)/i.test(texto)) {
+      somenteNomeSocial = true;
+      texto = texto.replace(/(?:^|\s)nome\s+social(?=\s|$)/gi, " ").trim();
+    }
+    if (/(?:^|\s)inativos?(?=\s|$)/i.test(texto)) {
+      somenteInativos = true;
+      texto = texto.replace(/(?:^|\s)inativos?(?=\s|$)/gi, " ").trim();
+    }
+    if (/(?:^|\s)aee(?=\s|$)/i.test(texto)) {
+      somenteAEE = true;
+      texto = texto.replace(/(?:^|\s)aee(?=\s|$)/gi, " ").trim();
+    }
+
+    return {
+      filtroLimpo: texto.replace(/\s+/g, " ").trim(),
+      somenteInativos,
+      somenteAEE,
+      somenteNomeSocial,
+    };
+  }
+
   function isBuscaInativos(termo) {
-    const q = String(termo || "").trim();
-    if (!q) return false;
-    if (q === "000000") return true; // atalho
-    const norm = q.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
-    return norm.includes("inativo");
-  }
-
-  // Helper: detectar busca por AEE (Atendimento Educacional Especializado)
-  // Ativa quando o usuário digita "aee" em qualquer combinação de maiúsculas/minúsculas
-  function isBuscaAEE(termo) {
-    const q = String(termo || "").trim();
-    return q.toLowerCase() === "aee";
-  }
-
-  // Helper: detectar atalho por estudantes com Nome Social
-  function isBuscaNomeSocial(termo) {
-    const q = String(termo || "").trim();
-    if (!q) return false;
-    const norm = q.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
-    return norm === "nome social";
+    return interpretarAtalhosFiltro(termo).somenteInativos;
   }
 
   // ────────────────────────────────────────────────────────────────
@@ -161,15 +188,15 @@ export default function Alunos() {
       setLoading(true);
 
       const escolaId = localStorage.getItem("escola_id") || undefined;
-      const somenteInativos   = isBuscaInativos(debouncedFiltro);
-      const somenteAEE        = isBuscaAEE(debouncedFiltro);
-      const somenteNomeSocial = isBuscaNomeSocial(debouncedFiltro);
+      const {
+        filtroLimpo,
+        somenteInativos,
+        somenteAEE,
+        somenteNomeSocial,
+      } = interpretarAtalhosFiltro(debouncedFiltro);
 
-      // Quando INATIVOS: envia status=inativo, limpa filtro textual.
-      // Quando AEE: envia aee=1, limpa filtro textual.
-      // Quando NOME SOCIAL: envia nome_social=1, limpa filtro textual.
       const params = {
-        filtro: (somenteInativos || somenteAEE || somenteNomeSocial) ? "" : debouncedFiltro,
+        filtro: filtroLimpo,
         status: somenteInativos ? "inativo" : "",
         aee:    somenteAEE ? "1" : "",
         nome_social: somenteNomeSocial ? "1" : "",

@@ -434,23 +434,30 @@ export default function ImportarListaModal({
     let alts = Array.isArray(q.alternativas) && q.alternativas.length > 0
       ? q.alternativas
       : [
-          { id: 1, letra: 'A', texto: '', imagem_url: null, correta: true },
+          { id: 1, letra: 'A', texto: '', imagem_url: null, correta: false },
           { id: 2, letra: 'B', texto: '', imagem_url: null, correta: false },
           { id: 3, letra: 'C', texto: '', imagem_url: null, correta: false },
           { id: 4, letra: 'D', texto: '', imagem_url: null, correta: false },
         ];
 
-    if (!alts.some((a) => a.correta)) {
+    const altsComConteudo = alts.filter((a) => (a?.texto && String(a.texto).trim()) || a?.imagem_url);
+
+    if (altsComConteudo.length > 0 && !altsComConteudo.some((a) => a.correta)) {
       const letraInferida =
         String(q.gabarito || '').toUpperCase().trim() ||
-        inferirLetraCorretaPorEstrutura(tipo, est, alts, `${q.enunciado || ''} ${q.comando_final || ''}`);
-      if (letraInferida && alts.some((a) => String(a.letra || '').toUpperCase().trim() === letraInferida)) {
+        inferirLetraCorretaPorEstrutura(tipo, est, altsComConteudo, `${q.enunciado || ''} ${q.comando_final || ''}`);
+      if (letraInferida && altsComConteudo.some((a) => String(a.letra || '').toUpperCase().trim() === letraInferida)) {
         alts = alts.map((a) => ({
           ...a,
-          correta: String(a.letra || '').toUpperCase().trim() === letraInferida,
+          correta: Boolean(((a?.texto && String(a.texto).trim()) || a?.imagem_url) && String(a.letra || '').toUpperCase().trim() === letraInferida),
         }));
       }
     }
+
+    const gabaritoValido =
+      alts.filter((a) => (a?.texto && String(a.texto).trim()) || a?.imagem_url).find((a) => a.correta)?.letra ||
+      (altsComConteudo.length > 0 ? q.gabarito : null) ||
+      null;
 
     return {
       ...q,
@@ -461,8 +468,8 @@ export default function ImportarListaModal({
       estrutura_json: est,
       imagem: q.midia?.url || q.imagem_url || null,
       alternativas: alts,
-      gabarito: alts.find((a) => a.correta)?.letra || q.gabarito || null,
-      gabarito_confirmado: !precisaConfirmarGabarito,
+      gabarito: gabaritoValido,
+      gabarito_confirmado: !precisaConfirmarGabarito && (tipo === 'discursiva' || tipo === 'somatoria' || Boolean(gabaritoValido) || (tipo === 'verdadeiro_falso' && (est.submodo || 'direto') === 'direto') || (tipo === 'associacao' && (est.submodo || 'direto') === 'direto') || (tipo === 'lacuna' && (est.submodo || 'direto') !== 'alternativas')),
       status_fila: 'pendente', // 'pendente' | 'salva_escola' | 'publicada_global' | 'ignorada'
       questao_id_salva: null,
       codigo_escola: null,

@@ -415,11 +415,11 @@ export function resumirGabaritoQuestao(questao) {
   const tipo = questao.tipo || est.modelo || 'objetiva';
 
   const rawAlts = questao.alternativas || parseJsonSafe(questao.alternativas_json, []) || [];
-  const alts = Array.isArray(rawAlts) ? rawAlts : [];
+  const alts = (Array.isArray(rawAlts) ? rawAlts : []).filter(a => (a?.texto && String(a.texto).trim()) || a?.imagem_url);
+  const temPlaceholderVazio = Array.isArray(rawAlts) && rawAlts.length > 0 && alts.length === 0;
   const altCorreta =
     alts.find(a => a.correta)?.letra ||
-    questao.correta ||
-    questao.gabarito ||
+    (temPlaceholderVazio ? '' : (questao.correta || questao.gabarito)) ||
     inferirLetraCorretaPorEstrutura(tipo, est, alts, `${questao.enunciado ?? questao.conteudo_bruto ?? ''} ${questao.comando_final ?? ''}`);
 
   if (tipo === 'verdadeiro_falso' && (est.submodo || 'direto') === 'direto') {

@@ -160,6 +160,20 @@ function LatexCode({ questao }) {
   );
 }
 
+function converterMarkdownEditorialParaLatex(raw = '') {
+  if (!raw) return '';
+  const segs = String(raw).split(/(\$\$[^$]+\$\$|\$[^$]+\$)/g);
+  return segs
+    .map((seg) => {
+      if (seg.startsWith('$')) return seg;
+      return seg
+        .replace(/\*\*([\s\S]+?)\*\*/g, '\\textbf{$1}')
+        .replace(/__([^\s_](?:[\s\S]*?[^\s_])?)__/g, '\\underline{$1}')
+        .replace(/\*([^\s*](?:[^*\n]*?[^\s*])?)\*/g, '\\textit{$1}');
+    })
+    .join('');
+}
+
 export function gerarLatex(questao) {
   const {
     enunciado = '',
@@ -175,27 +189,27 @@ export function gerarLatex(questao) {
 
   let latex = `\\noindent\n\\textbf{QUESTÃO}${fonte && !texto_apoio ? ` (${fonte})` : ''} {\\color{orange}\\rule{7.5cm}{0.4pt}}\n\n`;
   if (habilidade_bncc) latex += `% BNCC: ${habilidade_bncc}\n`;
-  if (texto_apoio) latex += `\\begin{quote}\\itshape ${texto_apoio}${fonte ? ` — ${fonte}` : ''}\\end{quote}\n\n`;
-  if (enunciado) latex += `${enunciado}\n\n`;
+  if (texto_apoio) latex += `\\begin{quote}\\itshape ${converterMarkdownEditorialParaLatex(texto_apoio)}${fonte ? ` — ${fonte}` : ''}\\end{quote}\n\n`;
+  if (enunciado) latex += `${converterMarkdownEditorialParaLatex(enunciado)}\n\n`;
   if (midia?.url || questao.imagem) {
     const w = { P: '0.36\\linewidth', M: '0.56\\linewidth', G: '0.84\\linewidth', '100%': '0.98\\linewidth' }[midia?.preset] || '0.56\\linewidth';
     latex += `\\begin{center}\\includegraphics[width=${w}]{figura.jpg}\\end{center}\n\n`;
   }
-  if (comando_final) latex += `\\textbf{${comando_final}}\n\n`;
+  if (comando_final) latex += `\\textbf{${converterMarkdownEditorialParaLatex(comando_final)}}\n\n`;
 
   const altsValidas = alternativas.filter(a => a.texto?.trim());
   if (tipo === 'afirmativas') {
     (estrutura.proposicoes || []).filter(p => p.texto?.trim()).forEach(p => {
-      latex += `\\noindent \\textbf{${p.romano}.} ${p.texto}\\\\\n`;
+      latex += `\\noindent \\textbf{${p.romano}.} ${converterMarkdownEditorialParaLatex(p.texto)}\\\\\n`;
     });
-    if (estrutura.comando_fechamento) latex += `\\textbf{${estrutura.comando_fechamento}}\n\n`;
+    if (estrutura.comando_fechamento) latex += `\\textbf{${converterMarkdownEditorialParaLatex(estrutura.comando_fechamento)}}\n\n`;
   } else if (tipo === 'verdadeiro_falso') {
     (estrutura.itens || []).filter(i => i.texto?.trim()).forEach(i => {
-      latex += `\\noindent (\\hspace{0.4cm}) ${i.texto}\\\\\n`;
+      latex += `\\noindent (\\hspace{0.4cm}) ${converterMarkdownEditorialParaLatex(i.texto)}\\\\\n`;
     });
   } else if (tipo === 'somatoria') {
     (estrutura.proposicoes || []).filter(p => p.texto?.trim()).forEach(p => {
-      latex += `\\noindent \\textbf{(${p.codigo})} ${p.texto}\\\\\n`;
+      latex += `\\noindent \\textbf{(${p.codigo})} ${converterMarkdownEditorialParaLatex(p.texto)}\\\\\n`;
     });
     latex += `\\begin{flushright}\\textbf{SOMA:} \\framebox[1.4cm]{\\rule{0pt}{0.4cm}}\\end{flushright}\n`;
   } else if (tipo === 'discursiva') {
@@ -206,7 +220,7 @@ export function gerarLatex(questao) {
   if (['objetiva', 'afirmativas'].includes(tipo) || estrutura?.submodo === 'sequencia' || estrutura?.submodo === 'alternativas') {
     if (altsValidas.length > 0) {
       latex += `\\begin{enumerate}[label=\\textbf{(\\Alph*)}]\n`;
-      altsValidas.forEach(alt => { latex += `  \\item ${alt.texto}\n`; });
+      altsValidas.forEach(alt => { latex += `  \\item ${converterMarkdownEditorialParaLatex(alt.texto)}\n`; });
       latex += `\\end{enumerate}\n`;
     }
   }

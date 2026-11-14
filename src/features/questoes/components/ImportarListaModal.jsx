@@ -20,6 +20,7 @@ import {
   QuestaoCorpoEstruturado,
   MathText,
   resumirGabaritoQuestao,
+  inferirLetraCorretaPorEstrutura,
 } from '../utils/questaoRenderer';
 
 const DISCIPLINAS_LISTA = [
@@ -429,6 +430,28 @@ export default function ImportarListaModal({
     const tipo = q.tipo || 'objetiva';
     const est = q.estrutura_json || criarEstruturaInicial(tipo);
     const precisaConfirmarGabarito = q.gabarito_origem !== 'marcado_na_imagem' && tipo !== 'discursiva';
+
+    let alts = Array.isArray(q.alternativas) && q.alternativas.length > 0
+      ? q.alternativas
+      : [
+          { id: 1, letra: 'A', texto: '', imagem_url: null, correta: true },
+          { id: 2, letra: 'B', texto: '', imagem_url: null, correta: false },
+          { id: 3, letra: 'C', texto: '', imagem_url: null, correta: false },
+          { id: 4, letra: 'D', texto: '', imagem_url: null, correta: false },
+        ];
+
+    if (!alts.some((a) => a.correta)) {
+      const letraInferida =
+        String(q.gabarito || '').toUpperCase().trim() ||
+        inferirLetraCorretaPorEstrutura(tipo, est, alts, `${q.enunciado || ''} ${q.comando_final || ''}`);
+      if (letraInferida && alts.some((a) => String(a.letra || '').toUpperCase().trim() === letraInferida)) {
+        alts = alts.map((a) => ({
+          ...a,
+          correta: String(a.letra || '').toUpperCase().trim() === letraInferida,
+        }));
+      }
+    }
+
     return {
       ...q,
       uid: q.id_fila || `q_${Date.now()}_${idxGlobal}`,
@@ -437,14 +460,8 @@ export default function ImportarListaModal({
       estrutura: est,
       estrutura_json: est,
       imagem: q.midia?.url || q.imagem_url || null,
-      alternativas: Array.isArray(q.alternativas) && q.alternativas.length > 0
-        ? q.alternativas
-        : [
-            { id: 1, letra: 'A', texto: '', imagem_url: null, correta: true },
-            { id: 2, letra: 'B', texto: '', imagem_url: null, correta: false },
-            { id: 3, letra: 'C', texto: '', imagem_url: null, correta: false },
-            { id: 4, letra: 'D', texto: '', imagem_url: null, correta: false },
-          ],
+      alternativas: alts,
+      gabarito: alts.find((a) => a.correta)?.letra || q.gabarito || null,
       gabarito_confirmado: !precisaConfirmarGabarito,
       status_fila: 'pendente', // 'pendente' | 'salva_escola' | 'publicada_global' | 'ignorada'
       questao_id_salva: null,
@@ -1655,7 +1672,26 @@ export default function ImportarListaModal({
                       <ModelosEditor
                         tipo={currentItem.tipo}
                         estrutura={currentItem.estrutura}
-                        onChangeEstrutura={(novaEst) => patchCurrentItem({ estrutura: novaEst, gabarito_confirmado: true })}
+                        onChangeEstrutura={(novaEst) => {
+                          const letraInf = inferirLetraCorretaPorEstrutura(
+                            currentItem.tipo,
+                            novaEst,
+                            currentItem.alternativas,
+                            `${currentItem.enunciado || ''} ${currentItem.comando_final || ''}`
+                          );
+                          const altsSincronizadas = letraInf
+                            ? (currentItem.alternativas || []).map((a) => ({
+                                ...a,
+                                correta: String(a.letra || '').toUpperCase().trim() === letraInf,
+                              }))
+                            : currentItem.alternativas;
+                          patchCurrentItem({
+                            estrutura: novaEst,
+                            alternativas: altsSincronizadas,
+                            gabarito: letraInf || currentItem.gabarito,
+                            gabarito_confirmado: true,
+                          });
+                        }}
                         alternativas={currentItem.alternativas}
                         onChangeAlternativas={(novasAlts) => patchCurrentItem({ alternativas: novasAlts, gabarito_confirmado: true })}
                         onMarcarCorreta={marcarCorretaItemAtual}

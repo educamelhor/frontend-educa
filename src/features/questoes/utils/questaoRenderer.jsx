@@ -128,7 +128,26 @@ export function normalizarTextoLatex(raw = '') {
     .join('');
 }
 
-/* ── Renderização Matemática Real via KaTeX (com fallback limpo) ── */
+function renderLinhasComItalico(plainStr = '', keyPrefix = 'txt') {
+  if (!plainStr) return null;
+  const lines = String(plainStr).split('\n');
+  return lines.map((ln, li) => {
+    const italicParts = ln.split(/(\*[^\s*](?:[^*\n]*?[^\s*])?\*)/g);
+    return (
+      <React.Fragment key={`${keyPrefix}-l${li}`}>
+        {italicParts.map((ip, ii) => {
+          if (ip.length >= 3 && ip.startsWith('*') && ip.endsWith('*') && !ip.startsWith('**')) {
+            return <em key={ii}>{ip.slice(1, -1)}</em>;
+          }
+          return <React.Fragment key={ii}>{ip}</React.Fragment>;
+        })}
+        {li < lines.length - 1 && <br />}
+      </React.Fragment>
+    );
+  });
+}
+
+/* ── Renderização Matemática Real via KaTeX + Destaques Editoriais (**negrito**, *itálico*, __sublinhado__) ── */
 export function MathText({ text = '', style, className }) {
   const [katexReady, setKatexReady] = useState(() => typeof window !== 'undefined' && Boolean(window.katex));
 
@@ -145,28 +164,82 @@ export function MathText({ text = '', style, className }) {
   }, [katexReady]);
 
   if (!text) return null;
-  const str = normalizarTextoLatex(text);
-  const parts = str.split(/(\$\$[^$]+\$\$|\$[^$]+\$)/g);
+  const str = normalizarTextoLatex(text)
+    .replace(/<(?:b|strong)>([\s\S]*?)<\/(?:b|strong)>/gi, '**$1**')
+    .replace(/<(?:i|em)>([\s\S]*?)<\/(?:i|em)>/gi, '*$1*')
+    .replace(/<u>([\s\S]*?)<\/u>/gi, '__$1__');
+
+  const renderInlineKatex = (expr, key) => {
+    if (katexReady && window.katex) {
+      try {
+        const html = window.katex.renderToString(expr, {
+          displayMode: false,
+          throwOnError: false,
+          strict: 'ignore',
+        });
+        return <span key={key} dangerouslySetInnerHTML={{ __html: html }} />;
+      } catch {
+        // fallback abaixo
+      }
+    }
+    return (
+      <code
+        key={key}
+        style={{
+          fontFamily: "'Cambria Math', 'Times New Roman', serif",
+          fontStyle: 'italic',
+          background: '#f0f9ff',
+          color: '#0369a1',
+          padding: '1px 5px',
+          borderRadius: 4,
+        }}
+      >
+        {expr}
+      </code>
+    );
+  };
+
+  const renderInlineSegment = (segment, keyPrefix, depth = 0) => {
+    if (!segment) return null;
+    if (depth > 2) return renderLinhasComItalico(segment, keyPrefix);
+
+    const tokens = segment.split(/(\*\*[\s\S]+?\*\*|__[^\s_](?:[\s\S]*?[^\s_])?__|\$[^$]+\$)/g);
+    return tokens.map((tok, tIdx) => {
+      if (!tok) return null;
+      const tKey = `${keyPrefix}-${tIdx}`;
+      if (tok.startsWith('$') && tok.endsWith('$') && tok.length > 2) {
+        return renderInlineKatex(tok.slice(1, -1), tKey);
+      }
+      if (tok.startsWith('**') && tok.endsWith('**') && tok.length > 4) {
+        return <strong key={tKey}>{renderInlineSegment(tok.slice(2, -2), `${tKey}-b`, depth + 1)}</strong>;
+      }
+      if (tok.startsWith('__') && tok.endsWith('__') && tok.length > 4) {
+        return <u key={tKey}>{renderInlineSegment(tok.slice(2, -2), `${tKey}-u`, depth + 1)}</u>;
+      }
+      return <React.Fragment key={tKey}>{renderLinhasComItalico(tok, tKey)}</React.Fragment>;
+    });
+  };
+
+  const displayBlocks = str.split(/(\$\$[^$]+\$\$)/g);
 
   return (
     <span className={className} style={style}>
-      {parts.map((part, idx) => {
+      {displayBlocks.map((part, idx) => {
         const isDisplay = part.startsWith('$$') && part.endsWith('$$') && part.length > 4;
-        const isInline  = !isDisplay && part.startsWith('$') && part.endsWith('$') && part.length > 2;
 
-        if (isDisplay || isInline) {
-          const expr = isDisplay ? part.slice(2, -2) : part.slice(1, -1);
+        if (isDisplay) {
+          const expr = part.slice(2, -2);
           if (katexReady && window.katex) {
             try {
               const html = window.katex.renderToString(expr, {
-                displayMode: isDisplay,
+                displayMode: true,
                 throwOnError: false,
                 strict: 'ignore',
               });
               return (
                 <span
                   key={idx}
-                  style={isDisplay ? { display: 'block', margin: '6px 0', textAlign: 'center' } : undefined}
+                  style={{ display: 'block', margin: '6px 0', textAlign: 'center' }}
                   dangerouslySetInnerHTML={{ __html: html }}
                 />
               );
@@ -178,11 +251,14 @@ export function MathText({ text = '', style, className }) {
             <code
               key={idx}
               style={{
+                display: 'block',
+                margin: '6px 0',
+                textAlign: 'center',
                 fontFamily: "'Cambria Math', 'Times New Roman', serif",
                 fontStyle: 'italic',
                 background: '#f0f9ff',
                 color: '#0369a1',
-                padding: '1px 5px',
+                padding: '2px 6px',
                 borderRadius: 4,
               }}
             >
@@ -191,27 +267,17 @@ export function MathText({ text = '', style, className }) {
           );
         }
 
-        // Preserva quebras de linha no texto comum (removendo \n redundante colado em bloco display $$...$$)
+        // Remove \n redundante imediatamente colado em bloco display $$...$$
         let cleanPart = part;
-        const prevPart = idx > 0 ? parts[idx - 1] : '';
-        const nextPart = idx + 1 < parts.length ? parts[idx + 1] : '';
+        const prevPart = idx > 0 ? displayBlocks[idx - 1] : '';
+        const nextPart = idx + 1 < displayBlocks.length ? displayBlocks[idx + 1] : '';
         if (prevPart.startsWith('$$') && prevPart.endsWith('$$') && prevPart.length > 4) {
           cleanPart = cleanPart.replace(/^\r?\n/, '');
         }
         if (nextPart.startsWith('$$') && nextPart.endsWith('$$') && nextPart.length > 4) {
           cleanPart = cleanPart.replace(/\r?\n$/, '');
         }
-        const lines = cleanPart.split('\n');
-        return (
-          <React.Fragment key={idx}>
-            {lines.map((ln, li) => (
-              <React.Fragment key={li}>
-                {ln}
-                {li < lines.length - 1 && <br />}
-              </React.Fragment>
-            ))}
-          </React.Fragment>
-        );
+        return <React.Fragment key={idx}>{renderInlineSegment(cleanPart, `seg-${idx}`)}</React.Fragment>;
       })}
     </span>
   );
@@ -227,7 +293,13 @@ export function SmartFigure({ midia, imagemUrl, modoProva = false }) {
   const widthPct = presetMap[m?.preset] || '58%';
   const align = ['left', 'center', 'right'].includes(m?.alinhamento) ? m.alinhamento : 'center';
   const justifyMap = { left: 'flex-start', center: 'center', right: 'flex-end' };
-  const legendaTxt = [m?.legenda, m?.credito ? `Fonte: ${m.credito}` : ''].filter(Boolean).join(' — ');
+  const legLimpa = String(m?.legenda || '').trim();
+  const credBruto = String(m?.credito || '').trim();
+  const credEhRodapeCaderno = /^(?:humanas|linguagens|matem[aá]tica|ci[êe]ncias)[\s\-–—_/0-9º°ªa-z]*$/i.test(credBruto);
+  const credUtil = credBruto && !credEhRodapeCaderno && !legLimpa.toLowerCase().includes(credBruto.toLowerCase())
+    ? `Fonte: ${credBruto}`
+    : '';
+  const legendaTxt = [legLimpa, credUtil].filter(Boolean).join(' — ');
 
   return (
     <figure style={{
@@ -269,6 +341,73 @@ export function SmartFigure({ midia, imagemUrl, modoProva = false }) {
   );
 }
 
+/* ── Inferência determinística da alternativa correta (A–E) a partir das proposições/sequência ── */
+export function inferirLetraCorretaPorEstrutura(tipo = 'objetiva', est = {}, alts = [], comandoContexto = '') {
+  if (!Array.isArray(alts) || alts.length < 2) return '';
+
+  if (tipo === 'afirmativas') {
+    const props = Array.isArray(est?.proposicoes) ? est.proposicoes : [];
+    if (props.length < 2) return '';
+    const ctx = `${comandoContexto || ''} ${est?.comando_fechamento || ''}`;
+    const pedeIncorretas = /\b(incorreta|incorretas|falsa|falsas|errada|erradas|exceto)\b/i.test(ctx);
+    const todosRomanos = props.map((p) => String(p.romano || '').toUpperCase().trim()).filter(Boolean);
+    const alvoSet = new Set(
+      props
+        .filter((p) => Boolean(p.correta) === !pedeIncorretas)
+        .map((p) => String(p.romano || '').toUpperCase().trim())
+        .filter(Boolean)
+    );
+
+    const candidatas = [];
+    for (const alt of alts) {
+      const txtSemSeculo = String(alt?.texto || '')
+        .replace(/\*\*([\s\S]+?)\*\*/g, '$1')
+        .replace(/\bs[eé]culos?\s+[IVXLCDM]+\b/gi, ' ');
+      let altSet = null;
+      if (/\btodas\b/i.test(txtSemSeculo) && !/\bexceto\b/i.test(txtSemSeculo)) {
+        altSet = new Set(todosRomanos);
+      } else if (/\bnenhuma\b/i.test(txtSemSeculo)) {
+        altSet = new Set();
+      } else {
+        const roms = [...txtSemSeculo.matchAll(/\b(I|II|III|IV|V|VI|VII|VIII)\b/g)].map((m) => m[1].toUpperCase());
+        if (roms.length > 0) altSet = new Set(roms);
+      }
+      if (altSet && altSet.size === alvoSet.size && [...alvoSet].every((r) => altSet.has(r))) {
+        candidatas.push(String(alt.letra || '').toUpperCase().trim());
+      }
+    }
+    return candidatas.length === 1 ? candidatas[0] : '';
+  }
+
+  if (tipo === 'verdadeiro_falso' && est?.submodo === 'sequencia') {
+    const seqAlvo = (est?.itens || []).map((i) => String(i.gabarito || '').toUpperCase().trim()).filter(Boolean);
+    if (seqAlvo.length < 2) return '';
+    const candidatas = [];
+    for (const alt of alts) {
+      const tokens = [...String(alt?.texto || '').toUpperCase().matchAll(/\b([VFCE])\b/g)].map((m) => m[1]);
+      if (tokens.length === seqAlvo.length && tokens.every((t, k) => t === seqAlvo[k])) {
+        candidatas.push(String(alt.letra || '').toUpperCase().trim());
+      }
+    }
+    return candidatas.length === 1 ? candidatas[0] : '';
+  }
+
+  if (tipo === 'associacao' && est?.submodo === 'sequencia') {
+    const seqAlvo = (est?.coluna_b || []).map((b) => String(b.vinculo_codigo || '').toUpperCase().trim()).filter(Boolean);
+    if (seqAlvo.length < 2) return '';
+    const candidatas = [];
+    for (const alt of alts) {
+      const tokens = [...String(alt?.texto || '').toUpperCase().matchAll(/[A-Z0-9]+/g)].map((m) => m[0]);
+      if (tokens.length === seqAlvo.length && tokens.every((t, k) => t === seqAlvo[k])) {
+        candidatas.push(String(alt.letra || '').toUpperCase().trim());
+      }
+    }
+    return candidatas.length === 1 ? candidatas[0] : '';
+  }
+
+  return '';
+}
+
 /* ── Resumo textual do gabarito para qualquer um dos 7 modelos ── */
 export function resumirGabaritoQuestao(questao) {
   if (!questao) return '—';
@@ -277,7 +416,11 @@ export function resumirGabaritoQuestao(questao) {
 
   const rawAlts = questao.alternativas || parseJsonSafe(questao.alternativas_json, []) || [];
   const alts = Array.isArray(rawAlts) ? rawAlts : [];
-  const altCorreta = alts.find(a => a.correta)?.letra || questao.correta;
+  const altCorreta =
+    alts.find(a => a.correta)?.letra ||
+    questao.correta ||
+    questao.gabarito ||
+    inferirLetraCorretaPorEstrutura(tipo, est, alts, `${questao.enunciado ?? questao.conteudo_bruto ?? ''} ${questao.comando_final ?? ''}`);
 
   if (tipo === 'verdadeiro_falso' && (est.submodo || 'direto') === 'direto') {
     const seq = (est.itens || []).map(i => i.gabarito || 'V').join(' - ');
@@ -320,7 +463,11 @@ export function QuestaoCorpoEstruturado({ questao, showGabarito = true, modoProv
 
   const rawAlts = questao.alternativas || parseJsonSafe(questao.alternativas_json, []) || [];
   const alts = (Array.isArray(rawAlts) ? rawAlts : []).filter(a => (a?.texto && String(a.texto).trim()) || a?.imagem_url);
-  const letraCorreta = alts.find(a => a.correta)?.letra || questao.correta;
+  const letraCorreta =
+    alts.find(a => a.correta)?.letra ||
+    questao.correta ||
+    questao.gabarito ||
+    inferirLetraCorretaPorEstrutura(tipo, est, alts, `${enunciadoRaw} ${comandoFinal}`);
 
   const posicaoFigura = ['apos_texto_apoio', 'entre_enunciado_e_comando', 'abaixo_comando'].includes(midia?.posicao)
     ? midia.posicao
@@ -688,12 +835,22 @@ export function QuestaoCorpoEstruturado({ questao, showGabarito = true, modoProv
 /* ── Gerador HTML string para o popup de impressão do navegador (ProvaPreview) ── */
 export function renderQuestaoPrintHtml(it, idx, template, showGabarito = false) {
   const esc = (s = '') => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const fmtPrint = (s = '') =>
+    esc(s)
+      .replace(/\*\*([\s\S]+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/__([^\s_](?:[\s\S]*?[^\s_])?)__/g, '<u>$1</u>')
+      .replace(/\*([^\s*](?:[^*\n]*?[^\s*])?)\*/g, '<em>$1</em>');
+
   const num = String(idx + 1).padStart(2, '0');
   const est = parseJsonSafe(it.estrutura_json, {}) || {};
   const midia = parseJsonSafe(it.midia_json, null);
   const tipo = it.tipo || est.modelo || (template === 'discursiva' ? 'discursiva' : 'objetiva');
   const alts = parseJsonSafe(it.alternativas_json, []) || [];
-  const correta = (Array.isArray(alts) ? alts : []).find(a => a.correta)?.letra || it.correta;
+  const correta =
+    (Array.isArray(alts) ? alts : []).find(a => a.correta)?.letra ||
+    it.correta ||
+    it.gabarito ||
+    inferirLetraCorretaPorEstrutura(tipo, est, alts, `${it.conteudo_bruto || ''} ${it.comando_final || ''}`);
 
   const imgSrc = midia?.url || it.imagem_url || it.imagem_base64;
   const presetMap = { P: '36%', M: '56%', G: '84%', '100%': '100%' };
@@ -702,13 +859,19 @@ export function renderQuestaoPrintHtml(it, idx, template, showGabarito = false) 
   const pos = ['apos_texto_apoio', 'entre_enunciado_e_comando', 'abaixo_comando'].includes(midia?.posicao)
     ? midia.posicao
     : 'entre_enunciado_e_comando';
-  const legenda = [midia?.legenda, midia?.credito ? `Fonte: ${midia.credito}` : ''].filter(Boolean).join(' — ');
+  const legLimpa = String(midia?.legenda || '').trim();
+  const credBruto = String(midia?.credito || '').trim();
+  const credEhRodapeCaderno = /^(?:humanas|linguagens|matem[aá]tica|ci[êe]ncias)[\s\-–—_/0-9º°ªa-z]*$/i.test(credBruto);
+  const credUtil = credBruto && !credEhRodapeCaderno && !legLimpa.toLowerCase().includes(credBruto.toLowerCase())
+    ? `Fonte: ${credBruto}`
+    : '';
+  const legenda = [legLimpa, credUtil].filter(Boolean).join(' — ');
 
   const figHtml = imgSrc
     ? `<div style="text-align:${align};margin:6px 0"><img src="${esc(imgSrc)}" style="display:inline-block;width:${wCss};max-width:100%;max-height:220px;height:auto;object-fit:contain"/>${legenda ? `<div style="font-size:7.5pt;color:#555;font-style:italic">${esc(legenda)}</div>` : ''}</div>`
     : '';
 
-  let enuncHtml = esc(it.conteudo_bruto || '').replace(/\n/g, '<br>');
+  let enuncHtml = fmtPrint(it.conteudo_bruto || '').replace(/\n/g, '<br>');
   if (tipo === 'lacuna') {
     enuncHtml = enuncHtml.replace(/\{\{([^}]+)\}\}/g, (_, r) =>
       showGabarito ? `<strong style="color:#166534;text-decoration:underline">${r}</strong>` : '_'.repeat(Math.max(8, r.length + 4))
@@ -718,19 +881,19 @@ export function renderQuestaoPrintHtml(it, idx, template, showGabarito = false) 
   const renderAlts = () => (Array.isArray(alts) ? alts : []).map(a => {
     const isCorr = showGabarito && (a.correta || a.letra === correta);
     const aImg = a.imagem_url ? `<div><img src="${esc(a.imagem_url)}" style="max-width:140px;max-height:95px;margin-top:2px"/></div>` : '';
-    return `<div style="display:flex;gap:5px;padding:1.5px 0;font-size:9.8pt;${isCorr ? 'background:#f0fdf4;font-weight:700' : ''}"><span style="font-weight:700;min-width:22px">(${esc(a.letra)})</span><div style="flex:1">${esc(a.texto || '')}${aImg}</div></div>`;
+    return `<div style="display:flex;gap:5px;padding:1.5px 0;font-size:9.8pt;${isCorr ? 'background:#f0fdf4;font-weight:700' : ''}"><span style="font-weight:700;min-width:22px">(${esc(a.letra)})</span><div style="flex:1">${fmtPrint(a.texto || '')}${aImg}</div></div>`;
   }).join('');
 
   const cmdPosCorpoPrint = (tipo === 'associacao' || tipo === 'verdadeiro_falso') && (est.submodo || 'direto') === 'sequencia';
-  const cmdHtml = it.comando_final ? `<p style="font-size:10pt;font-weight:600;line-height:1.5;margin:4px 0;text-align:left">${esc(it.comando_final)}</p>` : '';
+  const cmdHtml = it.comando_final ? `<p style="font-size:10pt;font-weight:600;line-height:1.5;margin:4px 0;text-align:left">${fmtPrint(it.comando_final)}</p>` : '';
 
   let corpo = '';
   if (tipo === 'afirmativas') {
-    const pHtml = (est.proposicoes || []).map((p, i) => `<div style="font-size:9.6pt;margin-bottom:2px;text-align:left"><strong>${esc(p.romano || ['I','II','III','IV','V'][i])}.</strong> ${esc(p.texto || '')}</div>`).join('');
-    const cf = est.comando_fechamento ? `<div style="font-weight:600;margin:4px 0;font-size:9.8pt;text-align:left">${esc(est.comando_fechamento)}</div>` : '';
+    const pHtml = (est.proposicoes || []).map((p, i) => `<div style="font-size:9.6pt;margin-bottom:2px;text-align:left"><strong>${esc(p.romano || ['I','II','III','IV','V'][i])}.</strong> ${fmtPrint(p.texto || '')}</div>`).join('');
+    const cf = est.comando_fechamento ? `<div style="font-weight:600;margin:4px 0;font-size:9.8pt;text-align:left">${fmtPrint(est.comando_fechamento)}</div>` : '';
     corpo = `${pHtml}${cf}${renderAlts()}`;
   } else if (tipo === 'verdadeiro_falso') {
-    const vHtml = (est.itens || []).map(x => `<div style="font-size:9.6pt;margin-bottom:2px;text-align:left"><span style="font-family:monospace;font-weight:700">( ${showGabarito && (est.submodo || 'direto') === 'direto' ? esc(x.gabarito || 'V') : '&nbsp;&nbsp;'} )</span> ${esc(x.texto || '')}</div>`).join('');
+    const vHtml = (est.itens || []).map(x => `<div style="font-size:9.6pt;margin-bottom:2px;text-align:left"><span style="font-family:monospace;font-weight:700">( ${showGabarito && (est.submodo || 'direto') === 'direto' ? esc(x.gabarito || 'V') : '&nbsp;&nbsp;'} )</span> ${fmtPrint(x.texto || '')}</div>`).join('');
     corpo = `${vHtml}${cmdPosCorpoPrint ? cmdHtml : ''}${est.submodo === 'sequencia' ? renderAlts() : ''}`;
   } else if (tipo === 'associacao') {
     const colA = est.coluna_a || [];
@@ -743,7 +906,7 @@ export function renderQuestaoPrintHtml(it, idx, template, showGabarito = false) 
     let rows = '';
     for (let i = 0; i < n; i++) {
       const a = colA[i]; const b = colB[i];
-      rows += `<tr><td style="border:0.5pt solid #666;padding:4px 6px;text-align:left;vertical-align:top;width:${wA}">${a ? `<strong>(${esc(a.codigo || i + 1)})</strong> ${esc(a.texto || '')}` : ''}</td><td style="border:0.5pt solid #666;padding:4px 6px;text-align:left;vertical-align:top;width:${wB}">${b ? `<span style="font-family:monospace;font-weight:700">( ${showGabarito && (est.submodo || 'direto') === 'direto' ? esc(b.vinculo_codigo || '') : '&nbsp;&nbsp;'} )</span> ${esc(b.texto || '')}` : ''}</td></tr>`;
+      rows += `<tr><td style="border:0.5pt solid #666;padding:4px 6px;text-align:left;vertical-align:top;width:${wA}">${a ? `<strong>(${esc(a.codigo || i + 1)})</strong> ${fmtPrint(a.texto || '')}` : ''}</td><td style="border:0.5pt solid #666;padding:4px 6px;text-align:left;vertical-align:top;width:${wB}">${b ? `<span style="font-family:monospace;font-weight:700">( ${showGabarito && (est.submodo || 'direto') === 'direto' ? esc(b.vinculo_codigo || '') : '&nbsp;&nbsp;'} )</span> ${fmtPrint(b.texto || '')}` : ''}</td></tr>`;
     }
     const hdr = `<thead><tr style="background:#f3f4f6"><th style="border:0.5pt solid #666;padding:4px 6px;text-align:left;width:${wA}">${esc(est.titulo_coluna_a || 'Coluna A')}</th><th style="border:0.5pt solid #666;padding:4px 6px;text-align:left;width:${wB}">${esc(est.titulo_coluna_b || 'Coluna B')}</th></tr></thead>`;
     corpo = `<table style="width:100%;border-collapse:collapse;font-size:9pt;margin:4px 0;text-align:left">${hdr}<tbody>${rows}</tbody></table>${cmdPosCorpoPrint ? cmdHtml : ''}${est.submodo === 'sequencia' ? renderAlts() : ''}`;
@@ -753,7 +916,7 @@ export function renderQuestaoPrintHtml(it, idx, template, showGabarito = false) 
       : '';
     corpo = `${bp}${est.submodo === 'alternativas' ? renderAlts() : ''}`;
   } else if (tipo === 'somatoria') {
-    const sHtml = (est.proposicoes || []).map(p => `<div style="font-size:9.6pt;margin-bottom:2px;text-align:left"><strong>(${esc(p.codigo || String(p.valor).padStart(2, '0'))})</strong> ${esc(p.texto || '')}</div>`).join('');
+    const sHtml = (est.proposicoes || []).map(p => `<div style="font-size:9.6pt;margin-bottom:2px;text-align:left"><strong>(${esc(p.codigo || String(p.valor).padStart(2, '0'))})</strong> ${fmtPrint(p.texto || '')}</div>`).join('');
     corpo = `${sHtml}<div style="text-align:right;margin-top:4px;font-weight:700;font-size:9.5pt">SOMA: <span style="border:1pt solid #000;padding:1px 10px">${showGabarito ? esc(String(est.soma_correta ?? 0).padStart(2, '0')) : '&nbsp;&nbsp;&nbsp;&nbsp;'}</span></div>`;
   } else if (tipo === 'discursiva') {
     corpo = (est.formato_espaco || 'linhas') === 'quadro_calculo'
@@ -765,7 +928,7 @@ export function renderQuestaoPrintHtml(it, idx, template, showGabarito = false) 
 
   return `<div style="break-inside:avoid;page-break-inside:avoid;margin-bottom:10px;padding-bottom:8px;border-bottom:0.5pt dashed #ccc">
     <div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-weight:700;font-size:10pt;text-transform:uppercase">QUESTÃO ${num}${it.fonte && !it.texto_apoio ? ` <span style="font-weight:600;font-size:8.5pt;text-transform:none">(${esc(it.fonte)})</span>` : ''}</span><span style="font-size:7.5pt;color:#666">${esc(it.disciplina || '')} ${it.habilidade_bncc ? `· ${esc(it.habilidade_bncc)}` : ''} · ${Number(it.valor_pontos || 1).toFixed(1)}pt</span></div>
-    ${it.texto_apoio ? `<blockquote style="border-left:3px solid #555;padding:4px 8px;font-style:italic;font-size:9pt;margin:4px 0;background:#f8f8f8">${esc(it.texto_apoio)}${it.fonte ? `<footer style="font-size:8pt;font-style:normal">— ${esc(it.fonte)}</footer>` : ''}</blockquote>` : ''}
+    ${it.texto_apoio ? `<blockquote style="border-left:3px solid #555;padding:4px 8px;font-style:italic;font-size:9pt;margin:4px 0;background:#f8f8f8">${fmtPrint(it.texto_apoio).replace(/\n/g, '<br>')}${it.fonte ? `<footer style="font-size:8pt;font-style:normal">— ${esc(it.fonte)}</footer>` : ''}</blockquote>` : ''}
     ${pos === 'apos_texto_apoio' ? figHtml : ''}
     <p style="font-size:10pt;line-height:1.55;text-align:justify;margin:3px 0 4px">${enuncHtml}</p>
     ${pos === 'entre_enunciado_e_comando' ? figHtml : ''}

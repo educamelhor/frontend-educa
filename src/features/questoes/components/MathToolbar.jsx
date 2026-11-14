@@ -23,6 +23,26 @@ const SNIPPETS = [
 ];
 
 export default function MathToolbar({ textareaRef, value = '', onChange, onConvertLatex, convertingLatex = false }) {
+  const wrapSelection = (marker, placeholder = 'texto') => {
+    const el = textareaRef?.current;
+    if (el && typeof el.selectionStart === 'number') {
+      const start = el.selectionStart;
+      const end = el.selectionEnd;
+      const selected = value.slice(start, end);
+      const inner = selected || placeholder;
+      const before = value.slice(0, start);
+      const after = value.slice(end);
+      const next = `${before}${marker}${inner}${marker}${after}`;
+      onChange(next);
+      requestAnimationFrame(() => {
+        el.focus();
+        el.setSelectionRange(start + marker.length, start + marker.length + inner.length);
+      });
+    } else {
+      onChange(`${value}${value && !value.endsWith(' ') ? ' ' : ''}${marker}${placeholder}${marker}`);
+    }
+  };
+
   const insertSnippet = (tex) => {
     const el = textareaRef?.current;
     if (el && typeof el.selectionStart === 'number') {
@@ -49,6 +69,33 @@ export default function MathToolbar({ textareaRef, value = '', onChange, onConve
       border: '1px solid #e2e8f0', borderBottom: 'none',
       borderRadius: '8px 8px 0 0',
     }}>
+      <button
+        type="button"
+        title="Negrito editorial (**trecho**)"
+        onClick={() => wrapSelection('**', 'negrito')}
+        style={{
+          padding: '2px 7px', borderRadius: 5,
+          border: '1px solid #cbd5e1', background: '#fff',
+          color: '#0f172a', fontSize: '0.74rem', fontWeight: 900,
+          cursor: 'pointer', lineHeight: 1.4,
+        }}
+      >
+        B
+      </button>
+      <button
+        type="button"
+        title="Itálico editorial (*trecho*)"
+        onClick={() => wrapSelection('*', 'itálico')}
+        style={{
+          padding: '2px 8px', borderRadius: 5,
+          border: '1px solid #cbd5e1', background: '#fff',
+          color: '#0f172a', fontSize: '0.74rem', fontWeight: 700,
+          fontStyle: 'italic', fontFamily: "'Times New Roman', serif",
+          cursor: 'pointer', lineHeight: 1.4, marginRight: 4,
+        }}
+      >
+        I
+      </button>
       <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#64748b', marginRight: 4, textTransform: 'uppercase' }}>
         ∑ Fórmulas:
       </span>

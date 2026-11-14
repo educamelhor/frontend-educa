@@ -22,11 +22,16 @@ import { Button } from "../../../components/ui/Button";
 
 export default function ImportCSV({ open, onClose, onFinish }) {
   const fileRef = useRef(null);
+  const ultimoResultadoRef = useRef(null);
   const [progress, setProgress] = useState(0);
   const [submitting, setSubmitting] = useState(false);
 
   // Estado do modal "turma não encontrada"
   const [turmaNaoEncontrada, setTurmaNaoEncontrada] = useState(null); // { nome }
+
+  // Estado do modal de DIVERGÊNCIA entre nome do arquivo e título interno do CSV
+  const [divergenciaTurma, setDivergenciaTurma] = useState(null);
+  // { nomeArquivo, nomeConteudo, turmasConteudo, turmasArquivo, arquivo }
 
   // Estado do modal de CONFLITO DE TURNO (mesma turma em mais de um turno)
   const [turnoConflito, setTurnoConflito] = useState(null);
@@ -39,32 +44,83 @@ export default function ImportCSV({ open, onClose, onFinish }) {
   if (!open) return null;
 
   // ─────────────────────────────────────────────
-  // Normaliza nome de turma para comparação
+  // Normaliza nome de turma para comparação inteligente
+  // ("6º Ano - A", "6° ANO A", "6 ANO A", "6º ANO A (1)" → "6 ANO A")
   // ─────────────────────────────────────────────
   function normalizarTurma(s) {
     return (s || "")
-      .replace(/Âº/g, "º")
-      .replace(/Âª/g, "ª")
-      .trim()
-      .toUpperCase();
+      .replace(/Ã‚Âº|Âº/g, "º")
+      .replace(/Ã‚Âª|Âª/g, "ª")
+      .replace(/\s*\(\d+\)\s*$/g, "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toUpperCase()
+      .replace(/[º°ª]/g, "")
+      .replace(/[-_]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
   }
 
   // ─────────────────────────────────────────────
-  // Busca todas as turmas com o nome informado
-  // Retorna array (pode ter 0, 1 ou várias)
+  // Lê os primeiros KB do CSV no navegador para extrair
+  // a turma do título oficial do EDUCADF ("Lista de alunos da Turma ...")
   // ─────────────────────────────────────────────
-  async function buscarTurmasPorNome(turmaNome) {
+  async function extrairTurmaDoConteudoCsv(file) {
+    try {
+      const slice = file.slice(0, 4096);
+      const buf = await slice.arrayBuffer();
+      let texto = "";
+      try {
+        texto = new TextDecoder("utf-8", { fatal: true }).decode(buf);
+      } catch {
+        texto = new TextDecoder("windows-1252").decode(buf);
+      }
+      const linhas = texto
+        .replace(/^\uFEFF/, "")
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter(Boolean)
+        .slice(0, 10);
+
+      for (const linha of linhas) {
+        const limpa = linha.replace(/"/g, "").replace(/;+$/g, "").trim();
+        const mLista = limpa.match(/Lista\s+de\s+alunos\s+da\s+Turma\s+(.+?)$/i);
+        if (mLista && mLista[1]) return mLista[1].trim();
+      }
+      return "";
+    } catch {
+      return "";
+    }
+  }
+
+  function filtrarTurmasPorNome(listaTurmas, nomeAlvo) {
+    const alvoNorm = normalizarTurma(nomeAlvo);
+    if (!alvoNorm) return [];
+    return (listaTurmas || []).filter(
+      (t) => normalizarTurma(t.turma || t.nome || "") === alvoNorm
+    );
+  }
+
+  async function carregarTurmasEscola() {
     try {
       const res = await api.get("/api/turmas");
-      const turmas = res.data || [];
-      const nomeNorm = normalizarTurma(turmaNome);
-      return turmas.filter(
-        (t) => normalizarTurma(t.turma || t.nome || "") === nomeNorm
-      );
+      return Array.isArray(res.data) ? res.data : [];
     } catch (err) {
       console.error("Erro ao buscar turmas:", err);
       return [];
     }
+  }
+
+  async function prosseguirComTurmasCandidatas(file, turmasCandidatas, labelTurma) {
+    if (turmasCandidatas.length === 1) {
+      await executarImportacao(file, turmasCandidatas[0]);
+      return;
+    }
+    setTurnoConflito({
+      turmaNome: turmasCandidatas[0]?.turma || turmasCandidatas[0]?.nome || labelTurma,
+      opcoes: turmasCandidatas,
+      arquivo: file,
+    });
   }
 
   // ─────────────────────────────────────────────
@@ -92,6 +148,8 @@ export default function ImportCSV({ open, onClose, onFinish }) {
 
       const {
         localizados,
+        duplicadosIgnorados,
+        aeeIdentificados,
         inseridos,
         jaExistiam,
         inativados,
@@ -104,12 +162,15 @@ export default function ImportCSV({ open, onClose, onFinish }) {
         turma: turmaNome,
         turno: turmaObj.turno || "",
         localizados,
+        duplicadosIgnorados: duplicadosIgnorados || 0,
+        aeeIdentificados: aeeIdentificados || 0,
         inseridos,
         jaExistiam,
         reativados,
         inativados,
         message: `Turma ${turmaNome} (${turmaObj.turno || ""}) importada com sucesso.`,
       };
+      ultimoResultadoRef.current = resultado;
 
       if (Array.isArray(pendentesInativacao) && pendentesInativacao.length > 0) {
         onFinish && onFinish(resultado);
@@ -155,8 +216,15 @@ export default function ImportCSV({ open, onClose, onFinish }) {
     try {
       const { data } = await api.post("/api/alunos/inativar-lote", { alunoIds: ids });
       const msg = data?.message || `${ids.length} aluno(s) inativado(s).`;
+      const base = ultimoResultadoRef.current || {};
       setPendentesModal(null);
-      onFinish && onFinish({ status: "sucesso", message: msg });
+      onFinish &&
+        onFinish({
+          ...base,
+          status: "sucesso",
+          inativados: data?.inativados ?? ids.length,
+          message: msg,
+        });
       onClose && onClose();
     } catch (err) {
       console.error("Erro ao inativar:", err);
@@ -198,27 +266,48 @@ export default function ImportCSV({ open, onClose, onFinish }) {
       return;
     }
 
-    const turmaNome = file.name.replace(/\.csv$/i, "").trim();
+    const turmaDoArquivo = file.name
+      .replace(/\.csv$/i, "")
+      .replace(/\s*\(\d+\)\s*$/g, "")
+      .trim();
+    const turmaDoConteudo = await extrairTurmaDoConteudoCsv(file);
 
-    // Busca TODAS as turmas com esse nome (pode haver em mais de um turno)
-    const turmasEncontradas = await buscarTurmasPorNome(turmaNome);
+    const todasTurmas = await carregarTurmasEscola();
+    const turmasPorArquivo = filtrarTurmasPorNome(todasTurmas, turmaDoArquivo);
+    const turmasPorConteudo = turmaDoConteudo
+      ? filtrarTurmasPorNome(todasTurmas, turmaDoConteudo)
+      : [];
 
     if (e.target) e.target.value = null; // reset input
 
+    // Proteção: se o arquivo foi renomeado para uma turma existente, mas o conteúdo
+    // interno do EDUCADF declara outra turma existente diferente, pede confirmação explícita
+    if (
+      turmasPorArquivo.length > 0 &&
+      turmasPorConteudo.length > 0 &&
+      normalizarTurma(turmaDoArquivo) !== normalizarTurma(turmaDoConteudo)
+    ) {
+      setDivergenciaTurma({
+        nomeArquivo: turmasPorArquivo[0]?.turma || turmasPorArquivo[0]?.nome || turmaDoArquivo,
+        nomeConteudo: turmasPorConteudo[0]?.turma || turmasPorConteudo[0]?.nome || turmaDoConteudo,
+        turmasConteudo: turmasPorConteudo,
+        turmasArquivo: turmasPorArquivo,
+        arquivo: file,
+      });
+      return;
+    }
+
+    // Prioriza match pelo nome do arquivo; se não renomeou, usa automaticamente a turma lida dentro do CSV
+    const turmasEncontradas =
+      turmasPorArquivo.length > 0 ? turmasPorArquivo : turmasPorConteudo;
+    const nomeReferencia = turmaDoConteudo || turmaDoArquivo;
+
     if (turmasEncontradas.length === 0) {
-      // Nenhuma turma → modal de cadastro
-      setTurmaNaoEncontrada({ nome: turmaNome });
+      setTurmaNaoEncontrada({ nome: nomeReferencia });
       return;
     }
 
-    if (turmasEncontradas.length === 1) {
-      // Apenas uma turma → importa direto
-      await executarImportacao(file, turmasEncontradas[0]);
-      return;
-    }
-
-    // Mais de uma turma com o mesmo nome (turnos diferentes) → modal de seleção
-    setTurnoConflito({ turmaNome, opcoes: turmasEncontradas, arquivo: file });
+    await prosseguirComTurmasCandidatas(file, turmasEncontradas, nomeReferencia);
   }
 
   function openPicker() {
@@ -254,15 +343,15 @@ export default function ImportCSV({ open, onClose, onFinish }) {
           <p className="text-sm text-gray-600">
             Selecione o arquivo <strong>CSV</strong> exportado pelo portal{" "}
             <strong>EDUCADF</strong> (Secretaria de Estado de Educação do DF).
-            O nome do arquivo deve ser o <strong>nome exato da turma</strong>{" "}
-            cadastrada no sistema.
+            O sistema identifica a turma automaticamente pelo título do arquivo
+            ou pelo nome do CSV, ignorando eventuais linhas duplicadas da exportação.
           </p>
 
           <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
             <p className="text-xs text-blue-700 leading-relaxed">
               💡 <strong>Como exportar:</strong> Acesse o portal EDUCADF →
-              selecione a turma → clique em <em>"Exportar CSV"</em>. Renomeie o
-              arquivo com o nome exato da turma antes de importar.
+              selecione a turma → clique em <em>"Exportar CSV"</em> e envie o
+              arquivo aqui (com ou sem renomear para o nome da turma).
             </p>
           </div>
 
@@ -304,6 +393,90 @@ export default function ImportCSV({ open, onClose, onFinish }) {
           )}
         </div>
       </div>
+
+      {/* ═══════════════════════════════════════════════════════
+          MODAL PREMIUM: Divergência entre nome do arquivo e cabeçalho interno do CSV
+          ═══════════════════════════════════════════════════════ */}
+      {divergenciaTurma && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/55 p-4 backdrop-blur-[2px]">
+          <div
+            className="w-full max-w-md rounded-2xl bg-white shadow-2xl overflow-hidden"
+            style={{ animation: "fadeInScale 0.25s ease-out" }}
+          >
+            <div className="bg-gradient-to-r from-amber-500 to-orange-600 px-6 py-4">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">⚠️</span>
+                <div>
+                  <h3 className="text-lg font-bold text-white">Confirme a Turma de Destino</h3>
+                  <p className="text-amber-100 text-xs mt-0.5">
+                    O nome do arquivo difere da turma registrada dentro do CSV
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="px-6 py-5 space-y-3">
+              <p className="text-sm text-gray-700 leading-relaxed">
+                O cabeçalho interno exportado pelo EDUCADF indica a turma{" "}
+                <strong className="text-emerald-700">{divergenciaTurma.nomeConteudo}</strong>,
+                mas o arquivo está nomeado como{" "}
+                <strong className="text-indigo-700">{divergenciaTurma.nomeArquivo}</strong>.
+                Em qual turma deseja incluir estes estudantes?
+              </p>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  const { arquivo, turmasConteudo, nomeConteudo } = divergenciaTurma;
+                  setDivergenciaTurma(null);
+                  await prosseguirComTurmasCandidatas(arquivo, turmasConteudo, nomeConteudo);
+                }}
+                className="w-full flex items-center justify-between p-3.5 rounded-xl border-2 border-emerald-200 bg-emerald-50 hover:bg-emerald-100/70 text-left transition-all"
+              >
+                <div>
+                  <p className="text-xs font-semibold text-emerald-700 uppercase">
+                    Turma indicada dentro do CSV (Recomendado)
+                  </p>
+                  <p className="text-sm font-bold text-gray-900 mt-0.5">
+                    {divergenciaTurma.nomeConteudo}
+                  </p>
+                </div>
+                <span className="text-emerald-700 font-bold">→</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  const { arquivo, turmasArquivo, nomeArquivo } = divergenciaTurma;
+                  setDivergenciaTurma(null);
+                  await prosseguirComTurmasCandidatas(arquivo, turmasArquivo, nomeArquivo);
+                }}
+                className="w-full flex items-center justify-between p-3.5 rounded-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 text-left transition-all"
+              >
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase">
+                    Turma pelo nome do arquivo
+                  </p>
+                  <p className="text-sm font-bold text-gray-800 mt-0.5">
+                    {divergenciaTurma.nomeArquivo}
+                  </p>
+                </div>
+                <span className="text-gray-500 font-bold">→</span>
+              </button>
+            </div>
+
+            <div className="px-6 pb-5">
+              <Button
+                type="button"
+                onClick={() => setDivergenciaTurma(null)}
+                className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 px-5 py-2 rounded-xl font-medium border border-gray-300"
+              >
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ═══════════════════════════════════════════════════════
           MODAL PREMIUM: Conflito de turno
@@ -359,13 +532,15 @@ export default function ImportCSV({ open, onClose, onFinish }) {
                   const corTurno =
                     turma.turno?.toUpperCase().includes("MAT") ? "blue" :
                     turma.turno?.toUpperCase().includes("VES") ? "orange" :
-                    turma.turno?.toUpperCase().includes("NOT") ? "purple" : "gray";
+                    turma.turno?.toUpperCase().includes("NOT") ? "purple" :
+                    turma.turno?.toUpperCase().includes("INT") ? "emerald" : "gray";
 
                   const corMap = {
-                    blue:   { bg: "bg-blue-50",   border: "border-blue-200",   badge: "bg-blue-100 text-blue-700 border-blue-300",   icon: "🌅" },
-                    orange: { bg: "bg-orange-50",  border: "border-orange-200", badge: "bg-orange-100 text-orange-700 border-orange-300", icon: "☀️" },
-                    purple: { bg: "bg-purple-50",  border: "border-purple-200", badge: "bg-purple-100 text-purple-700 border-purple-300", icon: "🌙" },
-                    gray:   { bg: "bg-gray-50",    border: "border-gray-200",   badge: "bg-gray-100 text-gray-700 border-gray-300",   icon: "📚" },
+                    blue:    { bg: "bg-blue-50",    border: "border-blue-200",    badge: "bg-blue-100 text-blue-700 border-blue-300",       icon: "🌅" },
+                    orange:  { bg: "bg-orange-50",  border: "border-orange-200",  badge: "bg-orange-100 text-orange-700 border-orange-300", icon: "☀️" },
+                    purple:  { bg: "bg-purple-50",  border: "border-purple-200",  badge: "bg-purple-100 text-purple-700 border-purple-300", icon: "🌙" },
+                    emerald: { bg: "bg-emerald-50", border: "border-emerald-200", badge: "bg-emerald-100 text-emerald-700 border-emerald-300", icon: "🏫" },
+                    gray:    { bg: "bg-gray-50",    border: "border-gray-200",    badge: "bg-gray-100 text-gray-700 border-gray-300",       icon: "📚" },
                   };
                   const c = corMap[corTurno];
 

@@ -368,9 +368,19 @@ export default function Alunos() {
 
               {"inseridos" in resultadoImportacao ? (
                 <>
+                  {Number(resultadoImportacao.duplicadosIgnorados) > 0 && (
+                    <div className="text-amber-600">
+                      🔁 Linhas repetidas ignoradas: {resultadoImportacao.duplicadosIgnorados}
+                    </div>
+                  )}
                   <div className="text-green-600">✅ Inseridos: {resultadoImportacao.inseridos}</div>
                   <div className="text-yellow-600">🟡 Já existiam: {resultadoImportacao.jaExistiam}</div>
                   <div className="text-blue-600">📘 Reativados: {resultadoImportacao.reativados}</div>
+                  {Number(resultadoImportacao.aeeIdentificados) > 0 && (
+                    <div className="text-purple-600">
+                      🧩 AEE (ANEES) identificados: {resultadoImportacao.aeeIdentificados}
+                    </div>
+                  )}
                   <div className="text-red-600">❌ Inativados: {resultadoImportacao.inativados}</div>
                   <div className="text-gray-600">
                     {resultadoImportacao.turma
@@ -604,6 +614,8 @@ export default function Alunos() {
             } else {
               setResultadoImportacao({
                 localizados: res.localizados ?? 0,
+                duplicadosIgnorados: res.duplicadosIgnorados ?? 0,
+                aeeIdentificados: res.aeeIdentificados ?? 0,
                 inseridos: res.inseridos ?? 0,
                 jaExistiam: res.jaExistiam ?? 0,
                 reativados: res.reativados ?? 0,
@@ -633,6 +645,8 @@ export default function Alunos() {
             } else {
               setResultadoImportacao({
                 localizados: res.localizados ?? 0,
+                duplicadosIgnorados: res.duplicadosIgnorados ?? 0,
+                aeeIdentificados: res.aeeIdentificados ?? 0,
                 inseridos: res.inseridos ?? 0,
                 jaExistiam: res.jaExistiam ?? 0,
                 reativados: res.reativados ?? 0,

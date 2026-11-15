@@ -16,11 +16,177 @@
 // Observação: Todo o restante foi preservado como já aprovado.
 // ────────────────────────────────────────────────────────────────
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Dialog } from "@headlessui/react";
 import api from "../../../services/api";
 import Input from "../../../components/ui/Input";
 import { Button } from "../../../components/ui/Button";
+
+// ────────────────────────────────────────────────────────────────
+// Normalizador / Abreviador de ANEE (Padrão SEEDF / EDUCADF)
+// Converte descrições longas do CSV EDUCADF em siglas oficiais:
+// Ex.: "TRANSTORNO DO ESPECTRO AUTISTA" -> "TEA"
+//      "DEFICIÊNCIA FÍSICA MÉDIAS NECESSIDADES ESPECIAIS, TRANSTORNO DO DÉFICIT DE ATENÇÃO E HIPERATIVIDADE" -> "DF, TDAH"
+// ────────────────────────────────────────────────────────────────
+const REGRAS_ANEES_SEEDF = [
+  { sigla: "SC", descricao: "Surdocegueira", regex: /SURDOCEGUEIR|\bSC\b/ },
+  {
+    sigla: "TEA",
+    descricao: "Transtorno do Espectro Autista",
+    regex: /\bTEA\b|ESPECTRO AUTISTA|\bAUTISM|\bASPERGER\b|SINDROME DE RETT|DESINTEGRATIVO DA INFANCIA/,
+  },
+  {
+    sigla: "TGD",
+    descricao: "Transtorno Global do Desenvolvimento",
+    regex: /\bTGD\b|GLOBAL DO DESENVOLVIMENTO/,
+  },
+  {
+    sigla: "DF",
+    descricao: "Deficiência Física",
+    regex: /\bDF\b|DEFICIENCIA FISICA|DEFICIENCIA MOTORA|PARALISIA CEREBRAL|OSTOMIA|MOBILIDADE REDUZIDA/,
+  },
+  {
+    sigla: "DI",
+    descricao: "Deficiência Intelectual",
+    regex: /\bDI\b|DEFICIENCIA INTELECTUAL|DEFICIENCIA MENTAL|ATRASO COGNITIVO/,
+  },
+  {
+    sigla: "DA",
+    descricao: "Deficiência Auditiva",
+    regex: /\bDA\b|DEFICIENCIA AUDITIVA|HIPOACUSIA/,
+  },
+  {
+    sigla: "SURDEZ",
+    descricao: "Surdez",
+    regex: /\bSURDEZ\b/,
+    skipIfSurdocegueira: true,
+  },
+  {
+    sigla: "BV",
+    descricao: "Baixa Visão",
+    regex: /\bBV\b|BAIXA VISAO|VISAO SUBNORMAL/,
+  },
+  {
+    sigla: "VM",
+    descricao: "Visão Monocular",
+    regex: /\bVM\b|VISAO MONOCULAR/,
+  },
+  {
+    sigla: "DV",
+    descricao: "Deficiência Visual",
+    regex: /\bDV\b|DEFICIENCIA VISUAL|\bCEGUEIRA\b/,
+    skipIfSurdocegueira: true,
+  },
+  {
+    sigla: "DMU",
+    descricao: "Deficiência Múltipla",
+    regex: /\bDMU\b|DEFICIENCIAS? MULTIPLAS?/,
+  },
+  {
+    sigla: "AH/SD",
+    descricao: "Altas Habilidades / Superdotação",
+    regex: /\bAH\s*\/?\s*SD\b|ALTAS HABILIDADES|SUPERDOTAC/,
+  },
+  {
+    sigla: "SD",
+    descricao: "Síndrome de Down",
+    regex: /\bSD\b|SINDROME DE DOWN|TRISSOMIA DO 21/,
+    stripAhSdFirst: true,
+  },
+  {
+    sigla: "TDAH",
+    descricao: "Transtorno do Déficit de Atenção e Hiperatividade",
+    regex: /\bTDAH\b|\bTDA\b|DEFICIT DE ATENCAO|HIPERATIVIDADE/,
+  },
+  {
+    sigla: "TOD",
+    descricao: "Transtorno Opositivo Desafiador",
+    regex: /\bTOD\b|OPOSITOR DESAFIADOR|OPOSITIVO DESAFIADOR|DESAFIADOR OPOSITIVO/,
+  },
+  {
+    sigla: "TPAC",
+    descricao: "Transtorno do Processamento Auditivo Central",
+    regex: /\bTPAC\b|\bDPAC\b|PROCESSAMENTO AUDITIVO CENTRAL/,
+  },
+  {
+    sigla: "TDL",
+    descricao: "Transtorno do Desenvolvimento da Linguagem",
+    regex: /\bTDL\b|\bDEL\b|DESENVOLVIMENTO DA LINGUAGEM|ESPECIFICO DE LINGUAGEM|TRANSTORNO DE LINGUAGEM/,
+  },
+  { sigla: "DISLEXIA", descricao: "Dislexia", regex: /\bDISLEXIA\b/ },
+  { sigla: "DISCALCULIA", descricao: "Discalculia", regex: /\bDISCALCULIA\b/ },
+  { sigla: "DISGRAFIA", descricao: "Disgrafia", regex: /\bDISGRAFIA\b/ },
+  { sigla: "DISORTOGRAFIA", descricao: "Disortografia", regex: /\bDISORTOGRAFIA\b/ },
+  { sigla: "DISLALIA", descricao: "Dislalia", regex: /\bDISLALIA\b/ },
+  {
+    sigla: "TFE",
+    descricao: "Transtorno Funcional Específico",
+    regex: /\bTFE\b|FUNCIONAL ESPECIFICO|ESPECIFICO DE APRENDIZAGEM/,
+  },
+];
+
+export function abreviarAneesEducaDF(raw) {
+  const textoLimpo = String(raw ?? "")
+    .replace(/[\u00A0\t\r\n]+/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+
+  if (!textoLimpo) {
+    return { siglas: [], textoSiglas: "", itens: [] };
+  }
+
+  const segmentos = textoLimpo
+    .split(/[,;|]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const vistos = new Set();
+  const itens = [];
+
+  for (const seg of segmentos) {
+    const segNorm = seg
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toUpperCase()
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!segNorm) continue;
+
+    const temSurdocegueira = /SURDOCEGUEIR/.test(segNorm);
+    const segSemAhSd = segNorm.replace(/\bAH\s*\/?\s*SD\b/g, " ");
+    let bateuRegra = false;
+
+    for (const r of REGRAS_ANEES_SEEDF) {
+      if (r.skipIfSurdocegueira && temSurdocegueira) continue;
+      const alvo = r.stripAhSdFirst ? segSemAhSd : segNorm;
+      if (r.regex.test(alvo)) {
+        bateuRegra = true;
+        if (!vistos.has(r.sigla)) {
+          vistos.add(r.sigla);
+          itens.push({ sigla: r.sigla, descricao: r.descricao });
+        }
+      }
+    }
+
+    if (!bateuRegra) {
+      const fallback = seg
+        .replace(/\s*[-–]?\s*(BAIXAS?|M[EÉ]DIAS?|ALTAS?)\s+NECESSIDADES?\s+ESPECIAIS?/gi, "")
+        .trim();
+      const siglaFallback = (fallback || seg).toUpperCase();
+      if (siglaFallback && !vistos.has(siglaFallback)) {
+        vistos.add(siglaFallback);
+        itens.push({ sigla: siglaFallback, descricao: seg });
+      }
+    }
+  }
+
+  const siglas = itens.map((i) => i.sigla);
+  return {
+    siglas,
+    textoSiglas: siglas.join(", "),
+    itens,
+  };
+}
 
 export default function AlunoForm({ open, onClose, onSubmit, initialData = {}, anoLetivo }) {
   // ────────────────────────────────────────────────────────────────
@@ -46,12 +212,32 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {}, a
   const [atendimentoDiferencial, setAtendimentoDiferencial] = useState(
     initialData.atendimento_diferencial === 1 || initialData.atendimento_diferencial === true
   );
+  const [aneesBrutoOriginal, setAneesBrutoOriginal] = useState(initialData.anees || "");
+  const [aneesInput, setAneesInput] = useState(
+    () => abreviarAneesEducaDF(initialData.anees || "").textoSiglas
+  );
+  const [aneesEditadoManual, setAneesEditadoManual] = useState(false);
   const [usaNomeSocial, setUsaNomeSocial] = useState(
     initialData.usa_nome_social === 1 || initialData.usa_nome_social === true
   );
   const [nomeSocial, setNomeSocial] = useState(initialData.nome_social || "");
   const [turmas, setTurmas] = useState([]);
   const [modalAtivarOpen, setModalAtivarOpen] = useState(false);
+
+  const resumoAneesAtual = useMemo(() => abreviarAneesEducaDF(aneesInput), [aneesInput]);
+
+  const legendaAnees = useMemo(() => {
+    if (resumoAneesAtual.itens.length === 0) {
+      return "Siglas usuais: TEA, DF, DI, DA, DV, TDAH, TOD, TPAC, DMU, AH/SD.";
+    }
+    return resumoAneesAtual.itens
+      .map((item) =>
+        item.descricao && item.descricao.toUpperCase() !== item.sigla.toUpperCase()
+          ? `${item.sigla} — ${item.descricao}`
+          : item.sigla
+      )
+      .join(" · ");
+  }, [resumoAneesAtual]);
 
   // ────────────────────────────────────────────────────────────────
   // Carrega lista de turmas quando o modal abre
@@ -74,13 +260,39 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {}, a
       setDataNascimento(normalizeDate(initialData.data_nascimento));
       setTurmaId(initialData.turma_id ? String(initialData.turma_id) : "");
       setCpf(initialData.cpf || "");
-      setAtendimentoDiferencial(
-        initialData.atendimento_diferencial === 1 || initialData.atendimento_diferencial === true
-      );
+      const isAee =
+        initialData.atendimento_diferencial === 1 ||
+        initialData.atendimento_diferencial === true ||
+        Boolean(String(initialData.anees || "").trim());
+      setAtendimentoDiferencial(isAee);
+      const rawAnees = String(initialData.anees || "").trim();
+      setAneesBrutoOriginal(rawAnees);
+      setAneesInput(abreviarAneesEducaDF(rawAnees).textoSiglas);
+      setAneesEditadoManual(false);
       setUsaNomeSocial(
         initialData.usa_nome_social === 1 || initialData.usa_nome_social === true
       );
       setNomeSocial(initialData.nome_social || "");
+
+      // Fallback defensivo caso initialData tenha vindo sem o campo `anees`
+      if (initialData.codigo && typeof initialData.anees === "undefined") {
+        let cancelado = false;
+        api
+          .get(`/api/alunos/${initialData.codigo}`)
+          .then((res) => {
+            if (cancelado || !res?.data) return;
+            const fetchedAnees = String(res.data.anees || "").trim();
+            if (fetchedAnees) {
+              setAneesBrutoOriginal(fetchedAnees);
+              setAneesInput((prev) => prev || abreviarAneesEducaDF(fetchedAnees).textoSiglas);
+              setAtendimentoDiferencial(true);
+            }
+          })
+          .catch(() => {});
+        return () => {
+          cancelado = true;
+        };
+      }
     }
   }, [open, initialData]);
 
@@ -111,6 +323,15 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {}, a
   const buildPayload = () => {
     const nomeRegistroTrim = String(estudante || "").trim();
     const nomeSocialTrim = String(nomeSocial || "").trim();
+    const aneesDigitado = String(aneesInput || "").trim();
+    let aneesParaSalvar = null;
+    if (atendimentoDiferencial) {
+      if (!aneesEditadoManual && aneesBrutoOriginal) {
+        aneesParaSalvar = aneesBrutoOriginal;
+      } else {
+        aneesParaSalvar = aneesDigitado || null;
+      }
+    }
     return {
       codigo,
       estudante: usaNomeSocial ? nomeSocialTrim : nomeRegistroTrim,
@@ -121,6 +342,7 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {}, a
       turma_id: Number(turmaId),
       cpf,
       atendimento_diferencial: atendimentoDiferencial ? 1 : 0,
+      anees: aneesParaSalvar,
     };
   };
 
@@ -239,6 +461,50 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {}, a
               Estudante com Atendimento Diferencial (AEE)
             </label>
           </div>
+
+          {/* Campo condicional logo abaixo do checkbox AEE — Deficiência / ANEE (abreviatura: TEA, DF, etc.) */}
+          {atendimentoDiferencial && (
+            <div className="bg-blue-50/60 p-3 rounded border border-blue-200 space-y-2">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <label
+                  htmlFor="anees_estudante"
+                  className="block font-medium text-slate-800 text-sm"
+                >
+                  Deficiência / Necessidade (ANEE)
+                </label>
+                {resumoAneesAtual.itens.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {resumoAneesAtual.itens.map((item) => (
+                      <span
+                        key={item.sigla}
+                        title={item.descricao || item.sigla}
+                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-600 text-white shadow-sm"
+                      >
+                        {item.sigla}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <Input
+                id="anees_estudante"
+                value={aneesInput}
+                onChange={(e) => {
+                  setAneesInput(e.target.value);
+                  setAneesEditadoManual(true);
+                }}
+                placeholder="Ex.: TEA, DF, DI, DA, DV, TDAH, AH/SD"
+                className="w-full font-semibold text-slate-800"
+              />
+
+              {legendaAnees && (
+                <p className="text-xs text-slate-600 leading-snug">
+                  {legendaAnees}
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Nome Social — Res. CNE/CP nº 1/2018 · Lei nº 9.394/96 · Dec. 8.727/2016 · Dec. DF 37.982/2017 */}
           <div className="flex items-center space-x-2 mt-2 bg-slate-50 p-3 rounded border border-slate-200">

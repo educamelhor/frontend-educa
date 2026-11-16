@@ -29,6 +29,25 @@ function getCfg(prova) {
   return raw;
 }
 
+async function extrairMensagemErroAxios(err, fallbackMsg = 'Erro inesperado no servidor.') {
+  try {
+    const data = err?.response?.data;
+    if (data instanceof Blob) {
+      const txt = await data.text();
+      try {
+        const parsed = JSON.parse(txt);
+        return [parsed.message, parsed.detail].filter(Boolean).join(' — ') || fallbackMsg;
+      } catch {
+        return txt.slice(0, 220) || fallbackMsg;
+      }
+    }
+    if (data && typeof data === 'object') {
+      return [data.message, data.detail].filter(Boolean).join(' — ') || fallbackMsg;
+    }
+  } catch {}
+  return err?.message || fallbackMsg;
+}
+
 function shuffleArr(arr) {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -582,12 +601,14 @@ export default function ProvaPreview({ provaId, onClose, onUpdated }) {
     apiService.get(`/api/provas/${provaId}`)
       .then((res) => {
         const p = res.data || {};
-        setData(p);
-        const tpl = p.template_slug || 'modelo_01_provao';
+        const cfgInicial = getCfg(p);
+        const tpl = cfgInicial.modelo_slug || p.template_slug || 'modelo_01_provao';
+        setData({ ...p, template_slug: tpl });
         setLiveTemplate(tpl);
         setLiveCfg({
           ...DEFAULT_MODELO_01_CONFIG,
-          ...getCfg(p),
+          ...cfgInicial,
+          modelo_slug: tpl,
         });
         setDirtyCfg(false);
       })
@@ -607,12 +628,14 @@ export default function ProvaPreview({ provaId, onClose, onUpdated }) {
 
   const changeLiveTemplate = (novoSlug) => {
     setLiveTemplate(novoSlug);
+    setLiveCfg((prev) => ({ ...prev, modelo_slug: novoSlug }));
     setDirtyCfg(true);
   };
 
-  // Persiste silenciosamente ajustes visuais feitos no Estúdio antes de exportar PDF/DOCX
+  // Persiste ajustes visuais feitos no Estúdio antes de exportar PDF/DOCX/LaTeX
   const persistirAjustesSeNecessario = useCallback(async () => {
     if (!data || !dirtyCfg) return;
+    const cfgSincronizada = { ...liveCfg, modelo_slug: liveTemplate };
     try {
       await apiService.put(`/api/provas/${provaId}`, {
         titulo: data.titulo,
@@ -621,13 +644,14 @@ export default function ProvaPreview({ provaId, onClose, onUpdated }) {
         bimestre: data.bimestre,
         ano_letivo: data.ano_letivo,
         template_slug: liveTemplate,
-        config_json: liveCfg,
+        config_json: cfgSincronizada,
         status: data.status || 'montando',
       });
+      setData((prev) => (prev ? { ...prev, template_slug: liveTemplate, config_json: cfgSincronizada } : prev));
       setDirtyCfg(false);
-      if (onUpdated) onUpdated({ template_slug: liveTemplate, config_json: liveCfg });
-    } catch {
-      // prossegue mesmo se falhar salvamento secundário
+      if (onUpdated) onUpdated({ template_slug: liveTemplate, config_json: cfgSincronizada });
+    } catch (err) {
+      console.warn('[ProvaPreview] Falha ao persistir modelo antes de exportar:', err);
     }
   }, [data, dirtyCfg, provaId, liveTemplate, liveCfg, onUpdated]);
 
@@ -749,8 +773,9 @@ export default function ProvaPreview({ provaId, onClose, onUpdated }) {
     setGerandoDocx(true);
     try {
       await persistirAjustesSeNecessario();
-      const gab = incGab ? '?gabarito=1' : '';
-      const res = await apiService.get(`/api/provas/${provaId}/docx${gab}`, { responseType: 'blob' });
+      const escolaEnc = encodeURIComponent(escola);
+      const gab = incGab ? '&gabarito=1' : '';
+      const res = await apiService.get(`/api/provas/${provaId}/docx?escola=${escolaEnc}${gab}`, { responseType: 'blob' });
       const blob = res.data;
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -762,11 +787,12 @@ export default function ProvaPreview({ provaId, onClose, onUpdated }) {
       URL.revokeObjectURL(url);
       toast('📝 Arquivo Word (.docx) gerado e baixado com sucesso!', 'success');
     } catch (err) {
-      toast(`❌ Erro ao gerar Word (.docx): ${err?.response?.data?.message || err.message}`, 'error');
+      const msg = await extrairMensagemErroAxios(err, 'Erro ao gerar Word (.docx).');
+      toast(`❌ ${msg}`, 'error');
     } finally {
       setGerandoDocx(false);
     }
-  }, [data, persistirAjustesSeNecessario, incGab, provaId]);
+  }, [data, persistirAjustesSeNecessario, escola, incGab, provaId]);
 
   // ── Download PDF Rápido via backend (Playwright A4 Paginado) ───────────────
   const downloadPdf = useCallback(async () => {
@@ -788,7 +814,8 @@ export default function ProvaPreview({ provaId, onClose, onUpdated }) {
       URL.revokeObjectURL(url);
       toast('✅ PDF A4 gerado e baixado com sucesso!', 'success');
     } catch (err) {
-      toast(`❌ ${err?.response?.data?.message || err.message}. Use "Imprimir" ou "Word (.docx)".`, 'error');
+      const msg = await extrairMensagemErroAxios(err, 'Erro ao gerar PDF A4.');
+      toast(`❌ ${msg}`, 'error');
     } finally {
       setGerando(false);
     }
@@ -817,7 +844,8 @@ export default function ProvaPreview({ provaId, onClose, onUpdated }) {
       URL.revokeObjectURL(url);
       toast('⭐ PDF LaTeX gerado com sucesso!', 'success');
     } catch (err) {
-      toast(`❌ ${err?.response?.data?.message || err.message || 'Erro ao gerar PDF LaTeX.'}`, 'error');
+      const msg = await extrairMensagemErroAxios(err, 'Erro ao gerar PDF LaTeX.');
+      toast(`❌ ${msg}`, 'error');
     } finally {
       setGerandoLatex(false);
     }

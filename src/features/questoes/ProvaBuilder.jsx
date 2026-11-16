@@ -592,6 +592,7 @@ export default function ProvaBuilder({ onProvasSalvas, editingProva = null, onCl
         const full = await api(`/api/provas/${editingProva.id}`);
         if (!ativo || !full) return;
         const cfgSalva = parseCfgSafe(full.config_json);
+        const tplSalvo = cfgSalva.modelo_slug || full.template_slug || 'modelo_01_provao';
         setProvaId(full.id);
         setConfig({
           titulo: full.titulo || '',
@@ -599,11 +600,12 @@ export default function ProvaBuilder({ onProvasSalvas, editingProva = null, onCl
           turma: full.turma || '',
           bimestre: full.bimestre || '',
           ano_letivo: full.ano_letivo || new Date().getFullYear(),
-          template_slug: full.template_slug || 'modelo_01_provao',
+          template_slug: tplSalvo,
         });
         setLayoutCfg({
           ...DEFAULT_MODELO_01_CONFIG,
           ...cfgSalva,
+          modelo_slug: tplSalvo,
         });
         const itensCarregados = (full.itens || []).map((it) => ({
           ...it,
@@ -757,11 +759,13 @@ export default function ProvaBuilder({ onProvasSalvas, editingProva = null, onCl
     setSaving(true);
     try {
       let id = provaId;
+      const tplAtivoSalvar = config.template_slug || 'modelo_01_provao';
       const payload = {
         ...config,
+        template_slug: tplAtivoSalvar,
         titulo: tituloFinal,
         status: statusFinal,
-        config_json: layoutCfg,
+        config_json: { ...layoutCfg, modelo_slug: tplAtivoSalvar },
       };
 
       if (!id) {

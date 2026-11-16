@@ -29,6 +29,15 @@ const api = async (path, opts = {}) => {
   return response.data ?? null;
 };
 
+function resolverTemplateSlug(prova) {
+  if (!prova) return 'modelo_01_provao';
+  try {
+    const cfg = typeof prova.config_json === 'string' ? JSON.parse(prova.config_json) : prova.config_json;
+    if (cfg?.modelo_slug) return cfg.modelo_slug;
+  } catch {}
+  return prova.template_slug || 'modelo_01_provao';
+}
+
 function fmtDate(d) {
   if (!d) return '—';
   return new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -99,6 +108,7 @@ export default function ProvasHistorico({ onEdit, refreshKey }) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {filtradas.map(prova => {
             const s = STATUS_CFG[prova.status] || STATUS_CFG.montando;
+            const tplSlug = resolverTemplateSlug(prova);
             return (
               <div key={prova.id} style={{
                 background: '#fff', borderRadius: 12,
@@ -118,7 +128,7 @@ export default function ProvasHistorico({ onEdit, refreshKey }) {
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: '1.4rem',
                 }}>
-                  {TEMPLATE_LABEL[prova.template_slug]?.split(' ')[0] || '📋'}
+                  {TEMPLATE_LABEL[tplSlug]?.split(' ')[0] || '📙'}
                 </div>
 
                 {/* Info */}
@@ -157,7 +167,7 @@ export default function ProvasHistorico({ onEdit, refreshKey }) {
 
                 {/* Template */}
                 <span style={{ fontSize: '0.68rem', color: '#64748b', flexShrink: 0 }}>
-                  {TEMPLATE_LABEL[prova.template_slug] || prova.template_slug}
+                  {TEMPLATE_LABEL[tplSlug] || tplSlug}
                 </span>
 
                 {/* Data */}

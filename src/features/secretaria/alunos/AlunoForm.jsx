@@ -23,128 +23,241 @@ import Input from "../../../components/ui/Input";
 import { Button } from "../../../components/ui/Button";
 
 // ────────────────────────────────────────────────────────────────
-// Normalizador / Abreviador de ANEE (Padrão SEEDF / EDUCADF)
-// Converte descrições longas do CSV EDUCADF em siglas oficiais:
-// Ex.: "TRANSTORNO DO ESPECTRO AUTISTA" -> "TEA"
-//      "DEFICIÊNCIA FÍSICA MÉDIAS NECESSIDADES ESPECIAIS, TRANSTORNO DO DÉFICIT DE ATENÇÃO E HIPERATIVIDADE" -> "DF, TDAH"
+// Normalizador / Abreviador e Validador Semântico de ANEE (SEEDF / EDUCADF)
+// - Converte descrições oficiais em siglas: "TRANSTORNO DO ESPECTRO AUTISTA" -> "TEA"
+// - Rejeita automaticamente dados espúrios (ex.: nomes de responsáveis/filiação,
+//   endereços, telefones ou CPFs) herdados de importações legadas.
 // ────────────────────────────────────────────────────────────────
 const REGRAS_ANEES_SEEDF = [
-  { sigla: "SC", descricao: "Surdocegueira", regex: /SURDOCEGUEIR|\bSC\b/ },
+  {
+    sigla: "SC",
+    descricao: "Surdocegueira",
+    regexFrase: /SURDOCEGUEIR/,
+    regexSigla: /^SC(\s*[-–:(].*)?$/,
+  },
   {
     sigla: "TEA",
     descricao: "Transtorno do Espectro Autista",
-    regex: /\bTEA\b|ESPECTRO AUTISTA|\bAUTISM|\bASPERGER\b|SINDROME DE RETT|DESINTEGRATIVO DA INFANCIA/,
+    regexFrase: /ESPECTRO AUTISTA|\bAUTISM|\bASPERGER\b|SINDROME DE RETT|DESINTEGRATIVO DA INFANCIA/,
+    regexSigla: /^TEA(\s*[-–:(].*)?$/,
   },
   {
     sigla: "TGD",
     descricao: "Transtorno Global do Desenvolvimento",
-    regex: /\bTGD\b|GLOBAL DO DESENVOLVIMENTO/,
+    regexFrase: /GLOBAL DO DESENVOLVIMENTO/,
+    regexSigla: /^TGD(\s*[-–:(].*)?$/,
   },
   {
     sigla: "DF",
     descricao: "Deficiência Física",
-    regex: /\bDF\b|DEFICIENCIA FISICA|DEFICIENCIA MOTORA|PARALISIA CEREBRAL|OSTOMIA|MOBILIDADE REDUZIDA/,
+    regexFrase:
+      /DEFICIENCIA FISICA|DEFICIENCIA MOTORA|PARALISIA CEREBRAL|OSTOMIA|MOBILIDADE REDUZIDA|\bCADEIRANTE\b/,
+    regexSigla: /^DF(\s*[-–:(].*)?$/,
   },
   {
     sigla: "DI",
     descricao: "Deficiência Intelectual",
-    regex: /\bDI\b|DEFICIENCIA INTELECTUAL|DEFICIENCIA MENTAL|ATRASO COGNITIVO/,
+    regexFrase: /DEFICIENCIA INTELECTUAL|DEFICIENCIA MENTAL|ATRASO COGNITIVO/,
+    regexSigla: /^DI(\s*[-–:(].*)?$/,
   },
   {
     sigla: "DA",
     descricao: "Deficiência Auditiva",
-    regex: /\bDA\b|DEFICIENCIA AUDITIVA|HIPOACUSIA/,
+    regexFrase: /DEFICIENCIA AUDITIVA|HIPOACUSIA/,
+    regexSigla: /^DA(\s*[-–:(].*)?$/,
   },
   {
     sigla: "SURDEZ",
     descricao: "Surdez",
-    regex: /\bSURDEZ\b/,
+    regexFrase: /\bSURDEZ\b/,
+    regexSigla: /^SURDEZ(\s*[-–:(].*)?$/,
     skipIfSurdocegueira: true,
   },
   {
     sigla: "BV",
     descricao: "Baixa Visão",
-    regex: /\bBV\b|BAIXA VISAO|VISAO SUBNORMAL/,
+    regexFrase: /BAIXA VISAO|VISAO SUBNORMAL/,
+    regexSigla: /^BV(\s*[-–:(].*)?$/,
   },
   {
     sigla: "VM",
     descricao: "Visão Monocular",
-    regex: /\bVM\b|VISAO MONOCULAR/,
+    regexFrase: /VISAO MONOCULAR/,
+    regexSigla: /^VM(\s*[-–:(].*)?$/,
   },
   {
     sigla: "DV",
     descricao: "Deficiência Visual",
-    regex: /\bDV\b|DEFICIENCIA VISUAL|\bCEGUEIRA\b/,
+    regexFrase: /DEFICIENCIA VISUAL|\bCEGUEIRA\b/,
+    regexSigla: /^DV(\s*[-–:(].*)?$/,
     skipIfSurdocegueira: true,
   },
   {
     sigla: "DMU",
     descricao: "Deficiência Múltipla",
-    regex: /\bDMU\b|DEFICIENCIAS? MULTIPLAS?/,
+    regexFrase: /DEFICIENCIAS? MULTIPLAS?/,
+    regexSigla: /^DMU(\s*[-–:(].*)?$/,
   },
   {
     sigla: "AH/SD",
     descricao: "Altas Habilidades / Superdotação",
-    regex: /\bAH\s*\/?\s*SD\b|ALTAS HABILIDADES|SUPERDOTAC/,
+    regexFrase: /ALTAS HABILIDADES|SUPERDOTAC/,
+    regexSigla: /^(AH_SD|AH\s+SD)(\s*[-–:(].*)?$/,
   },
   {
     sigla: "SD",
     descricao: "Síndrome de Down",
-    regex: /\bSD\b|SINDROME DE DOWN|TRISSOMIA DO 21/,
-    stripAhSdFirst: true,
+    regexFrase: /SINDROME DE DOWN|TRISSOMIA DO 21/,
+    regexSigla: /^SD(\s*[-–:(].*)?$/,
   },
   {
     sigla: "TDAH",
     descricao: "Transtorno do Déficit de Atenção e Hiperatividade",
-    regex: /\bTDAH\b|\bTDA\b|DEFICIT DE ATENCAO|HIPERATIVIDADE/,
+    regexFrase: /\bTDAH\b|DEFICIT DE ATENCAO|HIPERATIVIDADE/,
+    regexSigla: /^(TDAH|TDA)(\s*[-–:(].*)?$/,
   },
   {
     sigla: "TOD",
     descricao: "Transtorno Opositivo Desafiador",
-    regex: /\bTOD\b|OPOSITOR DESAFIADOR|OPOSITIVO DESAFIADOR|DESAFIADOR OPOSITIVO/,
+    regexFrase: /\bTOD\b|OPOSITOR DESAFIADOR|OPOSITIVO DESAFIADOR|DESAFIADOR OPOSITIVO/,
+    regexSigla: /^TOD(\s*[-–:(].*)?$/,
   },
   {
     sigla: "TPAC",
     descricao: "Transtorno do Processamento Auditivo Central",
-    regex: /\bTPAC\b|\bDPAC\b|PROCESSAMENTO AUDITIVO CENTRAL/,
+    regexFrase: /\bTPAC\b|\bDPAC\b|PROCESSAMENTO AUDITIVO CENTRAL/,
+    regexSigla: /^(TPAC|DPAC|PAC)(\s*[-–:(].*)?$/,
   },
   {
     sigla: "TDL",
     descricao: "Transtorno do Desenvolvimento da Linguagem",
-    regex: /\bTDL\b|\bDEL\b|DESENVOLVIMENTO DA LINGUAGEM|ESPECIFICO DE LINGUAGEM|TRANSTORNO DE LINGUAGEM/,
+    regexFrase: /DESENVOLVIMENTO DA LINGUAGEM|ESPECIFICO DE LINGUAGEM|TRANSTORNO DE LINGUAGEM/,
+    regexSigla: /^(TDL|DEL)(\s*[-–:(].*)?$/,
   },
-  { sigla: "DISLEXIA", descricao: "Dislexia", regex: /\bDISLEXIA\b/ },
-  { sigla: "DISCALCULIA", descricao: "Discalculia", regex: /\bDISCALCULIA\b/ },
-  { sigla: "DISGRAFIA", descricao: "Disgrafia", regex: /\bDISGRAFIA\b/ },
-  { sigla: "DISORTOGRAFIA", descricao: "Disortografia", regex: /\bDISORTOGRAFIA\b/ },
-  { sigla: "DISLALIA", descricao: "Dislalia", regex: /\bDISLALIA\b/ },
+  { sigla: "DISLEXIA", descricao: "Dislexia", regexFrase: /\bDISLEXIA\b/ },
+  { sigla: "DISCALCULIA", descricao: "Discalculia", regexFrase: /\bDISCALCULIA\b/ },
+  { sigla: "DISGRAFIA", descricao: "Disgrafia", regexFrase: /\bDISGRAFIA\b/ },
+  { sigla: "DISORTOGRAFIA", descricao: "Disortografia", regexFrase: /\bDISORTOGRAFIA\b/ },
+  { sigla: "DISLALIA", descricao: "Dislalia", regexFrase: /\bDISLALIA\b/ },
   {
     sigla: "TFE",
     descricao: "Transtorno Funcional Específico",
-    regex: /\bTFE\b|FUNCIONAL ESPECIFICO|ESPECIFICO DE APRENDIZAGEM/,
+    regexFrase: /FUNCIONAL ESPECIFICO|ESPECIFICO DE APRENDIZAGEM/,
+    regexSigla: /^TFE(\s*[-–:(].*)?$/,
   },
 ];
 
-export function abreviarAneesEducaDF(raw) {
+export function ehValorAneesLegitimo(raw, contexto = {}) {
+  const limpar = (v) =>
+    String(v ?? "")
+      .replace(/[\u00A0\t\r\n]+/g, " ")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+
+  const s = limpar(raw);
+  if (!s) return false;
+
+  const norm = (v) =>
+    limpar(v)
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toUpperCase()
+      .replace(/\s+/g, " ")
+      .trim();
+
+  const sNorm = norm(s);
+  if (!sNorm) return false;
+
+  if (
+    /^(-+|NAO(\s+POSSUI|\s+CONSTA|\s+INFORMADO|\s+SE\s+APLICA|\s+DECLARADO)?|NENHUM[A]?|SEM(\s+NECESSIDADE.*|\s+LAUDO|\s+ATENDIMENTO|\s+DEFICIENCIA)?|N\/?A|NULL|ATIVO|INATIVO|MATRICULADO|CURSANDO|TRANSFERIDO|MASCULINO|FEMININO|PENDENTE|RESPONSAVEL)$/.test(
+      sNorm
+    )
+  ) {
+    return false;
+  }
+
+  if (
+    /^\d+$/.test(sNorm.replace(/[\s.()/-]+/g, "")) ||
+    /^\d{2}\/\d{2}\/\d{4}$/.test(sNorm) ||
+    /^\d{4}-\d{2}-\d{2}$/.test(sNorm)
+  ) {
+    return false;
+  }
+
+  const nomesProibidos = [
+    contexto.estudante,
+    contexto.nomeRegistro,
+    contexto.nomeSocial,
+    ...(Array.isArray(contexto.responsaveis) ? contexto.responsaveis : []),
+  ]
+    .map(norm)
+    .filter((n) => n.length >= 3);
+
+  for (const nomeProibido of nomesProibidos) {
+    if (sNorm === nomeProibido) return false;
+  }
+
+  if (
+    /\b(QUADRA|QD|CONJUNTO|CONJ|CJ|CASA|LOTE|LT|CHACARA|APTO|APARTAMENTO|BLOCO|AVENIDA|ESTRADA|RODOVIA|CONDOMINIO|RESIDENCIAL|FAZENDA|ESTANCIA|ARAPOANGA|PLANALTINA|JARDIM\s+RORIZ|MESTRE\s+D\s*ARMAS|SRL)\b/.test(
+      sNorm
+    )
+  ) {
+    return false;
+  }
+
+  const sProtegido = sNorm.replace(/\bAH\s*\/\s*SD\b/g, "AH_SD");
+  const segmentos = sProtegido
+    .split(/[,;|/]+/)
+    .map((seg) => seg.trim())
+    .filter(Boolean);
+
+  if (segmentos.length === 0) return false;
+
+  const REGEX_SIGLA_ISOLADA =
+    /^(TEA|TGD|DF|DI|DA|DV|BV|VM|SC|DMU|AH_SD|AH\s+SD|SD|TDAH|TDA|TOD|TPAC|DPAC|PAC|TDL|DEL|TFE|SURDEZ|CEGUEIRA)(\s*[-–:(].*)?$/;
+  const REGEX_CID = /\b(CID\s*[-:]?\s*[A-Z0-9]{2,6}|[FGHQ]\d{2}(\.\d+)?|6A\d{2}(\.\w+)?)\b/;
+  const REGEX_CLINICO_AEE =
+    /\b(TRANSTORN|DEFICIEN|AUTISM|ESPECTRO|ASPERGER|SINDROME\s+DE\s+RETT|DESINTEGRATIVO|SURDOCEGUEIR|SURDEZ|SURDO|SURDA|HIPOACUS|AUDITIV|AUDICAO|CEGUEIR|BAIXA\s+VISAO|VISAO\s+SUBNORMAL|VISAO\s+MONOCULAR|VISUAL|INTELECTUAL|MENTAL|FISIC|MOTOR|PARALISIA|OSTOMIA|MOBILIDADE|MULTIPL|ALTAS\s+HABILIDADES|SUPERDOT|SINDROME|TRISSOMIA|HIPERATIV|DEFICIT|ATENCAO|OPOSIT|DESAFIADOR|PROCESSAMENTO|LINGUAGEM|APRENDIZAGEM|DISLEX|DISCALCUL|DISGRAF|DISORTOGRAF|DISLAL|AFASIA|APRAXIA|DISFASIA|DISARTRIA|DISFLUENC|GAGUEIRA|MUTISMO|EPILEPS|CONVULS|ESQUIZOFREN|PSICOS|BIPOLAR|ANSIEDADE|DEPRESS|TOC|TOURETTE|NEURO|COGNITIV|ATRASO\s+(GLOBAL|NEURO|PSICOMOTOR|COGNITIV|DE\s+LINGUAGEM|DO\s+DESENVOLVIMENTO|MENTAL)|CADEIRANTE|CADEIRA\s+DE\s+RODAS|NANISMO|BAIXA\s+ESTATURA|MALFORMAC|AMPUTAC|HIDROCEFAL|MICROCEFAL|MIELOMENINGOCELE|DISTROFIA|ATROFIA|DISPLASIA|ESCLEROSE|FIBROSE|FIBROMIALG|ESCOLIOSE|CIFOSE|ARTRO|OSTEO|PLEGIA|PARESIA|ATAXIA|FISSURA|LABIOPALATIN|CARDIOPAT|NEFROPAT|HEPATOPAT|DIABET|HEMOFIL|FALCIFORME|CELIAC|COCLEAR|PROTESE|ORTESE|LIBRAS|BRAILLE|NECESSIDADES?\s+ESPECIAIS|EDUCACIONAL\s+ESPECIALIZAD|ATENDIMENTO\s+DIFERENCIAL|AEE|ANEE|ANEES)/;
+
+  return segmentos.some(
+    (seg) =>
+      REGEX_SIGLA_ISOLADA.test(seg) ||
+      REGEX_CID.test(seg) ||
+      REGEX_CLINICO_AEE.test(seg)
+  );
+}
+
+export function abreviarAneesEducaDF(raw, opcoes = {}) {
   const textoLimpo = String(raw ?? "")
     .replace(/[\u00A0\t\r\n]+/g, " ")
     .replace(/\s{2,}/g, " ")
     .trim();
 
   if (!textoLimpo) {
-    return { siglas: [], textoSiglas: "", itens: [] };
+    return { siglas: [], textoSiglas: "", itens: [], valido: false };
   }
 
-  const segmentos = textoLimpo
-    .split(/[,;|]+/)
+  const permitirTextoLivreManual = Boolean(opcoes.permitirTextoLivreManual);
+  const valido = ehValorAneesLegitimo(textoLimpo, opcoes.contexto || {});
+  if (!valido && !permitirTextoLivreManual) {
+    return { siglas: [], textoSiglas: "", itens: [], valido: false };
+  }
+
+  const textoProtegido = textoLimpo
+    .replace(/\bAH\s*\/\s*SD\b/gi, "AH_SD")
+    .replace(/ALTAS\s+HABILIDADES\s*\/\s*SUPERDOTA/gi, "ALTAS HABILIDADES E SUPERDOTA");
+
+  const segmentos = textoProtegido
+    .split(/[,;|/]+/)
     .map((s) => s.trim())
     .filter(Boolean);
 
   const vistos = new Set();
   const itens = [];
 
-  for (const seg of segmentos) {
-    const segNorm = seg
+  for (const segBruto of segmentos) {
+    const seg = segBruto.replace(/\bAH_SD\b/gi, "AH/SD");
+    const segNorm = segBruto
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
       .toUpperCase()
@@ -153,13 +266,13 @@ export function abreviarAneesEducaDF(raw) {
     if (!segNorm) continue;
 
     const temSurdocegueira = /SURDOCEGUEIR/.test(segNorm);
-    const segSemAhSd = segNorm.replace(/\bAH\s*\/?\s*SD\b/g, " ");
     let bateuRegra = false;
 
     for (const r of REGRAS_ANEES_SEEDF) {
       if (r.skipIfSurdocegueira && temSurdocegueira) continue;
-      const alvo = r.stripAhSdFirst ? segSemAhSd : segNorm;
-      if (r.regex.test(alvo)) {
+      const matchFrase = r.regexFrase ? r.regexFrase.test(segNorm) : false;
+      const matchSigla = r.regexSigla ? r.regexSigla.test(segNorm) : false;
+      if (matchFrase || matchSigla) {
         bateuRegra = true;
         if (!vistos.has(r.sigla)) {
           vistos.add(r.sigla);
@@ -168,7 +281,7 @@ export function abreviarAneesEducaDF(raw) {
       }
     }
 
-    if (!bateuRegra) {
+    if (!bateuRegra && (permitirTextoLivreManual || ehValorAneesLegitimo(seg, opcoes.contexto || {}))) {
       const fallback = seg
         .replace(/\s*[-–]?\s*(BAIXAS?|M[EÉ]DIAS?|ALTAS?)\s+NECESSIDADES?\s+ESPECIAIS?/gi, "")
         .trim();
@@ -185,6 +298,7 @@ export function abreviarAneesEducaDF(raw) {
     siglas,
     textoSiglas: siglas.join(", "),
     itens,
+    valido: itens.length > 0,
   };
 }
 
@@ -212,9 +326,25 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {}, a
   const [atendimentoDiferencial, setAtendimentoDiferencial] = useState(
     initialData.atendimento_diferencial === 1 || initialData.atendimento_diferencial === true
   );
-  const [aneesBrutoOriginal, setAneesBrutoOriginal] = useState(initialData.anees || "");
+  const [aneesBrutoOriginal, setAneesBrutoOriginal] = useState(() => {
+    const raw = String(initialData.anees || "").trim();
+    return ehValorAneesLegitimo(raw, {
+      estudante: initialData.estudante,
+      nomeRegistro: initialData.nome_registro,
+      nomeSocial: initialData.nome_social,
+    })
+      ? raw
+      : "";
+  });
   const [aneesInput, setAneesInput] = useState(
-    () => abreviarAneesEducaDF(initialData.anees || "").textoSiglas
+    () =>
+      abreviarAneesEducaDF(initialData.anees || "", {
+        contexto: {
+          estudante: initialData.estudante,
+          nomeRegistro: initialData.nome_registro,
+          nomeSocial: initialData.nome_social,
+        },
+      }).textoSiglas
   );
   const [aneesEditadoManual, setAneesEditadoManual] = useState(false);
   const [usaNomeSocial, setUsaNomeSocial] = useState(
@@ -224,7 +354,18 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {}, a
   const [turmas, setTurmas] = useState([]);
   const [modalAtivarOpen, setModalAtivarOpen] = useState(false);
 
-  const resumoAneesAtual = useMemo(() => abreviarAneesEducaDF(aneesInput), [aneesInput]);
+  const resumoAneesAtual = useMemo(
+    () =>
+      abreviarAneesEducaDF(aneesInput, {
+        permitirTextoLivreManual: aneesEditadoManual,
+        contexto: {
+          estudante,
+          nomeRegistro: estudante,
+          nomeSocial,
+        },
+      }),
+    [aneesInput, aneesEditadoManual, estudante, nomeSocial]
+  );
 
   const legendaAnees = useMemo(() => {
     if (resumoAneesAtual.itens.length === 0) {
@@ -262,12 +403,18 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {}, a
       setCpf(initialData.cpf || "");
       const isAee =
         initialData.atendimento_diferencial === 1 ||
-        initialData.atendimento_diferencial === true ||
-        Boolean(String(initialData.anees || "").trim());
+        initialData.atendimento_diferencial === true;
       setAtendimentoDiferencial(isAee);
+
+      const ctxAluno = {
+        estudante: initialData.estudante,
+        nomeRegistro: initialData.nome_registro,
+        nomeSocial: initialData.nome_social,
+      };
       const rawAnees = String(initialData.anees || "").trim();
-      setAneesBrutoOriginal(rawAnees);
-      setAneesInput(abreviarAneesEducaDF(rawAnees).textoSiglas);
+      const aneesValido = ehValorAneesLegitimo(rawAnees, ctxAluno) ? rawAnees : "";
+      setAneesBrutoOriginal(aneesValido);
+      setAneesInput(abreviarAneesEducaDF(aneesValido, { contexto: ctxAluno }).textoSiglas);
       setAneesEditadoManual(false);
       setUsaNomeSocial(
         initialData.usa_nome_social === 1 || initialData.usa_nome_social === true
@@ -275,17 +422,19 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {}, a
       setNomeSocial(initialData.nome_social || "");
 
       // Fallback defensivo caso initialData tenha vindo sem o campo `anees`
-      if (initialData.codigo && typeof initialData.anees === "undefined") {
+      if (isAee && initialData.codigo && typeof initialData.anees === "undefined") {
         let cancelado = false;
         api
           .get(`/api/alunos/${initialData.codigo}`)
           .then((res) => {
             if (cancelado || !res?.data) return;
             const fetchedAnees = String(res.data.anees || "").trim();
-            if (fetchedAnees) {
+            if (ehValorAneesLegitimo(fetchedAnees, ctxAluno)) {
               setAneesBrutoOriginal(fetchedAnees);
-              setAneesInput((prev) => prev || abreviarAneesEducaDF(fetchedAnees).textoSiglas);
-              setAtendimentoDiferencial(true);
+              setAneesInput(
+                (prev) =>
+                  prev || abreviarAneesEducaDF(fetchedAnees, { contexto: ctxAluno }).textoSiglas
+              );
             }
           })
           .catch(() => {});

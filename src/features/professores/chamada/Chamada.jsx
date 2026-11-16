@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import api from "../../../services/api";
 import {
   CalendarDaysIcon,
@@ -13,12 +13,35 @@ import {
   UserGroupIcon,
   XCircleIcon,
   ArrowPathIcon,
+  ClockIcon,
 } from "@heroicons/react/24/outline";
 
 // Motor PDF sob demanda (para clonagem de folha PDF quando desejado)
 const carregarPdf = () => import("./chamadaPdf");
 
 const DIAS_SEMANA = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+const DIAS_SEMANA_UPPER = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
+
+const normTexto = (s) =>
+  String(s || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+// Se um Sábado Letivo tiver no motivo referência a um dia da semana (ex: "Ref. Quinta-feira"), retorna 1..5
+const detectarDiaReferenciaSabadoLetivo = (motivo) => {
+  const m = normTexto(motivo);
+  if (!m) return null;
+  if (m.includes("SEGUNDA")) return 1;
+  if (m.includes("TERCA")) return 2;
+  if (m.includes("QUARTA")) return 3;
+  if (m.includes("QUINTA")) return 4;
+  if (m.includes("SEXTA")) return 5;
+  return null;
+};
 
 const hojeIso = () => {
   const n = new Date();
@@ -289,7 +312,214 @@ const slug = (s) =>
     .replace(/[^a-zA-Z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
 
+// Extrai e resume os slots da grade horária (`SECRETARIA + HORÁRIOS`) pertencentes a uma Turma + Disciplina
+const extrairInfoGradeParaTurma = (slotsGrade = [], turmaObj = null, disciplinaNome = "") => {
+  if (!turmaObj || !Array.isArray(slotsGrade) || slotsGrade.length === 0) {
+    return {
+      possuiNaGrade: false,
+      slots: [],
+      diasSemana: [],
+      ordensPorDia: {},
+      totalAulasSemanais: 0,
+      resumoCurto: "",
+      resumoDetalhado: "",
+    };
+  }
+
+  const tId = Number(turmaObj.id);
+  const tNomeNorm = normTexto(turmaObj.nome);
+  const dAlvoNorm = normTexto(disciplinaNome);
+  const isAgr = Boolean(turmaObj.is_agrupamento);
+
+  // 1) Filtra slots da turma
+  const daTurma = slotsGrade.filter((sl) => {
+    const idMatch =
+      Number(sl.turma_id) === tId &&
+      (sl.is_agrupamento === undefined || Boolean(sl.is_agrupamento) === isAgr);
+    const nomeMatch = tNomeNorm && normTexto(sl.turma_nome) === tNomeNorm;
+    return idMatch || nomeMatch;
+  });
+
+  // 2) Filtra pela disciplina selecionada (com fallback se o professor só tiver 1 disciplina naquela turma)
+  let filtrados = daTurma.filter((sl) => {
+    if (!dAlvoNorm) return true;
+    const slDisc = normTexto(sl.disciplina_nome);
+    if (!slDisc) return true;
+    return slDisc === dAlvoNorm || slDisc.includes(dAlvoNorm) || dAlvoNorm.includes(slDisc);
+  });
+
+  if (filtrados.length === 0 && daTurma.length > 0) {
+    const discsUnicas = new Set(daTurma.map((sl) => normTexto(sl.disciplina_nome)).filter(Boolean));
+    if (discsUnicas.size <= 1) {
+      filtrados = daTurma;
+    }
+  }
+
+  // Deduplica por (dia_semana, periodo_ordem)
+  const seen = new Set();
+  const unicos = [];
+  for (const s of filtrados) {
+    const d = Number(s.dia_semana ?? s.dia);
+    const o = Number(s.periodo_ordem ?? s.ordem);
+    if (!d || !o) continue;
+    const k = `${d}_${o}`;
+    if (!seen.has(k)) {
+      seen.add(k);
+      unicos.push({
+        ...s,
+        dia_semana: d,
+        periodo_ordem: o,
+      });
+    }
+  }
+
+  unicos.sort((a, b) => a.dia_semana - b.dia_semana || a.periodo_ordem - b.periodo_ordem);
+
+  const ordensPorDia = {};
+  for (const s of unicos) {
+    if (!ordensPorDia[s.dia_semana]) ordensPorDia[s.dia_semana] = [];
+    ordensPorDia[s.dia_semana].push(s.periodo_ordem);
+  }
+
+  const diasSemana = Object.keys(ordensPorDia)
+    .map(Number)
+    .sort((a, b) => a - b);
+
+  const partesCurto = diasSemana.map((d) => {
+    const ords = ordensPorDia[d];
+    return `${DIAS_SEMANA_UPPER[d] || `D${d}`} (${ords.map((o) => `${o}ª`).join("+")})`;
+  });
+
+  const partesDetalhado = diasSemana.map((d) => {
+    const ords = ordensPorDia[d];
+    const ehDupla = ords.length >= 2 && ords[1] === ords[0] + 1;
+    return `${DIAS_SEMANA[d] || `Dia ${d}`}: ${ords.map((o) => `${o}ª Aula`).join(" e ")}${
+      ehDupla ? " (Geminada)" : ""
+    }`;
+  });
+
+  return {
+    possuiNaGrade: unicos.length > 0,
+    slots: unicos,
+    diasSemana,
+    ordensPorDia,
+    totalAulasSemanais: unicos.length,
+    resumoCurto: partesCurto.join(" · "),
+    resumoDetalhado: partesDetalhado.join("  |  "),
+  };
+};
+
+// Verifica se um dia letivo (YYYY-MM-DD) tem aula da turma segundo a Grade Horária e retorna as ordens de aula daquele dia
+const obterOrdensGradeParaData = (iso, avDia, infoGrade) => {
+  if (!iso || !avDia?.letivo || !infoGrade?.possuiNaGrade) return [];
+  const [y, m, d] = iso.split("-").map(Number);
+  const dow = new Date(y, m - 1, d).getDay(); // 1=Seg .. 6=Sáb
+
+  // Dia útil normal (Seg..Sex) ou Sábado com slot próprio na grade
+  if (infoGrade.ordensPorDia[dow]?.length) {
+    return infoGrade.ordensPorDia[dow];
+  }
+
+  // Caso especial: Sábado Letivo configurado pela Direção
+  if (dow === 6 && avDia.codigo === "SABADO_LETIVO") {
+    const diaRef = detectarDiaReferenciaSabadoLetivo(avDia.motivo);
+    if (diaRef && infoGrade.ordensPorDia[diaRef]?.length) {
+      return infoGrade.ordensPorDia[diaRef];
+    }
+    // Se o Sábado Letivo não especificar qual dia da semana repõe, disponibiliza o 1º dia de aula da turma como referência
+    const primeiroDia = infoGrade.diasSemana[0];
+    if (primeiroDia && infoGrade.ordensPorDia[primeiroDia]?.length) {
+      return infoGrade.ordensPorDia[primeiroDia];
+    }
+  }
+
+  return [];
+};
+
+// Gera o cronograma completo de aulas previstas do professor no bimestre cruzando Governança × Grade Horária
+const gerarCronogramaGradeNoBimestre = (bimestreStr, governanca, infoGrade, refIso) => {
+  if (!infoGrade?.possuiNaGrade) {
+    return {
+      possuiCronograma: false,
+      datasAula: [],
+      janelaRecente: [],
+      totalDiasComAula: 0,
+      totalAulasPrevistas: 0,
+    };
+  }
+
+  const periodo = obterPeriodoBimestreGovernanca(bimestreStr, governanca);
+  const hoje = hojeIso();
+
+  let iniIso = periodo?.data_inicio;
+  let fimIso = periodo?.data_fim;
+  if (!iniIso || !fimIso) {
+    // Fallback caso a escola ainda não tenha cadastrado as datas de início/fim do bimestre
+    const [yh, mh, dh] = (refIso || hoje).split("-").map(Number);
+    const dIni = new Date(yh, mh - 1, dh - 40);
+    const dFim = new Date(yh, mh - 1, dh + 30);
+    iniIso = `${dIni.getFullYear()}-${String(dIni.getMonth() + 1).padStart(2, "0")}-${String(
+      dIni.getDate()
+    ).padStart(2, "0")}`;
+    fimIso = `${dFim.getFullYear()}-${String(dFim.getMonth() + 1).padStart(2, "0")}-${String(
+      dFim.getDate()
+    ).padStart(2, "0")}`;
+  }
+
+  const [y1, m1, d1] = iniIso.split("-").map(Number);
+  const [y2, m2, d2] = fimIso.split("-").map(Number);
+  const cur = new Date(y1, m1 - 1, d1);
+  const end = new Date(y2, m2 - 1, d2);
+
+  const datasAula = [];
+  let totalAulasPrevistas = 0;
+
+  while (cur <= end) {
+    const iso = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}-${String(
+      cur.getDate()
+    ).padStart(2, "0")}`;
+    const av = avaliarDiaLetivoGovernanca(iso, bimestreStr, governanca);
+    if (av.letivo) {
+      const ordens = obterOrdensGradeParaData(iso, av, infoGrade);
+      if (ordens.length > 0) {
+        datasAula.push({
+          iso,
+          ordens,
+          ehSabadoLetivo: av.codigo === "SABADO_LETIVO",
+          motivoSabado: av.motivo || null,
+        });
+        totalAulasPrevistas += ordens.length;
+      }
+    }
+    cur.setDate(cur.getDate() + 1);
+  }
+
+  // Monta janela rápida de até 7 datas centrada/ancorada na data de referência ou hoje
+  const alvoIso = refIso || hoje;
+  const isos = datasAula.map((x) => x.iso);
+  let idxAlvo = isos.findIndex((d) => d >= alvoIso);
+  if (idxAlvo === -1) idxAlvo = Math.max(0, isos.length - 1);
+
+  const qtdJanela = 7;
+  let startIdx = Math.max(0, idxAlvo - 4);
+  if (startIdx + qtdJanela > isos.length) {
+    startIdx = Math.max(0, isos.length - qtdJanela);
+  }
+  const janelaRecente = isos.slice(startIdx, startIdx + qtdJanela);
+
+  return {
+    possuiCronograma: datasAula.length > 0,
+    datasAula,
+    janelaRecente,
+    totalDiasComAula: datasAula.length,
+    totalAulasPrevistas,
+  };
+};
+
 export default function Chamada() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const deepLinkAplicadoRef = useRef(false);
+
   // ─── Estados do Sequenciador (Badge Pills — Padrão EducaMelhor) ───────────
   const [etapaAtiva, setEtapaAtiva] = useState(1);
   const [disciplinas, setDisciplinas] = useState([]);
@@ -304,13 +534,18 @@ export default function Chamada() {
   const [dataSelecionada, setDataSelecionada] = useState(hojeIso);
   const [aulaOrdemSelecionada, setAulaOrdemSelecionada] = useState(1);
   const [aulaGeminada, setAulaGeminada] = useState(false);
+  const [aulaGeminadaAutoGrade, setAulaGeminadaAutoGrade] = useState(false);
 
-  // ─── Estados de Governança > Ano Letivo (Dias Letivos & Horários) ────────
+  // ─── Estados de Governança > Ano Letivo & Grade Horária (`Secretaria > Horários`) ───
   const [governancaAnoLetivo, setGovernancaAnoLetivo] = useState({
     periodos: [],
     excecoes: [],
     horarios: [],
   });
+  const [slotsGradeProfessor, setSlotsGradeProfessor] = useState([]);
+  const [filtrarApenasDiasDaGrade, setFiltrarApenasDiasDaGrade] = useState(true);
+  const [mostrarCalendarioBimestreGrade, setMostrarCalendarioBimestreGrade] = useState(false);
+
   const [sincronizandoServidor, setSincronizandoServidor] = useState(false);
   const [ultimoSyncFmt, setUltimoSyncFmt] = useState(null);
   const jaAutoSelecionouBimestreRef = useRef(false);
@@ -396,39 +631,78 @@ export default function Chamada() {
     };
   };
 
-  // ─── 0) Carrega Configuração do Ano Letivo da Escola (Governança) ────────
+  // ─── 0) Carrega Governança (Ano Letivo) + Grade Horária (`Secretaria > Horários`) ───
   useEffect(() => {
     let ativo = true;
-    const carregarConfigAnoLetivo = async () => {
+    const carregarConfigEGrade = async () => {
       try {
-        const res = await api.get("/professores/me/chamada").catch(() => null);
-        if (ativo && res?.data?.ok && res.data.governanca) {
-          setGovernancaAnoLetivo(res.data.governanca);
-          return;
+        const [resChamada, resMeuHorario] = await Promise.all([
+          api.get("/professores/me/chamada").catch(() => null),
+          api.get("/grade/meu-horario").catch(() => null),
+        ]);
+
+        if (!ativo) return;
+
+        // 1) Hidrata Governança do Ano Letivo
+        if (resChamada?.data?.ok && resChamada.data.governanca) {
+          setGovernancaAnoLetivo(resChamada.data.governanca);
+        } else {
+          const escolaId = localStorage.getItem("escola_id");
+          const resGov = await api
+            .get("/governanca/ano-letivo-config", { params: { escola_id: escolaId } })
+            .catch(() => null);
+          if (ativo && resGov?.data?.ok) {
+            setGovernancaAnoLetivo({
+              periodos: resGov.data.periodos || [],
+              excecoes: resGov.data.excecoes || [],
+              horarios: resGov.data.horarios || [],
+            });
+          }
         }
-        // Fallback direto para /governanca/ano-letivo-config
-        const escolaId = localStorage.getItem("escola_id");
-        const resGov = await api
-          .get("/governanca/ano-letivo-config", { params: { escola_id: escolaId } })
-          .catch(() => null);
-        if (ativo && resGov?.data?.ok) {
-          setGovernancaAnoLetivo({
-            periodos: resGov.data.periodos || [],
-            excecoes: resGov.data.excecoes || [],
-            horarios: resGov.data.horarios || [],
-          });
+
+        // 2) Hidrata os slots da Grade Horária do Professor (`Secretaria > Horários`)
+        const slotsViaChamada = Array.isArray(resChamada?.data?.grade_horaria?.slots)
+          ? resChamada.data.grade_horaria.slots
+          : [];
+        const slotsViaMeuHorario = Array.isArray(resMeuHorario?.data?.slots)
+          ? resMeuHorario.data.slots
+          : [];
+
+        const combinados = [...slotsViaChamada];
+        const seen = new Set(
+          combinados.map(
+            (s) => `${s.is_agrupamento ? "agr" : "reg"}_${s.turma_id}_${s.dia_semana}_${s.periodo_ordem}`
+          )
+        );
+        for (const s of slotsViaMeuHorario) {
+          const d = Number(s.dia_semana ?? s.dia);
+          const o = Number(s.periodo_ordem ?? s.ordem);
+          const k = `reg_${s.turma_id}_${d}_${o}`;
+          if (!seen.has(k)) {
+            seen.add(k);
+            combinados.push({
+              ...s,
+              dia_semana: d,
+              periodo_ordem: o,
+              is_agrupamento: false,
+            });
+          }
+        }
+
+        if (combinados.length > 0) {
+          setSlotsGradeProfessor(combinados);
         }
       } catch (e) {
-        console.warn("Não foi possível carregar governança do ano letivo:", e);
+        console.warn("Não foi possível carregar governança / grade horária:", e);
       }
     };
-    carregarConfigAnoLetivo();
+    carregarConfigEGrade();
     return () => {
       ativo = false;
     };
   }, []);
 
-  // ─── 1) Carrega Disciplinas do Professor (com fallback para Direção) ─────
+  // ─── 1) Carrega Disciplinas do Professor (com suporte a Deep-Link do Meu Horário) ───
   useEffect(() => {
     let ativo = true;
     const carregarDisciplinas = async () => {
@@ -449,7 +723,16 @@ export default function Chamada() {
         }
         if (ativo) {
           setDisciplinas(lista);
-          setDisciplinaSelecionada(lista[0]);
+          const discQuery = searchParams.get("disciplina");
+          if (discQuery) {
+            const qNorm = normTexto(discQuery);
+            const encontrada = lista.find(
+              (d) => normTexto(d) === qNorm || normTexto(d).includes(qNorm) || qNorm.includes(normTexto(d))
+            );
+            setDisciplinaSelecionada(encontrada || lista[0]);
+          } else {
+            setDisciplinaSelecionada(lista[0]);
+          }
         }
       } finally {
         if (ativo) setCarregandoIniciais(false);
@@ -525,14 +808,14 @@ export default function Chamada() {
     if (jaAutoSelecionouBimestreRef.current) return;
     const periodos = governancaAnoLetivo?.periodos || [];
     if (!periodos.length) return;
-    const hoje = hojeIso();
+    const refData = searchParams.get("data") || hojeIso();
     const perVigente = periodos.find(
       (p) =>
         p.tipo === "bimestre" &&
         p.data_inicio &&
         p.data_fim &&
-        hoje >= p.data_inicio &&
-        hoje <= p.data_fim
+        refData >= p.data_inicio &&
+        refData <= p.data_fim
     );
     if (perVigente) {
       const labelVigente = `${perVigente.numero}º Bimestre`;
@@ -541,34 +824,13 @@ export default function Chamada() {
         jaAutoSelecionouBimestreRef.current = true;
       }
     }
-  }, [governancaAnoLetivo.periodos, bimestresDisponiveis]);
+  }, [governancaAnoLetivo.periodos, bimestresDisponiveis, searchParams]);
 
   useEffect(() => {
     if (bimestreSelecionado && !bimestresDisponiveis.includes(bimestreSelecionado)) {
       setBimestreSelecionado(bimestresDisponiveis[0] || "1º Bimestre");
     }
   }, [bimestresDisponiveis, bimestreSelecionado]);
-
-  // Quando o bimestre ou o calendário da Governança muda, posiciona automaticamente a data selecionada
-  // em um dia letivo válido daquele bimestre caso a data atual esteja fora do período ou não seja letiva.
-  useEffect(() => {
-    const avAtual = avaliarDiaLetivoGovernanca(
-      dataSelecionada,
-      bimestreSelecionado,
-      governancaAnoLetivo
-    );
-    if (!avAtual.letivo) {
-      const candidatos = gerarDiasLetivosRecentes(
-        hojeIso(),
-        bimestreSelecionado,
-        governancaAnoLetivo,
-        7
-      );
-      if (candidatos.length > 0) {
-        setDataSelecionada(candidatos[candidatos.length - 1]);
-      }
-    }
-  }, [bimestreSelecionado, governancaAnoLetivo]);
 
   // Turmas compatíveis com o bimestre selecionado
   const turmasCompativeis = useMemo(() => {
@@ -595,9 +857,31 @@ export default function Chamada() {
     });
   }, [turmas, bimestreSelecionado]);
 
-  // Auto-seleciona a primeira turma compatível para facilitar a visualização imediata
+  // Auto-seleciona a turma (respeitando deep-link `?turma_id=` se vier de Meu Horário)
   useEffect(() => {
     if (turmasCompativeis.length > 0) {
+      if (!deepLinkAplicadoRef.current) {
+        const turmaQuery = searchParams.get("turma_id");
+        const dataQuery = searchParams.get("data");
+        const ordemQuery = searchParams.get("ordem");
+
+        if (turmaQuery) {
+          const tMatch = turmasCompativeis.find((t) => String(t.id) === String(turmaQuery));
+          if (tMatch) {
+            setTurmaSelecionada(tMatch.id);
+            if (dataQuery && /^\d{4}-\d{2}-\d{2}$/.test(dataQuery)) {
+              setDataSelecionada(dataQuery);
+            }
+            if (ordemQuery && Number(ordemQuery) > 0) {
+              setAulaOrdemSelecionada(Number(ordemQuery));
+            }
+            setEtapaAtiva(4);
+            deepLinkAplicadoRef.current = true;
+            return;
+          }
+        }
+      }
+
       const existe = turmasCompativeis.some((t) => String(t.id) === String(turmaSelecionada));
       if (!existe) {
         setTurmaSelecionada(turmasCompativeis[0].id);
@@ -605,7 +889,7 @@ export default function Chamada() {
     } else {
       setTurmaSelecionada("");
     }
-  }, [turmasCompativeis, turmaSelecionada]);
+  }, [turmasCompativeis, turmaSelecionada, searchParams]);
 
   const turmaObj = useMemo(
     () =>
@@ -614,6 +898,80 @@ export default function Chamada() {
       null,
     [turmasCompativeis, turmas, turmaSelecionada]
   );
+
+  // ─── Informações da Grade Horária (`Secretaria > Horários`) para a Turma + Disciplina atual ───
+  const infoGradeTurma = useMemo(
+    () => extrairInfoGradeParaTurma(slotsGradeProfessor, turmaObj, disciplinaSelecionada),
+    [slotsGradeProfessor, turmaObj, disciplinaSelecionada]
+  );
+
+  // Cronograma de todas as datas de aula da turma no bimestre segundo Governança × Grade Horária
+  const cronogramaGradeBimestre = useMemo(
+    () =>
+      gerarCronogramaGradeNoBimestre(
+        bimestreSelecionado,
+        governancaAnoLetivo,
+        infoGradeTurma,
+        dataSelecionada || hojeIso()
+      ),
+    [bimestreSelecionado, governancaAnoLetivo, infoGradeTurma, dataSelecionada]
+  );
+
+  // Quando a turma, o bimestre ou a grade horária mudam, posiciona automaticamente a data selecionada:
+  // 1) Se a turma possui dias definidos na Grade Horária e a data atual não é dia de aula dessa turma (ou está fora do bimestre),
+  //    posiciona no dia de aula da turma mais próximo (até hoje, ou o próximo se for início de bimestre).
+  // 2) Se não houver grade horária para a turma, posiciona no dia letivo válido mais recente do bimestre.
+  const ultimaTurmaGradeAutoRef = useRef("");
+  useEffect(() => {
+    const contextoKey = `${turmaSelecionada}_${disciplinaSelecionada}_${bimestreSelecionado}_${infoGradeTurma.possuiNaGrade}`;
+    const mudouContexto = ultimaTurmaGradeAutoRef.current !== contextoKey;
+    ultimaTurmaGradeAutoRef.current = contextoKey;
+
+    const avAtual = avaliarDiaLetivoGovernanca(
+      dataSelecionada,
+      bimestreSelecionado,
+      governancaAnoLetivo
+    );
+
+    if (infoGradeTurma.possuiNaGrade && cronogramaGradeBimestre.datasAula.length > 0) {
+      const ordensHojeNaData = obterOrdensGradeParaData(
+        dataSelecionada,
+        avAtual,
+        infoGradeTurma
+      );
+      if (!avAtual.letivo || (mudouContexto && ordensHojeNaData.length === 0)) {
+        const hoje = hojeIso();
+        const passadasOuHoje = cronogramaGradeBimestre.datasAula.filter((d) => d.iso <= hoje);
+        const melhorData =
+          passadasOuHoje.length > 0
+            ? passadasOuHoje[passadasOuHoje.length - 1].iso
+            : cronogramaGradeBimestre.datasAula[0].iso;
+        if (melhorData && melhorData !== dataSelecionada) {
+          setDataSelecionada(melhorData);
+        }
+      }
+      return;
+    }
+
+    if (!avAtual.letivo) {
+      const candidatos = gerarDiasLetivosRecentes(
+        hojeIso(),
+        bimestreSelecionado,
+        governancaAnoLetivo,
+        7
+      );
+      if (candidatos.length > 0) {
+        setDataSelecionada(candidatos[candidatos.length - 1]);
+      }
+    }
+  }, [
+    turmaSelecionada,
+    disciplinaSelecionada,
+    bimestreSelecionado,
+    governancaAnoLetivo,
+    infoGradeTurma,
+    cronogramaGradeBimestre.datasAula,
+  ]);
 
   // ─── 3) Carrega Alunos Reais da Turma Selecionada ────────────────────────
   useEffect(() => {
@@ -652,8 +1010,9 @@ export default function Chamada() {
   // ─── 4) Persistência Híbrida (MySQL Backend + Cache Local) ───────────────
   const storageKey = useMemo(() => {
     const escolaId = localStorage.getItem("escola_id") || "0";
-    return `educa_chamada_v1_${escolaId}_${turmaSelecionada || "0"}_${slug(disciplinaSelecionada)}_${slug(bimestreSelecionado)}`;
-  }, [turmaSelecionada, disciplinaSelecionada, bimestreSelecionado]);
+    const prefixAgr = turmaObj?.is_agrupamento ? "agr_" : "";
+    return `educa_chamada_v1_${escolaId}_${prefixAgr}${turmaSelecionada || "0"}_${slug(disciplinaSelecionada)}_${slug(bimestreSelecionado)}`;
+  }, [turmaSelecionada, turmaObj?.is_agrupamento, disciplinaSelecionada, bimestreSelecionado]);
 
   useEffect(() => {
     if (!turmaSelecionada || !disciplinaSelecionada) return;
@@ -671,13 +1030,14 @@ export default function Chamada() {
     }
     setRegistroBimestre(mapaLocal);
 
-    // 2) Busca os registros salvos no banco de dados MySQL e a Governança atualizada
+    // 2) Busca os registros salvos no banco de dados MySQL, a Governança e os slots da Grade Horária
     const carregarDoServidor = async () => {
       try {
         const res = await api
           .get("/professores/me/chamada", {
             params: {
               turma_id: turmaSelecionada,
+              is_agrupamento: turmaObj?.is_agrupamento ? 1 : 0,
               disciplina: disciplinaSelecionada,
               bimestre: bimestreSelecionado,
             },
@@ -688,6 +1048,19 @@ export default function Chamada() {
 
         if (res.data.governanca) {
           setGovernancaAnoLetivo(res.data.governanca);
+        }
+
+        if (Array.isArray(res.data.grade_horaria?.slots) && res.data.grade_horaria.slots.length > 0) {
+          setSlotsGradeProfessor((prev) => {
+            const map = new Map();
+            for (const s of [...prev, ...res.data.grade_horaria.slots]) {
+              const d = Number(s.dia_semana ?? s.dia);
+              const o = Number(s.periodo_ordem ?? s.ordem);
+              const k = `${s.is_agrupamento ? "agr" : "reg"}_${s.turma_id}_${s.disciplina_id}_${d}_${o}`;
+              map.set(k, { ...s, dia_semana: d, periodo_ordem: o });
+            }
+            return Array.from(map.values());
+          });
         }
 
         const registrosDb = res.data.registros || {};
@@ -705,7 +1078,7 @@ export default function Chamada() {
     return () => {
       ativo = false;
     };
-  }, [storageKey, turmaSelecionada, disciplinaSelecionada, bimestreSelecionado]);
+  }, [storageKey, turmaSelecionada, turmaObj?.is_agrupamento, disciplinaSelecionada, bimestreSelecionado]);
 
   const salvarNoStorage = async (novoMapa, exibirFeedback = false, aulasParaSincronizar = null) => {
     setRegistroBimestre(novoMapa);
@@ -727,6 +1100,7 @@ export default function Chamada() {
         const res = await api.post("/professores/me/chamada", {
           bimestre: bimestreSelecionado,
           turma_id: turmaSelecionada,
+          is_agrupamento: turmaObj?.is_agrupamento ? 1 : 0,
           disciplina: disciplinaSelecionada,
           aulas: listaAulas,
         });
@@ -766,25 +1140,44 @@ export default function Chamada() {
     [turmaObj?.turno, governancaAnoLetivo]
   );
 
-  // Garante que a ordem da aula selecionada sempre exista dentro da quantidade de aulas do turno
+  // Avaliação do dia selecionado perante o calendário letivo da escola (Governança)
+  const avaliacaoDiaAtual = useMemo(
+    () => avaliarDiaLetivoGovernanca(dataSelecionada, bimestreSelecionado, governancaAnoLetivo),
+    [dataSelecionada, bimestreSelecionado, governancaAnoLetivo]
+  );
+
+  // Quais ordens de aula (`1ª`..`6ª`) pertencem ao professor nesta turma/disciplina na data selecionada (via Grade Horária)
+  const ordensDoProfessorNaDataAtual = useMemo(
+    () => obterOrdensGradeParaData(dataSelecionada, avaliacaoDiaAtual, infoGradeTurma),
+    [dataSelecionada, avaliacaoDiaAtual, infoGradeTurma]
+  );
+
+  // Auto-seleciona o horário exato do professor na turma e auto-ativa Aula Geminada quando a data ou turma muda
   useEffect(() => {
+    if (ordensDoProfessorNaDataAtual.length > 0) {
+      const primeiraOrdem = ordensDoProfessorNaDataAtual[0];
+      const temGeminadaConsecutiva =
+        ordensDoProfessorNaDataAtual.length >= 2 &&
+        ordensDoProfessorNaDataAtual.includes(primeiraOrdem + 1);
+
+      setAulaOrdemSelecionada(primeiraOrdem);
+      setAulaGeminada(temGeminadaConsecutiva);
+      setAulaGeminadaAutoGrade(temGeminadaConsecutiva);
+      return;
+    }
+
+    setAulaGeminadaAutoGrade(false);
     if (
       horariosDisponiveis.length > 0 &&
       !horariosDisponiveis.some((h) => h.ordem === aulaOrdemSelecionada)
     ) {
       setAulaOrdemSelecionada(horariosDisponiveis[0].ordem);
     }
-  }, [horariosDisponiveis, aulaOrdemSelecionada]);
+  }, [dataSelecionada, turmaSelecionada, disciplinaSelecionada, ordensDoProfessorNaDataAtual]);
 
   const horarioAtualObj = useMemo(
     () => horariosDisponiveis.find((h) => h.ordem === aulaOrdemSelecionada) || horariosDisponiveis[0],
     [horariosDisponiveis, aulaOrdemSelecionada]
-  );
-
-  // Avaliação do dia selecionado perante o calendário letivo da escola (Governança)
-  const avaliacaoDiaAtual = useMemo(
-    () => avaliarDiaLetivoGovernanca(dataSelecionada, bimestreSelecionado, governancaAnoLetivo),
-    [dataSelecionada, bimestreSelecionado, governancaAnoLetivo]
   );
 
   const resumoPeriodoBimestre = useMemo(
@@ -1195,7 +1588,7 @@ export default function Chamada() {
     baixarBlob(new Blob([pdfGerado.bytes], { type: "application/pdf" }), `${pdfGerado.nome}.pdf`);
   };
 
-  const diasRecentes = useMemo(
+  const diasRecentesTodos = useMemo(
     () =>
       gerarDiasLetivosRecentes(
         dataSelecionada || hojeIso(),
@@ -1205,6 +1598,45 @@ export default function Chamada() {
       ),
     [dataSelecionada, bimestreSelecionado, governancaAnoLetivo]
   );
+
+  // Lista rápida de datas exibida na Etapa 4: prioriza os dias de aula reais do professor na turma (via Grade Horária)
+  const diasRecentes = useMemo(() => {
+    if (
+      filtrarApenasDiasDaGrade &&
+      infoGradeTurma.possuiNaGrade &&
+      cronogramaGradeBimestre.janelaRecente.length > 0
+    ) {
+      const base = [...cronogramaGradeBimestre.janelaRecente];
+      if (dataSelecionada && !base.includes(dataSelecionada)) {
+        base.push(dataSelecionada);
+        base.sort();
+      }
+      return base;
+    }
+    return diasRecentesTodos;
+  }, [
+    filtrarApenasDiasDaGrade,
+    infoGradeTurma.possuiNaGrade,
+    cronogramaGradeBimestre.janelaRecente,
+    dataSelecionada,
+    diasRecentesTodos,
+  ]);
+
+  // Verifica se a data letiva selecionada pertence ou não aos dias da semana do professor na Grade Horária
+  const dataAtualPertenceAGrade = useMemo(() => {
+    if (!infoGradeTurma.possuiNaGrade || !avaliacaoDiaAtual.letivo) return true;
+    return ordensDoProfessorNaDataAtual.length > 0;
+  }, [infoGradeTurma.possuiNaGrade, avaliacaoDiaAtual.letivo, ordensDoProfessorNaDataAtual]);
+
+  // Calcula a data de aula da Grade Horária mais próxima para atalho de 1 clique
+  const dataAulaGradeMaisProxima = useMemo(() => {
+    if (!cronogramaGradeBimestre.datasAula.length) return null;
+    const hoje = hojeIso();
+    const ateHoje = cronogramaGradeBimestre.datasAula.filter((d) => d.iso <= hoje);
+    if (ateHoje.length > 0) return ateHoje[ateHoje.length - 1].iso;
+    return cronogramaGradeBimestre.datasAula[0].iso;
+  }, [cronogramaGradeBimestre.datasAula]);
+
   const totalPresentes = Math.max(0, alunos.length - faltasSetAtual.size);
   const percentualPresenca =
     alunos.length > 0 ? Math.round((totalPresentes / alunos.length) * 100) : 100;
@@ -1666,7 +2098,7 @@ export default function Chamada() {
             </div>
           )}
 
-          {/* ETAPA 3 — Turma */}
+          {/* ETAPA 3 — Turma (com Horários da Grade de Secretaria > Horários) */}
           {etapaAtiva === 3 && (
             <div>
               <p
@@ -1679,7 +2111,7 @@ export default function Chamada() {
                   marginBottom: "0.7rem",
                 }}
               >
-                Selecione a turma
+                Selecione a turma (conectada à sua Grade Horária)
               </p>
               {turmasCompativeis.length === 0 ? (
                 <span style={{ color: "#64748b", fontSize: "0.875rem" }}>
@@ -1690,6 +2122,11 @@ export default function Chamada() {
                   {turmasCompativeis.map((t) => {
                     const isSel = String(turmaSelecionada) === String(t.id);
                     const badge = getTurmaBadge(t);
+                    const infoG = extrairInfoGradeParaTurma(
+                      slotsGradeProfessor,
+                      t,
+                      disciplinaSelecionada
+                    );
                     return (
                       <button
                         key={`${t.is_agrupamento ? "agr" : "reg"}_${t.id}`}
@@ -1719,19 +2156,41 @@ export default function Chamada() {
                         }}
                       >
                         <span>{t.nome}</span>
-                        <span
-                          style={{
-                            fontSize: "0.64rem",
-                            padding: "1px 6px",
-                            borderRadius: "4px",
-                            fontWeight: 700,
-                            background: badge.bg,
-                            color: badge.text,
-                            border: `1px solid ${badge.border}`,
-                          }}
-                        >
-                          {badge.label}
-                        </span>
+                        <div style={{ display: "flex", alignItems: "center", gap: "4px", flexWrap: "wrap" }}>
+                          <span
+                            style={{
+                              fontSize: "0.62rem",
+                              padding: "1px 6px",
+                              borderRadius: "4px",
+                              fontWeight: 700,
+                              background: isSel ? "rgba(15,23,42,0.18)" : badge.bg,
+                              color: isSel ? "#0f172a" : badge.text,
+                              border: `1px solid ${isSel ? "rgba(15,23,42,0.25)" : badge.border}`,
+                            }}
+                          >
+                            {badge.label}
+                          </span>
+                          {infoG.possuiNaGrade && (
+                            <span
+                              style={{
+                                fontSize: "0.62rem",
+                                padding: "1px 6px",
+                                borderRadius: "4px",
+                                fontWeight: 800,
+                                background: isSel
+                                  ? "rgba(15,23,42,0.22)"
+                                  : "rgba(99,102,241,0.22)",
+                                color: isSel ? "#0f172a" : "#a5b4fc",
+                                border: isSel
+                                  ? "1px solid rgba(15,23,42,0.3)"
+                                  : "1px solid rgba(129,140,248,0.35)",
+                              }}
+                              title={`Grade Horária: ${infoG.resumoDetalhado}`}
+                            >
+                              📅 {infoG.resumoCurto}
+                            </span>
+                          )}
+                        </div>
                       </button>
                     );
                   })}
@@ -1740,9 +2199,210 @@ export default function Chamada() {
             </div>
           )}
 
-          {/* ETAPA 4 — Data e Aula(s) */}
+          {/* ETAPA 4 — Data e Aula(s) (Conectada a Governança + Secretaria > Horários) */}
           {etapaAtiva === 4 && (
             <div className="space-y-4">
+              {/* Faixa Inteligente da Grade Horária da Turma (`Secretaria > Horários`) */}
+              {infoGradeTurma.possuiNaGrade && (
+                <div
+                  style={{
+                    background: "rgba(99, 102, 241, 0.12)",
+                    border: "1px solid rgba(129, 140, 248, 0.3)",
+                    borderRadius: "0.85rem",
+                    padding: "0.75rem 1rem",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    flexWrap: "wrap",
+                    gap: "0.75rem",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.65rem", flexWrap: "wrap" }}>
+                    <span
+                      style={{
+                        background: "linear-gradient(135deg, #6366f1, #4f46e5)",
+                        color: "#fff",
+                        fontSize: "0.64rem",
+                        fontWeight: 900,
+                        padding: "3px 8px",
+                        borderRadius: "999px",
+                        letterSpacing: "0.06em",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      📅 Grade Horária ({turmaObj?.nome})
+                    </span>
+                    <span style={{ fontSize: "0.78rem", color: "#e0e7ff", fontWeight: 700 }}>
+                      {infoGradeTurma.resumoDetalhado}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: "0.68rem",
+                        color: "#a5b4fc",
+                        background: "rgba(15,23,42,0.45)",
+                        padding: "2px 8px",
+                        borderRadius: "999px",
+                        fontWeight: 700,
+                      }}
+                    >
+                      {infoGradeTurma.totalAulasSemanais}{" "}
+                      {infoGradeTurma.totalAulasSemanais === 1 ? "aula/sem" : "aulas/sem"}
+                      {cronogramaGradeBimestre.totalAulasPrevistas > 0
+                        ? ` · ${cronogramaGradeBimestre.totalAulasPrevistas} previstas no bim.`
+                        : ""}
+                    </span>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.45rem", flexWrap: "wrap" }}>
+                    <button
+                      type="button"
+                      onClick={() => setFiltrarApenasDiasDaGrade((v) => !v)}
+                      style={{
+                        fontSize: "0.68rem",
+                        fontWeight: 800,
+                        padding: "0.3rem 0.7rem",
+                        borderRadius: "0.5rem",
+                        cursor: "pointer",
+                        border: filtrarApenasDiasDaGrade
+                          ? "1px solid rgba(52,211,153,0.45)"
+                          : "1px solid rgba(255,255,255,0.18)",
+                        background: filtrarApenasDiasDaGrade
+                          ? "rgba(16,185,129,0.2)"
+                          : "rgba(255,255,255,0.06)",
+                        color: filtrarApenasDiasDaGrade ? "#6ee7b7" : "#cbd5e1",
+                      }}
+                      title="Alternar entre exibir apenas os dias da semana em que você leciona nesta turma ou todos os dias letivos"
+                    >
+                      {filtrarApenasDiasDaGrade
+                        ? "✓ Filtrando Meus Dias de Aula"
+                        : "Exibindo Todos os Dias Letivos"}
+                    </button>
+
+                    {cronogramaGradeBimestre.datasAula.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setMostrarCalendarioBimestreGrade((v) => !v)}
+                        style={{
+                          fontSize: "0.68rem",
+                          fontWeight: 800,
+                          padding: "0.3rem 0.75rem",
+                          borderRadius: "0.5rem",
+                          cursor: "pointer",
+                          border: "1px solid rgba(129,140,248,0.4)",
+                          background: mostrarCalendarioBimestreGrade
+                            ? "linear-gradient(135deg,#818cf8,#6366f1)"
+                            : "rgba(15,23,42,0.5)",
+                          color: "#fff",
+                        }}
+                      >
+                        {mostrarCalendarioBimestreGrade
+                          ? "Ocultar Datas do Bimestre ▲"
+                          : `Ver Todas as ${cronogramaGradeBimestre.datasAula.length} Datas de Aula ▼`}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Painel Expansível: Todas as Datas de Aula do Professor na Turma ao longo do Bimestre */}
+              {infoGradeTurma.possuiNaGrade &&
+                mostrarCalendarioBimestreGrade &&
+                cronogramaGradeBimestre.datasAula.length > 0 && (
+                  <div
+                    style={{
+                      background: "rgba(15, 23, 42, 0.55)",
+                      border: "1px solid rgba(255, 255, 255, 0.1)",
+                      borderRadius: "0.85rem",
+                      padding: "0.85rem 1rem",
+                    }}
+                  >
+                    <div className="flex items-center justify-between flex-wrap gap-2 mb-2.5">
+                      <span
+                        style={{
+                          fontSize: "0.7rem",
+                          fontWeight: 800,
+                          color: "#94a3b8",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.08em",
+                        }}
+                      >
+                        Cronograma de Aulas da Turma no {bimestreSelecionado} (Governança × Horários)
+                      </span>
+                      <span style={{ fontSize: "0.68rem", color: "#cbd5e1", fontWeight: 700 }}>
+                        <span style={{ color: "#34d399" }}>● Confirmada</span>
+                        {"  ·  "}
+                        <span style={{ color: "#fbbf24" }}>● Pendente (até hoje)</span>
+                        {"  ·  "}
+                        <span style={{ color: "#94a3b8" }}>● Futura</span>
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto pr-1">
+                      {cronogramaGradeBimestre.datasAula.map((item) => {
+                        const d = formatarDataCurta(item.iso);
+                        const isSel = dataSelecionada === item.iso;
+                        const hoje = hojeIso();
+                        const todasOrdsConfirmadas = item.ordens.every(
+                          (o) => registroBimestre[`${item.iso}#${o}`]?.confirmada
+                        );
+                        const algumaConfirmada = item.ordens.some(
+                          (o) => registroBimestre[`${item.iso}#${o}`]?.confirmada
+                        );
+                        const pendentePassada = item.iso <= hoje && !todasOrdsConfirmadas;
+
+                        return (
+                          <button
+                            key={item.iso}
+                            type="button"
+                            onClick={() => {
+                              setDataSelecionada(item.iso);
+                              if (item.ordens[0]) setAulaOrdemSelecionada(item.ordens[0]);
+                            }}
+                            style={{
+                              padding: "0.32rem 0.65rem",
+                              borderRadius: "0.5rem",
+                              fontSize: "0.72rem",
+                              fontWeight: 700,
+                              cursor: "pointer",
+                              background: isSel
+                                ? "linear-gradient(135deg,#22d3ee,#0ea5e9)"
+                                : todasOrdsConfirmadas
+                                ? "rgba(16,185,129,0.18)"
+                                : pendentePassada
+                                ? "rgba(245,158,11,0.15)"
+                                : "rgba(255,255,255,0.06)",
+                              color: isSel
+                                ? "#0f172a"
+                                : todasOrdsConfirmadas
+                                ? "#6ee7b7"
+                                : pendentePassada
+                                ? "#fcd34d"
+                                : "#cbd5e1",
+                              border: isSel
+                                ? "none"
+                                : todasOrdsConfirmadas
+                                ? "1px solid rgba(52,211,153,0.45)"
+                                : pendentePassada
+                                ? "1px solid rgba(251,191,36,0.4)"
+                                : "1px solid rgba(255,255,255,0.1)",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "4px",
+                            }}
+                          >
+                            <span>
+                              {d.wd} {d.dm}
+                            </span>
+                            <span style={{ fontSize: "0.62rem", opacity: 0.85 }}>
+                              ({item.ordens.map((o) => `${o}ª`).join("+")})
+                            </span>
+                            {(todasOrdsConfirmadas || algumaConfirmada) && <span>✓</span>}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
               <div className="flex flex-wrap items-center justify-between gap-4">
                 {/* Escolha rápida de dia letivo + Date Picker */}
                 <div>
@@ -1756,7 +2416,9 @@ export default function Chamada() {
                         letterSpacing: "0.1em",
                       }}
                     >
-                      Dia Letivo da Aula
+                      {filtrarApenasDiasDaGrade && infoGradeTurma.possuiNaGrade
+                        ? "Meus Dias de Aula na Turma"
+                        : "Dia Letivo da Aula"}
                     </span>
                     {resumoPeriodoBimestre && (
                       <span
@@ -1790,6 +2452,11 @@ export default function Chamada() {
                         governancaAnoLetivo
                       );
                       const ehSabLetivo = avDia.codigo === "SABADO_LETIVO";
+                      const ordensNaGradeDia = obterOrdensGradeParaData(
+                        iso,
+                        avDia,
+                        infoGradeTurma
+                      );
                       // Verifica se já há aula confirmada nesse dia
                       const temConfirmadaNoDia = aulasConfirmadasList.some((a) => a.data === iso);
                       return (
@@ -1797,7 +2464,15 @@ export default function Chamada() {
                           key={iso}
                           type="button"
                           onClick={() => setDataSelecionada(iso)}
-                          title={avDia.motivo ? `${avDia.label}: ${avDia.motivo}` : "Dia Letivo"}
+                          title={
+                            ordensNaGradeDia.length > 0
+                              ? `Dia de aula na Grade: ${ordensNaGradeDia
+                                  .map((o) => `${o}ª Aula`)
+                                  .join(" + ")}`
+                              : avDia.motivo
+                              ? `${avDia.label}: ${avDia.motivo}`
+                              : "Dia Letivo"
+                          }
                           style={{
                             padding: "0.42rem 0.85rem",
                             borderRadius: "0.6rem",
@@ -1813,6 +2488,8 @@ export default function Chamada() {
                               ? "none"
                               : temConfirmadaNoDia
                               ? "1px solid rgba(52,211,153,0.5)"
+                              : ordensNaGradeDia.length > 0
+                              ? "1px solid rgba(129,140,248,0.45)"
                               : ehSabLetivo
                               ? "1px solid rgba(251,191,36,0.45)"
                               : "1px solid rgba(255,255,255,0.12)",
@@ -1824,6 +2501,22 @@ export default function Chamada() {
                           <span>
                             {d.wd} {d.dm}
                           </span>
+                          {ordensNaGradeDia.length > 0 && (
+                            <span
+                              style={{
+                                fontSize: "0.58rem",
+                                padding: "1px 5px",
+                                borderRadius: 999,
+                                background: isSel
+                                  ? "rgba(15,23,42,0.18)"
+                                  : "rgba(99,102,241,0.25)",
+                                color: isSel ? "#0f172a" : "#c7d2fe",
+                                fontWeight: 800,
+                              }}
+                            >
+                              {ordensNaGradeDia.map((o) => `${o}ª`).join("+")}
+                            </span>
+                          )}
                           {ehSabLetivo && (
                             <span
                               style={{
@@ -1927,10 +2620,29 @@ export default function Chamada() {
                           Horário Padrão
                         </span>
                       )}
+                      {ordensDoProfessorNaDataAtual.length > 0 && (
+                        <span
+                          style={{
+                            fontSize: "0.62rem",
+                            background: "rgba(99,102,241,0.22)",
+                            border: "1px solid rgba(129,140,248,0.4)",
+                            color: "#c7d2fe",
+                            padding: "1px 8px",
+                            borderRadius: "999px",
+                            fontWeight: 800,
+                          }}
+                        >
+                          ★ Seu Horário hoje:{" "}
+                          {ordensDoProfessorNaDataAtual.map((o) => `${o}ª Aula`).join(" + ")}
+                        </span>
+                      )}
                     </div>
                     <button
                       type="button"
-                      onClick={() => setAulaGeminada((v) => !v)}
+                      onClick={() => {
+                        setAulaGeminada((v) => !v);
+                        setAulaGeminadaAutoGrade(false);
+                      }}
                       style={{
                         fontSize: "0.7rem",
                         fontWeight: 800,
@@ -1944,7 +2656,11 @@ export default function Chamada() {
                         color: aulaGeminada ? "#fff" : "#94a3b8",
                       }}
                     >
-                      {aulaGeminada ? "✓ Aula Dupla / Geminada Ativa" : "Aula Dupla / Geminada"}
+                      {aulaGeminada
+                        ? aulaGeminadaAutoGrade
+                          ? "⚡ Aula Dupla Automática (Grade)"
+                          : "✓ Aula Dupla / Geminada Ativa"
+                        : "Aula Dupla / Geminada"}
                     </button>
                   </div>
 
@@ -1953,6 +2669,7 @@ export default function Chamada() {
                       const isSel =
                         aulaOrdemSelecionada === h.ordem ||
                         (aulaGeminada && h.ordem === proxOrdemGeminada);
+                      const ehHorarioDoProf = ordensDoProfessorNaDataAtual.includes(h.ordem);
                       const keyH = `${dataSelecionada}#${h.ordem}`;
                       const regH = registroBimestre[keyH];
                       return (
@@ -1969,14 +2686,41 @@ export default function Chamada() {
                             transition: "all 0.18s",
                             background: isSel
                               ? "linear-gradient(135deg,#34d399,#10b981)"
+                              : ehHorarioDoProf
+                              ? "rgba(99,102,241,0.18)"
                               : "rgba(255,255,255,0.07)",
-                            color: isSel ? "#0f172a" : "#cbd5e1",
-                            border: isSel ? "none" : "1px solid rgba(255,255,255,0.12)",
+                            color: isSel ? "#0f172a" : ehHorarioDoProf ? "#e0e7ff" : "#cbd5e1",
+                            border: isSel
+                              ? "none"
+                              : ehHorarioDoProf
+                              ? "1px solid rgba(129,140,248,0.55)"
+                              : "1px solid rgba(255,255,255,0.12)",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "5px",
                           }}
                         >
-                          {regH?.confirmada ? "✓ " : ""}
-                          {h.label}
-                          {regH?.faltas?.length > 0 ? ` (${regH.faltas.length}F)` : ""}
+                          <span>
+                            {regH?.confirmada ? "✓ " : ""}
+                            {h.label}
+                            {regH?.faltas?.length > 0 ? ` (${regH.faltas.length}F)` : ""}
+                          </span>
+                          {ehHorarioDoProf && (
+                            <span
+                              style={{
+                                fontSize: "0.56rem",
+                                padding: "1px 5px",
+                                borderRadius: 999,
+                                background: isSel
+                                  ? "rgba(15,23,42,0.22)"
+                                  : "rgba(129,140,248,0.3)",
+                                color: isSel ? "#0f172a" : "#c7d2fe",
+                                fontWeight: 900,
+                              }}
+                            >
+                              ★ SEU HORÁRIO
+                            </span>
+                          )}
                         </button>
                       );
                     })}
@@ -2026,6 +2770,32 @@ export default function Chamada() {
               className="px-3.5 py-2 rounded-xl text-xs font-black bg-amber-600 text-white hover:bg-amber-700 transition"
             >
               Ir para o Dia Letivo mais próximo ({formatarDataCurta(diasRecentes[diasRecentes.length - 1]).dm})
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* ─── Aviso Inteligente caso o dia seja letivo, mas não seja dia de aula desta turma na Grade Horária ─── */}
+      {avaliacaoDiaAtual.letivo && !dataAtualPertenceAGrade && infoGradeTurma.possuiNaGrade && (
+        <div className="p-4 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-950 flex flex-wrap items-center justify-between gap-3 shadow-sm">
+          <div>
+            <div className="text-xs font-black uppercase tracking-wider text-indigo-700">
+              📅 Aviso da Grade Horária (Secretaria &gt; Horários)
+            </div>
+            <div className="text-sm font-semibold mt-0.5">
+              Na sua grade oficial, a turma <strong>{turmaObj?.nome}</strong> ({disciplinaSelecionada}) tem aula em:{" "}
+              <strong>{infoGradeTurma.resumoDetalhado}</strong>. Você selecionou{" "}
+              <strong>{formatarDataBr(dataSelecionada)}</strong> (útil apenas se for aula extra ou substituição).
+            </div>
+          </div>
+          {dataAulaGradeMaisProxima && (
+            <button
+              type="button"
+              onClick={() => setDataSelecionada(dataAulaGradeMaisProxima)}
+              className="px-3.5 py-2 rounded-xl text-xs font-black bg-indigo-600 text-white hover:bg-indigo-700 transition whitespace-nowrap"
+            >
+              Ir para o Dia da Minha Aula ({formatarDataCurta(dataAulaGradeMaisProxima).wd}{" "}
+              {formatarDataCurta(dataAulaGradeMaisProxima).dm})
             </button>
           )}
         </div>
@@ -2093,7 +2863,11 @@ export default function Chamada() {
                   <span className="text-2xl font-black text-slate-800">
                     {aulasConfirmadasList.length}
                   </span>
-                  <span className="text-xs text-slate-500 ml-1 font-medium">aulas dadas</span>
+                  <span className="text-xs text-slate-500 ml-1 font-medium">
+                    {cronogramaGradeBimestre.totalAulasPrevistas > 0
+                      ? `/ ${cronogramaGradeBimestre.totalAulasPrevistas} previstas`
+                      : "aulas dadas"}
+                  </span>
                 </div>
               </div>
               <button

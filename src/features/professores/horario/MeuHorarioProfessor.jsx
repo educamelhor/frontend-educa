@@ -589,7 +589,20 @@ export default function MeuHorarioProfessor() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => navigate('/professores/chamada')}
+                  onClick={() => {
+                    const primeira = aulasDeHoje[0];
+                    if (primeira) {
+                      const n = new Date();
+                      const hojeStr = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+                      navigate(
+                        `/professores/chamada?turma_id=${primeira.turma_id}&disciplina=${encodeURIComponent(
+                          primeira.disciplina_nome || ''
+                        )}&data=${hojeStr}&ordem=${primeira.periodo_ordem}`
+                      );
+                    } else {
+                      navigate('/professores/chamada');
+                    }
+                  }}
                   className="self-start md:self-auto inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-white text-slate-900 hover:bg-indigo-50 transition cursor-pointer"
                 >
                   <ClipboardDocumentCheckIcon className="w-4 h-4 text-indigo-600" />
@@ -599,9 +612,20 @@ export default function MeuHorarioProfessor() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-2.5">
                 {aulasDeHoje.map((aula, idx) => (
-                  <div
+                  <button
                     key={`${aula.turnoLabel}_${aula.periodo_ordem}_${idx}`}
-                    className="bg-white/10 hover:bg-white/15 backdrop-blur-sm border border-white/15 rounded-xl p-3 transition"
+                    type="button"
+                    onClick={() => {
+                      const n = new Date();
+                      const hojeStr = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+                      navigate(
+                        `/professores/chamada?turma_id=${aula.turma_id}&disciplina=${encodeURIComponent(
+                          aula.disciplina_nome || ''
+                        )}&data=${hojeStr}&ordem=${aula.periodo_ordem}`
+                      );
+                    }}
+                    title="Clique para abrir a Chamada Digital já posicionada nesta turma e horário"
+                    className="text-left bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/15 hover:border-cyan-300/60 rounded-xl p-3 transition cursor-pointer group"
                   >
                     <div className="flex items-center justify-between text-[11px] font-bold text-indigo-200 mb-1">
                       <span>
@@ -616,10 +640,15 @@ export default function MeuHorarioProfessor() {
                     <div className="text-sm font-extrabold text-white truncate">
                       {aula.turma_nome}
                     </div>
-                    <div className="text-xs font-medium text-slate-300 truncate mt-0.5">
-                      {aula.disciplina_nome}
+                    <div className="flex items-center justify-between gap-1 mt-1">
+                      <span className="text-xs font-medium text-slate-300 truncate">
+                        {aula.disciplina_nome}
+                      </span>
+                      <span className="text-[10px] font-extrabold text-cyan-300 opacity-85 group-hover:opacity-100 shrink-0">
+                        Chamada →
+                      </span>
                     </div>
-                  </div>
+                  </button>
                 ))}
               </div>
             </div>
@@ -761,7 +790,15 @@ export default function MeuHorarioProfessor() {
                                 }`}
                               >
                                 <div
-                                  className={`h-full rounded-xl border ${cor.bg} ${cor.border} p-2.5 shadow-2xs flex flex-col justify-between transition hover:shadow-md`}
+                                  onClick={() =>
+                                    navigate(
+                                      `/professores/chamada?turma_id=${slot.turma_id}&disciplina=${encodeURIComponent(
+                                        slot.disciplina_nome || ''
+                                      )}&ordem=${pOrd}`
+                                    )
+                                  }
+                                  title="Clique para abrir a Chamada Digital desta turma e horário"
+                                  className={`h-full rounded-xl border ${cor.bg} ${cor.border} p-2.5 shadow-2xs flex flex-col justify-between transition hover:shadow-md cursor-pointer`}
                                 >
                                   <div className="flex items-center justify-between gap-1.5">
                                     <span
@@ -820,7 +857,15 @@ export default function MeuHorarioProfessor() {
                   return (
                     <div
                       key={`${item.turma_id}_${item.disciplina_id}`}
-                      className={`rounded-xl border ${cor.border} ${cor.bg} p-3.5 flex flex-col justify-between`}
+                      onClick={() =>
+                        navigate(
+                          `/professores/chamada?turma_id=${item.turma_id}&disciplina=${encodeURIComponent(
+                            item.disciplina_nome || ''
+                          )}`
+                        )
+                      }
+                      title="Clique para fazer a chamada desta turma"
+                      className={`rounded-xl border ${cor.border} ${cor.bg} p-3.5 flex flex-col justify-between cursor-pointer hover:shadow-md transition`}
                     >
                       <div>
                         <div className="flex items-center justify-between gap-2">
@@ -837,15 +882,20 @@ export default function MeuHorarioProfessor() {
                           {item.disciplina_nome}
                         </div>
                       </div>
-                      <div className="flex flex-wrap gap-1 mt-3 pt-2 border-t border-black/5">
-                        {diasOrd.map((d) => (
-                          <span
-                            key={d}
-                            className="px-2 py-0.5 rounded text-[10px] font-bold bg-white/80 text-slate-700 border border-slate-200"
-                          >
-                            {DIAS_CURTOS[d] || `D${d}`}
-                          </span>
-                        ))}
+                      <div className="flex items-center justify-between gap-2 mt-3 pt-2 border-t border-black/5">
+                        <div className="flex flex-wrap gap-1">
+                          {diasOrd.map((d) => (
+                            <span
+                              key={d}
+                              className="px-2 py-0.5 rounded text-[10px] font-bold bg-white/80 text-slate-700 border border-slate-200"
+                            >
+                              {DIAS_CURTOS[d] || `D${d}`}
+                            </span>
+                          ))}
+                        </div>
+                        <span className="text-[10px] font-extrabold text-indigo-700 shrink-0">
+                          Chamada →
+                        </span>
                       </div>
                     </div>
                   );

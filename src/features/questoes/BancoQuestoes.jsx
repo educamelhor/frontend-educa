@@ -44,6 +44,7 @@ const IconProvas = () => (
 export default function BancoQuestoes() {
   const [activeTab, setActiveTab]             = useState('dashboard');
   const [editingQuestao, setEditingQuestao]   = useState(null);
+  const [editingProva, setEditingProva]       = useState(null);
   const [refreshKey, setRefreshKey]           = useState(0);
   const [dashboardKey, setDashboardKey]       = useState(0); // força refresh do dashboard
   const [provasRefreshKey, setProvasRefreshKey] = useState(0);
@@ -184,6 +185,7 @@ export default function BancoQuestoes() {
               className={`bq-tab${activeTab === tab.key ? ' active' : ''}`}
               onClick={() => {
                 if (tab.key !== 'criar') setEditingQuestao(null);
+                if (tab.key !== 'prova') setEditingProva(null);
                 setActiveTab(tab.key);
               }}
             >
@@ -246,6 +248,8 @@ export default function BancoQuestoes() {
         {/* Tab: Montar Prova */}
         {activeTab === 'prova' && (
           <ProvaBuilder
+            editingProva={editingProva}
+            onClearEditingProva={() => setEditingProva(null)}
             onProvasSalvas={() => setProvasRefreshKey(k => k + 1)}
           />
         )}
@@ -254,7 +258,10 @@ export default function BancoQuestoes() {
         {activeTab === 'historico' && (
           <ProvasHistorico
             refreshKey={provasRefreshKey}
-            onEdit={(prova) => setActiveTab('prova')}
+            onEdit={(prova) => {
+              setEditingProva(prova);
+              setActiveTab('prova');
+            }}
           />
         )}
       </div>

@@ -14,8 +14,12 @@ const STATUS_CFG = {
 };
 
 const TEMPLATE_LABEL = {
-  objetiva_2col: '📋 2 Colunas', objetiva_1col: '📄 1 Coluna',
-  discursiva: '✍️ Discursiva', mista: '🔀 Mista', enem: '🏆 ENEM',
+  modelo_01_provao: '📙 Modelo 01 (Provão)',
+  objetiva_2col: '📋 Modelo 02 (2 Col.)',
+  enem: '🏆 Modelo 03 (ENEM)',
+  objetiva_1col: '📄 Modelo 04 (1 Col.)',
+  discursiva: '✍️ Modelo 05 (Disc.)',
+  mista: '🔀 Modelo 06 (Mista)',
 };
 
 const api = async (path, opts = {}) => {
@@ -191,7 +195,11 @@ export default function ProvasHistorico({ onEdit, refreshKey }) {
 
       {/* Modal de preview PDF */}
       {previewId && (
-        <ProvaPreview provaId={previewId} onClose={() => setPreviewId(null)} />
+        <ProvaPreview
+          provaId={previewId}
+          onClose={() => setPreviewId(null)}
+          onUpdated={() => carregar()}
+        />
       )}
     </div>
   );

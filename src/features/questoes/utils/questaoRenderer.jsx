@@ -447,7 +447,15 @@ export function resumirGabaritoQuestao(questao) {
 }
 
 /* ── Renderização Completa da Anatomia da Questão (Tela + Preview A4) ── */
-export function QuestaoCorpoEstruturado({ questao, showGabarito = true, modoProva = false }) {
+export function QuestaoCorpoEstruturado({
+  questao,
+  showGabarito = true,
+  modoProva = false,
+  estiloAlternativa = 'maiuscula_parenteses',
+  fontBodyOverride = null,
+  lineHeightOverride = null,
+  estiloEditorialLimpo = false,
+}) {
   if (!questao) return null;
 
   const est = parseJsonSafe(questao.estrutura_json || questao.estrutura, {}) || {};
@@ -473,37 +481,43 @@ export function QuestaoCorpoEstruturado({ questao, showGabarito = true, modoProv
     ? midia.posicao
     : 'entre_enunciado_e_comando';
 
-  const fontBody = modoProva ? '10pt' : '0.9rem';
+  const fontBody = fontBodyOverride || (modoProva ? '10pt' : '0.9rem');
+  const lineH = lineHeightOverride || (estiloEditorialLimpo ? 1.36 : 1.62);
 
   const renderBlocoAlternativas = () => {
     if (!alts.length) return null;
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: modoProva ? 3 : 6, marginTop: modoProva ? 4 : 8 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: estiloEditorialLimpo ? 1.5 : modoProva ? 3 : 6, marginTop: estiloEditorialLimpo ? 3 : modoProva ? 4 : 8 }}>
         {alts.map((alt, i) => {
-          const letra = alt.letra || String.fromCharCode(65 + i);
+          const letra = String(alt.letra || String.fromCharCode(65 + i)).toUpperCase().trim();
           const isCorr = showGabarito && Boolean(alt.correta || (letraCorreta && letra === letraCorreta));
+          const rotulo = estiloAlternativa === 'minuscula_parentese'
+            ? `${letra.toLowerCase()})`
+            : `(${letra})`;
           return (
             <div
               key={alt.id || i}
               style={{
                 display: 'flex',
                 alignItems: 'flex-start',
-                gap: modoProva ? 6 : 9,
-                padding: modoProva ? '2px 4px' : '7px 11px',
+                gap: estiloEditorialLimpo ? 5 : modoProva ? 6 : 9,
+                padding: estiloEditorialLimpo ? '1px 0' : modoProva ? '2px 4px' : '7px 11px',
                 borderRadius: modoProva ? 3 : 8,
                 background: isCorr ? '#f0fdf4' : modoProva ? 'transparent' : '#f8fafc',
                 border: modoProva ? 'none' : `1.5px solid ${isCorr ? '#86efac' : '#e2e8f0'}`,
-                fontSize: modoProva ? '9.8pt' : '0.86rem',
+                fontSize: fontBodyOverride || (modoProva ? '9.8pt' : '0.86rem'),
+                lineHeight: estiloEditorialLimpo ? 1.34 : undefined,
+                textAlign: estiloEditorialLimpo ? 'justify' : undefined,
                 color: isCorr ? '#14532d' : modoProva ? '#000' : '#334155',
               }}
             >
               <span style={{
-                fontWeight: 800,
+                fontWeight: estiloEditorialLimpo && !isCorr ? 400 : 800,
                 flexShrink: 0,
-                minWidth: modoProva ? 22 : 24,
+                minWidth: estiloEditorialLimpo ? 18 : modoProva ? 22 : 24,
                 color: isCorr ? '#059669' : modoProva ? '#000' : '#475569',
               }}>
-                ({letra})
+                {rotulo}
               </span>
               <div style={{ flex: 1 }}>
                 {alt.texto && <MathText text={alt.texto} />}
@@ -512,7 +526,7 @@ export function QuestaoCorpoEstruturado({ questao, showGabarito = true, modoProv
                     <img
                       src={alt.imagem_url}
                       alt={`Alternativa ${letra}`}
-                      style={{ maxWidth: 160, maxHeight: 105, objectFit: 'contain', borderRadius: 4, border: '1px solid #e2e8f0', background: '#fff' }}
+                      style={{ maxWidth: 160, maxHeight: 105, objectFit: 'contain', borderRadius: 4, border: estiloEditorialLimpo ? 'none' : '1px solid #e2e8f0', background: '#fff' }}
                     />
                   </div>
                 )}
@@ -534,7 +548,7 @@ export function QuestaoCorpoEstruturado({ questao, showGabarito = true, modoProv
     if (!enunciadoRaw) return null;
     if (tipo !== 'lacuna') {
       return (
-        <div style={{ fontSize: fontBody, lineHeight: 1.62, textAlign: 'justify', color: modoProva ? '#000' : '#1e293b', margin: '4px 0' }}>
+        <div style={{ fontSize: fontBody, lineHeight: lineH, textAlign: 'justify', color: modoProva ? '#000' : '#1e293b', margin: estiloEditorialLimpo ? '2px 0 4px' : '4px 0' }}>
           <MathText text={enunciadoRaw} />
         </div>
       );
@@ -542,7 +556,7 @@ export function QuestaoCorpoEstruturado({ questao, showGabarito = true, modoProv
 
     const parts = String(enunciadoRaw).split(/(\{\{[^}]+\}\})/g);
     return (
-      <div style={{ fontSize: fontBody, lineHeight: 1.75, textAlign: 'justify', color: modoProva ? '#000' : '#1e293b', margin: '4px 0' }}>
+      <div style={{ fontSize: fontBody, lineHeight: estiloEditorialLimpo ? 1.45 : 1.75, textAlign: 'justify', color: modoProva ? '#000' : '#1e293b', margin: '4px 0' }}>
         {parts.map((p, idx) => {
           if (p.startsWith('{{') && p.endsWith('}}')) {
             const resp = p.slice(2, -2).trim();
@@ -574,23 +588,41 @@ export function QuestaoCorpoEstruturado({ questao, showGabarito = true, modoProv
     <div>
       {/* 1. Texto de apoio */}
       {textoApoio && (
-        <blockquote style={{
-          borderLeft: `3px solid ${modoProva ? '#555' : '#0e7490'}`,
-          background: modoProva ? '#f8f8f8' : '#f8fafc',
-          padding: modoProva ? '4px 8px' : '8px 12px',
-          margin: '0 0 8px',
-          borderRadius: modoProva ? 0 : 6,
-          fontSize: modoProva ? '9pt' : '0.82rem',
-          fontStyle: 'italic',
-          color: modoProva ? '#222' : '#475569',
-        }}>
-          <MathText text={textoApoio} />
-          {fonte && (
-            <footer style={{ fontSize: modoProva ? '7.8pt' : '0.73rem', fontStyle: 'normal', color: '#64748b', marginTop: 3 }}>
-              — {fonte}
-            </footer>
-          )}
-        </blockquote>
+        estiloEditorialLimpo ? (
+          <div style={{
+            margin: '2px 0 5px',
+            fontSize: fontBodyOverride ? `calc(${fontBodyOverride} - 0.5pt)` : '9.5pt',
+            fontStyle: 'italic',
+            textAlign: 'justify',
+            color: '#000',
+            lineHeight: 1.34,
+          }}>
+            <MathText text={textoApoio} />
+            {fonte && (
+              <div style={{ fontSize: '8pt', fontStyle: 'normal', textAlign: 'right', color: '#222', marginTop: 2 }}>
+                ({fonte})
+              </div>
+            )}
+          </div>
+        ) : (
+          <blockquote style={{
+            borderLeft: `3px solid ${modoProva ? '#555' : '#0e7490'}`,
+            background: modoProva ? '#f8f8f8' : '#f8fafc',
+            padding: modoProva ? '4px 8px' : '8px 12px',
+            margin: '0 0 8px',
+            borderRadius: modoProva ? 0 : 6,
+            fontSize: modoProva ? '9pt' : '0.82rem',
+            fontStyle: 'italic',
+            color: modoProva ? '#222' : '#475569',
+          }}>
+            <MathText text={textoApoio} />
+            {fonte && (
+              <footer style={{ fontSize: modoProva ? '7.8pt' : '0.73rem', fontStyle: 'normal', color: '#64748b', marginTop: 3 }}>
+                — {fonte}
+              </footer>
+            )}
+          </blockquote>
+        )
       )}
 
       {/* Figura após texto de apoio */}
@@ -833,13 +865,32 @@ export function QuestaoCorpoEstruturado({ questao, showGabarito = true, modoProv
 }
 
 /* ── Gerador HTML string para o popup de impressão do navegador (ProvaPreview) ── */
-export function renderQuestaoPrintHtml(it, idx, template, showGabarito = false) {
+export function renderQuestaoPrintHtml(it, idx, template, showGabarito = false, opts = {}) {
+  const {
+    isModelo01 = template === 'modelo_01_provao',
+    corDestaque = '#FF7F00',
+    estiloAlternativa = isModelo01 ? 'minuscula_parentese' : 'maiuscula_parenteses',
+    fontBody = isModelo01 ? '11pt' : '10pt',
+    mostrarMetaQuestao = !isModelo01,
+  } = opts || {};
+
   const esc = (s = '') => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  const fmtPrint = (s = '') =>
-    esc(s)
+  const fmtPrint = (s = '') => {
+    const mathToks = [];
+    const masked = String(s || '').replace(/\$\$[\s\S]+?\$\$|\$[^$\n]+\$/g, (m) => {
+      const id = `@@MP${mathToks.length}@@`;
+      mathToks.push(esc(m));
+      return id;
+    });
+    let out = esc(masked)
       .replace(/\*\*([\s\S]+?)\*\*/g, '<strong>$1</strong>')
       .replace(/__([^\s_](?:[\s\S]*?[^\s_])?)__/g, '<u>$1</u>')
       .replace(/\*([^\s*](?:[^*\n]*?[^\s*])?)\*/g, '<em>$1</em>');
+    mathToks.forEach((mt, idx) => {
+      out = out.replace(`@@MP${idx}@@`, () => mt);
+    });
+    return out;
+  };
 
   const num = String(idx + 1).padStart(2, '0');
   const est = parseJsonSafe(it.estrutura_json, {}) || {};
@@ -878,10 +929,12 @@ export function renderQuestaoPrintHtml(it, idx, template, showGabarito = false) 
     );
   }
 
-  const renderAlts = () => (Array.isArray(alts) ? alts : []).map(a => {
-    const isCorr = showGabarito && (a.correta || a.letra === correta);
+  const renderAlts = () => (Array.isArray(alts) ? alts : []).filter(a => (a?.texto && String(a.texto).trim()) || a?.imagem_url).map((a, aIdx) => {
+    const letraUp = String(a.letra || String.fromCharCode(65 + aIdx)).toUpperCase().trim();
+    const isCorr = showGabarito && (a.correta || letraUp === correta);
+    const rotulo = estiloAlternativa === 'minuscula_parentese' ? `${esc(letraUp.toLowerCase())})` : `(${esc(letraUp)})`;
     const aImg = a.imagem_url ? `<div><img src="${esc(a.imagem_url)}" style="max-width:140px;max-height:95px;margin-top:2px"/></div>` : '';
-    return `<div style="display:flex;gap:5px;padding:1.5px 0;font-size:9.8pt;${isCorr ? 'background:#f0fdf4;font-weight:700' : ''}"><span style="font-weight:700;min-width:22px">(${esc(a.letra)})</span><div style="flex:1">${fmtPrint(a.texto || '')}${aImg}</div></div>`;
+    return `<div style="display:flex;gap:5px;padding:1.5px 0;font-size:${fontBody};line-height:1.34;text-align:justify;${isCorr ? 'background:#f0fdf4;font-weight:700' : ''}"><span style="font-weight:${isModelo01 && !isCorr ? 400 : 700};min-width:${isModelo01 ? '18px' : '22px'}">${rotulo}</span><div style="flex:1">${fmtPrint(a.texto || '')}${aImg}</div></div>`;
   }).join('');
 
   const cmdPosCorpoPrint = (tipo === 'associacao' || tipo === 'verdadeiro_falso') && (est.submodo || 'direto') === 'sequencia';
@@ -924,6 +977,27 @@ export function renderQuestaoPrintHtml(it, idx, template, showGabarito = false) 
       : Array.from({ length: Number(est.linhas_resposta) || 6 }, () => '<div style="height:16px;border-bottom:0.6pt dotted #999;margin-bottom:4px"></div>').join('');
   } else {
     corpo = renderAlts();
+  }
+
+  if (isModelo01) {
+    const headerM01 = `<div style="display:flex;align-items:center;gap:7px;margin-bottom:4px">
+      <span style="font-weight:700;font-size:11.5pt;color:#000;white-space:nowrap">QUESTÃO ${num}${it.fonte && !it.texto_apoio ? ` <span style="font-weight:400;font-size:9pt">(${esc(it.fonte)})</span>` : ''}</span>
+      <span style="flex:1;height:12pt;background:${esc(corDestaque)};min-width:18px;-webkit-print-color-adjust:exact;print-color-adjust:exact"></span>
+      ${mostrarMetaQuestao ? `<span style="font-size:8pt;color:#333;white-space:nowrap">${Number(it.valor_pontos || 1).toFixed(1)}pt</span>` : ''}
+    </div>`;
+    const apoioM01 = it.texto_apoio
+      ? `<div style="font-style:italic;font-size:calc(${fontBody} - 0.5pt);text-align:justify;margin:3px 0 5px">${fmtPrint(it.texto_apoio).replace(/\n/g, '<br>')}${it.fonte ? `<div style="font-size:8pt;font-style:normal;text-align:right">(${esc(it.fonte)})</div>` : ''}</div>`
+      : '';
+    return `<div class="flow-item questao-m01" style="margin-bottom:11px">
+      ${headerM01}
+      ${apoioM01}
+      ${pos === 'apos_texto_apoio' ? figHtml : ''}
+      <p style="font-size:${fontBody};line-height:1.36;text-align:justify;margin:2px 0 4px">${enuncHtml}</p>
+      ${pos === 'entre_enunciado_e_comando' ? figHtml : ''}
+      ${!cmdPosCorpoPrint ? cmdHtml : ''}
+      ${pos === 'abaixo_comando' ? figHtml : ''}
+      ${corpo}
+    </div>`;
   }
 
   return `<div style="break-inside:avoid;page-break-inside:avoid;margin-bottom:10px;padding-bottom:8px;border-bottom:0.5pt dashed #ccc">

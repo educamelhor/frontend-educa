@@ -687,7 +687,7 @@ export default function ProvaPreview({ provaId, onClose, onUpdated }) {
   const cabItens      = liveCfg.cabecalho_itens ?? {};
   const sh            = (k) => cabItens[k] ?? true;
 
-  // ── LaTeX preview ──────────────────────────────────────────────────────────
+  // ── LaTeX preview (XeTeX / Tectonic 0.15) ──────────────────────────────────
   const gerarLatex = useCallback(() => {
     if (!data) return '';
     const corHex = String(liveCfg.cor_destaque || '#FF7F00').replace('#', '').toUpperCase();
@@ -699,10 +699,10 @@ export default function ProvaPreview({ provaId, onClose, onUpdated }) {
           : JSON.parse(it.alternativas_json || '[]');
       } catch {}
       const num = String(idx + 1).padStart(2, '0');
-      const altsLatex = alts.map((a) => `\t\\item[${String(a.letra || '').toLowerCase()})] ${a.texto || ''}`).join('\n');
-      return `\\noindent\n\\textbf{QUESTÃO ${num}}\\hspace{0.2cm}{\\color{corDestaque}\\leaders\\hrule height 8.8pt depth 2.2pt\\hfill\\kern0pt}\\par\\vspace{2pt}\n\n${it.conteudo_bruto || ''}\n\n${alts.length > 0 ? `\\begin{itemize}\n${altsLatex}\n\\end{itemize}` : ''}\n\n\\vspace{.35cm}`;
+      const altsLatex = alts.map((a) => `  \\item ${a.texto || ''}`).join('\n');
+      return `\\par\\vspace{4pt}\\noindent\n\\leavevmode{\\bfseries QUESTÃO ${num}}\\hspace{0.22cm}{\\color{corDestaque}\\leaders\\hrule height 8.6pt depth 2.0pt\\hfill\\kern0pt}\\par\\nopagebreak\\vspace{2pt}\n\n${it.conteudo_bruto || ''}\\par\\vspace{2pt}\n\n${alts.length > 0 ? `\\begin{enumerate}[label=\\alph*),leftmargin=*,itemsep=1.5pt]\n${altsLatex}\n\\end{enumerate}` : ''}\n\\vspace{0.22cm}`;
     });
-    return `\\documentclass{article}\n\\definecolor{corDestaque}{HTML}{${corHex}}\n\n\\begin{document}\n\t\\fontsize{${liveCfg.densidade_fonte || '11pt'}}{13.5pt}\\selectfont\n\n\t${is2col ? '\\begin{multicols*}{2}\n\t\t\\setlength{\\columnseprule}{0.85pt}\n' : ''}\n${questoes.join('\n\n')}\n\t${is2col ? '\\end{multicols*}' : ''}\n\t% Rodapé externo fora da moldura: ${rodapeAutoM01}\n\\end{document}`;
+    return `\\documentclass{article}\n\\usepackage{fontspec}\n\\IfFontExistsTF{Liberation Serif}{\\setmainfont{Liberation Serif}}{}\n\\usepackage[a4paper,lmargin=1.45cm,rmargin=1.45cm,tmargin=1.35cm,bmargin=1.90cm,headheight=15pt]{geometry}\n\\usepackage{multicol,tikz,fancyhdr,xcolor,graphicx,amsmath,amssymb}\n\\usepackage[shortlabels]{enumitem}\n\\usetikzlibrary{calc}\n\\definecolor{corDestaque}{HTML}{${corHex}}\n\n\\pagestyle{fancy}\\fancyhf{}\n\\fancyhead[L]{\\begin{tikzpicture}[overlay, remember picture]\n  \\draw[draw=black, line width=2.25pt] ($(current page.north west) + (0.95cm,-0.85cm)$) rectangle ($(current page.south east) + (-0.95cm,1.40cm)$);\n  \\node[anchor=center] at ($(current page.south) + (0cm,0.68cm)$) {\\fontsize{11pt}{13pt}\\selectfont ${rodapeAutoM01}};\n\\end{tikzpicture}}\n\\renewcommand{\\headrulewidth}{0pt}\\renewcommand{\\footrulewidth}{0pt}\n\n\\begin{document}\n\\fontsize{${liveCfg.densidade_fonte || '11pt'}}{13.6pt}\\selectfont\n${is2col ? '\\setlength{\\columnsep}{1.05cm}\\setlength{\\columnseprule}{0.85pt}\n\\begin{multicols*}{2}\n' : ''}\n${questoes.join('\n\n')}\n${is2col ? '\\end{multicols*}' : ''}\n\\end{document}`;
   }, [data, itens, is2col, liveCfg.cor_destaque, liveCfg.densidade_fonte, rodapeAutoM01]);
 
   // ── IMPRIMIR via browser (usa paginação folha a folha real no Modelo 01!) ──

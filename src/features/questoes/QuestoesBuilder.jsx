@@ -17,6 +17,11 @@ import {
   parseJsonSafe,
   resumirGabaritoQuestao,
 } from './utils/questaoRenderer';
+import {
+  useOpcoesEscolaQuestoes,
+  renderOpcoesDisciplinaEscola,
+  renderOpcoesSerieEscola,
+} from './utils/useOpcoesEscolaQuestoes';
 
 /* ── Constantes ─────────────────────────────────────────── */
 const LETRAS = ['A', 'B', 'C', 'D', 'E'];
@@ -36,17 +41,6 @@ const NIVEIS = [
   { value: 'medio',   label: '⭐⭐ Médio' },
   { value: 'dificil', label: '⭐⭐⭐ Difícil' },
   { value: 'enem',    label: '🏆 ENEM' },
-];
-
-const SERIES = [
-  '6º Ano EF', '7º Ano EF', '8º Ano EF', '9º Ano EF',
-  '1º EM', '2º EM', '3º EM', 'Ensino Superior',
-];
-
-const DISCIPLINAS = [
-  'Português', 'Matemática', 'Ciências', 'História', 'Geografia',
-  'Inglês', 'Artes', 'Educação Física', 'Biologia', 'Física',
-  'Química', 'Sociologia', 'Filosofia', 'Redação', 'PD',
 ];
 
 const TEXTO_APOIO_FONTES = [
@@ -103,6 +97,11 @@ function Block({ num, title, subtitle, rightAction, open, onToggle, children }) 
 
 /* ── Componente principal ────────────────────────────────── */
 export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
+  const {
+    disciplinas: disciplinasEscola,
+    itinerarios: itinerariosEscola,
+    series: seriesEscola,
+  } = useOpcoesEscolaQuestoes();
   const [form, setForm] = useState(createInitialState);
   const [openBlocks, setOpenBlocks] = useState({ 1: true, 2: true, 3: true, 4: true });
   const [saving, setSaving] = useState(false);
@@ -795,20 +794,27 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
             </div>
           </div>
 
-          {/* Disciplina + Série */}
+          {/* Disciplina + Série (Dinâmicos da Escola Logada) */}
           <div className="bq-field-row">
             <div className="bq-field">
               <label className="bq-label">Disciplina <span className="required">*</span></label>
               <select className="bq-select" value={form.disciplina} onChange={e => set('disciplina', e.target.value)}>
                 <option value="">— Selecione —</option>
-                {DISCIPLINAS.map(d => <option key={d} value={d}>{d}</option>)}
+                {renderOpcoesDisciplinaEscola({
+                  disciplinas: disciplinasEscola,
+                  itinerarios: itinerariosEscola,
+                  valorAtual: form.disciplina,
+                })}
               </select>
             </div>
             <div className="bq-field">
               <label className="bq-label">Série / Ano</label>
               <select className="bq-select" value={form.serie} onChange={e => set('serie', e.target.value)}>
                 <option value="">— Todas —</option>
-                {SERIES.map(s => <option key={s} value={s}>{s}</option>)}
+                {renderOpcoesSerieEscola({
+                  series: seriesEscola,
+                  valorAtual: form.serie,
+                })}
               </select>
             </div>
           </div>

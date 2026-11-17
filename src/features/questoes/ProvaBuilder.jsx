@@ -14,6 +14,10 @@ import {
   salvarPreferenciasModeloEscola,
   gerarTextoRodapeAutomatico,
 } from './utils/provaTemplates';
+import {
+  useOpcoesEscolaQuestoes,
+  renderOpcoesDisciplinaEscola,
+} from './utils/useOpcoesEscolaQuestoes';
 
 const NIVEL_COLORS = { facil: '#059669', medio: '#d97706', dificil: '#dc2626', enem: '#7c3aed' };
 const NIVEL_LABEL  = { facil: 'Fácil', medio: 'Médio', dificil: 'Difícil', enem: 'ENEM' };
@@ -303,9 +307,21 @@ function ProvaItem({ item, idx, accentColor, onRemove, onChangePontos, onDragSta
 /* ══════════════════════════════════════════════════════════════════════════════
    PAINEL CONFIGURAÇÕES + PERSONALIZAÇÃO DO MODELO 01
 ══════════════════════════════════════════════════════════════════════════════ */
-function ProvaConfigPanel({ config, layoutCfg, onChange, onChangeLayout }) {
+function ProvaConfigPanel({
+  config,
+  layoutCfg,
+  onChange,
+  onChangeLayout,
+  disciplinasEscola = [],
+  seriesEscola = [],
+  turmasEscola = [],
+}) {
   const isModelo01 = config.template_slug === 'modelo_01_provao';
   const rodapePreview = gerarTextoRodapeAutomatico(config, layoutCfg);
+  const opcoesSerieETurma = [
+    ...seriesEscola,
+    ...turmasEscola.map((t) => t.nome).filter((n) => n && !seriesEscola.includes(n)),
+  ];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -329,11 +345,15 @@ function ProvaConfigPanel({ config, layoutCfg, onChange, onChangeLayout }) {
           </label>
           <input
             type="text"
-            placeholder="Ex: Ciências e Matemática"
+            list="prova-disciplinas-escola-list"
+            placeholder="Ex: Espanhol ou Ciências e Matemática"
             value={config.disciplina}
             onChange={(e) => onChange({ disciplina: e.target.value })}
             style={{ width: '100%', padding: '8px 12px', borderRadius: 8, marginTop: 4, border: '1.5px solid #cbd5e1', fontSize: '0.86rem', fontFamily: 'inherit', boxSizing: 'border-box' }}
           />
+          <datalist id="prova-disciplinas-escola-list">
+            {disciplinasEscola.map((d) => <option key={d} value={d} />)}
+          </datalist>
         </div>
 
         <div>
@@ -342,11 +362,15 @@ function ProvaConfigPanel({ config, layoutCfg, onChange, onChangeLayout }) {
           </label>
           <input
             type="text"
-            placeholder="Ex: 9º ANO"
+            list="prova-turmas-escola-list"
+            placeholder="Ex: 9º Ano EF ou 1ª SÉRIE A"
             value={config.turma}
             onChange={(e) => onChange({ turma: e.target.value })}
             style={{ width: '100%', padding: '8px 12px', borderRadius: 8, marginTop: 4, border: '1.5px solid #cbd5e1', fontSize: '0.86rem', fontFamily: 'inherit', boxSizing: 'border-box' }}
           />
+          <datalist id="prova-turmas-escola-list">
+            {opcoesSerieETurma.map((t) => <option key={t} value={t} />)}
+          </datalist>
         </div>
 
         <div>
@@ -536,6 +560,13 @@ function ProvaConfigPanel({ config, layoutCfg, onChange, onChangeLayout }) {
    COMPONENTE PRINCIPAL — ProvaBuilder
 ══════════════════════════════════════════════════════════════════════════════ */
 export default function ProvaBuilder({ onProvasSalvas, editingProva = null, onClearEditingProva = null }) {
+  const {
+    disciplinas: disciplinasEscola,
+    itinerarios: itinerariosEscola,
+    todasDisciplinas: todasDisciplinasEscola,
+    series: seriesEscola,
+    turmas: turmasEscola,
+  } = useOpcoesEscolaQuestoes();
   const prefsEscola = getPreferenciasModeloEscola();
   const [padraoEscolaSlug, setPadraoEscolaSlug] = useState(prefsEscola.template_slug || 'modelo_01_provao');
 
@@ -980,13 +1011,18 @@ export default function ProvaBuilder({ onProvasSalvas, editingProva = null, onCl
             />
 
             <div style={{ display: 'flex', gap: 6 }}>
-              <input
-                type="text"
-                placeholder="Disciplina"
+              <select
                 value={bancoDisc}
-                onChange={(e) => setBancoDisc(e.target.value)}
-                style={{ flex: 1, padding: '6px 10px', borderRadius: 8, border: '1.5px solid #e2e8f0', fontSize: '0.78rem', fontFamily: 'inherit' }}
-              />
+                onChange={(e) => { setBancoDisc(e.target.value); setBancoPage(1); }}
+                style={{ flex: 1.35, padding: '6px 8px', borderRadius: 8, border: '1.5px solid #e2e8f0', fontSize: '0.78rem', fontFamily: 'inherit', background: '#fff' }}
+              >
+                <option value="">Todas as disciplinas</option>
+                {renderOpcoesDisciplinaEscola({
+                  disciplinas: disciplinasEscola,
+                  itinerarios: itinerariosEscola,
+                  valorAtual: bancoDisc,
+                })}
+              </select>
               <select
                 value={bancoNivel}
                 onChange={(e) => { setBancoNivel(e.target.value); setBancoPage(1); }}
@@ -1072,6 +1108,9 @@ export default function ProvaBuilder({ onProvasSalvas, editingProva = null, onCl
                 layoutCfg={layoutCfg}
                 onChange={updateConfig}
                 onChangeLayout={updateLayoutCfg}
+                disciplinasEscola={todasDisciplinasEscola}
+                seriesEscola={seriesEscola}
+                turmasEscola={turmasEscola}
               />
             </div>
           )}
@@ -1193,6 +1232,9 @@ export default function ProvaBuilder({ onProvasSalvas, editingProva = null, onCl
                     layoutCfg={layoutCfg}
                     onChange={updateConfig}
                     onChangeLayout={updateLayoutCfg}
+                    disciplinasEscola={todasDisciplinasEscola}
+                    seriesEscola={seriesEscola}
+                    turmasEscola={turmasEscola}
                   />
                 </div>
               )}

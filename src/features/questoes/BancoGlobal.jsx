@@ -4,6 +4,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import api from '../../services/api';
 import { QuestaoCorpoEstruturado } from './utils/questaoRenderer';
+import { useOpcoesEscolaQuestoes } from './utils/useOpcoesEscolaQuestoes';
 
 /* ── Utilitários ── */
 const NIVEL_LABEL  = { facil: 'Fácil', medio: 'Médio', dificil: 'Difícil', enem: 'ENEM' };
@@ -170,6 +171,7 @@ function CardGlobal({ q, onVer, onUsar, usando, isAutor, onExcluir }) {
 export default function BancoGlobal({ onUsada }) {
   const { professor_id: meuProfId, perfil: meuPerfil } = decodificarToken();
   const isGestor = ['diretor','coordenador','admin','militar'].includes(meuPerfil);
+  const { todasDisciplinas: disciplinasEscola } = useOpcoesEscolaQuestoes();
 
   const [questoes,          setQuestoes]          = useState([]);
   const [stats,             setStats]             = useState(null);
@@ -318,7 +320,10 @@ export default function BancoGlobal({ onUsada }) {
 
         <select value={filtDisc} onChange={e=>setFiltDisc(e.target.value)} style={selectStyle}>
           <option value="">Todas as disciplinas</option>
-          {disciplinas.map(d => <option key={d} value={d}>{d}</option>)}
+          {[
+            ...disciplinasEscola,
+            ...disciplinas.filter((d) => !disciplinasEscola.some((de) => de.toLowerCase() === String(d).toLowerCase())),
+          ].map(d => <option key={d} value={d}>{d}</option>)}
         </select>
 
         <select value={filtNivel} onChange={e=>setFiltNivel(e.target.value)} style={selectStyle}>
@@ -328,7 +333,7 @@ export default function BancoGlobal({ onUsada }) {
 
         <select value={filtSerie} onChange={e=>setFiltSerie(e.target.value)} style={selectStyle}>
           <option value="">Todas as séries</option>
-          {['6º Ano','7º Ano','8º Ano','9º Ano','1º Ano EM','2º Ano EM','3º Ano EM'].map(s=><option key={s} value={s}>{s}</option>)}
+          {['6º Ano EF','7º Ano EF','8º Ano EF','9º Ano EF','1ª Série EM','2ª Série EM','3ª Série EM'].map(s=><option key={s} value={s}>{s}</option>)}
         </select>
 
         <select value={ordenar} onChange={e=>setOrdenar(e.target.value)} style={selectStyle}>

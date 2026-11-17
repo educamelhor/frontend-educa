@@ -22,17 +22,11 @@ import {
   resumirGabaritoQuestao,
   inferirLetraCorretaPorEstrutura,
 } from '../utils/questaoRenderer';
-
-const DISCIPLINAS_LISTA = [
-  'Português', 'Matemática', 'Ciências', 'História', 'Geografia',
-  'Inglês', 'Artes', 'Educação Física', 'Biologia', 'Física',
-  'Química', 'Sociologia', 'Filosofia', 'Redação', 'PD',
-];
-
-const SERIES_LISTA = [
-  '6º Ano EF', '7º Ano EF', '8º Ano EF', '9º Ano EF',
-  '1º EM', '2º EM', '3º EM', 'Ensino Superior',
-];
+import {
+  useOpcoesEscolaQuestoes,
+  renderOpcoesDisciplinaEscola,
+  renderOpcoesSerieEscola,
+} from '../utils/useOpcoesEscolaQuestoes';
 
 const NIVEIS_LISTA = [
   { value: 'facil',   label: '⭐ Fácil' },
@@ -221,6 +215,12 @@ export default function ImportarListaModal({
   onImportado,
   onAbrirNoEstudio = null,
 }) {
+  const {
+    disciplinas: disciplinasEscola,
+    itinerarios: itinerariosEscola,
+    series: seriesEscola,
+  } = useOpcoesEscolaQuestoes();
+
   // Etapas: 'upload' | 'processando' | 'revisao' | 'resumo'
   const [etapa, setEtapa] = useState('upload');
   const [modoFonte, setModoFonte] = useState('visual'); // 'visual' (PDF/Fotos) | 'texto'
@@ -1030,14 +1030,21 @@ export default function ImportarListaModal({
                 <label style={S.miniLabel}>Disciplina padrão (opcional — IA detecta automaticamente)</label>
                 <select style={S.select} value={discPadrao} onChange={(e) => setDiscPadrao(e.target.value)}>
                   <option value="">✨ Detectar automaticamente por questão</option>
-                  {DISCIPLINAS_LISTA.map((d) => <option key={d} value={d}>{d}</option>)}
+                  {renderOpcoesDisciplinaEscola({
+                    disciplinas: disciplinasEscola,
+                    itinerarios: itinerariosEscola,
+                    valorAtual: discPadrao,
+                  })}
                 </select>
               </div>
               <div>
                 <label style={S.miniLabel}>Série padrão (opcional — IA sugere automaticamente)</label>
                 <select style={S.select} value={seriePadrao} onChange={(e) => setSeriePadrao(e.target.value)}>
                   <option value="">✨ Sugerir automaticamente</option>
-                  {SERIES_LISTA.map((s) => <option key={s} value={s}>{s}</option>)}
+                  {renderOpcoesSerieEscola({
+                    series: seriesEscola,
+                    valorAtual: seriePadrao,
+                  })}
                 </select>
               </div>
             </div>
@@ -1550,14 +1557,21 @@ export default function ImportarListaModal({
                     <label style={S.miniLabel}>Disciplina *</label>
                     <select style={S.selectCompact} value={currentItem.disciplina || ''} onChange={(e) => patchCurrentItem({ disciplina: e.target.value })}>
                       <option value="">Selecione...</option>
-                      {DISCIPLINAS_LISTA.map((d) => <option key={d} value={d}>{d}</option>)}
+                      {renderOpcoesDisciplinaEscola({
+                        disciplinas: disciplinasEscola,
+                        itinerarios: itinerariosEscola,
+                        valorAtual: currentItem.disciplina || '',
+                      })}
                     </select>
                   </div>
                   <div>
                     <label style={S.miniLabel}>Série</label>
                     <select style={S.selectCompact} value={currentItem.serie || ''} onChange={(e) => patchCurrentItem({ serie: e.target.value })}>
                       <option value="">Todas</option>
-                      {SERIES_LISTA.map((s) => <option key={s} value={s}>{s}</option>)}
+                      {renderOpcoesSerieEscola({
+                        series: seriesEscola,
+                        valorAtual: currentItem.serie || '',
+                      })}
                     </select>
                   </div>
                   <div>

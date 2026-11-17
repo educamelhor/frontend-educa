@@ -5,6 +5,11 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import apiService from '../../services/api';
 import QuestaoDetalhes from './components/QuestaoDetalhes';
 import BulkImportModal from './BulkImportModal';
+import {
+  useOpcoesEscolaQuestoes,
+  renderOpcoesDisciplinaEscola,
+  renderOpcoesSerieEscola,
+} from './utils/useOpcoesEscolaQuestoes';
 
 /* ── Decodifica JWT (sem biblioteca) para obter professor_id e perfil do usuário ── */
 function decodificarToken() {
@@ -320,6 +325,11 @@ export default function QuestoesBanco({ onEdit, refreshKey, onRemovida }) {
   // Quem sou eu?
   const { professor_id: meuProfId, perfil: meuPerfil } = decodificarToken();
   const isGestor = ['diretor', 'coordenador', 'admin', 'militar'].includes(meuPerfil);
+  const {
+    disciplinas: disciplinasCatalogoEscola,
+    itinerarios: itinerariosCatalogoEscola,
+    series: seriesCatalogoEscola,
+  } = useOpcoesEscolaQuestoes();
 
   const [questoes,   setQuestoes]   = useState([]);
   const [loading,    setLoading]    = useState(true);
@@ -527,10 +537,31 @@ export default function QuestoesBanco({ onEdit, refreshKey, onRemovida }) {
           />
         </div>
 
-        {/* Disciplina */}
+        {/* Disciplina (dinâmica da escola + questões existentes) */}
         <select className="bq-filter-select" value={filtDisc} onChange={e => { setFiltDisc(e.target.value); setPage(1); }}>
           <option value="">Todas as disciplinas</option>
-          {disciplinas.map(d => <option key={d} value={d}>{d}</option>)}
+          {renderOpcoesDisciplinaEscola({
+            disciplinas: [
+              ...disciplinasCatalogoEscola,
+              ...disciplinas.filter(
+                (d) =>
+                  ![...disciplinasCatalogoEscola, ...itinerariosCatalogoEscola].some(
+                    (c) => c.toLowerCase() === String(d).toLowerCase()
+                  )
+              ),
+            ],
+            itinerarios: itinerariosCatalogoEscola,
+            valorAtual: filtDisc,
+          })}
+        </select>
+
+        {/* Série / Ano (dinâmica das turmas da escola) */}
+        <select className="bq-filter-select" value={filtSerie} onChange={e => { setFiltSerie(e.target.value); setPage(1); }}>
+          <option value="">Todas as séries</option>
+          {renderOpcoesSerieEscola({
+            series: seriesCatalogoEscola,
+            valorAtual: filtSerie,
+          })}
         </select>
 
         {/* Tipo */}

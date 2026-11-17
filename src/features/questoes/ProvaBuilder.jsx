@@ -794,7 +794,8 @@ export default function ProvaBuilder({ onProvasSalvas, editingProva = null, onCl
       if (onProvasSalvas) onProvasSalvas();
       return id;
     } catch (err) {
-      toast(`❌ Erro ao salvar: ${err.message}`, 'error');
+      const msgDetalhe = err?.response?.data?.detail || err?.response?.data?.message || err.message;
+      toast(`❌ Erro ao salvar: ${msgDetalhe}`, 'error');
       return null;
     } finally {
       setSaving(false);

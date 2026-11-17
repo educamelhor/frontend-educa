@@ -465,9 +465,19 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {}, a
     // Se existir nome da turma no initialData e já temos a lista
     if (initialData?.turma && Array.isArray(turmas) && turmas.length) {
       const alvo = String(initialData.turma).toUpperCase().trim();
-      const match = turmas.find(
-        (t) => String(t.turma).toUpperCase().trim() === alvo
-      );
+      const turnoAlvo = String(initialData.turno || "").toUpperCase().trim();
+      const matchComTurno = turnoAlvo
+        ? turmas.find(
+            (t) =>
+              String(t.turma || t.nome || "").toUpperCase().trim() === alvo &&
+              String(t.turno || "").toUpperCase().trim() === turnoAlvo
+          )
+        : null;
+      const match =
+        matchComTurno ||
+        turmas.find(
+          (t) => String(t.turma || t.nome || "").toUpperCase().trim() === alvo
+        );
       if (match?.id) setTurmaId(String(match.id));
     }
   }, [open, initialData, turmas]);
@@ -721,11 +731,15 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {}, a
               <option value="">Selecione a turma</option>
               {turmas
                 .filter((t) => !anoLetivo || Number(t.ano) === Number(anoLetivo))
-                .map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.turma}
-                  </option>
-                ))}
+                .map((t) => {
+                  const nomeTurma = t.turma || t.nome || "";
+                  const labelTurma = t.turno ? `${nomeTurma} — ${t.turno}` : nomeTurma;
+                  return (
+                    <option key={t.id} value={t.id}>
+                      {labelTurma}
+                    </option>
+                  );
+                })}
             </select>
           </div>
 

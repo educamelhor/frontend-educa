@@ -79,12 +79,14 @@ export default function FaltasPage() {
 
   // ── Dados das turmas ──
   const [todasTurmas, setTodasTurmas] = useState([]);
+  const [todosAgrupamentos, setTodosAgrupamentos] = useState([]);
   const [loadingTurmas, setLoadingTurmas] = useState(true);
 
   // ── Dados das faltas da turma ──
   const [loadingFaltas, setLoadingFaltas] = useState(false);
   const [estudantes, setEstudantes] = useState([]);
   const [turmaInfo, setTurmaInfo] = useState(null);
+  const [chamadaOnline, setChamadaOnline] = useState(null);
   const [erro, setErro] = useState(null);
 
   // ── Aluno expandido para ver disciplinas ──
@@ -130,10 +132,42 @@ export default function FaltasPage() {
     carregarTurmas();
   }, []);
 
-  // 2. Turmas filtradas pelo ano selecionado
+  // 1b. Carrega agrupamentos (IFA / Eletivas / Projetos) do ano letivo selecionado
+  useEffect(() => {
+    let ativo = true;
+    async function carregarAgrupamentosAno() {
+      try {
+        const res = await api
+          .get("/api/agrupamentos", { params: { ano: anoLetivo } })
+          .catch(() => ({ data: [] }));
+        if (!ativo) return;
+        const rows = Array.isArray(res.data) ? res.data : [];
+        setTodosAgrupamentos(
+          rows.map((g) => ({
+            ...g,
+            turma: g.nome,
+            ano: Number(g.ano_letivo) || Number(anoLetivo),
+            is_agrupamento: true,
+            tipo_agrupamento: g.tipo || "IFA",
+          }))
+        );
+      } catch {
+        if (ativo) setTodosAgrupamentos([]);
+      }
+    }
+    carregarAgrupamentosAno();
+    return () => {
+      ativo = false;
+    };
+  }, [anoLetivo]);
+
+  // 2. Turmas + Agrupamentos filtrados pelo ano selecionado
   const turmasDoAno = useMemo(() => {
-    return todasTurmas.filter((t) => Number(t.ano) === Number(anoLetivo));
-  }, [todasTurmas, anoLetivo]);
+    const regulares = todasTurmas
+      .filter((t) => Number(t.ano) === Number(anoLetivo))
+      .map((t) => ({ ...t, is_agrupamento: false }));
+    return [...regulares, ...todosAgrupamentos];
+  }, [todasTurmas, todosAgrupamentos, anoLetivo]);
 
   // Contagem de turmas por turno
   const contagemTurnos = useMemo(() => {
@@ -145,7 +179,7 @@ export default function FaltasPage() {
     return counts;
   }, [turmasDoAno]);
 
-  // Turmas filtradas por turno e ordenadas
+  // Turmas filtradas por turno e ordenadas (regulares primeiro, agrupamentos em seguida)
   const turmasExibidas = useMemo(() => {
     let filtradas = turmasDoAno;
     if (turnoSelecionado !== "todos") {
@@ -153,13 +187,22 @@ export default function FaltasPage() {
         (t) => String(t.turno || "").toLowerCase().trim() === turnoSelecionado
       );
     }
-    return filtradas.sort((a, b) => (a.turma || a.nome || "").localeCompare(b.turma || b.nome || "", "pt-BR"));
+    return [...filtradas].sort((a, b) => {
+      if (Boolean(a.is_agrupamento) !== Boolean(b.is_agrupamento)) {
+        return a.is_agrupamento ? 1 : -1;
+      }
+      return (a.turma || a.nome || "").localeCompare(b.turma || b.nome || "", "pt-BR");
+    });
   }, [turmasDoAno, turnoSelecionado]);
 
   // Seleciona automaticamente a primeira turma caso nenhuma esteja selecionada
   useEffect(() => {
     if (turmasExibidas.length > 0) {
-      const aindaExiste = turmasExibidas.some((t) => t.id === turmaSelecionada?.id);
+      const aindaExiste = turmasExibidas.some(
+        (t) =>
+          t.id === turmaSelecionada?.id &&
+          Boolean(t.is_agrupamento) === Boolean(turmaSelecionada?.is_agrupamento)
+      );
       if (!aindaExiste) {
         setTurmaSelecionada(turmasExibidas[0]);
       }
@@ -173,6 +216,7 @@ export default function FaltasPage() {
     if (!turmaSelecionada?.id) {
       setEstudantes([]);
       setTurmaInfo(null);
+      setChamadaOnline(null);
       return;
     }
 
@@ -182,12 +226,16 @@ export default function FaltasPage() {
       setAlunoExpandido(null);
       try {
         const res = await api.get(`/api/secretaria/faltas/turma/${turmaSelecionada.id}`, {
-          params: { ano_letivo: anoLetivo },
+          params: {
+            ano_letivo: anoLetivo,
+            is_agrupamento: turmaSelecionada.is_agrupamento ? 1 : 0,
+          },
         });
 
         if (res.data?.ok) {
           setEstudantes(res.data.estudantes || []);
           setTurmaInfo(res.data.turma || turmaSelecionada);
+          setChamadaOnline(res.data.chamada_online || null);
         } else {
           setErro(res.data?.message || "Erro ao consultar faltas.");
         }
@@ -317,7 +365,8 @@ export default function FaltasPage() {
     return estudantes.filter(
       (e) =>
         e.nome.toLowerCase().includes(q) ||
-        String(e.codigo || "").toLowerCase().includes(q)
+        String(e.codigo || "").toLowerCase().includes(q) ||
+        String(e.turma_origem_nome || "").toLowerCase().includes(q)
     );
   }, [estudantes, buscaAluno]);
 
@@ -498,21 +547,43 @@ export default function FaltasPage() {
           ) : (
             <div className="flex flex-wrap gap-2">
               {turmasExibidas.map((t) => {
-                const isSelected = turmaSelecionada?.id === t.id;
+                const isSelected =
+                  turmaSelecionada?.id === t.id &&
+                  Boolean(turmaSelecionada?.is_agrupamento) === Boolean(t.is_agrupamento);
                 const nomeTurma = t.turma || t.nome;
+                const ehAgr = Boolean(t.is_agrupamento);
                 return (
                   <button
-                    key={t.id}
+                    key={`${ehAgr ? "agr" : "reg"}_${t.id}`}
                     type="button"
                     onClick={() => setTurmaSelecionada(t)}
                     className={`px-3.5 py-2 rounded-xl text-xs font-bold border transition-all flex items-center gap-2 ${
                       isSelected
-                        ? "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/20 scale-105"
+                        ? ehAgr
+                          ? "bg-purple-700 text-white border-purple-700 shadow-md shadow-purple-500/20 scale-105"
+                          : "bg-blue-600 text-white border-blue-600 shadow-md shadow-blue-500/20 scale-105"
+                        : ehAgr
+                        ? "bg-purple-50/70 text-purple-900 border-purple-200 hover:bg-purple-100 hover:border-purple-300"
                         : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700"
                     }`}
                   >
-                    <span className={`w-2 h-2 rounded-full ${isSelected ? "bg-white" : "bg-blue-500"}`} />
+                    <span
+                      className={`w-2 h-2 rounded-full ${
+                        isSelected ? "bg-white" : ehAgr ? "bg-purple-500" : "bg-blue-500"
+                      }`}
+                    />
                     <span>{nomeTurma}</span>
+                    {ehAgr && (
+                      <span
+                        className={`text-[9px] font-black px-1.5 py-0.5 rounded uppercase ${
+                          isSelected
+                            ? "bg-white/20 text-white"
+                            : "bg-purple-200/80 text-purple-800"
+                        }`}
+                      >
+                        {t.tipo_agrupamento || "IFA"}
+                      </span>
+                    )}
                     {t.turno && (
                       <span className={`text-[10px] font-medium opacity-80 uppercase ${isSelected ? "text-blue-100" : "text-slate-400"}`}>
                         ({t.turno})
@@ -529,10 +600,15 @@ export default function FaltasPage() {
       {/* ── BARRA DE FERRAMENTAS DA TABELA ── */}
       {turmaSelecionada && (
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-          <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="flex items-center gap-2.5 flex-wrap w-full sm:w-auto">
             <span className="font-extrabold text-slate-800 text-base flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-emerald-500" />
-              Turma: {turmaSelecionada.turma || turmaSelecionada.nome}
+              <span
+                className={`w-3 h-3 rounded-full ${
+                  turmaSelecionada.is_agrupamento ? "bg-purple-500" : "bg-emerald-500"
+                }`}
+              />
+              {turmaSelecionada.is_agrupamento ? "Agrupamento:" : "Turma:"}{" "}
+              {turmaSelecionada.turma || turmaSelecionada.nome}
             </span>
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 font-semibold border border-slate-200">
               Turno: {turmaSelecionada.turno || "—"}
@@ -540,6 +616,18 @@ export default function FaltasPage() {
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 font-semibold border border-slate-200">
               {estudantesFiltrados.length} estudante(s)
             </span>
+            {chamadaOnline?.total_aulas_lancadas > 0 && (
+              <span
+                className="text-xs px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-bold border border-indigo-200 flex items-center gap-1"
+                title={
+                  chamadaOnline.ultima_atualizacao_fmt
+                    ? `Último lançamento de chamada em ${chamadaOnline.ultima_atualizacao_fmt}`
+                    : "Alimentado automaticamente pelo módulo Professores > Chamada"
+                }
+              >
+                ⚡ Chamada Digital ({chamadaOnline.total_aulas_lancadas} aulas lançadas)
+              </span>
+            )}
           </div>
 
           {/* Busca textual por aluno */}
@@ -695,9 +783,16 @@ export default function FaltasPage() {
                               </div>
                             )}
                             <div>
-                              <p className="font-bold text-slate-800 leading-tight">
-                                {aluno.nome}
-                              </p>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <p className="font-bold text-slate-800 leading-tight">
+                                  {aluno.nome}
+                                </p>
+                                {aluno.turma_origem_nome && (
+                                  <span className="px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 text-[9px] font-black uppercase tracking-wide">
+                                    {aluno.turma_origem_nome}
+                                  </span>
+                                )}
+                              </div>
                               <div className="flex items-center gap-2 mt-0.5">
                                 <span className="text-[11px] text-slate-400 font-mono">
                                   Matrícula: {aluno.codigo}
@@ -932,9 +1027,16 @@ export default function FaltasPage() {
                                       className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between text-xs"
                                     >
                                       <div>
-                                        <p className="font-bold text-slate-800">
-                                          {disc.nome}
-                                        </p>
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                          <p className="font-bold text-slate-800">
+                                            {disc.nome}
+                                          </p>
+                                          {Number(disc.aulas_chamada_ano || 0) > 0 && (
+                                            <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">
+                                              ⚡ {disc.aulas_chamada_ano} aulas na chamada
+                                            </span>
+                                          )}
+                                        </div>
                                         <p className="text-[11px] text-slate-400 mt-0.5">
                                           B1: {disc.b1} | B2: {disc.b2} | B3: {disc.b3} | B4: {disc.b4}
                                         </p>

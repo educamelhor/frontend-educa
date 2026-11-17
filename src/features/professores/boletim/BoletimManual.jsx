@@ -1,5 +1,5 @@
 // src/features/professores/boletim/BoletimManual.jsx
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import api from "../../../services/api";
 
 const BIMESTRES = [
@@ -61,10 +61,18 @@ export default function BoletimManual() {
   // Mensagens
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const [resumoChamada, setResumoChamada] = useState(null);
 
   // Lançamentos locais temporários para digitação
   const [lancamentos, setLancamentos] = useState({}); // { [aluno_id]: { nota: string, faltas: string } }
   const [validations, setValidations] = useState({}); // { [aluno_id]: { notaValida: bool, faltasValida: bool } }
+
+  const turmaSelecionadaObj = useMemo(() => {
+    if (!selectedTurma) return null;
+    return (
+      turmas.find((t) => `${t.is_agrupamento ? "agr" : "reg"}_${t.id}` === selectedTurma) || null
+    );
+  }, [turmas, selectedTurma]);
 
   // Carrega as turmas moduladas do professor no início
   const carregarTurmas = useCallback(async () => {
@@ -87,7 +95,7 @@ export default function BoletimManual() {
 
   // Carrega as disciplinas moduladas quando a turma muda
   useEffect(() => {
-    if (!selectedTurma) {
+    if (!turmaSelecionadaObj) {
       setDisciplinas([]);
       setSelectedDisciplina("");
       return;
@@ -96,7 +104,14 @@ export default function BoletimManual() {
     const carregarDisciplinas = async () => {
       try {
         setLoadingFilter(true);
-        const { data } = await api.get(`/professores/me/turmas/${selectedTurma}/disciplinas`);
+        const { data } = await api.get(
+          `/professores/me/turmas/${turmaSelecionadaObj.id}/disciplinas`,
+          {
+            params: {
+              is_agrupamento: turmaSelecionadaObj.is_agrupamento ? 1 : 0,
+            },
+          }
+        );
         setDisciplinas(data?.disciplinas || []);
         if (data?.disciplinas?.length > 0) {
           // Auto seleciona a primeira se houver apenas uma
@@ -117,14 +132,15 @@ export default function BoletimManual() {
     };
 
     carregarDisciplinas();
-  }, [selectedTurma]);
+  }, [turmaSelecionadaObj]);
 
   // Carrega os alunos e as notas salvas quando todos os filtros estão preenchidos
   const buscarAlunos = useCallback(async () => {
-    if (!selectedTurma || !selectedDisciplina || !selectedBimestre) {
+    if (!turmaSelecionadaObj || !selectedDisciplina || !selectedBimestre) {
       setAlunos([]);
       setLancamentos({});
       setValidations({});
+      setResumoChamada(null);
       return;
     }
 
@@ -135,7 +151,8 @@ export default function BoletimManual() {
       
       const { data } = await api.get("/professores/boletim/alunos", {
         params: {
-          turma_id: selectedTurma,
+          turma_id: turmaSelecionadaObj.id,
+          is_agrupamento: turmaSelecionadaObj.is_agrupamento ? 1 : 0,
           disciplina_id: selectedDisciplina,
           bimestre: selectedBimestre,
           ano
@@ -144,6 +161,7 @@ export default function BoletimManual() {
 
       const list = data?.alunos || [];
       setAlunos(list);
+      setResumoChamada(data?.resumo_chamada || null);
 
       // Preenche os inputs com dados do banco
       const initialLancamentos = {};
@@ -166,7 +184,7 @@ export default function BoletimManual() {
     } finally {
       setLoadingStudents(false);
     }
-  }, [selectedTurma, selectedDisciplina, selectedBimestre, ano]);
+  }, [turmaSelecionadaObj, selectedDisciplina, selectedBimestre, ano]);
 
   useEffect(() => {
     buscarAlunos();
@@ -264,7 +282,8 @@ export default function BoletimManual() {
       });
 
       await api.post("/professores/boletim/salvar", {
-        turma_id: selectedTurma,
+        turma_id: turmaSelecionadaObj ? turmaSelecionadaObj.id : selectedTurma,
+        is_agrupamento: turmaSelecionadaObj?.is_agrupamento ? 1 : 0,
         disciplina_id: selectedDisciplina,
         bimestre: selectedBimestre,
         ano,
@@ -396,11 +415,15 @@ export default function BoletimManual() {
                 className="w-full h-11 px-3 border border-gray-250 rounded-xl bg-gray-50 focus:bg-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm font-semibold transition"
               >
                 <option value="">Selecione uma turma...</option>
-                {turmas.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.nome} ({t.turno})
-                  </option>
-                ))}
+                {turmas.map((t) => {
+                  const compositeKey = `${t.is_agrupamento ? "agr" : "reg"}_${t.id}`;
+                  return (
+                    <option key={compositeKey} value={compositeKey}>
+                      {t.nome} ({t.turno})
+                      {t.is_agrupamento ? ` · [${t.tipo_agrupamento || "Agrupamento"}]` : ""}
+                    </option>
+                  );
+                })}
               </select>
             </div>
 
@@ -488,6 +511,22 @@ export default function BoletimManual() {
           </div>
         ) : (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-150 overflow-hidden">
+            {resumoChamada?.sincronizado && (
+              <div className="px-6 py-3 bg-indigo-50/90 border-b border-indigo-100 flex flex-wrap items-center justify-between gap-2 text-xs text-indigo-900">
+                <div className="flex items-center gap-2 font-bold">
+                  <span>⚡</span>
+                  <span>
+                    Faltas sincronizadas automaticamente da <strong>Chamada Digital</strong> (
+                    {resumoChamada.total_aulas_confirmadas} aula
+                    {resumoChamada.total_aulas_confirmadas === 1 ? "" : "s"} confirmada
+                    {resumoChamada.total_aulas_confirmadas === 1 ? "" : "s"} neste bimestre).
+                  </span>
+                </div>
+                <span className="text-[11px] font-semibold text-indigo-600">
+                  Ajustes manuais também são permitidos abaixo
+                </span>
+              </div>
+            )}
             
             {/* Header da Tabela */}
             <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-4 bg-gray-50 border-b border-gray-150 text-xs font-bold text-gray-500 uppercase tracking-wider">
@@ -564,9 +603,26 @@ export default function BoletimManual() {
                           {badge.chars}
                         </div>
                       </div>
-                      <span className="text-sm font-extrabold text-gray-800 leading-tight">
-                        {al.nome}
-                      </span>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-extrabold text-gray-800 leading-tight">
+                            {al.nome}
+                          </span>
+                          {turmaSelecionadaObj?.is_agrupamento && al.turma_origem_nome && (
+                            <span className="px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 text-[10px] font-black uppercase tracking-wide">
+                              {al.turma_origem_nome}
+                            </span>
+                          )}
+                          {Number(al.dias_justificados_bimestre || 0) > 0 && (
+                            <span
+                              className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold"
+                              title={`${al.dias_justificados_bimestre} dia(s) com atestado/justificativa no bimestre`}
+                            >
+                              🏥 {al.dias_justificados_bimestre}d justif.
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </div>
 
                     {/* Nota Input */}

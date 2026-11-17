@@ -25,6 +25,24 @@ const carregarPdf = () => import("./chamadaPdf");
 const DIAS_SEMANA = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
 const DIAS_SEMANA_UPPER = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
 
+const TIPOS_JUSTIFICATIVA_MAP = {
+  atestado_medico: { label: "Atestado Médico", icon: "🏥" },
+  atestado_acompanhamento: { label: "Atestado Acomp.", icon: "👨‍⚕️" },
+  atestado_obito: { label: "Atestado de Óbito", icon: "🕊️" },
+  atividades_militares: { label: "Ativ. Militares", icon: "🎖️" },
+  convocacao_oficial: { label: "Convocação Oficial", icon: "📋" },
+  declaracao_trabalhista: { label: "Decl. Trabalhista", icon: "💼" },
+  populacao_itinerancia: { label: "Itinerância", icon: "🏕️" },
+  licenca_gestante: { label: "Licença Gestante", icon: "🤰" },
+  crenca_religiosa: { label: "Crença Religiosa", icon: "🙏" },
+  estudante_atleta: { label: "Estudante Atleta", icon: "🏅" },
+  atividade_remota: { label: "Atividade Remota", icon: "💻" },
+  intercambio: { label: "Intercâmbio", icon: "✈️" },
+};
+
+const getInfoTipoJustificativa = (tipo) =>
+  TIPOS_JUSTIFICATIVA_MAP[tipo] || { label: "Justificativa Legal", icon: "📋" };
+
 const normTexto = (s) =>
   String(s || "")
     .normalize("NFD")
@@ -534,6 +552,7 @@ export default function Chamada() {
   const [disciplinaSelecionada, setDisciplinaSelecionada] = useState("");
   const [bimestreSelecionado, setBimestreSelecionado] = useState("1º Bimestre");
   const [turmaSelecionada, setTurmaSelecionada] = useState("");
+  const [turmaIsAgrupamento, setTurmaIsAgrupamento] = useState(false);
   const [dataSelecionada, setDataSelecionada] = useState(hojeIso);
   const [aulaOrdemSelecionada, setAulaOrdemSelecionada] = useState(1);
   const [aulaGeminada, setAulaGeminada] = useState(false);
@@ -548,6 +567,10 @@ export default function Chamada() {
   const [slotsGradeProfessor, setSlotsGradeProfessor] = useState([]);
   const [filtrarApenasDiasDaGrade, setFiltrarApenasDiasDaGrade] = useState(true);
   const [mostrarCalendarioBimestreGrade, setMostrarCalendarioBimestreGrade] = useState(false);
+
+  // ─── Elo C: Atestados (`frequencia_justificativas`) & Sincronização c/ Boletim/Secretaria ───
+  const [justificativasTurma, setJustificativasTurma] = useState([]);
+  const [sincronizadoBoletimInfo, setSincronizadoBoletimInfo] = useState(null);
 
   const [sincronizandoServidor, setSincronizandoServidor] = useState(false);
   const [ultimoSyncFmt, setUltimoSyncFmt] = useState(null);
@@ -884,18 +907,25 @@ export default function Chamada() {
     });
   }, [turmas, bimestreSelecionado]);
 
-  // Auto-seleciona a turma (respeitando deep-link `?turma_id=` se vier de Meu Horário)
+  // Auto-seleciona a turma (respeitando deep-link `?turma_id=` e `is_agrupamento` sem colisão de IDs)
   useEffect(() => {
     if (turmasCompativeis.length > 0) {
       if (!deepLinkAplicadoRef.current) {
         const turmaQuery = searchParams.get("turma_id");
+        const agrQuery = searchParams.get("is_agrupamento");
         const dataQuery = searchParams.get("data");
         const ordemQuery = searchParams.get("ordem");
 
         if (turmaQuery) {
-          const tMatch = turmasCompativeis.find((t) => String(t.id) === String(turmaQuery));
+          const tMatch =
+            turmasCompativeis.find(
+              (t) =>
+                String(t.id) === String(turmaQuery) &&
+                (agrQuery == null || Boolean(t.is_agrupamento) === (agrQuery === "1" || agrQuery === "true"))
+            ) || turmasCompativeis.find((t) => String(t.id) === String(turmaQuery));
           if (tMatch) {
             setTurmaSelecionada(tMatch.id);
+            setTurmaIsAgrupamento(Boolean(tMatch.is_agrupamento));
             if (dataQuery && /^\d{4}-\d{2}-\d{2}$/.test(dataQuery)) {
               setDataSelecionada(dataQuery);
             }
@@ -909,21 +939,37 @@ export default function Chamada() {
         }
       }
 
-      const existe = turmasCompativeis.some((t) => String(t.id) === String(turmaSelecionada));
+      const existe = turmasCompativeis.some(
+        (t) =>
+          String(t.id) === String(turmaSelecionada) &&
+          Boolean(t.is_agrupamento) === Boolean(turmaIsAgrupamento)
+      );
       if (!existe) {
         setTurmaSelecionada(turmasCompativeis[0].id);
+        setTurmaIsAgrupamento(Boolean(turmasCompativeis[0].is_agrupamento));
       }
     } else {
       setTurmaSelecionada("");
+      setTurmaIsAgrupamento(false);
     }
-  }, [turmasCompativeis, turmaSelecionada, searchParams]);
+  }, [turmasCompativeis, turmaSelecionada, turmaIsAgrupamento, searchParams]);
 
   const turmaObj = useMemo(
     () =>
+      turmasCompativeis.find(
+        (t) =>
+          String(t.id) === String(turmaSelecionada) &&
+          Boolean(t.is_agrupamento) === Boolean(turmaIsAgrupamento)
+      ) ||
+      turmas.find(
+        (t) =>
+          String(t.id) === String(turmaSelecionada) &&
+          Boolean(t.is_agrupamento) === Boolean(turmaIsAgrupamento)
+      ) ||
       turmasCompativeis.find((t) => String(t.id) === String(turmaSelecionada)) ||
       turmas.find((t) => String(t.id) === String(turmaSelecionada)) ||
       null,
-    [turmasCompativeis, turmas, turmaSelecionada]
+    [turmasCompativeis, turmas, turmaSelecionada, turmaIsAgrupamento]
   );
 
   // ─── Informações da Grade Horária (`Secretaria > Horários`) para a Turma + Disciplina atual ───
@@ -944,13 +990,10 @@ export default function Chamada() {
     [bimestreSelecionado, governancaAnoLetivo, infoGradeTurma, dataSelecionada]
   );
 
-  // Quando a turma, o bimestre ou a grade horária mudam, posiciona automaticamente a data selecionada:
-  // 1) Se a turma possui dias definidos na Grade Horária e a data atual não é dia de aula dessa turma (ou está fora do bimestre),
-  //    posiciona no dia de aula da turma mais próximo (até hoje, ou o próximo se for início de bimestre).
-  // 2) Se não houver grade horária para a turma, posiciona no dia letivo válido mais recente do bimestre.
+  // Quando a turma, o bimestre ou a grade horária mudam, posiciona automaticamente a data selecionada
   const ultimaTurmaGradeAutoRef = useRef("");
   useEffect(() => {
-    const contextoKey = `${turmaSelecionada}_${disciplinaSelecionada}_${bimestreSelecionado}_${infoGradeTurma.possuiNaGrade}`;
+    const contextoKey = `${turmaIsAgrupamento ? "agr" : "reg"}_${turmaSelecionada}_${disciplinaSelecionada}_${bimestreSelecionado}_${infoGradeTurma.possuiNaGrade}`;
     const mudouContexto = ultimaTurmaGradeAutoRef.current !== contextoKey;
     ultimaTurmaGradeAutoRef.current = contextoKey;
 
@@ -993,6 +1036,7 @@ export default function Chamada() {
     }
   }, [
     turmaSelecionada,
+    turmaIsAgrupamento,
     disciplinaSelecionada,
     bimestreSelecionado,
     governancaAnoLetivo,
@@ -1000,25 +1044,33 @@ export default function Chamada() {
     cronogramaGradeBimestre.datasAula,
   ]);
 
-  // ─── 3) Carrega Alunos Reais da Turma Selecionada ────────────────────────
+  // ─── 3) Carrega Alunos Reais da Turma / Agrupamento Selecionado ──────────
   useEffect(() => {
     if (!turmaSelecionada) {
       setAlunos([]);
       return;
     }
     let ativo = true;
+    const ehAgr = Boolean(turmaObj?.is_agrupamento ?? turmaIsAgrupamento);
     const carregarAlunosDaTurma = async () => {
       setCarregandoAlunos(true);
       try {
-        const res = await api.get(`/turmas/${turmaSelecionada}/alunos`).catch(() => null);
+        const res = await api
+          .get(`/turmas/${turmaSelecionada}/alunos`, {
+            params: { is_agrupamento: ehAgr ? 1 : 0 },
+          })
+          .catch(() => null);
         if (ativo && res?.data?.ok && Array.isArray(res.data.alunos) && res.data.alunos.length > 0) {
           const ordenados = [...res.data.alunos]
-            .sort((a, b) => String(a.estudante || a.nome || "").localeCompare(String(b.estudante || b.nome || "")))
+            .sort((a, b) =>
+              String(a.estudante || a.nome || "").localeCompare(String(b.estudante || b.nome || ""))
+            )
             .map((a, idx) => ({
               id: a.id || a.aluno_id || idx + 1,
               nr: idx + 1,
               codigo: a.codigo || a.matricula || String(100000 + idx + 1),
               nome: String(a.estudante || a.nome || "").toUpperCase(),
+              turma_origem_nome: a.turma_origem_nome ? String(a.turma_origem_nome).trim() : null,
             }));
           setAlunos(ordenados);
         } else if (ativo) {
@@ -1032,7 +1084,7 @@ export default function Chamada() {
     return () => {
       ativo = false;
     };
-  }, [turmaSelecionada]);
+  }, [turmaSelecionada, turmaIsAgrupamento, turmaObj?.is_agrupamento]);
 
   // ─── 4) Persistência Híbrida (MySQL Backend + Cache Local) ───────────────
   const storageKey = useMemo(() => {
@@ -1056,8 +1108,10 @@ export default function Chamada() {
       mapaLocal = {};
     }
     setRegistroBimestre(mapaLocal);
+    setJustificativasTurma([]);
+    setSincronizadoBoletimInfo(null);
 
-    // 2) Busca os registros salvos no banco de dados MySQL, a Governança e os slots da Grade Horária
+    // 2) Busca os registros salvos no banco de dados MySQL, a Governança, Atestados e a Grade Horária
     const carregarDoServidor = async () => {
       try {
         const res = await api
@@ -1075,6 +1129,10 @@ export default function Chamada() {
 
         if (res.data.governanca) {
           setGovernancaAnoLetivo(res.data.governanca);
+        }
+
+        if (Array.isArray(res.data.justificativas)) {
+          setJustificativasTurma(res.data.justificativas);
         }
 
         if (Array.isArray(res.data.grade_horaria?.slots) && res.data.grade_horaria.slots.length > 0) {
@@ -1131,7 +1189,7 @@ export default function Chamada() {
       console.error("Erro ao salvar chamada localmente:", e);
     }
 
-    // Persiste no banco de dados MySQL (com validação de Governança > Ano Letivo)
+    // Persiste no banco de dados MySQL (com validação de Governança > Ano Letivo e sync imediato c/ Boletim)
     const listaAulas =
       Array.isArray(aulasParaSincronizar) && aulasParaSincronizar.length > 0
         ? aulasParaSincronizar
@@ -1152,10 +1210,13 @@ export default function Chamada() {
           setUltimoSyncFmt(
             `${String(agora.getHours()).padStart(2, "0")}:${String(agora.getMinutes()).padStart(2, "0")}`
           );
+          if (res.data.sincronizacao_boletim) {
+            setSincronizadoBoletimInfo(res.data.sincronizacao_boletim);
+          }
           if (exibirFeedback) {
             showToast(
               "success",
-              `✓ Chamada salva no servidor em ${turmaObj?.nome || "Turma"} (${formatarDataBr(
+              `✓ Chamada salva e sincronizada com o Boletim & Secretaria (${turmaObj?.nome || "Turma"} · ${formatarDataBr(
                 dataSelecionada
               )})!`
             );
@@ -1436,7 +1497,8 @@ export default function Chamada() {
       (a) =>
         a.nome.toLowerCase().includes(q) ||
         String(a.nr).includes(q) ||
-        String(a.codigo || "").toLowerCase().includes(q)
+        String(a.codigo || "").toLowerCase().includes(q) ||
+        String(a.turma_origem_nome || "").toLowerCase().includes(q)
     );
   }, [alunos, buscaAluno]);
 
@@ -1450,6 +1512,96 @@ export default function Chamada() {
     });
     return mapa;
   }, [aulasConfirmadasList]);
+
+  // ELO C — Justificativas / Atestados ativos na data da aula selecionada
+  const justificativasAtivasNaDataMap = useMemo(() => {
+    const map = new Map();
+    if (!dataSelecionada || !Array.isArray(justificativasTurma)) return map;
+    for (const j of justificativasTurma) {
+      const ini = String(j.data_inicio || "").slice(0, 10);
+      const fim = String(j.data_fim || ini).slice(0, 10);
+      if (ini && dataSelecionada >= ini && dataSelecionada <= fim) {
+        map.set(String(j.aluno_id), j);
+      }
+    }
+    return map;
+  }, [justificativasTurma, dataSelecionada]);
+
+  const atestadosDoDiaList = useMemo(() => {
+    if (justificativasAtivasNaDataMap.size === 0 || alunos.length === 0) return [];
+    const out = [];
+    for (const aluno of alunos) {
+      const just = justificativasAtivasNaDataMap.get(String(aluno.id));
+      if (just) {
+        out.push({
+          aluno,
+          justificativa: just,
+          jaMarcadoFalta: faltasSetAtual.has(aluno.id),
+        });
+      }
+    }
+    return out;
+  }, [alunos, justificativasAtivasNaDataMap, faltasSetAtual]);
+
+  const faltasJustificadasPorAlunoNoBimestre = useMemo(() => {
+    const mapa = {};
+    if (!Array.isArray(justificativasTurma) || justificativasTurma.length === 0) return mapa;
+    const justPorAluno = new Map();
+    for (const j of justificativasTurma) {
+      const k = String(j.aluno_id);
+      if (!justPorAluno.has(k)) justPorAluno.set(k, []);
+      justPorAluno.get(k).push({
+        ini: String(j.data_inicio || "").slice(0, 10),
+        fim: String(j.data_fim || j.data_inicio || "").slice(0, 10),
+      });
+    }
+    for (const aula of aulasConfirmadasList) {
+      const dt = String(aula.data || "").slice(0, 10);
+      for (const idAluno of aula.faltas || []) {
+        const ranges = justPorAluno.get(String(idAluno));
+        if (ranges && ranges.some((r) => dt >= r.ini && dt <= r.fim)) {
+          mapa[idAluno] = (mapa[idAluno] || 0) + 1;
+        }
+      }
+    }
+    return mapa;
+  }, [aulasConfirmadasList, justificativasTurma]);
+
+  const aplicarFaltasAtestadosDoDia = () => {
+    if (!avaliacaoDiaAtual.letivo || atestadosDoDiaList.length === 0) return;
+    const novaLista = new Set(registroAulaAtual.faltas || []);
+    for (const item of atestadosDoDiaList) {
+      novaLista.add(item.aluno.id);
+    }
+    const faltasArr = Array.from(novaLista);
+    const aulaPrincipal = {
+      ...registroAulaAtual,
+      data: dataSelecionada,
+      ordem: horarioAtualObj?.ordem || 1,
+      horario: horarioAtualObj?.horario || "07:30",
+      horario_fim: horarioAtualObj?.fim || null,
+      faltas: faltasArr,
+      confirmada: true,
+    };
+    const novoMapa = { ...registroBimestre, [aulaKeyAtual]: aulaPrincipal };
+    const aulasSync = [aulaPrincipal];
+
+    if (aulaGeminada && proxOrdemGeminada <= horariosDisponiveis.length) {
+      const proxObj = horariosDisponiveis.find((h) => h.ordem === proxOrdemGeminada);
+      const aulaGem = {
+        ...(novoMapa[aulaKeyGeminada] || {}),
+        data: dataSelecionada,
+        ordem: proxOrdemGeminada,
+        horario: proxObj?.horario || "",
+        horario_fim: proxObj?.fim || null,
+        faltas: faltasArr,
+        confirmada: true,
+      };
+      novoMapa[aulaKeyGeminada] = aulaGem;
+      aulasSync.push(aulaGem);
+    }
+    salvarNoStorage(novoMapa, true, aulasSync);
+  };
 
   // ─── Geração / Clonagem do CSV Oficial EDUCADF em 2º Plano ───────────────
   const gerarCsvClonadoEducaDF = (silencioso = false) => {
@@ -2597,7 +2749,9 @@ export default function Chamada() {
               ) : (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
                   {turmasCompativeis.map((t) => {
-                    const isSel = String(turmaSelecionada) === String(t.id);
+                    const isSel =
+                      String(turmaSelecionada) === String(t.id) &&
+                      Boolean(turmaIsAgrupamento) === Boolean(t.is_agrupamento);
                     const badge = getTurmaBadge(t);
                     const infoG = extrairInfoGradeParaTurma(
                       slotsGradeProfessor,
@@ -2610,6 +2764,7 @@ export default function Chamada() {
                         type="button"
                         onClick={() => {
                           setTurmaSelecionada(t.id);
+                          setTurmaIsAgrupamento(Boolean(t.is_agrupamento));
                           setEtapaAtiva(4);
                         }}
                         style={{
@@ -3410,6 +3565,14 @@ export default function Chamada() {
                         ↻ Alterada (Pendente re-envio EDUCADF)
                       </span>
                     )}
+                  {(aulasConfirmadasList.length > 0 || sincronizadoBoletimInfo?.sincronizado) && (
+                    <span
+                      className="text-xs font-extrabold px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200"
+                      title="As faltas acumuladas desta chamada alimentam automaticamente o Boletim Escolar, App EDUCA Mobile e Secretaria > Faltas"
+                    >
+                      ⚡ Boletim & Secretaria Sincronizados
+                    </span>
+                  )}
                   {sincronizandoServidor ? (
                     <span className="text-[11px] font-bold text-sky-600">Sincronizando...</span>
                   ) : ultimoSyncFmt ? (
@@ -3488,7 +3651,59 @@ export default function Chamada() {
             </div>
 
             {/* Grid de Estudantes */}
-            <div className="p-4 md:p-5">
+            <div className="p-4 md:p-5 space-y-3.5">
+              {/* ELO C — Alerta Automático de Atestados / Justificativas Ativas na Data */}
+              {atestadosDoDiaList.length > 0 && (
+                <div className="p-3.5 rounded-xl bg-teal-50/90 border border-teal-200 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-start gap-2.5 min-w-0">
+                    <span className="text-lg leading-none mt-0.5">🏥</span>
+                    <div className="min-w-0">
+                      <p className="text-xs font-black text-teal-900">
+                        {atestadosDoDiaList.length === 1
+                          ? "1 estudante possui Atestado / Justificativa vigente nesta data"
+                          : `${atestadosDoDiaList.length} estudantes possuem Atestado / Justificativa vigente nesta data`}
+                        <span className="font-semibold text-teal-700 ml-1.5">
+                          (cadastrado em Frequência / Secretaria)
+                        </span>
+                      </p>
+                      <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                        {atestadosDoDiaList.map(({ aluno: alAt, justificativa: jAt, jaMarcadoFalta }) => {
+                          const infoJ = getInfoTipoJustificativa(jAt.tipo);
+                          const dmI = formatarDataCurta(jAt.data_inicio).dm;
+                          const dmF = formatarDataCurta(jAt.data_fim || jAt.data_inicio).dm;
+                          return (
+                            <span
+                              key={alAt.id}
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                                jaMarcadoFalta
+                                  ? "bg-amber-100 text-amber-900 border-amber-300"
+                                  : "bg-white text-teal-800 border-teal-200"
+                              }`}
+                            >
+                              {infoJ.icon} {alAt.nome} · {infoJ.label} ({dmI === dmF ? dmI : `${dmI} a ${dmF}`})
+                              {jaMarcadoFalta ? " · Ausência registrada" : ""}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  {atestadosDoDiaList.some((x) => !x.jaMarcadoFalta) && (
+                    <button
+                      type="button"
+                      disabled={!avaliacaoDiaAtual.letivo}
+                      onClick={aplicarFaltasAtestadosDoDia}
+                      className="px-3.5 py-2 rounded-xl text-xs font-black bg-teal-700 text-white hover:bg-teal-800 shadow-sm disabled:opacity-45 transition whitespace-nowrap"
+                      title="Registra a ausência física (F) na chamada com abono automático pelo atestado cadastrado"
+                    >
+                      Registrar Ausência c/ Atestado (
+                      {atestadosDoDiaList.filter((x) => !x.jaMarcadoFalta).length})
+                    </button>
+                  )}
+                </div>
+              )}
+
               {carregandoAlunos ? (
                 <div className="py-12 text-center text-slate-400 text-sm font-semibold">
                   Carregando estudantes da turma...
@@ -3502,54 +3717,99 @@ export default function Chamada() {
                   {alunosFiltrados.map((aluno) => {
                     const faltou = faltasSetAtual.has(aluno.id);
                     const totalFaltasBim = faltasAcumuladasPorAluno[aluno.id] || 0;
+                    const justBim = faltasJustificadasPorAlunoNoBimestre[aluno.id] || 0;
+                    const atestadoHoje = justificativasAtivasNaDataMap.get(String(aluno.id));
+                    const infoJust = atestadoHoje ? getInfoTipoJustificativa(atestadoHoje.tipo) : null;
+                    const dmIni = atestadoHoje ? formatarDataCurta(atestadoHoje.data_inicio).dm : "";
+                    const dmFim = atestadoHoje
+                      ? formatarDataCurta(atestadoHoje.data_fim || atestadoHoje.data_inicio).dm
+                      : "";
+
                     return (
                       <button
                         key={aluno.id}
                         type="button"
                         onClick={() => alternarFaltaAluno(aluno.id)}
                         className={`text-left px-3.5 py-3 rounded-xl border-2 transition-all flex items-center justify-between gap-3 ${
-                          faltou
+                          faltou && atestadoHoje
+                            ? "bg-amber-50/95 border-amber-400 shadow-sm"
+                            : faltou
                             ? "bg-rose-50/90 border-rose-400 shadow-sm"
+                            : atestadoHoje
+                            ? "bg-teal-50/50 border-teal-300 hover:border-teal-500"
                             : "bg-white border-slate-200/90 hover:border-cyan-400"
                         }`}
                       >
                         <div className="flex items-center gap-3 min-w-0">
                           <span
                             className={`w-8 h-8 shrink-0 rounded-full grid place-items-center text-xs font-black transition ${
-                              faltou
+                              faltou && atestadoHoje
+                                ? "bg-amber-500 text-white shadow-sm"
+                                : faltou
                                 ? "bg-rose-500 text-white shadow-sm"
+                                : atestadoHoje
+                                ? "bg-teal-600 text-white shadow-sm"
                                 : "bg-slate-100 text-slate-700"
                             }`}
                           >
                             {aluno.nr}
                           </span>
                           <div className="min-w-0">
-                            <p
-                              className={`text-xs font-extrabold truncate ${
-                                faltou ? "text-rose-900" : "text-slate-800"
-                              }`}
-                            >
-                              {aluno.nome}
-                            </p>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <p
+                                className={`text-xs font-extrabold truncate ${
+                                  faltou && atestadoHoje
+                                    ? "text-amber-950"
+                                    : faltou
+                                    ? "text-rose-900"
+                                    : "text-slate-800"
+                                }`}
+                              >
+                                {aluno.nome}
+                              </p>
+                              {turmaObj?.is_agrupamento && aluno.turma_origem_nome && (
+                                <span className="px-1.5 py-0.5 rounded bg-purple-100 text-purple-800 text-[9px] font-black uppercase tracking-wide">
+                                  {aluno.turma_origem_nome}
+                                </span>
+                              )}
+                            </div>
                             <p className="text-[10px] text-slate-400 font-semibold">
                               Cód. EDUCADF: {aluno.codigo}
                               {totalFaltasBim > 0 && (
                                 <span className="ml-2 text-rose-500 font-bold">
                                   · {totalFaltasBim}F no bim.
+                                  {justBim > 0 ? ` (${justBim} justif.)` : ""}
                                 </span>
                               )}
                             </p>
+                            {atestadoHoje && infoJust && (
+                              <p
+                                className="text-[10px] font-extrabold text-teal-700 mt-0.5 truncate"
+                                title={atestadoHoje.descricao || infoJust.label}
+                              >
+                                {infoJust.icon} {infoJust.label} (
+                                {dmIni === dmFim ? dmIni : `${dmIni} a ${dmFim}`})
+                              </p>
+                            )}
                           </div>
                         </div>
 
                         <span
                           className={`shrink-0 text-[10px] font-black px-2.5 py-1 rounded-full tracking-wide ${
-                            faltou
+                            faltou && atestadoHoje
+                              ? "bg-amber-500 text-white"
+                              : faltou
                               ? "bg-rose-500 text-white"
+                              : atestadoHoje
+                              ? "bg-teal-100 text-teal-900 border border-teal-300"
                               : "bg-emerald-100 text-emerald-800"
                           }`}
                         >
-                          {faltou ? "FALTA · F" : "PRESENTE · C"}
+                          {faltou && atestadoHoje
+                            ? "FALTA JUSTIF. · FJ"
+                            : faltou
+                            ? "FALTA · F"
+                            : "PRESENTE · C"}
                         </span>
                       </button>
                     );

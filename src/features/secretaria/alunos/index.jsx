@@ -376,6 +376,16 @@ export default function Alunos() {
                   <div className="text-green-600">✅ Inseridos: {resultadoImportacao.inseridos}</div>
                   <div className="text-yellow-600">🟡 Já existiam: {resultadoImportacao.jaExistiam}</div>
                   <div className="text-blue-600">📘 Reativados: {resultadoImportacao.reativados}</div>
+                  {Number(resultadoImportacao.remanejados) > 0 && (
+                    <div className="text-indigo-600">
+                      ↪️ Remanejados para esta turma: {resultadoImportacao.remanejados}
+                    </div>
+                  )}
+                  {Number(resultadoImportacao.protegidosOutraTurma) > 0 && (
+                    <div className="text-cyan-700">
+                      🛡️ Mantidos na turma atual: {resultadoImportacao.protegidosOutraTurma}
+                    </div>
+                  )}
                   {Number(resultadoImportacao.aeeIdentificados) > 0 && (
                     <div className="text-purple-600">
                       🧩 AEE (ANEES) identificados: {resultadoImportacao.aeeIdentificados}

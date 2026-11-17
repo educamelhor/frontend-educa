@@ -41,6 +41,10 @@ export default function ImportCSV({ open, onClose, onFinish }) {
   const [pendentesModal, setPendentesModal] = useState(null);
   const [inativando, setInativando] = useState(false);
 
+  // Estado do modal de conflito de enturmação (alunos já ativos em outra turma)
+  const [conflitosModal, setConflitosModal] = useState(null);
+  const [remanejando, setRemanejando] = useState(false);
+
   if (!open) return null;
 
   // ─────────────────────────────────────────────
@@ -154,8 +158,12 @@ export default function ImportCSV({ open, onClose, onFinish }) {
         jaExistiam,
         inativados,
         reativados,
+        conflitosOutraTurma,
         pendentesInativacao,
       } = data || {};
+
+      const listaConflitos = Array.isArray(conflitosOutraTurma) ? conflitosOutraTurma : [];
+      const listaPendentes = Array.isArray(pendentesInativacao) ? pendentesInativacao : [];
 
       const resultado = {
         status: "sucesso",
@@ -168,19 +176,30 @@ export default function ImportCSV({ open, onClose, onFinish }) {
         jaExistiam,
         reativados,
         inativados,
+        protegidosOutraTurma: listaConflitos.length,
+        remanejados: 0,
         message: `Turma ${turmaNome} (${turmaObj.turno || ""}) importada com sucesso.`,
       };
       ultimoResultadoRef.current = resultado;
 
-      if (Array.isArray(pendentesInativacao) && pendentesInativacao.length > 0) {
-        onFinish && onFinish(resultado);
+      onFinish && onFinish(resultado);
+
+      if (listaConflitos.length > 0) {
+        setConflitosModal({
+          turmaId: turmaObj.id,
+          turmaNome,
+          conflitos: listaConflitos,
+          selecionados: new Set(),
+          filtroBusca: "",
+          pendentesDepois: listaPendentes,
+        });
+      } else if (listaPendentes.length > 0) {
         setPendentesModal({
           turma: turmaNome,
-          pendentes: pendentesInativacao,
-          selecionados: new Set(pendentesInativacao.map((p) => p.id)),
+          pendentes: listaPendentes,
+          selecionados: new Set(listaPendentes.map((p) => p.id)),
         });
       } else {
-        onFinish && onFinish(resultado);
         onClose && onClose();
       }
     } catch (err) {
@@ -250,6 +269,104 @@ export default function ImportCSV({ open, onClose, onFinish }) {
       ? new Set()
       : new Set(pendentesModal.pendentes.map((p) => p.id));
     setPendentesModal({ ...pendentesModal, selecionados: newSet });
+  }
+
+  // ─────────────────────────────────────────────
+  // Handlers do modal de Conflito entre Turmas (Remanejamento)
+  // ─────────────────────────────────────────────
+  function avancarAposConflitos(pendentesDepois, turmaNome) {
+    setConflitosModal(null);
+    if (Array.isArray(pendentesDepois) && pendentesDepois.length > 0) {
+      setPendentesModal({
+        turma: turmaNome,
+        pendentes: pendentesDepois,
+        selecionados: new Set(pendentesDepois.map((p) => p.id)),
+      });
+    } else {
+      onClose && onClose();
+    }
+  }
+
+  function toggleConflitoSelecionado(id) {
+    if (!conflitosModal) return;
+    const next = new Set(conflitosModal.selecionados);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setConflitosModal({ ...conflitosModal, selecionados: next });
+  }
+
+  function filtrarListaConflitos(conflitos, termo) {
+    const q = String(termo || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toUpperCase()
+      .trim();
+    if (!q) return conflitos;
+    return conflitos.filter((c) => {
+      const nome = String(c.estudante || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toUpperCase();
+      const cod = String(c.codigo || "");
+      const turmaOrig = String(c.turmaAtualNome || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toUpperCase();
+      return nome.includes(q) || cod.includes(q) || turmaOrig.includes(q);
+    });
+  }
+
+  function toggleTodosConflitosVisiveis() {
+    if (!conflitosModal) return;
+    const visiveis = filtrarListaConflitos(
+      conflitosModal.conflitos,
+      conflitosModal.filtroBusca
+    );
+    const todosMarcados =
+      visiveis.length > 0 &&
+      visiveis.every((c) => conflitosModal.selecionados.has(c.id));
+    const next = new Set(conflitosModal.selecionados);
+    if (todosMarcados) {
+      visiveis.forEach((c) => next.delete(c.id));
+    } else {
+      visiveis.forEach((c) => next.add(c.id));
+    }
+    setConflitosModal({ ...conflitosModal, selecionados: next });
+  }
+
+  async function handleConfirmarRemanejamento() {
+    if (!conflitosModal) return;
+    const ids = [...conflitosModal.selecionados];
+    if (ids.length === 0) {
+      avancarAposConflitos(conflitosModal.pendentesDepois, conflitosModal.turmaNome);
+      return;
+    }
+    setRemanejando(true);
+    try {
+      const { data } = await api.post("/api/alunos/remanejar-lote", {
+        turmaDestinoId: conflitosModal.turmaId,
+        alunoIds: ids,
+      });
+      const qtd = Number(data?.remanejados ?? ids.length);
+      const base = ultimoResultadoRef.current || {};
+      const atualizado = {
+        ...base,
+        status: "sucesso",
+        remanejados: qtd,
+        protegidosOutraTurma: Math.max(0, (base.protegidosOutraTurma || 0) - qtd),
+        message:
+          data?.message ||
+          `${qtd} estudante(s) remanejado(s) para ${conflitosModal.turmaNome}.`,
+      };
+      ultimoResultadoRef.current = atualizado;
+      onFinish && onFinish(atualizado);
+      avancarAposConflitos(conflitosModal.pendentesDepois, conflitosModal.turmaNome);
+    } catch (err) {
+      console.error("Erro ao remanejar estudantes:", err);
+      alert(err?.response?.data?.message || "Erro ao remanejar estudantes.");
+    } finally {
+      setRemanejando(false);
+    }
   }
 
   // ─────────────────────────────────────────────
@@ -670,6 +787,168 @@ export default function ImportCSV({ open, onClose, onFinish }) {
           </div>
         </div>
       )}
+
+      {/* ═══════════════════════════════════════════════════════
+          MODAL PREMIUM: Conflito entre Turmas (Proteção contra esvaziamento de outra turma)
+          ═══════════════════════════════════════════════════════ */}
+      {conflitosModal && (() => {
+        const conflitosVisiveis = filtrarListaConflitos(
+          conflitosModal.conflitos,
+          conflitosModal.filtroBusca
+        );
+        const turmasOrigemMap = new Map();
+        for (const c of conflitosModal.conflitos) {
+          const k = c.turmaAtualNome || "Outra turma";
+          turmasOrigemMap.set(k, (turmasOrigemMap.get(k) || 0) + 1);
+        }
+        const resumoOrigens = Array.from(turmasOrigemMap.entries())
+          .map(([nome, qtd]) => `${nome} (${qtd})`)
+          .join(", ");
+        const todosVisiveisMarcados =
+          conflitosVisiveis.length > 0 &&
+          conflitosVisiveis.every((c) => conflitosModal.selecionados.has(c.id));
+
+        return (
+          <div className="fixed inset-0 z-[65] flex items-center justify-center bg-black/60 p-4 backdrop-blur-[2px]">
+            <div
+              className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl overflow-hidden"
+              style={{ animation: "fadeInScale 0.25s ease-out" }}
+            >
+              <div className="bg-gradient-to-r from-indigo-700 via-blue-700 to-cyan-700 px-6 py-4">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">🛡️</span>
+                  <div>
+                    <h3 className="text-lg font-bold text-white tracking-tight">
+                      Estudantes Já Ativos em Outra Turma ({conflitosModal.conflitos.length})
+                    </h3>
+                    <p className="text-blue-100 text-xs mt-0.5">
+                      Destino: <strong className="text-white">{conflitosModal.turmaNome}</strong> • Origem atual:{" "}
+                      <strong className="text-white">{resumoOrigens}</strong>
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="px-6 py-4 space-y-3">
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3.5 text-sm text-gray-800 leading-relaxed">
+                  <p>
+                    ⚠️ <strong>Proteção Automática Ativada:</strong> Estes{" "}
+                    <strong>{conflitosModal.conflitos.length} estudante(s)</strong> constam no CSV enviado, mas{" "}
+                    <strong>já estão enturmados ativos em {resumoOrigens}</strong> (o portal EDUCADF mantém
+                    histórico de remanejamentos nos dois relatórios).
+                  </p>
+                  <p className="mt-1.5 text-xs text-gray-600">
+                    Para não remover alunos indevidamente da outra turma, marque abaixo{" "}
+                    <strong>somente os estudantes que realmente pertencem à turma {conflitosModal.turmaNome}</strong>,
+                    ou clique em <strong>Manter nas Turmas Atuais</strong>.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <input
+                    type="text"
+                    value={conflitosModal.filtroBusca}
+                    onChange={(e) =>
+                      setConflitosModal({ ...conflitosModal, filtroBusca: e.target.value })
+                    }
+                    placeholder="🔍 Buscar estudante na lista por nome ou RE..."
+                    className="flex-1 min-w-[220px] border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-gray-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={toggleTodosConflitosVisiveis}
+                    className="text-xs text-blue-600 hover:text-blue-800 font-semibold px-2 py-1"
+                  >
+                    {todosVisiveisMarcados ? "Desmarcar visíveis" : "Selecionar visíveis"}
+                  </button>
+                </div>
+
+                <div className="max-h-[260px] overflow-y-auto rounded-xl border border-gray-200 divide-y divide-gray-100">
+                  {conflitosVisiveis.length === 0 ? (
+                    <div className="p-6 text-center text-sm text-gray-500">
+                      Nenhum estudante encontrado para este filtro.
+                    </div>
+                  ) : (
+                    conflitosVisiveis.map((aluno, idx) => {
+                      const selected = conflitosModal.selecionados.has(aluno.id);
+                      return (
+                        <label
+                          key={aluno.id}
+                          className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-all ${
+                            selected ? "bg-blue-50 hover:bg-blue-100/70" : "bg-white hover:bg-gray-50"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selected}
+                            onChange={() => toggleConflitoSelecionado(aluno.id)}
+                            className="w-4 h-4 accent-blue-600 rounded shrink-0"
+                          />
+                          <span className="w-6 text-xs text-gray-400 font-mono shrink-0">
+                            {idx + 1}.
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-gray-800 truncate">
+                              {aluno.estudante}
+                            </p>
+                            <p className="text-xs text-gray-500">RE: {aluno.codigo}</p>
+                          </div>
+                          <span
+                            className={`shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
+                              selected
+                                ? "bg-blue-600 text-white border-blue-600"
+                                : "bg-slate-100 text-slate-700 border-slate-200"
+                            }`}
+                          >
+                            {selected
+                              ? `Mover → ${conflitosModal.turmaNome}`
+                              : `Ativo: ${aluno.turmaAtualNome}`}
+                          </span>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between text-xs text-gray-600">
+                  <span>
+                    <strong className="text-blue-700">{conflitosModal.selecionados.size}</strong> de{" "}
+                    {conflitosModal.conflitos.length} marcado(s) para remanejar para{" "}
+                    <strong>{conflitosModal.turmaNome}</strong>
+                  </span>
+                  <span>Os desmarcados permanecem intactos na turma atual</span>
+                </div>
+              </div>
+
+              <div className="px-6 pb-5 flex flex-wrap gap-3">
+                <Button
+                  type="button"
+                  onClick={() =>
+                    avancarAposConflitos(
+                      conflitosModal.pendentesDepois,
+                      conflitosModal.turmaNome
+                    )
+                  }
+                  disabled={remanejando}
+                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-800 px-4 py-2.5 rounded-xl font-medium border border-gray-300 disabled:opacity-60"
+                >
+                  Manter nas Turmas Atuais
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleConfirmarRemanejamento}
+                  disabled={remanejando || conflitosModal.selecionados.size === 0}
+                  className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-4 py-2.5 rounded-xl font-medium shadow-md disabled:opacity-50"
+                >
+                  {remanejando
+                    ? "Remanejando..."
+                    : `Remanejar ${conflitosModal.selecionados.size} Selecionado(s)`}
+                </Button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ═══════════════════════════════════════════════════════
           MODAL PREMIUM: Confirmação de Inativação

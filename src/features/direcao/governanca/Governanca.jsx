@@ -122,6 +122,8 @@ const PERFIL_LABELS = {
   aluno:            'Aluno',
   biblioteca:       'Biblioteca',
   educador_social:  'Educador Social',
+  administrativo:   'Administrativo',
+  financeiro:       'Financeiro',
   merenda:          'Merenda',
   psicologo:        'Psicólogo',
   responsavel:      'Responsável',

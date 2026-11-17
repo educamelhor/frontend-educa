@@ -165,6 +165,10 @@ const MODULOS_TREE = [
       { id: 'administrativo.memorando', label: 'MEMORANDO' },
     ]
   },
+  {
+    id: 'financeiro', label: 'Financeiro', icon: '💰',
+    filhos: []
+  },
 ];
 
 // ── Group accent colors (cycle) ───────────────────────────────────────────────
@@ -576,6 +580,7 @@ const PERFIS_LISTA = [
   { key: 'supervisor_administrativo', label: 'Supervisor Administrativo' },
   { key: 'disciplinar',               label: 'Disciplinar' },
   { key: 'administrativo',            label: 'Administrativo' },
+  { key: 'financeiro',                label: 'Financeiro' },
   { key: 'psicopedagogia',            label: 'Psicopedagogia' },
   { key: 'sala_recurso',              label: 'Sala de Recurso' },
   { key: 'apoio',                     label: 'Apoio' },
@@ -898,6 +903,7 @@ export default function PlataformaModulos() {
     secretaria: '🗂️', orientador: '🧭', aluno: '👨‍🎓',
     biblioteca: '📖', educador_social: '🤝', merenda: '🍽️',
     psicologo: '🧠', responsavel: '👨‍👩‍👧', vigilancia: '🔒',
+    administrativo: '🏢', financeiro: '💰',
   };
 
   // ── Styles ──────────────────────────────────────────────────────────────────

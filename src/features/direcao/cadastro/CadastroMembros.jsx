@@ -22,6 +22,7 @@ const FUNCOES = [
   { value: 'diretor',                   label: 'Diretor' },
   { value: 'disciplinar',               label: 'Disciplinar' },
   { value: 'educador_social',           label: 'Educador Social' },
+  { value: 'financeiro',                label: 'Financeiro' },
   { value: 'merenda',                   label: 'Merenda' },
   { value: 'monitor',                   label: 'Monitor' },
   { value: 'orientador',                label: 'Orientador' },

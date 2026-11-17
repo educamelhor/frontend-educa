@@ -845,7 +845,7 @@ function mapFuncaoToCategoria(funcao = "") {
   if (f === "professor") return "professor";
   if (["diretor", "vice_diretor", "supervisor_administrativo", "supervisor_pedagogico"].includes(f)) return "direcao";
   if (["coordenacao", "coordenador", "orientador", "pedagogo", "psicopedagogia", "psicologo", "sala_recurso"].includes(f)) return "pedagogico";
-  if (["secretaria", "secretario", "administrativo", "biblioteca"].includes(f)) return "administrativo";
+  if (["secretaria", "secretario", "administrativo", "financeiro", "biblioteca"].includes(f)) return "administrativo";
   if (["vigilancia", "portaria", "limpeza", "terceirizado"].includes(f)) return "terceirizado";
   if (["disciplinar", "diretor_disciplinar", "comandante", "monitor", "monitor_disciplinar"].includes(f)) return "disciplinar";
   return "apoio";
@@ -860,6 +860,7 @@ function mapFuncaoLabel(funcao = "") {
     secretaria: "Secretário(a) Escolar",
     secretario: "Secretário(a) Escolar",
     administrativo: "Assistente Administrativo",
+    financeiro: "Gestor(a) / Assistente Financeiro",
     supervisor_administrativo: "Supervisor(a) Administrativo",
     supervisor_pedagogico: "Supervisor(a) Pedagógico",
     orientador: "Orientador(a) Educacional",

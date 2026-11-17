@@ -547,6 +547,18 @@ export default function App() {
           <Route path="/administrativo/relatorios" element={<RequireModulo modulo="administrativo"><AdministrativoModule /></RequireModulo>} />
           <Route path="/administrativo/memorando"  element={<RequireModulo modulo="administrativo"><MemorandoPage /></RequireModulo>} />
 
+          {/* ── Financeiro (page será conectada no próximo passo) ────────── */}
+          <Route
+            path="/financeiro"
+            element={
+              <RequireModulo modulo="financeiro">
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center text-slate-500">
+                  Módulo Financeiro — página será criada no próximo passo.
+                </div>
+              </RequireModulo>
+            }
+          />
+
           <Route path="*" element={<Navigate to="/home" replace />} />
         </Route>
       </Routes>

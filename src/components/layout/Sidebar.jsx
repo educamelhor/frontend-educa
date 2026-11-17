@@ -34,6 +34,7 @@ import {
   SparklesIcon,
   DevicePhoneMobileIcon,
   ArrowRightOnRectangleIcon,
+  BanknotesIcon,
 } from '@heroicons/react/24/outline';
 import {
   PERFIS_MILITARES_SET,
@@ -2006,6 +2007,37 @@ export default function Sidebar({ isOpen, onClose }) {
               </ul>
             )}
           </>
+        )}
+
+        {/* ────────────────────────────────────────────────────
+            MÓDULO: FINANCEIRO (Link direto único)
+            Guard: isScopeEscola && !isDisciplinar && !isProfessor && hasModulo('financeiro')
+        ──────────────────────────────────────────────────── */}
+        {isScopeEscola && !isDisciplinar && !isProfessor && hasModulo('financeiro') && (
+          <Link
+            to="/financeiro"
+            className={`${getMainLinkClasses('/financeiro')} mt-2`}
+            style={{
+              background: isActive('/financeiro')
+                ? 'linear-gradient(90deg, rgba(16,185,129,0.22), transparent)'
+                : undefined,
+            }}
+          >
+            <BanknotesIcon
+              className="h-5 w-5 mr-2"
+              style={{ color: isActive('/financeiro') ? '#34d399' : '#6ee7b7' }}
+            />
+            <span className="flex-1 text-left" style={{ fontWeight: 700 }}>Financeiro</span>
+            <span style={{
+              fontSize: '0.52rem',
+              fontWeight: 800,
+              background: 'linear-gradient(135deg, #059669, #10b981)',
+              color: '#fff',
+              padding: '2px 6px',
+              borderRadius: '8px',
+              letterSpacing: '0.5px',
+            }}>NOVO</span>
+          </Link>
         )}
 
         {isScopeEscola && !isDisciplinar && !isProfessor && hasModulo('pedagogico') && (

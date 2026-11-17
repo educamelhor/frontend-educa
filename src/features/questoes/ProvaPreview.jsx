@@ -66,7 +66,7 @@ function QuestaoModelo01Card({ item, idx, corDestaque, fontBody, estiloAlternati
   const fontHeader = fontBody === '10pt' ? '10.8pt' : '11.8pt';
 
   return (
-    <div style={{ marginBottom: 11, fontFamily: "'Times New Roman', Times, serif", color: '#000' }}>
+    <div style={{ marginBottom: 9, fontFamily: "'Times New Roman', Times, serif", color: '#000' }}>
       {/* Linha separadora clonada do 9º ANO-EXATAS.docx: QUESTÃO 01 + retângulo sólido até o fim da coluna */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 4 }}>
         <span style={{
@@ -316,7 +316,7 @@ function CadernoPaginadoA4({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 28, position: 'relative' }}>
-      {/* Sonda invisível de largura idêntica a 1 coluna do caderno A4 (84.8mm) */}
+      {/* Sonda invisível de largura idêntica a 1 coluna do caderno A4 (91.5mm c/ margens otimizadas de 6mm) */}
       <div
         ref={probeContainerRef}
         onLoadCapture={() => setImgTick((n) => n + 1)}
@@ -324,7 +324,7 @@ function CadernoPaginadoA4({
           position: 'fixed',
           left: -9999,
           top: 0,
-          width: '84.8mm',
+          width: '91.5mm',
           visibility: 'hidden',
           pointerEvents: 'none',
           fontFamily: "'Times New Roman', Times, serif",
@@ -373,15 +373,15 @@ function CadernoPaginadoA4({
                 boxShadow: '0 14px 44px rgba(0,0,0,0.45)',
                 overflow: 'hidden',
               }}>
-                {/* Moldura preta fechada 2.25pt nos 4 lados */}
+                {/* Moldura preta fechada 2.25pt nos 4 lados (margens otimizadas 5.5–6mm) */}
                 <div style={{
                   position: 'absolute',
-                  top: '8.5mm',
-                  left: '9.5mm',
-                  right: '9.5mm',
-                  bottom: '14mm',
+                  top: '5.5mm',
+                  left: '6mm',
+                  right: '6mm',
+                  bottom: '10.5mm',
                   border: '2.25pt solid #000000',
-                  padding: '4.5mm 5mm',
+                  padding: '3mm 3.5mm',
                   background: '#ffffff',
                   boxSizing: 'border-box',
                 }}>
@@ -390,7 +390,7 @@ function CadernoPaginadoA4({
                     height: '100%',
                     display: 'grid',
                     gridTemplateColumns: 'minmax(0, 1fr) 0.85pt minmax(0, 1fr)',
-                    columnGap: '5.5mm',
+                    columnGap: '3.8mm',
                   }}>
                     {/* Coluna Esquerda */}
                     <div
@@ -419,15 +419,15 @@ function CadernoPaginadoA4({
                 {/* Rodapé posicionado ESTRITAMENTE FORA (abaixo) da moldura da página */}
                 <div style={{
                   position: 'absolute',
-                  left: '9.5mm',
-                  right: '9.5mm',
-                  bottom: '4.2mm',
-                  height: '7.5mm',
+                  left: '6mm',
+                  right: '6mm',
+                  bottom: '3.2mm',
+                  height: '6.2mm',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   fontFamily: "'Times New Roman', Times, serif",
-                  fontSize: '11pt',
+                  fontSize: '10.5pt',
                   color: '#000000',
                   letterSpacing: '0.02em',
                 }}>
@@ -702,7 +702,7 @@ export default function ProvaPreview({ provaId, onClose, onUpdated }) {
       const altsLatex = alts.map((a) => `  \\item ${a.texto || ''}`).join('\n');
       return `\\par\\vspace{4pt}\\noindent\n\\leavevmode{\\bfseries QUESTÃO ${num}}\\hspace{0.22cm}{\\color{corDestaque}\\leaders\\hrule height 8.6pt depth 2.0pt\\hfill\\kern0pt}\\par\\nopagebreak\\vspace{2pt}\n\n${it.conteudo_bruto || ''}\\par\\vspace{2pt}\n\n${alts.length > 0 ? `\\begin{enumerate}[label=\\alph*),leftmargin=*,itemsep=1.5pt]\n${altsLatex}\n\\end{enumerate}` : ''}\n\\vspace{0.22cm}`;
     });
-    return `\\documentclass{article}\n\\usepackage{fontspec}\n\\IfFontExistsTF{Liberation Serif}{\\setmainfont{Liberation Serif}}{}\n\\usepackage[a4paper,lmargin=1.45cm,rmargin=1.45cm,tmargin=1.35cm,bmargin=1.90cm,headheight=15pt]{geometry}\n\\usepackage{multicol,tikz,fancyhdr,xcolor,graphicx,amsmath,amssymb}\n\\usepackage[shortlabels]{enumitem}\n\\usetikzlibrary{calc}\n\\definecolor{corDestaque}{HTML}{${corHex}}\n\n\\pagestyle{fancy}\\fancyhf{}\n\\fancyhead[L]{\\begin{tikzpicture}[overlay, remember picture]\n  \\draw[draw=black, line width=2.25pt] ($(current page.north west) + (0.95cm,-0.85cm)$) rectangle ($(current page.south east) + (-0.95cm,1.40cm)$);\n  \\node[anchor=center] at ($(current page.south) + (0cm,0.68cm)$) {\\fontsize{11pt}{13pt}\\selectfont ${rodapeAutoM01}};\n\\end{tikzpicture}}\n\\renewcommand{\\headrulewidth}{0pt}\\renewcommand{\\footrulewidth}{0pt}\n\n\\begin{document}\n\\fontsize{${liveCfg.densidade_fonte || '11pt'}}{13.6pt}\\selectfont\n${is2col ? '\\setlength{\\columnsep}{1.05cm}\\setlength{\\columnseprule}{0.85pt}\n\\begin{multicols*}{2}\n' : ''}\n${questoes.join('\n\n')}\n${is2col ? '\\end{multicols*}' : ''}\n\\end{document}`;
+    return `\\documentclass{article}\n\\usepackage{fontspec}\n\\IfFontExistsTF{Liberation Serif}{\\setmainfont{Liberation Serif}}{}\n\\usepackage[a4paper,lmargin=0.95cm,rmargin=0.95cm,tmargin=0.85cm,bmargin=1.38cm,headheight=14pt]{geometry}\n\\usepackage{multicol,tikz,fancyhdr,xcolor,graphicx,amsmath,amssymb}\n\\usepackage[shortlabels]{enumitem}\n\\usetikzlibrary{calc}\n\\definecolor{corDestaque}{HTML}{${corHex}}\n\n\\pagestyle{fancy}\\fancyhf{}\n\\fancyhead[L]{\\begin{tikzpicture}[overlay, remember picture]\n  \\draw[draw=black, line width=2.25pt] ($(current page.north west) + (0.60cm,-0.55cm)$) rectangle ($(current page.south east) + (-0.60cm,1.05cm)$);\n  \\node[anchor=center] at ($(current page.south) + (0cm,0.58cm)$) {\\fontsize{10.5pt}{12.5pt}\\selectfont ${rodapeAutoM01}};\n\\end{tikzpicture}}\n\\renewcommand{\\headrulewidth}{0pt}\\renewcommand{\\footrulewidth}{0pt}\n\n\\begin{document}\n\\fontsize{${liveCfg.densidade_fonte || '11pt'}}{13.6pt}\\selectfont\n${is2col ? '\\setlength{\\columnsep}{0.76cm}\\setlength{\\columnseprule}{0.85pt}\n\\begin{multicols*}{2}\n' : ''}\n${questoes.join('\n\n')}\n${is2col ? '\\end{multicols*}' : ''}\n\\end{document}`;
   }, [data, itens, is2col, liveCfg.cor_destaque, liveCfg.densidade_fonte, rodapeAutoM01]);
 
   // ── IMPRIMIR via browser (usa paginação folha a folha real no Modelo 01!) ──
@@ -752,7 +752,7 @@ export default function ProvaPreview({ provaId, onClose, onUpdated }) {
       fontBody: liveCfg.densidade_fonte || '10pt',
     })).join('');
 
-    const margem = comMarg ? '10mm 12mm 14mm' : '4mm';
+    const margem = comMarg ? '6mm 6mm 10mm' : '4mm';
     win.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>${prova.titulo||'Prova'}</title>
       <style>
         *{box-sizing:border-box;margin:0;padding:0}
@@ -1212,7 +1212,7 @@ export default function ProvaPreview({ provaId, onClose, onUpdated }) {
           <div style={{
             width: '210mm', minHeight: '297mm',
             background: '#fff', boxShadow: '0 8px 40px rgba(0,0,0,0.4)',
-            padding: comMarg ? '10mm 12mm 14mm' : '4mm',
+            padding: comMarg ? '6mm 6mm 10mm' : '4mm',
             fontFamily: "'Source Serif 4', 'Times New Roman', serif",
             fontSize: '11pt', lineHeight: 1.55, color: '#000',
             position: 'relative',

@@ -14,6 +14,9 @@ import {
   XCircleIcon,
   ArrowPathIcon,
   ClockIcon,
+  KeyIcon,
+  ExclamationTriangleIcon,
+  ShieldCheckIcon,
 } from "@heroicons/react/24/outline";
 
 // Motor PDF sob demanda (para clonagem de folha PDF quando desejado)
@@ -556,11 +559,24 @@ export default function Chamada() {
   const [registroBimestre, setRegistroBimestre] = useState({});
   const [mensagem, setMensagem] = useState(null);
 
-  // ─── Estados de Clonagem e Migração EDUCADF (Final do Bimestre) ──────────
+  // ─── Estados de Clonagem e Migração EDUCADF (Final do Bimestre / Tempo Real) ───
   const [abaVisualizacao, setAbaVisualizacao] = useState("diario"); // "diario" | "migracao" | "pdf"
   const [csvModeloRaw, setCsvModeloRaw] = useState(null);
   const [csvClonadoPreview, setCsvClonadoPreview] = useState(null);
   const [migrandoEducaDF, setMigrandoEducaDF] = useState(false);
+  const [agenteEducaDFInfo, setAgenteEducaDFInfo] = useState({
+    credencial_configurada: false,
+    login: null,
+    conectado: false,
+  });
+  const [jobMigracao, setJobMigracao] = useState(null);
+
+  // ─── Modal Inline de Conexão Rápida EDUCADF (Etapa 0 sem sair da Chamada) ───
+  const [modalCredencialOpen, setModalCredencialOpen] = useState(false);
+  const [credLoginInput, setCredLoginInput] = useState("");
+  const [credSenhaInput, setCredSenhaInput] = useState("");
+  const [credPerfilInput, setCredPerfilInput] = useState("professor");
+  const [salvandoCredencial, setSalvandoCredencial] = useState(false);
 
   // ─── Estados do Motor Opcional PDF EDUCADF ───────────────────────────────
   const pdfInputRef = useRef(null);
@@ -691,6 +707,17 @@ export default function Chamada() {
 
         if (combinados.length > 0) {
           setSlotsGradeProfessor(combinados);
+        }
+
+        if (resChamada?.data?.agente_educadf) {
+          setAgenteEducaDFInfo({
+            credencial_configurada: Boolean(resChamada.data.agente_educadf.credencial_configurada),
+            login: resChamada.data.agente_educadf.login || null,
+            conectado: Boolean(resChamada.data.agente_educadf.conectado),
+          });
+          if (resChamada.data.agente_educadf.login) {
+            setCredLoginInput(resChamada.data.agente_educadf.login);
+          }
         }
       } catch (e) {
         console.warn("Não foi possível carregar governança / grade horária:", e);
@@ -1063,6 +1090,22 @@ export default function Chamada() {
           });
         }
 
+        if (res.data.agente_educadf) {
+          setAgenteEducaDFInfo({
+            credencial_configurada: Boolean(res.data.agente_educadf.credencial_configurada),
+            login: res.data.agente_educadf.login || null,
+            conectado: Boolean(res.data.agente_educadf.conectado),
+          });
+          if (res.data.agente_educadf.login) {
+            setCredLoginInput((prev) => prev || res.data.agente_educadf.login);
+          }
+          setJobMigracao(res.data.agente_educadf.job || null);
+          setMigrandoEducaDF(res.data.agente_educadf.job?.status === "running");
+        } else {
+          setJobMigracao(null);
+          setMigrandoEducaDF(false);
+        }
+
         const registrosDb = res.data.registros || {};
         const mesclado = { ...mapaLocal, ...registrosDb };
         setRegistroBimestre(mesclado);
@@ -1216,6 +1259,7 @@ export default function Chamada() {
       atual.add(alunoId);
     }
     const novasFaltas = [...atual];
+    const jaEstavaExportada = Boolean(registroAulaAtual.educadf_exportado_em_fmt);
     const aulaPrincipal = {
       ...registroAulaAtual,
       data: dataSelecionada,
@@ -1224,6 +1268,8 @@ export default function Chamada() {
       horario_fim: horarioAtualObj?.fim || null,
       confirmada: true, // Ao marcar falta, já marca a aula como dada
       faltas: novasFaltas,
+      educadf_status: jaEstavaExportada ? "PENDENTE_ATUALIZACAO" : registroAulaAtual.educadf_status || null,
+      educadf_exportado_em_fmt: null,
     };
     const novoMapa = {
       ...registroBimestre,
@@ -1234,13 +1280,19 @@ export default function Chamada() {
     // Se Aula Geminada estiver ativa, replica para a aula seguinte do mesmo dia
     if (aulaGeminada && proxOrdemGeminada <= horariosDisponiveis.length) {
       const hProx = horariosDisponiveis.find((h) => h.ordem === proxOrdemGeminada);
+      const regGemAnt = registroBimestre[aulaKeyGeminada];
       const aulaGem = {
+        ...regGemAnt,
         data: dataSelecionada,
         ordem: proxOrdemGeminada,
         horario: hProx?.horario || "",
         horario_fim: hProx?.fim || null,
         confirmada: true,
         faltas: novasFaltas,
+        educadf_status: regGemAnt?.educadf_exportado_em_fmt
+          ? "PENDENTE_ATUALIZACAO"
+          : regGemAnt?.educadf_status || null,
+        educadf_exportado_em_fmt: null,
       };
       novoMapa[aulaKeyGeminada] = aulaGem;
       aulasSync.push(aulaGem);
@@ -1254,6 +1306,8 @@ export default function Chamada() {
       showToast("error", `Não é possível registrar chamada: ${avaliacaoDiaAtual.motivo}`);
       return;
     }
+    const tinhaFaltasAntes = (registroAulaAtual.faltas || []).length > 0;
+    const jaEstavaExportada = Boolean(registroAulaAtual.educadf_exportado_em_fmt);
     const aulaPrincipal = {
       ...registroAulaAtual,
       data: dataSelecionada,
@@ -1262,6 +1316,12 @@ export default function Chamada() {
       horario_fim: horarioAtualObj?.fim || null,
       confirmada: true,
       faltas: [],
+      educadf_status:
+        jaEstavaExportada && tinhaFaltasAntes
+          ? "PENDENTE_ATUALIZACAO"
+          : registroAulaAtual.educadf_status || null,
+      educadf_exportado_em_fmt:
+        jaEstavaExportada && tinhaFaltasAntes ? null : registroAulaAtual.educadf_exportado_em_fmt || null,
     };
     const novoMapa = {
       ...registroBimestre,
@@ -1271,13 +1331,21 @@ export default function Chamada() {
 
     if (aulaGeminada && proxOrdemGeminada <= horariosDisponiveis.length) {
       const hProx = horariosDisponiveis.find((h) => h.ordem === proxOrdemGeminada);
+      const regGemAnt = registroBimestre[aulaKeyGeminada];
+      const gemTinhaFaltas = (regGemAnt?.faltas || []).length > 0;
+      const gemExportada = Boolean(regGemAnt?.educadf_exportado_em_fmt);
       const aulaGem = {
+        ...regGemAnt,
         data: dataSelecionada,
         ordem: proxOrdemGeminada,
         horario: hProx?.horario || "",
         horario_fim: hProx?.fim || null,
         confirmada: true,
         faltas: [],
+        educadf_status:
+          gemExportada && gemTinhaFaltas ? "PENDENTE_ATUALIZACAO" : regGemAnt?.educadf_status || null,
+        educadf_exportado_em_fmt:
+          gemExportada && gemTinhaFaltas ? null : regGemAnt?.educadf_exportado_em_fmt || null,
       };
       novoMapa[aulaKeyGeminada] = aulaGem;
       aulasSync.push(aulaGem);
@@ -1299,6 +1367,8 @@ export default function Chamada() {
       horario_fim: horarioAtualObj?.fim || null,
       confirmada: novoStatus,
       faltas: registroAulaAtual.faltas || [],
+      educadf_status: novoStatus ? registroAulaAtual.educadf_status || null : null,
+      educadf_exportado_em_fmt: novoStatus ? registroAulaAtual.educadf_exportado_em_fmt || null : null,
     };
     const novoMapa = {
       ...registroBimestre,
@@ -1308,13 +1378,17 @@ export default function Chamada() {
 
     if (aulaGeminada && proxOrdemGeminada <= horariosDisponiveis.length) {
       const hProx = horariosDisponiveis.find((h) => h.ordem === proxOrdemGeminada);
+      const regGemAnt = registroBimestre[aulaKeyGeminada];
       const aulaGem = {
+        ...regGemAnt,
         data: dataSelecionada,
         ordem: proxOrdemGeminada,
         horario: hProx?.horario || "",
         horario_fim: hProx?.fim || null,
         confirmada: novoStatus,
         faltas: registroAulaAtual.faltas || [],
+        educadf_status: novoStatus ? regGemAnt?.educadf_status || null : null,
+        educadf_exportado_em_fmt: novoStatus ? regGemAnt?.educadf_exportado_em_fmt || null : null,
       };
       novoMapa[aulaKeyGeminada] = aulaGem;
       aulasSync.push(aulaGem);
@@ -1337,6 +1411,22 @@ export default function Chamada() {
       .map(([key, v]) => ({ key, ...v }))
       .sort((a, b) => String(a.data).localeCompare(String(b.data)) || Number(a.ordem) - Number(b.ordem));
   }, [registroBimestre]);
+
+  const aulasJaExportadasList = useMemo(
+    () =>
+      aulasConfirmadasList.filter(
+        (a) => a.educadf_status === "EXPORTADO" && Boolean(a.educadf_exportado_em_fmt)
+      ),
+    [aulasConfirmadasList]
+  );
+
+  const aulasPendentesExportacaoList = useMemo(
+    () =>
+      aulasConfirmadasList.filter(
+        (a) => !a.educadf_exportado_em_fmt || a.educadf_status === "PENDENTE_ATUALIZACAO"
+      ),
+    [aulasConfirmadasList]
+  );
 
   // Filtro de busca de alunos
   const alunosFiltrados = useMemo(() => {
@@ -1362,13 +1452,20 @@ export default function Chamada() {
   }, [aulasConfirmadasList]);
 
   // ─── Geração / Clonagem do CSV Oficial EDUCADF em 2º Plano ───────────────
-  const gerarCsvClonadoEducaDF = () => {
+  const gerarCsvClonadoEducaDF = (silencioso = false) => {
+    const modoSilencioso = silencioso === true;
     if (alunos.length === 0) {
-      showToast("error", "Selecione uma turma com estudantes para clonar o arquivo do EDUCADF.");
+      if (!modoSilencioso) {
+        showToast("error", "Selecione uma turma com estudantes para visualizar a matriz do EDUCADF.");
+      }
       return;
     }
 
-    const nomeProf = localStorage.getItem("nome_usuario") || localStorage.getItem("nome") || "PROFESSOR EDUCAMELHOR";
+    const nomeProf =
+      localStorage.getItem("nome_usuario") ||
+      localStorage.getItem("userName") ||
+      localStorage.getItem("nome") ||
+      "PROFESSOR EDUCAMELHOR";
     const etapaEnsino = turmaObj?.etapa || "ENSINO FUNDAMENTAL 9 ANOS";
     const nomeTurma = turmaObj?.nome || "TURMA";
 
@@ -1382,12 +1479,12 @@ export default function Chamada() {
               data: dataSelecionada,
               ordem: horarioAtualObj?.ordem || 1,
               horario: horarioAtualObj?.horario || "07:30",
-              confirmada: true,
+              confirmada: false,
               faltas: [...faltasSetAtual],
             },
           ];
 
-    const cabecalhosAulas = colunasAulas.map((c) => `${c.data} (${c.ordem} - ${c.horario})`);
+    const cabecalhosAulas = colunasAulas.map((c) => `${c.data} (${c.ordem}ª - ${c.horario})`);
     const headerRow = [
       "Professor",
       "Disciplina",
@@ -1417,13 +1514,14 @@ export default function Chamada() {
 
     const escapeCsv = (val) => {
       const s = String(val ?? "");
-      return s.includes(",") || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
+      return s.includes(";") || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
     };
 
     const conteudoCsv = [headerRow, ...linhasAlunos]
-      .map((row) => row.map(escapeCsv).join(","))
+      .map((row) => row.map(escapeCsv).join(";"))
       .join("\r\n");
 
+    setCsvModeloRaw(null);
     setCsvClonadoPreview({
       cabecalhosAulas,
       colunasAulas,
@@ -1431,28 +1529,202 @@ export default function Chamada() {
       csvText: conteudoCsv,
       nomeArquivo: `Chamada-EDUCADF-${slug(nomeTurma)}-${slug(disciplinaSelecionada)}.csv`,
     });
-    setAbaVisualizacao("migracao");
-    showToast("success", "✓ Arquivo CSV nativo do EDUCADF clonado em 2º plano com as marcações do bimestre!");
+    if (!modoSilencioso) {
+      setAbaVisualizacao("migracao");
+    }
   };
 
-  // Importar um CSV modelo baixado do EDUCADF e preenchê-lo automaticamente
+  // Atualiza automaticamente a matriz em Aba 2 quando mudam os lançamentos ou a turma
+  useEffect(() => {
+    if (abaVisualizacao === "migracao" && alunos.length > 0 && !csvModeloRaw) {
+      gerarCsvClonadoEducaDF(true);
+    }
+  }, [abaVisualizacao, alunos, aulasConfirmadasList, turmaSelecionada, disciplinaSelecionada, bimestreSelecionado]);
+
+  // Parser RFC-4180 simples que preserva delimitador original (`;` ou `,`)
+  const parseCsvLine = (line, delim) => {
+    const out = [];
+    let cur = "";
+    let inQuotes = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          cur += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (ch === delim && !inQuotes) {
+        out.push(cur);
+        cur = "";
+      } else {
+        cur += ch;
+      }
+    }
+    out.push(cur);
+    return out;
+  };
+
+  // Clona com 100% de fidelidade estrutural um CSV modelo baixado do EDUCADF
   const onImportarCsvEducaDF = async (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
 
     try {
-      const texto = await file.text();
-      const linhas = texto.split(/\r?\n/).filter((l) => l.trim().length > 0);
-      if (linhas.length < 2) {
+      const textoLimpo = (await file.text()).replace(/^\uFEFF/, "");
+      const linhasBrutas = textoLimpo.split(/\r?\n/).filter((l) => l.trim().length > 0);
+      if (linhasBrutas.length < 2) {
         showToast("error", "O arquivo CSV selecionado parece vazio ou inválido.");
         return;
       }
-      setCsvModeloRaw({ nome: file.name, totalLinhas: linhas.length - 1 });
+
+      // Detecta delimitador original (`;` é padrão Excel/EDUCADF PT-BR, `,` alternativo)
+      const qtdPontoVirgula = (linhasBrutas[0].match(/;/g) || []).length;
+      const qtdVirgula = (linhasBrutas[0].match(/,/g) || []).length;
+      const delim = qtdPontoVirgula >= qtdVirgula ? ";" : ",";
+
+      const headerOriginal = parseCsvLine(linhasBrutas[0], delim);
+      const rowsOriginais = linhasBrutas.slice(1).map((l) => parseCsvLine(l, delim));
+
+      // Localiza colunas de Código/RE e Nome do Estudante no CSV original
+      let idxCod = headerOriginal.findIndex((h) =>
+        /cod|re\b|matric|identif/i.test(normTexto(h))
+      );
+      let idxNome = headerOriginal.findIndex((h) =>
+        /estudante|aluno|nome/i.test(normTexto(h))
+      );
+      if (idxCod === -1 && headerOriginal.length >= 2) idxCod = 0;
+      if (idxNome === -1 && headerOriginal.length >= 2) idxNome = idxCod === 0 ? 1 : 0;
+
+      // Detecta convenção de presença do arquivo (`P` ou `C`)
+      const temLetraP = rowsOriginais.some((r) =>
+        r.some((cell, ci) => ci > Math.max(idxCod, idxNome) && String(cell || "").trim().toUpperCase() === "P")
+      );
+      const marcaPresenca = temLetraP ? "P" : "C";
+
+      // Mapeia colunas de data do cabeçalho original para registros confirmados do bimestre
+      const anoRef = new Date().getFullYear();
+      const mapaColunaParaRegistro = new Map();
+      const contadoresDataNoCsv = {};
+
+      headerOriginal.forEach((colHeader, colIdx) => {
+        if (colIdx === idxCod || colIdx === idxNome) return;
+        const txt = String(colHeader || "").trim();
+        let isoCol = null;
+
+        const mIso = txt.match(/(\d{4})-(\d{2})-(\d{2})/);
+        const mBrAno = txt.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+        const mBrCurto = txt.match(/\b(\d{2})\/(\d{2})\b/);
+
+        if (mIso) isoCol = `${mIso[1]}-${mIso[2]}-${mIso[3]}`;
+        else if (mBrAno) isoCol = `${mBrAno[3]}-${mBrAno[2]}-${mBrAno[1]}`;
+        else if (mBrCurto) isoCol = `${anoRef}-${mBrCurto[2]}-${mBrCurto[1]}`;
+
+        if (!isoCol) return;
+
+        contadoresDataNoCsv[isoCol] = (contadoresDataNoCsv[isoCol] || 0) + 1;
+        const ocorrenciaDia = contadoresDataNoCsv[isoCol];
+
+        // Procura ordem explícita no cabeçalho ex: "(2 - 08:20)" ou "2ª"
+        const mOrd = txt.match(/(?:\(|\b)([1-6])[ªº]?\s*(?:-|aula)/i);
+        const ordemExplicita = mOrd ? Number(mOrd[1]) : null;
+
+        const aulasDaData = aulasConfirmadasList.filter((a) => a.data === isoCol);
+        if (aulasDaData.length === 0) return;
+
+        const regMatch =
+          (ordemExplicita && aulasDaData.find((a) => Number(a.ordem) === ordemExplicita)) ||
+          aulasDaData[ocorrenciaDia - 1] ||
+          aulasDaData[0];
+
+        if (regMatch) {
+          mapaColunaParaRegistro.set(colIdx, regMatch);
+        }
+      });
+
+      // Se o CSV modelo tinha colunas de datas, injeta nelas preservando 100% da estrutura original!
+      if (mapaColunaParaRegistro.size > 0) {
+        const mapaAlunoPorRe = new Map();
+        const mapaAlunoPorNome = new Map();
+        alunos.forEach((al) => {
+          const reLimpo = String(al.codigo || "").replace(/\D/g, "").replace(/^0+/, "");
+          if (reLimpo) mapaAlunoPorRe.set(reLimpo, al);
+          mapaAlunoPorNome.set(normTexto(al.nome), al);
+        });
+
+        const novasLinhasCsv = rowsOriginais.map((row) => {
+          const novaRow = [...row];
+          while (novaRow.length < headerOriginal.length) novaRow.push("");
+
+          const reRow = String(novaRow[idxCod] || "").replace(/\D/g, "").replace(/^0+/, "");
+          const nomeRowNorm = normTexto(novaRow[idxNome] || "");
+          const alunoMatch =
+            (reRow && mapaAlunoPorRe.get(reRow)) ||
+            (nomeRowNorm && mapaAlunoPorNome.get(nomeRowNorm)) ||
+            null;
+
+          if (alunoMatch) {
+            for (const [colIdx, regAula] of mapaColunaParaRegistro.entries()) {
+              const faltou = (regAula.faltas || []).some(
+                (id) => String(id) === String(alunoMatch.id)
+              );
+              novaRow[colIdx] = faltou ? "F" : marcaPresenca;
+            }
+          }
+          return novaRow;
+        });
+
+        const escapeCell = (val) => {
+          const s = String(val ?? "");
+          return s.includes(delim) || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
+        };
+
+        const csvReconstruido = [headerOriginal, ...novasLinhasCsv]
+          .map((r) => r.map(escapeCell).join(delim))
+          .join("\r\n");
+
+        const indicesAulas = Array.from(mapaColunaParaRegistro.keys());
+        const cabecalhosPreview = indicesAulas.map((ci) => headerOriginal[ci]);
+        const colunasPreview = indicesAulas.map((ci) => mapaColunaParaRegistro.get(ci));
+        const linhasPreview = novasLinhasCsv.map((r) => [
+          "",
+          disciplinaSelecionada,
+          turmaObj?.nome || "",
+          "",
+          r[idxCod] || "",
+          r[idxNome] || "",
+          ...indicesAulas.map((ci) => r[ci] || "-"),
+        ]);
+
+        setCsvModeloRaw({
+          nome: file.name,
+          totalLinhas: novasLinhasCsv.length,
+          colunasInjetadas: indicesAulas.length,
+          delimitador: delim,
+        });
+        setCsvClonadoPreview({
+          cabecalhosAulas: cabecalhosPreview,
+          colunasAulas: colunasPreview,
+          linhas: linhasPreview,
+          csvText: csvReconstruido,
+          nomeArquivo: file.name.replace(/\.csv$/i, "") + "-preenchido.csv",
+        });
+        setAbaVisualizacao("migracao");
+        showToast(
+          "success",
+          `✓ Arquivo original "${file.name}" clonado preservando colunas e delimitador (${indicesAulas.length} coluna(s) preenchida(s))!`
+        );
+        return;
+      }
+
+      // Caso o CSV enviado não possua colunas de datas reconhecíveis, gera a matriz padrão com os alunos
+      setCsvModeloRaw({ nome: file.name, totalLinhas: rowsOriginais.length });
       gerarCsvClonadoEducaDF();
       showToast(
         "success",
-        `✓ Modelo "${file.name}" lido e clonado com os lançamentos online do professor!`
+        `✓ Modelo "${file.name}" lido e matriz gerada com os lançamentos online do bimestre!`
       );
     } catch (err) {
       console.error(err);
@@ -1475,18 +1747,223 @@ export default function Chamada() {
     setTimeout(() => URL.revokeObjectURL(url), 5000);
   };
 
-  const simularEnvioAgenteEducaDF = () => {
-    if (!csvClonadoPreview) {
-      gerarCsvClonadoEducaDF();
+  // ─── Polling em Tempo Real da Migração Playwright (Chamada → EDUCADF) ────
+  useEffect(() => {
+    if (jobMigracao?.status !== "running" || !turmaSelecionada || !disciplinaSelecionada) {
+      return undefined;
     }
+
+    let cancelado = false;
+    const timer = setInterval(async () => {
+      try {
+        const res = await api.get("/professores/me/chamada/exportar-status", {
+          params: {
+            turma_id: turmaSelecionada,
+            is_agrupamento: turmaObj?.is_agrupamento ? 1 : 0,
+            disciplina: disciplinaSelecionada,
+            bimestre: bimestreSelecionado,
+          },
+        });
+        if (cancelado || !res?.data?.ok) return;
+
+        // Atualiza badges das aulas exportadas em tempo real conforme cada dia é salvo no EDUCADF
+        const expMap = res.data.exportadas_map || {};
+        if (Object.keys(expMap).length > 0) {
+          setRegistroBimestre((prev) => {
+            let mudou = false;
+            const proximo = { ...prev };
+            for (const [k, infoExp] of Object.entries(expMap)) {
+              if (proximo[k]) {
+                if (
+                  proximo[k].educadf_status !== infoExp.educadf_status ||
+                  proximo[k].educadf_exportado_em_fmt !== infoExp.educadf_exportado_em_fmt
+                ) {
+                  proximo[k] = {
+                    ...proximo[k],
+                    educadf_status: infoExp.educadf_status,
+                    educadf_exportado_em_fmt: infoExp.educadf_exportado_em_fmt,
+                  };
+                  mudou = true;
+                }
+              }
+            }
+            if (mudou) {
+              try {
+                localStorage.setItem(storageKey, JSON.stringify(proximo));
+              } catch (_) {}
+              return proximo;
+            }
+            return prev;
+          });
+        }
+
+        const job = res.data.job;
+        if (!job) {
+          setMigrandoEducaDF(false);
+          setJobMigracao(null);
+          return;
+        }
+
+        setJobMigracao(job);
+        if (job.status !== "running") {
+          setMigrandoEducaDF(false);
+          if (job.status === "done") {
+            showToast(
+              "success",
+              job.message || "✓ Frequência migrada com sucesso para o portal EDUCADF!"
+            );
+          } else if (job.status === "partial") {
+            showToast(
+              "info",
+              job.message || "Migração concluída parcialmente. Confira os detalhes na tela."
+            );
+          } else if (job.status === "error") {
+            showToast(
+              "error",
+              job.message || "Não foi possível concluir a migração para o EDUCADF."
+            );
+          }
+        }
+      } catch (err) {
+        console.warn("[Chamada->EDUCADF] Falha ao consultar status da migração:", err?.message);
+      }
+    }, 2500);
+
+    return () => {
+      cancelado = true;
+      clearInterval(timer);
+    };
+  }, [
+    jobMigracao?.status,
+    turmaSelecionada,
+    turmaObj?.is_agrupamento,
+    disciplinaSelecionada,
+    bimestreSelecionado,
+    storageKey,
+  ]);
+
+  // ─── Dispara a Migração Automatizada Real para o Portal EDUCADF ──────────
+  const iniciarMigracaoEducaDF = async ({ apenasPendentes = true, datasEspecificas = null } = {}) => {
+    if (!turmaSelecionada || !disciplinaSelecionada) {
+      showToast("error", "Selecione a disciplina e a turma antes de migrar para o EDUCADF.");
+      return;
+    }
+
+    if (aulasConfirmadasList.length === 0) {
+      showToast(
+        "error",
+        "Confirme ao menos uma aula ('✓ Dei esta aula' ou 'Salvar Chamada') antes de migrar a frequência para o EDUCADF."
+      );
+      return;
+    }
+
+    if (!csvClonadoPreview && alunos.length > 0) {
+      gerarCsvClonadoEducaDF(true);
+    }
+    setAbaVisualizacao("migracao");
+
+    if (!agenteEducaDFInfo.credencial_configurada) {
+      setModalCredencialOpen(true);
+      showToast(
+        "info",
+        "Conecte sua matrícula e senha do portal EDUCADF para iniciar a migração automática."
+      );
+      return;
+    }
+
     setMigrandoEducaDF(true);
-    setTimeout(() => {
+    try {
+      const res = await api.post("/professores/me/chamada/exportar-educadf", {
+        bimestre: bimestreSelecionado,
+        turma_id: turmaSelecionada,
+        is_agrupamento: turmaObj?.is_agrupamento ? 1 : 0,
+        disciplina: disciplinaSelecionada,
+        apenas_pendentes: apenasPendentes,
+        datas: datasEspecificas,
+        aulas: aulasConfirmadasList,
+      });
+
+      if (res?.data?.ok && res.data.job) {
+        setJobMigracao(res.data.job);
+        showToast(
+          "info",
+          res.data.message || "🚀 Agente EDUCA conectado! Lançando frequência no portal EDUCADF..."
+        );
+      }
+    } catch (err) {
       setMigrandoEducaDF(false);
+      const codigo = err?.response?.data?.codigo;
+      const msg =
+        err?.response?.data?.message ||
+        "Não foi possível iniciar a migração de frequência para o EDUCADF.";
+
+      if (codigo === "SEM_CREDENCIAIS" || codigo === "CREDENCIAIS_CORROMPIDAS") {
+        setModalCredencialOpen(true);
+        showToast("error", msg);
+        return;
+      }
+      if (codigo === "EM_EXECUCAO" && err?.response?.data?.job) {
+        setJobMigracao(err.response.data.job);
+        setMigrandoEducaDF(true);
+        showToast("info", msg);
+        return;
+      }
+      if (codigo === "TUDO_JA_EXPORTADO") {
+        showToast("info", msg);
+        return;
+      }
+      showToast("error", msg);
+    }
+  };
+
+  // ─── Salva Credenciais EDUCADF Inline (Criptografia AES-256) sem sair da Chamada ───
+  const salvarCredencialEducaDFInline = async (e) => {
+    e?.preventDefault?.();
+    if (!credLoginInput.trim() || !credSenhaInput.trim()) {
+      showToast("error", "Informe seu usuário/matrícula e senha do portal EDUCADF.");
+      return;
+    }
+
+    setSalvandoCredencial(true);
+    try {
+      const perfilUsuario = String(localStorage.getItem("perfil") || "").toLowerCase();
+      const resp = await api.post("/api/agente/credenciais", {
+        educadf_login: credLoginInput.trim(),
+        educadf_senha: credSenhaInput.trim(),
+        perfil_educadf: credPerfilInput || "professor",
+        professor_id:
+          perfilUsuario === "professor" ? Number(localStorage.getItem("professor_id")) || 0 : 0,
+      });
+
+      if (!resp?.data?.ok) {
+        showToast("error", resp?.data?.message || "Erro ao salvar credenciais do EDUCADF.");
+        return;
+      }
+
+      const credId = resp.data.id;
+      if (credId) {
+        api.post(`/api/agente/credenciais/${credId}/testar`).catch(() => {});
+      }
+
+      setAgenteEducaDFInfo({
+        credencial_configurada: true,
+        login: credLoginInput.trim(),
+        conectado: true,
+      });
+      setCredSenhaInput("");
+      setModalCredencialOpen(false);
       showToast(
         "success",
-        "🚀 Arquivo clonado pronto para envio automatizado ao portal EDUCADF (Etapa de Backend será conectada a seguir)!"
+        "✓ Credenciais do EDUCADF salvas com criptografia AES-256! Você já pode migrar a frequência."
       );
-    }, 1200);
+    } catch (err) {
+      showToast(
+        "error",
+        err?.response?.data?.message || "Não foi possível salvar suas credenciais do EDUCADF."
+      );
+    } finally {
+      setSalvandoCredencial(false);
+    }
   };
 
   // ─── Funções do Motor PDF Opcional (Folha EDUCADF com "X" vetorial) ──────
@@ -2868,15 +3345,22 @@ export default function Chamada() {
                       ? `/ ${cronogramaGradeBimestre.totalAulasPrevistas} previstas`
                       : "aulas dadas"}
                   </span>
+                  {aulasJaExportadasList.length > 0 && (
+                    <span className="block text-[10px] font-extrabold text-teal-600 mt-0.5">
+                      ☁ {aulasJaExportadasList.length} já no EDUCADF
+                    </span>
+                  )}
                 </div>
               </div>
               <button
                 type="button"
-                onClick={gerarCsvClonadoEducaDF}
+                onClick={() => gerarCsvClonadoEducaDF(false)}
                 className="px-3 py-2 rounded-xl text-xs font-extrabold bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow hover:opacity-95 transition whitespace-nowrap"
-                title="Gerar arquivo clonado para o EDUCADF"
+                title="Abrir painel de migração automática para o EDUCADF"
               >
-                Migrar →
+                {aulasPendentesExportacaoList.length > 0
+                  ? `Migrar (${aulasPendentesExportacaoList.length}) →`
+                  : "EDUCADF →"}
               </button>
             </div>
           </div>
@@ -2910,6 +3394,22 @@ export default function Chamada() {
                       Aguardando confirmação (“Dei esta aula”)
                     </span>
                   )}
+                  {registroAulaAtual.confirmada &&
+                    registroAulaAtual.educadf_status === "EXPORTADO" &&
+                    registroAulaAtual.educadf_exportado_em_fmt && (
+                      <span
+                        className="text-xs font-extrabold px-2.5 py-1 rounded-full bg-teal-100 text-teal-800 border border-teal-200"
+                        title={`Sincronizada no portal EDUCADF em ${registroAulaAtual.educadf_exportado_em_fmt}`}
+                      >
+                        ☁ No EDUCADF ({registroAulaAtual.educadf_exportado_em_fmt})
+                      </span>
+                    )}
+                  {registroAulaAtual.confirmada &&
+                    registroAulaAtual.educadf_status === "PENDENTE_ATUALIZACAO" && (
+                      <span className="text-xs font-extrabold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                        ↻ Alterada (Pendente re-envio EDUCADF)
+                      </span>
+                    )}
                   {sincronizandoServidor ? (
                     <span className="text-[11px] font-bold text-sky-600">Sincronizando...</span>
                   ) : ultimoSyncFmt ? (
@@ -3072,6 +3572,8 @@ export default function Chamada() {
                   aulasConfirmadasList.map((a) => {
                     const d = formatarDataCurta(a.data);
                     const ativa = a.key === aulaKeyAtual;
+                    const jaExportada =
+                      a.educadf_status === "EXPORTADO" && Boolean(a.educadf_exportado_em_fmt);
                     return (
                       <button
                         key={a.key}
@@ -3080,13 +3582,23 @@ export default function Chamada() {
                           setDataSelecionada(a.data);
                           setAulaOrdemSelecionada(Number(a.ordem) || 1);
                         }}
-                        className={`text-xs font-bold px-2.5 py-1 rounded-full border transition ${
+                        title={
+                          jaExportada
+                            ? `Sincronizada no EDUCADF em ${a.educadf_exportado_em_fmt}`
+                            : "Confirmada no EducaMelhor (pendente de envio ao EDUCADF)"
+                        }
+                        className={`text-xs font-bold px-2.5 py-1 rounded-full border transition inline-flex items-center gap-1 ${
                           ativa
                             ? "bg-cyan-600 text-white border-cyan-600"
+                            : jaExportada
+                            ? "bg-teal-50 text-teal-800 border-teal-300 hover:border-teal-500"
                             : "bg-white text-slate-700 border-slate-300 hover:border-cyan-400"
                         }`}
                       >
-                        {d.dm} · {a.ordem}ª ({a.faltas?.length || 0}F)
+                        <span>
+                          {d.dm} · {a.ordem}ª ({a.faltas?.length || 0}F)
+                        </span>
+                        {jaExportada && <span className="text-[10px]">☁</span>}
                       </button>
                     );
                   })
@@ -3095,11 +3607,11 @@ export default function Chamada() {
 
               <button
                 type="button"
-                onClick={gerarCsvClonadoEducaDF}
+                onClick={() => gerarCsvClonadoEducaDF(false)}
                 className="text-xs font-extrabold text-cyan-700 hover:text-cyan-900 flex items-center gap-1"
               >
                 <SparklesIcon className="w-4 h-4" />
-                Visualizar Arquivo Clonado para o EDUCADF →
+                Abrir Painel de Migração EDUCADF →
               </button>
             </div>
           </section>
@@ -3107,32 +3619,32 @@ export default function Chamada() {
       )}
 
       {/* ═══════════════════════════════════════════════════════════════════════
-          ABA 2: CLONAGEM EM 2º PLANO E MIGRAÇÃO PARA O EDUCADF (FINAL DO BIMESTRE)
+          ABA 2: MIGRAÇÃO REAL AUTOMATIZADA E CLONAGEM PARA O EDUCADF
       ═══════════════════════════════════════════════════════════════════════ */}
       {abaVisualizacao === "migracao" && (
         <section className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden space-y-5 p-5 md:p-6">
-          {/* Explicação visual do Fluxo de Clonagem em 2º Plano */}
+          {/* Cabeçalho + Ações de Migração */}
           <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-100 pb-5">
             <div>
               <span className="text-[11px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
-                Fluxo de Migração sem Fotos · Clonagem Direta
+                Agente EDUCA · Migração Real Automatizada
               </span>
               <h2 className="text-xl font-black text-slate-800 mt-2">
-                Clonagem e Migração de Frequência para o Portal EDUCADF
+                Migração de Frequência Direto para o Portal EDUCADF
               </h2>
               <p className="text-xs text-slate-500 mt-1 max-w-3xl leading-relaxed">
-                Durante o bimestre, você registra normalmente as chamadas online no{" "}
-                <strong>EducaMelhor</strong>. No fechamento, nosso sistema baixa/clona o arquivo modelo do{" "}
-                <strong>EDUCADF</strong> em segundo plano, injeta automaticamente os códigos{" "}
-                <code className="bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded font-bold">C</code>{" "}
-                (Compareceu),{" "}
-                <code className="bg-rose-50 text-rose-700 px-1.5 py-0.5 rounded font-bold">F</code> (Faltou) e{" "}
-                <code className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-bold">-</code> e envia o
-                arquivo original com 100% de fidelidade (sem necessidade de impressão ou câmera).
+                O <strong>Agente EDUCA</strong> acessa automaticamente o Diário de Classe no portal{" "}
+                <strong>EDUCADF</strong> com suas credenciais criptografadas, seleciona{" "}
+                <strong>{turmaObj?.nome || "sua turma"}</strong> ({disciplinaSelecionada}), abre cada dia
+                letivo confirmado no calendário e salva as presenças{" "}
+                <code className="bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded font-bold">P / C</code> e
+                faltas{" "}
+                <code className="bg-rose-50 text-rose-700 px-1.5 py-0.5 rounded font-bold">F</code> sem
+                necessidade de digitação manual.
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <input
                 ref={csvInputRef}
                 type="file"
@@ -3144,9 +3656,10 @@ export default function Chamada() {
                 type="button"
                 onClick={() => csvInputRef.current?.click()}
                 className="px-3.5 py-2.5 rounded-xl text-xs font-extrabold bg-slate-100 text-slate-700 hover:bg-slate-200 flex items-center gap-1.5 transition"
+                title="Importar um arquivo CSV baixado do EDUCADF e preenchê-lo preservando colunas e delimitador"
               >
                 <ArrowPathIcon className="w-4 h-4" />
-                Clonar a partir de CSV do EDUCADF
+                Clonar CSV do EDUCADF
               </button>
 
               <input
@@ -3163,49 +3676,280 @@ export default function Chamada() {
                 className="px-3.5 py-2.5 rounded-xl text-xs font-extrabold bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 flex items-center gap-1.5 transition"
               >
                 <DocumentTextIcon className="w-4 h-4" />
-                {lendoPdf ? "Lendo PDF..." : "Clonar Folha PDF EDUCADF (com X)"}
+                {lendoPdf ? "Lendo PDF..." : "Clonar Folha PDF (com X)"}
               </button>
 
               {csvClonadoPreview && (
                 <button
                   type="button"
                   onClick={baixarCsvClonado}
-                  className="px-4 py-2.5 rounded-xl text-xs font-black bg-slate-800 text-white hover:bg-slate-900 flex items-center gap-1.5 transition"
+                  className="px-3.5 py-2.5 rounded-xl text-xs font-black bg-slate-800 text-white hover:bg-slate-900 flex items-center gap-1.5 transition"
                 >
                   <DocumentArrowDownIcon className="w-4 h-4" />
-                  Baixar CSV Preenchido
+                  Baixar CSV
                 </button>
               )}
 
+              {aulasJaExportadasList.length > 0 &&
+                aulasPendentesExportacaoList.length > 0 &&
+                !migrandoEducaDF && (
+                  <button
+                    type="button"
+                    onClick={() => iniciarMigracaoEducaDF({ apenasPendentes: false })}
+                    className="px-3.5 py-2.5 rounded-xl text-xs font-extrabold bg-teal-50 text-teal-800 border border-teal-200 hover:bg-teal-100 transition"
+                    title="Reenviar todas as aulas confirmadas do bimestre ao EDUCADF"
+                  >
+                    Re-migrar Tudo ({aulasConfirmadasList.length})
+                  </button>
+                )}
+
               <button
                 type="button"
-                onClick={simularEnvioAgenteEducaDF}
+                onClick={() =>
+                  iniciarMigracaoEducaDF({
+                    apenasPendentes: aulasPendentesExportacaoList.length > 0,
+                  })
+                }
                 disabled={migrandoEducaDF}
-                className="px-4 py-2.5 rounded-xl text-xs font-black bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow hover:opacity-95 flex items-center gap-1.5 transition"
+                className="px-4 py-2.5 rounded-xl text-xs font-black bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow hover:opacity-95 disabled:opacity-60 flex items-center gap-1.5 transition"
               >
                 <CloudArrowUpIcon className="w-4 h-4" />
-                {migrandoEducaDF ? "Sincronizando..." : "Migrar para o EDUCADF"}
+                {migrandoEducaDF
+                  ? "Migrando no EDUCADF..."
+                  : aulasPendentesExportacaoList.length > 0
+                  ? `Migrar Pendentes (${aulasPendentesExportacaoList.length})`
+                  : aulasConfirmadasList.length > 0
+                  ? `Re-migrar Bimestre (${aulasConfirmadasList.length})`
+                  : "Migrar para o EDUCADF"}
               </button>
             </div>
           </div>
+
+          {/* Barra de Conexão EDUCADF (Etapa 0) + KPIs de Migração do Bimestre */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-stretch">
+            <div
+              className={`lg:col-span-6 rounded-2xl p-4 border flex flex-wrap items-center justify-between gap-3 ${
+                agenteEducaDFInfo.credencial_configurada
+                  ? "bg-emerald-50/70 border-emerald-200"
+                  : "bg-amber-50/80 border-amber-300"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className={`p-2.5 rounded-xl ${
+                    agenteEducaDFInfo.credencial_configurada
+                      ? "bg-emerald-500 text-white"
+                      : "bg-amber-500 text-white"
+                  }`}
+                >
+                  {agenteEducaDFInfo.credencial_configurada ? (
+                    <ShieldCheckIcon className="w-5 h-5" />
+                  ) : (
+                    <KeyIcon className="w-5 h-5" />
+                  )}
+                </div>
+                <div>
+                  <div className="text-[11px] font-black uppercase tracking-wider text-slate-600">
+                    Conexão Portal EDUCADF (AES-256)
+                  </div>
+                  {agenteEducaDFInfo.credencial_configurada ? (
+                    <div className="text-sm font-extrabold text-emerald-900">
+                      ✓ Conta Configurada · Matrícula{" "}
+                      <span className="font-mono bg-white/80 px-1.5 py-0.5 rounded border border-emerald-200">
+                        {agenteEducaDFInfo.login}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="text-xs font-bold text-amber-900">
+                      Conecte sua matrícula e senha do EDUCADF para habilitar o envio automático.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setModalCredencialOpen(true)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-black transition ${
+                    agenteEducaDFInfo.credencial_configurada
+                      ? "bg-white text-emerald-800 border border-emerald-300 hover:bg-emerald-100"
+                      : "bg-amber-600 text-white hover:bg-amber-700 shadow-sm"
+                  }`}
+                >
+                  {agenteEducaDFInfo.credencial_configurada
+                    ? "Atualizar Credencial"
+                    : "Conectar EDUCADF"}
+                </button>
+                <Link
+                  to="/agente-educa/credenciais"
+                  className="px-2.5 py-1.5 rounded-xl text-[11px] font-bold text-slate-600 hover:bg-white/80 border border-slate-200 transition"
+                  title="Abrir painel completo do Agente EDUCA"
+                >
+                  Painel Agente ↗
+                </Link>
+              </div>
+            </div>
+
+            <div className="lg:col-span-2 rounded-2xl p-3.5 bg-slate-50 border border-slate-200 flex flex-col justify-center">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                Confirmadas
+              </span>
+              <span className="text-2xl font-black text-slate-800 mt-0.5">
+                {aulasConfirmadasList.length}
+              </span>
+              <span className="text-[11px] text-slate-500 font-semibold">aulas no bimestre</span>
+            </div>
+
+            <div className="lg:col-span-2 rounded-2xl p-3.5 bg-teal-50/70 border border-teal-200 flex flex-col justify-center">
+              <span className="text-[10px] font-black uppercase tracking-wider text-teal-700">
+                Já no EDUCADF
+              </span>
+              <span className="text-2xl font-black text-teal-800 mt-0.5">
+                {aulasJaExportadasList.length}
+              </span>
+              <span className="text-[11px] text-teal-700 font-semibold">sincronizadas ☁</span>
+            </div>
+
+            <div className="lg:col-span-2 rounded-2xl p-3.5 bg-cyan-50/70 border border-cyan-200 flex flex-col justify-center">
+              <span className="text-[10px] font-black uppercase tracking-wider text-cyan-700">
+                Pendentes
+              </span>
+              <span className="text-2xl font-black text-cyan-900 mt-0.5">
+                {aulasPendentesExportacaoList.length}
+              </span>
+              <span className="text-[11px] text-cyan-700 font-semibold">prontas p/ envio</span>
+            </div>
+          </div>
+
+          {/* Card de Progresso ao Vivo / Resultado da Migração Playwright */}
+          {jobMigracao && (
+            <div
+              className={`rounded-2xl p-4 md:p-5 border space-y-3 ${
+                jobMigracao.status === "running"
+                  ? "bg-slate-900 text-white border-cyan-500/40 shadow-md"
+                  : jobMigracao.status === "done"
+                  ? "bg-emerald-50 border-emerald-300 text-emerald-950"
+                  : jobMigracao.status === "partial"
+                  ? "bg-amber-50 border-amber-300 text-amber-950"
+                  : "bg-rose-50 border-rose-300 text-rose-950"
+              }`}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  {jobMigracao.status === "running" ? (
+                    <ArrowPathIcon className="w-5 h-5 text-cyan-400 animate-spin shrink-0" />
+                  ) : jobMigracao.status === "done" ? (
+                    <CheckCircleIcon className="w-5 h-5 text-emerald-600 shrink-0" />
+                  ) : (
+                    <ExclamationTriangleIcon
+                      className={`w-5 h-5 shrink-0 ${
+                        jobMigracao.status === "partial" ? "text-amber-600" : "text-rose-600"
+                      }`}
+                    />
+                  )}
+                  <div>
+                    <div className="text-xs font-black uppercase tracking-wider opacity-80">
+                      {jobMigracao.status === "running"
+                        ? "Agente EDUCA em Execução no Portal EDUCADF"
+                        : jobMigracao.status === "done"
+                        ? "Migração Concluída com Sucesso"
+                        : jobMigracao.status === "partial"
+                        ? "Migração Concluída Parcialmente"
+                        : "Atenção na Migração para o EDUCADF"}
+                    </div>
+                    <div className="text-sm font-extrabold mt-0.5">
+                      {jobMigracao.status === "running"
+                        ? jobMigracao.etapa || "Sincronizando frequência no Diário de Classe..."
+                        : jobMigracao.message || jobMigracao.etapa}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 flex-wrap">
+                  {jobMigracao.totalDatas > 0 && (
+                    <span
+                      className={`text-xs font-black px-3 py-1 rounded-full ${
+                        jobMigracao.status === "running"
+                          ? "bg-cyan-500/20 text-cyan-300 border border-cyan-400/30"
+                          : "bg-white/80 text-slate-800 border border-slate-200"
+                      }`}
+                    >
+                      {jobMigracao.datasProcessadas || 0} / {jobMigracao.totalDatas} dia(s) ·{" "}
+                      {jobMigracao.aulasExportadas || 0} aula(s) salva(s)
+                    </span>
+                  )}
+
+                  {jobMigracao.status !== "running" && (
+                    <button
+                      type="button"
+                      onClick={() => setJobMigracao(null)}
+                      className="text-xs font-bold px-2.5 py-1 rounded-lg bg-black/5 hover:bg-black/10 transition"
+                    >
+                      Fechar
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {jobMigracao.status === "running" && (
+                <div className="space-y-1.5">
+                  <div className="w-full h-2.5 rounded-full bg-slate-800 overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-cyan-400 to-emerald-400 transition-all duration-500"
+                      style={{
+                        width: `${Math.max(
+                          8,
+                          Math.round(
+                            ((jobMigracao.datasProcessadas || 0) /
+                              Math.max(1, jobMigracao.totalDatas || 1)) *
+                              100
+                          )
+                        )}%`,
+                      }}
+                    />
+                  </div>
+                  <p className="text-[11px] text-slate-300 font-medium">
+                    Você pode acompanhar cada data recebendo o selo <strong>☁</strong> em tempo real
+                    enquanto o Agente EDUCA salva no portal.
+                  </p>
+                </div>
+              )}
+
+              {Array.isArray(jobMigracao.avisos) && jobMigracao.avisos.length > 0 && (
+                <div className="pt-2 border-t border-black/10 space-y-1">
+                  <div className="text-xs font-black">
+                    Detalhes por data ({jobMigracao.avisos.length} aviso(s)):
+                  </div>
+                  <ul className="text-xs space-y-1 max-h-32 overflow-y-auto">
+                    {jobMigracao.avisos.map((av, idx) => (
+                      <li key={idx} className="font-semibold">
+                        • <strong>{formatarDataBr(av.data)}:</strong> {av.motivo}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Pré-visualização da Matriz CSV Nativa do EDUCADF */}
           {csvClonadoPreview ? (
             <div className="space-y-3">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <div className="text-xs font-bold text-slate-600">
-                  Arquivo gerado em segundo plano:{" "}
+                  Matriz pronta para migração / exportação:{" "}
                   <code className="bg-slate-100 px-2 py-0.5 rounded text-slate-800 font-extrabold">
                     {csvClonadoPreview.nomeArquivo}
                   </code>
                   {csvModeloRaw && (
                     <span className="ml-2 text-emerald-600">
-                      (Clonado sobre o modelo {csvModeloRaw.nome})
+                      (Clonado fielmente sobre {csvModeloRaw.nome})
                     </span>
                   )}
                 </div>
                 <span className="text-[11px] font-bold text-slate-400">
-                  Formato oficial EDUCADF: Professor, Disciplina, Turma, Etapa, CodEstudante, Estudante, Datas...
+                  Colunas com selo ☁ já estão sincronizadas no Diário de Classe do EDUCADF
                 </span>
               </div>
 
@@ -3216,14 +3960,30 @@ export default function Chamada() {
                       <th className="py-2.5 px-3 font-extrabold border-r border-slate-700">Cód. EDUCADF</th>
                       <th className="py-2.5 px-3 font-extrabold border-r border-slate-700">Estudante</th>
                       <th className="py-2.5 px-3 font-extrabold border-r border-slate-700">Turma</th>
-                      {csvClonadoPreview.cabecalhosAulas.map((cab, i) => (
-                        <th
-                          key={i}
-                          className="py-2.5 px-3 font-extrabold text-center border-r border-slate-700 whitespace-nowrap bg-slate-800"
-                        >
-                          {cab}
-                        </th>
-                      ))}
+                      {csvClonadoPreview.cabecalhosAulas.map((cab, i) => {
+                        const colMeta = csvClonadoPreview.colunasAulas?.[i];
+                        const expOk =
+                          colMeta?.educadf_status === "EXPORTADO" &&
+                          Boolean(colMeta?.educadf_exportado_em_fmt);
+                        return (
+                          <th
+                            key={i}
+                            className="py-2 px-3 font-extrabold text-center border-r border-slate-700 whitespace-nowrap bg-slate-800"
+                            title={
+                              expOk
+                                ? `Sincronizada no EDUCADF em ${colMeta.educadf_exportado_em_fmt}`
+                                : undefined
+                            }
+                          >
+                            <div>{cab}</div>
+                            {expOk && (
+                              <span className="inline-block mt-0.5 text-[10px] px-1.5 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 font-black">
+                                ☁ EDUCADF ✓
+                              </span>
+                            )}
+                          </th>
+                        );
+                      })}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200">
@@ -3252,7 +4012,7 @@ export default function Chamada() {
                                 className={`inline-block w-6 h-6 leading-6 rounded-full text-[11px] ${
                                   m === "F"
                                     ? "bg-rose-500 text-white"
-                                    : m === "C"
+                                    : m === "C" || m === "P"
                                     ? "bg-emerald-100 text-emerald-800"
                                     : "bg-slate-100 text-slate-400"
                                 }`}
@@ -3270,8 +4030,7 @@ export default function Chamada() {
             </div>
           ) : (
             <div className="p-8 text-center text-slate-400 text-sm">
-              Clique em <strong>“Gerar CSV Clonado”</strong> ou selecione uma turma para visualizar a matriz de
-              exportação do EDUCADF.
+              Selecione uma turma com estudantes para visualizar a matriz de frequência do EDUCADF.
             </div>
           )}
         </section>
@@ -3333,6 +4092,106 @@ export default function Chamada() {
             </div>
           )}
         </section>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          MODAL INLINE: CONECTAR CONTA DO PORTAL EDUCADF (CRIPTOGRAFIA AES-256)
+      ═══════════════════════════════════════════════════════════════════════ */}
+      {modalCredencialOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs"
+          onClick={() => !salvandoCredencial && setModalCredencialOpen(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-6 py-4 bg-gradient-to-r from-slate-900 to-slate-800 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <ShieldCheckIcon className="w-6 h-6 text-emerald-400" />
+                <div>
+                  <h3 className="text-sm font-black tracking-wide uppercase">
+                    Conectar Conta EDUCADF
+                  </h3>
+                  <p className="text-[11px] text-slate-300 font-medium">
+                    Criptografia militar AES-256 · Etapa 0 do Agente EDUCA
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={salvandoCredencial}
+                onClick={() => setModalCredencialOpen(false)}
+                className="text-slate-400 hover:text-white text-sm font-black"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={salvarCredencialEducaDFInline} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-1">
+                  Matrícula / Usuário EDUCADF
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={credLoginInput}
+                  onChange={(e) => setCredLoginInput(e.target.value)}
+                  placeholder="Ex.: 02123456"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-bold text-slate-800 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-1">
+                  Senha do Portal EDUCADF
+                </label>
+                <input
+                  type="password"
+                  required
+                  value={credSenhaInput}
+                  onChange={(e) => setCredSenhaInput(e.target.value)}
+                  placeholder="Digite sua senha do EDUCADF"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-bold text-slate-800 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-extrabold text-slate-700 uppercase tracking-wider mb-1">
+                  Perfil no EDUCADF
+                </label>
+                <select
+                  value={credPerfilInput}
+                  onChange={(e) => setCredPerfilInput(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-bold text-slate-800 focus:outline-none focus:border-emerald-500 bg-white"
+                >
+                  <option value="professor">Professor</option>
+                  <option value="secretario">Secretário Escolar</option>
+                  <option value="diretor">Diretor / Gestor</option>
+                </select>
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  disabled={salvandoCredencial}
+                  onClick={() => setModalCredencialOpen(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={salvandoCredencial}
+                  className="px-5 py-2.5 rounded-xl text-xs font-black bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow hover:opacity-95 disabled:opacity-60 transition"
+                >
+                  {salvandoCredencial ? "Salvando com AES-256..." : "Salvar e Conectar"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

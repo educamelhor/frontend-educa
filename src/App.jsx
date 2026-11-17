@@ -176,6 +176,11 @@ import {
 import AdministrativoModule from "./features/administrativo";
 import MemorandoPage from "./features/administrativo/MemorandoPage";
 
+// ✅ MÓDULO FINANCEIRO
+import FinanceiroModule from "./features/financeiro";
+import PdafPage from "./features/financeiro/PdafPage";
+import PddePage from "./features/financeiro/PddePage";
+
 // Layout protegido para rotas autenticadas
 function ProtectedLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -547,17 +552,10 @@ export default function App() {
           <Route path="/administrativo/relatorios" element={<RequireModulo modulo="administrativo"><AdministrativoModule /></RequireModulo>} />
           <Route path="/administrativo/memorando"  element={<RequireModulo modulo="administrativo"><MemorandoPage /></RequireModulo>} />
 
-          {/* ── Financeiro (page será conectada no próximo passo) ────────── */}
-          <Route
-            path="/financeiro"
-            element={
-              <RequireModulo modulo="financeiro">
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8 text-center text-slate-500">
-                  Módulo Financeiro — página será criada no próximo passo.
-                </div>
-              </RequireModulo>
-            }
-          />
+          {/* ── Financeiro ───────────────────────────────────────────────── */}
+          <Route path="/financeiro"      element={<RequireModulo modulo="financeiro"><FinanceiroModule /></RequireModulo>} />
+          <Route path="/financeiro/pdaf" element={<RequireModulo modulo="financeiro"><PdafPage /></RequireModulo>} />
+          <Route path="/financeiro/pdde" element={<RequireModulo modulo="financeiro"><PddePage /></RequireModulo>} />
 
           <Route path="*" element={<Navigate to="/home" replace />} />
         </Route>

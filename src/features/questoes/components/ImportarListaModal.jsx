@@ -270,9 +270,19 @@ export default function ImportarListaModal({
   const [verPaginaInteira, setVerPaginaInteira] = useState(false);
   const [salvandoAcao, setSalvandoAcao] = useState(''); // '' | 'escola' | 'global'
   const [erroItem, setErroItem] = useState('');
+  const [sucessoItem, setSucessoItem] = useState('');
   const [copiadoCodigo, setCopiadoCodigo] = useState('');
   const [showManualCropModal, setShowManualCropModal] = useState(false);
   const [teveAlgumaSalva, setTeveAlgumaSalva] = useState(false);
+  const [confirmandoExclusaoIdx, setConfirmandoExclusaoIdx] = useState(null);
+  const [excluindoItem, setExcluindoItem] = useState(false);
+  const sucessoItemTimerRef = useRef(null);
+
+  const dispararSucessoItem = (msg) => {
+    if (sucessoItemTimerRef.current) clearTimeout(sucessoItemTimerRef.current);
+    setSucessoItem(msg);
+    sucessoItemTimerRef.current = setTimeout(() => setSucessoItem(''), 6000);
+  };
 
   const fileInputRef = useRef(null);
   const enunciadoEditRef = useRef(null);
@@ -722,10 +732,55 @@ export default function ImportarListaModal({
         if (idx !== activeIdx) return it;
         const next = { ...it, ...partial };
         if (partial.estrutura) next.estrutura_json = partial.estrutura;
-        if (partial.midia !== undefined) next.imagem = partial.midia?.url || partial.imagem || null;
+        if (partial.midia !== undefined) {
+          next.midia = partial.midia;
+          next.midia_json = partial.midia;
+          next.imagem = partial.midia?.url || null;
+          next.imagem_url = partial.midia?.url || null;
+        }
         return next;
       })
     );
+  };
+
+  /* ── Persiste automaticamente novo recorte caso a questão já tenha sido salva no banco, e exibe confirmação ── */
+  const handleMidiaRecortadaNaFila = async (novaMidia) => {
+    if (!currentItem || !novaMidia?.url) return;
+    const itemAtualizado = {
+      ...currentItem,
+      imagem: novaMidia.url,
+      imagem_url: novaMidia.url,
+      midia: novaMidia,
+      midia_json: novaMidia,
+    };
+    patchCurrentItem({
+      imagem: novaMidia.url,
+      imagem_url: novaMidia.url,
+      midia: novaMidia,
+    });
+
+    const dims = novaMidia.width && novaMidia.height ? ` (${novaMidia.width}×${novaMidia.height}px)` : '';
+
+    if (itemAtualizado.questao_id_salva) {
+      try {
+        await api.put(`/api/questoes/${itemAtualizado.questao_id_salva}`, montarPayloadApi(itemAtualizado));
+        if (itemAtualizado.codigo_global) {
+          await api.post(`/api/questoes/${itemAtualizado.questao_id_salva}/publicar`).catch(() => {});
+        }
+        onImportado?.({ manterAberto: true });
+        dispararSucessoItem(
+          `✅ Recorte HD atualizado e salvo automaticamente na questão ${itemAtualizado.codigo_escola}${dims}!`
+        );
+      } catch {
+        dispararSucessoItem(
+          `✅ Recorte HD aplicado na tela${dims}! Clique em "Atualizar na Escola" abaixo para gravar no banco.`
+        );
+      }
+    } else {
+      dispararSucessoItem(
+        `✅ Recorte HD aplicado com sucesso${dims}! Confira a prévia atualizada e salve a questão abaixo.`
+      );
+    }
   };
 
   const mudarTipoItemAtual = (novoTipo) => {
@@ -867,9 +922,11 @@ export default function ImportarListaModal({
       }
 
       let codigoGlobal = currentItem.codigo_global;
+      let globalIdSalvo = currentItem.global_id_salva || null;
       if (publicarGlobal) {
         const { data: pubData } = await api.post(`/api/questoes/${localId}/publicar`);
         codigoGlobal = pubData.codigo || `EMQG-${String(pubData.global_id || localId).padStart(5, '0')}`;
+        globalIdSalvo = pubData.global_id || globalIdSalvo;
       }
 
       const novoStatus = publicarGlobal ? 'publicada_global' : 'salva_escola';
@@ -879,6 +936,7 @@ export default function ImportarListaModal({
               ...it,
               status_fila: novoStatus,
               questao_id_salva: localId,
+              global_id_salva: globalIdSalvo,
               codigo_escola: codigoEscola,
               codigo_global: codigoGlobal,
             }
@@ -897,6 +955,7 @@ export default function ImportarListaModal({
   };
 
   const ignorarQuestaoAtual = () => {
+    setSucessoItem('');
     const novaFila = fila.map((it, idx) =>
       idx === activeIdx && it.status_fila === 'pendente'
         ? { ...it, status_fila: 'ignorada' }
@@ -904,6 +963,57 @@ export default function ImportarListaModal({
     );
     setFila(novaFila);
     avancarParaProximaPendente(novaFila);
+  };
+
+  /* ── Exclui definitivamente uma questão importada (da fila e, se já salva, também do Banco) ── */
+  const confirmarExclusaoQuestaoFila = async () => {
+    if (confirmandoExclusaoIdx === null || confirmandoExclusaoIdx < 0 || confirmandoExclusaoIdx >= fila.length) {
+      setConfirmandoExclusaoIdx(null);
+      return;
+    }
+    const idxAlvo = confirmandoExclusaoIdx;
+    const alvo = fila[idxAlvo];
+    if (!alvo) {
+      setConfirmandoExclusaoIdx(null);
+      return;
+    }
+
+    setExcluindoItem(true);
+    setErroItem('');
+    try {
+      if (alvo.global_id_salva) {
+        await api.delete(`/api/questoes/global/${alvo.global_id_salva}?hard=1`).catch(() => {});
+      }
+      if (alvo.questao_id_salva) {
+        await api.delete(`/api/questoes/${alvo.questao_id_salva}?hard=1`);
+        onImportado?.({ manterAberto: true });
+      }
+
+      const novaFila = fila.filter((_, idx) => idx !== idxAlvo);
+      setConfirmandoExclusaoIdx(null);
+      setVerPaginaInteira(false);
+
+      if (novaFila.length === 0) {
+        setFila([]);
+        setActiveIdx(0);
+        setEtapa('upload');
+        return;
+      }
+
+      const proxIdx = Math.min(idxAlvo, novaFila.length - 1);
+      setFila(novaFila);
+      setActiveIdx(proxIdx);
+      dispararSucessoItem(
+        alvo.codigo_escola
+          ? `🗑️ Questão ${alvo.codigo_escola} excluída permanentemente do banco e da lista.`
+          : '🗑️ Questão excluída da lista de importação.'
+      );
+    } catch (err) {
+      setConfirmandoExclusaoIdx(null);
+      setErroItem(err.response?.data?.message || err.message || 'Não foi possível excluir a questão.');
+    } finally {
+      setExcluindoItem(false);
+    }
   };
 
   const copiarTexto = (cod) => {
@@ -1533,6 +1643,7 @@ export default function ImportarListaModal({
                       onChange={(novaUrl, novaMidia) => {
                         patchCurrentItem({ imagem: novaUrl, imagem_url: novaUrl, midia: novaMidia });
                       }}
+                      onCropApplied={handleMidiaRecortadaNaFila}
                     />
                   </div>
                 </div>
@@ -1781,6 +1892,21 @@ export default function ImportarListaModal({
                   )}
                 </div>
 
+                {sucessoItem && (
+                  <div style={{
+                    background: '#ecfdf5', border: '1.5px solid #6ee7b7', color: '#065f46',
+                    padding: '10px 14px', borderRadius: 10, fontSize: '0.8rem', fontWeight: 800,
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+                  }}>
+                    <span>{sucessoItem}</span>
+                    <button
+                      type="button"
+                      onClick={() => setSucessoItem('')}
+                      style={{ background: 'transparent', border: 'none', color: '#047857', fontWeight: 800, cursor: 'pointer' }}
+                    >✕</button>
+                  </div>
+                )}
+
                 {erroItem && <div style={S.errorBanner}>⚠️ {erroItem}</div>}
               </div>
             </div>
@@ -1791,26 +1917,40 @@ export default function ImportarListaModal({
                 <button
                   type="button"
                   style={S.smallGhostBtn}
-                  disabled={activeIdx === 0 || Boolean(salvandoAcao)}
-                  onClick={() => { setActiveIdx((i) => Math.max(0, i - 1)); setErroItem(''); }}
+                  disabled={activeIdx === 0 || Boolean(salvandoAcao) || excluindoItem}
+                  onClick={() => { setActiveIdx((i) => Math.max(0, i - 1)); setErroItem(''); setSucessoItem(''); }}
                 >
                   ← Anterior
                 </button>
                 <button
                   type="button"
                   style={S.smallGhostBtn}
-                  disabled={activeIdx >= fila.length - 1 || Boolean(salvandoAcao)}
-                  onClick={() => { setActiveIdx((i) => Math.min(fila.length - 1, i + 1)); setErroItem(''); }}
+                  disabled={activeIdx >= fila.length - 1 || Boolean(salvandoAcao) || excluindoItem}
+                  onClick={() => { setActiveIdx((i) => Math.min(fila.length - 1, i + 1)); setErroItem(''); setSucessoItem(''); }}
                 >
                   Próxima →
                 </button>
                 <button
                   type="button"
                   style={{ ...S.smallGhostBtn, color: '#64748b' }}
-                  disabled={Boolean(salvandoAcao)}
+                  disabled={Boolean(salvandoAcao) || excluindoItem}
                   onClick={ignorarQuestaoAtual}
                 >
                   ⏭️ Ignorar e Avançar
+                </button>
+                <button
+                  type="button"
+                  style={{
+                    ...S.smallGhostBtn,
+                    color: '#dc2626',
+                    borderColor: '#fecaca',
+                    background: '#fff5f5',
+                  }}
+                  disabled={Boolean(salvandoAcao) || excluindoItem}
+                  onClick={() => setConfirmandoExclusaoIdx(activeIdx)}
+                  title="Remove definitivamente esta questão da lista importada (e do banco, se já tiver sido salva)"
+                >
+                  🗑️ Excluir Questão
                 </button>
               </div>
 
@@ -1956,6 +2096,17 @@ export default function ImportarListaModal({
                               {q.status_fila === 'ignorada' ? '⏭️ Ignorada (Revisar)' : '⏳ Pendente (Revisar)'}
                             </button>
                           )}
+                          <button
+                            type="button"
+                            onClick={() => setConfirmandoExclusaoIdx(idx)}
+                            title="Excluir questão"
+                            style={{
+                              background: '#fff5f5', color: '#dc2626', border: '1px solid #fecaca',
+                              borderRadius: 6, padding: '2px 8px', fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer',
+                            }}
+                          >
+                            🗑️ Excluir
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -1992,13 +2143,94 @@ export default function ImportarListaModal({
             url: currentItem.pagina_original_url,
             bbox: currentItem.questao_bbox || [150, 100, 750, 900],
           }}
-          onApply={(novaUrl, novaMidia) => {
-            patchCurrentItem({ imagem: novaUrl, imagem_url: novaUrl, midia: novaMidia });
+          onApply={(novaMidia) => {
             setShowManualCropModal(false);
+            handleMidiaRecortadaNaFila(novaMidia);
           }}
           onClose={() => setShowManualCropModal(false)}
         />
       )}
+
+      {/* Modal de Confirmação de Exclusão da Questão Importada */}
+      {confirmandoExclusaoIdx !== null && fila[confirmandoExclusaoIdx] && (() => {
+        const qAlvo = fila[confirmandoExclusaoIdx];
+        const jaSalva = Boolean(qAlvo.questao_id_salva);
+        return (
+          <div
+            style={{
+              position: 'fixed', inset: 0, zIndex: 10080,
+              background: 'rgba(15, 23, 42, 0.72)', backdropFilter: 'blur(4px)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16,
+            }}
+            onClick={(e) => { if (e.target === e.currentTarget && !excluindoItem) setConfirmandoExclusaoIdx(null); }}
+          >
+            <div style={{
+              background: '#fff', borderRadius: 16, width: '100%', maxWidth: 430,
+              padding: '24px 24px 20px', boxShadow: '0 24px 64px rgba(0,0,0,0.32)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                <div style={{
+                  width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+                  background: '#fee2e2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.35rem',
+                }}>
+                  🗑️
+                </div>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: '0.98rem', color: '#0f172a' }}>
+                    Excluir Questão Q{confirmandoExclusaoIdx + 1}?
+                  </div>
+                  <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: 2 }}>
+                    {jaSalva
+                      ? `Salva como ${qAlvo.codigo_escola}${qAlvo.codigo_global ? ` / ${qAlvo.codigo_global}` : ''}`
+                      : 'Questão importada ainda não salva no banco'}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{
+                background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10,
+                padding: '9px 12px', fontSize: '0.78rem', color: '#334155', lineHeight: 1.5, marginBottom: 14,
+              }}>
+                {String(qAlvo.enunciado || '(sem enunciado)').slice(0, 120)}
+                {String(qAlvo.enunciado || '').length > 120 ? '...' : ''}
+              </div>
+
+              <div style={{ fontSize: '0.78rem', color: jaSalva ? '#b91c1c' : '#475569', lineHeight: 1.5, marginBottom: 18, fontWeight: jaSalva ? 700 : 500 }}>
+                {jaSalva
+                  ? 'Esta questão já foi gravada no Banco de Questões. Confirmar a exclusão irá removê-la permanentemente do banco e desta lista.'
+                  : 'Esta questão será removida definitivamente desta lista de importação.'}
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                <button
+                  type="button"
+                  disabled={excluindoItem}
+                  onClick={() => setConfirmandoExclusaoIdx(null)}
+                  style={S.secondaryBtn}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  disabled={excluindoItem}
+                  onClick={confirmarExclusaoQuestaoFila}
+                  style={{
+                    padding: '10px 18px', borderRadius: 10, border: 'none',
+                    background: excluindoItem ? '#94a3b8' : 'linear-gradient(135deg, #dc2626, #b91c1c)',
+                    color: '#fff', fontWeight: 800, fontSize: '0.84rem', cursor: excluindoItem ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {excluindoItem
+                    ? '⏳ Excluindo...'
+                    : jaSalva
+                      ? '🗑️ Excluir do Banco e da Lista'
+                      : '🗑️ Excluir da Lista'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

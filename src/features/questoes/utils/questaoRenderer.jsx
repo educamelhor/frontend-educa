@@ -459,7 +459,7 @@ export function QuestaoCorpoEstruturado({
   if (!questao) return null;
 
   const est = parseJsonSafe(questao.estrutura_json || questao.estrutura, {}) || {};
-  const midia = parseJsonSafe(questao.midia_json || questao.midia, null);
+  const midia = parseJsonSafe(questao.midia ?? questao.midia_json, null);
   const tipo = questao.tipo || est.modelo || 'objetiva';
 
   const enunciadoRaw = questao.enunciado ?? questao.conteudo_bruto ?? '';

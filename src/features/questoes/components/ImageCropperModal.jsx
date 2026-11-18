@@ -1,9 +1,9 @@
 // src/features/questoes/components/ImageCropperModal.jsx
 // Estúdio de Recorte Manual de Precisão (1 ou N Bounding Boxes 0..1000) sobre a imagem original no DO Spaces.
-// Suporta seleção de múltiplas áreas (questões em 2 colunas / figuras duplas), costura de quebra de coluna
-// e escolha entre arranjo Lado a Lado ou Empilhado.
+// Suporta redimensionamento pelas 8 alças (bordas/cantos), movimentação da caixa, redesenho livre,
+// seleção de múltiplas áreas (questões em 2 colunas) e aplicação estrita das dimensões definidas pelo usuário.
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import api from '../../../services/api';
 
 function clamp(v, min, max) {
@@ -11,6 +11,18 @@ function clamp(v, min, max) {
 }
 
 const BOX_COLORS = ['#0ea5e9', '#10b981', '#f59e0b', '#8b5cf6'];
+const MIN_BOX_SIZE = 20;
+
+const HANDLE_SPECS = [
+  { mode: 'nw', top: '0%',   left: '0%',   cursor: 'nwse-resize' },
+  { mode: 'n',  top: '0%',   left: '50%',  cursor: 'ns-resize' },
+  { mode: 'ne', top: '0%',   left: '100%', cursor: 'nesw-resize' },
+  { mode: 'e',  top: '50%',  left: '100%', cursor: 'ew-resize' },
+  { mode: 'se', top: '100%', left: '100%', cursor: 'nwse-resize' },
+  { mode: 's',  top: '100%', left: '50%',  cursor: 'ns-resize' },
+  { mode: 'sw', top: '100%', left: '0%',   cursor: 'nesw-resize' },
+  { mode: 'w',  top: '50%',  left: '0%',   cursor: 'ew-resize' },
+];
 
 export default function ImageCropperModal({ midia, onApply, onClose }) {
   const sourceUrl = midia?.original_url || midia?.url;
@@ -39,48 +51,104 @@ export default function ImageCropperModal({ midia, onApply, onClose }) {
   const [scannerClean, setScannerClean] = useState(Boolean(midia?.scanner_clean));
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState('');
-  const [dragging, setDragging] = useState(false);
-  const startPtRef = useRef(null);
-  const wrapRef = useRef(null);
 
-  if (!sourceUrl) return null;
+  // dragRef: { mode: 'draw'|'move'|'nw'|'n'|'ne'|'e'|'se'|'s'|'sw'|'w', idx, startX, startY, origBox }
+  const dragRef = useRef(null);
+  const imgRef = useRef(null);
+  const wrapRef = useRef(null);
 
   const safeIdx = Math.min(activeIdx, Math.max(0, areas.length - 1));
   const currentArea = areas[safeIdx] || areas[0];
 
-  const coordsRelativas = (clientX, clientY) => {
-    const rect = wrapRef.current?.getBoundingClientRect();
+  const coordsRelativas = useCallback((clientX, clientY) => {
+    const el = imgRef.current || wrapRef.current;
+    const rect = el?.getBoundingClientRect();
     if (!rect || !rect.width || !rect.height) return { x: 500, y: 500 };
     const x = clamp(Math.round(((clientX - rect.left) / rect.width) * 1000), 0, 1000);
     const y = clamp(Math.round(((clientY - rect.top) / rect.height) * 1000), 0, 1000);
     return { x, y };
-  };
+  }, []);
 
-  const updateBoxAt = (idx, newBbox) => {
+  const updateBoxAt = useCallback((idx, newBbox) => {
     setAreas((prev) => prev.map((it, i) => (i === idx ? { ...it, bbox: newBbox } : it)));
-  };
+  }, []);
 
-  const onPointerDown = (e) => {
+  useEffect(() => {
+    const handleWinMove = (e) => {
+      const st = dragRef.current;
+      if (!st) return;
+      const pt = coordsRelativas(e.clientX, e.clientY);
+      const dx = pt.x - st.startX;
+      const dy = pt.y - st.startY;
+      const [oy1, ox1, oy2, ox2] = st.origBox;
+
+      if (st.mode === 'draw') {
+        const ymin = Math.min(st.startY, pt.y);
+        const ymax = Math.max(st.startY, pt.y);
+        const xmin = Math.min(st.startX, pt.x);
+        const xmax = Math.max(st.startX, pt.x);
+        updateBoxAt(st.idx, [ymin, xmin, ymax, xmax]);
+        return;
+      }
+
+      if (st.mode === 'move') {
+        const boxH = oy2 - oy1;
+        const boxW = ox2 - ox1;
+        const ny1 = clamp(oy1 + dy, 0, 1000 - boxH);
+        const nx1 = clamp(ox1 + dx, 0, 1000 - boxW);
+        updateBoxAt(st.idx, [ny1, nx1, ny1 + boxH, nx1 + boxW]);
+        return;
+      }
+
+      let ny1 = oy1;
+      let nx1 = ox1;
+      let ny2 = oy2;
+      let nx2 = ox2;
+
+      if (st.mode.includes('n')) ny1 = clamp(oy1 + dy, 0, oy2 - MIN_BOX_SIZE);
+      if (st.mode.includes('s')) ny2 = clamp(oy2 + dy, oy1 + MIN_BOX_SIZE, 1000);
+      if (st.mode.includes('w')) nx1 = clamp(ox1 + dx, 0, ox2 - MIN_BOX_SIZE);
+      if (st.mode.includes('e')) nx2 = clamp(ox2 + dx, ox1 + MIN_BOX_SIZE, 1000);
+
+      updateBoxAt(st.idx, [ny1, nx1, ny2, nx2]);
+    };
+
+    const handleWinUp = () => {
+      dragRef.current = null;
+    };
+
+    window.addEventListener('pointermove', handleWinMove);
+    window.addEventListener('pointerup', handleWinUp);
+    window.addEventListener('pointercancel', handleWinUp);
+    return () => {
+      window.removeEventListener('pointermove', handleWinMove);
+      window.removeEventListener('pointerup', handleWinUp);
+      window.removeEventListener('pointercancel', handleWinUp);
+    };
+  }, [coordsRelativas, updateBoxAt]);
+
+  if (!sourceUrl) return null;
+
+  const iniciarDrag = (e, mode, idxAlvo = safeIdx) => {
     e.preventDefault();
+    e.stopPropagation();
     const pt = coordsRelativas(e.clientX, e.clientY);
-    startPtRef.current = pt;
-    setDragging(true);
-    updateBoxAt(safeIdx, [pt.y, pt.x, clamp(pt.y + 30, 0, 1000), clamp(pt.x + 30, 0, 1000)]);
-  };
-
-  const onPointerMove = (e) => {
-    if (!dragging || !startPtRef.current) return;
-    const pt = coordsRelativas(e.clientX, e.clientY);
-    const ymin = Math.min(startPtRef.current.y, pt.y);
-    const ymax = Math.max(startPtRef.current.y, pt.y);
-    const xmin = Math.min(startPtRef.current.x, pt.x);
-    const xmax = Math.max(startPtRef.current.x, pt.x);
-    updateBoxAt(safeIdx, [ymin, xmin, ymax, xmax]);
-  };
-
-  const onPointerUp = () => {
-    setDragging(false);
-    startPtRef.current = null;
+    const orig = (areas[idxAlvo]?.bbox || [80, 80, 920, 920]).slice();
+    dragRef.current = {
+      mode,
+      idx: idxAlvo,
+      startX: pt.x,
+      startY: pt.y,
+      origBox: orig,
+    };
+    if (mode === 'draw') {
+      updateBoxAt(idxAlvo, [
+        pt.y,
+        pt.x,
+        clamp(pt.y + MIN_BOX_SIZE, 0, 1000),
+        clamp(pt.x + MIN_BOX_SIZE, 0, 1000),
+      ]);
+    }
   };
 
   const adicionarArea = () => {
@@ -103,11 +171,57 @@ export default function ImageCropperModal({ midia, onApply, onClose }) {
     );
   };
 
+  /* Fallback client-side via Canvas caso sourceUrl seja data:/blob: local fora do DO Spaces */
+  const recortarLocalViaCanvas = async (bboxUnico) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = () => reject(new Error('Não foi possível carregar a imagem para recorte.'));
+      img.src = sourceUrl;
+    });
+    const W = img.naturalWidth || 800;
+    const H = img.naturalHeight || 600;
+    const [ymin, xmin, ymax, xmax] = bboxUnico.map(Number);
+    const sx = clamp(Math.round((xmin / 1000) * W), 0, W - 10);
+    const sy = clamp(Math.round((ymin / 1000) * H), 0, H - 10);
+    const sw = clamp(Math.round(((xmax - xmin) / 1000) * W), 10, W - sx);
+    const sh = clamp(Math.round(((ymax - ymin) / 1000) * H), 10, H - sy);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = sw;
+    canvas.height = sh;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, sw, sh);
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+
+    const blob = await new Promise((r) => canvas.toBlob(r, 'image/jpeg', 0.94));
+    if (!blob) throw new Error('Falha ao gerar imagem recortada.');
+
+    const fd = new FormData();
+    fd.append('imagem', blob, `recorte_${Date.now()}.jpg`);
+    fd.append('scanner_clean', scannerClean ? '1' : '0');
+    fd.append('keep_original', '0');
+    fd.append('posicao', midia?.posicao || 'entre_enunciado_e_comando');
+    fd.append('legenda', midia?.legenda || '');
+    fd.append('credito', midia?.credito || '');
+
+    const { data } = await api.post('/api/questoes/upload-imagem', fd);
+    return {
+      ...(data.midia || {}),
+      url: data.url || data.midia?.url,
+      original_url: sourceUrl,
+      bbox: [Math.round(ymin), Math.round(xmin), Math.round(ymax), Math.round(xmax)],
+      bboxes: [{ bbox: [Math.round(ymin), Math.round(xmin), Math.round(ymax), Math.round(xmax)], coluna: 'unica', continuacao: false }],
+    };
+  };
+
   const aplicarRecorte = async () => {
     for (let i = 0; i < areas.length; i++) {
       const [ymin, xmin, ymax, xmax] = areas[i].bbox;
-      if (ymax - ymin < 20 || xmax - xmin < 20) {
-        setErro(`A Área ${i + 1} está muito pequena. Arraste sobre a imagem para demarcá-la.`);
+      if (ymax - ymin < MIN_BOX_SIZE || xmax - xmin < MIN_BOX_SIZE) {
+        setErro(`A Área ${i + 1} está muito pequena. Arraste as alças ou redesenhe a área.`);
         setActiveIdx(i);
         return;
       }
@@ -115,24 +229,45 @@ export default function ImageCropperModal({ midia, onApply, onClose }) {
     setLoading(true);
     setErro('');
     try {
-      const payload = {
-        source_url: sourceUrl,
-        bboxes: JSON.stringify(areas),
-        bbox: areas.length === 1 ? JSON.stringify(areas[0].bbox) : undefined,
-        composicao_layout: composicaoLayout,
-        coluna_divisao_x: midia?.coluna_divisao_x || 0,
-        layout_origem: midia?.layout_origem || (areas.length > 1 ? 'duas_colunas' : 'coluna_unica'),
-        scanner_clean: scannerClean ? '1' : '0',
-        posicao: midia?.posicao || 'entre_enunciado_e_comando',
-        alinhamento: midia?.alinhamento || 'center',
-        legenda: midia?.legenda || '',
-        credito: midia?.credito || '',
-      };
-      const { data } = await api.post('/api/questoes/processar-midia', payload);
-      onApply({
-        ...data.midia,
-        original_url: sourceUrl,
-      });
+      const ehDoSpaces = /^https:\/\/[a-z0-9.-]*digitaloceanspaces\.com\//i.test(sourceUrl);
+      let midiaResultante = null;
+
+      if (ehDoSpaces) {
+        const areasArredondadas = areas.map((a) => ({
+          ...a,
+          bbox: a.bbox.map((v) => clamp(Math.round(Number(v)), 0, 1000)),
+        }));
+        const payload = {
+          source_url: sourceUrl,
+          bboxes: JSON.stringify(areasArredondadas),
+          bbox: areasArredondadas.length === 1 ? JSON.stringify(areasArredondadas[0].bbox) : undefined,
+          recorte_manual: '1',
+          composicao_layout: composicaoLayout,
+          coluna_divisao_x: midia?.coluna_divisao_x || 0,
+          layout_origem: midia?.layout_origem || (areasArredondadas.length > 1 ? 'duas_colunas' : 'coluna_unica'),
+          scanner_clean: scannerClean ? '1' : '0',
+          posicao: midia?.posicao || 'entre_enunciado_e_comando',
+          alinhamento: midia?.alinhamento || 'center',
+          legenda: midia?.legenda || '',
+          credito: midia?.credito || '',
+        };
+        const { data } = await api.post('/api/questoes/processar-midia', payload);
+        const urlNova = data?.midia?.url || data?.url;
+        if (!urlNova) {
+          throw new Error('O servidor não retornou a imagem recortada.');
+        }
+        midiaResultante = {
+          ...(data.midia || {}),
+          url: urlNova,
+          original_url: sourceUrl,
+          bbox: areasArredondadas[0].bbox,
+          bboxes: areasArredondadas,
+        };
+      } else {
+        midiaResultante = await recortarLocalViaCanvas(areas[0].bbox);
+      }
+
+      onApply(midiaResultante);
       onClose();
     } catch (err) {
       setErro(err.response?.data?.message || err.message || 'Erro ao recortar figura.');
@@ -151,7 +286,7 @@ export default function ImageCropperModal({ midia, onApply, onClose }) {
       onClick={(e) => { if (e.target === e.currentTarget && !loading) onClose(); }}
     >
       <div style={{
-        background: '#fff', borderRadius: 16, width: '100%', maxWidth: 840,
+        background: '#fff', borderRadius: 16, width: '100%', maxWidth: 860,
         maxHeight: '94vh', display: 'flex', flexDirection: 'column', overflow: 'hidden',
         boxShadow: '0 24px 70px rgba(0,0,0,0.35)',
       }}>
@@ -164,13 +299,14 @@ export default function ImageCropperModal({ midia, onApply, onClose }) {
             <div style={{ fontWeight: 800, fontSize: '0.98rem' }}>
               ✂️ Estúdio de Recorte Inteligente {areas.length > 1 ? `(${areas.length} Áreas / 2 Colunas)` : ''}
             </div>
-            <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.82)' }}>
-              Arraste sobre o print para isolar a figura ativa. Em questões de 2 colunas, adicione uma 2ª área para unir os dois lados!
+            <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.84)' }}>
+              Arraste as bordas/cantos azuis para ajustar milimetricamente ou clique fora da caixa para desenhar nova seleção
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
+            disabled={loading}
             style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', width: 32, height: 32, borderRadius: 8, cursor: 'pointer' }}
           >✕</button>
         </div>
@@ -265,10 +401,7 @@ export default function ImageCropperModal({ midia, onApply, onClose }) {
         <div style={{ padding: 16, overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', background: '#f1f5f9' }}>
           <div
             ref={wrapRef}
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-            onPointerLeave={onPointerUp}
+            onPointerDown={(e) => iniciarDrag(e, 'draw', safeIdx)}
             style={{
               position: 'relative', display: 'inline-block', cursor: 'crosshair',
               userSelect: 'none', touchAction: 'none', maxWidth: '100%',
@@ -276,10 +409,11 @@ export default function ImageCropperModal({ midia, onApply, onClose }) {
             }}
           >
             <img
+              ref={imgRef}
               src={sourceUrl}
               alt="Original para recorte"
               draggable={false}
-              style={{ display: 'block', maxWidth: '100%', maxHeight: '52vh', pointerEvents: 'none' }}
+              style={{ display: 'block', maxWidth: '100%', maxHeight: '54vh', pointerEvents: 'none' }}
             />
 
             {areas.map((ar, idx) => {
@@ -293,7 +427,9 @@ export default function ImageCropperModal({ midia, onApply, onClose }) {
                     if (!isAtiva) {
                       ev.stopPropagation();
                       setActiveIdx(idx);
+                      return;
                     }
+                    iniciarDrag(ev, 'move', idx);
                   }}
                   style={{
                     position: 'absolute',
@@ -302,10 +438,10 @@ export default function ImageCropperModal({ midia, onApply, onClose }) {
                     width: `${Math.max(1, (xmax - xmin) / 10)}%`,
                     height: `${Math.max(1, (ymax - ymin) / 10)}%`,
                     border: `${isAtiva ? '2.5px solid' : '2px dashed'} ${cor}`,
-                    background: areas.length > 1 ? `${cor}${isAtiva ? '22' : '14'}` : 'transparent',
+                    background: areas.length > 1 ? `${cor}${isAtiva ? '1c' : '12'}` : 'transparent',
                     boxShadow: areas.length === 1 ? '0 0 0 9999px rgba(15, 23, 42, 0.50)' : 'none',
-                    pointerEvents: isAtiva ? 'none' : 'auto',
-                    cursor: isAtiva ? 'crosshair' : 'pointer',
+                    cursor: isAtiva ? 'move' : 'pointer',
+                    boxSizing: 'border-box',
                   }}
                 >
                   <span style={{
@@ -315,6 +451,28 @@ export default function ImageCropperModal({ midia, onApply, onClose }) {
                   }}>
                     Área {idx + 1}{ar.continuacao ? ' 🔗' : ''}
                   </span>
+
+                  {/* 8 Alças de Redimensionamento de Precisão */}
+                  {isAtiva && HANDLE_SPECS.map((h) => (
+                    <div
+                      key={h.mode}
+                      onPointerDown={(ev) => iniciarDrag(ev, h.mode, idx)}
+                      style={{
+                        position: 'absolute',
+                        top: h.top,
+                        left: h.left,
+                        width: 12,
+                        height: 12,
+                        transform: 'translate(-50%, -50%)',
+                        background: '#ffffff',
+                        border: `2px solid ${cor}`,
+                        borderRadius: 3,
+                        cursor: h.cursor,
+                        boxShadow: '0 1px 4px rgba(0,0,0,0.28)',
+                        zIndex: 4,
+                      }}
+                    />
+                  ))}
                 </div>
               );
             })}
@@ -385,7 +543,7 @@ export default function ImageCropperModal({ midia, onApply, onClose }) {
               color: '#fff', fontWeight: 800, cursor: loading ? 'not-allowed' : 'pointer',
             }}
           >
-            {loading ? '⏳ Compondo HD...' : `✂️ Aplicar Recorte HD${areas.length > 1 ? ` (${areas.length} áreas)` : ''}`}
+            {loading ? '⏳ Aplicando Recorte HD...' : `✂️ Aplicar Recorte HD${areas.length > 1 ? ` (${areas.length} áreas)` : ''}`}
           </button>
         </div>
       </div>

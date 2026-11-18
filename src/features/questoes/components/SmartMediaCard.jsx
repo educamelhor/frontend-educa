@@ -32,13 +32,21 @@ const DPI_BADGE = {
   baixa: { label: '🔴 Baixa Resolução (pode pixelar no A4)', bg: '#fef2f2', color: '#b91c1c', border: '#fecaca' },
 };
 
-export default function SmartMediaCard({ imagem, midia, onChange }) {
+export default function SmartMediaCard({ imagem, midia, onChange, onCropApplied = null }) {
   const [uploading, setUploading] = useState(false);
   const [reprocessing, setReprocessing] = useState(false);
   const [showCropper, setShowCropper] = useState(false);
   const [erro, setErro] = useState('');
+  const [sucessoMsg, setSucessoMsg] = useState('');
   const [drag, setDrag] = useState(false);
   const fileRef = useRef(null);
+  const sucessoTimerRef = useRef(null);
+
+  const dispararSucesso = (msg) => {
+    if (sucessoTimerRef.current) clearTimeout(sucessoTimerRef.current);
+    setSucessoMsg(msg);
+    sucessoTimerRef.current = setTimeout(() => setSucessoMsg(''), 5500);
+  };
 
   const imgUrl = midia?.url || imagem || null;
 
@@ -102,6 +110,7 @@ export default function SmartMediaCard({ imagem, midia, onChange }) {
         source_url: sourceUrl,
         bboxes: Array.isArray(midia?.bboxes) && midia.bboxes.length > 0 ? JSON.stringify(midia.bboxes) : undefined,
         bbox: (!midia?.bboxes || midia.bboxes.length === 0) && midia?.bbox ? JSON.stringify(midia.bbox) : undefined,
+        recorte_manual: '1',
         composicao_layout: usarCompLayout,
         coluna_divisao_x: midia?.coluna_divisao_x || 0,
         layout_origem: midia?.layout_origem || 'coluna_unica',
@@ -112,7 +121,10 @@ export default function SmartMediaCard({ imagem, midia, onChange }) {
         legenda: midia?.legenda || '',
         credito: midia?.credito || '',
       });
-      onChange(data.url, { ...data.midia, original_url: sourceUrl });
+      const midiaAtualizada = { ...data.midia, url: data.url || data.midia?.url, original_url: sourceUrl };
+      onChange(midiaAtualizada.url, midiaAtualizada);
+      onCropApplied?.(midiaAtualizada);
+      dispararSucesso('✅ Figura reprocessada em alta definição!');
     } catch (err) {
       setErro(err.response?.data?.message || 'Não foi possível reprocessar a figura.');
     } finally {
@@ -212,9 +224,29 @@ export default function SmartMediaCard({ imagem, midia, onChange }) {
       {showCropper && (
         <ImageCropperModal
           midia={midia || { url: imgUrl, original_url: imgUrl }}
-          onApply={(novaMidia) => onChange(novaMidia.url, novaMidia)}
+          onApply={(novaMidia) => {
+            onChange(novaMidia.url, novaMidia);
+            onCropApplied?.(novaMidia);
+            const dims = novaMidia?.width && novaMidia?.height ? ` (${novaMidia.width}×${novaMidia.height}px)` : '';
+            dispararSucesso(`✅ Novo recorte HD aplicado com sucesso${dims}!`);
+          }}
           onClose={() => setShowCropper(false)}
         />
+      )}
+
+      {sucessoMsg && (
+        <div style={{
+          background: '#ecfdf5', border: '1.5px solid #6ee7b7', color: '#065f46',
+          padding: '7px 10px', borderRadius: 8, fontSize: '0.75rem', fontWeight: 800,
+          marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+        }}>
+          <span>{sucessoMsg}</span>
+          <button
+            type="button"
+            onClick={() => setSucessoMsg('')}
+            style={{ background: 'transparent', border: 'none', color: '#047857', fontWeight: 800, cursor: 'pointer', fontSize: '0.75rem' }}
+          >✕</button>
+        </div>
       )}
 
       {/* Header do Estúdio de Mídia */}

@@ -452,12 +452,21 @@ export default function AgentePlanos() {
       return '⏱️ O portal EDUCADF demorou demais para responder (tempo limite excedido). Isso indica instabilidade momentânea do portal — não é um problema com a turma ou o plano. Aguarde alguns minutos e tente novamente.';
     if (m.includes('swal') || m.includes('intercepts pointer') || m.includes('overlay'))
       return 'O portal EDUCADF exibiu uma janela de alerta que bloqueou a operação. Tente novamente — o agente agora fecha esse alerta automaticamente.';
-    if (m.includes('login') || m.includes('senha') || m.includes('credencial'))
-      return 'Falha no login do EDUCADF. Verifique suas credenciais em Agente EDUCA > Configurações.';
+    if (m.includes('login') || m.includes('senha') || m.includes('credencial') || m.includes('autentica')) {
+      if (m.includes('e-mail') || m.includes('email') || msg.includes('@')) {
+        const emailMatch = msg.match(/"([^"]+@[^"]+)"/)?.[1];
+        return `🔑 Falha no login do EDUCADF: seu usuário foi salvo como e-mail${emailMatch ? ` ("${emailMatch}")` : ''}, mas o portal EDUCADF exige sua Matrícula SEEDF (professor efetivo) ou seu CPF (professor temporário). Acesse Agente EDUCA > Configurações e atualize seu login e senha do EDUCADF.`;
+      }
+      return '🔑 Falha no login do EDUCADF. Verifique se sua Matrícula SEEDF (ou CPF, se contrato temporário) e sua senha estão corretas em Agente EDUCA > Configurações.';
+    }
     if (m.includes('nenhum evento') || m.includes('não retornou aulas') || m.includes('nenhum evento do calendario'))
       return `📅 A turma "${msg.match(/"([^"]+)"/)?.[1] || 'selecionada'}" foi localizada e filtrada no EDUCADF, porém não foram encontradas aulas registradas no calendário para o período deste plano. Verifique se existem aulas lançadas no EDUCADF para esta turma neste bimestre/semestre.`;
-    if (m.includes('turma'))
-      return `🔍 Turma não localizada no EDUCADF: "${msg.match(/"([^"]+)"/) ?.[1] || 'ver detalhes'}". Verifique se a turma pertence ao seu diário neste semestre ou se o Mapeamento Global de Turmas foi preenchido pela secretaria.`;
+    if (m.includes('turma')) {
+      const turmaAlvo = msg.match(/"([^"]+)"/)?.[1] || 'ver detalhes';
+      const visiveis = msg.match(/\(Turmas visíveis no EDUCADF:\s*([^)]+)\)/i)?.[1]?.trim();
+      return `🔍 Turma não localizada no EDUCADF: "${turmaAlvo}". Verifique se a turma pertence ao seu diário neste semestre ou se o Mapeamento Global de Turmas foi preenchido pela secretaria.` +
+             (visiveis ? `\n\nTurmas listadas pelo EDUCADF na sua conta: ${visiveis}.` : '');
+    }
     if (m.includes('filtrar') || m.includes('filtro'))
       return 'Falha ao aplicar filtros no EDUCADF. O portal pode estar lento — tente novamente em alguns minutos.';
     if (m.includes('aba') || m.includes('procedimento'))

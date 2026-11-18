@@ -264,6 +264,13 @@ export default function AgenteCredenciais() {
       setFeedback({ type: 'error', msg: 'Preencha o usuário e a senha para continuar.' });
       return;
     }
+    if (matricula.trim().includes('@')) {
+      setFeedback({
+        type: 'error',
+        msg: 'O portal EDUCADF não aceita e-mail como login. Informe sua Matrícula SEEDF (se efetivo) ou seu CPF (se contrato temporário).',
+      });
+      return;
+    }
     setSalvando(true);
     setFeedback({ type: 'info', msg: 'Salvando credenciais com criptografia AES-256…' });
 
@@ -421,12 +428,15 @@ export default function AgenteCredenciais() {
 
               {/* Campo: Usuário / CPF */}
               <div>
-                <label className="block text-sm font-bold text-slate-700 mb-2 ml-1">Usuário / Matrícula / CPF</label>
+                <label className="block text-sm font-bold text-slate-700 mb-2 ml-1">Matrícula SEEDF ou CPF (não use e-mail)</label>
                 <div className="relative">
                   <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 pointer-events-none" />
                   <input
                     type="text"
-                    placeholder="Ex: 2078759"
+                    name="educadf_matricula_cpf"
+                    autoComplete="off"
+                    data-lpignore="true"
+                    placeholder="Matrícula (efetivo) ou CPF (temporário)"
                     value={matricula}
                     onChange={e => setMatricula(e.target.value)}
                     disabled={isTesting || salvando}
@@ -442,6 +452,8 @@ export default function AgenteCredenciais() {
                   <KeyIcon className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 pointer-events-none" />
                   <input
                     type={showPw ? 'text' : 'password'}
+                    name="educadf_secret_pwd"
+                    autoComplete="new-password"
                     placeholder="Sua senha secreta"
                     value={senha}
                     onChange={e => setSenha(e.target.value)}

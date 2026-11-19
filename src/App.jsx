@@ -76,6 +76,8 @@ import Governanca from "./features/direcao/governanca/Governanca.jsx";
 // ✅ PLATAFORMA (CEO) — v1
 import PlataformaEscolas from "./features/plataforma/PlataformaEscolas.jsx";
 import PlataformaDiretores from "./features/plataforma/PlataformaDiretores.jsx";
+import PlataformaRegionais from "./features/plataforma/PlataformaRegionais.jsx";
+import PlataformaChefes from "./features/plataforma/PlataformaChefes.jsx";
 import PlataformaAuditoriaRBAC from "./features/plataforma/PlataformaAuditoriaRBAC.jsx";
 import PlataformaUsageInsights from "./features/plataforma/PlataformaUsageInsights.jsx";
 import UsageEscolaDetalhe from "./features/plataforma/UsageEscolaDetalhe.jsx";
@@ -365,6 +367,8 @@ export default function App() {
           <Route path="/plataforma/modulos"       element={<RequireCeo><PlataformaModulos /></RequireCeo>} />
           <Route path="/plataforma/escolas"       element={<RequireCeo><PlataformaEscolas /></RequireCeo>} />
           <Route path="/plataforma/diretores"     element={<RequireCeo><PlataformaDiretores /></RequireCeo>} />
+          <Route path="/plataforma/regionais"     element={<RequireCeo><PlataformaRegionais /></RequireCeo>} />
+          <Route path="/plataforma/chefes"        element={<RequireCeo><PlataformaChefes /></RequireCeo>} />
           <Route path="/plataforma/auditoria-rbac" element={<RequireCeo><PlataformaAuditoriaRBAC /></RequireCeo>} />
           <Route path="/plataforma/usage"          element={<RequireCeo><PlataformaUsageInsights /></RequireCeo>} />
           <Route path="/plataforma/usage/:id"      element={<RequireCeo><UsageEscolaDetalhe /></RequireCeo>} />

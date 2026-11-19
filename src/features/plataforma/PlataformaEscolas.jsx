@@ -12,6 +12,7 @@ const ORIGENS = [
 
 export default function PlataformaEscolas() {
   const [escolas, setEscolas] = useState([]);
+  const [regionais, setRegionais] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busca, setBusca] = useState("");
 
@@ -31,6 +32,7 @@ export default function PlataformaEscolas() {
   const [fTipos, setFTipos] = useState([]);
   const [fOrigem, setFOrigem] = useState("");
   const [fCnpj, setFCnpj] = useState("");
+  const [fRegionalId, setFRegionalId] = useState("");
   const [salvando, setSalvando] = useState(false);
 
   // Form Diretor
@@ -56,8 +58,12 @@ export default function PlataformaEscolas() {
   const fetchEscolas = async () => {
     setLoading(true);
     try {
-      const { data } = await api.get("/api/plataforma/escolas");
+      const [{ data }, regRes] = await Promise.all([
+        api.get("/api/plataforma/escolas"),
+        api.get("/api/plataforma/regionais").catch(() => ({ data: { regionais: [] } })),
+      ]);
       setEscolas(Array.isArray(data) ? data : data.escolas || []);
+      setRegionais(Array.isArray(regRes?.data) ? regRes.data : regRes?.data?.regionais || []);
     } catch { mostrarMensagem("Erro ao carregar escolas.", "erro"); }
     finally { setLoading(false); }
   };
@@ -125,7 +131,7 @@ export default function PlataformaEscolas() {
 
   const resetFormEscola = () => {
     setEditId(null); setFNome(""); setFApelido(""); setFCidade(""); setFEstado(""); setFEndereco("");
-    setFTipos([]); setFOrigem(""); setFCnpj("");
+    setFTipos([]); setFOrigem(""); setFCnpj(""); setFRegionalId("");
   };
 
   const resetFormDiretor = () => {
@@ -145,6 +151,7 @@ export default function PlataformaEscolas() {
     setFTipos(parseTipo(esc.tipo));
     setFOrigem(esc.origem || "");
     setFCnpj(esc.cnpj || "");
+    setFRegionalId(esc.regional_id ? String(esc.regional_id) : "");
     setModalEditar(true);
     setMenuAberto(null);
   };
@@ -175,6 +182,7 @@ export default function PlataformaEscolas() {
         cidade: fCidade.trim() || undefined, estado: fEstado.trim() || undefined,
         tipo: fTipos.length ? fTipos : undefined, origem: fOrigem || undefined,
         cnpj: fCnpj.trim() || undefined,
+        regional_id: fRegionalId ? Number(fRegionalId) : null,
       });
       mostrarMensagem("✅ Escola criada!"); setModalCriar(false); resetFormEscola(); fetchEscolas();
     } catch (err) {
@@ -194,6 +202,7 @@ export default function PlataformaEscolas() {
         cidade: fCidade.trim() || undefined, estado: fEstado.trim() || undefined,
         tipo: fTipos.length ? fTipos : [], origem: fOrigem || undefined,
         cnpj: fCnpj.trim() || undefined,
+        regional_id: fRegionalId ? Number(fRegionalId) : null,
       });
       mostrarMensagem("✅ Escola atualizada!"); setModalEditar(false); resetFormEscola(); fetchEscolas();
     } catch (err) {
@@ -322,6 +331,21 @@ export default function PlataformaEscolas() {
         </div>
       </div>
       <div>
+        <label className="block text-sm font-medium text-slate-700 mb-1">Coordenação Regional de Ensino (CRE)</label>
+        <select
+          value={fRegionalId}
+          onChange={e => setFRegionalId(e.target.value)}
+          className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
+        >
+          <option value="">-- Sem vínculo com Regional (CRE) --</option>
+          {regionais.map(r => (
+            <option key={r.id} value={r.id}>
+              {r.apelido ? `${r.apelido} — ${r.nome}` : r.nome}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
         <label className="block text-sm font-medium text-slate-700 mb-1">CNPJ</label>
         <input type="text" value={fCnpj} onChange={e => setFCnpj(fmtCNPJ(e.target.value))}
           className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
@@ -395,7 +419,14 @@ export default function PlataformaEscolas() {
                     <td className="px-4 py-3 text-slate-500 font-medium whitespace-nowrap">#{esc.id}</td>
                     <td className="px-4 py-3">
                       <div className="font-semibold text-slate-800">{esc.nome}</div>
-                      {esc.apelido && esc.apelido !== esc.nome && <div className="text-xs text-slate-400">{esc.apelido}</div>}
+                      <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                        {esc.apelido && esc.apelido !== esc.nome && <span className="text-xs text-slate-400">{esc.apelido}</span>}
+                        {(esc.regional_apelido || esc.regional_nome) && (
+                          <span className="text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 px-1.5 py-0.5 rounded">
+                            🏛️ {esc.regional_apelido || esc.regional_nome}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
                       {esc.cidade || esc.estado ? `${esc.cidade || "–"} / ${esc.estado || "–"}` : <span className="text-slate-400 italic">–</span>}

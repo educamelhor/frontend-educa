@@ -52,6 +52,8 @@ export default function Sidebar({ isOpen, onClose }) {
   const [openGroup, setOpenGroup] = useState(getInitialOpenGroup);
   const [openCorrecoes, setOpenCorrecoes] = useState(false);
   const [openGabaritoPed, setOpenGabaritoPed] = useState(false);
+  const [openEscolasSub, setOpenEscolasSub] = useState(true);
+  const [openRegionaisSub, setOpenRegionaisSub] = useState(true);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -278,7 +280,11 @@ export default function Sidebar({ isOpen, onClose }) {
     else if (p.startsWith('/monitoramento')) setOpenGroup('monitoramento');
     else if (p.startsWith('/direcao')) setOpenGroup('direcao');
     else if (p.startsWith('/plataforma/mobile')) setOpenGroup('mobile');
-    else if (p.startsWith('/plataforma')) setOpenGroup('plataforma');
+    else if (p.startsWith('/plataforma')) {
+      setOpenGroup('plataforma');
+      if (p.startsWith('/plataforma/escolas') || p.startsWith('/plataforma/diretores')) setOpenEscolasSub(true);
+      if (p.startsWith('/plataforma/regionais') || p.startsWith('/plataforma/chefes')) setOpenRegionaisSub(true);
+    }
     else if (p.startsWith('/gabarito')) setOpenGroup('gabarito');
     else if (p.startsWith('/agente-educa')) setOpenGroup('agente-educa');
     else if (p.startsWith('/biblioteca')) setOpenGroup('biblioteca');
@@ -348,14 +354,14 @@ export default function Sidebar({ isOpen, onClose }) {
               }}>CEO</span>
             </Link>
 
-            {/* ─── GRUPO: Escolas (submenus) ─── */}
+            {/* ─── GRUPO: Instituições (Escolas -> Diretores | Regionais -> Chefes) ─── */}
             <button
               className="flex items-center w-full py-2 px-3 rounded hover:bg-blue-700 transition"
               onClick={() => setOpenGroup(openGroup === 'plataforma' ? null : 'plataforma')}
               type="button"
             >
               <HomeIcon className="h-5 w-5 mr-2" />
-              <span className="flex-1 text-left">Escolas</span>
+              <span className="flex-1 text-left font-semibold">Instituições</span>
               {openGroup === 'plataforma' ? (
                 <ChevronDownIcon className="h-4 w-4" />
               ) : (
@@ -364,22 +370,83 @@ export default function Sidebar({ isOpen, onClose }) {
             </button>
 
             {openGroup === 'plataforma' && (
-              <ul className="ml-4 mb-2">
+              <ul className="ml-4 mb-2 space-y-1">
+                {/* 1) Sub-menu ESCOLAS -> DIRETORES */}
                 <li>
-                  <Link
-                    to="/plataforma/escolas"
-                    className={getSubmenuLinkClasses('/plataforma/escolas', true)}
-                  >
-                    <HomeIcon className="h-5 w-5 mr-2" /> Escolas
-                  </Link>
+                  <div className="flex items-center">
+                    <Link
+                      to="/plataforma/escolas"
+                      onClick={() => setOpenEscolasSub(true)}
+                      className={`${getSubmenuLinkClasses('/plataforma/escolas', true)} flex-1`}
+                    >
+                      <HomeIcon className="h-5 w-5 mr-2" />
+                      <span className="flex-1 text-left">Escolas</span>
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => setOpenEscolasSub(v => !v)}
+                      className="p-1.5 rounded hover:bg-blue-700/70 transition text-blue-200"
+                      title={openEscolasSub ? 'Recolher Diretores' : 'Expandir Diretores'}
+                    >
+                      {openEscolasSub ? (
+                        <ChevronDownIcon className="h-3.5 w-3.5" />
+                      ) : (
+                        <ChevronRightIcon className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  </div>
+
+                  {openEscolasSub && (
+                    <ul className="ml-6 mt-0.5 border-l border-blue-400/30 pl-2">
+                      <li>
+                        <Link
+                          to="/plataforma/diretores"
+                          className={getSubmenuLinkClasses('/plataforma/diretores', true)}
+                        >
+                          <UsersIcon className="h-4 w-4 mr-2" /> Diretores
+                        </Link>
+                      </li>
+                    </ul>
+                  )}
                 </li>
+
+                {/* 2) Sub-menu REGIONAIS -> CHEFES */}
                 <li>
-                  <Link
-                    to="/plataforma/diretores"
-                    className={getSubmenuLinkClasses('/plataforma/diretores', true)}
-                  >
-                    <UsersIcon className="h-5 w-5 mr-2" /> Diretores
-                  </Link>
+                  <div className="flex items-center">
+                    <Link
+                      to="/plataforma/regionais"
+                      onClick={() => setOpenRegionaisSub(true)}
+                      className={`${getSubmenuLinkClasses('/plataforma/regionais', true)} flex-1`}
+                    >
+                      <AcademicCapIcon className="h-5 w-5 mr-2" />
+                      <span className="flex-1 text-left">Regionais</span>
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => setOpenRegionaisSub(v => !v)}
+                      className="p-1.5 rounded hover:bg-blue-700/70 transition text-blue-200"
+                      title={openRegionaisSub ? 'Recolher Chefes' : 'Expandir Chefes'}
+                    >
+                      {openRegionaisSub ? (
+                        <ChevronDownIcon className="h-3.5 w-3.5" />
+                      ) : (
+                        <ChevronRightIcon className="h-3.5 w-3.5" />
+                      )}
+                    </button>
+                  </div>
+
+                  {openRegionaisSub && (
+                    <ul className="ml-6 mt-0.5 border-l border-blue-400/30 pl-2">
+                      <li>
+                        <Link
+                          to="/plataforma/chefes"
+                          className={getSubmenuLinkClasses('/plataforma/chefes', true)}
+                        >
+                          <UserGroupIcon className="h-4 w-4 mr-2" /> Chefes
+                        </Link>
+                      </li>
+                    </ul>
+                  )}
                 </li>
               </ul>
             )}

@@ -176,7 +176,7 @@ export default function PlataformaChefes() {
         email: editEmail.trim() || undefined,
         papel: editPapel,
       });
-      mostrarMensagem("✅ Chefe atualizado!");
+      mostrarMensagem("✅ Dados do chefe atualizados!");
       setModalEditar(false);
       fetchAll();
     } catch (err) {
@@ -253,7 +253,7 @@ export default function PlataformaChefes() {
     setExecutandoStatus(true);
     try {
       await api.patch(`/api/plataforma/chefes/${chefe.id}/status`, { status: tipo });
-      const labels = { bloqueado: "bloqueado", cancelado: "cancelado e desvinculado", ativo: "reativado" };
+      const labels = { bloqueado: "bloqueado", cancelado: "cancelado", ativo: "reativado" };
       setModalConfirm(null);
       mostrarMensagem(`✅ Chefe ${labels[tipo]}!`);
       fetchAll();
@@ -288,27 +288,77 @@ export default function PlataformaChefes() {
     return "pendente";
   };
 
+  // Situação unificada (elimina a contradição entre "Pendente" e "Inativo")
+  const renderSituacaoUnificada = (c) => {
+    const isAtivo = Number(c.ativo) === 1;
+    if (!isAtivo) {
+      return (
+        <div>
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">
+            🚫 Bloqueado / Inativo
+          </span>
+          <div className="text-[11px] text-slate-400 mt-0.5">Acesso suspenso pelo CEO</div>
+        </div>
+      );
+    }
+
+    const st = cadastroStatus(c);
+    if (st === "concluido") {
+      return (
+        <div>
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+            ✅ Conta Ativa
+          </span>
+          <div className="text-[11px] text-slate-400 mt-0.5">Senha criada • Acesso liberado</div>
+        </div>
+      );
+    }
+    if (st === "expirado") {
+      return (
+        <div>
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-orange-100 text-orange-700">
+            ⏰ Convite Expirado
+          </span>
+          <div className="text-[11px] text-slate-400 mt-0.5">Gere novo código no menu ⋮</div>
+        </div>
+      );
+    }
+    return (
+      <div>
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
+          ⏳ Aguardando Ativação
+        </span>
+        <div className="text-[11px] text-slate-400 mt-0.5">Falta o chefe criar a senha pelo link</div>
+      </div>
+    );
+  };
+
   const chefesFiltrados = chefes.filter((c) => {
     if (!busca.trim()) return true;
     const q = busca.toLowerCase();
     const info = papelInfo(c.papel);
-    return [c.nome, c.regional_nome, c.regional_apelido, c.cidade, c.cpf, c.email, info.sigla, info.chefeLabel, String(c.id)]
-      .some(v => String(v || "").toLowerCase().includes(q));
+    return [
+      c.nome,
+      c.regional_nome,
+      c.regional_apelido,
+      c.cidade,
+      c.cpf,
+      c.email,
+      info.sigla,
+      info.chefeLabel,
+      info.areaCurta,
+      String(c.id),
+    ].some(v => String(v || "").toLowerCase().includes(q));
   });
-
-  const statusBadge = (c) => {
-    if (Number(c.ativo) === 1) return <span className="px-2 py-0.5 rounded text-xs font-semibold bg-green-100 text-green-700">Ativo</span>;
-    return <span className="px-2 py-0.5 rounded text-xs font-semibold bg-red-100 text-red-600">Inativo</span>;
-  };
 
   return (
     <div className="w-full p-4 sm:p-6 lg:p-8">
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Chefes de Coordenações Regionais (CRE / SEEDF)</h1>
+          <h1 className="text-2xl font-bold text-slate-800">Chefes das Regionais de Ensino</h1>
           <p className="text-sm text-slate-500">
-            Coordenadores Regionais de Ensino e Chefes das Unidades Orgânicas (UNIEB, UNIPLAT, UNIGEP, UNIAE e UNIAG)
+            Gestão dos Coordenadores Gerais das Regionais (CREs) e dos Chefes dos 5 Setores (Educação Básica, Planejamento, Gestão de Pessoas, Infraestrutura e Administração Geral)
           </p>
         </div>
         <button onClick={abrirVincular}
@@ -332,71 +382,88 @@ export default function PlataformaChefes() {
           <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
         </svg>
         <input type="text" value={busca} onChange={e => setBusca(e.target.value)}
-          placeholder="Buscar por nome do chefe, CRE/Regional, CPF, unidade (UNIEB, UNIPLAT, UNIGEP, UNIAE, UNIAG)..."
+          placeholder="Buscar por nome da pessoa, CPF, cargo (ex: Educação Básica, Gestão de Pessoas) ou Regional..."
           className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white" />
       </div>
 
-      {/* Tabela */}
+      {/* Tabela Reorganizada e Clara */}
       {loading ? (
         <div className="flex justify-center p-12 text-slate-500">Carregando chefes...</div>
       ) : chefesFiltrados.length === 0 ? (
         <div className="text-center p-16 text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-300">
           <p className="text-lg mb-2">{busca.trim() ? "Nenhum chefe encontrado." : "Nenhum chefe vinculado às Regionais."}</p>
-          <p className="text-sm text-slate-400">Clique em "Vincular Chefe" para cadastrar o Coordenador Regional ou Chefes de Unidade (SEEDF).</p>
+          <p className="text-sm text-slate-400">Clique em "Vincular Chefe" para cadastrar o Coordenador Geral ou Chefes de Setor de uma Regional.</p>
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
           <table className="min-w-full divide-y divide-slate-200 text-sm">
             <thead className="bg-slate-50">
               <tr>
-                <th className="px-4 py-3 text-left font-semibold text-slate-600">Regional (CRE)</th>
-                <th className="px-4 py-3 text-left font-semibold text-slate-600">Localização</th>
-                <th className="px-4 py-3 text-left font-semibold text-slate-600">Função / Unidade SEEDF</th>
-                <th className="px-4 py-3 text-left font-semibold text-slate-600">Chefe</th>
-                <th className="px-4 py-3 text-left font-semibold text-slate-600">Cadastro</th>
-                <th className="px-4 py-3 text-left font-semibold text-slate-600">Status</th>
+                <th className="px-4 py-3 text-left font-semibold text-slate-600">Chefe (Pessoa)</th>
+                <th className="px-4 py-3 text-left font-semibold text-slate-600">Cargo / Setor de Atuação</th>
+                <th className="px-4 py-3 text-left font-semibold text-slate-600">Órgão Regional Vinculado</th>
+                <th className="px-4 py-3 text-left font-semibold text-slate-600">Cidade / UF</th>
+                <th className="px-4 py-3 text-left font-semibold text-slate-600">Situação da Conta</th>
                 <th className="px-4 py-3 text-center font-semibold text-slate-600">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {chefesFiltrados.map((c) => {
-                const isCancelado = !c.regional_id;
+                const isInativo = Number(c.ativo) === 0;
                 const info = papelInfo(c.papel);
+                const orgaoPrincipal = c.regional_apelido || c.regional_nome || "Regional não definida";
+                const orgaoSub = c.regional_apelido && c.regional_nome && c.regional_apelido !== c.regional_nome
+                  ? c.regional_nome
+                  : null;
+
                 return (
-                  <tr key={c.id} className={`hover:bg-slate-50 transition ${isCancelado ? "opacity-50" : ""}`}>
-                    <td className="px-4 py-3">
-                      <div className="font-semibold text-slate-800">{c.regional_nome || "Regional não definida"}</div>
-                      <div className="text-xs text-slate-400">
-                        {c.regional_apelido ? `${c.regional_apelido} • ` : ""}ID: {c.regional_id}
+                  <tr key={c.id} className={`hover:bg-slate-50 transition ${isInativo ? "bg-slate-50/60" : ""}`}>
+                    {/* 1) PESSOA (CHEFE) */}
+                    <td className="px-4 py-3.5">
+                      <div className="font-bold text-slate-800">{c.nome}</div>
+                      <div className="text-xs text-slate-500 mt-0.5">
+                        {c.cpf ? `CPF: ${fmtCPF(c.cpf)}` : "CPF não informado"}
+                        {c.email ? ` • ${c.email}` : ""}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-slate-600 whitespace-nowrap">
-                      {c.cidade || c.estado ? `${c.cidade || "–"} / ${c.estado || "–"}` : <span className="text-slate-400 italic">–</span>}
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
+
+                    {/* 2) CARGO CLARO E SEM JARGÃO CONFUSO */}
+                    <td className="px-4 py-3.5">
                       <span
-                        title={`${info.nome}: ${info.resumo}`}
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-xs font-semibold border ${info.cor}`}
+                        title={info.resumo}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border ${info.cor}`}
                       >
-                        <span>[{info.sigla}]</span>
+                        <span>{info.icone}</span>
                         <span>{info.chefeLabel}</span>
                       </span>
+                      <div className="text-[11px] text-slate-500 mt-1">
+                        {info.subtitulo}
+                      </div>
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-slate-800">{c.nome}</div>
-                      {c.cpf && <div className="text-xs text-slate-400">{fmtCPF(c.cpf)}</div>}
+
+                    {/* 3) ÓRGÃO REGIONAL */}
+                    <td className="px-4 py-3.5">
+                      <div className="font-semibold text-slate-800 flex items-center gap-1.5">
+                        <span>🏛️</span>
+                        <span>{orgaoPrincipal}</span>
+                      </div>
+                      <div className="text-xs text-slate-400 mt-0.5">
+                        {orgaoSub ? `${orgaoSub} • ` : ""}Órgão ID #{c.regional_id}
+                      </div>
                     </td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      {(() => {
-                        const st = cadastroStatus(c);
-                        if (st === "concluido") return <span className="px-2 py-0.5 rounded text-xs font-semibold bg-green-100 text-green-700">✅ Concluído</span>;
-                        if (st === "expirado") return <span className="px-2 py-0.5 rounded text-xs font-semibold bg-red-100 text-red-600">⏰ Expirado</span>;
-                        if (st === "pendente") return <span className="px-2 py-0.5 rounded text-xs font-semibold bg-yellow-100 text-yellow-700">⏳ Pendente</span>;
-                        return <span className="px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 text-slate-500">–</span>;
-                      })()}
+
+                    {/* 4) CIDADE / UF */}
+                    <td className="px-4 py-3.5 text-slate-600 whitespace-nowrap">
+                      {c.cidade || c.estado ? `${c.cidade || "–"} / ${c.estado || "–"}` : <span className="text-slate-400 italic">–</span>}
                     </td>
-                    <td className="px-4 py-3">{statusBadge(c)}</td>
-                    <td className="px-4 py-3 text-center">
+
+                    {/* 5) SITUAÇÃO UNIFICADA */}
+                    <td className="px-4 py-3.5 whitespace-nowrap">
+                      {renderSituacaoUnificada(c)}
+                    </td>
+
+                    {/* 6) AÇÕES */}
+                    <td className="px-4 py-3.5 text-center">
                       <button
                         ref={el => { btnRefs.current[c.id] = el; }}
                         onClick={() => {
@@ -434,7 +501,7 @@ export default function PlataformaChefes() {
         return (
           <>
             <div className="fixed inset-0 z-[60]" onClick={() => setMenuAberto(null)} />
-            <div className="fixed z-[70] w-52 bg-white rounded-xl shadow-xl border border-slate-200 py-1"
+            <div className="fixed z-[70] w-56 bg-white rounded-xl shadow-xl border border-slate-200 py-1"
               style={{
                 top: menuPos.flipUp ? undefined : menuPos.top,
                 bottom: menuPos.flipUp ? (window.innerHeight - menuPos.top + 4) : undefined,
@@ -447,7 +514,7 @@ export default function PlataformaChefes() {
                   isAtivo ? "text-slate-700 hover:bg-slate-50 cursor-pointer" : "text-slate-400 cursor-not-allowed"
                 }`}>
                 <svg className={`h-4 w-4 ${isAtivo ? "text-blue-500" : "text-slate-300"}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z" /></svg>
-                Editar dados
+                Editar nome / cargo
               </button>
 
               <button
@@ -464,7 +531,7 @@ export default function PlataformaChefes() {
                 <button onClick={() => handleRegenerarCodigo(c)} disabled={gerandoCodigo}
                   className="flex items-center w-full px-4 py-2.5 text-sm text-teal-600 hover:bg-teal-50 transition gap-2">
                   <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1 1 21.75 8.25Z" /></svg>
-                  {gerandoCodigo ? "Gerando..." : "Gerar código"}
+                  {gerandoCodigo ? "Gerando..." : "Gerar novo link de convite"}
                 </button>
               )}
 
@@ -474,7 +541,7 @@ export default function PlataformaChefes() {
                 <button onClick={() => abrirConfirm("bloqueado", c)}
                   className="flex items-center w-full px-4 py-2.5 text-sm text-orange-600 hover:bg-orange-50 transition gap-2">
                   <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>
-                  Bloquear
+                  Bloquear acesso
                 </button>
               )}
 
@@ -482,7 +549,7 @@ export default function PlataformaChefes() {
                 <button onClick={() => abrirConfirm("ativo", c)}
                   className="flex items-center w-full px-4 py-2.5 text-sm text-green-600 hover:bg-green-50 transition gap-2">
                   <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 1 1 9 0v3.75M3.75 21.75h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H3.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>
-                  Reativar
+                  Reativar acesso
                 </button>
               )}
 
@@ -511,7 +578,7 @@ export default function PlataformaChefes() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-              <h2 className="text-lg font-bold text-slate-800">Vincular Chefe de Regional (CRE / SEEDF)</h2>
+              <h2 className="text-lg font-bold text-slate-800">Vincular Chefe em uma Regional</h2>
               <button onClick={() => { setModalVincular(false); setConviteResult(null); }} className="text-slate-400 hover:text-slate-600">
                 <svg className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
               </button>
@@ -519,19 +586,19 @@ export default function PlataformaChefes() {
             <div className="px-6 pt-4">{renderMensagem()}</div>
             <form onSubmit={handleVincular} className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Coordenação Regional de Ensino (CRE) *</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">1. Qual é o Órgão Regional (CRE)? *</label>
                 <select required value={chefeRegionalId} onChange={e => setChefeRegionalId(e.target.value)}
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                  <option value="">Selecione uma Regional</option>
+                  <option value="">Selecione a Regional...</option>
                   {regionais.map(reg => (
                     <option key={reg.id} value={reg.id}>
-                      {reg.apelido ? `${reg.apelido} — ${reg.nome}` : reg.nome} (ID: {reg.id})
+                      🏛️ {reg.apelido || reg.nome} {reg.cidade ? `(${reg.cidade})` : ""} — ID #{reg.id}
                     </option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Cargo / Unidade Orgânica SEEDF *</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">2. Qual cargo esta pessoa ocupará na Regional? *</label>
                 <select
                   value={chefePapel}
                   onChange={e => setChefePapel(e.target.value)}
@@ -539,22 +606,22 @@ export default function PlataformaChefes() {
                 >
                   {UNIDADES_CRE_SEEDF.map(u => (
                     <option key={u.papelKey} value={u.papelKey}>
-                      [{u.sigla}] {u.chefeLabel} — {u.nome}
+                      {u.icone} {u.chefeLabel} ({u.sigla === "GABINETE" ? "Direção Geral da CRE" : `Setor ${u.sigla}`})
                     </option>
                   ))}
                 </select>
-                <p className="text-xs text-slate-500 mt-1">
-                  {papelInfo(chefePapel).resumo}
-                </p>
+                <div className="mt-1.5 bg-blue-50 border border-blue-100 rounded-lg p-2.5 text-xs text-blue-800">
+                  <strong>Atribuição do cargo:</strong> {papelInfo(chefePapel).resumo}
+                </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Nome completo *</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">3. Nome completo da pessoa *</label>
                 <input type="text" required value={chefeNome} onChange={e => setChefeNome(e.target.value)}
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  placeholder="Nome do Coordenador Regional ou Chefe de Unidade" />
+                  placeholder="Ex: Juliana Silva e Silva" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">CPF *</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">4. CPF *</label>
                 <input type="text" required value={chefeCpf} onChange={e => setChefeCpf(fmtCPF(e.target.value))}
                   className={`w-full border rounded-lg px-3 py-2 text-slate-800 focus:ring-2 focus:outline-none ${
                     cpfCompleto(chefeCpf) && !validarCPF(chefeCpf)
@@ -566,7 +633,7 @@ export default function PlataformaChefes() {
                 )}
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Email <span className="text-slate-400 font-normal">(opcional)</span></label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">5. E-mail <span className="text-slate-400 font-normal">(opcional)</span></label>
                 <input type="email" value={chefeEmail} onChange={e => setChefeEmail(e.target.value)}
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   placeholder="chefe@edu.se.df.gov.br" />
@@ -619,7 +686,7 @@ export default function PlataformaChefes() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-              <h2 className="text-lg font-bold text-slate-800">Editar Chefe Regional</h2>
+              <h2 className="text-lg font-bold text-slate-800">Editar Dados do Chefe</h2>
               <button onClick={() => setModalEditar(false)} className="text-slate-400 hover:text-slate-600">
                 <svg className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
               </button>
@@ -627,7 +694,7 @@ export default function PlataformaChefes() {
             <div className="px-6 pt-4">{renderMensagem()}</div>
             <form onSubmit={handleEditar} className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Cargo / Unidade SEEDF</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Cargo na Regional</label>
                 <select
                   value={editPapel}
                   onChange={e => setEditPapel(e.target.value)}
@@ -635,18 +702,18 @@ export default function PlataformaChefes() {
                 >
                   {UNIDADES_CRE_SEEDF.map(u => (
                     <option key={u.papelKey} value={u.papelKey}>
-                      [{u.sigla}] {u.chefeLabel}
+                      {u.icone} {u.chefeLabel} ({u.sigla === "GABINETE" ? "CRE" : u.sigla})
                     </option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Nome completo *</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Nome completo da pessoa *</label>
                 <input type="text" required value={editNome} onChange={e => setEditNome(e.target.value)}
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none" autoFocus />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">E-mail</label>
                 <input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)}
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
               </div>
@@ -678,13 +745,13 @@ export default function PlataformaChefes() {
             <div className="px-6 pt-4">{renderMensagem()}</div>
             <div className="px-6 pt-2">
               <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-600">
-                <strong>Substituindo:</strong> {subChefe.nome} — {subChefe.regional_nome} ({papelInfo(subChefe.papel).chefeLabel})
-                <br /><span className="text-xs text-slate-400">O chefe atual será desativado e o novo assumirá a mesma função na Regional.</span>
+                <strong>Substituindo:</strong> {subChefe.nome} — {subChefe.regional_apelido || subChefe.regional_nome} ({papelInfo(subChefe.papel).chefeLabel})
+                <br /><span className="text-xs text-slate-400">O chefe atual será desativado e a nova pessoa assumirá o mesmo cargo na Regional.</span>
               </div>
             </div>
             <form onSubmit={handleSubstituir} className="p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Nome do novo chefe *</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Nome completo do novo chefe *</label>
                 <input type="text" required value={subNome} onChange={e => setSubNome(e.target.value)}
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   placeholder="Nome completo" autoFocus />
@@ -702,7 +769,7 @@ export default function PlataformaChefes() {
                 )}
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Email <span className="text-slate-400 font-normal">(opcional)</span></label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">E-mail <span className="text-slate-400 font-normal">(opcional)</span></label>
                 <input type="email" value={subEmail} onChange={e => setSubEmail(e.target.value)}
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   placeholder="novo.chefe@edu.se.df.gov.br" />
@@ -758,7 +825,7 @@ export default function PlataformaChefes() {
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-800">Cancelar chefe?</h3>
-                  <p className="text-sm text-slate-500">O chefe <strong>{modalConfirm.chefe.nome}</strong> será desativado.</p>
+                  <p className="text-sm text-slate-500">O acesso de <strong>{modalConfirm.chefe.nome}</strong> será desativado.</p>
                 </div>
               </div>
             ) : modalConfirm.tipo === "bloqueado" ? (
@@ -812,7 +879,9 @@ export default function PlataformaChefes() {
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-1">
                 <p className="font-bold text-slate-800 text-lg">{modalExcluir.nome}</p>
                 {modalExcluir.cpf && <p className="text-sm text-slate-500">CPF: {fmtCPF(modalExcluir.cpf)}</p>}
-                {modalExcluir.regional_nome && <p className="text-sm text-slate-500">Regional: {modalExcluir.regional_nome}</p>}
+                {(modalExcluir.regional_apelido || modalExcluir.regional_nome) && (
+                  <p className="text-sm text-slate-500">Regional: {modalExcluir.regional_apelido || modalExcluir.regional_nome}</p>
+                )}
               </div>
             </div>
             <div className="px-6 pb-6 flex gap-3">

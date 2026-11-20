@@ -50,7 +50,7 @@ const PORTAIS_CONFIG = {
     labelLogin: "E-mail de acesso",
     dicaSeguranca: "Autenticação corporativa unificada por e-mail e senha com verificação em 2 etapas (2FA) e opção de dispositivo confiado.",
     Icon: AcademicCapIcon,
-    cardGradient: "linear-gradient(135deg, rgba(37,99,235,0.24) 0%, rgba(16,185,129,0.16) 100%)",
+    cardGradient: "linear-gradient(145deg, rgba(13, 38, 92, 0.94) 0%, rgba(8, 47, 58, 0.94) 100%)",
     panelGradient: "linear-gradient(155deg, #1e3a8a 0%, #1d4ed8 48%, #059669 100%)",
     btnGradient: "linear-gradient(135deg, #2563eb 0%, #0ea5e9 55%, #10b981 100%)",
     accentRing: "rgba(56, 189, 248, 0.55)",
@@ -70,7 +70,7 @@ const PORTAIS_CONFIG = {
     labelLogin: "E-mail institucional (CRE)",
     dicaSeguranca: "Acesso exclusivo por e-mail e senha para Coordenadores Regionais de Ensino e Chefes das Unidades Orgânicas.",
     Icon: BuildingLibraryIcon,
-    cardGradient: "linear-gradient(135deg, rgba(8,145,178,0.26) 0%, rgba(99,102,241,0.18) 100%)",
+    cardGradient: "linear-gradient(145deg, rgba(8, 47, 73, 0.94) 0%, rgba(26, 24, 78, 0.95) 100%)",
     panelGradient: "linear-gradient(155deg, #0f172a 0%, #0e7490 50%, #4f46e5 100%)",
     btnGradient: "linear-gradient(135deg, #0891b2 0%, #2563eb 55%, #6366f1 100%)",
     accentRing: "rgba(34, 211, 238, 0.55)",
@@ -90,7 +90,7 @@ const PORTAIS_CONFIG = {
     labelLogin: "E-mail Executivo (CEO / Plataforma)",
     dicaSeguranca: "Ambiente de alta segurança protegido por autenticação obrigatória de duplo fator (OTP).",
     Icon: SparklesIcon,
-    cardGradient: "linear-gradient(135deg, rgba(245,158,11,0.22) 0%, rgba(139,92,246,0.20) 100%)",
+    cardGradient: "linear-gradient(145deg, rgba(46, 26, 12, 0.94) 0%, rgba(32, 16, 62, 0.95) 100%)",
     panelGradient: "linear-gradient(155deg, #18181b 0%, #311042 48%, #b45309 100%)",
     btnGradient: "linear-gradient(135deg, #d97706 0%, #9333ea 60%, #4f46e5 100%)",
     accentRing: "rgba(251, 191, 36, 0.55)",
@@ -104,10 +104,40 @@ export default function Login() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // ── Controle do Portal e Modal ──
+  // ── Controle do Portal, Carrossel Orbital 3D e Modal ──
+  const CARROSSEL_ORDEM = ["escola", "cre", "plataforma"];
   const [hoveredCard, setHoveredCard] = useState("escola");
+  const hoverLockUntilRef = useRef(0);
+  const lastSwitchCoordsRef = useRef({ x: -9999, y: -9999 });
   const [modalAberto, setModalAberto] = useState(false);
   const [tipoAcesso, setTipoAcesso] = useState("escola"); // "escola" | "cre" | "plataforma"
+
+  // Blindagem Anti-Ping-Pong no Hover 3D:
+  // Garante giro orbital firme quando o card viaja para o centro e outro passa sob o cursor parado.
+  const ativarCardCarrossel = (chave, clientX, clientY, forcar = false) => {
+    if (chave === hoveredCard) {
+      // Se o mouse já entrou no card central, libera sensibilidade máxima para o próximo movimento lateral
+      lastSwitchCoordsRef.current = { x: -9999, y: -9999 };
+      return;
+    }
+    if (forcar) {
+      hoverLockUntilRef.current = Date.now() + 620;
+      setHoveredCard(chave);
+      return;
+    }
+    const agora = Date.now();
+    if (agora < hoverLockUntilRef.current) return;
+    if (typeof clientX === "number" && typeof clientY === "number") {
+      const dist = Math.hypot(
+        clientX - lastSwitchCoordsRef.current.x,
+        clientY - lastSwitchCoordsRef.current.y
+      );
+      if (dist < 32) return;
+      lastSwitchCoordsRef.current = { x: clientX, y: clientY };
+    }
+    hoverLockUntilRef.current = agora + 620;
+    setHoveredCard(chave);
+  };
 
   // ── Controle de etapas do fluxo de login ──
   const [etapa, setEtapa] = useState("login"); // "login" | "codigo" | "escola" | "reset_codigo" | "reset_nova_senha"
@@ -922,101 +952,231 @@ export default function Login() {
         ) : (
           <>
             {/* Cabeçalho da Página de Seleção */}
-            <div className="text-center max-w-2xl mx-auto mb-10 sm:mb-12">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/10 border border-white/15 text-[11px] font-bold tracking-[0.2em] uppercase text-sky-300 mb-4">
+            <div className="text-center max-w-2xl mx-auto mb-6 sm:mb-8">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/10 border border-white/15 text-[11px] font-bold tracking-[0.2em] uppercase text-sky-300 mb-3">
                 <LockClosedIcon className="h-3.5 w-3.5" />
                 <span>Central de Autenticação Inteligente</span>
               </div>
               <h1
-                className="text-3xl sm:text-5xl font-extrabold tracking-tight text-white mb-3"
+                className="text-3xl sm:text-5xl font-extrabold tracking-tight text-white mb-2.5"
                 style={{ fontFamily: "'Montserrat', sans-serif" }}
               >
                 Escolha seu perfil de acesso
               </h1>
               <p className="text-sm sm:text-base text-blue-200/80 font-light">
-                Selecione abaixo a sua esfera institucional para abrir o cofre de autenticação dedicado.
+                Passe o cursor sobre a esfera desejada para trazê-la ao centro e clique para autenticar.
               </p>
             </div>
 
-            {/* Grade dos 3 Cards: ESCOLA | CREs | CEO */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
-              {["escola", "cre", "plataforma"].map((chave, idx) => {
+            {/* ═══ PALCO CARROSSEL ORBITAL 3D (DESKTOP >= 768px) ═══ */}
+            <div className="hidden md:flex flex-col items-center w-full">
+              <div
+                className="relative w-full max-w-5xl h-[435px] flex items-center justify-center"
+                style={{ perspective: "1400px" }}
+              >
+                {/* Halo luminoso projetado no piso sob o card central */}
+                <div
+                  className="pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2 w-[380px] h-14 rounded-full blur-2xl transition-all duration-700"
+                  style={{ background: portalAurora.auroraColor }}
+                />
+
+                <div
+                  className="relative w-full h-full"
+                  style={{ transformStyle: "preserve-3d" }}
+                >
+                  {CARROSSEL_ORDEM.map((chave) => {
+                    const cfg = PORTAIS_CONFIG[chave];
+                    const IconComp = cfg.Icon;
+                    const activeIdx = CARROSSEL_ORDEM.indexOf(hoveredCard);
+                    const idx = CARROSSEL_ORDEM.indexOf(chave);
+                    const diff = (idx - activeIdx + 3) % 3;
+                    // diff === 0 -> Frente/Centro | diff === 1 -> Fundo Direito | diff === 2 -> Fundo Esquerdo
+                    const pos = diff === 0 ? "center" : diff === 1 ? "right" : "left";
+                    const isCenter = pos === "center";
+
+                    const transform3d =
+                      pos === "center"
+                        ? "translate3d(-50%, 0px, 110px) rotateY(0deg) scale(1.08)"
+                        : pos === "left"
+                        ? "translate3d(calc(-50% - 340px), 12px, -140px) rotateY(26deg) scale(0.86)"
+                        : "translate3d(calc(-50% + 340px), 12px, -140px) rotateY(-26deg) scale(0.86)";
+
+                    const glareTransform =
+                      pos === "center"
+                        ? "translateX(0%) rotate(18deg)"
+                        : pos === "left"
+                        ? "translateX(-35%) rotate(18deg)"
+                        : "translateX(35%) rotate(18deg)";
+
+                    return (
+                      <button
+                        key={cfg.key}
+                        type="button"
+                        onMouseEnter={(e) => ativarCardCarrossel(chave, e.clientX, e.clientY)}
+                        onMouseMove={(e) => ativarCardCarrossel(chave, e.clientX, e.clientY)}
+                        onFocus={() => ativarCardCarrossel(chave, undefined, undefined, true)}
+                        onClick={() => abrirPortalModal(chave)}
+                        style={{
+                          width: "360px",
+                          left: "50%",
+                          top: "14px",
+                          background: cfg.cardGradient,
+                          transform: transform3d,
+                          zIndex: isCenter ? 30 : 10,
+                          opacity: isCenter ? 1 : 0.62,
+                          filter: isCenter ? "brightness(1.06)" : "brightness(0.75) saturate(0.88)",
+                          transition:
+                            "transform 720ms cubic-bezier(0.22, 1, 0.36, 1), opacity 560ms ease, box-shadow 650ms ease, filter 560ms ease",
+                          boxShadow: isCenter
+                            ? `0 34px 80px -15px rgba(0,0,0,0.88), 0 0 50px -10px ${cfg.auroraColor}, 0 0 0 1.5px ${cfg.accentRing}`
+                            : "0 20px 45px -18px rgba(0,0,0,0.75), 0 0 0 1px rgba(255,255,255,0.12)",
+                          backfaceVisibility: "hidden",
+                          willChange: "transform, opacity",
+                        }}
+                        className="group absolute text-left rounded-3xl p-7 backdrop-blur-2xl flex flex-col justify-between min-h-[392px] overflow-hidden cursor-pointer"
+                      >
+                        {/* Feixe superior colorido */}
+                        <div
+                          className="pointer-events-none absolute inset-x-0 top-0 h-1.5 transition-opacity duration-500"
+                          style={{
+                            background: cfg.btnGradient,
+                            opacity: isCenter ? 1 : 0.55,
+                          }}
+                        />
+
+                        {/* Reflexo especular de vidro que desliza conforme o ângulo 3D */}
+                        <div
+                          className="pointer-events-none absolute -inset-y-16 -inset-x-24 opacity-20 transition-transform duration-700"
+                          style={{
+                            background:
+                              "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.16) 50%, transparent 100%)",
+                            transform: glareTransform,
+                          }}
+                        />
+
+                        <div className="relative z-10">
+                          <div className="flex items-start justify-between gap-3 mb-5">
+                            <div
+                              className={`w-14 h-14 rounded-2xl flex items-center justify-center border border-white/30 shadow-lg transition-transform duration-500 ${
+                                isCenter ? "scale-105" : "scale-95"
+                              }`}
+                              style={{ background: cfg.btnGradient }}
+                            >
+                              <IconComp className="h-7 w-7 text-white" />
+                            </div>
+                            <span
+                              className={`text-[10px] font-extrabold tracking-widest uppercase px-2.5 py-1 rounded-full border ${cfg.badgeClass}`}
+                            >
+                              {cfg.badge}
+                            </span>
+                          </div>
+
+                          <h2
+                            className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mb-1"
+                            style={{ fontFamily: "'Montserrat', sans-serif" }}
+                          >
+                            {cfg.titulo}
+                          </h2>
+                          <div className="text-xs font-semibold text-blue-200/90 mb-3">
+                            {cfg.subtitulo}
+                          </div>
+                          <p className="text-xs sm:text-[13px] text-blue-100/80 leading-relaxed mb-5">
+                            {cfg.descricao}
+                          </p>
+
+                          <div className="flex flex-wrap gap-1.5 mb-5">
+                            {cfg.publico.map((p) => (
+                              <span
+                                key={p}
+                                className="text-[11px] font-medium px-2.5 py-0.5 rounded-md bg-white/10 text-white/90 border border-white/10"
+                              >
+                                {p}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="relative z-10 pt-4 border-t border-white/15 flex items-center justify-between">
+                          <span className="text-sm font-bold text-white group-hover:text-sky-200 transition-colors">
+                            {cfg.ctaLabel}
+                          </span>
+                          <span
+                            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-300 ${
+                              isCenter
+                                ? "bg-white text-slate-900 shadow-md group-hover:translate-x-1"
+                                : "bg-white/10 text-white"
+                            }`}
+                          >
+                            <ArrowRightIcon className="h-4 w-4 stroke-[2.5]" />
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Indicadores Orbitais Discretos */}
+              <div className="flex items-center gap-2.5 mt-3">
+                {CARROSSEL_ORDEM.map((chave) => {
+                  const cfg = PORTAIS_CONFIG[chave];
+                  const ativo = hoveredCard === chave;
+                  return (
+                    <button
+                      key={chave}
+                      type="button"
+                      onMouseEnter={() => ativarCardCarrossel(chave, undefined, undefined, true)}
+                      onClick={() => abrirPortalModal(chave)}
+                      className={`px-3 py-1 rounded-full text-[11px] font-bold tracking-wider transition-all border ${
+                        ativo
+                          ? "bg-white/15 text-white border-white/40 scale-105 shadow-sm"
+                          : "bg-white/5 text-blue-200/50 border-white/10 hover:text-white/80"
+                      }`}
+                    >
+                      {ativo ? `● ${cfg.titulo}` : cfg.titulo}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* ═══ VERSÃO MOBILE EMPILHADA (< 768px — onde não há hover de mouse) ═══ */}
+            <div className="grid grid-cols-1 gap-5 w-full md:hidden">
+              {CARROSSEL_ORDEM.map((chave) => {
                 const cfg = PORTAIS_CONFIG[chave];
                 const IconComp = cfg.Icon;
-                const isHovered = hoveredCard === chave;
                 return (
                   <button
                     key={cfg.key}
                     type="button"
-                    onMouseEnter={() => setHoveredCard(chave)}
-                    onFocus={() => setHoveredCard(chave)}
                     onClick={() => abrirPortalModal(chave)}
-                    style={{
-                      background: cfg.cardGradient,
-                      animation: `cardFloatIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) ${idx * 0.1}s both`,
-                      boxShadow: isHovered
-                        ? `0 24px 60px -12px ${cfg.auroraColor}, 0 0 0 1px ${cfg.accentRing}`
-                        : "0 16px 40px -15px rgba(0,0,0,0.6)",
-                    }}
-                    className="group relative text-left rounded-3xl p-7 backdrop-blur-2xl border border-white/15 transition-all duration-300 hover:-translate-y-2 flex flex-col justify-between overflow-hidden"
+                    style={{ background: cfg.cardGradient }}
+                    className="relative text-left rounded-3xl p-6 border border-white/15 shadow-xl flex flex-col justify-between overflow-hidden"
                   >
-                    {/* Brilho superior */}
                     <div
-                      className="pointer-events-none absolute inset-x-0 top-0 h-1 opacity-80 group-hover:opacity-100 transition-opacity"
+                      className="pointer-events-none absolute inset-x-0 top-0 h-1"
                       style={{ background: cfg.btnGradient }}
                     />
-
                     <div>
-                      {/* Topo do Card: Ícone 3D + Badge */}
-                      <div className="flex items-start justify-between gap-3 mb-6">
+                      <div className="flex items-start justify-between gap-3 mb-4">
                         <div
-                          className="w-14 h-14 rounded-2xl flex items-center justify-center border border-white/25 shadow-lg transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3"
+                          className="w-12 h-12 rounded-2xl flex items-center justify-center border border-white/25"
                           style={{ background: cfg.btnGradient }}
                         >
-                          <IconComp className="h-7 w-7 text-white" />
+                          <IconComp className="h-6 w-6 text-white" />
                         </div>
                         <span className={`text-[10px] font-extrabold tracking-widest uppercase px-2.5 py-1 rounded-full border ${cfg.badgeClass}`}>
                           {cfg.badge}
                         </span>
                       </div>
-
-                      {/* Título e Subtítulo */}
-                      <h2
-                        className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mb-1"
-                        style={{ fontFamily: "'Montserrat', sans-serif" }}
-                      >
+                      <h2 className="text-2xl font-extrabold text-white mb-1" style={{ fontFamily: "'Montserrat', sans-serif" }}>
                         {cfg.titulo}
                       </h2>
-                      <div className="text-xs font-semibold text-blue-200/90 mb-3">
-                        {cfg.subtitulo}
-                      </div>
-                      <p className="text-xs sm:text-sm text-blue-100/75 leading-relaxed mb-6">
-                        {cfg.descricao}
-                      </p>
-
-                      {/* Chips de Perfis Contemplados */}
-                      <div className="flex flex-wrap gap-1.5 mb-7">
-                        {cfg.publico.map((p) => (
-                          <span
-                            key={p}
-                            className="text-[11px] font-medium px-2.5 py-0.5 rounded-md bg-white/10 text-white/90 border border-white/10"
-                          >
-                            {p}
-                          </span>
-                        ))}
-                      </div>
+                      <p className="text-xs text-blue-100/80 mb-4">{cfg.descricao}</p>
                     </div>
-
-                    {/* Botão de Ação */}
-                    <div className="pt-4 border-t border-white/10 flex items-center justify-between">
-                      <span className="text-sm font-bold text-white group-hover:text-sky-200 transition-colors">
-                        {cfg.ctaLabel}
-                      </span>
-                      <span
-                        className="w-9 h-9 rounded-xl flex items-center justify-center bg-white/10 group-hover:bg-white text-white group-hover:text-slate-900 transition-all duration-300 group-hover:translate-x-1"
-                      >
-                        <ArrowRightIcon className="h-4 w-4 stroke-[2.5]" />
-                      </span>
+                    <div className="pt-3 border-t border-white/10 flex items-center justify-between">
+                      <span className="text-sm font-bold text-white">{cfg.ctaLabel}</span>
+                      <ArrowRightIcon className="h-4 w-4 text-white" />
                     </div>
                   </button>
                 );

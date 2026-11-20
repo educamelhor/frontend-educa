@@ -146,12 +146,17 @@ export default function LandingPage() {
             >
               <span className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-sky-300 shadow-[0_0_12px_#7dd3fc]" />
             </div>
-            <div className="relative p-4 rounded-3xl bg-white/10 backdrop-blur-xl border border-white/20 shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
+            <div
+              className="relative p-4 rounded-3xl border border-white/40 shadow-[0_20px_60px_rgba(0,0,0,0.42)]"
+              style={{
+                background: "linear-gradient(145deg, #fbbf24 0%, #f59e0b 52%, #ea580c 100%)",
+              }}
+            >
               <img
                 src={logo}
                 alt="Logo Educa.Melhor"
                 className="w-24 h-24 object-contain bg-transparent"
-                style={{ filter: "drop-shadow(0 8px 24px rgba(0,0,0,0.35))" }}
+                style={{ filter: "grayscale(1) contrast(1.6) drop-shadow(0 6px 16px rgba(0,0,0,0.25))" }}
                 draggable={false}
               />
             </div>

@@ -896,7 +896,18 @@ export default function Login() {
         </button>
 
         <div className="flex items-center gap-2.5">
-          <img src={logo} alt="Educa.Melhor" className="w-8 h-8 object-contain" draggable={false} />
+          <div
+            className="p-1.5 rounded-xl border border-white/35 shadow-md"
+            style={{ background: "linear-gradient(145deg, #fbbf24 0%, #f59e0b 52%, #ea580c 100%)" }}
+          >
+            <img
+              src={logo}
+              alt="Educa.Melhor"
+              className="w-6 h-6 object-contain"
+              style={{ filter: "grayscale(1) contrast(1.6)" }}
+              draggable={false}
+            />
+          </div>
           <span className="font-bold text-base sm:text-lg tracking-tight" style={{ fontFamily: "'Montserrat', sans-serif" }}>
             Educa<span className="text-sky-400">.Melhor</span>
           </span>

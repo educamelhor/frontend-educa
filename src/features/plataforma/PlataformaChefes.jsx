@@ -48,8 +48,24 @@ export default function PlataformaChefes() {
   const btnRefs = useRef({});
 
   const [mensagem, setMensagem] = useState({ texto: "", tipo: "" });
+  const [linkCopiado, setLinkCopiado] = useState(false);
+  const copyTimerRef = useRef(null);
 
-  useEffect(() => { fetchAll(); }, []);
+  const copiarLinkComFeedback = (texto) => {
+    navigator.clipboard?.writeText(texto);
+    setLinkCopiado(true);
+    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    copyTimerRef.current = setTimeout(() => {
+      setLinkCopiado(false);
+    }, 10000);
+  };
+
+  useEffect(() => {
+    fetchAll();
+    return () => {
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    };
+  }, []);
 
   const fetchAll = async () => {
     setLoading(true);
@@ -125,7 +141,7 @@ export default function PlataformaChefes() {
     setChefePapel("coordenador_regional");
     setConviteResult(null);
   };
-  const abrirVincular = () => { resetVincular(); setModalVincular(true); setMenuAberto(null); };
+  const abrirVincular = () => { resetVincular(); setLinkCopiado(false); setModalVincular(true); setMenuAberto(null); };
 
   const handleVincular = async (e) => {
     e.preventDefault();
@@ -193,6 +209,7 @@ export default function PlataformaChefes() {
     setSubCpf("");
     setSubEmail("");
     setSubConviteResult(null);
+    setLinkCopiado(false);
     setModalSubstituir(true);
     setMenuAberto(null);
   };
@@ -268,6 +285,7 @@ export default function PlataformaChefes() {
   // Regenerar código
   const handleRegenerarCodigo = async (c) => {
     setGerandoCodigo(true);
+    setLinkCopiado(false);
     setMenuAberto(null);
     try {
       const { data } = await api.post(`/api/plataforma/chefes/${c.id}/regenerar-codigo`);
@@ -658,16 +676,18 @@ export default function PlataformaChefes() {
                   <div className="mb-3">
                     <label className="block text-xs font-semibold text-green-700 uppercase tracking-wide mb-1.5">Link de ativação</label>
                     <input type="text" readOnly value={linkVinc}
-                      onClick={e => { e.target.select(); navigator.clipboard?.writeText(linkVinc); mostrarMensagem("📋 Link copiado!"); }}
+                      onClick={e => { e.target.select(); copiarLinkComFeedback(linkVinc); }}
                       className="w-full border border-green-300 rounded-lg px-3 py-2 text-xs font-mono bg-white text-green-900 cursor-pointer hover:bg-green-50 transition" />
                     <p className="text-xs text-green-600 mt-1">
                       Expira em: {new Date(conviteResult.expira_em).toLocaleString("pt-BR")}
                     </p>
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => { navigator.clipboard?.writeText(linkVinc); mostrarMensagem("📋 Link copiado!"); }}
-                      className="flex-1 flex items-center justify-center gap-1.5 bg-teal-600 hover:bg-teal-700 text-white font-medium py-2 rounded-lg transition text-xs">
-                      Copiar link
+                    <button onClick={() => copiarLinkComFeedback(linkVinc)}
+                      className={`flex-1 flex items-center justify-center gap-1.5 font-medium py-2 rounded-lg transition text-xs text-white ${
+                        linkCopiado ? "bg-emerald-700" : "bg-teal-600 hover:bg-teal-700"
+                      }`}>
+                      {linkCopiado ? "✓ Link copiado" : "Copiar link"}
                     </button>
                     <a href={`https://wa.me/?text=${encodeURIComponent(msgVinc)}`} target="_blank" rel="noopener noreferrer"
                       className="flex-1 flex items-center justify-center gap-1.5 bg-green-600 hover:bg-green-700 text-white font-medium py-2 rounded-lg transition text-xs">
@@ -794,13 +814,15 @@ export default function PlataformaChefes() {
                   <div className="mb-3">
                     <label className="block text-xs font-semibold text-green-700 uppercase tracking-wide mb-1.5">Link de ativação</label>
                     <input type="text" readOnly value={linkSub}
-                      onClick={e => { e.target.select(); navigator.clipboard?.writeText(linkSub); mostrarMensagem("📋 Link copiado!"); }}
+                      onClick={e => { e.target.select(); copiarLinkComFeedback(linkSub); }}
                       className="w-full border border-green-300 rounded-lg px-3 py-2 text-xs font-mono bg-white text-green-900 cursor-pointer hover:bg-green-50 transition" />
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => { navigator.clipboard?.writeText(linkSub); mostrarMensagem("📋 Link copiado!"); }}
-                      className="flex-1 bg-teal-600 hover:bg-teal-700 text-white font-medium py-2 rounded-lg transition text-xs">
-                      Copiar link
+                    <button onClick={() => copiarLinkComFeedback(linkSub)}
+                      className={`flex-1 font-medium py-2 rounded-lg transition text-xs text-white ${
+                        linkCopiado ? "bg-emerald-700" : "bg-teal-600 hover:bg-teal-700"
+                      }`}>
+                      {linkCopiado ? "✓ Link copiado" : "Copiar link"}
                     </button>
                     <a href={`https://wa.me/?text=${encodeURIComponent(msgSub)}`} target="_blank" rel="noopener noreferrer"
                       className="flex-1 text-center bg-green-600 hover:bg-green-700 text-white font-medium py-2 rounded-lg transition text-xs">
@@ -915,7 +937,7 @@ export default function PlataformaChefes() {
                   type="text"
                   readOnly
                   value={linkAtivacao}
-                  onClick={e => { e.target.select(); navigator.clipboard?.writeText(linkAtivacao); mostrarMensagem("📋 Link copiado!"); }}
+                  onClick={e => { e.target.select(); copiarLinkComFeedback(linkAtivacao); }}
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs font-mono bg-white text-slate-700 cursor-pointer"
                 />
                 <p className="text-xs text-slate-400 mt-1.5">
@@ -924,16 +946,18 @@ export default function PlataformaChefes() {
               </div>
               <div className="flex gap-2 mb-3">
                 <button
-                  onClick={() => { navigator.clipboard?.writeText(linkAtivacao); mostrarMensagem("📋 Link copiado!"); }}
-                  className="flex-1 bg-teal-600 hover:bg-teal-700 text-white font-medium py-2.5 rounded-lg transition text-sm">
-                  Copiar link
+                  onClick={() => copiarLinkComFeedback(linkAtivacao)}
+                  className={`flex-1 font-medium py-2.5 rounded-lg transition text-sm text-white ${
+                    linkCopiado ? "bg-emerald-700" : "bg-teal-600 hover:bg-teal-700"
+                  }`}>
+                  {linkCopiado ? "✓ Link copiado" : "Copiar link"}
                 </button>
                 <a href={whatsUrl} target="_blank" rel="noopener noreferrer"
                   className="flex-1 text-center bg-green-600 hover:bg-green-700 text-white font-medium py-2.5 rounded-lg transition text-sm">
                   Enviar via WhatsApp
                 </a>
               </div>
-              <button onClick={() => setModalCodigo(null)}
+              <button onClick={() => { setModalCodigo(null); setLinkCopiado(false); }}
                 className="w-full border border-slate-300 text-slate-600 hover:bg-slate-50 font-medium py-2.5 rounded-lg transition text-sm">
                 Fechar
               </button>

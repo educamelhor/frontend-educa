@@ -46,9 +46,25 @@ export default function PlataformaDiretores() {
   const btnRefs = useRef({});
 
   const [mensagem, setMensagem] = useState({ texto: "", tipo: "" });
+  const [linkCopiado, setLinkCopiado] = useState(false);
+  const copyTimerRef = useRef(null);
+
+  const copiarLinkComFeedback = (texto) => {
+    navigator.clipboard?.writeText(texto);
+    setLinkCopiado(true);
+    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    copyTimerRef.current = setTimeout(() => {
+      setLinkCopiado(false);
+    }, 10000);
+  };
 
   // ── Fetch ───────────────────────────────────
-  useEffect(() => { fetchAll(); }, []);
+  useEffect(() => {
+    fetchAll();
+    return () => {
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    };
+  }, []);
 
   const fetchAll = async () => {
     setLoading(true);
@@ -131,7 +147,7 @@ export default function PlataformaDiretores() {
   // ── Actions ─────────────────────────────────
   // Vincular
   const resetVincular = () => { setDirEscolaId(""); setDirNome(""); setDirCpf(""); setDirEmail(""); setDirPapel("diretor"); setConviteResult(null); };
-  const abrirVincular = () => { resetVincular(); setModalVincular(true); setMenuAberto(null); };
+  const abrirVincular = () => { resetVincular(); setLinkCopiado(false); setModalVincular(true); setMenuAberto(null); };
 
   const handleVincular = async (e) => {
     e.preventDefault();
@@ -174,7 +190,7 @@ export default function PlataformaDiretores() {
 
   // Substituir
   const abrirSubstituir = (d) => {
-    setSubDir(d); setSubNome(""); setSubCpf(""); setSubEmail(""); setSubConviteResult(null);
+    setSubDir(d); setSubNome(""); setSubCpf(""); setSubEmail(""); setSubConviteResult(null); setLinkCopiado(false);
     setModalSubstituir(true); setMenuAberto(null);
   };
 
@@ -254,6 +270,7 @@ export default function PlataformaDiretores() {
   // Regenerar código
   const handleRegenarCodigo = async (d) => {
     setGerandoCodigo(true);
+    setLinkCopiado(false);
     setMenuAberto(null);
     try {
       const { data } = await api.post(`/api/plataforma/diretores/${d.id}/regenerar-codigo`);
@@ -567,7 +584,7 @@ export default function PlataformaDiretores() {
                 <div className="mb-3">
                   <label className="block text-xs font-semibold text-green-700 uppercase tracking-wide mb-1.5">Link de ativação</label>
                   <input type="text" readOnly value={linkVinc}
-                    onClick={e => { e.target.select(); navigator.clipboard?.writeText(linkVinc); mostrarMensagem("📋 Link copiado!"); }}
+                    onClick={e => { e.target.select(); copiarLinkComFeedback(linkVinc); }}
                     className="w-full border border-green-300 rounded-lg px-3 py-2 text-xs font-mono bg-white text-green-900 cursor-pointer hover:bg-green-50 transition" />
                   <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
                     <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
@@ -575,10 +592,12 @@ export default function PlataformaDiretores() {
                   </p>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => { navigator.clipboard?.writeText(linkVinc); mostrarMensagem("📋 Link copiado!"); }}
-                    className="flex-1 flex items-center justify-center gap-1.5 bg-teal-600 hover:bg-teal-700 text-white font-medium py-2 rounded-lg transition text-xs">
+                  <button onClick={() => copiarLinkComFeedback(linkVinc)}
+                    className={`flex-1 flex items-center justify-center gap-1.5 font-medium py-2 rounded-lg transition text-xs text-white ${
+                      linkCopiado ? "bg-emerald-700" : "bg-teal-600 hover:bg-teal-700"
+                    }`}>
                     <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0 0 13.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 0 1-.75.75H9.75a.75.75 0 0 1-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 0 1 1.927-.184" /></svg>
-                    Copiar link
+                    {linkCopiado ? "Link copiado" : "Copiar link"}
                   </button>
                   <a href={`https://wa.me/?text=${encodeURIComponent(msgVinc)}`} target="_blank" rel="noopener noreferrer"
                     className="flex-1 flex items-center justify-center gap-1.5 bg-green-600 hover:bg-green-700 text-white font-medium py-2 rounded-lg transition text-xs">
@@ -684,7 +703,7 @@ export default function PlataformaDiretores() {
                 <div className="mb-3">
                   <label className="block text-xs font-semibold text-green-700 uppercase tracking-wide mb-1.5">Link de ativação</label>
                   <input type="text" readOnly value={linkSub}
-                    onClick={e => { e.target.select(); navigator.clipboard?.writeText(linkSub); mostrarMensagem("📋 Link copiado!"); }}
+                    onClick={e => { e.target.select(); copiarLinkComFeedback(linkSub); }}
                     className="w-full border border-green-300 rounded-lg px-3 py-2 text-xs font-mono bg-white text-green-900 cursor-pointer hover:bg-green-50 transition" />
                   <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
                     <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
@@ -692,10 +711,12 @@ export default function PlataformaDiretores() {
                   </p>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => { navigator.clipboard?.writeText(linkSub); mostrarMensagem("📋 Link copiado!"); }}
-                    className="flex-1 flex items-center justify-center gap-1.5 bg-teal-600 hover:bg-teal-700 text-white font-medium py-2 rounded-lg transition text-xs">
+                  <button onClick={() => copiarLinkComFeedback(linkSub)}
+                    className={`flex-1 flex items-center justify-center gap-1.5 font-medium py-2 rounded-lg transition text-xs text-white ${
+                      linkCopiado ? "bg-emerald-700" : "bg-teal-600 hover:bg-teal-700"
+                    }`}>
                     <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0 0 13.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 0 1-.75.75H9.75a.75.75 0 0 1-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 0 1 1.927-.184" /></svg>
-                    Copiar link
+                    {linkCopiado ? "Link copiado" : "Copiar link"}
                   </button>
                   <a href={`https://wa.me/?text=${encodeURIComponent(msgSub)}`} target="_blank" rel="noopener noreferrer"
                     className="flex-1 flex items-center justify-center gap-1.5 bg-green-600 hover:bg-green-700 text-white font-medium py-2 rounded-lg transition text-xs">
@@ -858,7 +879,7 @@ export default function PlataformaDiretores() {
                 type="text"
                 readOnly
                 value={linkAtivacao}
-                onClick={e => { e.target.select(); navigator.clipboard?.writeText(linkAtivacao); mostrarMensagem("📋 Link copiado!"); }}
+                onClick={e => { e.target.select(); copiarLinkComFeedback(linkAtivacao); }}
                 className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs font-mono bg-white text-slate-700 cursor-pointer hover:bg-slate-50 transition"
               />
               <p className="text-xs text-slate-400 mt-1.5 flex items-center gap-1">
@@ -870,10 +891,12 @@ export default function PlataformaDiretores() {
             {/* Ações */}
             <div className="flex gap-2 mb-3">
               <button
-                onClick={() => { navigator.clipboard?.writeText(linkAtivacao); mostrarMensagem("📋 Link copiado para a área de transferência!"); }}
-                className="flex-1 flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-700 text-white font-medium py-2.5 rounded-lg transition text-sm">
+                onClick={() => copiarLinkComFeedback(linkAtivacao)}
+                className={`flex-1 flex items-center justify-center gap-2 font-medium py-2.5 rounded-lg transition text-sm text-white ${
+                  linkCopiado ? "bg-emerald-700" : "bg-teal-600 hover:bg-teal-700"
+                }`}>
                 <svg className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0 0 13.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 0 1-.75.75H9.75a.75.75 0 0 1-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 0 1 1.927-.184" /></svg>
-                Copiar link
+                {linkCopiado ? "Link copiado" : "Copiar link"}
               </button>
               <a
                 href={whatsUrl}
@@ -886,7 +909,7 @@ export default function PlataformaDiretores() {
             </div>
 
             <button
-              onClick={() => setModalCodigo(null)}
+              onClick={() => { setModalCodigo(null); setLinkCopiado(false); }}
               className="w-full border border-slate-300 text-slate-600 hover:bg-slate-50 font-medium py-2.5 rounded-lg transition text-sm">
               Fechar
             </button>

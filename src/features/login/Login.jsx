@@ -1,7 +1,27 @@
 // src/features/login/Login.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import api from "../../services/api"; // Serviço centralizado para requisições
+import {
+  AcademicCapIcon,
+  BuildingLibraryIcon,
+  ShieldCheckIcon,
+  SparklesIcon,
+  LockClosedIcon,
+  EnvelopeIcon,
+  IdentificationIcon,
+  DevicePhoneMobileIcon,
+  EyeIcon,
+  EyeSlashIcon,
+  ArrowLeftIcon,
+  ArrowRightIcon,
+  XMarkIcon,
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
+  KeyIcon,
+} from "@heroicons/react/24/outline";
+import "@fontsource/montserrat/700.css";
+import api from "../../services/api";
+import logo from "../landing/logo.png";
 
 function isEmailValido(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || "").trim());
@@ -9,7 +29,6 @@ function isEmailValido(email) {
 
 function isCelularValido(valor) {
   const digits = String(valor || "").replace(/\D/g, "");
-  // Aceita 10 ou 11 dÃ­gitos (com ou sem DDD)
   return digits.length === 10 || digits.length === 11;
 }
 
@@ -18,82 +37,169 @@ function isCpfValido(valor) {
   return digits.length === 11;
 }
 
-// âœ… Normaliza o identificador de login:
-// - e-mail => trim + lowercase
-// - celular/cpf => somente dÃ­gitos
 function normalizarLogin(valor) {
   const v = String(valor || "").trim();
   if (isEmailValido(v)) return v.toLowerCase();
   return v.replace(/\D/g, "");
 }
 
-// ✅ Mesma regra do cadastro (mínimo 6, letra, número e 1 destes: $#@*_)
 function senhaForte(s) {
   if (!s) return false;
-  const temMinimo = s.length >= 6;
-  const temLetra = /[A-Za-z]/.test(s);
-  const temNumero = /\d/.test(s);
-  const temEspecial = /[$#@*_]/.test(s);
-  return temMinimo && temLetra && temNumero && temEspecial;
+  return s.length >= 6 && /[A-Za-z]/.test(s) && /\d/.test(s) && /[$#@*_]/.test(s);
 }
 
+// ── Configuração dos 3 Portais de Acesso ──
+const PORTAIS_CONFIG = {
+  escola: {
+    key: "escola",
+    badge: "UNIDADES ESCOLARES",
+    titulo: "ESCOLA",
+    subtitulo: "Ambiente Escolar Integrado",
+    descricao:
+      "Gestão pedagógica, diário eletrônico, chamada inteligente, gabaritos, frequência e portal do estudante.",
+    publico: ["Direção", "Coordenação", "Secretaria", "Professores", "Alunos & Famílias"],
+    placeholderLogin: "CPF, e-mail ou celular",
+    labelLogin: "Identificação (CPF, e-mail ou celular)",
+    dicaSeguranca: "Diretores acessam direto via CPF. Demais perfis contam com verificação inteligente em 2 etapas.",
+    Icon: AcademicCapIcon,
+    cardGradient: "linear-gradient(135deg, rgba(37,99,235,0.24) 0%, rgba(16,185,129,0.16) 100%)",
+    panelGradient: "linear-gradient(155deg, #1e3a8a 0%, #1d4ed8 48%, #059669 100%)",
+    btnGradient: "linear-gradient(135deg, #2563eb 0%, #0ea5e9 55%, #10b981 100%)",
+    accentRing: "rgba(56, 189, 248, 0.55)",
+    auroraColor: "rgba(37, 99, 235, 0.42)",
+    badgeClass: "bg-sky-500/20 text-sky-200 border-sky-400/30",
+    ctaLabel: "Acessar Unidade Escolar",
+  },
+  cre: {
+    key: "cre",
+    badge: "COORDENAÇÕES REGIONAIS",
+    titulo: "CREs",
+    subtitulo: "Coordenações Regionais de Ensino",
+    descricao:
+      "Supervisão regional da rede, acompanhamento das escolas vinculadas, planejamento territorial e gestão de pessoas.",
+    publico: ["Coordenador Regional", "UNIEB", "UNIPLAT", "UNIGEP", "UNIAE", "UNIAG"],
+    placeholderLogin: "CPF ou e-mail institucional",
+    labelLogin: "CPF ou E-mail do Gestor Regional",
+    dicaSeguranca: "Acesso exclusivo para Coordenadores Regionais de Ensino e Chefes das Unidades Orgânicas.",
+    Icon: BuildingLibraryIcon,
+    cardGradient: "linear-gradient(135deg, rgba(8,145,178,0.26) 0%, rgba(99,102,241,0.18) 100%)",
+    panelGradient: "linear-gradient(155deg, #0f172a 0%, #0e7490 50%, #4f46e5 100%)",
+    btnGradient: "linear-gradient(135deg, #0891b2 0%, #2563eb 55%, #6366f1 100%)",
+    accentRing: "rgba(34, 211, 238, 0.55)",
+    auroraColor: "rgba(6, 182, 212, 0.38)",
+    badgeClass: "bg-cyan-500/20 text-cyan-200 border-cyan-400/30",
+    ctaLabel: "Acessar Regional (CRE)",
+  },
+  plataforma: {
+    key: "plataforma",
+    badge: "GOVERNANÇA EXECUTIVA",
+    titulo: "CEO",
+    subtitulo: "Plataforma & Governança Central",
+    descricao:
+      "Controle global de instituições, licenciamento de módulos por perfil, auditoria RBAC, prazos e telemetria.",
+    publico: ["CEO", "Super Admin", "Governança", "Auditoria & Insights"],
+    placeholderLogin: "E-mail executivo da Plataforma",
+    labelLogin: "E-mail Executivo (CEO / Plataforma)",
+    dicaSeguranca: "Ambiente de alta segurança protegido por autenticação obrigatória de duplo fator (OTP).",
+    Icon: SparklesIcon,
+    cardGradient: "linear-gradient(135deg, rgba(245,158,11,0.22) 0%, rgba(139,92,246,0.20) 100%)",
+    panelGradient: "linear-gradient(155deg, #18181b 0%, #311042 48%, #b45309 100%)",
+    btnGradient: "linear-gradient(135deg, #d97706 0%, #9333ea 60%, #4f46e5 100%)",
+    accentRing: "rgba(251, 191, 36, 0.55)",
+    auroraColor: "rgba(217, 119, 6, 0.34)",
+    badgeClass: "bg-amber-500/20 text-amber-200 border-amber-400/35",
+    ctaLabel: "Acessar Plataforma CEO",
+  },
+};
+
 export default function Login() {
-  // 📌 Controle de etapas do fluxo de login
-  const [etapa, setEtapa] = useState("login"); // "login" | "codigo" | 'escola' | "reset_codigo" | "reset_nova_senha"
-
-  // 📌 Campos do formulário
   const location = useLocation();
+  const navigate = useNavigate();
 
-  const [tipoAcesso, setTipoAcesso] = useState("escola"); // "escola" | "plataforma"
+  // ── Controle do Portal e Modal ──
+  const [hoveredCard, setHoveredCard] = useState("escola");
+  const [modalAberto, setModalAberto] = useState(false);
+  const [tipoAcesso, setTipoAcesso] = useState("escola"); // "escola" | "cre" | "plataforma"
 
+  // ── Controle de etapas do fluxo de login ──
+  const [etapa, setEtapa] = useState("login"); // "login" | "codigo" | "escola" | "reset_codigo" | "reset_nova_senha"
+
+  // ── Campos do formulário ──
   const [usuario, setUsuario] = useState("");
   const [senha, setSenha] = useState("");
+  const [showSenha, setShowSenha] = useState(false);
+  const [capsLockAtivo, setCapsLockAtivo] = useState(false);
   const [codigo, setCodigo] = useState("");
+  const otpRefs = useRef([]);
 
-  // ✅ Reset de senha (via OTP)
+  // ── Reset de senha (via OTP) ──
   const [resetCodigo, setResetCodigo] = useState("");
   const [resetSenha, setResetSenha] = useState("");
   const [resetConfSenha, setResetConfSenha] = useState("");
+  const [showResetSenha, setShowResetSenha] = useState(false);
   const [resetEmailLocked, setResetEmailLocked] = useState(false);
 
-  // 📌 Metadados do usuário e UI
+  // ── Metadados do usuário e UI ──
   const [usuarioId, setUsuarioId] = useState(null);
-  const [nomeUsuarioLogin, setNomeUsuarioLogin] = useState(""); // ✅ nome para exibir no multi-escola
+  const [nomeUsuarioLogin, setNomeUsuarioLogin] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
-
-  // ✅ Multi-escola (seleção de contexto)
+  // ── Multi-escola ──
   const [escolasVinculadas, setEscolasVinculadas] = useState([]);
   const [escolaSelecionada, setEscolaSelecionada] = useState("");
   const [usuarioCtxSelecionado, setUsuarioCtxSelecionado] = useState("");
 
-
-  // ✅ Mensagens inline (substitui alert)
+  // ── Mensagens inline ──
   const [mensagem, setMensagem] = useState("");
   const [tipoMensagem, setTipoMensagem] = useState("erro"); // "erro" | "info" | "sucesso"
 
-  // ✅ Reenviar código (cooldown)
-  const [cooldown, setCooldown] = useState(0); // segundos restantes
-
-  // ✅ Dispositivo confiado
+  // ── Reenviar código (cooldown) & Dispositivo confiado ──
+  const [cooldown, setCooldown] = useState(0);
   const [confirarDispositivo, setConfirarDispositivo] = useState(false);
 
-  // ✅ Manutenção Programada: se o backend retornar 503 + { maintenance: true }
-  // o login escolar exibe uma tela de aviso em vez de "Erro no login."
+  // ── Manutenção Programada ──
   const [manutencao, setManutencao] = useState(null);
 
-  // ✅ Checagem proativa: verifica manutenção ao montar a página (antes do login)
-  // Exibe a tela de aviso mesmo sem o usuário ter tentado entrar
-  React.useEffect(() => {
-    if (tipoAcesso === 'plataforma') return; // CEO não vê tela de manutenção
-    api.get('/api/auth/status')
-      .then(res => {
+  useEffect(() => {
+    if (tipoAcesso === "plataforma") return;
+    api.get("/api/auth/status")
+      .then((res) => {
         if (res.data?.maintenance) setManutencao(res.data);
       })
-      .catch(() => {}); // endpoint público: falha silenciosa
+      .catch(() => {});
   }, [tipoAcesso]);
 
+  // Se veio redirecionado do CadastroUsuario com state.email, abre direto o modal ESCOLA preenchido
+  useEffect(() => {
+    const emailFromState = location?.state?.email;
+    if (emailFromState) {
+      setUsuario(emailFromState);
+      setTipoAcesso("escola");
+      setModalAberto(true);
+    }
+  }, [location?.state]);
+
+  // Fechar modal no ESC (quando não está autenticando)
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.key === "Escape" && modalAberto && !loading && !success) {
+        fecharModal();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [modalAberto, loading, success]);
+
+  // Cooldown da etapa de código
+  useEffect(() => {
+    if (etapa !== "codigo") return;
+    setCooldown((prev) => (prev > 0 ? prev : 60));
+    const t = setInterval(() => {
+      setCooldown((s) => (s > 0 ? s - 1 : 0));
+    }, 1000);
+    return () => clearInterval(t);
+  }, [etapa]);
 
   // Helpers para device_token (localStorage)
   const getDeviceToken = () => {
@@ -106,11 +212,6 @@ export default function Login() {
     try { localStorage.removeItem("device_token"); } catch {}
   };
 
-
-  const navigate = useNavigate();
-
-  // ✅ Higiene de sessão: ao entrar no Sistema Escolar, remove vestígios da Plataforma (CEO)
-  // (não toca no token escolar)
   const limparSessaoPlataforma = () => {
     try {
       localStorage.removeItem("plataforma_token");
@@ -119,79 +220,75 @@ export default function Login() {
     } catch {}
   };
 
-  // ✅ Carrega disciplinas do professor logado e grava no localStorage
-  // - Formato novo (definitivo): disciplinas_professor_ctx = [{ id, nome }]
-  // - Compatibilidade (até PASSO 9.3): disciplinas_professor = ["Matemática", ...]
   const carregarDisciplinasProfessor = async (token) => {
     try {
       if (!token) return;
-
       const { data } = await api.get("/api/professores/me/disciplinas", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
-
-      // Novo formato: [{ id, nome }]
       const disciplinasCtx = Array.isArray(data?.disciplinas)
         ? data.disciplinas
-            .map((d) => ({
-              id: Number(d?.id),
-              nome: String(d?.nome || "").trim(),
-            }))
+            .map((d) => ({ id: Number(d?.id), nome: String(d?.nome || "").trim() }))
             .filter((d) => Number.isFinite(d.id) && d.nome)
         : [];
-
-      // Compatibilidade: apenas nomes (para a tela Conteúdos atual não quebrar)
       const nomes = disciplinasCtx.map((d) => d.nome);
-
       localStorage.setItem("disciplinas_professor_ctx", JSON.stringify(disciplinasCtx));
       localStorage.setItem("disciplinas_professor", JSON.stringify(nomes));
-    } catch (e) {
-      // fallback seguro: não impede login
+    } catch {
       localStorage.setItem("disciplinas_professor_ctx", JSON.stringify([]));
       localStorage.setItem("disciplinas_professor", JSON.stringify([]));
     }
   };
 
-  // ✅ CTA de cadastro (aparece somente quando a mensagem for "Usuário não encontrado.")
   const irParaCadastro = () => {
     const email = String(usuario || "").trim();
     navigate("/cadastro", { state: { email } });
   };
 
-  // ✅ Voltar da etapa "escola" para "codigo" sem resetar sessão (usuarioId/senha/cooldown)
+  const abrirPortalModal = (chave) => {
+    setTipoAcesso(chave);
+    setHoveredCard(chave);
+    setEtapa("login");
+    setMensagem("");
+    setSenha("");
+    setShowSenha(false);
+    setCodigo("");
+    setSuccess(false);
+    setModalAberto(true);
+  };
+
+  const trocarPerfilNoModal = (chave) => {
+    if (loading || success) return;
+    setTipoAcesso(chave);
+    setHoveredCard(chave);
+    voltarParaLogin(true);
+  };
+
+  const fecharModal = () => {
+    if (loading) return;
+    setModalAberto(false);
+    voltarParaLogin(false);
+  };
+
   const voltarParaCodigo = () => {
     setEtapa("codigo");
     setMensagem("");
     setTipoMensagem("info");
-    // Mantém escolasVinculadas e usuarioId para evitar reenviar código
   };
 
-
-  // ✅ Voltar com limpeza completa do estado da etapa "codigo"
-  const voltarParaLogin = () => {
+  const voltarParaLogin = (limparUsuario = false) => {
     setEtapa("login");
-
-    // ✅ Limpa multi-escola
     setEscolasVinculadas([]);
     setEscolaSelecionada("");
-
-    // ✅ Limpa estado da etapa de código
     setCodigo("");
     setUsuarioId(null);
     setNomeUsuarioLogin("");
-
-    // ✅ Segurança: ao voltar, limpa a senha (mantém e-mail por conveniência)
+    if (limparUsuario) setUsuario("");
     setSenha("");
-
-    // ✅ Reset de senha
     setResetCodigo("");
     setResetSenha("");
     setResetConfSenha("");
     setResetEmailLocked(false);
-
-    // ✅ Limpa feedback/flags
     setMensagem("");
     setTipoMensagem("erro");
     setSuccess(false);
@@ -199,46 +296,96 @@ export default function Login() {
     setCooldown(0);
   };
 
-  // ✅ Abrir fluxo de reset (só quando o e-mail for válido)
+  const checarCapsLock = (e) => {
+    if (e?.getModifierState) {
+      setCapsLockAtivo(e.getModifierState("CapsLock"));
+    }
+  };
+
+  // Detecção visual inteligente do que o usuário está digitando
+  const detectarTipoIdentificador = () => {
+    const raw = String(usuario || "").trim();
+    if (!raw) return null;
+    if (raw.includes("@")) {
+      return { icone: "✉️", texto: isEmailValido(raw) ? "E-mail válido" : "Digitando e-mail...", ok: isEmailValido(raw) };
+    }
+    const nums = raw.replace(/\D/g, "");
+    if (nums.length === 11 && !raw.includes("(")) {
+      return { icone: "🪪", texto: "CPF / Celular (11 dígitos)", ok: true };
+    }
+    if (nums.length >= 10 && nums.length <= 11) {
+      return { icone: "📱", texto: "Celular reconhecido", ok: true };
+    }
+    return null;
+  };
+  const infoIdentificador = detectarTipoIdentificador();
+
+  // ──Manipulação das 6 caixas de OTP──
+  const codigoDigitos = Array.from({ length: 6 }, (_, i) => codigo[i] || "");
+
+  const handleOtpChange = (idx, val) => {
+    const digit = val.replace(/\D/g, "").slice(-1);
+    const arr = [...codigoDigitos];
+    arr[idx] = digit;
+    const joined = arr.join("");
+    setCodigo(joined);
+    setMensagem("");
+    if (digit && idx < 5) {
+      otpRefs.current[idx + 1]?.focus();
+    }
+  };
+
+  const handleOtpKeyDown = (idx, e) => {
+    if (e.key === "Backspace" && !codigoDigitos[idx] && idx > 0) {
+      const arr = [...codigoDigitos];
+      arr[idx - 1] = "";
+      setCodigo(arr.join(""));
+      otpRefs.current[idx - 1]?.focus();
+    }
+  };
+
+  const handleOtpPaste = (e) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    setCodigo(pasted);
+    setMensagem("");
+    if (pasted.length > 0) {
+      otpRefs.current[Math.min(5, pasted.length - 1)]?.focus();
+    }
+  };
+
+  // ── Reset de Senha ──
   const abrirResetSenha = () => {
     const email = String(usuario || "").trim().toLowerCase();
-
     if (!isEmailValido(email)) {
       setTipoMensagem("erro");
-      setMensagem("Para redefinir a senha, informe um e-mail válido.");
+      setMensagem("Informe seu e-mail no campo de identificação para redefinir a senha.");
       return;
     }
-
     setResetCodigo("");
     setResetSenha("");
     setResetConfSenha("");
-    setResetEmailLocked(true); // trava para garantir o e-mail localizado
-
+    setResetEmailLocked(true);
     setTipoMensagem("info");
     setMensagem("");
     setEtapa("reset_codigo");
     setCooldown(0);
   };
 
-  // ✅ Enviar código de reset
   const handleResetEnviarCodigo = async () => {
     if (loading) return;
-
     const email = String(usuario || "").trim().toLowerCase();
     if (!isEmailValido(email)) {
       setTipoMensagem("erro");
       setMensagem("E-mail inválido.");
       return;
     }
-
     setLoading(true);
     setMensagem("");
-
     try {
       await api.post("/api/auth/reset-senha/enviar-codigo", { email });
-
       setTipoMensagem("info");
-      setMensagem("Enviamos um código para seu e-mail. Informe abaixo para continuar.");
+      setMensagem("Enviamos um código de 6 dígitos para seu e-mail.");
       setCooldown(60);
     } catch (err) {
       setTipoMensagem("erro");
@@ -248,94 +395,64 @@ export default function Login() {
     }
   };
 
-  // ✅ Confirmar código de reset
   const handleResetConfirmarCodigo = async (e) => {
     e.preventDefault();
     if (loading) return;
-
     const email = String(usuario || "").trim().toLowerCase();
-
     if (!isEmailValido(email)) {
       setTipoMensagem("erro");
       setMensagem("E-mail inválido.");
       return;
     }
-
     if (String(resetCodigo || "").trim().length !== 6) {
       setTipoMensagem("erro");
       setMensagem("Informe o código de 6 dígitos.");
       return;
     }
-
     setLoading(true);
     setMensagem("");
-
     try {
       await api.post("/api/auth/reset-senha/confirmar-codigo", {
         email,
         codigo: String(resetCodigo).trim(),
       });
-
       setTipoMensagem("sucesso");
-      setMensagem("Código confirmado. Agora crie sua nova senha.");
+      setMensagem("Código validado! Defina sua nova senha abaixo.");
       setEtapa("reset_nova_senha");
     } catch (err) {
       setTipoMensagem("erro");
       setMensagem(err.response?.data?.message || "Código inválido ou expirado.");
-
-      // 🔁 Limpa o código quando estiver incorreto
       setResetCodigo("");
     } finally {
       setLoading(false);
     }
   };
 
-  // ✅ Alterar senha (reset)
   const handleResetAlterarSenha = async (e) => {
     e.preventDefault();
     if (loading) return;
-
     const email = String(usuario || "").trim().toLowerCase();
     const code = String(resetCodigo || "").trim();
-
-    if (!isEmailValido(email)) {
-      setTipoMensagem("erro");
-      setMensagem("E-mail inválido.");
-      return;
-    }
-
-    if (code.length !== 6) {
-      setTipoMensagem("erro");
-      setMensagem("Código inválido.");
-      return;
-    }
-
     if (!senhaForte(resetSenha)) {
       setTipoMensagem("erro");
-      setMensagem("Senha fraca. Use no mínimo 6 caracteres com letras, números e 1 destes: $#@*_");
+      setMensagem("Use no mínimo 6 caracteres com letras, números e 1 especial ($#@*_).");
       return;
     }
-
     if (resetSenha !== resetConfSenha) {
       setTipoMensagem("erro");
       setMensagem("As senhas não coincidem.");
       return;
     }
-
     setLoading(true);
     setMensagem("");
-
     try {
       await api.post("/api/auth/reset-senha/alterar", {
         email,
         codigo: code,
         senha: resetSenha,
       });
-
       setTipoMensagem("sucesso");
-      setMensagem("Senha redefinida com sucesso! Você será redirecionado para o login.");
-
-      // ✅ volta automático para login (mantendo o e-mail)
+      setMensagem("Senha redefinida com sucesso! Retornando ao login...");
       setTimeout(() => {
         setEtapa("login");
         setSenha("");
@@ -344,7 +461,7 @@ export default function Login() {
         setResetConfSenha("");
         setResetEmailLocked(false);
         setTipoMensagem("info");
-        setMensagem("Agora faça login com sua nova senha.");
+        setMensagem("Pronto! Faça login com sua nova senha.");
       }, 1200);
     } catch (err) {
       setTipoMensagem("erro");
@@ -354,33 +471,7 @@ export default function Login() {
     }
   };
 
-  // ✅ Se veio do CadastroUsuario, já preenche o e-mail no campo
-  useEffect(() => {
-    const emailFromState = location?.state?.email;
-    if (emailFromState) setUsuario(emailFromState);
-  }, [location?.state]);
-
-  // ✅ Ao entrar na etapa de código, inicia cooldown e controla contagem
-  useEffect(() => {
-    if (etapa !== "codigo") return;
-
-    // inicia 60s somente se ainda não houver cooldown ativo
-    setCooldown((prev) => (prev > 0 ? prev : 60));
-
-    const t = setInterval(() => {
-      setCooldown((s) => (s > 0 ? s - 1 : 0));
-    }, 1000);
-
-    return () => clearInterval(t);
-  }, [etapa]);
-
-
-  /**
-   * 1ª Etapa — Envia:
-   * - escola + cpf + senha => login escolar direto (diretor)
-   * - escola + email/celular + senha => gera código de confirmação (OTP)
-   * - plataforma + email + senha => inicia OTP da plataforma
-   */
+  // ── 1ª Etapa: Login Principal ──
   const handleLogin = async (e) => {
     e.preventDefault();
 
@@ -388,60 +479,56 @@ export default function Login() {
       setTipoMensagem("erro");
       setMensagem(
         tipoAcesso === "plataforma"
-          ? "Informe e-mail e senha para continuar."
-          : "Informe CPF, e-mail ou celular, além da senha, para continuar."
+          ? "Informe seu e-mail executivo e senha."
+          : "Informe sua identificação e senha para continuar."
       );
       return;
     }
 
     const valorLogin = normalizarLogin(usuario);
-    const isCpf = isCpfValido(valorLogin);
+    const isCpf = isCpfValido(valorLogin) && !String(usuario).includes("@");
 
+    // ── Fluxo CEO / Plataforma ──
     if (tipoAcesso === "plataforma") {
       if (!isEmailValido(valorLogin)) {
         setTipoMensagem("erro");
-        setMensagem("Na Plataforma, informe um e-mail válido para continuar.");
+        setMensagem("No Portal CEO, informe um endereço de e-mail válido.");
         return;
       }
-
       setLoading(true);
       setMensagem("");
-
       try {
         const { data } = await api.post("/api/auth-plataforma/login", {
           email: valorLogin,
           senha,
         });
-
         const resolvedUsuarioId =
           data?.usuarioId ?? data?.userId ?? data?.id ?? data?.usuario_id ?? data?.usuario?.id ?? null;
-
         if (!resolvedUsuarioId) {
           setTipoMensagem("erro");
-          setMensagem("Falha ao iniciar confirmação da Plataforma. Atualize a página e tente novamente.");
+          setMensagem("Falha ao iniciar verificação de segurança. Tente novamente.");
           return;
         }
-
         setUsuarioId(resolvedUsuarioId);
         setTipoMensagem("info");
-        setMensagem("Código enviado para o e-mail da Plataforma.");
+        setMensagem("Código de segurança enviado para seu e-mail executivo.");
         setCooldown(60);
         setEtapa("codigo");
         return;
       } catch (err) {
         setTipoMensagem("erro");
-        setMensagem(err.response?.data?.message || "Erro no login da Plataforma.");
+        setMensagem(err.response?.data?.message || "Credenciais inválidas na Plataforma CEO.");
         return;
       } finally {
         setLoading(false);
       }
     }
 
+    // ── Fluxo ESCOLA ou CREs ──
     const okLogin = isEmailValido(valorLogin) || isCelularValido(valorLogin) || isCpf;
-
     if (!okLogin) {
       setTipoMensagem("erro");
-      setMensagem("Informe um CPF, e-mail ou celular válido para continuar.");
+      setMensagem("Informe um CPF, e-mail ou celular válido.");
       return;
     }
 
@@ -450,57 +537,47 @@ export default function Login() {
 
     try {
       const payload = isCpf
-        ? { cpf: valorLogin, senha }
-        : { emailOuCelular: valorLogin, senha, device_token: getDeviceToken() };
+        ? { cpf: valorLogin, senha, contexto: tipoAcesso === "cre" ? "cre" : "escola" }
+        : { emailOuCelular: valorLogin, senha, device_token: getDeviceToken(), contexto: tipoAcesso };
 
       const { data } = await api.post("/api/auth/login", payload);
 
-      // ✅ Fluxo novo: CPF de diretor retorna token direto (sem etapa OTP)
+      // Login direto por CPF (Diretor ou Chefe Regional)
       if (isCpf && data?.token) {
         limparSessaoPlataforma();
-
         localStorage.setItem("token", data.token);
         localStorage.setItem("userName", data.nome || "Usuário");
-        localStorage.setItem("escola_id", data.escola_id || "");
-        localStorage.setItem("nome_escola", data.nome_escola || "Escola não definida");
+        localStorage.setItem("escola_id", data.escola_id ?? "");
+        localStorage.setItem("nome_escola", data.nome_escola || "Instituição");
         localStorage.setItem("perfil", data.perfil || "diretor");
         localStorage.setItem("scope", data.scope || "escola");
         localStorage.setItem("perfis", JSON.stringify(Array.isArray(data?.perfis) ? data.perfis : []));
         localStorage.setItem("permissoes", JSON.stringify(Array.isArray(data?.permissoes) ? data.permissoes : []));
-        // 🔄 Inicia com array vazio para evitar janela de 'mostra tudo' antes do refresh.
-        // applyModulosFromServer atualizará com os módulos corretos ao montar.
         localStorage.setItem("modulos_ativos", "[]");
         sessionStorage.removeItem("modulos_last_refresh");
 
+        setNomeUsuarioLogin(data.nome || "");
         setTipoMensagem("sucesso");
-        setMensagem("Login realizado com sucesso!");
+        setMensagem("Acesso autorizado!");
         setSuccess(true);
-
-        setTimeout(() => {
-          navigate("/home");
-        }, 1200);
-
+        setTimeout(() => navigate("/home"), 1200);
         return;
       }
 
-      // ✅ Dispositivo confiado: backend pulou OTP (pode ter token direto ou pedir escola)
-      // BUG FIX: não exigir data?.token aqui — multi-escola retorna sem token ainda
+      // Dispositivo confiado (pula OTP)
       if (!isCpf && data?.dispositivo_confiado) {
         limparSessaoPlataforma();
-
-        // Multi-escola ainda precisa de seleção
         if (data?.multi_escola) {
           const lista = Array.isArray(data?.escolas) ? data.escolas : [];
           setEscolasVinculadas(lista);
           setUsuarioId(data.usuarioId || null);
-
           const ultima = localStorage.getItem("last_escola_id");
           const ctx = ultima ? lista.find((e) => String(e.id) === String(ultima)) : null;
           setEscolaSelecionada(ctx ? String(ctx.id) : "");
           setUsuarioCtxSelecionado(ctx ? String(ctx.usuario_ctx_id || "") : "");
           setNomeUsuarioLogin(String(data?.nome || ""));
           setTipoMensagem("info");
-          setMensagem("Selecione a escola para entrar no sistema.");
+          setMensagem("Selecione a unidade para acessar.");
           setEtapa("escola");
           return;
         }
@@ -513,172 +590,109 @@ export default function Login() {
         localStorage.setItem("scope", data.scope || "escola");
         localStorage.setItem("perfis", JSON.stringify(Array.isArray(data?.perfis) ? data.perfis : []));
         localStorage.setItem("permissoes", JSON.stringify(Array.isArray(data?.permissoes) ? data.permissoes : []));
-        // 🔄 Inicia com array vazio para evitar janela de 'mostra tudo' antes do refresh.
-        // applyModulosFromServer atualizará com os módulos corretos ao montar.
         localStorage.setItem("modulos_ativos", "[]");
         sessionStorage.removeItem("modulos_last_refresh");
 
         await carregarDisciplinasProfessor(data.token);
 
-        const cpfLsD = data?.cpf || "";
-        const fotoLsD = data?.foto_url || "";
-        localStorage.setItem("cpf", String(cpfLsD || "").replace(/\D/g, ""));
-        localStorage.setItem("foto_url", String(fotoLsD || ""));
+        localStorage.setItem("cpf", String(data?.cpf || "").replace(/\D/g, ""));
+        localStorage.setItem("foto_url", String(data?.foto_url || ""));
         localStorage.setItem("last_escola_id", String(data.escola_id || ""));
 
+        setNomeUsuarioLogin(data.nome || "");
         setTipoMensagem("sucesso");
-        setMensagem("🔒 Login rápido! Dispositivo reconhecido.");
+        setMensagem("Dispositivo reconhecido!");
         setSuccess(true);
-
-        setTimeout(() => { navigate("/home"); }, 1200);
+        setTimeout(() => navigate("/home"), 1200);
         return;
       }
 
-      // ✅ Fluxo legado/OTP: backend devolve usuarioId para confirmar código
+      // Fluxo OTP padrão
       const resolvedUsuarioId =
         data?.usuarioId ?? data?.userId ?? data?.id ?? data?.usuario_id ?? data?.usuario?.id ?? null;
 
       if (!resolvedUsuarioId) {
         setTipoMensagem("erro");
-        setMensagem("Falha ao iniciar confirmação: usuarioId não retornou no login. Atualize a página e tente novamente.");
+        setMensagem("Não foi possível iniciar a verificação. Tente novamente.");
         return;
       }
 
       setUsuarioId(resolvedUsuarioId);
       setTipoMensagem("info");
-      setMensagem("Código enviado. Verifique seu e-mail.");
+      setMensagem("Enviamos um código de 6 dígitos para seu e-mail cadastrado.");
       setCooldown(60);
       setEtapa("codigo");
     } catch (err) {
-      // ✅ Detecta Manutenção Programada (HTTP 503 + maintenance: true)
       if (err.response?.status === 503 && err.response?.data?.maintenance) {
         setManutencao(err.response.data);
+        setModalAberto(false);
         return;
       }
       setTipoMensagem("erro");
-      setMensagem(err.response?.data?.message || "Erro no login.");
+      setMensagem(err.response?.data?.message || "Não foi possível autenticar.");
     } finally {
       setLoading(false);
     }
   };
 
-  /**
-   * 2ª Etapa — Confirma o código enviado por e-mail
-   * ✅ IMPORTANTE: mesma regra de rota (prefixo /auth já é aplicado ao /api no baseURL)
-   * Espera-se que o backend retorne token, nome, escola_id, nome_escola e perfil.
-   */
-
+  // ── Reenviar Código OTP ──
   const handleReenviarCodigo = async () => {
-    if (loading) return;
-    if (cooldown > 0) return;
-
+    if (loading || cooldown > 0) return;
     if (!usuario?.trim() || !senha?.trim()) {
-      setTipoMensagem("erro");
-      setMensagem(
-        tipoAcesso === "plataforma"
-          ? "Para reenviar o código, informe e-mail e senha novamente."
-          : "Para reenviar o código, informe e-mail ou celular e senha novamente."
-      );
       setEtapa("login");
       return;
     }
-
     const valorLogin = normalizarLogin(usuario);
-    const isCpf = isCpfValido(valorLogin);
 
     if (tipoAcesso === "plataforma") {
-      if (!isEmailValido(valorLogin)) {
-        setTipoMensagem("erro");
-        setMensagem("Na Plataforma, o reenviar código é válido apenas para e-mail.");
-        setEtapa("login");
-        return;
-      }
-
       setLoading(true);
       setMensagem("");
-
       try {
-        const { data } = await api.post("/api/auth-plataforma/login", {
-          email: valorLogin,
-          senha,
-        });
-
-        const resolvedUsuarioId =
-          data?.usuarioId ?? data?.userId ?? data?.id ?? data?.usuario_id ?? data?.usuario?.id ?? null;
-
-        if (!resolvedUsuarioId) {
-          setTipoMensagem("erro");
-          setMensagem("Falha ao reenviar: usuarioId não retornou no login da Plataforma.");
-          return;
-        }
-
-        setUsuarioId(resolvedUsuarioId);
+        const { data } = await api.post("/api/auth-plataforma/login", { email: valorLogin, senha });
+        const resolvedUsuarioId = data?.usuarioId ?? data?.userId ?? data?.id ?? data?.usuario_id ?? null;
+        if (resolvedUsuarioId) setUsuarioId(resolvedUsuarioId);
         setCodigo("");
         setTipoMensagem("info");
-        setMensagem("Novo código enviado para o e-mail da Plataforma.");
+        setMensagem("Novo código enviado para seu e-mail executivo.");
         setCooldown(60);
-        return;
       } catch (err) {
         setTipoMensagem("erro");
-        setMensagem(err.response?.data?.message || "Erro ao reenviar o código da Plataforma.");
-        return;
+        setMensagem(err.response?.data?.message || "Erro ao reenviar código.");
       } finally {
         setLoading(false);
       }
-    }
-
-    const okLogin = isEmailValido(valorLogin) || isCelularValido(valorLogin);
-
-    if (isCpf || !okLogin) {
-      setTipoMensagem("erro");
-      setMensagem("O reenviar código é válido apenas para login por e-mail ou celular.");
-      setEtapa("login");
       return;
     }
 
     setLoading(true);
     setMensagem("");
-
     try {
-      const { data } = await api.post("/api/auth/login", {
-        emailOuCelular: valorLogin,
-        senha,
-      });
-
-      const resolvedUsuarioId =
-        data?.usuarioId ?? data?.userId ?? data?.id ?? data?.usuario_id ?? data?.usuario?.id ?? null;
-
-      if (!resolvedUsuarioId) {
-        setTipoMensagem("erro");
-        setMensagem("Falha ao reenviar: usuarioId não retornou no login. Volte e tente novamente.");
-        return;
-      }
-
-      setUsuarioId(resolvedUsuarioId);
+      const { data } = await api.post("/api/auth/login", { emailOuCelular: valorLogin, senha });
+      const resolvedUsuarioId = data?.usuarioId ?? data?.userId ?? data?.id ?? data?.usuario_id ?? null;
+      if (resolvedUsuarioId) setUsuarioId(resolvedUsuarioId);
       setCodigo("");
       setTipoMensagem("info");
-      setMensagem("Novo código enviado. Verifique seu e-mail.");
+      setMensagem("Novo código enviado! Verifique sua caixa de entrada.");
       setCooldown(60);
     } catch (err) {
       setTipoMensagem("erro");
-      setMensagem(err.response?.data?.message || "Erro ao reenviar o código.");
+      setMensagem(err.response?.data?.message || "Erro ao reenviar código.");
     } finally {
       setLoading(false);
     }
   };
 
+  // ── 2ª Etapa: Confirmar OTP ──
   const handleConfirmar = async (e) => {
     e.preventDefault();
-
-    if (!codigo?.trim()) {
+    if (!codigo?.trim() || codigo.length !== 6) {
       setTipoMensagem("erro");
-      setMensagem("Informe o código para confirmar.");
+      setMensagem("Digite os 6 números do código de verificação.");
       return;
     }
-
     if (!usuarioId) {
       setTipoMensagem("erro");
-      setMensagem("Sessão da confirmação perdida. Clique em Voltar e envie o código novamente.");
+      setMensagem("Sessão expirada. Volte e faça login novamente.");
       return;
     }
 
@@ -686,21 +700,15 @@ export default function Login() {
     setMensagem("");
 
     try {
-      // ✅ Fluxo Plataforma (CEO)
       if (tipoAcesso === "plataforma") {
-        const { data } = await api.post("/api/auth-plataforma/confirmar", {
-          usuarioId,
-          codigo,
-        });
-
+        const { data } = await api.post("/api/auth-plataforma/confirmar", { usuarioId, codigo });
         localStorage.setItem("token", data.token);
-        localStorage.setItem("userName", data.nome || "Usuário");
+        localStorage.setItem("userName", data.nome || "Administrador CEO");
         localStorage.setItem("perfil", data.perfil || "ADMIN_GLOBAL");
         localStorage.setItem("scope", data.scope || "plataforma");
         localStorage.setItem("perfis", JSON.stringify(Array.isArray(data?.perfis) ? data.perfis : []));
         localStorage.setItem("permissoes", JSON.stringify(Array.isArray(data?.permissoes) ? data.permissoes : []));
 
-        // limpa vestígios do contexto escolar
         localStorage.removeItem("escola_id");
         localStorage.removeItem("nome_escola");
         localStorage.removeItem("cpf");
@@ -708,18 +716,14 @@ export default function Login() {
         localStorage.removeItem("disciplinas_professor_ctx");
         localStorage.removeItem("disciplinas_professor");
 
+        setNomeUsuarioLogin(data.nome || "CEO");
         setTipoMensagem("sucesso");
-        setMensagem("Login da Plataforma realizado com sucesso!");
+        setMensagem("Acesso Executivo Autorizado!");
         setSuccess(true);
-
-        setTimeout(() => {
-          navigate("/plataforma/escolas");
-        }, 1200);
-
+        setTimeout(() => navigate("/plataforma/dashboard"), 1200);
         return;
       }
 
-      // ✅ Fluxo Escolar
       const { data } = await api.post("/api/auth/confirmar", {
         usuarioId,
         codigo,
@@ -729,28 +733,22 @@ export default function Login() {
       if (data?.multi_escola) {
         const lista = Array.isArray(data?.escolas) ? data.escolas : [];
         setEscolasVinculadas(lista);
-
         const ultima = localStorage.getItem("last_escola_id");
-        const contextoUltimo = ultima
-          ? lista.find((e) => String(e.id) === String(ultima))
-          : null;
-
-        setEscolaSelecionada(contextoUltimo ? String(contextoUltimo.id) : "");
-        setUsuarioCtxSelecionado(contextoUltimo ? String(contextoUltimo.usuario_ctx_id || "") : "");
+        const ctxUlt = ultima ? lista.find((e) => String(e.id) === String(ultima)) : null;
+        setEscolaSelecionada(ctxUlt ? String(ctxUlt.id) : "");
+        setUsuarioCtxSelecionado(ctxUlt ? String(ctxUlt.usuario_ctx_id || "") : "");
         setNomeUsuarioLogin(String(data?.nome || ""));
-
         setTipoMensagem("info");
-        setMensagem("Selecione a escola para entrar no sistema.");
+        setMensagem("Escolha a instituição para iniciar sua sessão.");
         setEtapa("escola");
         return;
       }
 
       limparSessaoPlataforma();
-
       localStorage.setItem("token", data.token);
       localStorage.setItem("userName", data.nome || "Usuário");
-      localStorage.setItem("escola_id", data.escola_id || 1);
-      localStorage.setItem("nome_escola", data.nome_escola || "Escola não definida");
+      localStorage.setItem("escola_id", data.escola_id ?? 1);
+      localStorage.setItem("nome_escola", data.nome_escola || "Instituição");
       localStorage.setItem("perfil", data.perfil || "aluno");
       localStorage.setItem("scope", data.scope || "escola");
       localStorage.setItem("perfis", JSON.stringify(Array.isArray(data?.perfis) ? data.perfis : []));
@@ -760,57 +758,38 @@ export default function Login() {
 
       const cpfLs = data?.cpf || data?.usuario?.cpf || data?.user?.cpf || "";
       const fotoLs = data?.fotoUrl || data?.foto_url || data?.foto || "";
-
       localStorage.setItem("cpf", String(cpfLs || "").replace(/\D/g, ""));
       localStorage.setItem("foto_url", String(fotoLs || ""));
 
-      // ✅ Salvar device_token se o backend gerou (usuário marcou "confiar neste dispositivo")
       if (data?.device_token) saveDeviceToken(data.device_token);
-      // Só limpa o device_token se o usuário explicitamente desmarcou a opção
-      // NÃO limpar automaticamente apenas porque passou pelo OTP sem marcar
-      // (usuário pode já ter um token válido de sessão anterior)
       if (!confirarDispositivo && !getDeviceToken()) clearDeviceToken();
 
-      // 🔄 Inicia com array vazio para evitar janela de 'mostra tudo' antes do refresh.
-      // applyModulosFromServer atualizará com os módulos corretos ao montar.
       localStorage.setItem("modulos_ativos", "[]");
       sessionStorage.removeItem("modulos_last_refresh");
 
+      setNomeUsuarioLogin(data.nome || "");
       setTipoMensagem("sucesso");
-      setMensagem("Login realizado com sucesso!");
+      setMensagem("Acesso confirmado!");
       setSuccess(true);
-
-      setTimeout(() => {
-        navigate("/home");
-      }, 1500);
+      setTimeout(() => navigate("/home"), 1300);
     } catch (err) {
       setTipoMensagem("erro");
-      setMensagem(err.response?.data?.message || "Erro na confirmação.");
+      setMensagem(err.response?.data?.message || "Código inválido ou expirado.");
     } finally {
       setLoading(false);
     }
   };
 
-
+  // ── 3ª Etapa: Seleção Multi-Escola ──
   const handleConfirmarEscola = async (e) => {
     e.preventDefault();
-
-    if (!usuarioId) {
+    if (!usuarioId || !escolaSelecionada || !usuarioCtxSelecionado) {
       setTipoMensagem("erro");
-      setMensagem("Sessão perdida. Volte e envie o código novamente.");
-      setEtapa("login");
+      setMensagem("Selecione uma unidade para continuar.");
       return;
     }
-
-    if (!escolaSelecionada || !usuarioCtxSelecionado) {
-      setTipoMensagem("erro");
-      setMensagem("Selecione uma escola para continuar.");
-      return;
-    }
-
     setLoading(true);
     setMensagem("");
-
     try {
       const { data } = await api.post("/api/auth/confirmar-escola", {
         usuarioId,
@@ -819,632 +798,959 @@ export default function Login() {
       });
 
       localStorage.setItem("token", data.token);
-
-      // ✅ Entrou no escopo escola: limpa sessão antiga da Plataforma (CEO)
       limparSessaoPlataforma();
-
       localStorage.setItem("userName", data.nome || "Usuário");
       localStorage.setItem("escola_id", data.escola_id || 1);
       localStorage.setItem("nome_escola", data.nome_escola || "Escola não definida");
       localStorage.setItem("perfil", data.perfil || "aluno");
       localStorage.setItem("scope", data.scope || "escola");
-
-      // ✅ RBAC (perfis/permissoes)
       localStorage.setItem("perfis", JSON.stringify(Array.isArray(data?.perfis) ? data.perfis : []));
       localStorage.setItem("permissoes", JSON.stringify(Array.isArray(data?.permissoes) ? data.permissoes : []));
 
-      // ✅ DISCIPLINAS do professor (para Conteúdos)
       await carregarDisciplinasProfessor(data.token);
 
-      // ✅ Cabeçalho: CPF + Foto (URL) para avatar global
-      // Tolerante a variações do backend: fotoUrl | foto_url | foto
       const cpfLs = data?.cpf || data?.usuario?.cpf || data?.user?.cpf || "";
       const fotoLs = data?.fotoUrl || data?.foto_url || data?.foto || "";
-
       localStorage.setItem("cpf", String(cpfLs || "").replace(/\D/g, ""));
       localStorage.setItem("foto_url", String(fotoLs || ""));
-
-      // ✅ Memoriza a última escola usada para pré-seleção futura
       localStorage.setItem("last_escola_id", String(data.escola_id || ""));
-
-      // 🔄 Inicia com array vazio para evitar janela de 'mostra tudo' antes do refresh.
       localStorage.setItem("modulos_ativos", "[]");
       sessionStorage.removeItem("modulos_last_refresh");
 
+      setNomeUsuarioLogin(data.nome || "");
       setTipoMensagem("sucesso");
-      setMensagem("Login realizado com sucesso!");
+      setMensagem("Unidade selecionada com sucesso!");
       setSuccess(true);
-
-      setTimeout(() => {
-        navigate("/home");
-      }, 1500);
+      setTimeout(() => navigate("/home"), 1200);
     } catch (err) {
       setTipoMensagem("erro");
-      setMensagem(err.response?.data?.message || "Erro ao selecionar escola.");
+      setMensagem(err.response?.data?.message || "Erro ao selecionar unidade.");
     } finally {
       setLoading(false);
     }
   };
 
+  const portalAtivo = PORTAIS_CONFIG[tipoAcesso] || PORTAIS_CONFIG.escola;
+  const ActivePortalIcon = portalAtivo.Icon;
+  const portalAurora = PORTAIS_CONFIG[hoveredCard] || PORTAIS_CONFIG.escola;
+  const stepIndex = success ? 3 : etapa === "codigo" || etapa === "escola" ? 2 : 1;
+
+  const senhaChecks = [
+    { label: "6+ caracteres", ok: resetSenha.length >= 6 },
+    { label: "Letras (A-Z)", ok: /[A-Za-z]/.test(resetSenha) },
+    { label: "Números (0-9)", ok: /\d/.test(resetSenha) },
+    { label: "Especial ($#@*_)", ok: /[$#@*_]/.test(resetSenha) },
+  ];
+
   return (
-    <div className="h-screen w-screen relative flex items-center justify-center">
-      {/* 🌆 Fundo */}
-      <div className="absolute inset-0 bg-[url('/login_wallpaper.png')] bg-repeat bg-[length:750px_750px]"></div>
-      <div className="absolute inset-0 bg-blue-200/20"></div>
+    <div
+      className="relative min-h-screen w-full overflow-x-hidden flex flex-col justify-between text-white select-none"
+      style={{
+        background: "radial-gradient(circle at 50% 0%, #0f2557 0%, #07122e 52%, #030714 100%)",
+      }}
+    >
+      <style>{`
+        @keyframes vaultModalSpring {
+          0%   { opacity: 0; transform: scale(0.92) translateY(24px); }
+          65%  { opacity: 1; transform: scale(1.015) translateY(-3px); }
+          100% { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        @keyframes cardFloatIn {
+          from { opacity: 0; transform: translateY(22px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes borderBeamSpin {
+          from { transform: rotate(0deg); }
+          to   { transform: rotate(360deg); }
+        }
+        .animate-vaultModal {
+          animation: vaultModalSpring 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+      `}</style>
 
-      {/* 🧾 Card */}
-      {/* ✅ MANUTENÇÃO PROGRAMADA: exibe tela de aviso para usuários do Sistema Escolar */}
-      {manutencao && tipoAcesso !== 'plataforma' ? (
-        <div className="relative z-10 bg-white/95 p-8 rounded-2xl shadow-xl w-[460px] flex flex-col items-center text-center gap-5">
-          <div style={{ fontSize: '4rem' }}>🔧</div>
-          <h2 style={{ fontSize: '1.4rem', fontWeight: 800, color: '#1e293b', margin: 0 }}>
-            Sistema em Manutenção
-          </h2>
-          <p style={{ fontSize: '0.95rem', color: '#475569', lineHeight: 1.6, margin: 0 }}>
-            {manutencao.mensagem || 'O sistema está em manutenção programada. Tente novamente em instantes.'}
-          </p>
-          {(manutencao.inicio || manutencao.fim) && (
-            <div style={{
-              background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)',
-              borderRadius: 12, padding: '12px 20px', fontSize: '0.82rem', color: '#92400e', width: '100%'
-            }}>
-              {manutencao.inicio && (
-                <div><strong>Início:</strong> {new Date(manutencao.inicio).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</div>
-              )}
-              {manutencao.fim && (
-                <div><strong>Previsão de término:</strong> {new Date(manutencao.fim).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</div>
-              )}
-            </div>
-          )}
-          <button
-            onClick={() => setManutencao(null)}
-            style={{
-              marginTop: 8, padding: '10px 24px', borderRadius: 10, border: 'none',
-              background: '#e2e8f0', color: '#334155', fontWeight: 600,
-              fontSize: '0.875rem', cursor: 'pointer'
-            }}
-          >
-            Tentar novamente
-          </button>
+      {/* ── Luzes Volumétricas Dinâmicas que reagem ao Card em foco ── */}
+      <div
+        className="pointer-events-none fixed top-[-140px] left-1/2 -translate-x-1/2 w-[780px] h-[520px] rounded-full blur-[140px] transition-all duration-700"
+        style={{ background: `radial-gradient(circle, ${portalAurora.auroraColor}, transparent 70%)` }}
+      />
+      <div
+        className="pointer-events-none fixed inset-0 opacity-[0.09]"
+        style={{
+          backgroundImage:
+            "linear-gradient(to right, rgba(255,255,255,0.25) 1px, transparent 1px), linear-gradient(to bottom, rgba(255,255,255,0.25) 1px, transparent 1px)",
+          backgroundSize: "64px 64px",
+          maskImage: "radial-gradient(circle at 50% 38%, black 30%, transparent 82%)",
+          WebkitMaskImage: "radial-gradient(circle at 50% 38%, black 30%, transparent 82%)",
+        }}
+      />
+
+      {/* ── Header do Portal de Acesso ── */}
+      <header className="relative z-10 w-full max-w-6xl mx-auto px-6 pt-6 flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => navigate("/")}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/15 border border-white/15 text-xs sm:text-sm font-semibold text-blue-100 transition-all"
+        >
+          <ArrowLeftIcon className="h-4 w-4" />
+          <span>Início</span>
+        </button>
+
+        <div className="flex items-center gap-2.5">
+          <img src={logo} alt="Educa.Melhor" className="w-8 h-8 object-contain" draggable={false} />
+          <span className="font-bold text-base sm:text-lg tracking-tight" style={{ fontFamily: "'Montserrat', sans-serif" }}>
+            Educa<span className="text-sky-400">.Melhor</span>
+          </span>
         </div>
-      ) : (
-      <div className="relative z-10 bg-white/90 p-8 rounded-2xl shadow-xl w-96 min-h-[420px] flex flex-col justify-center">
-        {success ? (
-          <div className="text-center text-green-700 font-semibold text-lg animate-fadeIn">
-            Login realizado com sucesso!
-          </div>
 
-        ) : etapa === "login" ? (
-          // 🔐 Formulário de login
-          <form onSubmit={handleLogin} className="flex flex-col space-y-4">
-            <div className="flex rounded-xl border border-gray-200 bg-gray-50 p-1">
+        <div className="hidden sm:inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-400/25 text-xs text-emerald-300 font-medium">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span>Portais Operacionais</span>
+        </div>
+      </header>
+
+      {/* ── Conteúdo Principal: Aviso de Manutenção OU Os 3 Cards (ESCOLA, CREs, CEO) ── */}
+      <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 sm:px-6 py-10 max-w-6xl mx-auto w-full">
+        {manutencao ? (
+          <div className="max-w-lg w-full rounded-3xl bg-white/10 backdrop-blur-2xl border border-amber-400/35 p-8 text-center shadow-2xl">
+            <div className="w-16 h-16 rounded-2xl bg-amber-500/20 border border-amber-400/40 flex items-center justify-center mx-auto mb-5">
+              <ExclamationTriangleIcon className="h-9 w-9 text-amber-300" />
+            </div>
+            <h2 className="text-2xl font-extrabold text-white mb-2">Manutenção Programada</h2>
+            <p className="text-sm text-blue-100/85 leading-relaxed mb-5">
+              {manutencao.mensagem || "Estamos aplicando melhorias programadas no ambiente escolar. Voltaremos em instantes."}
+            </p>
+            {(manutencao.inicio || manutencao.fim) && (
+              <div className="rounded-2xl bg-amber-500/10 border border-amber-400/25 p-4 text-xs text-amber-200 mb-6 space-y-1">
+                {manutencao.inicio && (
+                  <div>
+                    <strong>Início:</strong>{" "}
+                    {new Date(manutencao.inicio).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}
+                  </div>
+                )}
+                {manutencao.fim && (
+                  <div>
+                    <strong>Previsão de retorno:</strong>{" "}
+                    {new Date(manutencao.fim).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}
+                  </div>
+                )}
+              </div>
+            )}
+            <div className="flex flex-col sm:flex-row gap-3">
               <button
                 type="button"
-                onClick={() => {
-                  setTipoAcesso("escola");
-                  setMensagem("");
-                  setUsuario("");
-                  setSenha("");
-                }}
-                className={`flex-1 rounded-lg py-2 text-sm font-semibold transition ${
-                  tipoAcesso === "escola"
-                    ? "bg-blue-600 text-white shadow"
-                    : "text-gray-700 hover:bg-white"
-                }`}
+                onClick={() => setManutencao(null)}
+                className="flex-1 py-3 rounded-xl bg-white/15 hover:bg-white/25 font-semibold text-sm text-white transition"
               >
-                Sistema Escolar
+                Voltar aos Portais
               </button>
-
               <button
                 type="button"
                 onClick={() => {
-                  setTipoAcesso("plataforma");
-                  setMensagem("");
-                  setUsuario("");
-                  setSenha("");
+                  setManutencao(null);
+                  abrirPortalModal("plataforma");
                 }}
-                className={`flex-1 rounded-lg py-2 text-sm font-semibold transition ${
-                  tipoAcesso === "plataforma"
-                    ? "bg-slate-800 text-white shadow"
-                    : "text-gray-700 hover:bg-white"
-                }`}
+                className="flex-1 py-3 rounded-xl bg-amber-500 hover:bg-amber-600 font-bold text-sm text-slate-950 transition"
               >
-                Plataforma (CEO)
+                Acesso Executivo (CEO)
               </button>
             </div>
-
-            <h2 className="text-xl font-bold text-center text-blue-900">
-              {tipoAcesso === "plataforma" ? "Login da Plataforma" : "Login"}
-            </h2>
-
-            {mensagem && (
-              <div className="space-y-3">
-                <div
-                  className={`rounded border p-2 text-center text-sm font-semibold ${
-                    tipoMensagem === "sucesso"
-                      ? "border-green-200 bg-green-50 text-green-700"
-                      : tipoMensagem === "info"
-                      ? "border-blue-200 bg-blue-50 text-blue-700"
-                      : "border-red-200 bg-red-50 text-red-700"
-                  }`}
-                >
-                  {mensagem}
-                </div>
-
-                {/* ✅ CTA: direciona para cadastro somente quando for "Usuário não encontrado." */}
-                {tipoAcesso === "escola" &&
-                  tipoMensagem === "erro" &&
-                  String(mensagem || "").toLowerCase().includes("usuário não encontrado") && (
-                    <div className="rounded-lg border border-gray-200 bg-white px-3 py-2">
-                      <div className="text-center text-sm text-gray-700">
-                        Ainda não tem cadastro?
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={irParaCadastro}
-                        className="mt-2 w-full rounded-lg bg-gray-900 py-2 text-sm font-semibold text-white hover:bg-black"
-                      >
-                        Criar conta
-                      </button>
-
-                      <div className="mt-2 text-center text-xs text-gray-500">
-                        Você será direcionado para o cadastro e seu e-mail será reaproveitado.
-                      </div>
-                    </div>
-                  )}
-
-                {/* ✅ CTA: redefinir senha (somente quando senha estiver incorreta) */}
-                {tipoAcesso === "escola" &&
-                  tipoMensagem === "erro" &&
-                  (String(mensagem || "").toLowerCase().includes("senha") ||
-                    String(mensagem || "").toLowerCase().includes("credenciais")) &&
-                  !String(mensagem || "").toLowerCase().includes("usuário não encontrado") && (
-                    <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-                      <div className="text-center text-sm font-semibold text-amber-900">
-                        Esqueceu sua senha?
-                      </div>
-
-                      <div className="mt-1 text-center text-xs text-amber-800">
-                        Vamos enviar um código para seu e-mail e permitir criar uma nova senha com segurança.
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={abrirResetSenha}
-                        className="mt-2 w-full rounded-lg bg-amber-600 py-2 text-sm font-semibold text-white hover:bg-amber-700"
-                      >
-                        Criar nova senha
-                      </button>
-                    </div>
-                  )}
-              </div>
-            )}
-
-            <input
-              type="text"
-              placeholder={
-                tipoAcesso === "plataforma"
-                  ? "E-mail da Plataforma"
-                  : "CPF, e-mail ou celular"
-              }
-              value={usuario}
-              onChange={(e) => {
-                setUsuario(e.target.value);
-                setMensagem("");
-              }}
-              className="px-4 py-2 rounded-lg border border-gray-300"
-            />
-
-            <input
-              type="password"
-              placeholder="Senha"
-              value={senha}
-              onChange={(e) => {
-                setSenha(e.target.value);
-                setMensagem("");
-              }}
-              className="px-4 py-2 rounded-lg border border-gray-300"
-            />
-
-            <button
-              className="bg-blue-600 text-white py-2 rounded-lg disabled:cursor-not-allowed disabled:opacity-40"
-              disabled={loading || !usuario?.trim() || !senha?.trim()}
-            >
-              {loading ? "Entrando..." : "Continuar"}
-            </button>
-
-            {loading && (
-              <div className="flex flex-col items-center mt-2 text-blue-600">
-                <svg
-                  className="animate-spin h-5 w-5 mb-1"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  ></circle>
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                  ></path>
-                </svg>
-                <span className="text-sm font-medium">Verificando...</span>
-              </div>
-            )}
-          </form>
-
-
-
-
-
-        ) : etapa === "reset_codigo" ? (
-          // 🔐 Reset senha — etapa 1: enviar/confirmar código
-          <form onSubmit={handleResetConfirmarCodigo} className="flex flex-col space-y-4">
-            <h2 className="text-xl font-bold text-center text-blue-900">Redefinir senha</h2>
-
-            <p className="text-center text-sm text-gray-600">
-              Enviaremos um código de verificação para o e-mail cadastrado.
-            </p>
-
-            {mensagem && (
-              <div
-                className={`rounded border p-2 text-center text-sm font-semibold ${
-                  tipoMensagem === "sucesso"
-                    ? "border-green-200 bg-green-50 text-green-700"
-                    : tipoMensagem === "info"
-                    ? "border-blue-200 bg-blue-50 text-blue-700"
-                    : "border-red-200 bg-red-50 text-red-700"
-                }`}
-              >
-                {mensagem}
-              </div>
-            )}
-
-            <input
-              type="email"
-              placeholder="E-mail"
-              value={usuario}
-              readOnly={resetEmailLocked}
-              onChange={(e) => {
-                setUsuario(e.target.value);
-                setMensagem("");
-              }}
-              className={`px-4 py-2 rounded-lg border border-gray-300 ${
-                resetEmailLocked ? "bg-gray-100 cursor-not-allowed" : ""
-              }`}
-            />
-
-            <button
-              type="button"
-              onClick={handleResetEnviarCodigo}
-              className="rounded-lg border border-blue-200 bg-blue-50 py-2 font-semibold text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-40"
-              disabled={loading || !isEmailValido(usuario)}
-            >
-              {loading ? "Enviando..." : "Enviar código"}
-            </button>
-
-            <input
-              type="text"
-              placeholder="Digite o código"
-              value={resetCodigo}
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              maxLength={6}
-              onChange={(e) => {
-                const onlyDigits = e.target.value.replace(/\D/g, "").slice(0, 6);
-                setResetCodigo(onlyDigits);
-                setMensagem("");
-              }}
-              className="px-4 py-2 rounded-lg border border-gray-300 text-center font-mono text-lg tracking-widest"
-            />
-
-            <button
-              className="bg-green-600 text-white py-2 rounded-lg disabled:cursor-not-allowed disabled:opacity-40"
-              disabled={loading || resetCodigo.length !== 6}
-            >
-              {loading ? "Confirmando..." : "Confirmar código"}
-            </button>
-
-            <button
-              type="button"
-              onClick={voltarParaLogin}
-              className="rounded-lg border border-gray-300 bg-white py-2 font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-              disabled={loading}
-            >
-              Voltar
-            </button>
-          </form>
-        ) : etapa === "reset_nova_senha" ? (
-          // 🔐 Reset senha — etapa 2: criar nova senha
-          <form onSubmit={handleResetAlterarSenha} className="flex flex-col space-y-4">
-            <h2 className="text-xl font-bold text-center text-blue-900">Criar nova senha</h2>
-
-            <p className="text-center text-sm text-gray-600">
-              Mínimo 6 caracteres, com letras, números e pelo menos 1 destes: $#@*_
-            </p>
-
-            {mensagem && (
-              <div
-                className={`rounded border p-2 text-center text-sm font-semibold ${
-                  tipoMensagem === "sucesso"
-                    ? "border-green-200 bg-green-50 text-green-700"
-                    : tipoMensagem === "info"
-                    ? "border-blue-200 bg-blue-50 text-blue-700"
-                    : "border-red-200 bg-red-50 text-red-700"
-                }`}
-              >
-                {mensagem}
-              </div>
-            )}
-
-            <input
-              type="password"
-              placeholder="Nova senha"
-              value={resetSenha}
-              autoComplete="new-password"
-              onChange={(e) => {
-                setResetSenha(e.target.value);
-                setMensagem("");
-              }}
-              className="px-4 py-2 rounded-lg border border-gray-300"
-            />
-
-            {resetSenha && !senhaForte(resetSenha) && (
-              <div className="text-xs text-red-600 text-center">
-                Senha fraca. Use no mínimo 6 caracteres com letras, números e 1 destes: $#@*_
-              </div>
-            )}
-
-            <input
-              type="password"
-              placeholder="Confirmar nova senha"
-              value={resetConfSenha}
-              autoComplete="new-password"
-              onChange={(e) => {
-                setResetConfSenha(e.target.value);
-                setMensagem("");
-              }}
-              className="px-4 py-2 rounded-lg border border-gray-300"
-            />
-
-            {resetConfSenha && resetSenha !== resetConfSenha && (
-              <div className="text-xs text-red-600 text-center">As senhas não coincidem.</div>
-            )}
-
-            <button
-              className="bg-green-600 text-white py-2 rounded-lg disabled:cursor-not-allowed disabled:opacity-40"
-              disabled={loading || !senhaForte(resetSenha) || resetSenha !== resetConfSenha}
-            >
-              {loading ? "Salvando..." : "Salvar nova senha"}
-            </button>
-
-            <button
-              type="button"
-              onClick={voltarParaLogin}
-              className="rounded-lg border border-gray-300 bg-white py-2 font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-              disabled={loading}
-            >
-              Voltar
-            </button>
-          </form>
-        ) : etapa === "codigo" ? (
-
-
-
-
-
-
-          // 🔢 Formulário de confirmação de código
-          <form onSubmit={handleConfirmar} className="flex flex-col space-y-4">
-            <h2 className="text-xl font-bold text-center text-blue-900">Confirmação</h2>
-            <p className="text-center text-sm text-gray-600">
-              Um código foi enviado para seu e-mail cadastrado.
-            </p>
-
-            {mensagem && (
-              <div
-                className={`rounded border p-2 text-center text-sm font-semibold ${
-                  tipoMensagem === "sucesso"
-                    ? "border-green-200 bg-green-50 text-green-700"
-                    : tipoMensagem === "info"
-                    ? "border-blue-200 bg-blue-50 text-blue-700"
-                    : "border-red-200 bg-red-50 text-red-700"
-                }`}
-              >
-                {mensagem}
-              </div>
-            )}
-
-            <input
-              type="text"
-              placeholder="Digite o código"
-              value={codigo}
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              maxLength={6}
-              onChange={(e) => {
-                const onlyDigits = e.target.value.replace(/\D/g, "").slice(0, 6);
-                setCodigo(onlyDigits);
-                setMensagem("");
-              }}
-              className="px-4 py-2 rounded-lg border border-gray-300 text-center font-mono text-lg tracking-widest"
-            />
-
-            {/* ✅ Opção: Confiar neste dispositivo */}
-            <label
-              htmlFor="confiar-dispositivo"
-              className={`flex items-start gap-3 rounded-xl border px-4 py-3 cursor-pointer transition-all select-none ${
-                confirarDispositivo
-                  ? "border-blue-400 bg-blue-50 shadow-sm"
-                  : "border-gray-200 bg-gray-50 hover:bg-white"
-              }`}
-            >
-              <input
-                id="confiar-dispositivo"
-                type="checkbox"
-                checked={confirarDispositivo}
-                onChange={(e) => setConfirarDispositivo(e.target.checked)}
-                className="mt-0.5 h-4 w-4 accent-blue-600 flex-shrink-0"
-              />
-              <div>
-                <div className={`text-sm font-semibold ${ confirarDispositivo ? "text-blue-800" : "text-gray-700" }`}>
-                  Não pedir código neste aparelho
-                </div>
-                <div className="text-xs text-gray-500 mt-0.5">
-                  Este dispositivo será lembrado por 90 dias. Use apenas em aparelhos de uso pessoal.
-                </div>
-              </div>
-            </label>
-
-            <button
-              className="bg-green-600 text-white py-2 rounded-lg disabled:cursor-not-allowed disabled:opacity-40"
-              disabled={loading || codigo.length !== 6}
-            >
-              {loading ? "Confirmando..." : "Confirmar"}
-            </button>
-
-            <button
-              type="button"
-              onClick={handleReenviarCodigo}
-              className="rounded-lg border border-blue-200 bg-blue-50 py-2 font-semibold text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-40"
-              disabled={loading || cooldown > 0}
-            >
-              {cooldown > 0 ? `Reenviar em 00:${String(cooldown).padStart(2, "0")}` : "Reenviar código"}
-            </button>
-
-            <button
-              type="button"
-              onClick={voltarParaLogin}
-              className="rounded-lg border border-gray-300 bg-white py-2 font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-              disabled={loading}
-            >
-              Voltar
-            </button>
-
-            {loading && (
-              <div className="flex flex-col items-center mt-2 text-green-600">
-                <svg
-                  className="animate-spin h-5 w-5 mb-1"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle
-                    className="opacity-25"
-                    cx="12"
-                    cy="12"
-                    r="10"
-                    stroke="currentColor"
-                    strokeWidth="4"
-                  ></circle>
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-                  ></path>
-                </svg>
-                <span className="text-sm font-medium">Verificando...</span>
-              </div>
-            )}
-          </form>
+          </div>
         ) : (
-          // 🏫 Seleção de escola (multi-escola)
-          <form onSubmit={handleConfirmarEscola} className="flex flex-col space-y-4">
-            <h2 className="text-xl font-bold text-center text-blue-900">Selecione a escola</h2>
-
-            {nomeUsuarioLogin?.trim() && (
-              <p className="text-center text-sm text-gray-700">
-                Bem-vindo(a), <span className="font-semibold">{nomeUsuarioLogin}</span>
-              </p>
-            )}
-
-            <p className="text-center text-sm text-gray-600">
-              Você possui vínculo com mais de uma escola. Escolha o contexto de acesso.
-            </p>
-
-
-            {mensagem && (
-              <div
-                className={`rounded border p-2 text-center text-sm font-semibold ${
-                  tipoMensagem === "sucesso"
-                    ? "border-green-200 bg-green-50 text-green-700"
-                    : tipoMensagem === "info"
-                    ? "border-blue-200 bg-blue-50 text-blue-700"
-                    : "border-red-200 bg-red-50 text-red-700"
-                }`}
-              >
-                {mensagem}
+          <>
+            {/* Cabeçalho da Página de Seleção */}
+            <div className="text-center max-w-2xl mx-auto mb-10 sm:mb-12">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/10 border border-white/15 text-[11px] font-bold tracking-[0.2em] uppercase text-sky-300 mb-4">
+                <LockClosedIcon className="h-3.5 w-3.5" />
+                <span>Central de Autenticação Inteligente</span>
               </div>
-            )}
+              <h1
+                className="text-3xl sm:text-5xl font-extrabold tracking-tight text-white mb-3"
+                style={{ fontFamily: "'Montserrat', sans-serif" }}
+              >
+                Escolha seu perfil de acesso
+              </h1>
+              <p className="text-sm sm:text-base text-blue-200/80 font-light">
+                Selecione abaixo a sua esfera institucional para abrir o cofre de autenticação dedicado.
+              </p>
+            </div>
 
-            <div className="rounded-lg border border-gray-200 bg-white p-3">
-              <div className="flex flex-col gap-2">
-                {(Array.isArray(escolasVinculadas) ? escolasVinculadas : []).map((esc) => (
-                  <label
-                    key={String(esc.id)}
-                      className="flex items-center gap-2 cursor-pointer rounded px-2 py-1 hover:bg-gray-50"
+            {/* Grade dos 3 Cards: ESCOLA | CREs | CEO */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
+              {["escola", "cre", "plataforma"].map((chave, idx) => {
+                const cfg = PORTAIS_CONFIG[chave];
+                const IconComp = cfg.Icon;
+                const isHovered = hoveredCard === chave;
+                return (
+                  <button
+                    key={cfg.key}
+                    type="button"
+                    onMouseEnter={() => setHoveredCard(chave)}
+                    onFocus={() => setHoveredCard(chave)}
+                    onClick={() => abrirPortalModal(chave)}
+                    style={{
+                      background: cfg.cardGradient,
+                      animation: `cardFloatIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) ${idx * 0.1}s both`,
+                      boxShadow: isHovered
+                        ? `0 24px 60px -12px ${cfg.auroraColor}, 0 0 0 1px ${cfg.accentRing}`
+                        : "0 16px 40px -15px rgba(0,0,0,0.6)",
+                    }}
+                    className="group relative text-left rounded-3xl p-7 backdrop-blur-2xl border border-white/15 transition-all duration-300 hover:-translate-y-2 flex flex-col justify-between overflow-hidden"
                   >
-
-                    <input
-                      type="radio"
-                      name="escola"
-                      value={String(esc.usuario_ctx_id || esc.id)}
-                      checked={String(usuarioCtxSelecionado) === String(esc.usuario_ctx_id || "")}
-                      onChange={() => {
-                        setEscolaSelecionada(String(esc.id));
-                        setUsuarioCtxSelecionado(String(esc.usuario_ctx_id || ""));
-                        setMensagem("");
-                      }}
-                      disabled={loading}
+                    {/* Brilho superior */}
+                    <div
+                      className="pointer-events-none absolute inset-x-0 top-0 h-1 opacity-80 group-hover:opacity-100 transition-opacity"
+                      style={{ background: cfg.btnGradient }}
                     />
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-800">
-                        {esc.nome}
-                        {esc.apelido && (
-                          <span className="ml-1 font-semibold text-blue-700">({esc.apelido})</span>
-                        )}
-                        {" "}<span className="text-xs text-gray-500">({esc.perfil})</span>
-                      </span>
 
-                      {String(localStorage.getItem("last_escola_id") || "") === String(esc.id) && (
-                        <span className="rounded bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
-                          Última usada
+                    <div>
+                      {/* Topo do Card: Ícone 3D + Badge */}
+                      <div className="flex items-start justify-between gap-3 mb-6">
+                        <div
+                          className="w-14 h-14 rounded-2xl flex items-center justify-center border border-white/25 shadow-lg transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3"
+                          style={{ background: cfg.btnGradient }}
+                        >
+                          <IconComp className="h-7 w-7 text-white" />
+                        </div>
+                        <span className={`text-[10px] font-extrabold tracking-widest uppercase px-2.5 py-1 rounded-full border ${cfg.badgeClass}`}>
+                          {cfg.badge}
+                        </span>
+                      </div>
+
+                      {/* Título e Subtítulo */}
+                      <h2
+                        className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight mb-1"
+                        style={{ fontFamily: "'Montserrat', sans-serif" }}
+                      >
+                        {cfg.titulo}
+                      </h2>
+                      <div className="text-xs font-semibold text-blue-200/90 mb-3">
+                        {cfg.subtitulo}
+                      </div>
+                      <p className="text-xs sm:text-sm text-blue-100/75 leading-relaxed mb-6">
+                        {cfg.descricao}
+                      </p>
+
+                      {/* Chips de Perfis Contemplados */}
+                      <div className="flex flex-wrap gap-1.5 mb-7">
+                        {cfg.publico.map((p) => (
+                          <span
+                            key={p}
+                            className="text-[11px] font-medium px-2.5 py-0.5 rounded-md bg-white/10 text-white/90 border border-white/10"
+                          >
+                            {p}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Botão de Ação */}
+                    <div className="pt-4 border-t border-white/10 flex items-center justify-between">
+                      <span className="text-sm font-bold text-white group-hover:text-sky-200 transition-colors">
+                        {cfg.ctaLabel}
+                      </span>
+                      <span
+                        className="w-9 h-9 rounded-xl flex items-center justify-center bg-white/10 group-hover:bg-white text-white group-hover:text-slate-900 transition-all duration-300 group-hover:translate-x-1"
+                      >
+                        <ArrowRightIcon className="h-4 w-4 stroke-[2.5]" />
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Links Rápidos Inferiores (Primeiro Acesso / Convite) */}
+            <div className="mt-10 flex flex-wrap items-center justify-center gap-4 text-xs sm:text-sm text-blue-200/80">
+              <span>Ainda não possui conta escolar?</span>
+              <button
+                type="button"
+                onClick={() => navigate("/cadastro")}
+                className="font-bold text-emerald-300 hover:text-emerald-200 underline underline-offset-4 transition"
+              >
+                Criar conta gratuita
+              </button>
+              <span className="opacity-40">•</span>
+              <button
+                type="button"
+                onClick={() => navigate("/ativar-diretor")}
+                className="inline-flex items-center gap-1.5 font-semibold text-sky-300 hover:text-sky-200 underline underline-offset-4 transition"
+              >
+                <KeyIcon className="h-3.5 w-3.5" />
+                <span>Tenho um código de convite (Diretor / Chefe CRE)</span>
+              </button>
+            </div>
+          </>
+        )}
+      </main>
+
+      {/* ── Rodapé Minimalista ── */}
+      <footer className="relative z-10 text-center pb-5 px-4 text-xs text-blue-300/60">
+        © {new Date().getFullYear()} Educa.Melhor • Segurança Criptografada TLS + 2FA •{" "}
+        <a href="/suporte" className="hover:text-white underline underline-offset-2">Suporte</a> •{" "}
+        <a href="/privacidade" className="hover:text-white underline underline-offset-2">Privacidade</a>
+      </footer>
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          MODAL DE LOGIN CINEMATOGRÁFICO (SPLIT-SHOWCASE VAULT MODAL)
+      ═══════════════════════════════════════════════════════════════════════ */}
+      {modalAberto && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/80 backdrop-blur-xl"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) fecharModal();
+          }}
+        >
+          <div className="animate-vaultModal relative w-full max-w-4xl rounded-[2rem] overflow-hidden shadow-[0_32px_90px_rgba(0,0,0,0.75)] border border-white/20 bg-slate-900 grid grid-cols-1 lg:grid-cols-12">
+            {/* Botão Fechar (X) */}
+            <button
+              type="button"
+              onClick={fecharModal}
+              disabled={loading}
+              title="Fechar (Esc)"
+              className="absolute top-4 right-4 z-30 w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 flex items-center justify-center transition shadow-sm"
+            >
+              <XMarkIcon className="h-5 w-5" />
+            </button>
+
+            {/* ─── COLUNA ESQUERDA: IDENTIDADE VIVA DO PERFIL & TELEMETRIA ─── */}
+            <div
+              className="lg:col-span-5 p-6 sm:p-8 text-white flex flex-col justify-between relative overflow-hidden transition-all duration-500"
+              style={{ background: portalAtivo.panelGradient }}
+            >
+              {/* Efeito de brilho radial no painel esquerdo */}
+              <div className="pointer-events-none absolute -bottom-24 -left-24 w-72 h-72 rounded-full bg-white/15 blur-3xl" />
+
+              <div>
+                {/* Seletor Rápido de Esfera dentro do próprio Modal */}
+                <div className="inline-flex items-center p-1 rounded-xl bg-black/25 backdrop-blur-md border border-white/15 mb-6 w-full">
+                  {[
+                    { k: "escola", l: "Escola" },
+                    { k: "cre", l: "CREs" },
+                    { k: "plataforma", l: "CEO" },
+                  ].map((tab) => (
+                    <button
+                      key={tab.k}
+                      type="button"
+                      onClick={() => trocarPerfilNoModal(tab.k)}
+                      className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                        tipoAcesso === tab.k
+                          ? "bg-white text-slate-900 shadow-md"
+                          : "text-white/75 hover:text-white"
+                      }`}
+                    >
+                      {tab.l}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Emblema + Título da Esfera */}
+                <div className="flex items-center gap-3.5 mb-4">
+                  <div className="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur-md border border-white/30 flex items-center justify-center shadow-lg">
+                    <ActivePortalIcon className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-extrabold tracking-widest uppercase text-white/75 block">
+                      PORTAL SELECIONADO
+                    </span>
+                    <h3
+                      className="text-2xl font-extrabold tracking-tight"
+                      style={{ fontFamily: "'Montserrat', sans-serif" }}
+                    >
+                      {portalAtivo.titulo}
+                    </h3>
+                  </div>
+                </div>
+
+                <p className="text-xs sm:text-sm text-white/85 leading-relaxed mb-6">
+                  {portalAtivo.dicaSeguranca}
+                </p>
+
+                {/* Stepper Dinâmico de Segurança em Tempo Real */}
+                <div className="hidden sm:block space-y-3 pt-4 border-t border-white/15">
+                  {[
+                    { n: 1, t: "Identificação Criptografada", d: "Validação de credenciais" },
+                    { n: 2, t: "Verificação Inteligente", d: "Código 2FA ou dispositivo confiado" },
+                    { n: 3, t: "Sessão Autenticada", d: "Carregamento de permissões RBAC" },
+                  ].map((st) => {
+                    const concluido = stepIndex > st.n;
+                    const atual = stepIndex === st.n;
+                    return (
+                      <div
+                        key={st.n}
+                        className={`flex items-center gap-3 transition-opacity ${
+                          atual || concluido ? "opacity-100" : "opacity-45"
+                        }`}
+                      >
+                        <div
+                          className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-extrabold border ${
+                            concluido
+                              ? "bg-emerald-400 text-slate-950 border-emerald-300"
+                              : atual
+                              ? "bg-white text-slate-900 border-white shadow-[0_0_15px_rgba(255,255,255,0.6)]"
+                              : "bg-white/10 text-white border-white/25"
+                          }`}
+                        >
+                          {concluido ? "✓" : st.n}
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-white">{st.t}</div>
+                          <div className="text-[11px] text-white/70">{st.d}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Selo Inferior de Segurança */}
+              <div className="hidden lg:flex items-center gap-2 pt-6 text-[11px] text-white/75">
+                <ShieldCheckIcon className="h-4 w-4 text-emerald-300 flex-shrink-0" />
+                <span>Protegido por criptografia ponta a ponta Educa.Melhor Vault™</span>
+              </div>
+            </div>
+
+            {/* ─── COLUNA DIREITA: FORMULÁRIOS ULTRA-MODERNOS (FUNDO CLARO CLEAN) ─── */}
+            <div className="lg:col-span-7 bg-white text-slate-800 p-6 sm:p-10 flex flex-col justify-center min-h-[470px]">
+              {/* ═══ ESTADO DE SUCESSO CELEBRATÓRIO ═══ */}
+              {success ? (
+                <div className="text-center py-8 animate-fadeIn">
+                  <div className="w-20 h-20 rounded-3xl bg-emerald-100 border border-emerald-200 flex items-center justify-center mx-auto mb-5 shadow-inner">
+                    <CheckCircleIcon className="h-12 w-12 text-emerald-600" />
+                  </div>
+                  <h3 className="text-2xl font-extrabold text-slate-900 mb-1">
+                    Acesso Autorizado!
+                  </h3>
+                  {nomeUsuarioLogin && (
+                    <p className="text-sm font-semibold text-blue-600 mb-2">
+                      Bem-vindo(a), {nomeUsuarioLogin}
+                    </p>
+                  )}
+                  <p className="text-xs text-slate-500 mb-6">
+                    Preparando seu ambiente {portalAtivo.subtitulo}...
+                  </p>
+                  <div className="w-48 h-1.5 bg-slate-100 rounded-full overflow-hidden mx-auto">
+                    <div
+                      className="h-full rounded-full animate-pulse"
+                      style={{ width: "100%", background: portalAtivo.btnGradient }}
+                    />
+                  </div>
+                </div>
+
+              ) : etapa === "login" ? (
+                /* ═══ ETAPA 1: CREDENCIAIS ═══ */
+                <form onSubmit={handleLogin} className="space-y-5">
+                  <div>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-blue-600">
+                      {portalAtivo.subtitulo}
+                    </span>
+                    <h2 className="text-2xl font-extrabold text-slate-900 mt-0.5">
+                      Entrar em {portalAtivo.titulo}
+                    </h2>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Insira suas credenciais abaixo para autenticar sua sessão.
+                    </p>
+                  </div>
+
+                  {/* Alertas e CTAs inteligentes */}
+                  {mensagem && (
+                    <div className="space-y-3">
+                      <div
+                        className={`rounded-xl border px-4 py-3 text-xs sm:text-sm font-semibold flex items-center gap-2.5 ${
+                          tipoMensagem === "sucesso"
+                            ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                            : tipoMensagem === "info"
+                            ? "border-blue-200 bg-blue-50 text-blue-800"
+                            : "border-red-200 bg-red-50 text-red-700"
+                        }`}
+                      >
+                        <span className="flex-1">{mensagem}</span>
+                      </div>
+
+                      {tipoAcesso === "escola" &&
+                        tipoMensagem === "erro" &&
+                        String(mensagem || "").toLowerCase().includes("usuário não encontrado") && (
+                          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 flex items-center justify-between gap-3">
+                            <div className="text-xs text-slate-600">
+                              <strong className="text-slate-800 block">Ainda não tem cadastro?</strong>
+                              Crie sua conta agora aproveitando o e-mail digitado.
+                            </div>
+                            <button
+                              type="button"
+                              onClick={irParaCadastro}
+                              className="px-4 py-2 rounded-lg bg-slate-900 hover:bg-black text-white text-xs font-bold whitespace-nowrap transition"
+                            >
+                              Criar conta →
+                            </button>
+                          </div>
+                        )}
+
+                      {tipoAcesso !== "plataforma" &&
+                        tipoMensagem === "erro" &&
+                        (String(mensagem || "").toLowerCase().includes("senha") ||
+                          String(mensagem || "").toLowerCase().includes("credenciais")) &&
+                        !String(mensagem || "").toLowerCase().includes("usuário não encontrado") && (
+                          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3.5 flex items-center justify-between gap-3">
+                            <div className="text-xs text-amber-900">
+                              <strong className="block">Esqueceu sua senha?</strong>
+                              Receba um código no seu e-mail e crie uma nova senha.
+                            </div>
+                            <button
+                              type="button"
+                              onClick={abrirResetSenha}
+                              className="px-3.5 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold whitespace-nowrap transition"
+                            >
+                              Redefinir senha
+                            </button>
+                          </div>
+                        )}
+                    </div>
+                  )}
+
+                  {/* Campo Identificador com Auto-Detecção Inteligente */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-xs font-bold text-slate-700">
+                        {portalAtivo.labelLogin}
+                      </label>
+                      {infoIdentificador && (
+                        <span
+                          className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                            infoIdentificador.ok
+                              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                              : "bg-slate-100 text-slate-600"
+                          }`}
+                        >
+                          {infoIdentificador.icone} {infoIdentificador.texto}
                         </span>
                       )}
                     </div>
-                  </label>
+                    <div className="relative">
+                      <div className="pointer-events-none absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
+                        {tipoAcesso === "plataforma" ? (
+                          <EnvelopeIcon className="h-5 w-5" />
+                        ) : String(usuario).includes("@") ? (
+                          <EnvelopeIcon className="h-5 w-5 text-blue-500" />
+                        ) : String(usuario).replace(/\D/g, "").length >= 10 ? (
+                          <DevicePhoneMobileIcon className="h-5 w-5 text-blue-500" />
+                        ) : (
+                          <IdentificationIcon className="h-5 w-5" />
+                        )}
+                      </div>
+                      <input
+                        type="text"
+                        autoFocus
+                        placeholder={portalAtivo.placeholderLogin}
+                        value={usuario}
+                        onChange={(e) => {
+                          setUsuario(e.target.value);
+                          setMensagem("");
+                        }}
+                        className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-300 text-slate-900 placeholder-slate-400 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition bg-slate-50/60 focus:bg-white"
+                      />
+                    </div>
+                  </div>
 
-                ))}
-              </div>
+                  {/* Campo Senha com Olho Mostrar/Ocultar + Detector Caps Lock */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-xs font-bold text-slate-700">Senha de acesso</label>
+                      {tipoAcesso !== "plataforma" && isEmailValido(usuario) && (
+                        <button
+                          type="button"
+                          onClick={abrirResetSenha}
+                          className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition"
+                        >
+                          Esqueceu a senha?
+                        </button>
+                      )}
+                    </div>
+                    <div className="relative">
+                      <div className="pointer-events-none absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
+                        <LockClosedIcon className="h-5 w-5" />
+                      </div>
+                      <input
+                        type={showSenha ? "text" : "password"}
+                        placeholder="Digite sua senha"
+                        value={senha}
+                        onKeyUp={checarCapsLock}
+                        onKeyDown={checarCapsLock}
+                        onChange={(e) => {
+                          setSenha(e.target.value);
+                          setMensagem("");
+                        }}
+                        className="w-full pl-11 pr-11 py-3 rounded-xl border border-slate-300 text-slate-900 placeholder-slate-400 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition bg-slate-50/60 focus:bg-white"
+                      />
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        onClick={() => setShowSenha((v) => !v)}
+                        className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-700 transition"
+                        title={showSenha ? "Ocultar senha" : "Mostrar senha"}
+                      >
+                        {showSenha ? <EyeSlashIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+                      </button>
+                    </div>
+                    {capsLockAtivo && (
+                      <p className="text-[11px] font-semibold text-amber-600 mt-1.5 flex items-center gap-1">
+                        <span>⚠️</span> Caps Lock está ativado
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Botão Entrar com Gradiente do Portal */}
+                  <button
+                    type="submit"
+                    disabled={loading || !usuario?.trim() || !senha?.trim()}
+                    style={{ background: portalAtivo.btnGradient }}
+                    className="w-full py-3.5 rounded-xl text-white font-bold text-sm shadow-lg hover:opacity-95 hover:shadow-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  >
+                    {loading ? (
+                      <>
+                        <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24" fill="none">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                        </svg>
+                        <span>Autenticando com segurança...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Continuar para {portalAtivo.titulo}</span>
+                        <ArrowRightIcon className="h-4 w-4 stroke-[2.5]" />
+                      </>
+                    )}
+                  </button>
+                </form>
+
+              ) : etapa === "codigo" ? (
+                /* ═══ ETAPA 2: 6 CAIXAS INTELIGENTES DE CÓDIGO OTP ═══ */
+                <form onSubmit={handleConfirmar} className="space-y-5">
+                  <div>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600">
+                      Verificação em Duas Etapas (2FA)
+                    </span>
+                    <h2 className="text-2xl font-extrabold text-slate-900 mt-0.5">
+                      Digite o código de 6 dígitos
+                    </h2>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Enviamos um código de segurança para o e-mail vinculado à sua conta.
+                    </p>
+                  </div>
+
+                  {mensagem && (
+                    <div
+                      className={`rounded-xl border px-4 py-2.5 text-xs font-semibold ${
+                        tipoMensagem === "erro"
+                          ? "border-red-200 bg-red-50 text-red-700"
+                          : "border-blue-200 bg-blue-50 text-blue-800"
+                      }`}
+                    >
+                      {mensagem}
+                    </div>
+                  )}
+
+                  {/* 6 Caixas Individuais de OTP */}
+                  <div className="flex justify-between gap-2 sm:gap-3" onPaste={handleOtpPaste}>
+                    {codigoDigitos.map((dig, i) => (
+                      <input
+                        key={i}
+                        ref={(el) => { otpRefs.current[i] = el; }}
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={1}
+                        autoFocus={i === 0}
+                        value={dig}
+                        onChange={(e) => handleOtpChange(i, e.target.value)}
+                        onKeyDown={(e) => handleOtpKeyDown(i, e)}
+                        className={`w-full h-14 text-center text-2xl font-extrabold rounded-xl border-2 transition-all focus:outline-none ${
+                          dig
+                            ? "border-blue-600 bg-blue-50/50 text-slate-900 shadow-sm"
+                            : "border-slate-300 bg-slate-50 text-slate-900 focus:border-blue-500 focus:bg-white"
+                        }`}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Opção Confiar neste Dispositivo (para Escola e CRE) */}
+                  {tipoAcesso !== "plataforma" && (
+                    <label
+                      htmlFor="confiar-dispositivo"
+                      className={`flex items-start gap-3 rounded-xl border p-3.5 cursor-pointer transition-all ${
+                        confirarDispositivo
+                          ? "border-blue-400 bg-blue-50/70"
+                          : "border-slate-200 bg-slate-50 hover:bg-slate-100/70"
+                      }`}
+                    >
+                      <input
+                        id="confiar-dispositivo"
+                        type="checkbox"
+                        checked={confirarDispositivo}
+                        onChange={(e) => setConfirarDispositivo(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 accent-blue-600 rounded"
+                      />
+                      <div>
+                        <div className="text-xs font-bold text-slate-800">
+                          Confiar neste dispositivo por 90 dias
+                        </div>
+                        <div className="text-[11px] text-slate-500">
+                          Não pediremos código nos próximos acessos neste aparelho pessoal.
+                        </div>
+                      </div>
+                    </label>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={loading || codigo.length !== 6}
+                    style={{ background: portalAtivo.btnGradient }}
+                    className="w-full py-3.5 rounded-xl text-white font-bold text-sm shadow-lg hover:opacity-95 transition disabled:opacity-40"
+                  >
+                    {loading ? "Validando código..." : "Confirmar e Entrar"}
+                  </button>
+
+                  <div className="flex items-center justify-between pt-1 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => voltarParaLogin(false)}
+                      disabled={loading}
+                      className="font-semibold text-slate-500 hover:text-slate-800 transition"
+                    >
+                      ← Alterar login
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleReenviarCodigo}
+                      disabled={loading || cooldown > 0}
+                      className="font-bold text-blue-600 hover:text-blue-800 disabled:text-slate-400 transition"
+                    >
+                      {cooldown > 0 ? `Reenviar em ${cooldown}s` : "Reenviar código"}
+                    </button>
+                  </div>
+                </form>
+
+              ) : etapa === "escola" ? (
+                /* ═══ ETAPA 3: SELEÇÃO MULTI-ESCOLA ═══ */
+                <form onSubmit={handleConfirmarEscola} className="space-y-4">
+                  <div>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-blue-600">
+                      Múltiplos Vínculos Encontrados
+                    </span>
+                    <h2 className="text-2xl font-extrabold text-slate-900 mt-0.5">
+                      {nomeUsuarioLogin ? `Olá, ${nomeUsuarioLogin.split(" ")[0]}!` : "Escolha a instituição"}
+                    </h2>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Selecione em qual unidade você deseja trabalhar nesta sessão:
+                    </p>
+                  </div>
+
+                  <div className="max-h-56 overflow-y-auto space-y-2 pr-1">
+                    {escolasVinculadas.map((esc) => {
+                      const selecionado = String(usuarioCtxSelecionado) === String(esc.usuario_ctx_id || "");
+                      const ultimaUsada = String(localStorage.getItem("last_escola_id") || "") === String(esc.id);
+                      return (
+                        <label
+                          key={String(esc.usuario_ctx_id || esc.id)}
+                          className={`flex items-center justify-between p-3.5 rounded-xl border-2 cursor-pointer transition-all ${
+                            selecionado
+                              ? "border-blue-600 bg-blue-50/60 shadow-sm"
+                              : "border-slate-200 hover:border-blue-300 bg-white"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="radio"
+                              name="escola_ctx"
+                              checked={selecionado}
+                              onChange={() => {
+                                setEscolaSelecionada(String(esc.id));
+                                setUsuarioCtxSelecionado(String(esc.usuario_ctx_id || ""));
+                                setMensagem("");
+                              }}
+                              className="h-4 w-4 accent-blue-600"
+                            />
+                            <div>
+                              <div className="text-sm font-bold text-slate-800">
+                                {esc.apelido || esc.nome}
+                              </div>
+                              <div className="text-xs text-slate-500">
+                                {esc.nome} • Perfil: <span className="font-semibold uppercase">{esc.perfil}</span>
+                              </div>
+                            </div>
+                          </div>
+                          {ultimaUsada && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                              Última usada
+                            </span>
+                          )}
+                        </label>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={voltarParaCodigo}
+                      disabled={loading}
+                      className="px-4 py-3 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
+                    >
+                      Voltar
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={loading || !escolaSelecionada || !usuarioCtxSelecionado}
+                      style={{ background: portalAtivo.btnGradient }}
+                      className="flex-1 py-3 rounded-xl text-white font-bold text-sm shadow-lg disabled:opacity-40 transition"
+                    >
+                      {loading ? "Entrando..." : "Acessar Unidade →"}
+                    </button>
+                  </div>
+                </form>
+
+              ) : etapa === "reset_codigo" ? (
+                /* ═══ RECUPERAÇÃO DE SENHA — ETAPA 1 ═══ */
+                <form onSubmit={handleResetConfirmarCodigo} className="space-y-4">
+                  <div>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600">
+                      Recuperação de Acesso
+                    </span>
+                    <h2 className="text-2xl font-extrabold text-slate-900 mt-0.5">Redefinir sua senha</h2>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Clique em "Enviar código" para receber os 6 dígitos no seu e-mail.
+                    </p>
+                  </div>
+
+                  {mensagem && (
+                    <div
+                      className={`rounded-xl border px-4 py-2.5 text-xs font-semibold ${
+                        tipoMensagem === "erro"
+                          ? "border-red-200 bg-red-50 text-red-700"
+                          : "border-blue-200 bg-blue-50 text-blue-800"
+                      }`}
+                    >
+                      {mensagem}
+                    </div>
+                  )}
+
+                  <div className="flex gap-2">
+                    <input
+                      type="email"
+                      value={usuario}
+                      readOnly={resetEmailLocked}
+                      onChange={(e) => setUsuario(e.target.value)}
+                      className="flex-1 px-4 py-2.5 rounded-xl border border-slate-300 text-sm bg-slate-100 text-slate-700"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleResetEnviarCodigo}
+                      disabled={loading || !isEmailValido(usuario)}
+                      className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold whitespace-nowrap disabled:opacity-40 transition"
+                    >
+                      {loading ? "Enviando..." : "Enviar código"}
+                    </button>
+                  </div>
+
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    placeholder="000000"
+                    value={resetCodigo}
+                    onChange={(e) => setResetCodigo(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    className="w-full py-3 rounded-xl border border-slate-300 text-center font-mono text-xl font-bold tracking-[0.4em] text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => voltarParaLogin(false)}
+                      className="flex-1 py-3 rounded-xl border border-slate-300 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
+                    >
+                      Voltar
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={loading || resetCodigo.length !== 6}
+                      className="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold disabled:opacity-40 transition"
+                    >
+                      Validar código
+                    </button>
+                  </div>
+                </form>
+
+              ) : (
+                /* ═══ RECUPERAÇÃO DE SENHA — ETAPA 2 (NOVA SENHA) ═══ */
+                <form onSubmit={handleResetAlterarSenha} className="space-y-4">
+                  <div>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600">
+                      Código Confirmado
+                    </span>
+                    <h2 className="text-2xl font-extrabold text-slate-900 mt-0.5">Crie sua nova senha</h2>
+                  </div>
+
+                  {mensagem && (
+                    <div
+                      className={`rounded-xl border px-4 py-2.5 text-xs font-semibold ${
+                        tipoMensagem === "sucesso"
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                          : "border-red-200 bg-red-50 text-red-700"
+                      }`}
+                    >
+                      {mensagem}
+                    </div>
+                  )}
+
+                  <div className="relative">
+                    <input
+                      type={showResetSenha ? "text" : "password"}
+                      placeholder="Nova senha forte"
+                      value={resetSenha}
+                      onChange={(e) => setResetSenha(e.target.value)}
+                      className="w-full px-4 py-3 pr-11 rounded-xl border border-slate-300 text-sm text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowResetSenha((v) => !v)}
+                      className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400"
+                    >
+                      {showResetSenha ? <EyeSlashIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {senhaChecks.map((c) => (
+                      <div
+                        key={c.label}
+                        className={`text-[11px] font-semibold flex items-center gap-1.5 ${
+                          c.ok ? "text-emerald-600" : "text-slate-400"
+                        }`}
+                      >
+                        <span>{c.ok ? "✓" : "○"}</span>
+                        <span>{c.label}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  <input
+                    type={showResetSenha ? "text" : "password"}
+                    placeholder="Confirme a nova senha"
+                    value={resetConfSenha}
+                    onChange={(e) => setResetConfSenha(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-300 text-sm text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  />
+
+                  <button
+                    type="submit"
+                    disabled={loading || !senhaForte(resetSenha) || resetSenha !== resetConfSenha}
+                    className="w-full py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm disabled:opacity-40 transition"
+                  >
+                    {loading ? "Salvando..." : "Salvar Nova Senha"}
+                  </button>
+                </form>
+              )}
             </div>
-
-            <button
-              className="bg-green-600 text-white py-2 rounded-lg disabled:cursor-not-allowed disabled:opacity-40"
-              disabled={loading || !escolaSelecionada || !usuarioCtxSelecionado}
-            >
-              {loading ? "Entrando..." : "Entrar"}
-            </button>
-
-            <button
-              type="button"
-              onClick={voltarParaCodigo}
-              className="rounded-lg border border-gray-300 bg-white py-2 font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40"
-              disabled={loading}
-            >
-              Voltar
-            </button>
-          </form>
-        )}
-      </div>
-      )} {/* fim ternário manutenção */}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

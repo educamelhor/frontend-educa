@@ -109,38 +109,97 @@ export default function Login() {
   // null = estado inicial com os 3 cards lado a lado; ao passar o mouse sobre qualquer card, inicia o giro 3D!
   const [hoveredCard, setHoveredCard] = useState(null);
   const hoverLockUntilRef = useRef(0);
-  const lastSwitchCoordsRef = useRef({ x: -9999, y: -9999 });
+  const lockedSideRef = useRef(null); // "left" | "right" | null — trava o lado onde um card de fundo acabou de deslizar sob o cursor
+  const mouseAnchorRef = useRef({ x: null, t: 0 });
+  const hoverIntentTimerRef = useRef(null);
   const [modalAberto, setModalAberto] = useState(false);
   const [tipoAcesso, setTipoAcesso] = useState("escola"); // "escola" | "cre" | "plataforma"
 
-  // Blindagem Anti-Ping-Pong no Hover 3D:
-  // 1) Se hoveredCard === null (estado inicial lado a lado), dispara instantaneamente ao tocar qualquer card.
-  // 2) Após o giro iniciar, bloqueia por 580ms o card que viaja para o fundo sob o cursor parado.
-  const ativarCardCarrossel = (chave, clientX, clientY, forcar = false) => {
+  const limparHoverIntent = () => {
+    if (hoverIntentTimerRef.current) {
+      clearTimeout(hoverIntentTimerRef.current);
+      hoverIntentTimerRef.current = null;
+    }
+  };
+
+  const atualizarAncoraMouse = (clientX) => {
+    if (typeof clientX !== "number") return;
+    const agora = Date.now();
+    if (mouseAnchorRef.current.x === null || agora - mouseAnchorRef.current.t > 90) {
+      mouseAnchorRef.current = { x: clientX, t: agora };
+    }
+  };
+
+  // Blindagem Tripla (Zona Neutra Lateral + Trava Pós-Giro Sob o Cursor + Vetor Direcional):
+  // - Quando o usuário passa o mouse em um card lateral, ele gira para o centro e outro card ocupa aquela lateral sob o cursor.
+  // - Essa lateral fica travada (`lockedSideRef`) até o cursor chegar ao card central (ou sair pelas bordas externas),
+  //   garantindo caminho 100% livre da lateral até o centro para clicar no card desejado!
+  const ativarCardCarrossel = (chave, posAtual, clientX, forcar = false) => {
     if (chave === hoveredCard) {
-      lastSwitchCoordsRef.current = { x: -9999, y: -9999 };
+      limparHoverIntent();
       return;
     }
     const agora = Date.now();
+
+    // 1) Disparo imediato no estado inicial (3 cards lado a lado), clique direto na aba de fundo ou nos indicadores
     if (forcar || hoveredCard === null) {
-      if (typeof clientX === "number" && typeof clientY === "number") {
-        lastSwitchCoordsRef.current = { x: clientX, y: clientY };
+      limparHoverIntent();
+      if (typeof clientX === "number") {
+        mouseAnchorRef.current = { x: clientX, t: agora };
       }
-      hoverLockUntilRef.current = agora + 580;
+      lockedSideRef.current =
+        posAtual === "flat-left" || posAtual === "left"
+          ? "left"
+          : posAtual === "flat-right" || posAtual === "right"
+          ? "right"
+          : null;
+      hoverLockUntilRef.current = agora + 780;
       setHoveredCard(chave);
       return;
     }
-    if (agora < hoverLockUntilRef.current) return;
-    if (typeof clientX === "number" && typeof clientY === "number") {
-      const dist = Math.hypot(
-        clientX - lastSwitchCoordsRef.current.x,
-        clientY - lastSwitchCoordsRef.current.y
-      );
-      if (dist < 16) return;
-      lastSwitchCoordsRef.current = { x: clientX, y: clientY };
+
+    // 2) Trava pós-giro na lateral de origem: impede que o novo card que deslizou sob o cursor gire sozinho
+    //    enquanto o usuário leva o mouse da lateral até o card central para clicar
+    if (lockedSideRef.current && posAtual === lockedSideRef.current) {
+      limparHoverIntent();
+      return;
     }
-    hoverLockUntilRef.current = agora + 580;
-    setHoveredCard(chave);
+
+    // 3) Trava durante a animação de giro (780ms)
+    if (agora < hoverLockUntilRef.current) return;
+
+    // 4) Guarda de Vetor Direcional (janela suavizada contra movimento diagonal):
+    //    Se o card está na ESQUERDA ("left") e o mouse se move para a DIREITA (rumo ao centro, dx > 2) -> NÃO GIRA!
+    //    Se o card está na DIREITA ("right") e o mouse se move para a ESQUERDA (rumo ao centro, dx < -2) -> NÃO GIRA!
+    if (typeof clientX === "number") {
+      const anchorX = mouseAnchorRef.current.x;
+      if (anchorX !== null) {
+        const dx = clientX - anchorX;
+        if (posAtual === "left" && dx > 2) {
+          limparHoverIntent();
+          mouseAnchorRef.current = { x: clientX, t: agora };
+          return;
+        }
+        if (posAtual === "right" && dx < -2) {
+          limparHoverIntent();
+          mouseAnchorRef.current = { x: clientX, t: agora };
+          return;
+        }
+      }
+      atualizarAncoraMouse(clientX);
+    }
+
+    // 5) Confirmação suave de intenção (130ms na aba externa) para eliminar disparos por esbarrão rápido
+    if (!hoverIntentTimerRef.current) {
+      hoverIntentTimerRef.current = setTimeout(() => {
+        hoverIntentTimerRef.current = null;
+        if (Date.now() < hoverLockUntilRef.current) return;
+        if (lockedSideRef.current && posAtual === lockedSideRef.current) return;
+        lockedSideRef.current = posAtual === "left" ? "left" : posAtual === "right" ? "right" : null;
+        hoverLockUntilRef.current = Date.now() + 780;
+        setHoveredCard(chave);
+      }, 130);
+    }
   };
 
   // ── Controle de etapas do fluxo de login ──
@@ -983,7 +1042,36 @@ export default function Login() {
                   style={{ background: portalAurora.auroraColor }}
                 />
 
-                <div className="relative w-full h-full pointer-events-none">
+                <div
+                  className="relative w-full h-full pointer-events-none"
+                  onMouseMove={(e) => {
+                    if (hoveredCard !== null) {
+                      atualizarAncoraMouse(e.clientX);
+                    }
+                  }}
+                >
+                  {/* 🛡️ ZONA NEUTRA LATERAL AO REDOR DO CARD CENTRAL (680px = ~412px card central projetado + 134px livres de cada lado):
+                      Fica em zIndex 25 (acima dos cards de fundo zIndex 10 e abaixo do card central zIndex 30),
+                      criando um corredor amplo nas duas laterais do card central que NÃO detecta os cards de fundo! */}
+                  {hoveredCard !== null && (
+                    <div
+                      onMouseEnter={limparHoverIntent}
+                      onMouseMove={(e) => {
+                        limparHoverIntent();
+                        atualizarAncoraMouse(e.clientX);
+                      }}
+                      style={{
+                        width: "680px",
+                        left: "50%",
+                        top: "0px",
+                        bottom: "0px",
+                        transform: "translateX(-50%)",
+                        zIndex: 25,
+                      }}
+                      className="pointer-events-auto absolute"
+                    />
+                  )}
+
                   {CARROSSEL_ORDEM.map((chave, idx) => {
                     const cfg = PORTAIS_CONFIG[chave];
                     const IconComp = cfg.Icon;
@@ -1013,8 +1101,8 @@ export default function Login() {
                         : pos === "center"
                         ? "perspective(1400px) translate3d(-50%, 0px, 95px) rotateY(0deg) scale(1.08)"
                         : pos === "left"
-                        ? "perspective(1400px) translate3d(calc(-50% - 340px), 12px, -135px) rotateY(26deg) scale(0.86)"
-                        : "perspective(1400px) translate3d(calc(-50% + 340px), 12px, -135px) rotateY(-26deg) scale(0.86)";
+                        ? "perspective(1400px) translate3d(calc(-50% - 365px), 12px, -135px) rotateY(26deg) scale(0.86)"
+                        : "perspective(1400px) translate3d(calc(-50% + 365px), 12px, -135px) rotateY(-26deg) scale(0.86)";
 
                     const glareTransform =
                       pos === "left"
@@ -1027,10 +1115,44 @@ export default function Login() {
                       <button
                         key={cfg.key}
                         type="button"
-                        onMouseEnter={(e) => ativarCardCarrossel(chave, e.clientX, e.clientY)}
-                        onMouseMove={(e) => ativarCardCarrossel(chave, e.clientX, e.clientY)}
-                        onFocus={() => ativarCardCarrossel(chave, undefined, undefined, true)}
-                        onClick={() => abrirPortalModal(chave)}
+                        onMouseEnter={(e) => {
+                          if (isCenter) {
+                            lockedSideRef.current = null;
+                            limparHoverIntent();
+                            return;
+                          }
+                          ativarCardCarrossel(chave, pos, e.clientX);
+                        }}
+                        onMouseMove={(e) => {
+                          if (isCenter) {
+                            lockedSideRef.current = null;
+                            return;
+                          }
+                          ativarCardCarrossel(chave, pos, e.clientX);
+                        }}
+                        onMouseLeave={(e) => {
+                          limparHoverIntent();
+                          // Se o mouse saiu pela borda externa/vertical (fora do carrossel), libera a trava daquele lado
+                          if (lockedSideRef.current === pos) {
+                            const rect = e.currentTarget.getBoundingClientRect();
+                            const saiuPorFora =
+                              (pos === "left" && e.clientX <= rect.left + 12) ||
+                              (pos === "right" && e.clientX >= rect.right - 12) ||
+                              e.clientY <= rect.top + 12 ||
+                              e.clientY >= rect.bottom - 12;
+                            if (saiuPorFora) {
+                              lockedSideRef.current = null;
+                            }
+                          }
+                        }}
+                        onFocus={() => ativarCardCarrossel(chave, pos, undefined, true)}
+                        onClick={() => {
+                          if (!isModoInicialLadoALado && !isCenter) {
+                            ativarCardCarrossel(chave, pos, undefined, true);
+                            return;
+                          }
+                          abrirPortalModal(chave);
+                        }}
                         style={{
                           width: "356px",
                           left: "50%",
@@ -1144,7 +1266,7 @@ export default function Login() {
                     <button
                       key={chave}
                       type="button"
-                      onMouseEnter={() => ativarCardCarrossel(chave, undefined, undefined, true)}
+                      onMouseEnter={() => ativarCardCarrossel(chave, "indicator", undefined, true)}
                       onClick={() => abrirPortalModal(chave)}
                       className={`px-3 py-1 rounded-full text-[11px] font-bold tracking-wider transition-all border ${
                         ativo

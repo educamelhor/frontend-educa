@@ -106,36 +106,40 @@ export default function Login() {
 
   // ── Controle do Portal, Carrossel Orbital 3D e Modal ──
   const CARROSSEL_ORDEM = ["escola", "cre", "plataforma"];
-  const [hoveredCard, setHoveredCard] = useState("escola");
+  // null = estado inicial com os 3 cards lado a lado; ao passar o mouse sobre qualquer card, inicia o giro 3D!
+  const [hoveredCard, setHoveredCard] = useState(null);
   const hoverLockUntilRef = useRef(0);
   const lastSwitchCoordsRef = useRef({ x: -9999, y: -9999 });
   const [modalAberto, setModalAberto] = useState(false);
   const [tipoAcesso, setTipoAcesso] = useState("escola"); // "escola" | "cre" | "plataforma"
 
   // Blindagem Anti-Ping-Pong no Hover 3D:
-  // Garante giro orbital firme quando o card viaja para o centro e outro passa sob o cursor parado.
+  // 1) Se hoveredCard === null (estado inicial lado a lado), dispara instantaneamente ao tocar qualquer card.
+  // 2) Após o giro iniciar, bloqueia por 580ms o card que viaja para o fundo sob o cursor parado.
   const ativarCardCarrossel = (chave, clientX, clientY, forcar = false) => {
     if (chave === hoveredCard) {
-      // Se o mouse já entrou no card central, libera sensibilidade máxima para o próximo movimento lateral
       lastSwitchCoordsRef.current = { x: -9999, y: -9999 };
       return;
     }
-    if (forcar) {
-      hoverLockUntilRef.current = Date.now() + 620;
+    const agora = Date.now();
+    if (forcar || hoveredCard === null) {
+      if (typeof clientX === "number" && typeof clientY === "number") {
+        lastSwitchCoordsRef.current = { x: clientX, y: clientY };
+      }
+      hoverLockUntilRef.current = agora + 580;
       setHoveredCard(chave);
       return;
     }
-    const agora = Date.now();
     if (agora < hoverLockUntilRef.current) return;
     if (typeof clientX === "number" && typeof clientY === "number") {
       const dist = Math.hypot(
         clientX - lastSwitchCoordsRef.current.x,
         clientY - lastSwitchCoordsRef.current.y
       );
-      if (dist < 32) return;
+      if (dist < 16) return;
       lastSwitchCoordsRef.current = { x: clientX, y: clientY };
     }
-    hoverLockUntilRef.current = agora + 620;
+    hoverLockUntilRef.current = agora + 580;
     setHoveredCard(chave);
   };
 
@@ -970,43 +974,54 @@ export default function Login() {
 
             {/* ═══ PALCO CARROSSEL ORBITAL 3D (DESKTOP >= 768px) ═══ */}
             <div className="hidden md:flex flex-col items-center w-full">
-              <div
-                className="relative w-full max-w-5xl h-[435px] flex items-center justify-center"
-                style={{ perspective: "1400px" }}
-              >
-                {/* Halo luminoso projetado no piso sob o card central */}
+              <div className="relative w-full max-w-6xl h-[465px] flex items-center justify-center pointer-events-none">
+                {/* Halo luminoso projetado no piso sob o card central (aparece quando o carrossel 3D está ativo) */}
                 <div
-                  className="pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2 w-[380px] h-14 rounded-full blur-2xl transition-all duration-700"
+                  className={`pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 w-[380px] h-14 rounded-full blur-2xl transition-all duration-700 ${
+                    hoveredCard ? "opacity-100" : "opacity-0"
+                  }`}
                   style={{ background: portalAurora.auroraColor }}
                 />
 
-                <div
-                  className="relative w-full h-full"
-                  style={{ transformStyle: "preserve-3d" }}
-                >
-                  {CARROSSEL_ORDEM.map((chave) => {
+                <div className="relative w-full h-full pointer-events-none">
+                  {CARROSSEL_ORDEM.map((chave, idx) => {
                     const cfg = PORTAIS_CONFIG[chave];
                     const IconComp = cfg.Icon;
-                    const activeIdx = CARROSSEL_ORDEM.indexOf(hoveredCard);
-                    const idx = CARROSSEL_ORDEM.indexOf(chave);
-                    const diff = (idx - activeIdx + 3) % 3;
-                    // diff === 0 -> Frente/Centro | diff === 1 -> Fundo Direito | diff === 2 -> Fundo Esquerdo
-                    const pos = diff === 0 ? "center" : diff === 1 ? "right" : "left";
+                    const isModoInicialLadoALado = hoveredCard === null;
+
+                    // Quando hoveredCard === null: 3 cards lado a lado (idx 0 = esquerda, idx 1 = centro, idx 2 = direita)
+                    // Quando hoveredCard !== null: carrossel 3D ativo (card sob hover vai para frente/centro, os outros 2 recuam)
+                    let pos = "center";
+                    if (isModoInicialLadoALado) {
+                      pos = idx === 0 ? "flat-left" : idx === 1 ? "flat-center" : "flat-right";
+                    } else {
+                      const activeIdx = CARROSSEL_ORDEM.indexOf(hoveredCard);
+                      const diff = (idx - activeIdx + 3) % 3;
+                      pos = diff === 0 ? "center" : diff === 1 ? "right" : "left";
+                    }
+
                     const isCenter = pos === "center";
+                    const isDestaque = isModoInicialLadoALado || isCenter;
 
                     const transform3d =
-                      pos === "center"
-                        ? "translate3d(-50%, 0px, 110px) rotateY(0deg) scale(1.08)"
+                      pos === "flat-left"
+                        ? "perspective(1400px) translate3d(calc(-50% - 376px), 0px, 0px) rotateY(0deg) scale(1)"
+                        : pos === "flat-center"
+                        ? "perspective(1400px) translate3d(-50%, 0px, 0px) rotateY(0deg) scale(1)"
+                        : pos === "flat-right"
+                        ? "perspective(1400px) translate3d(calc(-50% + 376px), 0px, 0px) rotateY(0deg) scale(1)"
+                        : pos === "center"
+                        ? "perspective(1400px) translate3d(-50%, 0px, 95px) rotateY(0deg) scale(1.08)"
                         : pos === "left"
-                        ? "translate3d(calc(-50% - 340px), 12px, -140px) rotateY(26deg) scale(0.86)"
-                        : "translate3d(calc(-50% + 340px), 12px, -140px) rotateY(-26deg) scale(0.86)";
+                        ? "perspective(1400px) translate3d(calc(-50% - 340px), 12px, -135px) rotateY(26deg) scale(0.86)"
+                        : "perspective(1400px) translate3d(calc(-50% + 340px), 12px, -135px) rotateY(-26deg) scale(0.86)";
 
                     const glareTransform =
-                      pos === "center"
-                        ? "translateX(0%) rotate(18deg)"
-                        : pos === "left"
+                      pos === "left"
                         ? "translateX(-35%) rotate(18deg)"
-                        : "translateX(35%) rotate(18deg)";
+                        : pos === "right"
+                        ? "translateX(35%) rotate(18deg)"
+                        : "translateX(0%) rotate(18deg)";
 
                     return (
                       <button
@@ -1017,30 +1032,34 @@ export default function Login() {
                         onFocus={() => ativarCardCarrossel(chave, undefined, undefined, true)}
                         onClick={() => abrirPortalModal(chave)}
                         style={{
-                          width: "360px",
+                          width: "356px",
                           left: "50%",
-                          top: "14px",
+                          top: "20px",
                           background: cfg.cardGradient,
                           transform: transform3d,
-                          zIndex: isCenter ? 30 : 10,
-                          opacity: isCenter ? 1 : 0.62,
-                          filter: isCenter ? "brightness(1.06)" : "brightness(0.75) saturate(0.88)",
+                          zIndex: isCenter ? 30 : isModoInicialLadoALado ? 20 : 10,
+                          opacity: isDestaque ? 1 : 0.62,
+                          filter: isCenter
+                            ? "brightness(1.06)"
+                            : isModoInicialLadoALado
+                            ? "brightness(1)"
+                            : "brightness(0.75) saturate(0.88)",
                           transition:
-                            "transform 720ms cubic-bezier(0.22, 1, 0.36, 1), opacity 560ms ease, box-shadow 650ms ease, filter 560ms ease",
+                            "transform 700ms cubic-bezier(0.22, 1, 0.36, 1), opacity 520ms ease, box-shadow 620ms ease, filter 520ms ease",
                           boxShadow: isCenter
                             ? `0 34px 80px -15px rgba(0,0,0,0.88), 0 0 50px -10px ${cfg.auroraColor}, 0 0 0 1.5px ${cfg.accentRing}`
-                            : "0 20px 45px -18px rgba(0,0,0,0.75), 0 0 0 1px rgba(255,255,255,0.12)",
+                            : "0 20px 45px -18px rgba(0,0,0,0.75), 0 0 0 1px rgba(255,255,255,0.14)",
                           backfaceVisibility: "hidden",
                           willChange: "transform, opacity",
                         }}
-                        className="group absolute text-left rounded-3xl p-7 backdrop-blur-2xl flex flex-col justify-between min-h-[392px] overflow-hidden cursor-pointer"
+                        className="pointer-events-auto group absolute text-left rounded-3xl p-7 backdrop-blur-2xl flex flex-col justify-between min-h-[392px] overflow-hidden cursor-pointer"
                       >
                         {/* Feixe superior colorido */}
                         <div
                           className="pointer-events-none absolute inset-x-0 top-0 h-1.5 transition-opacity duration-500"
                           style={{
                             background: cfg.btnGradient,
-                            opacity: isCenter ? 1 : 0.55,
+                            opacity: isDestaque ? 1 : 0.55,
                           }}
                         />
 
@@ -1117,7 +1136,7 @@ export default function Login() {
               </div>
 
               {/* Indicadores Orbitais Discretos */}
-              <div className="flex items-center gap-2.5 mt-3">
+              <div className="flex items-center gap-2.5 mt-4">
                 {CARROSSEL_ORDEM.map((chave) => {
                   const cfg = PORTAIS_CONFIG[chave];
                   const ativo = hoveredCard === chave;

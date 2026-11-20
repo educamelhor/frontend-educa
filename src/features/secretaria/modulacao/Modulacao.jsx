@@ -276,6 +276,7 @@ export default function Modulacao() {
         a?.turmaId
       );
 
+    const vistos = new Set();
     return arr
       .map((a) => ({
         professor_id: Number(a.professor_id ?? a.profId ?? a.id_professor ?? a?.professor?.id),
@@ -287,7 +288,13 @@ export default function Modulacao() {
         turno: a.turno ?? a?.turma?.turno ?? a?.turno_nome ?? null,
         semestre: Number(a.semestre ?? 1),
       }))
-      .filter((x) => x.professor_id && x.turma_id && x.disciplina_id);
+      .filter((x) => {
+        if (!x.professor_id || !x.turma_id || !x.disciplina_id) return false;
+        const dedupKey = `${x.professor_id}|${x.turma_id}|${x.disciplina_id}`;
+        if (vistos.has(dedupKey)) return false;
+        vistos.add(dedupKey);
+        return true;
+      });
   }
 
 

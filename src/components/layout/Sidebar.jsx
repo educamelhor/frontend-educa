@@ -35,6 +35,7 @@ import {
   DevicePhoneMobileIcon,
   ArrowRightOnRectangleIcon,
   BanknotesIcon,
+  BuildingLibraryIcon,
 } from '@heroicons/react/24/outline';
 import {
   PERFIS_MILITARES_SET,
@@ -76,6 +77,14 @@ export default function Sidebar({ isOpen, onClose }) {
   const scope = getScope();
   const isScopeEscola = scope === 'escola';
   const isScopePlataforma = scope === 'plataforma';
+  const isScopeCre = scope === 'cre';
+  const cargoRegional = String(localStorage.getItem('cargo_regional') || 'coordenador_regional')
+    .toLowerCase()
+    .trim();
+  const codigoCreSidebar = String(localStorage.getItem('codigo_cre') || '').trim();
+  const canCreUniag =
+    isScopeCre &&
+    (cargoRegional === 'coordenador_regional' || cargoRegional === 'chefe_uniag');
 
   const hasPerm = (perm) => getPermissoes().includes(perm);
 
@@ -621,6 +630,94 @@ export default function Sidebar({ isOpen, onClose }) {
                 letterSpacing: '0.5px',
               }}>PREMIUM</span>
             </Link>
+          </>
+        ) : isScopeCre ? (
+          <>
+            {/* ─── ESFERA CRE (Coordenação Regional de Ensino - SEEDF) ─── */}
+            <div
+              className="mb-3 px-3 py-2.5 rounded-xl border"
+              style={{
+                background: 'linear-gradient(135deg, rgba(124,58,237,0.28), rgba(67,56,202,0.18))',
+                borderColor: 'rgba(196,181,253,0.28)',
+              }}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-violet-200">
+                  {codigoCreSidebar || 'CRE • SEEDF'}
+                </span>
+                <span
+                  style={{
+                    fontSize: '0.52rem',
+                    fontWeight: 800,
+                    background: 'linear-gradient(135deg, #a855f7, #6366f1)',
+                    color: '#fff',
+                    padding: '1px 6px',
+                    borderRadius: '8px',
+                    letterSpacing: '0.5px',
+                  }}
+                >
+                  REGIONAL
+                </span>
+              </div>
+              <p className="text-[11px] text-blue-100/90 font-semibold mt-1 truncate">
+                {localStorage.getItem('cargo_label') || 'Gestão Regional'}
+              </p>
+            </div>
+
+            {/* 1) GABINETE REGIONAL */}
+            <Link
+              to="/cre/gabinete"
+              className={getMainLinkClasses('/cre/gabinete')}
+              style={{
+                marginBottom: 6,
+                background: isActive('/cre/gabinete')
+                  ? 'linear-gradient(90deg, rgba(168,85,247,0.28), transparent)'
+                  : undefined,
+              }}
+            >
+              <BuildingLibraryIcon
+                className="h-5 w-5 mr-2"
+                style={{ color: isActive('/cre/gabinete') ? '#d8b4fe' : undefined }}
+              />
+              <span className="flex-1 text-left" style={{ fontWeight: 700 }}>
+                Gabinete Regional
+              </span>
+            </Link>
+
+            {/* 2) UNIAG — Administração Geral & Prestação de Contas */}
+            {canCreUniag && (
+              <Link
+                to="/cre/uniag"
+                className={getMainLinkClasses('/cre/uniag')}
+                style={{
+                  marginBottom: 6,
+                  background: isActive('/cre/uniag')
+                    ? 'linear-gradient(90deg, rgba(168,85,247,0.28), transparent)'
+                    : undefined,
+                }}
+              >
+                <BanknotesIcon
+                  className="h-5 w-5 mr-2"
+                  style={{ color: isActive('/cre/uniag') ? '#d8b4fe' : undefined }}
+                />
+                <span className="flex-1 text-left" style={{ fontWeight: 700 }}>
+                  UNIAG • Contas
+                </span>
+                <span
+                  style={{
+                    fontSize: '0.55rem',
+                    fontWeight: 800,
+                    background: 'linear-gradient(135deg, #a855f7, #7c3aed)',
+                    color: '#fff',
+                    padding: '2px 6px',
+                    borderRadius: '8px',
+                    letterSpacing: '0.5px',
+                  }}
+                >
+                  PDAF
+                </span>
+              </Link>
+            )}
           </>
         ) : (
           <>

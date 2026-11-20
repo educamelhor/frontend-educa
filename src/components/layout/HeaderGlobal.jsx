@@ -17,6 +17,7 @@ export default function HeaderGlobal({ onToggleSidebar, sidebarOpen }) {
   const [nomeEscola, setNomeEscola] = useState("");
   const [userName, setUserName] = useState("");
   const [perfil, setPerfil] = useState("");
+  const [cargoLabel, setCargoLabel] = useState("");
   const [cpf, setCpf] = useState("");
 
   // ─── Foto: URL estável + flag de falha permanente ───
@@ -61,14 +62,16 @@ export default function HeaderGlobal({ onToggleSidebar, sidebarOpen }) {
       const savedName    = localStorage.getItem("userName") || "Usuário";
       const savedPerfil  = (localStorage.getItem("perfil") || "aluno").toLowerCase().trim();
       const savedScope   = (localStorage.getItem("scope") || "escola").toLowerCase().trim();
+      const savedCargoLabel = localStorage.getItem("cargo_label") || "";
       const savedEscola  = savedScope === "plataforma"
         ? "Plataforma (CEO)"
-        : localStorage.getItem("nome_escola") || "Escola não definida";
+        : localStorage.getItem("nome_escola") || (savedScope === "cre" ? "Coordenação Regional" : "Escola não definida");
       const savedCpf     = localStorage.getItem("cpf") || "";
       const savedFoto    = localStorage.getItem("foto_url") || "";
 
       setUserName(savedName);
       setPerfil(savedPerfil);
+      setCargoLabel(savedCargoLabel);
       setNomeEscola(savedEscola);
       setCpf(savedCpf);
 
@@ -89,16 +92,25 @@ export default function HeaderGlobal({ onToggleSidebar, sidebarOpen }) {
       fetchedFromApi.current = true;
 
       try {
-        const token    = localStorage.getItem("token");
-        const escolaId = localStorage.getItem("escola_id");
-        if (!token || !escolaId) return;
+        const token      = localStorage.getItem("token");
+        const savedScope = (localStorage.getItem("scope") || "escola").toLowerCase().trim();
+        if (!token || savedScope === "plataforma") return;
 
-        const resp = await fetch(`${API_BASE}/usuarios/me/foto`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "x-escola-id": escolaId,
-          },
-        });
+        let resp;
+        if (savedScope === "cre") {
+          resp = await fetch(`${API_BASE}/cre/me/foto`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+        } else {
+          const escolaId = localStorage.getItem("escola_id");
+          if (!escolaId) return;
+          resp = await fetch(`${API_BASE}/usuarios/me/foto`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "x-escola-id": escolaId,
+            },
+          });
+        }
         const data = await resp.json().catch(() => ({}));
         if (!resp.ok) return;
 
@@ -129,6 +141,8 @@ export default function HeaderGlobal({ onToggleSidebar, sidebarOpen }) {
         setUserName(localStorage.getItem("userName") || "Usuário");
       if (e.key === "perfil" || e.key === null)
         setPerfil((localStorage.getItem("perfil") || "aluno").toLowerCase().trim());
+      if (e.key === "cargo_label" || e.key === null)
+        setCargoLabel(localStorage.getItem("cargo_label") || "");
       if (e.key === "nome_escola" || e.key === null) {
         const scope = (localStorage.getItem("scope") || "escola").toLowerCase().trim();
         setNomeEscola(scope === "plataforma" ? "Plataforma (CEO)" : localStorage.getItem("nome_escola") || "Escola não definida");
@@ -151,6 +165,11 @@ export default function HeaderGlobal({ onToggleSidebar, sidebarOpen }) {
     localStorage.removeItem("perfil");
     localStorage.removeItem("nome_escola");
     localStorage.removeItem("escola_id");
+    localStorage.removeItem("regional_id");
+    localStorage.removeItem("cargo_regional");
+    localStorage.removeItem("cargo_label");
+    localStorage.removeItem("codigo_cre");
+    localStorage.removeItem("modulos_ativos");
     localStorage.removeItem("scope");
     localStorage.removeItem("perfis");
     localStorage.removeItem("permissoes");
@@ -401,20 +420,29 @@ const API_BASE = (() => {
     const token = localStorage.getItem("token");
     if (!token) throw new Error("Sessão expirada. Faça login novamente.");
 
-    const escolaId = localStorage.getItem("escola_id");
-    if (!escolaId) throw new Error("Escola não definida. Faça login novamente.");
-
+    const savedScope = (localStorage.getItem("scope") || "escola").toLowerCase().trim();
     const form = new FormData();
     form.append("foto", file);
 
-    const resp = await fetch(`${API_BASE}/usuarios/me/foto`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "x-escola-id": escolaId,
-      },
-      body: form,
-    });
+    let resp;
+    if (savedScope === "cre") {
+      resp = await fetch(`${API_BASE}/cre/me/foto`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      });
+    } else {
+      const escolaId = localStorage.getItem("escola_id");
+      if (!escolaId) throw new Error("Escola não definida. Faça login novamente.");
+      resp = await fetch(`${API_BASE}/usuarios/me/foto`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "x-escola-id": escolaId,
+        },
+        body: form,
+      });
+    }
 
 
     const data = await resp.json().catch(() => ({}));
@@ -514,15 +542,17 @@ const API_BASE = (() => {
         {/* Nome e perfil */}
         <span className="header-user-info">
           {userName} <span className="text-sm text-gray-600">({
-            {
-              militar: "Comandante",
-              disciplinar: "Disciplinar",
-              diretor_disciplinar: "Diretor Disciplinar",
-              professor: "Professor",
-              diretor: "Diretor",
-              coordenador: "Coordenador",
-              admin: "Administrador",
-            }[perfil] || perfil
+            perfil === "chefe_regional" || perfil === "coordenador_regional"
+              ? (cargoLabel || "Gestor Regional")
+              : ({
+                  militar: "Comandante",
+                  disciplinar: "Disciplinar",
+                  diretor_disciplinar: "Diretor Disciplinar",
+                  professor: "Professor",
+                  diretor: "Diretor",
+                  coordenador: "Coordenador",
+                  admin: "Administrador",
+                }[perfil] || perfil)
           })</span>
         </span>
 

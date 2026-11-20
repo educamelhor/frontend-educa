@@ -330,6 +330,46 @@ export default function Login() {
     } catch {}
   };
 
+  const limparSessaoCre = () => {
+    try {
+      localStorage.removeItem("regional_id");
+      localStorage.removeItem("cargo_regional");
+      localStorage.removeItem("cargo_label");
+      localStorage.removeItem("codigo_cre");
+    } catch {}
+  };
+
+  const persistirSessaoCre = (data) => {
+    limparSessaoPlataforma();
+    const cargoReg = String(data?.cargo_regional || "coordenador_regional").toLowerCase().trim();
+    const modulosCre = Array.isArray(data?.modulos_ativos)
+      ? data.modulos_ativos
+      : ["cre", "cre.gabinete", ...(cargoReg === "coordenador_regional" || cargoReg === "chefe_uniag" ? ["cre.uniag"] : [])];
+
+    localStorage.setItem("token", data.token);
+    localStorage.setItem("userName", data.nome || "Gestor Regional");
+    localStorage.setItem("scope", "cre");
+    localStorage.setItem("perfil", data.perfil || "chefe_regional");
+    localStorage.setItem("regional_id", String(data.regional_id || ""));
+    localStorage.setItem("cargo_regional", cargoReg);
+    localStorage.setItem("cargo_label", String(data.cargo_label || ""));
+    localStorage.setItem("codigo_cre", String(data.codigo_cre || ""));
+    localStorage.setItem("nome_escola", data.nome_regional || data.nome_escola || "Coordenação Regional");
+    localStorage.setItem("perfis", JSON.stringify(Array.isArray(data?.perfis) ? data.perfis : [cargoReg]));
+    localStorage.setItem("permissoes", JSON.stringify(Array.isArray(data?.permissoes) ? data.permissoes : []));
+    localStorage.setItem("modulos_ativos", JSON.stringify(modulosCre));
+    localStorage.setItem("cpf", String(data?.cpf || "").replace(/\D/g, ""));
+    localStorage.setItem("foto_url", String(data?.foto_url || data?.fotoUrl || ""));
+    sessionStorage.removeItem("modulos_last_refresh");
+
+    localStorage.removeItem("escola_id");
+    localStorage.removeItem("last_escola_id");
+    localStorage.removeItem("disciplinas_professor_ctx");
+    localStorage.removeItem("disciplinas_professor");
+
+    return cargoReg === "chefe_uniag" ? "/cre/uniag" : "/cre/gabinete";
+  };
+
   const carregarDisciplinasProfessor = async (token) => {
     try {
       if (!token) return;
@@ -655,6 +695,18 @@ export default function Login() {
           return;
         }
 
+        // ── Sessão isolada CRE (scope: "cre") ──
+        if (String(data?.scope || "").toLowerCase() === "cre") {
+          const destinoCre = persistirSessaoCre(data);
+          setNomeUsuarioLogin(data.nome || "");
+          setTipoMensagem("sucesso");
+          setMensagem("Dispositivo reconhecido!");
+          setSuccess(true);
+          setTimeout(() => navigate(destinoCre), 1100);
+          return;
+        }
+
+        limparSessaoCre();
         localStorage.setItem("token", data.token);
         localStorage.setItem("userName", data.nome || "Usuário");
         localStorage.setItem("escola_id", data.escola_id ?? 1);
@@ -663,7 +715,7 @@ export default function Login() {
         localStorage.setItem("scope", data.scope || "escola");
         localStorage.setItem("perfis", JSON.stringify(Array.isArray(data?.perfis) ? data.perfis : []));
         localStorage.setItem("permissoes", JSON.stringify(Array.isArray(data?.permissoes) ? data.permissoes : []));
-        localStorage.setItem("modulos_ativos", "[]");
+        localStorage.setItem("modulos_ativos", JSON.stringify(Array.isArray(data?.modulos_ativos) ? data.modulos_ativos : []));
         sessionStorage.removeItem("modulos_last_refresh");
 
         await carregarDisciplinasProfessor(data.token);
@@ -740,7 +792,12 @@ export default function Login() {
     setLoading(true);
     setMensagem("");
     try {
-      const { data } = await api.post("/api/auth/login", { emailOuCelular: valorLogin, senha });
+      const { data } = await api.post("/api/auth/login", {
+        email: valorLogin,
+        emailOuCelular: valorLogin,
+        senha,
+        contexto: tipoAcesso,
+      });
       const resolvedUsuarioId = data?.usuarioId ?? data?.userId ?? data?.id ?? data?.usuario_id ?? null;
       if (resolvedUsuarioId) setUsuarioId(resolvedUsuarioId);
       setCodigo("");
@@ -788,6 +845,7 @@ export default function Login() {
         localStorage.removeItem("foto_url");
         localStorage.removeItem("disciplinas_professor_ctx");
         localStorage.removeItem("disciplinas_professor");
+        limparSessaoCre();
 
         setNomeUsuarioLogin(data.nome || "CEO");
         setTipoMensagem("sucesso");
@@ -817,7 +875,22 @@ export default function Login() {
         return;
       }
 
+      // ── Sessão isolada CRE (scope: "cre") ──
+      if (String(data?.scope || "").toLowerCase() === "cre") {
+        if (data?.device_token) saveDeviceToken(data.device_token);
+        if (!confirarDispositivo && !getDeviceToken()) clearDeviceToken();
+
+        const destinoCre = persistirSessaoCre(data);
+        setNomeUsuarioLogin(data.nome || "");
+        setTipoMensagem("sucesso");
+        setMensagem("Acesso Regional Confirmado!");
+        setSuccess(true);
+        setTimeout(() => navigate(destinoCre), 1200);
+        return;
+      }
+
       limparSessaoPlataforma();
+      limparSessaoCre();
       localStorage.setItem("token", data.token);
       localStorage.setItem("userName", data.nome || "Usuário");
       localStorage.setItem("escola_id", data.escola_id ?? 1);
@@ -837,7 +910,7 @@ export default function Login() {
       if (data?.device_token) saveDeviceToken(data.device_token);
       if (!confirarDispositivo && !getDeviceToken()) clearDeviceToken();
 
-      localStorage.setItem("modulos_ativos", "[]");
+      localStorage.setItem("modulos_ativos", JSON.stringify(Array.isArray(data?.modulos_ativos) ? data.modulos_ativos : []));
       sessionStorage.removeItem("modulos_last_refresh");
 
       setNomeUsuarioLogin(data.nome || "");

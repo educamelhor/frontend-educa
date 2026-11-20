@@ -183,6 +183,9 @@ import FinanceiroModule from "./features/financeiro";
 import PdafPage from "./features/financeiro/PdafPage";
 import PddePage from "./features/financeiro/PddePage";
 
+// ✅ MÓDULO CRE — Coordenações Regionais de Ensino (Gabinete & UNIAG)
+import { CreGabinetePage, CreUniagPage } from "./features/cre";
+
 // Layout protegido para rotas autenticadas
 function ProtectedLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -248,6 +251,33 @@ function RequirePlatformAuth({ children }) {
   const scope = String(payload?.scope || "").toLowerCase();
   if (scope !== "plataforma") return <Navigate to="/login" replace />;
   return children;
+}
+
+function RequireCreAuth({ children }) {
+  const token = localStorage.getItem("token");
+  if (!token) return <Navigate to="/login" replace />;
+  const payload = parseJwtPayload(token);
+  const scope = String(payload?.scope || "").toLowerCase();
+  const regionalId = Number(payload?.regional_id || 0);
+  if (scope !== "cre" || !regionalId || regionalId <= 0) {
+    try { localStorage.removeItem("token"); } catch { }
+    return <Navigate to="/login" replace />;
+  }
+  return children;
+}
+
+function RequireCreUniag({ children }) {
+  const token = localStorage.getItem("token");
+  const payload = parseJwtPayload(token);
+  const cargo = String(
+    payload?.cargo_regional || localStorage.getItem("cargo_regional") || "coordenador_regional"
+  )
+    .toLowerCase()
+    .trim();
+  if (cargo === "coordenador_regional" || cargo === "chefe_uniag") {
+    return children;
+  }
+  return <Navigate to="/cre/gabinete" replace />;
 }
 
 function RequireDiretor({ children }) {
@@ -377,6 +407,14 @@ export default function App() {
           <Route path="/plataforma/suporte"        element={<RequireCeo><PlataformaSuporte /></RequireCeo>} />
           <Route path="/plataforma/governanca"     element={<RequireCeo><PlataformaGovernanca /></RequireCeo>} />
           <Route path="/plataforma/banco-master"   element={<RequireCeo><BancoMaster /></RequireCeo>} />
+        </Route>
+
+        {/* Rotas protegidas da COORDENAÇÃO REGIONAL DE ENSINO (CRE) — Escopo isolado "cre" */}
+        <Route element={<RequireCreAuth><ProtectedLayout /></RequireCreAuth>}>
+          <Route path="/cre" element={<Navigate to="/cre/gabinete" replace />} />
+          <Route path="/cre/gabinete" element={<CreGabinetePage />} />
+          <Route path="/cre/uniag" element={<RequireCreUniag><CreUniagPage /></RequireCreUniag>} />
+          <Route path="/cre/*" element={<Navigate to="/cre/gabinete" replace />} />
         </Route>
 
         {/* Rotas protegidas do SISTEMA ESCOLAR */}

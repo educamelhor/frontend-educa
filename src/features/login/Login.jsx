@@ -36,7 +36,7 @@ function senhaForte(s) {
   return s.length >= 6 && /[A-Za-z]/.test(s) && /\d/.test(s) && /[$#@*_]/.test(s);
 }
 
-// ── Configuração dos 3 Portais de Acesso (Padrão Corporativo Unificado: E-mail + Senha + 2FA) ──
+// ── Configuração dos 3 Portais de Acesso (Tríade Cromática: Esmeralda • Ametista Real • Ouro Imperial) ──
 const PORTAIS_CONFIG = {
   escola: {
     key: "escola",
@@ -50,12 +50,21 @@ const PORTAIS_CONFIG = {
     labelLogin: "E-mail de acesso",
     dicaSeguranca: "Autenticação corporativa unificada por e-mail e senha com verificação em 2 etapas (2FA) e opção de dispositivo confiado.",
     Icon: AcademicCapIcon,
-    cardGradient: "linear-gradient(145deg, rgba(13, 38, 92, 0.94) 0%, rgba(8, 47, 58, 0.94) 100%)",
-    panelGradient: "linear-gradient(155deg, #1e3a8a 0%, #1d4ed8 48%, #059669 100%)",
-    btnGradient: "linear-gradient(135deg, #2563eb 0%, #0ea5e9 55%, #10b981 100%)",
-    accentRing: "rgba(56, 189, 248, 0.55)",
-    auroraColor: "rgba(37, 99, 235, 0.42)",
-    badgeClass: "bg-sky-500/20 text-sky-200 border-sky-400/30",
+    cardGradient: "linear-gradient(152deg, rgba(6, 52, 40, 0.95) 0%, rgba(5, 34, 30, 0.96) 52%, rgba(7, 22, 34, 0.97) 100%)",
+    cornerGlow: "rgba(16, 185, 129, 0.28)",
+    bottomGlow: "rgba(20, 184, 166, 0.18)",
+    panelGradient: "linear-gradient(155deg, #064e3b 0%, #047857 48%, #0d9488 100%)",
+    btnGradient: "linear-gradient(135deg, #10b981 0%, #059669 52%, #0d9488 100%)",
+    accentRing: "rgba(52, 211, 153, 0.72)",
+    restingRing: "rgba(52, 211, 153, 0.32)",
+    auroraColor: "rgba(16, 185, 129, 0.44)",
+    badgeClass: "bg-emerald-500/20 text-emerald-200 border-emerald-400/40",
+    subtitleClass: "text-emerald-300/95",
+    descClass: "text-emerald-50/80",
+    chipClass: "bg-emerald-500/15 text-emerald-100/95 border-emerald-400/25",
+    ctaHoverClass: "group-hover:text-emerald-200",
+    pillActiveClass: "bg-emerald-500/20 text-emerald-200 border-emerald-400/50 shadow-[0_0_16px_rgba(16,185,129,0.35)]",
+    modalAccentText: "text-emerald-700",
     ctaLabel: "Acessar Unidade Escolar",
   },
   cre: {
@@ -70,12 +79,21 @@ const PORTAIS_CONFIG = {
     labelLogin: "E-mail institucional (CRE)",
     dicaSeguranca: "Acesso exclusivo por e-mail e senha para Coordenadores Regionais de Ensino e Chefes das Unidades Orgânicas.",
     Icon: BuildingLibraryIcon,
-    cardGradient: "linear-gradient(145deg, rgba(8, 47, 73, 0.94) 0%, rgba(26, 24, 78, 0.95) 100%)",
-    panelGradient: "linear-gradient(155deg, #0f172a 0%, #0e7490 50%, #4f46e5 100%)",
-    btnGradient: "linear-gradient(135deg, #0891b2 0%, #2563eb 55%, #6366f1 100%)",
-    accentRing: "rgba(34, 211, 238, 0.55)",
-    auroraColor: "rgba(6, 182, 212, 0.38)",
-    badgeClass: "bg-cyan-500/20 text-cyan-200 border-cyan-400/30",
+    cardGradient: "linear-gradient(152deg, rgba(40, 18, 84, 0.95) 0%, rgba(27, 16, 66, 0.96) 52%, rgba(15, 19, 48, 0.97) 100%)",
+    cornerGlow: "rgba(168, 85, 247, 0.32)",
+    bottomGlow: "rgba(99, 102, 241, 0.20)",
+    panelGradient: "linear-gradient(155deg, #2e1065 0%, #5b21b6 48%, #4338ca 100%)",
+    btnGradient: "linear-gradient(135deg, #a855f7 0%, #7c3aed 52%, #4f46e5 100%)",
+    accentRing: "rgba(192, 132, 252, 0.72)",
+    restingRing: "rgba(167, 139, 250, 0.34)",
+    auroraColor: "rgba(139, 92, 246, 0.46)",
+    badgeClass: "bg-violet-500/20 text-violet-200 border-violet-400/40",
+    subtitleClass: "text-violet-300/95",
+    descClass: "text-indigo-50/80",
+    chipClass: "bg-violet-500/15 text-violet-100/95 border-violet-400/25",
+    ctaHoverClass: "group-hover:text-violet-200",
+    pillActiveClass: "bg-violet-500/20 text-violet-200 border-violet-400/50 shadow-[0_0_16px_rgba(139,92,246,0.38)]",
+    modalAccentText: "text-violet-700",
     ctaLabel: "Acessar Regional (CRE)",
   },
   plataforma: {
@@ -90,12 +108,21 @@ const PORTAIS_CONFIG = {
     labelLogin: "E-mail Executivo (CEO / Plataforma)",
     dicaSeguranca: "Ambiente de alta segurança protegido por autenticação obrigatória de duplo fator (OTP).",
     Icon: SparklesIcon,
-    cardGradient: "linear-gradient(145deg, rgba(46, 26, 12, 0.94) 0%, rgba(32, 16, 62, 0.95) 100%)",
-    panelGradient: "linear-gradient(155deg, #18181b 0%, #311042 48%, #b45309 100%)",
-    btnGradient: "linear-gradient(135deg, #d97706 0%, #9333ea 60%, #4f46e5 100%)",
-    accentRing: "rgba(251, 191, 36, 0.55)",
-    auroraColor: "rgba(217, 119, 6, 0.34)",
-    badgeClass: "bg-amber-500/20 text-amber-200 border-amber-400/35",
+    cardGradient: "linear-gradient(152deg, rgba(56, 30, 8, 0.95) 0%, rgba(35, 20, 9, 0.96) 52%, rgba(20, 14, 12, 0.97) 100%)",
+    cornerGlow: "rgba(245, 158, 11, 0.30)",
+    bottomGlow: "rgba(234, 88, 12, 0.18)",
+    panelGradient: "linear-gradient(155deg, #1c1917 0%, #78350f 50%, #b45309 100%)",
+    btnGradient: "linear-gradient(135deg, #f59e0b 0%, #d97706 52%, #ea580c 100%)",
+    accentRing: "rgba(251, 191, 36, 0.72)",
+    restingRing: "rgba(251, 191, 36, 0.34)",
+    auroraColor: "rgba(245, 158, 11, 0.44)",
+    badgeClass: "bg-amber-500/20 text-amber-200 border-amber-400/40",
+    subtitleClass: "text-amber-300/95",
+    descClass: "text-amber-50/80",
+    chipClass: "bg-amber-500/15 text-amber-100/95 border-amber-400/25",
+    ctaHoverClass: "group-hover:text-amber-200",
+    pillActiveClass: "bg-amber-500/20 text-amber-200 border-amber-400/50 shadow-[0_0_16px_rgba(245,158,11,0.35)]",
+    modalAccentText: "text-amber-700",
     ctaLabel: "Acessar Plataforma CEO",
   },
 };
@@ -878,7 +905,9 @@ export default function Login() {
 
   const portalAtivo = PORTAIS_CONFIG[tipoAcesso] || PORTAIS_CONFIG.escola;
   const ActivePortalIcon = portalAtivo.Icon;
-  const portalAurora = PORTAIS_CONFIG[hoveredCard] || PORTAIS_CONFIG.escola;
+  const portalAuroraColor = hoveredCard
+    ? PORTAIS_CONFIG[hoveredCard]?.auroraColor || "rgba(56, 189, 248, 0.28)"
+    : "rgba(56, 189, 248, 0.28)";
   const stepIndex = success ? 3 : etapa === "codigo" || etapa === "escola" ? 2 : 1;
 
   const senhaChecks = [
@@ -917,7 +946,7 @@ export default function Login() {
       {/* ── Luzes Volumétricas Dinâmicas que reagem ao Card em foco ── */}
       <div
         className="pointer-events-none fixed top-[-140px] left-1/2 -translate-x-1/2 w-[780px] h-[520px] rounded-full blur-[140px] transition-all duration-700"
-        style={{ background: `radial-gradient(circle, ${portalAurora.auroraColor}, transparent 70%)` }}
+        style={{ background: `radial-gradient(circle, ${portalAuroraColor}, transparent 70%)` }}
       />
       <div
         className="pointer-events-none fixed inset-0 opacity-[0.09]"
@@ -1039,7 +1068,7 @@ export default function Login() {
                   className={`pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 w-[380px] h-14 rounded-full blur-2xl transition-all duration-700 ${
                     hoveredCard ? "opacity-100" : "opacity-0"
                   }`}
-                  style={{ background: portalAurora.auroraColor }}
+                  style={{ background: portalAuroraColor }}
                 />
 
                 <div
@@ -1169,19 +1198,30 @@ export default function Login() {
                           transition:
                             "transform 700ms cubic-bezier(0.22, 1, 0.36, 1), opacity 520ms ease, box-shadow 620ms ease, filter 520ms ease",
                           boxShadow: isCenter
-                            ? `0 34px 80px -15px rgba(0,0,0,0.88), 0 0 50px -10px ${cfg.auroraColor}, 0 0 0 1.5px ${cfg.accentRing}`
-                            : "0 20px 45px -18px rgba(0,0,0,0.75), 0 0 0 1px rgba(255,255,255,0.14)",
+                            ? `0 34px 80px -15px rgba(0,0,0,0.88), 0 0 56px -8px ${cfg.auroraColor}, 0 0 0 1.5px ${cfg.accentRing}`
+                            : isModoInicialLadoALado
+                            ? `0 24px 55px -16px rgba(0,0,0,0.82), 0 0 32px -12px ${cfg.auroraColor}, 0 0 0 1px ${cfg.restingRing}`
+                            : `0 20px 45px -18px rgba(0,0,0,0.75), 0 0 0 1px ${cfg.restingRing}`,
                           backfaceVisibility: "hidden",
                           willChange: "transform, opacity",
                         }}
                         className="pointer-events-auto group absolute text-left rounded-3xl p-7 backdrop-blur-2xl flex flex-col justify-between min-h-[392px] overflow-hidden cursor-pointer"
                       >
+                        {/* Nebulosa interna da esfera (iluminação volumétrica de joalheria) */}
+                        <div
+                          className="pointer-events-none absolute inset-0 transition-opacity duration-500"
+                          style={{
+                            background: `radial-gradient(circle at 88% 12%, ${cfg.cornerGlow} 0%, transparent 56%), radial-gradient(circle at 12% 92%, ${cfg.bottomGlow} 0%, transparent 52%)`,
+                            opacity: isDestaque ? 1 : 0.65,
+                          }}
+                        />
+
                         {/* Feixe superior colorido */}
                         <div
                           className="pointer-events-none absolute inset-x-0 top-0 h-1.5 transition-opacity duration-500"
                           style={{
                             background: cfg.btnGradient,
-                            opacity: isDestaque ? 1 : 0.55,
+                            opacity: isDestaque ? 1 : 0.65,
                           }}
                         />
 
@@ -1218,10 +1258,10 @@ export default function Login() {
                           >
                             {cfg.titulo}
                           </h2>
-                          <div className="text-xs font-semibold text-blue-200/90 mb-3">
+                          <div className={`text-xs font-semibold mb-3 ${cfg.subtitleClass}`}>
                             {cfg.subtitulo}
                           </div>
-                          <p className="text-xs sm:text-[13px] text-blue-100/80 leading-relaxed mb-5">
+                          <p className={`text-xs sm:text-[13px] leading-relaxed mb-5 ${cfg.descClass}`}>
                             {cfg.descricao}
                           </p>
 
@@ -1229,7 +1269,7 @@ export default function Login() {
                             {cfg.publico.map((p) => (
                               <span
                                 key={p}
-                                className="text-[11px] font-medium px-2.5 py-0.5 rounded-md bg-white/10 text-white/90 border border-white/10"
+                                className={`text-[11px] font-medium px-2.5 py-0.5 rounded-md border ${cfg.chipClass}`}
                               >
                                 {p}
                               </span>
@@ -1238,7 +1278,7 @@ export default function Login() {
                         </div>
 
                         <div className="relative z-10 pt-4 border-t border-white/15 flex items-center justify-between">
-                          <span className="text-sm font-bold text-white group-hover:text-sky-200 transition-colors">
+                          <span className={`text-sm font-bold text-white transition-colors ${cfg.ctaHoverClass}`}>
                             {cfg.ctaLabel}
                           </span>
                           <span
@@ -1268,9 +1308,9 @@ export default function Login() {
                       type="button"
                       onMouseEnter={() => ativarCardCarrossel(chave, "indicator", undefined, true)}
                       onClick={() => abrirPortalModal(chave)}
-                      className={`px-3 py-1 rounded-full text-[11px] font-bold tracking-wider transition-all border ${
+                      className={`px-3.5 py-1 rounded-full text-[11px] font-bold tracking-wider transition-all border ${
                         ativo
-                          ? "bg-white/15 text-white border-white/40 scale-105 shadow-sm"
+                          ? `${cfg.pillActiveClass} scale-105`
                           : "bg-white/5 text-blue-200/50 border-white/10 hover:text-white/80"
                       }`}
                     >
@@ -1291,14 +1331,23 @@ export default function Login() {
                     key={cfg.key}
                     type="button"
                     onClick={() => abrirPortalModal(chave)}
-                    style={{ background: cfg.cardGradient }}
-                    className="relative text-left rounded-3xl p-6 border border-white/15 shadow-xl flex flex-col justify-between overflow-hidden"
+                    style={{
+                      background: cfg.cardGradient,
+                      boxShadow: `0 20px 45px -16px rgba(0,0,0,0.8), 0 0 0 1px ${cfg.restingRing}`,
+                    }}
+                    className="relative text-left rounded-3xl p-6 flex flex-col justify-between overflow-hidden"
                   >
                     <div
-                      className="pointer-events-none absolute inset-x-0 top-0 h-1"
+                      className="pointer-events-none absolute inset-0"
+                      style={{
+                        background: `radial-gradient(circle at 88% 12%, ${cfg.cornerGlow} 0%, transparent 56%)`,
+                      }}
+                    />
+                    <div
+                      className="pointer-events-none absolute inset-x-0 top-0 h-1.5"
                       style={{ background: cfg.btnGradient }}
                     />
-                    <div>
+                    <div className="relative z-10">
                       <div className="flex items-start justify-between gap-3 mb-4">
                         <div
                           className="w-12 h-12 rounded-2xl flex items-center justify-center border border-white/25"
@@ -1310,12 +1359,13 @@ export default function Login() {
                           {cfg.badge}
                         </span>
                       </div>
-                      <h2 className="text-2xl font-extrabold text-white mb-1" style={{ fontFamily: "'Montserrat', sans-serif" }}>
+                      <h2 className="text-2xl font-extrabold text-white mb-0.5" style={{ fontFamily: "'Montserrat', sans-serif" }}>
                         {cfg.titulo}
                       </h2>
-                      <p className="text-xs text-blue-100/80 mb-4">{cfg.descricao}</p>
+                      <div className={`text-xs font-semibold mb-2 ${cfg.subtitleClass}`}>{cfg.subtitulo}</div>
+                      <p className={`text-xs mb-4 ${cfg.descClass}`}>{cfg.descricao}</p>
                     </div>
-                    <div className="pt-3 border-t border-white/10 flex items-center justify-between">
+                    <div className="relative z-10 pt-3 border-t border-white/10 flex items-center justify-between">
                       <span className="text-sm font-bold text-white">{cfg.ctaLabel}</span>
                       <ArrowRightIcon className="h-4 w-4 text-white" />
                     </div>
@@ -1505,7 +1555,7 @@ export default function Login() {
                 /* ═══ ETAPA 1: CREDENCIAIS ═══ */
                 <form onSubmit={handleLogin} className="space-y-5">
                   <div>
-                    <span className="text-[11px] font-bold uppercase tracking-wider text-blue-600">
+                    <span className={`text-[11px] font-bold uppercase tracking-wider ${portalAtivo.modalAccentText}`}>
                       {portalAtivo.subtitulo}
                     </span>
                     <h2 className="text-2xl font-extrabold text-slate-900 mt-0.5">

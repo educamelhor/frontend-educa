@@ -46,7 +46,7 @@ const PORTAIS_CONFIG = {
     descricao:
       "Gestão pedagógica, diário eletrônico, chamada inteligente, gabaritos, frequência, secretaria e equipe técnica.",
     publico: ["Direção", "Coordenação", "Secretaria", "Professores", "Disciplinar & Equipe"],
-    placeholderLogin: "seu.email@instituicao.com.br",
+    placeholderLogin: "seu.email@email.com.br",
     labelLogin: "E-mail de acesso",
     dicaSeguranca: "Autenticação corporativa unificada por e-mail e senha com verificação em 2 etapas (2FA) e opção de dispositivo confiado.",
     Icon: AcademicCapIcon,
@@ -66,7 +66,7 @@ const PORTAIS_CONFIG = {
     descricao:
       "Supervisão regional da rede, acompanhamento das escolas vinculadas, planejamento territorial e gestão de pessoas.",
     publico: ["Coordenador Regional", "UNIEB", "UNIPLAT", "UNIGEP", "UNIAE", "UNIAG"],
-    placeholderLogin: "seu.email@edu.se.df.gov.br",
+    placeholderLogin: "seu.email@email.com.br",
     labelLogin: "E-mail institucional (CRE)",
     dicaSeguranca: "Acesso exclusivo por e-mail e senha para Coordenadores Regionais de Ensino e Chefes das Unidades Orgânicas.",
     Icon: BuildingLibraryIcon,
@@ -86,7 +86,7 @@ const PORTAIS_CONFIG = {
     descricao:
       "Controle global de instituições, licenciamento de módulos por perfil, auditoria RBAC, prazos e telemetria.",
     publico: ["CEO", "Super Admin", "Governança", "Auditoria & Insights"],
-    placeholderLogin: "E-mail executivo da Plataforma",
+    placeholderLogin: "seu.email@email.com.br",
     labelLogin: "E-mail Executivo (CEO / Plataforma)",
     dicaSeguranca: "Ambiente de alta segurança protegido por autenticação obrigatória de duplo fator (OTP).",
     Icon: SparklesIcon,
@@ -1892,6 +1892,7 @@ export default function Login() {
                   <div className="flex gap-2">
                     <input
                       type="email"
+                      placeholder="seu.email@email.com.br"
                       value={usuario}
                       readOnly={resetEmailLocked}
                       onChange={(e) => setUsuario(e.target.value)}

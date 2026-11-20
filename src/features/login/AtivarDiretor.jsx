@@ -233,7 +233,7 @@ export default function AtivarDiretor() {
               <div className="mb-5">
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">E-mail *</label>
                 <input type="email" value={email} onChange={e => { setEmail(e.target.value); setErro(""); }}
-                  placeholder="seu@email.com"
+                  placeholder="seu.email@email.com.br"
                   className="w-full border border-slate-300 rounded-xl px-4 py-3 text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   autoFocus autoComplete="email" />
               </div>

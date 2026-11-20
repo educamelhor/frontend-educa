@@ -27,20 +27,8 @@ function isEmailValido(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || "").trim());
 }
 
-function isCelularValido(valor) {
-  const digits = String(valor || "").replace(/\D/g, "");
-  return digits.length === 10 || digits.length === 11;
-}
-
-function isCpfValido(valor) {
-  const digits = String(valor || "").replace(/\D/g, "");
-  return digits.length === 11;
-}
-
 function normalizarLogin(valor) {
-  const v = String(valor || "").trim();
-  if (isEmailValido(v)) return v.toLowerCase();
-  return v.replace(/\D/g, "");
+  return String(valor || "").trim().toLowerCase();
 }
 
 function senhaForte(s) {
@@ -48,7 +36,7 @@ function senhaForte(s) {
   return s.length >= 6 && /[A-Za-z]/.test(s) && /\d/.test(s) && /[$#@*_]/.test(s);
 }
 
-// ── Configuração dos 3 Portais de Acesso ──
+// ── Configuração dos 3 Portais de Acesso (Padrão Corporativo Unificado: E-mail + Senha + 2FA) ──
 const PORTAIS_CONFIG = {
   escola: {
     key: "escola",
@@ -56,11 +44,11 @@ const PORTAIS_CONFIG = {
     titulo: "ESCOLA",
     subtitulo: "Ambiente Escolar Integrado",
     descricao:
-      "Gestão pedagógica, diário eletrônico, chamada inteligente, gabaritos, frequência e portal do estudante.",
-    publico: ["Direção", "Coordenação", "Secretaria", "Professores", "Alunos & Famílias"],
-    placeholderLogin: "CPF, e-mail ou celular",
-    labelLogin: "Identificação (CPF, e-mail ou celular)",
-    dicaSeguranca: "Diretores acessam direto via CPF. Demais perfis contam com verificação inteligente em 2 etapas.",
+      "Gestão pedagógica, diário eletrônico, chamada inteligente, gabaritos, frequência, secretaria e equipe técnica.",
+    publico: ["Direção", "Coordenação", "Secretaria", "Professores", "Disciplinar & Equipe"],
+    placeholderLogin: "seu.email@instituicao.com.br",
+    labelLogin: "E-mail de acesso",
+    dicaSeguranca: "Autenticação corporativa unificada por e-mail e senha com verificação em 2 etapas (2FA) e opção de dispositivo confiado.",
     Icon: AcademicCapIcon,
     cardGradient: "linear-gradient(135deg, rgba(37,99,235,0.24) 0%, rgba(16,185,129,0.16) 100%)",
     panelGradient: "linear-gradient(155deg, #1e3a8a 0%, #1d4ed8 48%, #059669 100%)",
@@ -78,9 +66,9 @@ const PORTAIS_CONFIG = {
     descricao:
       "Supervisão regional da rede, acompanhamento das escolas vinculadas, planejamento territorial e gestão de pessoas.",
     publico: ["Coordenador Regional", "UNIEB", "UNIPLAT", "UNIGEP", "UNIAE", "UNIAG"],
-    placeholderLogin: "CPF ou e-mail institucional",
-    labelLogin: "CPF ou E-mail do Gestor Regional",
-    dicaSeguranca: "Acesso exclusivo para Coordenadores Regionais de Ensino e Chefes das Unidades Orgânicas.",
+    placeholderLogin: "seu.email@edu.se.df.gov.br",
+    labelLogin: "E-mail institucional (CRE)",
+    dicaSeguranca: "Acesso exclusivo por e-mail e senha para Coordenadores Regionais de Ensino e Chefes das Unidades Orgânicas.",
     Icon: BuildingLibraryIcon,
     cardGradient: "linear-gradient(135deg, rgba(8,145,178,0.26) 0%, rgba(99,102,241,0.18) 100%)",
     panelGradient: "linear-gradient(155deg, #0f172a 0%, #0e7490 50%, #4f46e5 100%)",
@@ -170,12 +158,14 @@ export default function Login() {
       .catch(() => {});
   }, [tipoAcesso]);
 
-  // Se veio redirecionado do CadastroUsuario com state.email, abre direto o modal ESCOLA preenchido
+  // Se veio redirecionado do CadastroUsuario ou AtivarDiretor com state.email, abre o modal correto já preenchido
   useEffect(() => {
     const emailFromState = location?.state?.email;
+    const portalFromState = location?.state?.portal || "escola";
     if (emailFromState) {
       setUsuario(emailFromState);
-      setTipoAcesso("escola");
+      setTipoAcesso(portalFromState);
+      setHoveredCard(portalFromState);
       setModalAberto(true);
     }
   }, [location?.state]);
@@ -302,21 +292,14 @@ export default function Login() {
     }
   };
 
-  // Detecção visual inteligente do que o usuário está digitando
+  // Validação visual em tempo real do formato do e-mail corporativo
   const detectarTipoIdentificador = () => {
     const raw = String(usuario || "").trim();
     if (!raw) return null;
-    if (raw.includes("@")) {
-      return { icone: "✉️", texto: isEmailValido(raw) ? "E-mail válido" : "Digitando e-mail...", ok: isEmailValido(raw) };
+    if (isEmailValido(raw)) {
+      return { icone: "✓", texto: "Formato de e-mail válido", ok: true };
     }
-    const nums = raw.replace(/\D/g, "");
-    if (nums.length === 11 && !raw.includes("(")) {
-      return { icone: "🪪", texto: "CPF / Celular (11 dígitos)", ok: true };
-    }
-    if (nums.length >= 10 && nums.length <= 11) {
-      return { icone: "📱", texto: "Celular reconhecido", ok: true };
-    }
-    return null;
+    return { icone: "✉️", texto: "Digite seu e-mail completo", ok: false };
   };
   const infoIdentificador = detectarTipoIdentificador();
 
@@ -471,30 +454,25 @@ export default function Login() {
     }
   };
 
-  // ── 1ª Etapa: Login Principal ──
+  // ── 1ª Etapa: Login Principal (Padrão Corporativo Unificado: E-mail + Senha) ──
   const handleLogin = async (e) => {
     e.preventDefault();
 
     if (!usuario?.trim() || !senha?.trim()) {
       setTipoMensagem("erro");
-      setMensagem(
-        tipoAcesso === "plataforma"
-          ? "Informe seu e-mail executivo e senha."
-          : "Informe sua identificação e senha para continuar."
-      );
+      setMensagem("Informe seu e-mail cadastrado e senha para continuar.");
       return;
     }
 
     const valorLogin = normalizarLogin(usuario);
-    const isCpf = isCpfValido(valorLogin) && !String(usuario).includes("@");
+    if (!isEmailValido(valorLogin)) {
+      setTipoMensagem("erro");
+      setMensagem("Informe um endereço de e-mail válido.");
+      return;
+    }
 
     // ── Fluxo CEO / Plataforma ──
     if (tipoAcesso === "plataforma") {
-      if (!isEmailValido(valorLogin)) {
-        setTipoMensagem("erro");
-        setMensagem("No Portal CEO, informe um endereço de e-mail válido.");
-        return;
-      }
       setLoading(true);
       setMensagem("");
       try {
@@ -524,48 +502,23 @@ export default function Login() {
       }
     }
 
-    // ── Fluxo ESCOLA ou CREs ──
-    const okLogin = isEmailValido(valorLogin) || isCelularValido(valorLogin) || isCpf;
-    if (!okLogin) {
-      setTipoMensagem("erro");
-      setMensagem("Informe um CPF, e-mail ou celular válido.");
-      return;
-    }
-
+    // ── Fluxo ESCOLA ou CREs (Unificado por E-mail + Senha + 2FA / Dispositivo Confiado) ──
     setLoading(true);
     setMensagem("");
 
     try {
-      const payload = isCpf
-        ? { cpf: valorLogin, senha, contexto: tipoAcesso === "cre" ? "cre" : "escola" }
-        : { emailOuCelular: valorLogin, senha, device_token: getDeviceToken(), contexto: tipoAcesso };
+      const payload = {
+        email: valorLogin,
+        emailOuCelular: valorLogin,
+        senha,
+        device_token: getDeviceToken(),
+        contexto: tipoAcesso,
+      };
 
       const { data } = await api.post("/api/auth/login", payload);
 
-      // Login direto por CPF (Diretor ou Chefe Regional)
-      if (isCpf && data?.token) {
-        limparSessaoPlataforma();
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("userName", data.nome || "Usuário");
-        localStorage.setItem("escola_id", data.escola_id ?? "");
-        localStorage.setItem("nome_escola", data.nome_escola || "Instituição");
-        localStorage.setItem("perfil", data.perfil || "diretor");
-        localStorage.setItem("scope", data.scope || "escola");
-        localStorage.setItem("perfis", JSON.stringify(Array.isArray(data?.perfis) ? data.perfis : []));
-        localStorage.setItem("permissoes", JSON.stringify(Array.isArray(data?.permissoes) ? data.permissoes : []));
-        localStorage.setItem("modulos_ativos", "[]");
-        sessionStorage.removeItem("modulos_last_refresh");
-
-        setNomeUsuarioLogin(data.nome || "");
-        setTipoMensagem("sucesso");
-        setMensagem("Acesso autorizado!");
-        setSuccess(true);
-        setTimeout(() => navigate("/home"), 1200);
-        return;
-      }
-
       // Dispositivo confiado (pula OTP)
-      if (!isCpf && data?.dispositivo_confiado) {
+      if (data?.dispositivo_confiado) {
         limparSessaoPlataforma();
         if (data?.multi_escola) {
           const lista = Array.isArray(data?.escolas) ? data.escolas : [];
@@ -584,8 +537,8 @@ export default function Login() {
 
         localStorage.setItem("token", data.token);
         localStorage.setItem("userName", data.nome || "Usuário");
-        localStorage.setItem("escola_id", data.escola_id || 1);
-        localStorage.setItem("nome_escola", data.nome_escola || "Escola não definida");
+        localStorage.setItem("escola_id", data.escola_id ?? 1);
+        localStorage.setItem("nome_escola", data.nome_escola || "Instituição");
         localStorage.setItem("perfil", data.perfil || "aluno");
         localStorage.setItem("scope", data.scope || "escola");
         localStorage.setItem("perfis", JSON.stringify(Array.isArray(data?.perfis) ? data.perfis : []));
@@ -1337,18 +1290,11 @@ export default function Login() {
                     </div>
                     <div className="relative">
                       <div className="pointer-events-none absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400">
-                        {tipoAcesso === "plataforma" ? (
-                          <EnvelopeIcon className="h-5 w-5" />
-                        ) : String(usuario).includes("@") ? (
-                          <EnvelopeIcon className="h-5 w-5 text-blue-500" />
-                        ) : String(usuario).replace(/\D/g, "").length >= 10 ? (
-                          <DevicePhoneMobileIcon className="h-5 w-5 text-blue-500" />
-                        ) : (
-                          <IdentificationIcon className="h-5 w-5" />
-                        )}
+                        <EnvelopeIcon className={`h-5 w-5 ${isEmailValido(usuario) ? "text-blue-600" : ""}`} />
                       </div>
                       <input
-                        type="text"
+                        type="email"
+                        autoComplete="email"
                         autoFocus
                         placeholder={portalAtivo.placeholderLogin}
                         value={usuario}

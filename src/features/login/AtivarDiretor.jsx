@@ -387,9 +387,13 @@ export default function AtivarDiretor() {
                 Seu e-mail <strong>{email}</strong> foi verificado.
               </p>
               <p className="text-slate-500 mb-6">
-                Agora faça login com seu <strong>CPF ou e‑mail</strong> e a senha que criou.
+                Agora faça login utilizando seu <strong>e-mail verificado</strong> e a senha que criou.
               </p>
-              <button onClick={() => navigate("/login", { replace: true })}
+              <button
+                onClick={() => {
+                  const isChefeCre = ["chefe_regional", "coordenador_regional"].includes(String(usuario?.perfil || "").toLowerCase());
+                  navigate("/login", { replace: true, state: { email, portal: isChefeCre ? "cre" : "escola" } });
+                }}
                 className="w-full bg-gradient-to-r from-green-500 to-blue-500 text-white font-bold py-3.5 rounded-xl shadow-lg hover:shadow-xl hover:scale-[1.01] transition-all duration-200 text-lg">
                 Ir para Login →
               </button>

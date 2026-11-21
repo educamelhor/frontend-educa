@@ -1,154 +1,251 @@
 // src/features/financeiro/ModalDespesaPdaf.jsx
 // ============================================================================
-// Modal de Lançamento / Edição de Compra e Despesa do PDAF
-// Contempla integralmente as 10 colunas oficiais da tabela PDAF + prévia de saldo
-// em tempo real por Fonte de Recurso (Custeio e Capital).
+// Modal Clean — Lançamento / Edição de Despesa do Trimestre (PDAF)
+// Vincula obrigatoriamente cada pagamento a uma Portaria específica ou a Rendimentos,
+// com suporte nativo a Rateio (quando 1 compra utiliza saldo de 2+ Portarias/Fontes).
 // ============================================================================
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { toast } from "react-hot-toast";
 import {
   XMarkIcon,
-  CheckCircleIcon,
-  ExclamationTriangleIcon,
+  PlusIcon,
+  TrashIcon,
   DocumentPlusIcon,
+  ExclamationTriangleIcon,
 } from "@heroicons/react/24/outline";
 import api from "../../services/api";
 import {
-  FONTES_PDAF,
   formatBRL,
   maskMoedaInput,
   numberToMoedaInput,
   parseMoedaInput,
   maskCpfCnpj,
-  hojeIso,
   sugerirProximaCompra,
 } from "./financeiroUtils";
+
+function dataPadraoTrimestre(exercicio, trimestre) {
+  const hoje = new Date();
+  const anoHoje = hoje.getFullYear();
+  const mesHoje = hoje.getMonth() + 1;
+  const triHoje = Math.ceil(mesHoje / 3);
+  if (Number(exercicio) === anoHoje && Number(trimestre) === triHoje) {
+    return hoje.toISOString().slice(0, 10);
+  }
+  const mesInicial = String((Number(trimestre) - 1) * 3 + 1).padStart(2, "0");
+  return `${exercicio}-${mesInicial}-10`;
+}
 
 export default function ModalDespesaPdaf({
   aberto,
   onFechar,
   exercicio,
+  trimestre = 1,
+  dadosTrimestre = null,
   despesaEdicao = null,
   despesasExistentes = [],
-  resumo = null,
+  modoRateioInicial = false,
   onSalvo,
 }) {
   const [compra, setCompra] = useState("");
-  const [dataPagamento, setDataPagamento] = useState(hojeIso());
+  const [dataPagamento, setDataPagamento] = useState("");
+  const [documentoFiscal, setDocumentoFiscal] = useState("");
   const [ordemServicoOrcamentos, setOrdemServicoOrcamentos] = useState("");
   const [fornecedor, setFornecedor] = useState("");
   const [cnpjCpf, setCnpjCpf] = useState("");
   const [descricaoGeral, setDescricaoGeral] = useState("");
-  const [fonteRecurso, setFonteRecurso] = useState("ORDINARIO");
   const [processoIncorporacao, setProcessoIncorporacao] = useState("");
-  const [custeioStr, setCusteioStr] = useState("");
-  const [capitalStr, setCapitalStr] = useState("");
+  const [parcelas, setParcelas] = useState([]);
   const [salvando, setSalvando] = useState(false);
+
+  // Opções de fontes disponíveis neste trimestre (Portarias ativas + Rendimentos)
+  const opcoesFonte = useMemo(() => {
+    const lista = [];
+    const ord = dadosTrimestre?.ordinario?.linhas || [];
+    const eme = dadosTrimestre?.emendas?.linhas || [];
+
+    for (const p of ord) {
+      lista.push({
+        key: `PORT_${p.portaria_id}`,
+        fonte_recurso: "ORDINARIO",
+        portaria_id: p.portaria_id,
+        label: `Ordinário • ${p.numero_portaria} (Disp. Cust: ${formatBRL(p.saldo_custeio)} | Cap: ${formatBRL(p.saldo_capital)})`,
+        saldo_custeio: Number(p.saldo_custeio || 0),
+        saldo_capital: Number(p.saldo_capital || 0),
+      });
+    }
+    for (const p of eme) {
+      lista.push({
+        key: `PORT_${p.portaria_id}`,
+        fonte_recurso: "EMENDA",
+        portaria_id: p.portaria_id,
+        label: `Emenda • ${p.numero_portaria} (Disp. Cust: ${formatBRL(p.saldo_custeio)} | Cap: ${formatBRL(p.saldo_capital)})`,
+        saldo_custeio: Number(p.saldo_custeio || 0),
+        saldo_capital: Number(p.saldo_capital || 0),
+      });
+    }
+    const saldoRend = Number(dadosTrimestre?.rendimentos?.saldo_final || 0);
+    lista.push({
+      key: "RENDIMENTO",
+      fonte_recurso: "RENDIMENTO",
+      portaria_id: null,
+      label: `Rendimentos de Aplicação (Disp.: ${formatBRL(saldoRend)})`,
+      saldo_custeio: saldoRend,
+      saldo_capital: saldoRend,
+    });
+    return lista;
+  }, [dadosTrimestre]);
 
   useEffect(() => {
     if (!aberto) return;
+    const defaultKey = opcoesFonte[0]?.key || "RENDIMENTO";
+
     if (despesaEdicao) {
       setCompra(despesaEdicao.compra || "");
-      setDataPagamento(despesaEdicao.data_pagamento || hojeIso());
+      setDataPagamento(despesaEdicao.data_pagamento || dataPadraoTrimestre(exercicio, trimestre));
+      setDocumentoFiscal(despesaEdicao.documento_fiscal || "");
       setOrdemServicoOrcamentos(despesaEdicao.ordem_servico_orcamentos || "");
       setFornecedor(despesaEdicao.fornecedor || "");
       setCnpjCpf(maskCpfCnpj(despesaEdicao.cnpj_cpf || ""));
       setDescricaoGeral(despesaEdicao.descricao_geral || "");
-      setFonteRecurso(despesaEdicao.fonte_recurso || "ORDINARIO");
       setProcessoIncorporacao(despesaEdicao.processo_incorporacao || "");
-      setCusteioStr(numberToMoedaInput(despesaEdicao.valor_custeio));
-      setCapitalStr(numberToMoedaInput(despesaEdicao.valor_capital));
+
+      const chaveEdicao =
+        despesaEdicao.fonte_recurso === "RENDIMENTO"
+          ? "RENDIMENTO"
+          : despesaEdicao.portaria_id
+          ? `PORT_${despesaEdicao.portaria_id}`
+          : defaultKey;
+
+      setParcelas([
+        {
+          fonteKey: chaveEdicao,
+          custeioStr: numberToMoedaInput(despesaEdicao.valor_custeio),
+          capitalStr: numberToMoedaInput(despesaEdicao.valor_capital),
+        },
+      ]);
     } else {
       setCompra(sugerirProximaCompra(despesasExistentes));
-      setDataPagamento(hojeIso());
+      setDataPagamento(dataPadraoTrimestre(exercicio, trimestre));
+      setDocumentoFiscal("");
       setOrdemServicoOrcamentos("");
       setFornecedor("");
       setCnpjCpf("");
       setDescricaoGeral("");
-      setFonteRecurso("ORDINARIO");
       setProcessoIncorporacao("");
-      setCusteioStr("");
-      setCapitalStr("");
+
+      if (modoRateioInicial && opcoesFonte.length >= 2) {
+        setParcelas([
+          { fonteKey: opcoesFonte[0].key, custeioStr: "", capitalStr: "" },
+          { fonteKey: opcoesFonte[1].key, custeioStr: "", capitalStr: "" },
+        ]);
+      } else {
+        setParcelas([{ fonteKey: defaultKey, custeioStr: "", capitalStr: "" }]);
+      }
     }
-  }, [aberto, despesaEdicao, despesasExistentes]);
+  }, [aberto, despesaEdicao, despesasExistentes, exercicio, trimestre, modoRateioInicial, opcoesFonte]);
 
   if (!aberto) return null;
 
-  const valorCusteio = parseMoedaInput(custeioStr);
-  const valorCapital = parseMoedaInput(capitalStr);
-  const totalCompra = valorCusteio + valorCapital;
+  function atualizarParcela(idx, campo, valor) {
+    setParcelas((prev) =>
+      prev.map((item, i) => (i === idx ? { ...item, [campo]: valor } : item))
+    );
+  }
 
-  // Cálculo do saldo disponível na fonte selecionada (descontando o valor antigo caso esteja editando a mesma fonte)
-  const chaveResumo =
-    fonteRecurso === "EMENDA"
-      ? "emenda"
-      : fonteRecurso === "RENDIMENTO"
-      ? "rendimento"
-      : "ordinario";
+  function adicionarParcelaRateio() {
+    const fallbackKey = opcoesFonte[0]?.key || "RENDIMENTO";
+    setParcelas((prev) => [
+      ...prev,
+      { fonteKey: fallbackKey, custeioStr: "", capitalStr: "" },
+    ]);
+  }
 
-  const bucketFonte = resumo?.[chaveResumo] || {
-    saldo_custeio: 0,
-    saldo_capital: 0,
-    saldo_total: 0,
-  };
+  function removerParcelaRateio(idx) {
+    if (parcelas.length <= 1) return;
+    setParcelas((prev) => prev.filter((_, i) => i !== idx));
+  }
 
-  const estornoEdicaoCusteio =
-    despesaEdicao && despesaEdicao.fonte_recurso === fonteRecurso
-      ? Number(despesaEdicao.valor_custeio || 0)
-      : 0;
-  const estornoEdicaoCapital =
-    despesaEdicao && despesaEdicao.fonte_recurso === fonteRecurso
-      ? Number(despesaEdicao.valor_capital || 0)
-      : 0;
-
-  const dispCusteioAntes = Number(bucketFonte.saldo_custeio || 0) + estornoEdicaoCusteio;
-  const dispCapitalAntes = Number(bucketFonte.saldo_capital || 0) + estornoEdicaoCapital;
-  const saldoCusteioApos = dispCusteioAntes - valorCusteio;
-  const saldoCapitalApos = dispCapitalAntes - valorCapital;
-  const excedeSaldo =
-    (valorCusteio > 0 && saldoCusteioApos < -0.005) ||
-    (valorCapital > 0 && saldoCapitalApos < -0.005);
+  const somaCusteio = parcelas.reduce((acc, p) => acc + parseMoedaInput(p.custeioStr), 0);
+  const somaCapital = parcelas.reduce((acc, p) => acc + parseMoedaInput(p.capitalStr), 0);
+  const totalNota = somaCusteio + somaCapital;
 
   async function handleSubmit(e) {
     e.preventDefault();
     if (!compra.trim() || !fornecedor.trim() || !descricaoGeral.trim()) {
-      toast.error("Preencha os campos obrigatórios: Compra, Fornecedor e Descrição Geral.");
+      toast.error("Preencha Compra, Fornecedor e Descrição Geral.");
       return;
     }
-    if (totalCompra <= 0) {
+    if (totalNota <= 0) {
       toast.error("Informe um valor maior que zero em Custeio e/ou Capital.");
       return;
     }
 
+    const rateiosMontados = [];
+    for (const p of parcelas) {
+      const vc = parseMoedaInput(p.custeioStr);
+      const vk = parseMoedaInput(p.capitalStr);
+      if (vc + vk <= 0) {
+        toast.error("Todas as parcelas informadas devem ter valor maior que zero.");
+        return;
+      }
+      if (p.fonteKey === "RENDIMENTO") {
+        rateiosMontados.push({
+          fonte_recurso: "RENDIMENTO",
+          portaria_id: null,
+          valor_custeio: vc,
+          valor_capital: vk,
+        });
+      } else if (String(p.fonteKey).startsWith("PORT_")) {
+        const pid = Number(String(p.fonteKey).replace("PORT_", ""));
+        const opt = opcoesFonte.find((o) => o.portaria_id === pid);
+        rateiosMontados.push({
+          fonte_recurso: opt?.fonte_recurso || "ORDINARIO",
+          portaria_id: pid,
+          valor_custeio: vc,
+          valor_capital: vk,
+        });
+      }
+    }
+
     setSalvando(true);
     try {
-      const payload = {
+      const basePayload = {
         exercicio,
+        trimestre: Number(trimestre),
         compra: compra.trim(),
         data_pagamento: dataPagamento,
+        documento_fiscal: documentoFiscal.trim() || null,
         ordem_servico_orcamentos: ordemServicoOrcamentos.trim() || null,
         fornecedor: fornecedor.trim(),
         cnpj_cpf: cnpjCpf.trim() || null,
         descricao_geral: descricaoGeral.trim(),
-        fonte_recurso: fonteRecurso,
         processo_incorporacao: processoIncorporacao.trim() || null,
-        valor_custeio: valorCusteio,
-        valor_capital: valorCapital,
       };
 
       if (despesaEdicao?.id) {
-        await api.put(`/api/financeiro/pdaf/despesas/${despesaEdicao.id}`, payload);
-        toast.success("Compra/despesa atualizada com sucesso!");
+        const unico = rateiosMontados[0];
+        await api.put(`/api/financeiro/pdaf/despesas/${despesaEdicao.id}`, {
+          ...basePayload,
+          ...unico,
+        });
+        toast.success("Despesa atualizada!");
       } else {
-        await api.post("/api/financeiro/pdaf/despesas", payload);
-        toast.success("Compra/despesa registrada com sucesso!");
+        await api.post("/api/financeiro/pdaf/despesas", {
+          ...basePayload,
+          rateios: rateiosMontados,
+        });
+        toast.success(
+          rateiosMontados.length > 1
+            ? "Despesa rateada registrada com sucesso!"
+            : "Despesa registrada com sucesso!"
+        );
       }
 
       if (onSalvo) await onSalvo();
       onFechar();
     } catch (err) {
-      toast.error(err?.response?.data?.message || "Erro ao salvar compra/despesa.");
+      toast.error(err?.response?.data?.message || "Erro ao salvar despesa.");
     } finally {
       setSalvando(false);
     }
@@ -156,250 +253,258 @@ export default function ModalDespesaPdaf({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden">
-        {/* Cabeçalho */}
-        <div
-          className="px-6 py-5 text-white flex items-center justify-between shrink-0"
-          style={{
-            background: "linear-gradient(135deg, #064e3b 0%, #047857 55%, #0d9488 100%)",
-          }}
-        >
-          <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-white/15 border border-white/20 flex items-center justify-center">
-              <DocumentPlusIcon className="w-6 h-6 text-emerald-100" />
-            </div>
+      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden">
+        <div className="px-6 py-4 bg-blue-900 text-white flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-3">
+            <DocumentPlusIcon className="w-6 h-6 text-blue-200" />
             <div>
-              <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-200">
-                PDAF • Execução Financeira ({exercicio})
+              <span className="text-[11px] font-bold uppercase tracking-wider text-blue-200">
+                {trimestre}º Trimestre / {exercicio}
               </span>
-              <h2 className="text-lg sm:text-xl font-extrabold">
-                {despesaEdicao ? "Editar Compra / Despesa" : "Nova Compra / Despesa"}
+              <h2 className="text-lg font-bold">
+                {despesaEdicao ? "Editar Despesa Realizada" : "Registrar Despesa Realizada"}
               </h2>
             </div>
           </div>
-
           <button
             type="button"
             onClick={onFechar}
-            className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition cursor-pointer"
-            title="Fechar"
+            className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center cursor-pointer"
           >
             <XMarkIcon className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Formulário */}
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-5 flex-1">
-          {/* Linha 1: Compra, Data Pagamento, Nº OS / 3 Orçamentos */}
-          <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
-            <div className="sm:col-span-3">
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                COMPRA *
-              </label>
+        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-4 flex-1">
+          {/* Linha 1: Compra, Data, Doc Fiscal, OS / 3 Orçamentos */}
+          <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5">
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-bold text-slate-700 mb-1">Compra *</label>
               <input
                 type="text"
                 value={compra}
                 onChange={(e) => setCompra(e.target.value)}
-                placeholder="Ex.: 01"
                 required
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-bold text-slate-900 placeholder:text-slate-400 focus:border-emerald-600 focus:outline-none"
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-bold text-slate-900"
               />
             </div>
 
-            <div className="sm:col-span-4">
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                DATA PAGAMENTO *
-              </label>
+            <div className="sm:col-span-3">
+              <label className="block text-xs font-bold text-slate-700 mb-1">Data Pagto *</label>
               <input
                 type="date"
                 value={dataPagamento}
                 onChange={(e) => setDataPagamento(e.target.value)}
                 required
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-medium text-slate-900 focus:border-emerald-600 focus:outline-none"
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900"
               />
             </div>
 
-            <div className="sm:col-span-5">
+            <div className="sm:col-span-3">
+              <label className="block text-xs font-bold text-slate-700 mb-1">Nº Doc. Fiscal</label>
+              <input
+                type="text"
+                value={documentoFiscal}
+                onChange={(e) => setDocumentoFiscal(e.target.value)}
+                placeholder="Ex.: NF 1420"
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900"
+              />
+            </div>
+
+            <div className="sm:col-span-4">
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                Nº ORDEM DE SERVIÇO / 3 ORÇAMENTOS
+                Nº OS / 3 Orçamentos
               </label>
               <input
                 type="text"
                 value={ordemServicoOrcamentos}
                 onChange={(e) => setOrdemServicoOrcamentos(e.target.value)}
-                placeholder="Ex.: OS 12/2026 - 3 Orçamentos"
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-600 focus:outline-none"
+                placeholder="Ex.: 97893 ou 3 Orçamentos"
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900"
               />
             </div>
           </div>
 
-          {/* Linha 2: Fornecedor + CNPJ / CPF */}
-          <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
+          {/* Linha 2: Fornecedor + CNPJ/CPF */}
+          <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5">
             <div className="sm:col-span-7">
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                FORNECEDOR *
-              </label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Fornecedor *</label>
               <input
                 type="text"
                 value={fornecedor}
                 onChange={(e) => setFornecedor(e.target.value)}
-                placeholder="Razão social ou nome completo do fornecedor"
+                placeholder="Razão social ou nome do fornecedor"
                 required
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-600 focus:outline-none"
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900"
+              />
+            </div>
+
+            <div className="sm:col-span-5">
+              <label className="block text-xs font-bold text-slate-700 mb-1">CNPJ / CPF *</label>
+              <input
+                type="text"
+                value={cnpjCpf}
+                onChange={(e) => setCnpjCpf(maskCpfCnpj(e.target.value))}
+                placeholder="00.000.000/0001-00"
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm font-mono text-slate-900"
+              />
+            </div>
+          </div>
+
+          {/* Linha 3: Descrição + Processo Incorporação */}
+          <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5">
+            <div className="sm:col-span-7">
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Descrição Geral da Compra *
+              </label>
+              <input
+                type="text"
+                value={descricaoGeral}
+                onChange={(e) => setDescricaoGeral(e.target.value)}
+                placeholder="Ex.: Gás, Expediente, Telhado e calha..."
+                required
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900"
               />
             </div>
 
             <div className="sm:col-span-5">
               <label className="block text-xs font-bold text-slate-700 mb-1">
-                CNPJ / CPF
-              </label>
-              <input
-                type="text"
-                value={cnpjCpf}
-                onChange={(e) => setCnpjCpf(maskCpfCnpj(e.target.value))}
-                placeholder="00.000.000/0000-00 ou 000.000.000-00"
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-mono text-slate-900 placeholder:text-slate-400 focus:border-emerald-600 focus:outline-none"
-              />
-            </div>
-          </div>
-
-          {/* Linha 3: Descrição Geral */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              DESCRIÇÃO GERAL *
-            </label>
-            <textarea
-              rows={2}
-              value={descricaoGeral}
-              onChange={(e) => setDescricaoGeral(e.target.value)}
-              placeholder="Descreva os materiais adquiridos ou serviços executados..."
-              required
-              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-600 focus:outline-none resize-none"
-            />
-          </div>
-
-          {/* Linha 4: Fonte Recurso + Nº Processo Incorporação */}
-          <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
-            <div className="sm:col-span-6">
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                FONTE RECURSO *
-              </label>
-              <select
-                value={fonteRecurso}
-                onChange={(e) => setFonteRecurso(e.target.value)}
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm font-semibold text-slate-900 focus:border-emerald-600 focus:outline-none"
-              >
-                {FONTES_PDAF.map((f) => (
-                  <option key={f.value} value={f.value}>
-                    {f.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="sm:col-span-6">
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Nº PROCESSO INCORPORAÇÃO
+                Nº Processo Incorporação (Capital)
               </label>
               <input
                 type="text"
                 value={processoIncorporacao}
                 onChange={(e) => setProcessoIncorporacao(e.target.value)}
-                placeholder="Ex.: 00080-00054321/2026-11 (bens de Capital)"
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-600 focus:outline-none"
+                placeholder="Obrigatório p/ bens de Capital"
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900"
               />
             </div>
           </div>
 
-          {/* Linha 5: Custeio + Capital */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="rounded-2xl border border-blue-200 bg-blue-50/40 p-4">
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-extrabold uppercase tracking-wider text-blue-900">
-                  CUSTEIO (R$)
-                </label>
-                <span className="text-[11px] font-semibold text-slate-500">
-                  Disp.:{" "}
-                  <strong className={dispCusteioAntes < 0 ? "text-rose-600" : "text-slate-700"}>
-                    {formatBRL(dispCusteioAntes)}
-                  </strong>
-                </span>
-              </div>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={custeioStr}
-                onChange={(e) => setCusteioStr(maskMoedaInput(e.target.value))}
-                placeholder="0,00"
-                className="w-full rounded-xl border border-blue-300 bg-white px-3.5 py-2.5 text-base font-extrabold text-right text-slate-900 placeholder:text-slate-400 focus:border-blue-600 focus:outline-none"
-              />
+          {/* Alocação por Portaria / Rendimentos (Suporta Rateio!) */}
+          <div className="rounded-2xl border border-blue-200 bg-blue-50/40 p-4 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-extrabold uppercase tracking-wider text-blue-900">
+                Portaria / Fonte Pagadora
+              </span>
+              {!despesaEdicao && (
+                <button
+                  type="button"
+                  onClick={adicionarParcelaRateio}
+                  className="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs font-bold bg-white text-blue-800 border border-blue-300 hover:bg-blue-100 cursor-pointer"
+                >
+                  <PlusIcon className="w-3.5 h-3.5" />
+                  Ratear com outra Portaria / Fonte
+                </button>
+              )}
             </div>
 
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/40 p-4">
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-extrabold uppercase tracking-wider text-emerald-900">
-                  CAPITAL (R$)
-                </label>
-                <span className="text-[11px] font-semibold text-slate-500">
-                  Disp.:{" "}
-                  <strong className={dispCapitalAntes < 0 ? "text-rose-600" : "text-slate-700"}>
-                    {formatBRL(dispCapitalAntes)}
-                  </strong>
+            {opcoesFonte.length === 1 && opcoesFonte[0].key === "RENDIMENTO" && (
+              <div className="flex items-center gap-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                <ExclamationTriangleIcon className="w-4 h-4 shrink-0" />
+                <span>
+                  Nenhuma Portaria cadastrada neste trimestre ainda. Para pagar com PDAF Ordinário ou Emenda, cadastre primeiro na etapa <strong>1. Portarias & Emendas</strong>.
                 </span>
               </div>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={capitalStr}
-                onChange={(e) => setCapitalStr(maskMoedaInput(e.target.value))}
-                placeholder="0,00"
-                className="w-full rounded-xl border border-emerald-300 bg-white px-3.5 py-2.5 text-base font-extrabold text-right text-slate-900 placeholder:text-slate-400 focus:border-emerald-600 focus:outline-none"
-              />
+            )}
+
+            <div className="space-y-2.5">
+              {parcelas.map((parc, idx) => (
+                <div
+                  key={idx}
+                  className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end bg-white p-3 rounded-xl border border-slate-200"
+                >
+                  <div className="sm:col-span-6">
+                    <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                      Fonte / Portaria {parcelas.length > 1 ? `#${idx + 1}` : ""} *
+                    </label>
+                    <select
+                      value={parc.fonteKey}
+                      onChange={(e) => atualizarParcela(idx, "fonteKey", e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-xs font-bold text-slate-900"
+                    >
+                      {opcoesFonte.map((opt) => (
+                        <option key={opt.key} value={opt.key}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="sm:col-span-3">
+                    <label className="block text-[11px] font-bold text-blue-800 mb-1">
+                      Custeio (R$)
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={parc.custeioStr}
+                      onChange={(e) =>
+                        atualizarParcela(idx, "custeioStr", maskMoedaInput(e.target.value))
+                      }
+                      placeholder="0,00"
+                      className="w-full rounded-lg border border-slate-300 px-2.5 py-2 text-sm font-bold text-right text-slate-900"
+                    />
+                  </div>
+
+                  <div className="sm:col-span-3 flex items-center gap-1.5">
+                    <div className="flex-1">
+                      <label className="block text-[11px] font-bold text-emerald-800 mb-1">
+                        Capital (R$)
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={parc.capitalStr}
+                        onChange={(e) =>
+                          atualizarParcela(idx, "capitalStr", maskMoedaInput(e.target.value))
+                        }
+                        placeholder="0,00"
+                        className="w-full rounded-lg border border-slate-300 px-2.5 py-2 text-sm font-bold text-right text-slate-900"
+                      />
+                    </div>
+
+                    {parcelas.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removerParcelaRateio(idx)}
+                        className="p-2 rounded-lg text-rose-600 hover:bg-rose-50 cursor-pointer mt-4"
+                        title="Remover parcela"
+                      >
+                        <TrashIcon className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* Alerta preventivo caso ultrapasse o saldo disponível na natureza */}
-          {excedeSaldo && (
-            <div className="rounded-2xl bg-amber-50 border border-amber-200 px-4 py-3 flex items-start gap-3 text-xs text-amber-900">
-              <ExclamationTriangleIcon className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-              <div>
-                <strong className="font-extrabold">Atenção ao saldo por natureza de despesa:</strong>{" "}
-                o valor informado excede o saldo atualmente lançado nesta fonte (Custeio após:{" "}
-                <strong>{formatBRL(saldoCusteioApos)}</strong> | Capital após:{" "}
-                <strong>{formatBRL(saldoCapitalApos)}</strong>). Caso ainda não tenha lançado o repasse de entrada, registre-o em{" "}
-                <strong>Entradas / Repasses</strong>.
-              </div>
-            </div>
-          )}
-
-          {/* Rodapé do Formulário */}
-          <div className="pt-4 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="pt-3 flex items-center justify-between border-t border-slate-100">
             <div className="text-xs text-slate-600">
-              Valor total da compra:{" "}
-              <strong className="text-base font-extrabold text-slate-900">
-                {formatBRL(totalCompra)}
-              </strong>
+              Total da Compra:{" "}
+              <strong className="text-slate-900 text-base">{formatBRL(totalNota)}</strong>
+              {parcelas.length > 1 && (
+                <span className="ml-2 text-blue-700 font-semibold">
+                  ({parcelas.length} fontes somadas)
+                </span>
+              )}
             </div>
 
-            <div className="flex items-center justify-end gap-2.5">
+            <div className="flex items-center gap-2.5">
               <button
                 type="button"
                 onClick={onFechar}
-                className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-bold transition cursor-pointer"
+                className="px-4 py-2 rounded-xl text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 cursor-pointer"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
                 disabled={salvando}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white text-sm font-bold shadow-md transition cursor-pointer"
+                className="px-5 py-2 rounded-xl text-sm font-bold text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 shadow-sm cursor-pointer"
               >
-                <CheckCircleIcon className="w-4 h-4" />
-                {salvando
-                  ? "Salvando..."
-                  : despesaEdicao
-                  ? "Salvar Alterações"
-                  : "Registrar Compra"}
+                {salvando ? "Salvando..." : despesaEdicao ? "Salvar Alterações" : "Registrar Despesa"}
               </button>
             </div>
           </div>

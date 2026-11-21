@@ -1,41 +1,51 @@
 // src/features/cre/CreGabinetePage.jsx
 // ============================================================================
-// EDUCA.MELHOR — Módulo CRE > Gabinete Regional (/cre/gabinete)
-// Visão executiva consolidada da Coordenação Regional de Ensino (SEEDF):
-//   - Escolas vinculadas à Regional, corpo discente/turmas e direção ativa
-//   - Panorama consolidado da execução financeira PDAF das unidades vinculadas
-//   - Acesso rápido à UNIAG (Acompanhamento & Pré-Análise SEI)
+// EDUCA.MELHOR — Módulo CRE > Gabinete Regional (/cre/gabinete) — CLEAN + MODULAR
+// Fluxo progressivo e intuitivo (espelhando Conselho de Classe):
+//   Nível 1: Selecionar Exercício + escolher frente ([Escolas da Regional] | [Gestores CRE] | [Ir p/ UNIAG])
+//   Nível 2: Visualizar KPIs sintéticos + clicar no Chip da Unidade Escolar
+//   Nível 3: Ficha executiva limpa da Escola selecionada + atalho direto para os 4 Trimestres na UNIAG
 // ============================================================================
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import {
   BuildingLibraryIcon,
-  AcademicCapIcon,
-  UserGroupIcon,
-  BanknotesIcon,
-  ScaleIcon,
-  MagnifyingGlassIcon,
   ArrowRightIcon,
-  ArrowPathIcon,
   ShieldCheckIcon,
-  CheckCircleIcon,
-  ClockIcon,
 } from "@heroicons/react/24/outline";
 import api from "../../services/api";
 import { formatBRL } from "../financeiro/financeiroUtils";
+
+const STATUS_TRI_DOT = {
+  EM_ELABORACAO: { label: "Em elaboração", dot: "bg-slate-400" },
+  ENVIADO_UNIAG: { label: "Aguardando UNIAG", dot: "bg-blue-600" },
+  EM_ANALISE: { label: "Em conferência", dot: "bg-indigo-600" },
+  EM_DILIGENCIA: { label: "Em diligência", dot: "bg-amber-500" },
+  VALIDADO_SEI: { label: "Validado p/ SEI", dot: "bg-emerald-600" },
+};
 
 export default function CreGabinetePage() {
   const navigate = useNavigate();
   const anoCorrente = new Date().getFullYear();
 
   const [exercicio, setExercicio] = useState(anoCorrente);
+  const [exerciciosDisponiveis, setExerciciosDisponiveis] = useState([
+    anoCorrente + 1,
+    anoCorrente,
+    anoCorrente - 1,
+  ]);
   const [dados, setDados] = useState(null);
   const [carregando, setCarregando] = useState(true);
-  const [busca, setBusca] = useState("");
 
-  const cargoLocal = String(localStorage.getItem("cargo_regional") || "coordenador_regional")
+  // Navegação Progressiva Clean + Modular
+  const [secaoAtiva, setSecaoAtiva] = useState(null); // "escolas" | "chefia" | null
+  const [escolaSelecionadaId, setEscolaSelecionadaId] = useState(null);
+
+  const cargoLocal = String(
+    localStorage.getItem("cargo_regional") || "coordenador_regional"
+  )
     .toLowerCase()
     .trim();
   const podeAcessarUniag =
@@ -50,6 +60,12 @@ export default function CreGabinetePage() {
         });
         if (data?.ok) {
           setDados(data);
+          if (
+            Array.isArray(data.exercicios_disponiveis) &&
+            data.exercicios_disponiveis.length > 0
+          ) {
+            setExerciciosDisponiveis(data.exercicios_disponiveis);
+          }
         }
       } catch (err) {
         toast.error(
@@ -74,6 +90,8 @@ export default function CreGabinetePage() {
     total_alunos: 0,
     total_turmas: 0,
     escolas_com_pdaf: 0,
+    remessas_aguardando_uniag: 0,
+    remessas_validadas_sei: 0,
     pdaf_recebido: 0,
     pdaf_executado: 0,
     pdaf_saldo: 0,
@@ -86,413 +104,359 @@ export default function CreGabinetePage() {
     localStorage.getItem("cargo_label") ||
     "Coordenador(a) Geral da Regional";
 
-  const escolasFiltradas = useMemo(() => {
-    const t = busca.trim().toLowerCase();
-    if (!t) return escolas;
-    return escolas.filter((e) =>
-      [e.nome, e.apelido, e.cidade, e.diretor, e.comandante, e.cnpj]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase()
-        .includes(t)
-    );
-  }, [escolas, busca]);
-
-  const anosOpcoes = [anoCorrente + 1, anoCorrente, anoCorrente - 1];
+  const escolaSelecionada =
+    escolas.find((e) => e.id === escolaSelecionadaId) || null;
 
   return (
-    <div className="p-4 sm:p-6 max-w-[1600px] mx-auto space-y-6 pb-12">
-      {/* ── Hero Institucional Ametista Real (Identidade Oficial CREs) ── */}
-      <div
-        className="relative overflow-hidden rounded-3xl px-6 py-7 sm:px-8 sm:py-8 text-white shadow-xl"
-        style={{
-          background:
-            "linear-gradient(135deg, #2e1065 0%, #5b21b6 52%, #4338ca 100%)",
-        }}
+    <div className="p-6 max-w-7xl mx-auto">
+      {/* Selo Institucional Discreto no Topo */}
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold bg-violet-50 text-violet-900 border border-violet-200">
+          <BuildingLibraryIcon className="w-4 h-4 text-violet-700" />
+          {regional.codigo_cre || "CRE • SEEDF"}
+          {regional.cidade ? ` • ${regional.cidade}/${regional.estado || "DF"}` : ""}
+        </span>
+
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-white text-slate-700 border border-slate-200">
+          <ShieldCheckIcon className="w-4 h-4 text-violet-700" />
+          {cargoLabel}
+        </span>
+      </div>
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          NÍVEL 1 (CLEAN): TÍTULO + SELETOR DE EXERCÍCIO + BOTÕES PRINCIPAIS
+         ══════════════════════════════════════════════════════════════════════ */}
+      <h1
+        className="text-4xl sm:text-5xl font-bold text-center text-violet-950 mb-5"
+        style={{ fontFamily: "'Montserrat', sans-serif" }}
       >
-        <div
-          className="pointer-events-none absolute -top-16 -right-12 w-72 h-72 rounded-full"
-          style={{
-            background:
-              "radial-gradient(circle, rgba(216,180,254,0.24) 0%, transparent 70%)",
-          }}
-        />
+        {regional.apelido ||
+          regional.nome ||
+          localStorage.getItem("nome_escola") ||
+          "Gabinete Regional"}
+      </h1>
 
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider bg-white/15 text-violet-100 border border-white/25">
-                <BuildingLibraryIcon className="w-3.5 h-3.5" />
-                {regional.codigo_cre || "CRE • SEEDF"}
-              </span>
-              {regional.cidade && (
-                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-black/20 text-violet-200 border border-white/10">
-                  {regional.cidade} / {regional.estado || "DF"}
-                </span>
-              )}
-            </div>
-
-            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight leading-tight">
-              {regional.nome ||
-                localStorage.getItem("nome_escola") ||
-                "Coordenação Regional de Ensino"}
-            </h1>
-
-            <p className="text-sm text-violet-200/95 font-medium flex flex-wrap items-center gap-2">
-              <ShieldCheckIcon className="w-4 h-4 text-violet-300 shrink-0" />
-              <span>{cargoLabel}</span>
-              <span className="opacity-50">•</span>
-              <span>Gabinete & Supervisão Territorial</span>
-            </p>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="inline-flex items-center gap-2 bg-black/25 border border-white/20 rounded-xl px-3.5 py-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-violet-200">
-                Exercício
-              </span>
-              <select
-                value={exercicio}
-                onChange={(e) => setExercicio(Number(e.target.value))}
-                className="bg-transparent text-sm font-extrabold text-white focus:outline-none cursor-pointer"
-              >
-                {anosOpcoes.map((ano) => (
-                  <option key={ano} value={ano} className="text-slate-900">
-                    {ano}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => carregarGabinete(exercicio)}
-              disabled={carregando}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/20 border border-white/20 text-white transition cursor-pointer disabled:opacity-50"
-              title="Atualizar indicadores"
-            >
-              <ArrowPathIcon
-                className={`w-4 h-4 ${carregando ? "animate-spin" : ""}`}
-              />
-              Atualizar
-            </button>
-
-            {podeAcessarUniag && (
-              <button
-                type="button"
-                onClick={() => navigate("/cre/uniag")}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-extrabold text-violet-950 bg-white hover:bg-violet-50 shadow-lg transition cursor-pointer"
-              >
-                <BanknotesIcon className="w-4 h-4 text-violet-700" />
-                UNIAG — Prestação de Contas
-                <ArrowRightIcon className="w-4 h-4 text-violet-700" />
-              </button>
-            )}
-          </div>
+      <div className="flex justify-center mb-8">
+        <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-lg shadow-sm border border-violet-200">
+          <label
+            htmlFor="filtro-exercicio-gabinete"
+            className="text-sm font-semibold text-gray-700"
+          >
+            Exercício:
+          </label>
+          <select
+            id="filtro-exercicio-gabinete"
+            value={exercicio}
+            onChange={(e) => {
+              setExercicio(Number(e.target.value));
+              setEscolaSelecionadaId(null);
+            }}
+            className="border rounded px-2 py-1 text-sm font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-violet-500 cursor-pointer"
+          >
+            {exerciciosDisponiveis.map((ano) => (
+              <option key={ano} value={ano}>
+                {ano}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
-      {/* ── 4 Cards de Indicadores Consolidados da Regional ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
-        <div className="bg-white rounded-3xl border border-slate-200 p-5 sm:p-6 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div className="w-11 h-11 rounded-2xl bg-violet-50 border border-violet-200 text-violet-700 flex items-center justify-center">
-              <BuildingLibraryIcon className="w-5 h-5" />
-            </div>
-            <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-violet-50 text-violet-700 border border-violet-200">
-              Rede CRE
-            </span>
-          </div>
-          <div className="mt-4">
-            <p className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
-              Escolas Vinculadas
-            </p>
-            <div className="text-3xl font-extrabold text-slate-900 mt-1">
-              {carregando ? "—" : kpis.total_escolas}
-            </div>
-            <p className="text-xs text-slate-500 mt-1">
-              {kpis.escolas_ativas} unidade(s) ativa(s) na plataforma
-            </p>
-          </div>
-        </div>
+      {/* Botões Principais Clean (Estilo Conselho de Classe) */}
+      <div className="flex flex-wrap justify-center gap-4 mb-9">
+        <button
+          type="button"
+          onClick={() => {
+            setSecaoAtiva("escolas");
+            setEscolaSelecionadaId(null);
+          }}
+          className={`px-7 py-4 text-lg sm:text-xl font-semibold rounded-xl shadow-md transition transform hover:scale-105 cursor-pointer flex flex-col items-center min-w-[210px] ${
+            secaoAtiva === "escolas"
+              ? "bg-green-600 text-white"
+              : "bg-white text-violet-950 border border-violet-400 hover:bg-violet-50"
+          }`}
+        >
+          <span>Escolas da Regional</span>
+          <span
+            className={`mt-1 text-xs font-semibold ${
+              secaoAtiva === "escolas" ? "text-green-100" : "text-slate-500"
+            }`}
+          >
+            {carregando ? "..." : `${kpis.total_escolas} unidade(s)`}
+          </span>
+        </button>
 
-        <div className="bg-white rounded-3xl border border-slate-200 p-5 sm:p-6 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div className="w-11 h-11 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-700 flex items-center justify-center">
-              <UserGroupIcon className="w-5 h-5" />
-            </div>
-            <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
-              {exercicio}
-            </span>
-          </div>
-          <div className="mt-4">
-            <p className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
-              Estudantes na Rede
-            </p>
-            <div className="text-3xl font-extrabold text-slate-900 mt-1">
-              {carregando
-                ? "—"
-                : Number(kpis.total_alunos || 0).toLocaleString("pt-BR")}
-            </div>
-            <p className="text-xs text-slate-500 mt-1">
-              Distribuídos em {kpis.total_turmas} turma(s) cadastrada(s)
-            </p>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-3xl border border-slate-200 p-5 sm:p-6 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div className="w-11 h-11 rounded-2xl bg-blue-50 border border-blue-200 text-blue-700 flex items-center justify-center">
-              <BanknotesIcon className="w-5 h-5" />
-            </div>
-            <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
-              PDAF {exercicio}
-            </span>
-          </div>
-          <div className="mt-4">
-            <p className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
-              Recursos Recebidos (Rede)
-            </p>
-            <div className="text-2xl font-extrabold text-slate-900 mt-1">
-              {carregando ? "—" : formatBRL(kpis.pdaf_recebido)}
-            </div>
-            <p className="text-xs text-slate-500 mt-1">
-              {kpis.escolas_com_pdaf} de {kpis.total_escolas} escola(s) com lançamentos
-            </p>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-3xl border border-slate-200 p-5 sm:p-6 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div className="w-11 h-11 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center">
-              <ScaleIcon className="w-5 h-5" />
-            </div>
-            <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-              UNIAG
-            </span>
-          </div>
-          <div className="mt-4">
-            <p className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
-              Saldo PDAF Consolidado
-            </p>
-            <div
-              className={`text-2xl font-extrabold mt-1 ${
-                Number(kpis.pdaf_saldo || 0) < -0.005
-                  ? "text-rose-600"
-                  : "text-emerald-700"
+        {podeAcessarUniag && (
+          <button
+            type="button"
+            onClick={() => navigate(`/cre/uniag?exercicio=${exercicio}`)}
+            className="px-7 py-4 text-lg sm:text-xl font-semibold rounded-xl shadow-md transition transform hover:scale-105 cursor-pointer flex flex-col items-center min-w-[230px] bg-white text-violet-950 border border-violet-400 hover:bg-violet-50"
+          >
+            <span>UNIAG • Prestação PDAF</span>
+            <span
+              className={`mt-1 text-xs font-semibold ${
+                Number(kpis.remessas_aguardando_uniag || 0) > 0
+                  ? "text-blue-700 font-bold"
+                  : "text-slate-500"
               }`}
             >
-              {carregando ? "—" : formatBRL(kpis.pdaf_saldo)}
-            </div>
-            <p className="text-xs text-slate-500 mt-1">
-              Executado no ano: {formatBRL(kpis.pdaf_executado)}
-            </p>
-          </div>
-        </div>
+              {carregando
+                ? "..."
+                : Number(kpis.remessas_aguardando_uniag || 0) > 0
+                ? `● ${kpis.remessas_aguardando_uniag} aguardando análise`
+                : `${kpis.remessas_validadas_sei || 0} trimestre(s) validados SEI`}
+            </span>
+          </button>
+        )}
+
+        <button
+          type="button"
+          onClick={() => {
+            setSecaoAtiva("chefia");
+            setEscolaSelecionadaId(null);
+          }}
+          className={`px-7 py-4 text-lg sm:text-xl font-semibold rounded-xl shadow-md transition transform hover:scale-105 cursor-pointer flex flex-col items-center min-w-[210px] ${
+            secaoAtiva === "chefia"
+              ? "bg-green-600 text-white"
+              : "bg-white text-violet-950 border border-violet-400 hover:bg-violet-50"
+          }`}
+        >
+          <span>Gestores da CRE</span>
+          <span
+            className={`mt-1 text-xs font-semibold ${
+              secaoAtiva === "chefia" ? "text-green-100" : "text-slate-500"
+            }`}
+          >
+            {carregando ? "..." : `${chefes.length} gestor(es) ativos`}
+          </span>
+        </button>
       </div>
 
-      {/* ── Mapa de Unidades Escolares Vinculadas à Regional ── */}
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-200 bg-slate-50/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <AcademicCapIcon className="w-5 h-5 text-violet-700" />
-            <div>
-              <h2 className="text-base font-extrabold text-slate-900">
-                Unidades Escolares Vinculadas à Regional
-              </h2>
-              <p className="text-xs text-slate-500">
-                Escolas associadas a esta CRE e resumo em tempo real da execução PDAF ({exercicio})
-              </p>
+      {/* ══════════════════════════════════════════════════════════════════════
+          NÍVEL 2A: PANORAMA + CHIPS DAS ESCOLAS DA REGIONAL
+         ══════════════════════════════════════════════════════════════════════ */}
+      {secaoAtiva === "escolas" && (
+        <div className="space-y-7">
+          {/* 4 Indicadores Sintéticos da Rede */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5 max-w-5xl mx-auto">
+            <div className="rounded-xl bg-white border border-violet-200 px-4 py-3 text-center shadow-xs">
+              <div className="text-[11px] font-extrabold uppercase text-slate-500">
+                Estudantes na Rede
+              </div>
+              <div className="text-lg font-extrabold text-violet-950">
+                {Number(kpis.total_alunos || 0).toLocaleString("pt-BR")}
+              </div>
+              <div className="text-[11px] text-slate-500">
+                {kpis.total_turmas} turmas
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-white border border-blue-200 px-4 py-3 text-center shadow-xs">
+              <div className="text-[11px] font-extrabold uppercase text-slate-500">
+                PDAF Recebido ({exercicio})
+              </div>
+              <div className="text-lg font-extrabold text-blue-900">
+                {formatBRL(kpis.pdaf_recebido || 0)}
+              </div>
+              <div className="text-[11px] text-slate-500">
+                {kpis.escolas_com_pdaf} de {kpis.total_escolas} escolas
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-white border border-slate-200 px-4 py-3 text-center shadow-xs">
+              <div className="text-[11px] font-extrabold uppercase text-slate-500">
+                PDAF Executado ({exercicio})
+              </div>
+              <div className="text-lg font-extrabold text-slate-900">
+                {formatBRL(kpis.pdaf_executado || 0)}
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-emerald-50/90 border border-emerald-300 px-4 py-3 text-center shadow-xs">
+              <div className="text-[11px] font-extrabold uppercase text-emerald-800">
+                Saldo Consolidado
+              </div>
+              <div className="text-lg font-extrabold text-emerald-900">
+                {formatBRL(kpis.pdaf_saldo || 0)}
+              </div>
             </div>
           </div>
 
-          <div className="relative min-w-[260px]">
-            <MagnifyingGlassIcon className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="text"
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-              placeholder="Buscar escola, apelido ou diretor..."
-              className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-white text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:border-violet-600 focus:outline-none"
-            />
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[980px]">
-            <thead>
-              <tr className="bg-slate-900 text-white text-[11px] font-extrabold uppercase tracking-wider">
-                <th className="py-3.5 px-4">Unidade Escolar</th>
-                <th className="py-3.5 px-4">Direção Escolar</th>
-                <th className="py-3.5 px-4 text-center">Estudantes / Turmas</th>
-                <th className="py-3.5 px-4 text-center">Módulo PDAF</th>
-                <th className="py-3.5 px-4 text-right">Recebido ({exercicio})</th>
-                <th className="py-3.5 px-4 text-right">Executado ({exercicio})</th>
-                <th className="py-3.5 px-4 text-right">Saldo Atual</th>
-                {podeAcessarUniag && (
-                  <th className="py-3.5 px-4 text-center">UNIAG</th>
-                )}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200/80 text-xs sm:text-sm">
-              {carregando ? (
-                <tr>
-                  <td
-                    colSpan={podeAcessarUniag ? 8 : 7}
-                    className="py-12 text-center text-slate-400 font-medium"
-                  >
-                    Carregando unidades escolares vinculadas...
-                  </td>
-                </tr>
-              ) : escolasFiltradas.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={podeAcessarUniag ? 8 : 7}
-                    className="py-12 px-6 text-center text-slate-500"
-                  >
-                    {escolas.length === 0
-                      ? "Nenhuma unidade escolar foi vinculada a esta Coordenação Regional até o momento."
-                      : "Nenhuma escola encontrada para o filtro informado."}
-                  </td>
-                </tr>
-              ) : (
-                escolasFiltradas.map((esc) => {
-                  const temMov =
-                    Number(esc.pdaf?.entradas_count || 0) > 0 ||
-                    Number(esc.pdaf?.despesas_count || 0) > 0;
-                  return (
-                    <tr
-                      key={esc.id}
-                      className="hover:bg-violet-50/40 transition bg-white"
-                    >
-                      <td className="py-3.5 px-4">
-                        <div className="font-extrabold text-slate-900">
-                          {esc.apelido || esc.nome}
-                        </div>
-                        {esc.apelido && esc.apelido !== esc.nome && (
-                          <div className="text-xs text-slate-500">{esc.nome}</div>
-                        )}
-                      </td>
-
-                      <td className="py-3.5 px-4 text-slate-700">
-                        {esc.diretor ? (
-                          <div className="font-semibold text-slate-800">
-                            {esc.diretor}
-                          </div>
-                        ) : (
-                          <span className="text-slate-400 italic text-xs">
-                            Sem diretor vinculado
-                          </span>
-                        )}
-                        {esc.comandante && (
-                          <div className="text-[11px] text-slate-500">
-                            Cmd.: {esc.comandante}
-                          </div>
-                        )}
-                      </td>
-
-                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                        <span className="font-bold text-slate-900">
-                          {Number(esc.total_alunos || 0).toLocaleString("pt-BR")}
-                        </span>{" "}
-                        <span className="text-xs text-slate-500">
-                          alunos ({esc.total_turmas || 0} turmas)
-                        </span>
-                      </td>
-
-                      <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                        {temMov ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            <CheckCircleIcon className="w-3.5 h-3.5" />
-                            Em execução
-                          </span>
-                        ) : esc.modulo_financeiro_ativo ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                            <ClockIcon className="w-3.5 h-3.5" />
-                            Habilitado
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-500 border border-slate-200">
-                            Sem lançamentos
-                          </span>
-                        )}
-                      </td>
-
-                      <td className="py-3.5 px-4 text-right whitespace-nowrap font-semibold text-slate-700">
-                        {formatBRL(esc.pdaf?.recebido || 0)}
-                      </td>
-
-                      <td className="py-3.5 px-4 text-right whitespace-nowrap font-semibold text-blue-800">
-                        {formatBRL(esc.pdaf?.executado || 0)}
-                      </td>
-
-                      <td
-                        className={`py-3.5 px-4 text-right whitespace-nowrap font-extrabold ${
-                          Number(esc.pdaf?.saldo || 0) < -0.005
-                            ? "text-rose-600"
-                            : "text-emerald-700"
-                        }`}
-                      >
-                        {formatBRL(esc.pdaf?.saldo || 0)}
-                      </td>
-
-                      {podeAcessarUniag && (
-                        <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              navigate(`/cre/uniag?escola=${esc.id}&exercicio=${exercicio}`)
-                            }
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-violet-800 bg-violet-50 hover:bg-violet-100 border border-violet-200 transition cursor-pointer"
-                          >
-                            Inspecionar
-                            <ArrowRightIcon className="w-3.5 h-3.5" />
-                          </button>
-                        </td>
-                      )}
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* ── Quadro de Gestores Regionais Habilitados ── */}
-      {chefes.length > 0 && (
-        <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm space-y-4">
-          <div>
-            <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-800">
-              Gestores Habilitados nesta Coordenação Regional
-            </h3>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Titulares ativos vinculados ao Gabinete e às Unidades Orgânicas desta CRE
+          {/* Chips das Escolas Vinculadas */}
+          {escolas.length === 0 ? (
+            <p className="text-center text-slate-500 py-6">
+              Nenhuma unidade escolar vinculada a esta Coordenação Regional.
             </p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-            {chefes.map((c) => (
-              <div
-                key={c.id}
-                className="flex items-center gap-3.5 p-3.5 rounded-2xl border border-slate-200 bg-slate-50/60"
-              >
-                <div className="w-10 h-10 rounded-xl bg-violet-700 text-white font-extrabold text-sm flex items-center justify-center shrink-0">
-                  {String(c.nome || "C")
-                    .trim()
-                    .charAt(0)
-                    .toUpperCase()}
-                </div>
-                <div className="min-w-0">
-                  <div className="text-sm font-bold text-slate-900 truncate">
-                    {c.nome}
+          ) : (
+            <div className="flex flex-wrap justify-center gap-3.5">
+              {escolas.map((esc) => {
+                const selecionada = escolaSelecionadaId === esc.id;
+                return (
+                  <div
+                    key={esc.id}
+                    onClick={() => setEscolaSelecionadaId(esc.id)}
+                    className={`bg-gradient-to-b from-violet-200 to-violet-50 rounded-lg px-5 py-2.5 shadow-md cursor-pointer hover:shadow-xl transition-transform hover:scale-105 text-center font-bold text-violet-950 text-xs sm:text-sm flex items-center justify-center whitespace-nowrap ${
+                      selecionada ? "ring-2 ring-green-600" : ""
+                    }`}
+                  >
+                    {esc.apelido || esc.nome}
                   </div>
-                  <div className="text-xs font-semibold text-violet-700 truncate">
-                    {c.cargo_label}
+                );
+              })}
+            </div>
+          )}
+
+          {/* NÍVEL 3: FICHA EXECUTIVA DA ESCOLA SELECIONADA */}
+          {escolaSelecionada && (
+            <div className="bg-white rounded-xl shadow-md p-6 max-w-4xl mx-auto space-y-5 border border-slate-200">
+              <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-200 pb-4">
+                <div>
+                  <span className="text-xs font-extrabold uppercase tracking-wider text-violet-700">
+                    Unidade Escolar Jurisdicionada
+                  </span>
+                  <h2 className="text-2xl font-bold text-violet-950">
+                    {escolaSelecionada.apelido || escolaSelecionada.nome}
+                  </h2>
+                  {escolaSelecionada.nome !== escolaSelecionada.apelido && (
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      {escolaSelecionada.nome}
+                    </p>
+                  )}
+                </div>
+
+                {podeAcessarUniag && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      navigate(
+                        `/cre/uniag?escola=${escolaSelecionada.id}&exercicio=${exercicio}`
+                      )
+                    }
+                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-violet-700 hover:bg-violet-800 shadow-sm transition cursor-pointer"
+                  >
+                    Auditar na UNIAG
+                    <ArrowRightIcon className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 text-xs sm:text-sm">
+                <div className="rounded-xl bg-slate-50 border border-slate-200 p-3.5">
+                  <span className="block text-[11px] font-bold uppercase text-slate-500">
+                    Direção Escolar
+                  </span>
+                  <strong className="text-slate-900">
+                    {escolaSelecionada.diretor || "Sem diretor vinculado"}
+                  </strong>
+                  {escolaSelecionada.comandante && (
+                    <div className="text-xs text-slate-600 mt-0.5">
+                      Cmd.: {escolaSelecionada.comandante}
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-xl bg-slate-50 border border-slate-200 p-3.5">
+                  <span className="block text-[11px] font-bold uppercase text-slate-500">
+                    Corpo Discente ({exercicio})
+                  </span>
+                  <strong className="text-slate-900">
+                    {Number(
+                      escolaSelecionada.total_alunos || 0
+                    ).toLocaleString("pt-BR")}{" "}
+                    estudantes
+                  </strong>
+                  <div className="text-xs text-slate-600 mt-0.5">
+                    {escolaSelecionada.total_turmas || 0} turmas ativas
+                  </div>
+                </div>
+
+                <div className="rounded-xl bg-emerald-50/70 border border-emerald-200 p-3.5">
+                  <span className="block text-[11px] font-bold uppercase text-emerald-800">
+                    Saldo Atual PDAF ({exercicio})
+                  </span>
+                  <strong className="text-base font-extrabold text-emerald-950">
+                    {formatBRL(escolaSelecionada.pdaf?.saldo || 0)}
+                  </strong>
+                  <div className="text-xs text-slate-600 mt-0.5">
+                    Executado: {formatBRL(escolaSelecionada.pdaf?.executado || 0)}
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
+
+              {/* Situação dos 4 Trimestres na UNIAG */}
+              <div className="space-y-2">
+                <div className="text-xs font-extrabold uppercase tracking-wider text-slate-500">
+                  Situação Trimestral na UNIAG ({exercicio})
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[1, 2, 3, 4].map((t) => {
+                    const st =
+                      escolaSelecionada.pdaf?.trimestres_status?.[t] ||
+                      "EM_ELABORACAO";
+                    const meta = STATUS_TRI_DOT[st] || STATUS_TRI_DOT.EM_ELABORACAO;
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        disabled={!podeAcessarUniag}
+                        onClick={() =>
+                          navigate(
+                            `/cre/uniag?escola=${escolaSelecionada.id}&exercicio=${exercicio}&trimestre=${t}`
+                          )
+                        }
+                        className="rounded-xl border border-slate-200 bg-slate-50 hover:bg-violet-50 p-3 text-left transition cursor-pointer disabled:cursor-default"
+                      >
+                        <div className="text-xs font-extrabold text-slate-900">
+                          {t}º Trimestre
+                        </div>
+                        <div className="mt-1 flex items-center gap-1.5 text-[11px] font-semibold text-slate-600">
+                          <span
+                            className={`w-2 h-2 rounded-full shrink-0 ${meta.dot}`}
+                          />
+                          <span>{meta.label}</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          NÍVEL 2B: QUADRO DE GESTORES DA REGIONAL
+         ══════════════════════════════════════════════════════════════════════ */}
+      {secaoAtiva === "chefia" && (
+        <div className="bg-white rounded-xl shadow-md p-6 max-w-3xl mx-auto space-y-4 border border-slate-200">
+          <h2 className="text-xl font-bold text-violet-950">
+            Quadro de Gestão Regional
+          </h2>
+          {chefes.length === 0 ? (
+            <p className="text-sm text-slate-500">
+              Nenhum gestor regional ativo cadastrado nesta CRE.
+            </p>
+          ) : (
+            <div className="divide-y divide-slate-200">
+              {chefes.map((c) => (
+                <div
+                  key={c.id}
+                  className="py-3 flex flex-wrap items-center justify-between gap-2"
+                >
+                  <div>
+                    <div className="text-sm font-bold text-slate-900">
+                      {c.nome}
+                    </div>
+                    <div className="text-xs text-slate-500">{c.email}</div>
+                  </div>
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-violet-50 text-violet-900 border border-violet-200">
+                    {c.cargo_label}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

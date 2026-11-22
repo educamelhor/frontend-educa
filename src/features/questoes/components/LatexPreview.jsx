@@ -7,6 +7,8 @@ import {
   QuestaoCorpoEstruturado,
   MathText,
   resumirGabaritoQuestao,
+  extrairMidiasQuestao,
+  parseBlocosTextoApoio,
 } from '../utils/questaoRenderer';
 
 export default function LatexPreview({ questao, codigo }) {
@@ -21,16 +23,16 @@ export default function LatexPreview({ questao, codigo }) {
     fonte,
     alternativas = [],
     estrutura,
-    midia,
-    imagem,
     tags = [],
     temas = [],
     habilidade_bncc,
     explicacao,
   } = questao;
 
+  const { midiaPrincipal, midiaApoio, imagemFallbackPrincipal } = extrairMidiasQuestao(questao);
+
   const hasContent = Boolean(
-    enunciado || comando_final || texto_apoio || imagem || midia?.url ||
+    enunciado || comando_final || texto_apoio || imagemFallbackPrincipal || midiaPrincipal?.url || midiaApoio?.url ||
     alternativas.some(a => a.texto || a.imagem_url) ||
     (estrutura?.proposicoes || []).some(p => p.texto) ||
     (estrutura?.itens || []).some(i => i.texto) ||
@@ -182,18 +184,41 @@ export function gerarLatex(questao) {
     fonte = '',
     alternativas = [],
     estrutura = {},
-    midia = null,
     tipo = 'objetiva',
     habilidade_bncc = '',
   } = questao;
 
+  const { midiaPrincipal, midiaApoio, imagemFallbackPrincipal } = extrairMidiasQuestao(questao);
+
   let latex = `\\noindent\n\\textbf{QUESTÃO}${fonte && !texto_apoio ? ` (${fonte})` : ''} {\\color{orange}\\rule{7.5cm}{0.4pt}}\n\n`;
   if (habilidade_bncc) latex += `% BNCC: ${habilidade_bncc}\n`;
-  if (texto_apoio) latex += `\\begin{quote}\\itshape ${converterMarkdownEditorialParaLatex(texto_apoio)}${fonte ? ` — ${fonte}` : ''}\\end{quote}\n\n`;
+
+  const renderTexFig = (mObj, nomeArq) => {
+    const w = { P: '0.36\\linewidth', M: '0.56\\linewidth', G: '0.84\\linewidth', '100%': '0.98\\linewidth' }[mObj?.preset] || '0.56\\linewidth';
+    return `\\begin{center}\\includegraphics[width=${w}]{${nomeArq}}\\end{center}\n\n`;
+  };
+
+  if (midiaApoio?.url && midiaApoio.posicao_apoio === 'acima_texto_apoio') {
+    latex += renderTexFig(midiaApoio, 'figura_apoio.jpg');
+  }
+
+  if (texto_apoio) {
+    const blocos = parseBlocosTextoApoio(texto_apoio);
+    const texBlocos = blocos.map((b) => {
+      if (b.tipo === 'titulo') return `\\begin{center}\\textbf{${converterMarkdownEditorialParaLatex(b.texto)}}\\end{center}`;
+      if (b.tipo === 'subtitulo') return `\\begin{center}\\textit{${converterMarkdownEditorialParaLatex(b.texto)}}\\end{center}`;
+      return converterMarkdownEditorialParaLatex(b.texto);
+    }).join('\n\n');
+    latex += `\\begin{quote}\n${texBlocos}${fonte ? `\n\\par\\hfill{\\footnotesize (${fonte})}` : ''}\n\\end{quote}\n\n`;
+  }
+
+  if (midiaApoio?.url && midiaApoio.posicao_apoio !== 'acima_texto_apoio') {
+    latex += renderTexFig(midiaApoio, 'figura_apoio.jpg');
+  }
+
   if (enunciado) latex += `${converterMarkdownEditorialParaLatex(enunciado)}\n\n`;
-  if (midia?.url || questao.imagem) {
-    const w = { P: '0.36\\linewidth', M: '0.56\\linewidth', G: '0.84\\linewidth', '100%': '0.98\\linewidth' }[midia?.preset] || '0.56\\linewidth';
-    latex += `\\begin{center}\\includegraphics[width=${w}]{figura.jpg}\\end{center}\n\n`;
+  if (midiaPrincipal?.url || imagemFallbackPrincipal) {
+    latex += renderTexFig(midiaPrincipal, 'figura.jpg');
   }
   if (comando_final) latex += `\\textbf{${converterMarkdownEditorialParaLatex(comando_final)}}\n\n`;
 

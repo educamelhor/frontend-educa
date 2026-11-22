@@ -20,6 +20,11 @@ const POSICOES = [
   { key: 'abaixo_comando',            label: '⬇️ Abaixo do comando' },
 ];
 
+const POSICOES_APOIO = [
+  { key: 'abaixo_texto_apoio', label: '⬇️ Abaixo do texto de apoio (antes da questão)' },
+  { key: 'acima_texto_apoio',  label: '⬆️ No topo (acima do texto de apoio)' },
+];
+
 const ALINHAMENTOS = [
   { key: 'left',   label: '⬅ Esq' },
   { key: 'center', label: '⬌ Centro' },
@@ -32,7 +37,13 @@ const DPI_BADGE = {
   baixa: { label: '🔴 Baixa Resolução (pode pixelar no A4)', bg: '#fef2f2', color: '#b91c1c', border: '#fecaca' },
 };
 
-export default function SmartMediaCard({ imagem, midia, onChange, onCropApplied = null }) {
+export default function SmartMediaCard({
+  imagem,
+  midia,
+  onChange,
+  onCropApplied = null,
+  modoApoio = false,
+}) {
   const [uploading, setUploading] = useState(false);
   const [reprocessing, setReprocessing] = useState(false);
   const [showCropper, setShowCropper] = useState(false);
@@ -55,7 +66,8 @@ export default function SmartMediaCard({ imagem, midia, onChange, onCropApplied 
       url: imgUrl,
       original_url: midia?.original_url || imgUrl,
       preset: midia?.preset || 'M',
-      posicao: midia?.posicao || 'entre_enunciado_e_comando',
+      posicao: midia?.posicao || (modoApoio ? 'apos_texto_apoio' : 'entre_enunciado_e_comando'),
+      ...(modoApoio ? { posicao_apoio: midia?.posicao_apoio || 'abaixo_texto_apoio' } : {}),
       alinhamento: midia?.alinhamento || 'center',
       scanner_clean: Boolean(midia?.scanner_clean),
       dpi_status: midia?.dpi_status || 'alta',
@@ -78,18 +90,21 @@ export default function SmartMediaCard({ imagem, midia, onChange, onCropApplied 
     try {
       const fd = new FormData();
       fd.append('imagem', file);
-      fd.append('posicao', midia?.posicao || 'entre_enunciado_e_comando');
+      fd.append('posicao', modoApoio ? 'apos_texto_apoio' : (midia?.posicao || 'entre_enunciado_e_comando'));
       const { data } = await api.post('/api/questoes/upload-imagem', fd);
-      const novaMidia = data.midia || {
+      const baseMidia = data.midia || {
         url: data.url,
         original_url: data.url,
         preset: 'M',
-        posicao: 'entre_enunciado_e_comando',
+        posicao: modoApoio ? 'apos_texto_apoio' : 'entre_enunciado_e_comando',
         alinhamento: 'center',
         dpi_status: 'alta',
         legenda: '',
         credito: '',
       };
+      const novaMidia = modoApoio
+        ? { ...baseMidia, posicao_apoio: midia?.posicao_apoio || 'abaixo_texto_apoio' }
+        : baseMidia;
       onChange(data.url, novaMidia);
     } catch (err) {
       setErro(err.response?.data?.message || err.message || 'Falha ao enviar imagem.');
@@ -115,13 +130,18 @@ export default function SmartMediaCard({ imagem, midia, onChange, onCropApplied 
         coluna_divisao_x: midia?.coluna_divisao_x || 0,
         layout_origem: midia?.layout_origem || 'coluna_unica',
         scanner_clean: usarClean ? '1' : '0',
-        posicao: midia?.posicao || 'entre_enunciado_e_comando',
+        posicao: midia?.posicao || (modoApoio ? 'apos_texto_apoio' : 'entre_enunciado_e_comando'),
         preset: overrides.resetPreset ? undefined : (midia?.preset || undefined),
         alinhamento: midia?.alinhamento || 'center',
         legenda: midia?.legenda || '',
         credito: midia?.credito || '',
       });
-      const midiaAtualizada = { ...data.midia, url: data.url || data.midia?.url, original_url: sourceUrl };
+      const midiaAtualizada = {
+        ...data.midia,
+        url: data.url || data.midia?.url,
+        original_url: sourceUrl,
+        ...(modoApoio ? { posicao_apoio: midia?.posicao_apoio || 'abaixo_texto_apoio' } : {}),
+      };
       onChange(midiaAtualizada.url, midiaAtualizada);
       onCropApplied?.(midiaAtualizada);
       dispararSucesso('✅ Figura reprocessada em alta definição!');
@@ -184,11 +204,15 @@ export default function SmartMediaCard({ imagem, midia, onChange, onCropApplied 
             </div>
           ) : (
             <>
-              <div style={{ fontSize: '0.84rem', fontWeight: 700, color: '#334155' }}>
-                🖼️ Clique, arraste ou cole aqui apenas a figura da questão
+              <div style={{ fontSize: '0.82rem', fontWeight: 700, color: modoApoio ? '#92400e' : '#334155' }}>
+                {modoApoio
+                  ? '📌 Clique, arraste ou cole aqui um Exemplo / Tirinha / Imagem ANTES da questão'
+                  : '🖼️ Clique, arraste ou cole aqui apenas a figura da questão'}
               </div>
               <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: 3 }}>
-                Auto-ajuste inteligente de escala (P/M/G/100%), corte de margens brancas e nitidez p/ prova A4
+                {modoApoio
+                  ? 'Exibido como contexto/exemplo prévio antes do enunciado principal (salvo junto à questão)'
+                  : 'Auto-ajuste inteligente de escala (P/M/G/100%), corte de margens brancas e nitidez p/ prova A4'}
               </div>
             </>
           )}
@@ -201,6 +225,7 @@ export default function SmartMediaCard({ imagem, midia, onChange, onCropApplied 
   const dpi = DPI_BADGE[midia?.dpi_status || 'alta'] || DPI_BADGE.alta;
   const presetAtual = midia?.preset || 'M';
   const posicaoAtual = midia?.posicao || 'entre_enunciado_e_comando';
+  const posicaoApoioAtual = midia?.posicao_apoio === 'acima_texto_apoio' ? 'acima_texto_apoio' : 'abaixo_texto_apoio';
   const alignAtual = midia?.alinhamento || 'center';
   const podeReprocessar = /^https:\/\/[a-z0-9.-]*digitaloceanspaces\.com\//i.test(midia?.original_url || imgUrl);
   const qtdAreas = Array.isArray(midia?.bboxes) ? midia.bboxes.length : (midia?.partes_count || 1);
@@ -208,8 +233,10 @@ export default function SmartMediaCard({ imagem, midia, onChange, onCropApplied 
 
   return (
     <div style={{
-      border: '1.5px solid #bae6fd',
-      background: 'linear-gradient(180deg, #f0f9ff 0%, #ffffff 100%)',
+      border: `1.5px solid ${modoApoio ? '#fcd34d' : '#bae6fd'}`,
+      background: modoApoio
+        ? 'linear-gradient(180deg, #fffbeb 0%, #ffffff 100%)'
+        : 'linear-gradient(180deg, #f0f9ff 0%, #ffffff 100%)',
       borderRadius: 12,
       padding: 12,
     }}>
@@ -225,9 +252,12 @@ export default function SmartMediaCard({ imagem, midia, onChange, onCropApplied 
         <ImageCropperModal
           midia={midia || { url: imgUrl, original_url: imgUrl }}
           onApply={(novaMidia) => {
-            onChange(novaMidia.url, novaMidia);
-            onCropApplied?.(novaMidia);
-            const dims = novaMidia?.width && novaMidia?.height ? ` (${novaMidia.width}×${novaMidia.height}px)` : '';
+            const ajustada = modoApoio
+              ? { ...novaMidia, posicao_apoio: posicaoApoioAtual }
+              : novaMidia;
+            onChange(ajustada.url, ajustada);
+            onCropApplied?.(ajustada);
+            const dims = ajustada?.width && ajustada?.height ? ` (${ajustada.width}×${ajustada.height}px)` : '';
             dispararSucesso(`✅ Novo recorte HD aplicado com sucesso${dims}!`);
           }}
           onClose={() => setShowCropper(false)}
@@ -252,8 +282,8 @@ export default function SmartMediaCard({ imagem, midia, onChange, onCropApplied 
       {/* Header do Estúdio de Mídia */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '0.74rem', fontWeight: 800, color: '#0369a1', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-            ✨ Mídia Independente
+          <span style={{ fontSize: '0.74rem', fontWeight: 800, color: modoApoio ? '#b45309' : '#0369a1', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+            {modoApoio ? '📌 Exemplo / Imagem Pré-Questão' : '✨ Mídia Independente'}
           </span>
           <span style={{
             fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: 99,
@@ -431,24 +461,27 @@ export default function SmartMediaCard({ imagem, midia, onChange, onCropApplied 
       {/* Posição semântica na questão */}
       <div style={{ marginBottom: 8 }}>
         <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#64748b', marginBottom: 4, textTransform: 'uppercase' }}>
-          Posição Exata na Anatomia da Questão
+          {modoApoio ? 'Posição no Bloco Pré-Questão' : 'Posição Exata na Anatomia da Questão'}
         </div>
         <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-          {POSICOES.map(pos => (
-            <button
-              key={pos.key}
-              type="button"
-              onClick={() => updateMidia({ posicao: pos.key })}
-              style={{
-                padding: '4px 10px', borderRadius: 6, fontSize: '0.73rem', fontWeight: 700, cursor: 'pointer',
-                border: `1.5px solid ${posicaoAtual === pos.key ? '#0e7490' : '#e2e8f0'}`,
-                background: posicaoAtual === pos.key ? '#ecfeff' : '#fff',
-                color: posicaoAtual === pos.key ? '#0e7490' : '#475569',
-              }}
-            >
-              {pos.label}
-            </button>
-          ))}
+          {(modoApoio ? POSICOES_APOIO : POSICOES).map(pos => {
+            const ativo = modoApoio ? posicaoApoioAtual === pos.key : posicaoAtual === pos.key;
+            return (
+              <button
+                key={pos.key}
+                type="button"
+                onClick={() => updateMidia(modoApoio ? { posicao_apoio: pos.key } : { posicao: pos.key })}
+                style={{
+                  padding: '4px 10px', borderRadius: 6, fontSize: '0.73rem', fontWeight: 700, cursor: 'pointer',
+                  border: `1.5px solid ${ativo ? (modoApoio ? '#d97706' : '#0e7490') : '#e2e8f0'}`,
+                  background: ativo ? (modoApoio ? '#fffbeb' : '#ecfeff') : '#fff',
+                  color: ativo ? (modoApoio ? '#b45309' : '#0e7490') : '#475569',
+                }}
+              >
+                {pos.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 

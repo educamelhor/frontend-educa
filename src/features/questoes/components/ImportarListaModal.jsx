@@ -11,6 +11,7 @@ import 'pdfjs-dist/build/pdf.worker.entry';
 import api from '../../../services/api';
 import SmartMediaCard from './SmartMediaCard';
 import ImageCropperModal from './ImageCropperModal';
+import TextoApoioToolbar from './TextoApoioToolbar';
 import ModelosEditor from './ModelosEditor';
 import TagsInput from './TagsInput';
 import { gerarLatex } from './LatexPreview';
@@ -21,6 +22,8 @@ import {
   MathText,
   resumirGabaritoQuestao,
   inferirLetraCorretaPorEstrutura,
+  extrairMidiasQuestao,
+  empacotarMidiaParaSalvar,
 } from '../utils/questaoRenderer';
 import {
   useOpcoesEscolaQuestoes,
@@ -272,7 +275,7 @@ export default function ImportarListaModal({
   const [erroItem, setErroItem] = useState('');
   const [sucessoItem, setSucessoItem] = useState('');
   const [copiadoCodigo, setCopiadoCodigo] = useState('');
-  const [showManualCropModal, setShowManualCropModal] = useState(false);
+  const [manualCropAlvo, setManualCropAlvo] = useState(null); // null | 'principal' | 'apoio'
   const [teveAlgumaSalva, setTeveAlgumaSalva] = useState(false);
   const [confirmandoExclusaoIdx, setConfirmandoExclusaoIdx] = useState(null);
   const [excluindoItem, setExcluindoItem] = useState(false);
@@ -286,6 +289,7 @@ export default function ImportarListaModal({
 
   const fileInputRef = useRef(null);
   const enunciadoEditRef = useRef(null);
+  const textoApoioEditRef = useRef(null);
   const objectUrlsRef = useRef([]);
 
   const registrarObjectUrl = (url) => {
@@ -469,6 +473,9 @@ export default function ImportarListaModal({
       (altsComConteudo.length > 0 ? q.gabarito : null) ||
       null;
 
+    const { midiaPrincipal, midiaApoio, imagemFallbackPrincipal } = extrairMidiasQuestao(q);
+    const pacoteInicial = empacotarMidiaParaSalvar(midiaPrincipal, midiaApoio, imagemFallbackPrincipal);
+
     return {
       ...q,
       uid: q.id_fila || `q_${Date.now()}_${idxGlobal}`,
@@ -476,7 +483,11 @@ export default function ImportarListaModal({
       pagina_local_preview: paginaLocalPreview || q.pagina_original_url || null,
       estrutura: est,
       estrutura_json: est,
-      imagem: q.midia?.url || q.imagem_url || null,
+      midia: midiaPrincipal,
+      midia_apoio: midiaApoio,
+      midia_json: pacoteInicial.midiaCombinada,
+      imagem: midiaPrincipal?.url || imagemFallbackPrincipal || null,
+      imagem_url: midiaPrincipal?.url || imagemFallbackPrincipal || null,
       alternativas: alts,
       gabarito: gabaritoValido,
       gabarito_confirmado: !precisaConfirmarGabarito && (tipo === 'discursiva' || tipo === 'somatoria' || Boolean(gabaritoValido) || (tipo === 'verdadeiro_falso' && (est.submodo || 'direto') === 'direto') || (tipo === 'associacao' && (est.submodo || 'direto') === 'direto') || (tipo === 'lacuna' && (est.submodo || 'direto') !== 'alternativas')),
@@ -732,34 +743,55 @@ export default function ImportarListaModal({
         if (idx !== activeIdx) return it;
         const next = { ...it, ...partial };
         if (partial.estrutura) next.estrutura_json = partial.estrutura;
-        if (partial.midia !== undefined) {
-          next.midia = partial.midia;
-          next.midia_json = partial.midia;
-          next.imagem = partial.midia?.url || null;
-          next.imagem_url = partial.midia?.url || null;
+        if (partial.midia !== undefined || partial.midia_apoio !== undefined || partial.imagem !== undefined) {
+          const novaPrincipal = partial.midia !== undefined ? partial.midia : next.midia;
+          const novaApoio = partial.midia_apoio !== undefined ? partial.midia_apoio : next.midia_apoio;
+          const novaImg = partial.midia !== undefined ? (partial.midia?.url || null) : next.imagem;
+          const pacote = empacotarMidiaParaSalvar(novaPrincipal, novaApoio, novaImg);
+          next.midia = novaPrincipal || null;
+          next.midia_apoio = novaApoio || null;
+          next.midia_json = pacote.midiaCombinada;
+          next.imagem = novaPrincipal?.url || (!novaApoio ? novaImg : null) || null;
+          next.imagem_url = next.imagem;
         }
         return next;
       })
     );
   };
 
-  /* ── Persiste automaticamente novo recorte caso a questão já tenha sido salva no banco, e exibe confirmação ── */
-  const handleMidiaRecortadaNaFila = async (novaMidia) => {
+  /* ── Persiste automaticamente novo recorte (principal ou pré-questão) caso a questão já tenha sido salva no banco ── */
+  const handleMidiaRecortadaNaFila = async (novaMidia, alvo = 'principal') => {
     if (!currentItem || !novaMidia?.url) return;
+    const isApoio = alvo === 'apoio';
+    const midiaApoioAjustada = isApoio
+      ? {
+          ...novaMidia,
+          posicao_apoio:
+            novaMidia.posicao_apoio ||
+            currentItem.midia_apoio?.posicao_apoio ||
+            (currentItem.texto_apoio ? 'abaixo_texto_apoio' : 'acima_texto_apoio'),
+        }
+      : currentItem.midia_apoio;
+    const midiaPrincipalAjustada = isApoio ? currentItem.midia : novaMidia;
+    const pacote = empacotarMidiaParaSalvar(midiaPrincipalAjustada, midiaApoioAjustada, isApoio ? currentItem.imagem : novaMidia.url);
+
     const itemAtualizado = {
       ...currentItem,
-      imagem: novaMidia.url,
-      imagem_url: novaMidia.url,
-      midia: novaMidia,
-      midia_json: novaMidia,
+      midia: midiaPrincipalAjustada || null,
+      midia_apoio: midiaApoioAjustada || null,
+      midia_json: pacote.midiaCombinada,
+      imagem: pacote.imagem_url,
+      imagem_url: pacote.imagem_url,
     };
-    patchCurrentItem({
-      imagem: novaMidia.url,
-      imagem_url: novaMidia.url,
-      midia: novaMidia,
-    });
+
+    patchCurrentItem(
+      isApoio
+        ? { midia_apoio: midiaApoioAjustada }
+        : { imagem: novaMidia.url, imagem_url: novaMidia.url, midia: novaMidia }
+    );
 
     const dims = novaMidia.width && novaMidia.height ? ` (${novaMidia.width}×${novaMidia.height}px)` : '';
+    const rotuloAlvo = isApoio ? 'Exemplo/imagem pré-questão' : 'Recorte HD';
 
     if (itemAtualizado.questao_id_salva) {
       try {
@@ -769,16 +801,16 @@ export default function ImportarListaModal({
         }
         onImportado?.({ manterAberto: true });
         dispararSucessoItem(
-          `✅ Recorte HD atualizado e salvo automaticamente na questão ${itemAtualizado.codigo_escola}${dims}!`
+          `✅ ${rotuloAlvo} atualizado e salvo automaticamente na questão ${itemAtualizado.codigo_escola}${dims}!`
         );
       } catch {
         dispararSucessoItem(
-          `✅ Recorte HD aplicado na tela${dims}! Clique em "Atualizar na Escola" abaixo para gravar no banco.`
+          `✅ ${rotuloAlvo} aplicado na tela${dims}! Clique em "Atualizar na Escola" abaixo para gravar no banco.`
         );
       }
     } else {
       dispararSucessoItem(
-        `✅ Recorte HD aplicado com sucesso${dims}! Confira a prévia atualizada e salve a questão abaixo.`
+        `✅ ${rotuloAlvo} aplicado com sucesso${dims}! Confira a prévia atualizada e salve a questão abaixo.`
       );
     }
   };
@@ -861,8 +893,7 @@ export default function ImportarListaModal({
       ? item.temas.filter(Boolean)
       : [item.disciplina || 'Geral'];
 
-    const rawImg = item.midia?.url || item.imagem || null;
-    const isBase64 = Boolean(rawImg && String(rawImg).startsWith('data:'));
+    const pacoteMidia = empacotarMidiaParaSalvar(item.midia, item.midia_apoio, item.imagem);
 
     const latex = gerarLatex({
       ...item,
@@ -888,9 +919,9 @@ export default function ImportarListaModal({
       resposta_aberta:   item.resposta_aberta || null,
       tags:              Array.isArray(item.tags) ? item.tags.join(',') : '',
       temas:             JSON.stringify(temasGarantidos),
-      imagem_url:        !isBase64 ? rawImg : null,
-      imagem_base64:     isBase64 ? rawImg : null,
-      midia_json:        item.midia ? JSON.stringify(item.midia) : null,
+      imagem_url:        pacoteMidia.imagem_url,
+      imagem_base64:     pacoteMidia.imagem_base64,
+      midia_json:        pacoteMidia.midia_json,
       explicacao:        item.explicacao || null,
       compartilhada:     1,
       status:            'ativa',
@@ -1599,14 +1630,14 @@ export default function ImportarListaModal({
               })}
             </div>
 
-            {/* Corpo Dividido: Esquerda (Página/Recorte + SmartMediaCard) | Direita (Preview/Edição + Gabarito) */}
+            {/* Corpo Dividido: Esquerda (Página/Recorte + Exemplo Pré-Questão + Figura da Questão) | Direita (Preview/Edição + Gabarito) */}
             <div style={{
               display: 'grid',
-              gridTemplateColumns: currentItem.pagina_local_preview || currentItem.midia ? 'minmax(300px, 38%) 1fr' : '1fr',
+              gridTemplateColumns: currentItem.pagina_local_preview || currentItem.midia || currentItem.midia_apoio ? 'minmax(300px, 38%) 1fr' : '1fr',
               gap: 16, padding: '14px 18px', overflowY: 'auto', maxHeight: '64vh',
             }}>
-              {/* ── COLUNA ESQUERDA: Origem Visual + Mídia Independente ── */}
-              {(currentItem.pagina_local_preview || currentItem.midia) && (
+              {/* ── COLUNA ESQUERDA: Origem Visual + Exemplo Pré-Questão + Mídia Independente ── */}
+              {(currentItem.pagina_local_preview || currentItem.midia || currentItem.midia_apoio) && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                   {currentItem.pagina_local_preview && (
                     <RecortePaginaPreview
@@ -1617,7 +1648,39 @@ export default function ImportarListaModal({
                     />
                   )}
 
-                  {/* Card Independente de Figura da Questão */}
+                  {/* Card 1: Exemplo / Tirinha / Imagem ANTES da Questão (midia_apoio) */}
+                  <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 11, padding: 10 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 6, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase' }}>
+                        📌 Exemplo / Imagem Antes da Questão (Opcional)
+                      </span>
+                      {!currentItem.midia_apoio && currentItem.pagina_original_url && (
+                        <button
+                          type="button"
+                          onClick={() => setManualCropAlvo('apoio')}
+                          style={{
+                            background: '#fff', color: '#b45309', border: '1px solid #fbbf24',
+                            borderRadius: 7, padding: '4px 9px', fontSize: '0.71rem', fontWeight: 800, cursor: 'pointer',
+                          }}
+                          title="Recortar da página enviada um exemplo ilustrado, tirinha ou quadro que aparece ANTES da questão"
+                        >
+                          ✂️ Recortar Exemplo da Página
+                        </button>
+                      )}
+                    </div>
+
+                    <SmartMediaCard
+                      modoApoio={true}
+                      imagem={currentItem.midia_apoio?.url || null}
+                      midia={currentItem.midia_apoio}
+                      onChange={(_novaUrl, novaMidiaApoio) => {
+                        patchCurrentItem({ midia_apoio: novaMidiaApoio });
+                      }}
+                      onCropApplied={(novaMidiaApoio) => handleMidiaRecortadaNaFila(novaMidiaApoio, 'apoio')}
+                    />
+                  </div>
+
+                  {/* Card 2: Figura Independente DENTRO do Enunciado da Questão (midia) */}
                   <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 11, padding: 10 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 6, flexWrap: 'wrap' }}>
                       <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#0e7490', textTransform: 'uppercase' }}>
@@ -1626,7 +1689,7 @@ export default function ImportarListaModal({
                       {!currentItem.midia && currentItem.pagina_original_url && (
                         <button
                           type="button"
-                          onClick={() => setShowManualCropModal(true)}
+                          onClick={() => setManualCropAlvo('principal')}
                           style={{
                             background: '#f0f9ff', color: '#0369a1', border: '1px solid #7dd3fc',
                             borderRadius: 7, padding: '4px 9px', fontSize: '0.71rem', fontWeight: 800, cursor: 'pointer',
@@ -1643,7 +1706,7 @@ export default function ImportarListaModal({
                       onChange={(novaUrl, novaMidia) => {
                         patchCurrentItem({ imagem: novaUrl, imagem_url: novaUrl, midia: novaMidia });
                       }}
-                      onCropApplied={handleMidiaRecortadaNaFila}
+                      onCropApplied={(novaMidia) => handleMidiaRecortadaNaFila(novaMidia, 'principal')}
                     />
                   </div>
                 </div>
@@ -1772,14 +1835,56 @@ export default function ImportarListaModal({
                     background: '#fff', border: '1.5px solid #bae6fd', borderRadius: 12,
                     padding: 14, display: 'flex', flexDirection: 'column', gap: 10,
                   }}>
-                    <div>
-                      <label style={S.miniLabel}>Texto de Apoio / Texto Base Compartilhado (opcional)</label>
+                    <div style={{
+                      background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10,
+                      padding: 10, display: 'flex', flexDirection: 'column', gap: 8,
+                    }}>
+                      <label style={S.miniLabel}>
+                        📌 Texto de Apoio & Exemplo / Imagem Antes da Questão (opcional)
+                      </label>
+                      <TextoApoioToolbar
+                        textareaRef={textoApoioEditRef}
+                        value={currentItem.texto_apoio || ''}
+                        disciplina={currentItem.disciplina || ''}
+                        fonteAtual={currentItem.fonte || ''}
+                        onChange={(val) => patchCurrentItem({ texto_apoio: val })}
+                        onExtractedFonte={(fnt) => patchCurrentItem({ fonte: fnt })}
+                      />
                       <textarea
-                        style={{ ...S.textareaCompact, minHeight: 68 }}
+                        ref={textoApoioEditRef}
+                        style={{ ...S.textareaCompact, minHeight: 82, borderTopLeftRadius: 0, borderTopRightRadius: 0 }}
                         value={currentItem.texto_apoio || ''}
                         onChange={(e) => patchCurrentItem({ texto_apoio: e.target.value })}
-                        placeholder="Texto base antes do enunciado..."
+                        placeholder={'Ex:\n# Título do Texto\n## Subtítulo\n\nPrimeiro parágrafo com **negrito**, *itálico* ou __sublinhado__...'}
                       />
+                      <div style={{ marginTop: 2 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5, gap: 6, flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: '0.68rem', fontWeight: 800, color: '#b45309', textTransform: 'uppercase' }}>
+                            Imagem / Exemplo Ilustrado / Tirinha Antes da Questão
+                          </span>
+                          {!currentItem.midia_apoio && currentItem.pagina_original_url && (
+                            <button
+                              type="button"
+                              onClick={() => setManualCropAlvo('apoio')}
+                              style={{
+                                background: '#fffbeb', color: '#b45309', border: '1px solid #fbbf24',
+                                borderRadius: 6, padding: '3px 9px', fontSize: '0.7rem', fontWeight: 800, cursor: 'pointer',
+                              }}
+                            >
+                              ✂️ Recortar Exemplo da Página
+                            </button>
+                          )}
+                        </div>
+                        <SmartMediaCard
+                          modoApoio={true}
+                          imagem={currentItem.midia_apoio?.url || null}
+                          midia={currentItem.midia_apoio}
+                          onChange={(_novaUrl, novaMidiaApoio) => {
+                            patchCurrentItem({ midia_apoio: novaMidiaApoio });
+                          }}
+                          onCropApplied={(novaMidiaApoio) => handleMidiaRecortadaNaFila(novaMidiaApoio, 'apoio')}
+                        />
+                      </div>
                     </div>
                     <div>
                       <label style={S.miniLabel}>Enunciado Principal * (use $...$ para LaTeX inline ou $$...$$ para equação em destaque)</label>
@@ -2135,19 +2240,25 @@ export default function ImportarListaModal({
         )}
       </div>
 
-      {/* Modal de Recorte Manual Direto sobre a Página Original (quando a questão não tinha recorte automático) */}
-      {showManualCropModal && currentItem?.pagina_original_url && (
+      {/* Modal de Recorte Manual Direto sobre a Página Original (para Exemplo Pré-Questão ou Figura Principal) */}
+      {manualCropAlvo && currentItem?.pagina_original_url && (
         <ImageCropperModal
           midia={{
             original_url: currentItem.pagina_original_url,
             url: currentItem.pagina_original_url,
-            bbox: currentItem.questao_bbox || [150, 100, 750, 900],
+            bbox:
+              manualCropAlvo === 'apoio'
+                ? (currentItem.questao_bbox
+                    ? [Math.max(0, currentItem.questao_bbox[0] - 220), currentItem.questao_bbox[1], currentItem.questao_bbox[0] + 80, currentItem.questao_bbox[3]]
+                    : [60, 80, 420, 920])
+                : (currentItem.questao_bbox || [150, 100, 750, 900]),
           }}
           onApply={(novaMidia) => {
-            setShowManualCropModal(false);
-            handleMidiaRecortadaNaFila(novaMidia);
+            const alvo = manualCropAlvo;
+            setManualCropAlvo(null);
+            handleMidiaRecortadaNaFila(novaMidia, alvo);
           }}
-          onClose={() => setShowManualCropModal(false)}
+          onClose={() => setManualCropAlvo(null)}
         />
       )}
 

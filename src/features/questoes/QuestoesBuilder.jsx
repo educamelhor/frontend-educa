@@ -6,6 +6,7 @@ import api from '../../services/api';
 import TagsInput from './components/TagsInput';
 import SmartMediaCard from './components/SmartMediaCard';
 import MathToolbar from './components/MathToolbar';
+import TextoApoioToolbar from './components/TextoApoioToolbar';
 import ModelosEditor from './components/ModelosEditor';
 import LatexPreview, { gerarLatex } from './components/LatexPreview';
 import ImagemParaQuestaoModal from './components/ImagemParaQuestaoModal';
@@ -16,6 +17,8 @@ import {
   criarEstruturaInicial,
   parseJsonSafe,
   resumirGabaritoQuestao,
+  extrairMidiasQuestao,
+  empacotarMidiaParaSalvar,
 } from './utils/questaoRenderer';
 import {
   useOpcoesEscolaQuestoes,
@@ -68,6 +71,7 @@ const createInitialState = () => ({
   temas: [],
   imagem: null,
   midia: null,
+  midia_apoio: null,
   compartilhada: true,
 });
 
@@ -123,6 +127,7 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
   const [savedCodigo, setSavedCodigo]   = useState(null);
 
   const enunciadoRef = useRef(null);
+  const textoApoioRef = useRef(null);
 
   /* Popula formulário no modo edição */
   useEffect(() => {
@@ -154,7 +159,7 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
 
       const tipoEd = editingQuestao.tipo || 'objetiva';
       const estEd  = parseJsonSafe(editingQuestao.estrutura_json, null) || criarEstruturaInicial(tipoEd);
-      const midEd  = parseJsonSafe(editingQuestao.midia_json, null);
+      const { midiaPrincipal, midiaApoio, imagemFallbackPrincipal } = extrairMidiasQuestao(editingQuestao);
 
       setForm({
         disciplina:      editingQuestao.disciplina || '',
@@ -172,8 +177,9 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
         explicacao:      editingQuestao.explicacao || '',
         tags:            tagsArr,
         temas:           temasArr,
-        imagem:          midEd?.url || editingQuestao.imagem_url || editingQuestao.imagem_base64 || null,
-        midia:           midEd,
+        imagem:          midiaPrincipal?.url || imagemFallbackPrincipal || null,
+        midia:           midiaPrincipal,
+        midia_apoio:     midiaApoio,
         compartilhada:   editingQuestao.compartilhada !== undefined ? Boolean(editingQuestao.compartilhada) : true,
       });
       setSavedCodigo(editingQuestao.codigo || `EMQE-${String(editingQuestao.numero_q || editingQuestao.id).padStart(5, '0')}`);
@@ -246,6 +252,8 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
         }))
       : LETRAS.map(mkAlt);
 
+    const { midiaPrincipal, midiaApoio, imagemFallbackPrincipal } = extrairMidiasQuestao(dados);
+
     setForm(prev => ({
       ...prev,
       tipo:            novoTipo,
@@ -261,8 +269,9 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
       comando_final:   dados.comando_final || '',
       alternativas:    altsExtraidas,
       estrutura:       dados.estrutura_json || criarEstruturaInicial(novoTipo),
-      midia:           dados.midia || null,
-      imagem:          dados.midia?.url || dados.imagem_url || null,
+      midia:           midiaPrincipal,
+      midia_apoio:     midiaApoio,
+      imagem:          midiaPrincipal?.url || imagemFallbackPrincipal || null,
       resposta_aberta: dados.resposta_aberta || '',
       explicacao:      dados.explicacao || prev.explicacao,
     }));
@@ -404,7 +413,7 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
   const validar = (exigirTemasGlobal = false) => {
     if (!form.disciplina) return 'Selecione a disciplina no Bloco ①.';
     if (!form.enunciado.trim()) return 'O enunciado é obrigatório.';
-    if (form.imagem && String(form.imagem).startsWith('blob:')) {
+    if ((form.imagem && String(form.imagem).startsWith('blob:')) || (form.midia_apoio?.url && String(form.midia_apoio.url).startsWith('blob:'))) {
       return 'Aguarde o término do envio da imagem.';
     }
 
@@ -473,8 +482,7 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
     }
 
     const latex = gerarLatex(form);
-    const rawImg = form.midia?.url || form.imagem || null;
-    const isBase64 = Boolean(rawImg && String(rawImg).startsWith('data:'));
+    const pacoteMidia = empacotarMidiaParaSalvar(form.midia, form.midia_apoio, form.imagem);
 
     return {
       conteudo_bruto:    form.enunciado,
@@ -493,9 +501,9 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
       resposta_aberta:   form.resposta_aberta || null,
       tags:              form.tags.join(','),
       temas:             form.temas.length > 0 ? JSON.stringify(form.temas) : null,
-      imagem_url:        !isBase64 ? rawImg : null,
-      imagem_base64:     isBase64  ? rawImg : null,
-      midia_json:        form.midia ? JSON.stringify(form.midia) : null,
+      imagem_url:        pacoteMidia.imagem_url,
+      imagem_base64:     pacoteMidia.imagem_base64,
+      midia_json:        pacoteMidia.midia_json,
       explicacao:        form.explicacao || null,
       compartilhada:     form.compartilhada ? 1 : 0,
       status,
@@ -862,15 +870,24 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
           open={openBlocks[2]}
           onToggle={() => toggle(2)}
         >
-          {/* Texto de apoio + Banca/Fonte */}
-          <details open={Boolean(form.texto_apoio || form.fonte)} style={{ marginBottom: 12 }}>
+          {/* Contexto Pré-Questão: Fonte, Texto de Apoio Rico & Imagem/Exemplo Antes da Questão */}
+          <details open={Boolean(form.texto_apoio || form.fonte || form.midia_apoio?.url)} style={{ marginBottom: 14 }}>
             <summary style={{
-              fontSize: '0.8rem', color: '#0e7490', cursor: 'pointer',
-              fontWeight: 700, marginBottom: 8, userSelect: 'none',
+              fontSize: '0.81rem', color: '#0e7490', cursor: 'pointer',
+              fontWeight: 800, marginBottom: 8, userSelect: 'none',
+              display: 'flex', alignItems: 'center', gap: 6,
             }}>
-              📖 Fonte / Banca & Texto de Apoio (opcional)
+              <span>📌 Contexto Antes da Questão: Texto de Apoio, Exemplo Ilustrado / Tirinha & Fonte (opcional)</span>
+              {(form.texto_apoio || form.midia_apoio?.url) && (
+                <span style={{
+                  fontSize: '0.68rem', background: '#fef3c7', color: '#92400e',
+                  border: '1px solid #fcd34d', padding: '1px 7px', borderRadius: 99, fontWeight: 800,
+                }}>
+                  Preenchido
+                </span>
+              )}
             </summary>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '8px 10px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '10px 12px', background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0' }}>
               <div className="bq-field">
                 <label className="bq-label">Fonte / Banca Examinadora</label>
                 <input
@@ -885,12 +902,37 @@ export default function QuestoesBuilder({ editingQuestao, onSaved, onCancel }) {
                 </datalist>
               </div>
               <div className="bq-field">
-                <label className="bq-label">Texto base / Poema / Tirinha textual (antes do enunciado)</label>
+                <label className="bq-label">
+                  Texto de Apoio / Chamada de Exemplo / Poema / Reportagem (antes do enunciado)
+                </label>
+                <TextoApoioToolbar
+                  textareaRef={textoApoioRef}
+                  value={form.texto_apoio}
+                  disciplina={form.disciplina}
+                  fonteAtual={form.fonte}
+                  onChange={(val) => set('texto_apoio', val)}
+                  onExtractedFonte={(fnt) => set('fonte', fnt)}
+                />
                 <textarea
+                  ref={textoApoioRef}
                   className="bq-textarea"
+                  style={{ borderTopLeftRadius: 0, borderTopRightRadius: 0, minHeight: 92 }}
                   value={form.texto_apoio}
                   onChange={e => set('texto_apoio', e.target.value)}
-                  placeholder="Trecho de reportagem, poema ou texto motivador..."
+                  placeholder={'Ex:\n# Título do Texto ou Poema\n## Subtítulo opcional\n\nPrimeiro parágrafo com **destaque** ou *itálico*...\n\nSegundo parágrafo...'}
+                />
+              </div>
+              <div className="bq-field">
+                <label className="bq-label">
+                  📌 Imagem / Exemplo Resolvido / Tirinha Antes da Questão <span style={{ fontWeight: 400, color: '#64748b', textTransform: 'none' }}>(independente da figura do enunciado)</span>
+                </label>
+                <SmartMediaCard
+                  modoApoio={true}
+                  imagem={form.midia_apoio?.url || null}
+                  midia={form.midia_apoio}
+                  onChange={(_url, midiaApoioObj) => {
+                    setForm(p => ({ ...p, midia_apoio: midiaApoioObj }));
+                  }}
                 />
               </div>
             </div>

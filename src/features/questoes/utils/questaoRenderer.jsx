@@ -19,6 +19,142 @@ export function parseJsonSafe(raw, fallback = null) {
   try { return JSON.parse(raw); } catch { return fallback; }
 }
 
+/**
+ * Desempacota de forma segura e retrocompatível as duas camadas independentes de mídia da questão:
+ * - `midiaApoio`: imagem/exemplo resolvido/tirinha exibida ANTES da questão (junto ao texto de apoio)
+ * - `midiaPrincipal`: figura/gráfico/esquema exibida DENTRO do enunciado da questão
+ */
+export function extrairMidiasQuestao(questao) {
+  if (!questao) {
+    return { midiaPrincipal: null, midiaApoio: null, imagemFallbackPrincipal: null };
+  }
+  const rawMidia = parseJsonSafe(questao.midia ?? questao.midia_json, null);
+  const rawApoioDireta = parseJsonSafe(questao.midia_apoio, null);
+  const rawApoioEmbutida = parseJsonSafe(rawMidia?.midia_apoio, null);
+
+  const candidataApoio = rawApoioDireta?.url
+    ? rawApoioDireta
+    : (rawApoioEmbutida?.url ? rawApoioEmbutida : null);
+
+  const midiaApoio = candidataApoio
+    ? {
+        ...candidataApoio,
+        posicao_apoio:
+          candidataApoio.posicao_apoio === 'acima_texto_apoio'
+            ? 'acima_texto_apoio'
+            : 'abaixo_texto_apoio',
+      }
+    : null;
+
+  const semPrincipalExplicito = Boolean(
+    rawMidia?.sem_midia_principal || (!rawMidia?.url && (rawMidia?.midia_apoio || midiaApoio))
+  );
+
+  let midiaPrincipal = null;
+  if (!semPrincipalExplicito && rawMidia?.url) {
+    const clone = { ...rawMidia };
+    delete clone.midia_apoio;
+    delete clone.sem_midia_principal;
+    midiaPrincipal = clone;
+  }
+
+  const imagemFallbackPrincipal = semPrincipalExplicito
+    ? null
+    : (questao.imagem || questao.imagem_url || questao.imagem_base64 || null);
+
+  return { midiaPrincipal, midiaApoio, imagemFallbackPrincipal };
+}
+
+/**
+ * Empacota `midiaPrincipal` e `midiaApoio` em `midia_json` + `imagem_url`/`imagem_base64`
+ * garantindo que uma questão que possua APENAS `midia_apoio` nunca duplique a imagem no enunciado.
+ */
+export function empacotarMidiaParaSalvar(midiaPrincipal = null, midiaApoio = null, imagemLegada = null) {
+  const principalObj = midiaPrincipal?.url
+    ? (() => {
+        const clone = { ...midiaPrincipal };
+        delete clone.midia_apoio;
+        delete clone.sem_midia_principal;
+        return clone;
+      })()
+    : null;
+
+  const apoioObj = midiaApoio?.url
+    ? {
+        ...midiaApoio,
+        posicao_apoio:
+          midiaApoio.posicao_apoio === 'acima_texto_apoio'
+            ? 'acima_texto_apoio'
+            : 'abaixo_texto_apoio',
+      }
+    : null;
+
+  let midiaCombinada = null;
+  if (principalObj && apoioObj) {
+    midiaCombinada = { ...principalObj, midia_apoio: apoioObj };
+  } else if (principalObj) {
+    midiaCombinada = principalObj;
+  } else if (apoioObj) {
+    midiaCombinada = { url: null, sem_midia_principal: true, midia_apoio: apoioObj };
+  }
+
+  const rawImgPrincipal = principalObj?.url || (!apoioObj ? imagemLegada : null) || null;
+  const isBase64 = Boolean(rawImgPrincipal && String(rawImgPrincipal).startsWith('data:'));
+
+  return {
+    midiaCombinada,
+    midia_json: midiaCombinada ? JSON.stringify(midiaCombinada) : null,
+    imagem_url: !isBase64 ? rawImgPrincipal : null,
+    imagem_base64: isBase64 ? rawImgPrincipal : null,
+  };
+}
+
+/**
+ * Analisa o texto de apoio em blocos semânticos editoriais:
+ * - `# Título` -> `{ tipo: 'titulo', texto }`
+ * - `## Subtítulo` -> `{ tipo: 'subtitulo', texto }`
+ * - Parágrafos / estrofes separados por linha em branco -> `{ tipo: 'paragrafo', texto }`
+ */
+export function parseBlocosTextoApoio(raw = '') {
+  const s = String(raw || '').replace(/\r\n/g, '\n').trim();
+  if (!s) return [];
+
+  const linhas = s.split('\n');
+  const blocos = [];
+  let bufferParagrafo = [];
+
+  const flushParagrafo = () => {
+    if (bufferParagrafo.length > 0) {
+      const txt = bufferParagrafo.join('\n').trim();
+      if (txt) blocos.push({ tipo: 'paragrafo', texto: txt });
+      bufferParagrafo = [];
+    }
+  };
+
+  for (const linha of linhas) {
+    const trimmed = linha.trim();
+    if (!trimmed) {
+      flushParagrafo();
+      continue;
+    }
+    const mSub = trimmed.match(/^#{2,3}\s+(.+)$/);
+    if (mSub) {
+      flushParagrafo();
+      blocos.push({ tipo: 'subtitulo', texto: mSub[1].trim() });
+      continue;
+    }
+    const mTit = trimmed.match(/^#\s+(.+)$/);
+    if (mTit) {
+      flushParagrafo();
+      blocos.push({ tipo: 'titulo', texto: mTit[1].trim() });
+      continue;
+    }
+    bufferParagrafo.push(linha);
+  }
+  flushParagrafo();
+  return blocos;
+}
+
 export function criarEstruturaInicial(tipo) {
   switch (tipo) {
     case 'afirmativas':
@@ -446,6 +582,109 @@ export function resumirGabaritoQuestao(questao) {
   return altCorreta ? `(${altCorreta})` : '—';
 }
 
+/* ── Bloco Editorial Rico de Texto de Apoio (Título, Subtítulo, Parágrafos, Negrito/Itálico/Sublinhado e Fonte) ── */
+export function TextoApoioFormatado({
+  text = '',
+  fonte = '',
+  modoProva = false,
+  estiloEditorialLimpo = false,
+  fontBodyOverride = null,
+}) {
+  const blocos = parseBlocosTextoApoio(text);
+  if (!blocos.length) return null;
+
+  const baseSize = estiloEditorialLimpo
+    ? (fontBodyOverride ? `calc(${fontBodyOverride} - 0.5pt)` : '9.5pt')
+    : (modoProva ? '9.2pt' : '0.84rem');
+
+  const renderBlocos = () =>
+    blocos.map((b, idx) => {
+      const isLast = idx === blocos.length - 1;
+      if (b.tipo === 'titulo') {
+        return (
+          <div
+            key={`ta-t-${idx}`}
+            style={{
+              fontWeight: 800,
+              fontStyle: 'normal',
+              textAlign: 'center',
+              fontSize: estiloEditorialLimpo || modoProva ? '10pt' : '0.92rem',
+              color: modoProva || estiloEditorialLimpo ? '#000' : '#0f172a',
+              lineHeight: 1.32,
+              marginBottom: blocos[idx + 1]?.tipo === 'subtitulo' ? 2 : 5,
+            }}
+          >
+            <MathText text={b.texto} />
+          </div>
+        );
+      }
+      if (b.tipo === 'subtitulo') {
+        return (
+          <div
+            key={`ta-st-${idx}`}
+            style={{
+              fontWeight: 600,
+              fontStyle: 'italic',
+              textAlign: 'center',
+              fontSize: estiloEditorialLimpo || modoProva ? '9pt' : '0.82rem',
+              color: modoProva || estiloEditorialLimpo ? '#222' : '#475569',
+              lineHeight: 1.34,
+              marginBottom: 5,
+            }}
+          >
+            <MathText text={b.texto} />
+          </div>
+        );
+      }
+      return (
+        <div
+          key={`ta-p-${idx}`}
+          style={{
+            fontStyle: 'normal',
+            fontSize: baseSize,
+            textAlign: 'justify',
+            lineHeight: estiloEditorialLimpo ? 1.36 : 1.56,
+            color: modoProva || estiloEditorialLimpo ? '#111' : '#334155',
+            marginBottom: isLast ? 0 : (estiloEditorialLimpo ? 4 : 6),
+          }}
+        >
+          <MathText text={b.texto} />
+        </div>
+      );
+    });
+
+  if (estiloEditorialLimpo) {
+    return (
+      <div style={{ margin: '2px 0 5px' }}>
+        {renderBlocos()}
+        {fonte && (
+          <div style={{ fontSize: '8pt', fontStyle: 'normal', textAlign: 'right', color: '#222', marginTop: 2 }}>
+            ({fonte})
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <blockquote style={{
+      borderLeft: `3px solid ${modoProva ? '#555' : '#0e7490'}`,
+      background: modoProva ? '#f8f8f8' : '#f8fafc',
+      padding: modoProva ? '5px 9px' : '9px 13px',
+      margin: '0 0 8px',
+      borderRadius: modoProva ? 0 : 6,
+      fontStyle: 'normal',
+    }}>
+      {renderBlocos()}
+      {fonte && (
+        <footer style={{ fontSize: modoProva ? '7.8pt' : '0.73rem', fontStyle: 'normal', textAlign: 'right', color: '#64748b', marginTop: 4 }}>
+          — {fonte}
+        </footer>
+      )}
+    </blockquote>
+  );
+}
+
 /* ── Renderização Completa da Anatomia da Questão (Tela + Preview A4) ── */
 export function QuestaoCorpoEstruturado({
   questao,
@@ -459,7 +698,7 @@ export function QuestaoCorpoEstruturado({
   if (!questao) return null;
 
   const est = parseJsonSafe(questao.estrutura_json || questao.estrutura, {}) || {};
-  const midia = parseJsonSafe(questao.midia ?? questao.midia_json, null);
+  const { midiaPrincipal: midia, midiaApoio, imagemFallbackPrincipal: imagemFallback } = extrairMidiasQuestao(questao);
   const tipo = questao.tipo || est.modelo || 'objetiva';
 
   const enunciadoRaw = questao.enunciado ?? questao.conteudo_bruto ?? '';
@@ -467,7 +706,6 @@ export function QuestaoCorpoEstruturado({
   const textoApoio   = questao.texto_apoio ?? '';
   const fonte        = questao.fonte ?? '';
   const respostaAberta = questao.resposta_aberta ?? '';
-  const imagemFallback = questao.imagem || questao.imagem_url || questao.imagem_base64 || null;
 
   const rawAlts = questao.alternativas || parseJsonSafe(questao.alternativas_json, []) || [];
   const alts = (Array.isArray(rawAlts) ? rawAlts : []).filter(a => (a?.texto && String(a.texto).trim()) || a?.imagem_url);
@@ -584,48 +822,32 @@ export function QuestaoCorpoEstruturado({
     );
   };
 
+  const posicaoApoio = midiaApoio?.posicao_apoio === 'acima_texto_apoio'
+    ? 'acima_texto_apoio'
+    : 'abaixo_texto_apoio';
+
   return (
     <div>
-      {/* 1. Texto de apoio */}
-      {textoApoio && (
-        estiloEditorialLimpo ? (
-          <div style={{
-            margin: '2px 0 5px',
-            fontSize: fontBodyOverride ? `calc(${fontBodyOverride} - 0.5pt)` : '9.5pt',
-            fontStyle: 'italic',
-            textAlign: 'justify',
-            color: '#000',
-            lineHeight: 1.34,
-          }}>
-            <MathText text={textoApoio} />
-            {fonte && (
-              <div style={{ fontSize: '8pt', fontStyle: 'normal', textAlign: 'right', color: '#222', marginTop: 2 }}>
-                ({fonte})
-              </div>
-            )}
-          </div>
-        ) : (
-          <blockquote style={{
-            borderLeft: `3px solid ${modoProva ? '#555' : '#0e7490'}`,
-            background: modoProva ? '#f8f8f8' : '#f8fafc',
-            padding: modoProva ? '4px 8px' : '8px 12px',
-            margin: '0 0 8px',
-            borderRadius: modoProva ? 0 : 6,
-            fontSize: modoProva ? '9pt' : '0.82rem',
-            fontStyle: 'italic',
-            color: modoProva ? '#222' : '#475569',
-          }}>
-            <MathText text={textoApoio} />
-            {fonte && (
-              <footer style={{ fontSize: modoProva ? '7.8pt' : '0.73rem', fontStyle: 'normal', color: '#64748b', marginTop: 3 }}>
-                — {fonte}
-              </footer>
-            )}
-          </blockquote>
-        )
+      {/* 1. Bloco Pré-Questão: Exemplo Visual / Tirinha (midiaApoio) + Texto de Apoio Rico */}
+      {posicaoApoio === 'acima_texto_apoio' && midiaApoio?.url && (
+        <SmartFigure midia={midiaApoio} modoProva={modoProva} />
       )}
 
-      {/* Figura após texto de apoio */}
+      {textoApoio && (
+        <TextoApoioFormatado
+          text={textoApoio}
+          fonte={fonte}
+          modoProva={modoProva}
+          estiloEditorialLimpo={estiloEditorialLimpo}
+          fontBodyOverride={fontBodyOverride}
+        />
+      )}
+
+      {posicaoApoio === 'abaixo_texto_apoio' && midiaApoio?.url && (
+        <SmartFigure midia={midiaApoio} modoProva={modoProva} />
+      )}
+
+      {/* Figura principal após texto de apoio */}
       {posicaoFigura === 'apos_texto_apoio' && (
         <SmartFigure midia={midia} imagemUrl={imagemFallback} modoProva={modoProva} />
       )}
@@ -894,7 +1116,7 @@ export function renderQuestaoPrintHtml(it, idx, template, showGabarito = false, 
 
   const num = String(idx + 1).padStart(2, '0');
   const est = parseJsonSafe(it.estrutura_json, {}) || {};
-  const midia = parseJsonSafe(it.midia_json, null);
+  const { midiaPrincipal: midia, midiaApoio, imagemFallbackPrincipal } = extrairMidiasQuestao(it);
   const tipo = it.tipo || est.modelo || (template === 'discursiva' ? 'discursiva' : 'objetiva');
   const alts = parseJsonSafe(it.alternativas_json, []) || [];
   const correta =
@@ -903,24 +1125,48 @@ export function renderQuestaoPrintHtml(it, idx, template, showGabarito = false, 
     it.gabarito ||
     inferirLetraCorretaPorEstrutura(tipo, est, alts, `${it.conteudo_bruto || ''} ${it.comando_final || ''}`);
 
-  const imgSrc = midia?.url || it.imagem_url || it.imagem_base64;
   const presetMap = { P: '36%', M: '56%', G: '84%', '100%': '100%' };
-  const wCss = presetMap[midia?.preset] || '58%';
-  const align = ['left', 'center', 'right'].includes(midia?.alinhamento) ? midia.alinhamento : 'center';
+  const renderPrintFigObj = (mObj, fallbackUrl = null) => {
+    const src = mObj?.url || fallbackUrl;
+    if (!src) return '';
+    const wCss = presetMap[mObj?.preset] || '58%';
+    const align = ['left', 'center', 'right'].includes(mObj?.alinhamento) ? mObj.alinhamento : 'center';
+    const legLimpa = String(mObj?.legenda || '').trim();
+    const credBruto = String(mObj?.credito || '').trim();
+    const credEhRodapeCaderno = /^(?:humanas|linguagens|matem[aá]tica|ci[êe]ncias)[\s\-–—_/0-9º°ªa-z]*$/i.test(credBruto);
+    const credUtil = credBruto && !credEhRodapeCaderno && !legLimpa.toLowerCase().includes(credBruto.toLowerCase())
+      ? `Fonte: ${credBruto}`
+      : '';
+    const legenda = [legLimpa, credUtil].filter(Boolean).join(' — ');
+    return `<div style="text-align:${align};margin:6px 0"><img src="${esc(src)}" style="display:inline-block;width:${wCss};max-width:100%;max-height:220px;height:auto;object-fit:contain"/>${legenda ? `<div style="font-size:7.5pt;color:#555;font-style:italic">${esc(legenda)}</div>` : ''}</div>`;
+  };
+
   const pos = ['apos_texto_apoio', 'entre_enunciado_e_comando', 'abaixo_comando'].includes(midia?.posicao)
     ? midia.posicao
     : 'entre_enunciado_e_comando';
-  const legLimpa = String(midia?.legenda || '').trim();
-  const credBruto = String(midia?.credito || '').trim();
-  const credEhRodapeCaderno = /^(?:humanas|linguagens|matem[aá]tica|ci[êe]ncias)[\s\-–—_/0-9º°ªa-z]*$/i.test(credBruto);
-  const credUtil = credBruto && !credEhRodapeCaderno && !legLimpa.toLowerCase().includes(credBruto.toLowerCase())
-    ? `Fonte: ${credBruto}`
-    : '';
-  const legenda = [legLimpa, credUtil].filter(Boolean).join(' — ');
+  const posApoioPrint = midiaApoio?.posicao_apoio === 'acima_texto_apoio' ? 'acima_texto_apoio' : 'abaixo_texto_apoio';
+  const figApoioHtml = midiaApoio?.url ? renderPrintFigObj(midiaApoio, null) : '';
+  const figHtml = renderPrintFigObj(midia, imagemFallbackPrincipal);
 
-  const figHtml = imgSrc
-    ? `<div style="text-align:${align};margin:6px 0"><img src="${esc(imgSrc)}" style="display:inline-block;width:${wCss};max-width:100%;max-height:220px;height:auto;object-fit:contain"/>${legenda ? `<div style="font-size:7.5pt;color:#555;font-style:italic">${esc(legenda)}</div>` : ''}</div>`
-    : '';
+  const renderTextoApoioPrintHtml = (txt, fnt, limpo) => {
+    const blocos = parseBlocosTextoApoio(txt);
+    if (!blocos.length) return '';
+    const inner = blocos.map((b, bIdx) => {
+      const isLast = bIdx === blocos.length - 1;
+      if (b.tipo === 'titulo') {
+        return `<div style="font-weight:700;font-style:normal;text-align:center;font-size:10pt;line-height:1.3;margin-bottom:3px">${fmtPrint(b.texto)}</div>`;
+      }
+      if (b.tipo === 'subtitulo') {
+        return `<div style="font-weight:600;font-style:italic;text-align:center;font-size:9pt;line-height:1.32;margin-bottom:4px;color:#222">${fmtPrint(b.texto)}</div>`;
+      }
+      return `<div style="font-style:normal;text-align:justify;line-height:${limpo ? '1.36' : '1.48'};margin-bottom:${isLast ? '0' : '4px'}">${fmtPrint(b.texto).replace(/\n/g, '<br>')}</div>`;
+    }).join('');
+
+    if (limpo) {
+      return `<div style="font-size:calc(${fontBody} - 0.5pt);margin:3px 0 5px">${inner}${fnt ? `<div style="font-size:8pt;font-style:normal;text-align:right;margin-top:2px">(${esc(fnt)})</div>` : ''}</div>`;
+    }
+    return `<blockquote style="border-left:3px solid #555;padding:5px 9px;font-style:normal;font-size:9pt;margin:4px 0;background:#f8f8f8">${inner}${fnt ? `<footer style="font-size:8pt;font-style:normal;text-align:right;margin-top:2px">— ${esc(fnt)}</footer>` : ''}</blockquote>`;
+  };
 
   let enuncHtml = fmtPrint(it.conteudo_bruto || '').replace(/\n/g, '<br>');
   if (tipo === 'lacuna') {
@@ -985,12 +1231,12 @@ export function renderQuestaoPrintHtml(it, idx, template, showGabarito = false, 
       <span style="flex:1;height:12pt;background:${esc(corDestaque)};min-width:18px;-webkit-print-color-adjust:exact;print-color-adjust:exact"></span>
       ${mostrarMetaQuestao ? `<span style="font-size:8pt;color:#333;white-space:nowrap">${Number(it.valor_pontos || 1).toFixed(1)}pt</span>` : ''}
     </div>`;
-    const apoioM01 = it.texto_apoio
-      ? `<div style="font-style:italic;font-size:calc(${fontBody} - 0.5pt);text-align:justify;margin:3px 0 5px">${fmtPrint(it.texto_apoio).replace(/\n/g, '<br>')}${it.fonte ? `<div style="font-size:8pt;font-style:normal;text-align:right">(${esc(it.fonte)})</div>` : ''}</div>`
-      : '';
+    const apoioM01 = renderTextoApoioPrintHtml(it.texto_apoio, it.fonte, true);
     return `<div class="flow-item questao-m01" style="margin-bottom:11px">
       ${headerM01}
+      ${posApoioPrint === 'acima_texto_apoio' ? figApoioHtml : ''}
       ${apoioM01}
+      ${posApoioPrint === 'abaixo_texto_apoio' ? figApoioHtml : ''}
       ${pos === 'apos_texto_apoio' ? figHtml : ''}
       <p style="font-size:${fontBody};line-height:1.36;text-align:justify;margin:2px 0 4px">${enuncHtml}</p>
       ${pos === 'entre_enunciado_e_comando' ? figHtml : ''}
@@ -1000,9 +1246,12 @@ export function renderQuestaoPrintHtml(it, idx, template, showGabarito = false, 
     </div>`;
   }
 
+  const apoioCardHtml = renderTextoApoioPrintHtml(it.texto_apoio, it.fonte, false);
   return `<div style="break-inside:avoid;page-break-inside:avoid;margin-bottom:10px;padding-bottom:8px;border-bottom:0.5pt dashed #ccc">
     <div style="display:flex;justify-content:space-between;margin-bottom:3px"><span style="font-weight:700;font-size:10pt;text-transform:uppercase">QUESTÃO ${num}${it.fonte && !it.texto_apoio ? ` <span style="font-weight:600;font-size:8.5pt;text-transform:none">(${esc(it.fonte)})</span>` : ''}</span><span style="font-size:7.5pt;color:#666">${esc(it.disciplina || '')} ${it.habilidade_bncc ? `· ${esc(it.habilidade_bncc)}` : ''} · ${Number(it.valor_pontos || 1).toFixed(1)}pt</span></div>
-    ${it.texto_apoio ? `<blockquote style="border-left:3px solid #555;padding:4px 8px;font-style:italic;font-size:9pt;margin:4px 0;background:#f8f8f8">${fmtPrint(it.texto_apoio).replace(/\n/g, '<br>')}${it.fonte ? `<footer style="font-size:8pt;font-style:normal">— ${esc(it.fonte)}</footer>` : ''}</blockquote>` : ''}
+    ${posApoioPrint === 'acima_texto_apoio' ? figApoioHtml : ''}
+    ${apoioCardHtml}
+    ${posApoioPrint === 'abaixo_texto_apoio' ? figApoioHtml : ''}
     ${pos === 'apos_texto_apoio' ? figHtml : ''}
     <p style="font-size:10pt;line-height:1.55;text-align:justify;margin:3px 0 4px">${enuncHtml}</p>
     ${pos === 'entre_enunciado_e_comando' ? figHtml : ''}

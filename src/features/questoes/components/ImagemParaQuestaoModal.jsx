@@ -307,6 +307,19 @@ export default function ImagemParaQuestaoModal({ onClose, onUsar, initialFile = 
                   <div style={styles.revisaoLabel}>Print enviado</div>
                   <img src={preview} alt="Original" style={styles.revisaoImg} />
 
+                  {resultado.midia_apoio?.url && (
+                    <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: '#fffbeb', border: '1px solid #fcd34d' }}>
+                      <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#b45309', marginBottom: 6, textTransform: 'uppercase' }}>
+                        📌 Exemplo / Imagem Pré-Questão ({resultado.midia_apoio.preset || 'M'})
+                      </div>
+                      <img
+                        src={resultado.midia_apoio.url}
+                        alt="Exemplo pré-questão"
+                        style={{ width: '100%', maxHeight: 155, objectFit: 'contain', borderRadius: 6, background: '#fff', border: '1px solid #fde68a' }}
+                      />
+                    </div>
+                  )}
+
                   {resultado.midia?.url && (
                     <div style={{ marginTop: 10, padding: 10, borderRadius: 10, background: '#f0f9ff', border: '1px solid #bae6fd' }}>
                       <div style={{ fontSize: '0.68rem', fontWeight: 800, color: '#0369a1', marginBottom: 6, textTransform: 'uppercase' }}>

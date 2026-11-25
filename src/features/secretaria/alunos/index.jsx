@@ -249,6 +249,7 @@ export default function Alunos() {
   // ────────────────────────────────────────────────────────────────
   async function handleSalvar(dados) {
     try {
+      setErro("");
       if (alunoEditando?.id) {
         await api.put(`/api/alunos/${alunoEditando.id}`, dados);
         setMensagemSucesso("✅ Dados do aluno atualizados com sucesso!");
@@ -260,15 +261,17 @@ export default function Alunos() {
       setFormOpen(false);
       setAlunoEditando(null);
       await fetchAlunos();
-      return true;
+      return { ok: true };
     } catch (err) {
       console.error("❌ Erro ao salvar aluno:", err);
-      setErro(err?.response?.data?.message || "Erro ao salvar aluno.");
-      return false;
+      const mensagemErro = err?.response?.data?.message || "Erro ao salvar aluno.";
+      setErro(mensagemErro);
+      return { ok: false, message: mensagemErro };
     }
   }
 
   function handleEditar(aluno) {
+    setErro("");
     setAlunoEditando(aluno);
     setFormOpen(true);
   }
@@ -320,7 +323,7 @@ export default function Alunos() {
             <>
               <button
                 type="button"
-                onClick={() => { setAlunoEditando(null); setFormOpen(true); }}
+                onClick={() => { setErro(""); setAlunoEditando(null); setFormOpen(true); }}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition shadow-sm"
                 title="Adicionar Estudante"
               >
@@ -497,7 +500,7 @@ export default function Alunos() {
         open={isFormOpen}
         onClose={() => { setFormOpen(false); setAlunoEditando(null); }}
         onSubmit={handleSalvar}
-        initialData={alunoEditando || {}}
+        initialData={alunoEditando}
         turmas={turmas}
         anoLetivo={anoLetivo}
       />

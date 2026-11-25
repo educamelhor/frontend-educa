@@ -308,7 +308,10 @@ export function abreviarAneesEducaDF(raw, opcoes = {}) {
   };
 }
 
-export default function AlunoForm({ open, onClose, onSubmit, initialData = {}, anoLetivo }) {
+const EMPTY_INITIAL_DATA = Object.freeze({});
+
+export default function AlunoForm({ open, onClose, onSubmit, initialData: initialDataProp, anoLetivo }) {
+  const initialData = initialDataProp || EMPTY_INITIAL_DATA;
   // ────────────────────────────────────────────────────────────────
   // Helpers locais
   // ────────────────────────────────────────────────────────────────
@@ -359,6 +362,8 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {}, a
   const [nomeSocial, setNomeSocial] = useState(initialData.nome_social || "");
   const [turmas, setTurmas] = useState([]);
   const [modalAtivarOpen, setModalAtivarOpen] = useState(false);
+  const [erroForm, setErroForm] = useState("");
+  const [salvando, setSalvando] = useState(false);
 
   const resumoAneesAtual = useMemo(
     () =>
@@ -402,6 +407,8 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {}, a
   // ────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (open) {
+      setErroForm("");
+      setSalvando(false);
       setCodigo(initialData.codigo || "");
       setEstudante(initialData.nome_registro || initialData.estudante || "");
       setDataNascimento(normalizeDate(initialData.data_nascimento));
@@ -483,11 +490,15 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {}, a
   }, [open, initialData, turmas]);
 
   // ────────────────────────────────────────────────────────────────
-  // Submit (mantido + suporte a Nome Social)
+  // Submit (mantido + suporte a Nome Social + sanitização de RE e CPF)
   // ────────────────────────────────────────────────────────────────
   const buildPayload = () => {
+    const codigoLimpo = initialData.id
+      ? String(codigo || "").trim()
+      : String(codigo || "").trim().replace(/[.\-\s/]/g, "");
     const nomeRegistroTrim = String(estudante || "").trim();
     const nomeSocialTrim = String(nomeSocial || "").trim();
+    const cpfDigitos = String(cpf || "").replace(/\D/g, "").trim();
     const aneesDigitado = String(aneesInput || "").trim();
     let aneesParaSalvar = null;
     if (atendimentoDiferencial) {
@@ -498,65 +509,122 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {}, a
       }
     }
     return {
-      codigo,
+      codigo: codigoLimpo,
       estudante: usaNomeSocial ? nomeSocialTrim : nomeRegistroTrim,
       nome_registro: nomeRegistroTrim,
       usa_nome_social: usaNomeSocial ? 1 : 0,
       nome_social: usaNomeSocial ? nomeSocialTrim : null,
-      data_nascimento: dataNascimento,
+      data_nascimento: dataNascimento || null,
       turma_id: Number(turmaId),
-      cpf,
+      cpf: cpfDigitos || null,
       atendimento_diferencial: atendimentoDiferencial ? 1 : 0,
       anees: aneesParaSalvar,
     };
   };
 
+  const validarAntesDeSalvar = (payload) => {
+    if (!initialData.id) {
+      if (!payload.codigo || !/^\d+$/.test(String(payload.codigo))) {
+        return "RE (Registro Estudantil) inválido: informe apenas os dígitos numéricos do código do estudante.";
+      }
+      if (Number(payload.codigo) <= 0 || Number(payload.codigo) > 2147483647) {
+        return "RE (Registro Estudantil) fora da faixa permitida. Informe o código RE do EducaDF (não utilize o CPF neste campo).";
+      }
+    }
+    if (!payload.nome_registro) {
+      return "Informe o nome do estudante.";
+    }
+    if (usaNomeSocial && !String(nomeSocial || "").trim()) {
+      return "Informe o Nome Social do estudante.";
+    }
+    if (payload.cpf && String(payload.cpf).length !== 11) {
+      return "CPF do estudante inválido: informe os 11 dígitos numéricos ou deixe o campo em branco.";
+    }
+    if (!payload.turma_id || payload.turma_id <= 0) {
+      return "Selecione a turma do estudante.";
+    }
+    return "";
+  };
+
+  const interpretarResultadoSubmit = (res) => {
+    if (res === true) return { ok: true, message: "" };
+    if (res && typeof res === "object") {
+      return { ok: Boolean(res.ok), message: res.message || "" };
+    }
+    return { ok: false, message: "Não foi possível salvar os dados do estudante." };
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (salvando) return;
 
-    if (usaNomeSocial && !String(nomeSocial || "").trim()) {
+    const payload = buildPayload();
+    const erroValidacao = validarAntesDeSalvar(payload);
+    if (erroValidacao) {
+      setErroForm(erroValidacao);
       return;
     }
 
-    const payload = buildPayload();
+    setErroForm("");
+    setSalvando(true);
+    try {
+      let resultado;
+      if (initialData.id) {
+        // aluno já existia — mantemos o status atual ou ativo (se undefined)
+        resultado = await onSubmit({
+          ...initialData,
+          ...payload,
+          status: initialData.status || "ativo",
+        });
+      } else {
+        // novo aluno
+        resultado = await onSubmit(payload);
+      }
 
-    let sucesso = false;
-
-    if (initialData.id) {
-      // aluno já existia — mantemos o status atual ou ativo (se undefined)
-      sucesso = await onSubmit({
-        ...initialData,
-        ...payload,
-        status: initialData.status || "ativo",
-      });
-    } else {
-      // novo aluno
-      sucesso = await onSubmit(payload);
+      const { ok, message } = interpretarResultadoSubmit(resultado);
+      if (ok) {
+        onClose();
+      } else {
+        setErroForm(message || "Erro ao salvar estudante.");
+      }
+    } finally {
+      setSalvando(false);
     }
-
-    if (sucesso) onClose();
   };
 
   // ────────────────────────────────────────────────────────────────
   // Ativação explícita
   // ────────────────────────────────────────────────────────────────
   const handleConfirmarAtivacao = async () => {
-    if (usaNomeSocial && !String(nomeSocial || "").trim()) {
+    if (salvando) return;
+
+    const payload = buildPayload();
+    const erroValidacao = validarAntesDeSalvar(payload);
+    if (erroValidacao) {
       setModalAtivarOpen(false);
+      setErroForm(erroValidacao);
       return;
     }
 
-    const payload = buildPayload();
+    setErroForm("");
+    setSalvando(true);
+    try {
+      const resultado = await onSubmit({
+        ...initialData,
+        ...payload,
+        status: "ativo",
+      });
 
-    const sucesso = await onSubmit({
-      ...initialData,
-      ...payload,
-      status: "ativo",
-    });
-
-    if (sucesso) {
-      setModalAtivarOpen(false);
-      onClose();
+      const { ok, message } = interpretarResultadoSubmit(resultado);
+      if (ok) {
+        setModalAtivarOpen(false);
+        onClose();
+      } else {
+        setModalAtivarOpen(false);
+        setErroForm(message || "Erro ao reativar estudante.");
+      }
+    } finally {
+      setSalvando(false);
     }
   };
 
@@ -576,6 +644,12 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {}, a
         </Dialog.Title>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {erroForm && (
+            <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm font-medium">
+              {erroForm}
+            </div>
+          )}
+
           {/* RE (Registro Estudantil) */}
           <div>
             <label className="block font-medium mb-1">RE (Registro Estudantil)</label>
@@ -757,15 +831,17 @@ export default function AlunoForm({ open, onClose, onSubmit, initialData = {}, a
             <Button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-lg border border-gray-300 bg-gray-100 text-gray-700 hover:bg-gray-200 transition"
+              disabled={salvando}
+              className="px-4 py-2 rounded-lg border border-gray-300 bg-gray-100 text-gray-700 hover:bg-gray-200 transition disabled:opacity-50"
             >
               Cancelar
             </Button>
             <Button
               type="submit"
-              className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition"
+              disabled={salvando}
+              className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition disabled:opacity-60"
             >
-              Salvar
+              {salvando ? "Salvando..." : "Salvar"}
             </Button>
           </div>
         </form>

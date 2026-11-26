@@ -1,10 +1,13 @@
 // src/features/disciplinar/metadados/index.jsx
 // =============================================================
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   ChartBarIcon,
   ClipboardDocumentListIcon,
   ArrowPathIcon,
+  MagnifyingGlassIcon,
+  XMarkIcon,
+  ChevronUpDownIcon,
 } from "@heroicons/react/24/outline";
 import { AcademicCapIcon, SparklesIcon } from "@heroicons/react/24/solid";
 import api from "../../../services/api";
@@ -99,6 +102,9 @@ export default function MetadadosDisciplinar() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
+  const [conceitoAtivo, setConceitoAtivo] = useState(null);
+  const [buscaConceito, setBuscaConceito] = useState("");
+  const [ordemConceito, setOrdemConceito] = useState({ campo: "turma", dir: "asc" });
 
   const fetchData = useCallback(async () => {
     setLoading(true); setErro("");
@@ -127,6 +133,60 @@ export default function MetadadosDisciplinar() {
   const maxOcorr  = Math.max(...topOcorr.map(d => Number(d.qtd)), 1);
 
   const medidasFmt = medidas.map(d => ({ ...d, ...corMedida(d.medida), label: d.medida, qtd: Number(d.qtd) }));
+
+  const cardConceitoAtivo = useMemo(
+    () => comport.find(c => c.label === conceitoAtivo) || null,
+    [comport, conceitoAtivo]
+  );
+
+  const alunosConceitoFiltrados = useMemo(() => {
+    const lista = Array.isArray(cardConceitoAtivo?.alunos) ? [...cardConceitoAtivo.alunos] : [];
+    const termo = buscaConceito.trim().toLowerCase();
+    const filtrada = termo
+      ? lista.filter(a =>
+          String(a.re || "").toLowerCase().includes(termo) ||
+          String(a.nome || "").toLowerCase().includes(termo) ||
+          String(a.turma || "").toLowerCase().includes(termo)
+        )
+      : lista;
+
+    const collator = new Intl.Collator("pt-BR", { numeric: true, sensitivity: "base" });
+    const mult = ordemConceito.dir === "asc" ? 1 : -1;
+
+    filtrada.sort((a, b) => {
+      if (ordemConceito.campo === "pts") {
+        const diff = (Number(a.pts) - Number(b.pts)) * mult;
+        if (diff !== 0) return diff;
+      } else if (ordemConceito.campo === "re") {
+        const cmp = collator.compare(String(a.re || ""), String(b.re || "")) * mult;
+        if (cmp !== 0) return cmp;
+      } else if (ordemConceito.campo === "nome") {
+        const cmp = collator.compare(String(a.nome || ""), String(b.nome || "")) * mult;
+        if (cmp !== 0) return cmp;
+      } else {
+        const cmp = collator.compare(String(a.turma || ""), String(b.turma || "")) * mult;
+        if (cmp !== 0) return cmp;
+      }
+      return collator.compare(String(a.turma || ""), String(b.turma || "")) ||
+             collator.compare(String(a.nome || ""), String(b.nome || ""));
+    });
+
+    return filtrada;
+  }, [cardConceitoAtivo, buscaConceito, ordemConceito]);
+
+  function selecionarConceito(label) {
+    if (loading) return;
+    setConceitoAtivo(prev => (prev === label ? null : label));
+    setBuscaConceito("");
+  }
+
+  function alternarOrdemConceito(campo) {
+    setOrdemConceito(prev =>
+      prev.campo === campo
+        ? { campo, dir: prev.dir === "asc" ? "desc" : "asc" }
+        : { campo, dir: campo === "pts" ? "desc" : "asc" }
+    );
+  }
 
   function statusBadge(s) {
     const u = (s || "").toUpperCase();
@@ -276,23 +336,199 @@ export default function MetadadosDisciplinar() {
               }
               <div className="flex flex-wrap justify-center gap-x-8 gap-y-2">
                 {comport.map((d,i)=>(
-                  <div key={i} className="flex items-center gap-2 text-sm text-gray-600">
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => selecionarConceito(d.label)}
+                    className={`flex items-center gap-2 text-sm transition-colors cursor-pointer ${
+                      conceitoAtivo === d.label ? "font-bold text-gray-900" : "text-gray-600 hover:text-gray-900"
+                    }`}
+                  >
                     <span className="w-3 h-3 rounded-full inline-block" style={{background:d.cor}}/>
                     {d.label}
-                  </div>
+                  </button>
                 ))}
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 mt-4">
-                {comport.map((d,i)=>(
-                  <div key={i} className="rounded-xl p-3 text-center border transition-transform hover:scale-105"
-                    style={{background:d.bg,borderColor:d.cor+"33"}}>
-                    <p className="text-xs font-bold uppercase tracking-wide" style={{color:d.cor}}>{d.label}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{d.nota}</p>
-                    <p className="text-2xl font-extrabold mt-1" style={{color:d.cor}}>{loading?"—":d.qtd}</p>
-                    <p className="text-[10px] text-gray-400">{d.pct}% do total</p>
-                  </div>
-                ))}
+                {comport.map((d,i)=>{
+                  const ativo = conceitoAtivo === d.label;
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => selecionarConceito(d.label)}
+                      disabled={loading}
+                      className={`rounded-xl p-3 text-center border transition-all cursor-pointer focus:outline-none ${
+                        ativo ? "scale-[1.03]" : "hover:scale-105"
+                      }`}
+                      style={{
+                        background: d.bg,
+                        borderColor: ativo ? d.cor : d.cor + "33",
+                        boxShadow: ativo ? `0 0 0 2px ${d.cor}, 0 8px 18px -6px ${d.cor}55` : undefined,
+                      }}
+                    >
+                      <p className="text-xs font-bold uppercase tracking-wide" style={{color:d.cor}}>{d.label}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{d.nota}</p>
+                      <p className="text-2xl font-extrabold mt-1" style={{color:d.cor}}>{loading?"—":d.qtd}</p>
+                      <p className="text-[10px] text-gray-400">{d.pct}% do total</p>
+                      <p className="text-[10px] font-semibold mt-1.5 opacity-80" style={{color:d.cor}}>
+                        {ativo ? "▲ Ocultar lista" : "▼ Ver alunos"}
+                      </p>
+                    </button>
+                  );
+                })}
               </div>
+
+              {!cardConceitoAtivo && !loading && comport.length > 0 && (
+                <p className="text-center text-xs text-gray-400">
+                  Clique em um dos cards de comportamento acima para listar os respectivos estudantes.
+                </p>
+              )}
+
+              {/* Lista nominal de estudantes do conceito selecionado */}
+              {cardConceitoAtivo && !loading && (
+                <div className="border-t border-gray-100 pt-6 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      <span
+                        className="w-3.5 h-3.5 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: cardConceitoAtivo.cor }}
+                      />
+                      <h3 className="text-base font-bold text-gray-800 uppercase tracking-wide">
+                        {cardConceitoAtivo.label}
+                      </h3>
+                      <span className="text-xs font-medium text-gray-400">
+                        ({cardConceitoAtivo.nota})
+                      </span>
+                      <span
+                        className="text-xs font-bold px-3 py-1 rounded-full"
+                        style={{ backgroundColor: cardConceitoAtivo.bg, color: cardConceitoAtivo.cor }}
+                      >
+                        {buscaConceito.trim()
+                          ? `${alunosConceitoFiltrados.length} de ${cardConceitoAtivo.qtd}`
+                          : `${cardConceitoAtivo.qtd} ${cardConceitoAtivo.qtd === 1 ? "aluno" : "alunos"}`}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {cardConceitoAtivo.qtd > 0 && (
+                        <div className="relative flex-1 sm:w-64">
+                          <MagnifyingGlassIcon className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                          <input
+                            type="text"
+                            value={buscaConceito}
+                            onChange={e => setBuscaConceito(e.target.value)}
+                            placeholder="Filtrar RE, nome ou turma..."
+                            className="w-full pl-9 pr-8 py-1.5 text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-400 transition"
+                          />
+                          {buscaConceito && (
+                            <button
+                              type="button"
+                              onClick={() => setBuscaConceito("")}
+                              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                              title="Limpar busca"
+                            >
+                              <XMarkIcon className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setConceitoAtivo(null);
+                          setBuscaConceito("");
+                        }}
+                        className="p-2 rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition"
+                        title="Fechar lista"
+                      >
+                        <XMarkIcon className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {cardConceitoAtivo.qtd === 0 ? (
+                    <p className="text-center text-gray-400 text-sm py-8">
+                      Nenhum estudante classificado neste conceito.
+                    </p>
+                  ) : alunosConceitoFiltrados.length === 0 ? (
+                    <p className="text-center text-gray-400 text-sm py-8">
+                      Nenhum estudante encontrado para &ldquo;{buscaConceito}&rdquo;.
+                    </p>
+                  ) : (
+                    <div className="max-h-[520px] overflow-y-auto overflow-x-auto rounded-xl border border-gray-100">
+                      <table className="w-full text-left border-collapse">
+                        <thead className="sticky top-0 z-10 bg-gray-50 shadow-[0_1px_0_0_#f3f4f6]">
+                          <tr className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                            <th
+                              onClick={() => alternarOrdemConceito("re")}
+                              className="px-5 py-3 w-36 cursor-pointer select-none hover:text-gray-600 transition-colors"
+                            >
+                              <span className="inline-flex items-center gap-1">
+                                RE
+                                <ChevronUpDownIcon className="w-3.5 h-3.5" />
+                              </span>
+                            </th>
+                            <th
+                              onClick={() => alternarOrdemConceito("nome")}
+                              className="px-5 py-3 cursor-pointer select-none hover:text-gray-600 transition-colors"
+                            >
+                              <span className="inline-flex items-center gap-1">
+                                Nome
+                                <ChevronUpDownIcon className="w-3.5 h-3.5" />
+                              </span>
+                            </th>
+                            <th
+                              onClick={() => alternarOrdemConceito("turma")}
+                              className="px-5 py-3 text-center w-40 cursor-pointer select-none hover:text-gray-600 transition-colors"
+                            >
+                              <span className="inline-flex items-center justify-center gap-1">
+                                Turma
+                                <ChevronUpDownIcon className="w-3.5 h-3.5" />
+                              </span>
+                            </th>
+                            <th
+                              onClick={() => alternarOrdemConceito("pts")}
+                              className="px-5 py-3 text-center w-36 cursor-pointer select-none hover:text-gray-600 transition-colors"
+                            >
+                              <span className="inline-flex items-center justify-center gap-1">
+                                Pontuação
+                                <ChevronUpDownIcon className="w-3.5 h-3.5" />
+                              </span>
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50 bg-white">
+                          {alunosConceitoFiltrados.map((a, idx) => (
+                            <tr key={a.id || idx} className="hover:bg-blue-50/30 transition-colors">
+                              <td className="px-5 py-3.5 text-sm font-mono text-gray-600 whitespace-nowrap">
+                                {a.re}
+                              </td>
+                              <td className="px-5 py-3.5 text-sm font-semibold text-gray-800">
+                                {a.nome}
+                              </td>
+                              <td className="px-5 py-3.5 text-sm text-gray-600 text-center whitespace-nowrap">
+                                {a.turma}
+                              </td>
+                              <td className="px-5 py-3.5 text-center whitespace-nowrap">
+                                <span
+                                  className="inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-extrabold"
+                                  style={{
+                                    backgroundColor: cardConceitoAtivo.bg,
+                                    color: cardConceitoAtivo.cor,
+                                  }}
+                                >
+                                  {Number(a.pts).toFixed(2).replace(".", ",")}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

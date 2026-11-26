@@ -211,10 +211,20 @@ export default function GabaritoCorrigir() {
       const cropBlob = await respCrop.blob();
       setPreviewUrl(URL.createObjectURL(cropBlob));
 
-      // 2. Leitura de bolhas via Python
+      // 2. Leitura de bolhas via Python (com hints de formato p/ C/E e Mista)
       const cropFile = new File([cropBlob], "gabarito_crop.png", { type: "image/png" });
       const formDataCrop = new FormData();
       formDataCrop.append("file", cropFile);
+      if (avaliacaoAtiva.numQuestoes) formDataCrop.append("nQ", String(avaliacaoAtiva.numQuestoes));
+      if (avaliacaoAtiva.numAlternativas) formDataCrop.append("nA", String(avaliacaoAtiva.numAlternativas));
+      if (avaliacaoAtiva.formato_questoes === "certo_errado") {
+        formDataCrop.append("f", "CE");
+      } else if (avaliacaoAtiva.formato_questoes === "mista") {
+        formDataCrop.append("f", "M");
+        if (Array.isArray(avaliacaoAtiva.questoes_ce) && avaliacaoAtiva.questoes_ce.length > 0) {
+          formDataCrop.append("ce", avaliacaoAtiva.questoes_ce.join(","));
+        }
+      }
 
       const respBolhas = await fetch(`${PYTHON_API}/corrigir-bolhas`, {
         method: "POST",
@@ -232,8 +242,9 @@ export default function GabaritoCorrigir() {
       setRespostasAluno(respostas);
 
       // 2b. Identificar aluno via QR Code (lido pelo OMR)
-      if (dataBolhas.qrData && dataBolhas.qrData.re) {
-        const codigo = dataBolhas.qrData.re;
+      const qrCodigo = dataBolhas.qrData?.c || dataBolhas.qrData?.re;
+      if (qrCodigo) {
+        const codigo = qrCodigo;
         try {
           const respAluno = await api.get(`/alunos/por-codigo/${codigo}`);
           const dataAluno = respAluno.data;
@@ -251,27 +262,51 @@ export default function GabaritoCorrigir() {
         }
       }
 
-      // 3. Comparar com gabarito oficial
+      // 3. Comparar com gabarito oficial (suportando C/E, Mista e fator de correção Cebraspe)
       const gabOficial = avaliacaoAtiva.gabarito;
-      const resultado = respostas.map((resp, idx) => {
+      const fmtAval = avaliacaoAtiva.formato_questoes || "multipla_escolha";
+      const ceSetLocal = new Set(
+        fmtAval === "certo_errado"
+          ? Array.from({ length: gabOficial.length }, (_, i) => i + 1)
+          : fmtAval === "mista" && Array.isArray(avaliacaoAtiva.questoes_ce)
+            ? avaliacaoAtiva.questoes_ce.map(Number)
+            : []
+      );
+      const penalidadeAtiva = Boolean(Number(avaliacaoAtiva.penalidade_ce)) && ceSetLocal.size > 0;
+
+      const resultado = gabOficial.map((corretoRaw, idx) => {
+        const qNum = idx + 1;
+        const isCE = ceSetLocal.has(qNum);
+        const resp = String(respostas[idx] || "").trim().toUpperCase();
+        const correto = String(corretoRaw || "").trim().toUpperCase();
         const isNulo = resp === "N";
+        const isBranco = !resp || resp === "-";
+        const acertou = !isBranco && !isNulo && resp === correto;
+        const pontos = acertou ? 1 : (!isBranco && !isNulo && isCE && penalidadeAtiva ? -1 : 0);
         return {
-          numero: idx + 1,
+          numero: qNum,
+          tipo_item: isCE ? "CE" : "ME",
           resposta: resp,
-          correto: gabOficial[idx] || "",
-          acertou: !isNulo && resp === gabOficial[idx],
+          correto,
+          acertou,
+          pontos,
+          ...(pontos < 0 ? { penalizada: true } : {}),
         };
       });
 
       const acertos = resultado.filter((q) => q.acertou).length;
+      const errosPenalizados = resultado.filter((q) => q.pontos < 0).length;
+      const pontosLiquidos = Math.max(0, resultado.reduce((acc, q) => acc + q.pontos, 0));
       const totalQuestoes = gabOficial.length;
       const notaTotal = avaliacaoAtiva.notaTotal || 10;
       const valorQuestao = totalQuestoes ? notaTotal / totalQuestoes : 0;
-      const nota = parseFloat((acertos * valorQuestao).toFixed(2));
+      const nota = parseFloat((pontosLiquidos * valorQuestao).toFixed(2));
 
       setCorrecao({
         resultado,
         acertos,
+        errosPenalizados,
+        pontosLiquidos,
         totalQuestoes,
         nota,
         notaTotal,

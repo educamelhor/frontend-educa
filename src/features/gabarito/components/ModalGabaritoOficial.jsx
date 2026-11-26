@@ -107,6 +107,9 @@ export default function ModalGabaritoOficial({ open, onClose, onSave, avaliacaoI
         id: avalSelecionada.id, titulo: avalSelecionada.titulo, tipo: avalSelecionada.tipo,
         bimestre: avalSelecionada.bimestre, numQuestoes: avalSelecionada.num_questoes,
         numAlternativas: avalSelecionada.num_alternativas, notaTotal: avalSelecionada.nota_total,
+        formato_questoes: avalSelecionada.formato_questoes || "multipla_escolha",
+        questoes_ce: avalSelecionada.questoes_ce || null,
+        penalidade_ce: avalSelecionada.penalidade_ce || 0,
         gabarito, disciplinas_config: avalSelecionada.disciplinas_config,
       });
     } catch (err) {
@@ -129,6 +132,15 @@ export default function ModalGabaritoOficial({ open, onClose, onSave, avaliacaoI
 
   const nQ = avalSelecionada?.num_questoes || 0;
   const nA = avalSelecionada?.num_alternativas || 5;
+  const formatoAval = avalSelecionada?.formato_questoes || "multipla_escolha";
+  const ceSet = new Set(
+    formatoAval === "certo_errado"
+      ? Array.from({ length: nQ }, (_, i) => i + 1)
+      : formatoAval === "mista" && Array.isArray(avalSelecionada?.questoes_ce)
+        ? avalSelecionada.questoes_ce.map(Number)
+        : []
+  );
+  const penalidadeCeAtiva = Boolean(Number(avalSelecionada?.penalidade_ce)) && ceSet.size > 0;
   const alternativasLabels = LETRAS.split("").slice(0, nA);
   const discConfig = avalSelecionada?.disciplinas_config || [];
   const marcadas = gabarito.filter(Boolean).length;
@@ -224,6 +236,13 @@ export default function ModalGabaritoOficial({ open, onClose, onSave, avaliacaoI
           border-color: var(--gab-cyan, #06b6d4);
           color: var(--gab-cyan-light, #22d3ee);
           box-shadow: 0 0 12px rgba(6,182,212,0.3);
+          animation: mgBubblePop 0.2s ease-out;
+        }
+        .mg-bubble.ce-bubble.selected {
+          background: rgba(245,158,11,0.18);
+          border-color: #f59e0b;
+          color: #fbbf24;
+          box-shadow: 0 0 12px rgba(245,158,11,0.3);
           animation: mgBubblePop 0.2s ease-out;
         }
 
@@ -330,8 +349,16 @@ export default function ModalGabaritoOficial({ open, onClose, onSave, avaliacaoI
                                 </span>
                               )}
                             </div>
-                            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, fontSize: "0.75rem", color: "var(--gab-text-muted)" }}>
-                              <span>{a.num_questoes}Q · {a.num_alternativas} alt · Nota {a.nota_total}</span>
+                            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6, fontSize: "0.75rem", color: "var(--gab-text-muted)" }}>
+                              <span>
+                                {a.num_questoes}Q ·{" "}
+                                {a.formato_questoes === "certo_errado"
+                                  ? "Certo/Errado (C/E)"
+                                  : a.formato_questoes === "mista"
+                                    ? `Mista (${(a.questoes_ce || []).length} C/E + ${Math.max(0, (a.num_questoes || 0) - (a.questoes_ce || []).length)} ME)`
+                                    : `${a.num_alternativas} alt`}
+                                {" "}· Nota {a.nota_total}
+                              </span>
                               {a.bimestre && <span>· {a.bimestre}</span>}
                             </div>
                             {disc.length > 0 && (
@@ -387,8 +414,24 @@ export default function ModalGabaritoOficial({ open, onClose, onSave, avaliacaoI
                       <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--gab-text-primary)", letterSpacing: "0.5px" }}>
                         {avalSelecionada.titulo}
                       </div>
-                      <div style={{ fontSize: "0.78rem", color: "var(--gab-text-muted)", marginTop: 2 }}>
-                        {nQ} questões · {nA} alternativas (A–{LETRAS[nA - 1]}) · Nota {avalSelecionada.nota_total}
+                      <div style={{ fontSize: "0.78rem", color: "var(--gab-text-muted)", marginTop: 2, display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
+                        <span>
+                          {nQ} questões ·{" "}
+                          {formatoAval === "certo_errado"
+                            ? "Certo / Errado (C / E)"
+                            : formatoAval === "mista"
+                              ? `Prova Mista (${ceSet.size} C/E + ${Math.max(0, nQ - ceSet.size)} Múlt. Escolha A–${LETRAS[nA - 1]})`
+                              : `${nA} alternativas (A–${LETRAS[nA - 1]})`}
+                          {" "}· Nota {avalSelecionada.nota_total}
+                        </span>
+                        {penalidadeCeAtiva && (
+                          <span style={{
+                            padding: "1px 8px", borderRadius: 6, fontSize: "0.65rem", fontWeight: 700,
+                            background: "rgba(245,158,11,0.15)", border: "1px solid rgba(245,158,11,0.35)", color: "#fbbf24",
+                          }}>
+                            ⚖️ 1 errada anula 1 certa (C/E)
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -455,6 +498,8 @@ export default function ModalGabaritoOficial({ open, onClose, onSave, avaliacaoI
                         {secao.questoes.map(qIdx => {
                           const qNum = qIdx + 1;
                           const selecionada = gabarito[qIdx];
+                          const isCE = ceSet.has(qNum);
+                          const opcoesLinha = isCE ? ["C", "E"] : alternativasLabels;
 
                           return (
                             <div key={qIdx} className="mg-question">
@@ -462,34 +507,43 @@ export default function ModalGabaritoOficial({ open, onClose, onSave, avaliacaoI
                               <div style={{
                                 width: 40, textAlign: "center",
                                 fontSize: "0.85rem", fontWeight: 800,
-                                color: selecionada ? "#22d3ee" : "rgba(255,255,255,0.3)",
+                                color: selecionada ? (isCE ? "#fbbf24" : "#22d3ee") : "rgba(255,255,255,0.3)",
                                 fontFamily: "var(--gab-font-display)",
                                 transition: "color 0.2s",
                               }}>
                                 {String(qNum).padStart(2, "0")}
                               </div>
 
-                              {/* Bolhas */}
-                              <div style={{ display: "flex", gap: 6 }}>
-                                {alternativasLabels.map(letra => (
+                              {/* Bolhas (C/E ou A..E conforme o tipo da questão) */}
+                              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                                {opcoesLinha.map(letra => (
                                   <button
                                     key={letra}
                                     type="button"
-                                    className={`mg-bubble ${selecionada === letra ? "selected" : ""}`}
+                                    title={isCE ? (letra === "C" ? "Certo" : "Errado") : `Alternativa ${letra}`}
+                                    className={`mg-bubble ${isCE ? "ce-bubble" : ""} ${selecionada === letra ? "selected" : ""}`}
                                     onClick={() => marcar(qIdx, letra)}
                                   >
                                     {letra}
                                   </button>
                                 ))}
+                                {isCE && formatoAval === "mista" && (
+                                  <span style={{
+                                    marginLeft: 6, padding: "2px 7px", borderRadius: 6, fontSize: "0.64rem", fontWeight: 700,
+                                    background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.28)", color: "#fbbf24",
+                                  }}>
+                                    Certo / Errado
+                                  </span>
+                                )}
                               </div>
 
                               {/* Indicador de marcação */}
                               <div style={{
                                 marginLeft: "auto", fontSize: "0.78rem", fontWeight: 600,
-                                color: selecionada ? "#22d3ee" : "transparent",
+                                color: selecionada ? (isCE ? "#fbbf24" : "#22d3ee") : "transparent",
                                 transition: "color 0.2s",
                               }}>
-                                {selecionada || "·"}
+                                {selecionada ? (isCE ? (selecionada === "C" ? "C (Certo)" : "E (Errado)") : selecionada) : "·"}
                               </div>
                             </div>
                           );

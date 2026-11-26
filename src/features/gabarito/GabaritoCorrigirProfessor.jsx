@@ -1431,11 +1431,15 @@ export default function GabaritoCorrigirProfessor() {
                       <tr>
                         <td className="row-label">Resultado</td>
                         {correcao.resultado.map(q => (
-                          <td key={q.numero}>
+                          <td key={q.numero} title={q.penalizada ? "Item C/E errado: anulou 1 acerto (-1)" : ""}>
                             {q.acertou ? (
                               <span className="gab-acerto">✓</span>
                             ) : q.resposta === "N" ? (
                               <span style={{ color: "var(--gab-amber-light, #f59e0b)", fontWeight: 700, fontSize: "1rem" }} title="Nulo — múltiplas marcações">⊘</span>
+                            ) : !q.resposta ? (
+                              <span style={{ color: "var(--gab-text-muted, #64748b)", fontWeight: 600 }}>—</span>
+                            ) : q.penalizada ? (
+                              <span className="gab-erro" style={{ fontSize: "0.78rem", fontWeight: 800 }}>✗ -1</span>
                             ) : (
                               <span className="gab-erro">✗</span>
                             )}

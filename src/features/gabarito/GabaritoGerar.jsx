@@ -26,6 +26,11 @@ const MODELOS = [
   { id: "enem", label: "ENEM", desc: "Múltiplas matérias, > 45 questões", icon: "📋" },
   { id: "simplificado", label: "Simplificado", desc: "Compacto, economia de papel", icon: "📝" },
 ];
+const FORMATOS_QUESTOES = [
+  { id: "multipla_escolha", label: "Múltipla Escolha", desc: "Alternativas A–D, A–E...", icon: "🔘" },
+  { id: "certo_errado", label: "Certo / Errado", desc: "100% itens C ou E", icon: "⚖️" },
+  { id: "mista", label: "Prova Mista", desc: "Mescla Múlt. Escolha + C/E", icon: "🔀" },
+];
 
 export default function GabaritoGerar() {
   // ─── Dados ───
@@ -40,6 +45,11 @@ export default function GabaritoGerar() {
   const [bimestre, setBimestre] = useState("");
   const [numQuestoes, setNumQuestoes] = useState("10");
   const [numAlternativas, setNumAlternativas] = useState("5");
+  const [formatoQuestoes, setFormatoQuestoes] = useState("multipla_escolha"); // multipla_escolha | certo_errado | mista
+  const [questoesCe, setQuestoesCe] = useState([]); // array 1-based de questões Certo/Errado (modo mista)
+  const [penalidadeCe, setPenalidadeCe] = useState(false); // 1 errada anula 1 certa nos itens C/E
+  const [faixaCeDe, setFaixaCeDe] = useState("1");
+  const [faixaCeAte, setFaixaCeAte] = useState("5");
   const [notaTotal, setNotaTotal] = useState("10");
   const [dataAplicacao, setDataAplicacao] = useState("");
   const [modelo, setModelo] = useState("padrao");
@@ -142,13 +152,61 @@ export default function GabaritoGerar() {
     setBimestre(a.bimestre || "");
     setNumQuestoes(String(a.num_questoes || "10"));
     setNumAlternativas(String(a.num_alternativas || "5"));
+    setFormatoQuestoes(a.formato_questoes || "multipla_escolha");
+    setQuestoesCe(Array.isArray(a.questoes_ce) ? a.questoes_ce.map(Number) : []);
+    setPenalidadeCe(Boolean(Number(a.penalidade_ce)));
     setNotaTotal(String(a.nota_total || "10"));
     setModelo(a.modelo || "padrao");
     setDiscConfig(a.disciplinas_config || []);
-    setDataAplicacao(""); // Limpa pois é opcional ou usado em provas padronizadas
+    setDataAplicacao(a.data_aplicacao ? String(a.data_aplicacao).slice(0, 10) : "");
     setAvaliacaoSalva(a);
     window.scrollTo({ top: 0, behavior: 'smooth' });
     showToast("Avaliação carregada! Defina o Destino e gere a impressão.");
+  }
+
+  // ─── Helpers Formato Misto (Múltipla Escolha × Certo/Errado) ───
+  function handleChangeFormato(novoFormato) {
+    if (avaliacaoSalva) return;
+    setFormatoQuestoes(novoFormato);
+    if (novoFormato === "certo_errado") {
+      setNumAlternativas("2");
+    } else if (novoFormato === "mista") {
+      if (Number(numAlternativas) < 3) setNumAlternativas("5");
+      const total = Math.max(2, Number(numQuestoes) || 10);
+      if (questoesCe.length === 0) {
+        // Pré-seleciona primeira metade como sugestão inicial editável
+        const metade = Math.max(1, Math.floor(total / 2));
+        setQuestoesCe(Array.from({ length: metade }, (_, i) => i + 1));
+        setFaixaCeDe("1");
+        setFaixaCeAte(String(metade));
+      }
+    } else {
+      setPenalidadeCe(false);
+    }
+  }
+
+  function toggleQuestaoCe(qNum) {
+    if (avaliacaoSalva) return;
+    setQuestoesCe((prev) =>
+      prev.includes(qNum) ? prev.filter((n) => n !== qNum).sort((a, b) => a - b) : [...prev, qNum].sort((a, b) => a - b)
+    );
+  }
+
+  function aplicarFaixaTipo(marcarComoCE) {
+    if (avaliacaoSalva) return;
+    const total = Math.max(1, Number(numQuestoes) || 10);
+    const d = Math.max(1, Math.min(total, Number(faixaCeDe) || 1));
+    const a = Math.max(1, Math.min(total, Number(faixaCeAte) || total));
+    const inicio = Math.min(d, a);
+    const fim = Math.max(d, a);
+    setQuestoesCe((prev) => {
+      const set = new Set(prev.filter((n) => n >= 1 && n <= total));
+      for (let q = inicio; q <= fim; q++) {
+        if (marcarComoCE) set.add(q);
+        else set.delete(q);
+      }
+      return [...set].sort((x, y) => x - y);
+    });
   }
 
   // ─── Disciplina: Adicionar ───
@@ -208,6 +266,8 @@ export default function GabaritoGerar() {
   // ─── Questões cobertas ───
   const questoesCobertas = discConfig.reduce((sum, dc) => sum + Math.max(0, dc.ate - dc.de + 1), 0);
   const nQ = Number(numQuestoes) || 10;
+  const questoesCeValidas = questoesCe.filter((q) => q >= 1 && q <= nQ);
+  const ceSetAtivo = new Set(questoesCeValidas);
 
   // ─── Resetar formulário (Nova Avaliação) ───
   function handleNovaAvaliacao() {
@@ -217,6 +277,11 @@ export default function GabaritoGerar() {
     setBimestre("");
     setNumQuestoes("10");
     setNumAlternativas("5");
+    setFormatoQuestoes("multipla_escolha");
+    setQuestoesCe([]);
+    setPenalidadeCe(false);
+    setFaixaCeDe("1");
+    setFaixaCeAte("5");
     setNotaTotal("10");
     setDataAplicacao("");
     setModelo("padrao");
@@ -229,12 +294,17 @@ export default function GabaritoGerar() {
   }
 
   // ─── Construir endpoint + body para geração de PDF ───
-  function buildPdfRequest() {
+  function buildPdfRequest(overrideAvaliacaoId = null) {
+    const nAlternativasEfetivo = formatoQuestoes === "certo_errado" ? 2 : Number(numAlternativas);
     const body = {
       descricao: titulo,
       num_questoes: Number(numQuestoes),
-      num_alternativas: Number(numAlternativas),
+      num_alternativas: nAlternativasEfetivo,
       modelo,
+      formato_questoes: formatoQuestoes,
+      questoes_ce: formatoQuestoes === "mista" ? questoesCeValidas : null,
+      penalidade_ce: formatoQuestoes !== "multipla_escolha" && penalidadeCe ? 1 : 0,
+      avaliacao_id: overrideAvaliacaoId || avaliacaoSalva?.id || null,
     };
     let endpoint = "";
 
@@ -298,6 +368,18 @@ export default function GabaritoGerar() {
   async function handleSalvarEGerar() {
     if (!titulo.trim()) { showToast("Informe o título da avaliação.", "error"); return; }
     if (!tipo) { showToast("Selecione o tipo de avaliação.", "error"); return; }
+    if (!dataAplicacao) { showToast("Informe a data de aplicação da prova.", "error"); return; }
+
+    if (formatoQuestoes === "mista") {
+      if (questoesCeValidas.length === 0) {
+        showToast("Na Prova Mista, defina ao menos 1 questão como Certo/Errado.", "error");
+        return;
+      }
+      if (questoesCeValidas.length >= nQ) {
+        showToast("Todas as questões estão como C/E. Mantenha ao menos 1 Múltipla Escolha ou mude o formato para 'Certo / Errado'.", "error");
+        return;
+      }
+    }
 
     const faixaErr = validarFaixas();
     if (faixaErr !== true) { showToast(faixaErr, "error"); return; }
@@ -336,7 +418,10 @@ export default function GabaritoGerar() {
         tipo: tipo || null,
         bimestre: bimestre || null,
         num_questoes: Number(numQuestoes),
-        num_alternativas: Number(numAlternativas),
+        num_alternativas: formatoQuestoes === "certo_errado" ? 2 : Number(numAlternativas),
+        formato_questoes: formatoQuestoes,
+        questoes_ce: formatoQuestoes === "mista" ? questoesCeValidas : null,
+        penalidade_ce: formatoQuestoes !== "multipla_escolha" && penalidadeCe ? 1 : 0,
         nota_total: Number(String(notaTotal).replace(",", ".")) || 10,
         modelo,
         disciplinas_config: discConfig.length > 0 ? discConfig : null,
@@ -350,7 +435,7 @@ export default function GabaritoGerar() {
       setAvaliacaoSalva(salva);
 
       // 2. Gerar PDF
-      const { endpoint, body } = buildPdfRequest();
+      const { endpoint, body } = buildPdfRequest(salva.id);
       if (endpoint) {
         const resp = await api.post(endpoint, body, { responseType: "blob" });
         const blob = new Blob([resp.data], { type: "application/pdf" });
@@ -477,6 +562,46 @@ export default function GabaritoGerar() {
                 )}
               </div>
 
+              {/* FORMATO DAS QUESTÕES: Múltipla Escolha | Certo/Errado | Mista */}
+              <div className="gab-form-group">
+                <label className="gab-label">Formato das Questões *</label>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+                  {FORMATOS_QUESTOES.map((fmt) => {
+                    const ativo = formatoQuestoes === fmt.id;
+                    return (
+                      <button
+                        key={fmt.id}
+                        type="button"
+                        disabled={!!avaliacaoSalva}
+                        onClick={() => handleChangeFormato(fmt.id)}
+                        style={{
+                          display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 3,
+                          padding: "10px 12px", borderRadius: 10, textAlign: "left",
+                          cursor: avaliacaoSalva ? "not-allowed" : "pointer",
+                          opacity: avaliacaoSalva && !ativo ? 0.45 : 1,
+                          border: ativo ? "1.5px solid var(--gab-cyan)" : "1px solid var(--gab-border)",
+                          background: ativo ? "rgba(6, 182, 212, 0.09)" : "rgba(255,255,255,0.02)",
+                          transition: "all 0.2s", fontFamily: "var(--gab-font-body)",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, width: "100%" }}>
+                          <span style={{ fontSize: "1rem" }}>{fmt.icon}</span>
+                          <span style={{
+                            fontSize: "0.8rem", fontWeight: 700,
+                            color: ativo ? "var(--gab-cyan-light)" : "var(--gab-text-primary)",
+                          }}>
+                            {fmt.label}
+                          </span>
+                        </div>
+                        <span style={{ fontSize: "0.68rem", color: "var(--gab-text-muted)", lineHeight: 1.25 }}>
+                          {fmt.desc}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div className="gab-grid-2">
                 <div className="gab-form-group">
                   <label className="gab-label">Nº de Questões</label>
@@ -486,24 +611,195 @@ export default function GabaritoGerar() {
                     min={5}
                     max={100}
                     value={numQuestoes}
+                    disabled={!!avaliacaoSalva}
                     onChange={(e) => setNumQuestoes(e.target.value.replace(/\D/, ""))}
                   />
                 </div>
                 <div className="gab-form-group">
-                  <label className="gab-label">Alternativas (A-F)</label>
-                  <select
-                    className="gab-select"
-                    value={numAlternativas}
-                    onChange={(e) => setNumAlternativas(e.target.value)}
-                  >
-                    <option value="2">2 (A-B)</option>
-                    <option value="3">3 (A-C)</option>
-                    <option value="4">4 (A-D)</option>
-                    <option value="5">5 (A-E)</option>
-                    <option value="6">6 (A-F)</option>
-                  </select>
+                  <label className="gab-label">
+                    {formatoQuestoes === "certo_errado"
+                      ? "Alternativas (C / E)"
+                      : formatoQuestoes === "mista"
+                        ? "Alternativas (Múlt. Escolha)"
+                        : "Alternativas (A-F)"}
+                  </label>
+                  {formatoQuestoes === "certo_errado" ? (
+                    <input
+                      className="gab-input"
+                      type="text"
+                      value="2 (C = Certo · E = Errado)"
+                      disabled
+                      style={{ opacity: 0.85, fontWeight: 600, color: "var(--gab-cyan-light)" }}
+                    />
+                  ) : (
+                    <select
+                      className="gab-select"
+                      value={numAlternativas}
+                      disabled={!!avaliacaoSalva}
+                      onChange={(e) => setNumAlternativas(e.target.value)}
+                    >
+                      {formatoQuestoes !== "mista" && <option value="2">2 (A-B)</option>}
+                      <option value="3">3 (A-C)</option>
+                      <option value="4">4 (A-D)</option>
+                      <option value="5">5 (A-E)</option>
+                      <option value="6">6 (A-F)</option>
+                    </select>
+                  )}
                 </div>
               </div>
+
+              {/* MAPEADOR INTERATIVO DE PROVA MISTA (Múltipla Escolha × Certo/Errado) */}
+              {formatoQuestoes === "mista" && (
+                <div style={{
+                  padding: "14px 16px", borderRadius: 12,
+                  background: "linear-gradient(145deg, rgba(6,182,212,0.04) 0%, rgba(139,92,246,0.05) 100%)",
+                  border: "1px solid rgba(139,92,246,0.28)",
+                  display: "flex", flexDirection: "column", gap: 12,
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                    <div>
+                      <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--gab-text-primary)" }}>
+                        🔀 Distribuição das {nQ} Questões
+                      </div>
+                      <div style={{ fontSize: "0.7rem", color: "var(--gab-text-muted)", marginTop: 2 }}>
+                        Use o intervalo rápido ou clique sobre cada número para alternar entre Múltipla Escolha e Certo/Errado.
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 6, fontSize: "0.72rem", fontWeight: 700 }}>
+                      <span style={{
+                        padding: "4px 10px", borderRadius: 20,
+                        background: "rgba(6,182,212,0.14)", border: "1px solid rgba(6,182,212,0.35)", color: "#22d3ee",
+                      }}>
+                        ME (A–{"ABCDEF"[Number(numAlternativas) - 1] || "E"}): {Math.max(0, nQ - questoesCeValidas.length)}
+                      </span>
+                      <span style={{
+                        padding: "4px 10px", borderRadius: 20,
+                        background: "rgba(245,158,11,0.14)", border: "1px solid rgba(245,158,11,0.38)", color: "#fbbf24",
+                      }}>
+                        C/E: {questoesCeValidas.length}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Barra de intervalo rápido */}
+                  {!avaliacaoSalva && (
+                    <div style={{
+                      display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8,
+                      padding: "8px 10px", borderRadius: 8,
+                      background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.06)",
+                      fontSize: "0.75rem",
+                    }}>
+                      <span style={{ color: "var(--gab-text-muted)", fontWeight: 600 }}>Faixa rápida: Q</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={nQ}
+                        value={faixaCeDe}
+                        onChange={(e) => setFaixaCeDe(e.target.value)}
+                        className="gab-input"
+                        style={{ width: 58, padding: "4px 8px", textAlign: "center", fontSize: "0.78rem" }}
+                      />
+                      <span style={{ color: "var(--gab-text-muted)" }}>até Q</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={nQ}
+                        value={faixaCeAte}
+                        onChange={(e) => setFaixaCeAte(e.target.value)}
+                        className="gab-input"
+                        style={{ width: 58, padding: "4px 8px", textAlign: "center", fontSize: "0.78rem" }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => aplicarFaixaTipo(true)}
+                        style={{
+                          padding: "5px 10px", borderRadius: 6, cursor: "pointer", fontWeight: 700, fontSize: "0.72rem",
+                          background: "rgba(245,158,11,0.16)", border: "1px solid rgba(245,158,11,0.4)", color: "#fbbf24",
+                        }}
+                      >
+                        Definir C/E
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => aplicarFaixaTipo(false)}
+                        style={{
+                          padding: "5px 10px", borderRadius: 6, cursor: "pointer", fontWeight: 700, fontSize: "0.72rem",
+                          background: "rgba(6,182,212,0.14)", border: "1px solid rgba(6,182,212,0.35)", color: "#22d3ee",
+                        }}
+                      >
+                        Definir ME
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Grade clicável de questões 01..nQ */}
+                  <div style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(54px, 1fr))",
+                    gap: 6,
+                    maxHeight: 210,
+                    overflowY: "auto",
+                    paddingRight: 2,
+                  }}>
+                    {Array.from({ length: Math.min(100, Math.max(1, nQ)) }, (_, idx) => {
+                      const qNum = idx + 1;
+                      const isCE = ceSetAtivo.has(qNum);
+                      return (
+                        <button
+                          key={qNum}
+                          type="button"
+                          disabled={!!avaliacaoSalva}
+                          onClick={() => toggleQuestaoCe(qNum)}
+                          title={`Questão ${qNum}: ${isCE ? "Certo / Errado (clique p/ mudar para Múltipla Escolha)" : "Múltipla Escolha (clique p/ mudar para Certo / Errado)"}`}
+                          style={{
+                            display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                            padding: "5px 4px", borderRadius: 8,
+                            cursor: avaliacaoSalva ? "default" : "pointer",
+                            border: isCE ? "1.5px solid rgba(245,158,11,0.55)" : "1px solid rgba(6,182,212,0.3)",
+                            background: isCE ? "rgba(245,158,11,0.14)" : "rgba(6,182,212,0.07)",
+                            transition: "all 0.15s",
+                          }}
+                        >
+                          <span style={{ fontSize: "0.75rem", fontWeight: 800, color: isCE ? "#fbbf24" : "#e2e8f0" }}>
+                            {String(qNum).padStart(2, "0")}
+                          </span>
+                          <span style={{ fontSize: "0.58rem", fontWeight: 700, color: isCE ? "#fcd34d" : "#22d3ee" }}>
+                            {isCE ? "C/E" : `A-${"ABCDEF"[Number(numAlternativas) - 1] || "E"}`}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* OPÇÃO DE FATOR DE CORREÇÃO CEBRASPE / PAS-UnB (apenas quando há itens C/E) */}
+              {formatoQuestoes !== "multipla_escolha" && (
+                <label style={{
+                  display: "flex", alignItems: "flex-start", gap: 10,
+                  padding: "11px 14px", borderRadius: 10,
+                  cursor: avaliacaoSalva ? "not-allowed" : "pointer",
+                  background: penalidadeCe ? "rgba(245,158,11,0.08)" : "rgba(255,255,255,0.02)",
+                  border: penalidadeCe ? "1px solid rgba(245,158,11,0.35)" : "1px solid var(--gab-border)",
+                  transition: "all 0.2s",
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={penalidadeCe}
+                    disabled={!!avaliacaoSalva}
+                    onChange={(e) => setPenalidadeCe(e.target.checked)}
+                    style={{ marginTop: 3, accentColor: "#f59e0b" }}
+                  />
+                  <div>
+                    <div style={{ fontSize: "0.8rem", fontWeight: 700, color: penalidadeCe ? "#fbbf24" : "var(--gab-text-primary)" }}>
+                      ⚖️ Aplicar fator de correção nas questões C/E (1 errada anula 1 certa)
+                    </div>
+                    <div style={{ fontSize: "0.7rem", color: "var(--gab-text-muted)", marginTop: 2, lineHeight: 1.35 }}>
+                      Modelo PAS/UnB & Cebraspe: questão C/E deixada em branco vale 0; marcação errada desconta 1 acerto (nota mínima travada em 0,0).
+                    </div>
+                  </div>
+                </label>
+              )}
             </div>
           </div>
 
@@ -933,9 +1229,13 @@ export default function GabaritoGerar() {
                   <span style={{ marginLeft: 8, fontWeight: 600, color: "var(--gab-cyan-light)" }}>{numQuestoes}</span>
                 </div>
                 <div>
-                  <span style={{ color: "var(--gab-text-muted)" }}>Alternativas:</span>
-                  <span style={{ marginLeft: 8, fontWeight: 600, color: "var(--gab-cyan-light)" }}>
-                    {numAlternativas} (A-{"ABCDEF"[Number(numAlternativas) - 1]})
+                  <span style={{ color: "var(--gab-text-muted)" }}>Formato:</span>
+                  <span style={{ marginLeft: 8, fontWeight: 600, color: formatoQuestoes === "mista" ? "#fbbf24" : "var(--gab-cyan-light)" }}>
+                    {formatoQuestoes === "certo_errado"
+                      ? `Certo / Errado (C/E)${penalidadeCe ? " · c/ fator" : ""}`
+                      : formatoQuestoes === "mista"
+                        ? `Mista (${Math.max(0, nQ - questoesCeValidas.length)} ME + ${questoesCeValidas.length} C/E)${penalidadeCe ? " · c/ fator" : ""}`
+                        : `${numAlternativas} (A-${"ABCDEF"[Number(numAlternativas) - 1]})`}
                   </span>
                 </div>
                 <div>
@@ -1106,7 +1406,21 @@ export default function GabaritoGerar() {
                       <td style={{ padding: "12px 14px" }}>{new Date(a.created_at).toLocaleDateString("pt-BR")}</td>
                       <td style={{ padding: "12px 14px", fontWeight: 500, color: "var(--gab-cyan-light)" }}>{a.titulo}</td>
                       <td style={{ padding: "12px 14px" }}>{TIPOS_AVALIACAO.find((t) => t.id === a.tipo)?.label || a.tipo}</td>
-                      <td style={{ padding: "12px 14px" }}>{a.num_questoes} Qts</td>
+                      <td style={{ padding: "12px 14px" }}>
+                        <span>{a.num_questoes} Qts</span>
+                        {a.formato_questoes === "mista" && (
+                          <span style={{
+                            marginLeft: 6, padding: "2px 6px", borderRadius: 5, fontSize: "0.65rem", fontWeight: 700,
+                            background: "rgba(245,158,11,0.14)", border: "1px solid rgba(245,158,11,0.35)", color: "#fbbf24",
+                          }}>MISTA</span>
+                        )}
+                        {a.formato_questoes === "certo_errado" && (
+                          <span style={{
+                            marginLeft: 6, padding: "2px 6px", borderRadius: 5, fontSize: "0.65rem", fontWeight: 700,
+                            background: "rgba(6,182,212,0.14)", border: "1px solid rgba(6,182,212,0.35)", color: "#22d3ee",
+                          }}>C/E</span>
+                        )}
+                      </td>
                       <td style={{ padding: "12px 14px" }}>
                         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                           <button

@@ -2284,15 +2284,21 @@ export default function GabaritoCorrigirLote() {
                         <tr>
                           <td style={{ fontWeight: 700, position: "sticky", left: 0, background: "var(--gab-surface, #1a1f2e)", zIndex: 1 }}>RESULTADO</td>
                           {correcao.resultado.map(q => (
-                            <td key={q.numero} style={{
-                              textAlign: "center", fontWeight: 700, fontSize: "1rem",
-                              color: q.acertou
-                                ? "var(--gab-green-light, #10b981)"
-                                : q.resposta === "N"
-                                  ? "var(--gab-amber-light, #f59e0b)"
-                                  : "var(--gab-red-light, #ef4444)",
-                            }}>
-                              {q.acertou ? "✓" : q.resposta === "N" ? "⊘" : "✗"}
+                            <td
+                              key={q.numero}
+                              title={q.penalizada ? "Item C/E errado: anulou 1 acerto (-1)" : ""}
+                              style={{
+                                textAlign: "center", fontWeight: 700, fontSize: q.penalizada ? "0.78rem" : "1rem",
+                                color: q.acertou
+                                  ? "var(--gab-green-light, #10b981)"
+                                  : q.resposta === "N"
+                                    ? "var(--gab-amber-light, #f59e0b)"
+                                    : !q.resposta
+                                      ? "var(--gab-text-muted, #64748b)"
+                                      : "var(--gab-red-light, #ef4444)",
+                              }}
+                            >
+                              {q.acertou ? "✓" : q.resposta === "N" ? "⊘" : !q.resposta ? "—" : q.penalizada ? "✗ -1" : "✗"}
                             </td>
                           ))}
                         </tr>

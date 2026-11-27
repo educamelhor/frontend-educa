@@ -68,6 +68,17 @@ export default function Alunos() {
   const [isImportPdfOpen, setImportPdfOpen] = useState(false);
   const [resultadoImportacao, setResultadoImportacao] = useState(null);
 
+  // Governança: Secretaria pode importar alunos via planilha/lista (secretaria.importa_alunos)
+  const perfilLogado = String(localStorage.getItem("perfil") || "").toLowerCase().trim();
+  const isDirecaoAlta =
+    perfilLogado === "diretor" ||
+    perfilLogado === "vice_diretor" ||
+    perfilLogado === "direcao" ||
+    perfilLogado === "admin" ||
+    perfilLogado === "administrador";
+  const [secretariaImportaAlunos, setSecretariaImportaAlunos] = useState(isDirecaoAlta);
+  const canImportarAlunos = isDirecaoAlta || secretariaImportaAlunos;
+
   // ────────────────────────────────────────────────────────────────
   // Filtro de Ano Letivo
   // ────────────────────────────────────────────────────────────────
@@ -122,9 +133,29 @@ export default function Alunos() {
         setAnosLetivos([anoLetivoPadrao()]);
       }
     }
+    async function carregarGovernancaImportacao() {
+      if (isDirecaoAlta) {
+        setSecretariaImportaAlunos(true);
+        return;
+      }
+      try {
+        const eid = localStorage.getItem("escola_id");
+        const resGov = await api.get("/api/governanca/secretaria-config", {
+          params: eid ? { escola_id: eid } : {},
+        });
+        const permitido =
+          resGov.data?.importa_alunos !== undefined
+            ? Boolean(resGov.data.importa_alunos)
+            : String(resGov.data?.config?.["secretaria.importa_alunos"] ?? "1") !== "0";
+        setSecretariaImportaAlunos(permitido);
+      } catch {
+        setSecretariaImportaAlunos(true);
+      }
+    }
     carregarTurmas();
     carregarAnos();
-  }, []);
+    carregarGovernancaImportacao();
+  }, [isDirecaoAlta]);
 
   // ────────────────────────────────────────────────────────────────
   // Helper: extrair atalhos especiais preservando termos complementares
@@ -331,25 +362,29 @@ export default function Alunos() {
                 Adicionar Estudante
               </button>
 
-              <button
-                type="button"
-                onClick={() => setImportOpen(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 transition shadow-sm"
-                title="Incluir Estudantes"
-              >
-                <FolderOpenIcon className="w-5 h-5" />
-                Incluir Estudantes
-              </button>
+              {canImportarAlunos && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setImportOpen(true)}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 transition shadow-sm"
+                    title="Incluir Estudantes"
+                  >
+                    <FolderOpenIcon className="w-5 h-5" />
+                    Incluir Estudantes
+                  </button>
 
-              <button
-                type="button"
-                onClick={() => setImportPdfOpen(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-yellow-500 text-white hover:bg-yellow-600 transition shadow-sm font-medium"
-                title="Lista IEDUCAR"
-              >
-                <DocumentTextIcon className="w-5 h-5" />
-                Lista IEDUCAR
-              </button>
+                  <button
+                    type="button"
+                    onClick={() => setImportPdfOpen(true)}
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-yellow-500 text-white hover:bg-yellow-600 transition shadow-sm font-medium"
+                    title="Lista IEDUCAR"
+                  >
+                    <DocumentTextIcon className="w-5 h-5" />
+                    Lista IEDUCAR
+                  </button>
+                </>
+              )}
             </>
           )}
 

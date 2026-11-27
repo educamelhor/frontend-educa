@@ -450,29 +450,15 @@ export default function BoletimEdicao() {
             </p>
           </div>
 
-          {/* Seletor de Aba Premium */}
+          {/* Indicador de Aba Oficial (Mock oculto em produção) */}
           <div className="inline-flex bg-white/80 p-1 rounded-xl shadow-sm border border-blue-100 backdrop-blur">
             <button
+              type="button"
               onClick={() => setActiveTab("acompanhamento")}
-              className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
-                activeTab === "acompanhamento"
-                  ? "bg-blue-600 text-white shadow-sm"
-                  : "text-gray-600 hover:text-blue-600 hover:bg-blue-50/50"
-              }`}
+              className="px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-blue-600 text-white shadow-sm"
             >
               <ChartBarIcon className="w-4 h-4" />
               Acompanhamento de Lançamentos
-            </button>
-            <button
-              onClick={() => setActiveTab("edicao")}
-              className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
-                activeTab === "edicao"
-                  ? "bg-blue-600 text-white shadow-sm"
-                  : "text-gray-600 hover:text-blue-600 hover:bg-blue-50/50"
-              }`}
-            >
-              <AdjustmentsHorizontalIcon className="w-4 h-4" />
-              Ajustes e Regras (Mock)
             </button>
           </div>
         </header>

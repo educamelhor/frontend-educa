@@ -464,7 +464,7 @@ export default function App() {
           <Route path="/secretaria/matriculas/projetos" element={<RequireModulo modulo="secretaria.matriculas"><MatriculasModule /></RequireModulo>} />
           <Route path="/secretaria/professores" element={<RequireModulo modulo="secretaria"><Professores /></RequireModulo>} />
           <Route path="/secretaria/professores/:id/ficha" element={<RequireModulo modulo="secretaria"><FichaProfessor /></RequireModulo>} />
-          <Route path="/secretaria/boletim"    element={<RequireModulo modulo="secretaria"><BoletimEdicao /></RequireModulo>} />
+          <Route path="/secretaria/boletim"    element={<RequireModulo modulo="secretaria.boletim"><BoletimEdicao /></RequireModulo>} />
           <Route path="/secretaria/diarios"    element={<RequireModulo modulo="secretaria"><DiarioSecretaria /></RequireModulo>} />
           <Route path="/secretaria/relatorios" element={<RequireModulo modulo="secretaria"><RelatoriosSecretaria /></RequireModulo>} />
           <Route path="/secretaria/faltas"     element={<RequireModulo modulo="secretaria"><FaltasPage /></RequireModulo>} />

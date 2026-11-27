@@ -105,9 +105,18 @@ export default function BoletimEdicao() {
   const [buscaAlunoModal, setBuscaAlunoModal] = useState("");
   const [loadingModal, setLoadingModal] = useState(false);
 
-  // Perfil e controle de governança gestora
+  // Perfil e controle de governança gestora / secretaria
   const perfil = String(localStorage.getItem("perfil") || "").toLowerCase().trim();
-  const isDiretorOuVice = perfil === "diretor" || perfil === "vice_diretor";
+  const isDiretorOuVice =
+    perfil === "diretor" ||
+    perfil === "vice_diretor" ||
+    perfil === "direcao" ||
+    perfil === "admin" ||
+    perfil === "administrador";
+  const isSecretaria = perfil === "secretaria" || perfil === "secretario";
+
+  const [secretariaEditaNotas, setSecretariaEditaNotas] = useState(false);
+  const canEditBoletim = isDiretorOuVice || (isSecretaria && secretariaEditaNotas);
 
   const [isEditMode, setIsEditMode] = useState(false);
   const [confirmSaveOpen, setConfirmSaveOpen] = useState(false);
@@ -126,15 +135,31 @@ export default function BoletimEdicao() {
   const [notasEdicaoMock, setNotasEdicaoMock] = useState({});
 
   // ---------------------------------------------------------------------------
-  // Carregamento de filtros no boot
+  // Carregamento de filtros e governança da Secretaria no boot
   // ---------------------------------------------------------------------------
+  const carregarGovernancaSecretaria = async () => {
+    try {
+      const eid = localStorage.getItem("escola_id");
+      const resGov = await api.get("/api/governanca/secretaria-config", {
+        params: eid ? { escola_id: eid } : {},
+      });
+      const permitido =
+        resGov.data?.edita_notas === true ||
+        String(resGov.data?.config?.["secretaria.edita_notas"] || "0") === "1";
+      setSecretariaEditaNotas(permitido);
+    } catch {
+      setSecretariaEditaNotas(false);
+    }
+  };
+
   useEffect(() => {
     async function carregarFiltros() {
       try {
         const [resTurmas, resDiscs, resAnos] = await Promise.all([
           api.get("/api/turmas"),
           api.get("/api/disciplinas"),
-          api.get("/api/secretaria/relatorios/anos-letivos").catch(() => ({ data: [anoLetivoPadrao()] }))
+          api.get("/api/secretaria/relatorios/anos-letivos").catch(() => ({ data: [anoLetivoPadrao()] })),
+          carregarGovernancaSecretaria(),
         ]);
         setTurmas(resTurmas.data || []);
         setDisciplinas(resDiscs.data || []);
@@ -197,15 +222,18 @@ export default function BoletimEdicao() {
     setLoadingModal(true);
     setBuscaAlunoModal("");
     try {
-      const res = await api.get("/api/secretaria/relatorios/acompanhamento-notas/alunos", {
-        params: {
-          turma_id: item.turma_id,
-          disciplina_id: item.disciplina_id,
-          bimestre: filtroBimestre,
-          ano_letivo: filtroAnoLetivo,
-          is_agrupamento: item.is_agrupamento ? 1 : 0,
-        }
-      });
+      const [res] = await Promise.all([
+        api.get("/api/secretaria/relatorios/acompanhamento-notas/alunos", {
+          params: {
+            turma_id: item.turma_id,
+            disciplina_id: item.disciplina_id,
+            bimestre: filtroBimestre,
+            ano_letivo: filtroAnoLetivo,
+            is_agrupamento: item.is_agrupamento ? 1 : 0,
+          }
+        }),
+        isSecretaria ? carregarGovernancaSecretaria() : Promise.resolve(),
+      ]);
       setAlunosNotas(res.data || []);
     } catch (err) {
       console.error("Erro ao carregar alunos e notas:", err);
@@ -254,6 +282,7 @@ export default function BoletimEdicao() {
     try {
       const payload = {
         turma_id: modalData.turma_id,
+        is_agrupamento: modalData.is_agrupamento ? 1 : 0,
         disciplina_id: modalData.disciplina_id,
         bimestre: filtroBimestre,
         ano: filtroAnoLetivo,
@@ -688,7 +717,7 @@ export default function BoletimEdicao() {
                             <td className="px-5 py-3.5">
                               <div className="flex items-center gap-3 justify-center min-w-[130px]">
                                 <span className="font-mono text-xs font-bold text-gray-600">{noteCount} / {totalCount}</span>
-                                <div className="w-24 bg-gray-150 rounded-full h-2 overflow-hidden shadow-inner flex-1">
+                                <div className="w-24 bg-gray-200 rounded-full h-2 overflow-hidden shadow-inner flex-1">
                                   <div
                                     className={`h-2 rounded-full transition-all duration-300 ${
                                       percent === 100 ? "bg-green-500" : percent > 0 ? "bg-amber-500" : "bg-red-300"
@@ -965,15 +994,18 @@ export default function BoletimEdicao() {
           <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden border border-blue-100 animate-in fade-in zoom-in-95 duration-200">
             
             {/* Header Modal */}
-            <div className="px-6 py-4 bg-gradient-to-r from-blue-750 to-blue-850 text-white flex justify-between items-center shadow-md">
+            <div
+              className="px-6 py-4 bg-gradient-to-r from-blue-800 to-indigo-900 text-white flex justify-between items-center shadow-md"
+              style={{ background: "linear-gradient(90deg, #1e40af 0%, #1e3a8a 100%)" }}
+            >
               <div>
                 <span className="text-xs uppercase tracking-wider font-extrabold text-blue-200">Fiscalização de Notas</span>
-                <h2 className="text-lg font-bold flex items-center gap-1.5 mt-0.5">
+                <h2 className="text-lg font-bold flex items-center gap-1.5 mt-0.5 text-white">
                   🔍 Visualização de Lançamento
                 </h2>
               </div>
               <div className="flex items-center gap-3">
-                {isDiretorOuVice && (
+                {canEditBoletim && (
                   <button
                     type="button"
                     onClick={() => {
@@ -982,7 +1014,7 @@ export default function BoletimEdicao() {
                     className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border ${
                       isEditMode
                         ? "bg-amber-500 hover:bg-amber-600 text-white border-amber-400"
-                        : "bg-white/10 hover:bg-white/25 text-white border-white/20"
+                        : "bg-white/15 hover:bg-white/25 text-white border-white/30"
                     }`}
                   >
                     <span>{isEditMode ? "🔒" : "✏️"}</span>
@@ -994,7 +1026,7 @@ export default function BoletimEdicao() {
                     setModalOpen(false);
                     setIsEditMode(false);
                   }}
-                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition focus:outline-none"
+                  className="w-8 h-8 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center text-white transition focus:outline-none"
                   aria-label="Fechar"
                 >
                   <XMarkIcon className="w-5 h-5" />
@@ -1040,7 +1072,7 @@ export default function BoletimEdicao() {
                   value={buscaAlunoModal}
                   onChange={(e) => setBuscaAlunoModal(e.target.value)}
                   placeholder="Pesquisar aluno por nome ou matrícula..."
-                  className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-450 focus:border-transparent transition"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
                 />
               </div>
             </div>
@@ -1049,7 +1081,7 @@ export default function BoletimEdicao() {
             <div className="flex-1 overflow-y-auto px-6 pb-6">
               <div className="border border-gray-200 rounded-2xl overflow-hidden shadow-inner bg-gray-50/20">
                 <table className="min-w-full text-xs">
-                  <thead className="bg-gray-150 font-bold text-gray-700 border-b">
+                  <thead className="bg-gray-100 font-bold text-gray-700 border-b">
                     <tr>
                       <th className="px-4 py-2.5 text-left w-20">Foto</th>
                       <th className="px-4 py-2.5 text-left w-36">Matrícula</th>
@@ -1183,8 +1215,9 @@ export default function BoletimEdicao() {
             </div>
             <h3 className="text-lg font-bold text-gray-900 mb-2">Confirmar Lançamento de Notas/Faltas</h3>
             <p className="text-sm text-gray-600 leading-relaxed mb-6">
-              Você está prestes a salvar as alterações de notas e faltas de toda a turma como <strong>Gestor Escolar</strong>.
-              Isso atualizará os boletins oficiais e as informações dos diários dos alunos.
+              Você está prestes a salvar as alterações de notas e faltas de toda a turma como{" "}
+              <strong>{isSecretaria ? "Secretaria Escolar (autorizada via Governança)" : "Gestor Escolar"}</strong>.
+              Isso atualizará os boletins oficiais dos estudantes e registrará o lançamento para auditoria.
             </p>
             <div className="flex gap-3">
               <button

@@ -1,13 +1,17 @@
 // src/features/plataforma/PlataformaModulos.jsx
 // ============================================================================
-// CEO Module Licensing — define which menus each school can access
-// Two-panel: left = school list | right = module tree toggles
+// Central Unificada de Modulação (CEO) — EDUCA.MELHOR
+// Governa de forma isolada as 3 Esferas Institucionais:
+//   1. 🏛️ Escolas Públicas     (origem = 'publica')
+//   2. 🏫 Escolas Particulares (origem = 'particular' — whitelist homologada)
+//   3. 🗺️ Regionais (CREs)     (cargos orgânicos SEEDF — Gabinete & Unidades)
 // ============================================================================
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useLocation } from 'react-router-dom';
 import api from '../../services/api';
 
-// ── Full module tree ──────────────────────────────────────────────────────────
-const MODULOS_TREE = [
+// ── 1) ÁRVORE DE MÓDULOS — ESCOLA PÚBLICA ─────────────────────────────────────
+const MODULOS_TREE_PUBLICA = [
   {
     id: 'secretaria', label: 'Secretaria', icon: '📋',
     filhos: [
@@ -21,18 +25,16 @@ const MODULOS_TREE = [
       { id: 'secretaria.boletim', label: 'Boletim (Edição)' },
       { id: 'secretaria.relatorios', label: 'Relatórios' },
       { id: 'secretaria.horarios', label: 'Horários' },
-      { id: 'secretaria.agente', label: 'Agente' },
-      { id: 'secretaria.tabela_codigos', label: 'Tabela de Códigos' },
+      { id: 'secretaria.agente', label: 'Agente (SEEDF PDF)' },
+      { id: 'secretaria.tabela_codigos', label: 'Tabela de Códigos (SEEDF)' },
       { id: 'secretaria.sincronizar_seedf', label: 'Sincronizar SEEDF' },
       { id: 'secretaria.modulacao', label: 'Modulação' },
       { id: 'secretaria.etapas', label: 'Etapas de Ensino' },
       { id: 'secretaria.conflitos_notas', label: 'Conflitos de Notas' },
       { id: 'secretaria.faltas', label: 'Faltas' },
       { id: 'secretaria.liberacao', label: 'Liberação' },
-    ]
+    ],
   },
-  // ── DISCIPLINAR: módulo reservado — sempre ativo para perfis militares.
-  // O CEO não gerencia este módulo. Omitido intencionalmente da lista.
   {
     id: 'pedagogico', label: 'Pedagógico', icon: '🎓',
     filhos: [
@@ -41,9 +43,8 @@ const MODULOS_TREE = [
       { id: 'pedagogico.conteudos', label: 'Conteúdos' },
       { id: 'pedagogico.relatorios', label: 'Relatórios' },
       { id: 'pedagogico.correcoes', label: 'Correções' },
-    ]
+    ],
   },
-
   {
     id: 'gabarito', label: 'Gabarito', icon: '✅',
     filhos: [
@@ -51,7 +52,7 @@ const MODULOS_TREE = [
       { id: 'gabarito.corrigir_lote', label: 'Corrigir Lote' },
       { id: 'gabarito.corrigir', label: 'Corrigir' },
       { id: 'gabarito.resultados', label: 'Resultados' },
-    ]
+    ],
   },
   {
     id: 'frequencia', label: 'Frequência', icon: '📅',
@@ -61,7 +62,7 @@ const MODULOS_TREE = [
       { id: 'frequencia.busca_ativa', label: 'Busca Ativa' },
       { id: 'frequencia.conselho_tutelar', label: 'Conselho Tutelar' },
       { id: 'frequencia.liberacao', label: 'Liberação' },
-    ]
+    ],
   },
   {
     id: 'biblioteca', label: 'Biblioteca', icon: '📚',
@@ -72,10 +73,10 @@ const MODULOS_TREE = [
       { id: 'biblioteca.leitor_destaque', label: 'Leitor Destaque' },
       { id: 'biblioteca.concurso', label: 'Ranking & Concurso' },
       { id: 'biblioteca.metadados', label: 'Metadados' },
-    ]
+    ],
   },
   {
-    id: 'professores', label: 'Professores', icon: '👩🏫',
+    id: 'professores', label: 'Professores', icon: '👩‍🏫',
     filhos: [
       { id: 'professores.planos', label: 'Planos' },
       { id: 'professores.avaliacoes', label: 'Avaliações' },
@@ -85,7 +86,7 @@ const MODULOS_TREE = [
       { id: 'professores.conselho', label: 'Conselho de Classe' },
       { id: 'professores.boletim', label: 'Boletim Manual' },
       { id: 'professores.sala_recurso', label: 'Sala de Recursos' },
-    ]
+    ],
   },
   {
     id: 'monitoramento', label: 'Monitoramento', icon: '📡',
@@ -93,19 +94,16 @@ const MODULOS_TREE = [
       { id: 'monitoramento.painel', label: 'Painel' },
       { id: 'monitoramento.alertas', label: 'Alertas' },
       { id: 'monitoramento.embeddings', label: 'Embeddings' },
-    ]
+    ],
   },
+  { id: 'questoes', label: 'Banco de Questões', icon: '❓', filhos: [] },
   {
-    id: 'questoes', label: 'Banco de Questões', icon: '❓',
-    filhos: []
-  },
-  {
-    id: 'agente_educa', label: 'Agente EDUCA', icon: '🤖',
+    id: 'agente_educa', label: 'Agente EDUCA (EDUCADF)', icon: '🤖',
     filhos: [
       { id: 'agente_educa.credenciais', label: 'Credenciais' },
       { id: 'agente_educa.planos', label: 'Planos' },
       { id: 'agente_educa.notas', label: 'Notas' },
-    ]
+    ],
   },
   {
     id: 'impressao', label: 'Impressão', icon: '🖨️',
@@ -114,20 +112,17 @@ const MODULOS_TREE = [
       { id: 'impressao.boletins', label: 'Boletins' },
       { id: 'impressao.listas', label: 'Listas' },
       { id: 'impressao.documentos', label: 'Documentos' },
-    ]
+    ],
   },
-  {
-    id: 'ferramentas', label: 'Ferramentas', icon: '🔧',
-    filhos: []
-  },
+  { id: 'ferramentas', label: 'Ferramentas', icon: '🔧', filhos: [] },
   {
     id: 'direcao', label: 'Direção', icon: '🏛️',
     filhos: [
       { id: 'direcao.educa_capture', label: 'Educa-Capture' },
-      { id: 'direcao.responsaveis', label: 'Responsáveis' },
+      { id: 'direcao.responsaveis', label: 'Responsáveis (App)' },
       { id: 'direcao.cadastro', label: 'Cadastro de Membros' },
       { id: 'direcao.governanca', label: 'Governança' },
-    ]
+    ],
   },
   {
     id: 'merenda', label: 'Merenda', icon: '🍽️',
@@ -135,7 +130,7 @@ const MODULOS_TREE = [
       { id: 'merenda.cadastro', label: 'Cadastro' },
       { id: 'merenda.cardapio', label: 'Cardápio' },
       { id: 'merenda.relatorios', label: 'Relatórios' },
-    ]
+    ],
   },
   {
     id: 'comunicacao', label: 'Comunicação', icon: '💬',
@@ -143,7 +138,7 @@ const MODULOS_TREE = [
       { id: 'comunicacao.avisos', label: 'Avisos' },
       { id: 'comunicacao.comunicados', label: 'Comunicados' },
       { id: 'comunicacao.mural', label: 'Mural' },
-    ]
+    ],
   },
   {
     id: 'sala_recurso', label: 'Sala de Recursos (AEE)', icon: '🧩',
@@ -153,7 +148,7 @@ const MODULOS_TREE = [
       { id: 'sala_recurso.impressao', label: 'Impressão' },
       { id: 'sala_recurso.pdi', label: 'Plano Individual (PDI/PEI)' },
       { id: 'sala_recurso.atendimentos', label: 'Diário de Sessões' },
-    ]
+    ],
   },
   {
     id: 'administrativo', label: 'Administrativo', icon: '🏢',
@@ -163,15 +158,234 @@ const MODULOS_TREE = [
       { id: 'administrativo.ocorrencias', label: 'LANÇAMENTOS' },
       { id: 'administrativo.relatorios', label: 'IMPRIMIR / PDF' },
       { id: 'administrativo.memorando', label: 'MEMORANDO' },
-    ]
+    ],
   },
   {
-    id: 'financeiro', label: 'Financeiro', icon: '💰',
-    filhos: []
+    id: 'financeiro', label: 'Financeiro Público (Verbas)', icon: '💰',
+    filhos: [
+      { id: 'financeiro.pdaf', label: 'PDAF (Recursos Distritais / SEEDF)' },
+      { id: 'financeiro.pdde', label: 'PDDE (Recursos Federais / FNDE)' },
+    ],
   },
 ];
 
-// ── Group accent colors (cycle) ───────────────────────────────────────────────
+// ── 2) ÁRVORE DE MÓDULOS — ESCOLA PARTICULAR (Sem SEEDF/PDAF/PDDE) ────────────
+// Separada em:
+//   (A) Núcleo Homologado Rede Particular (pronto para escolas privadas)
+//   (B) Base Escolar em Adaptação (recolhida por padrão — ativar só após homologação privada)
+const MODULOS_PARTICULAR_HOMOLOGADOS = [
+  {
+    id: 'financeiro', label: 'Financeiro Particular (Comercial)', icon: '💰', homologado: true,
+    filhos: [
+      { id: 'financeiro.mensalidades', label: 'Mensalidades & Planos' },
+      { id: 'financeiro.boletos_pix', label: 'Boletos & PIX' },
+      { id: 'financeiro.contratos', label: 'Contratos Financeiros' },
+      { id: 'financeiro.inadimplencia', label: 'Gestão de Inadimplência' },
+      { id: 'financeiro.caixa_dre', label: 'Fluxo de Caixa & DRE' },
+    ],
+  },
+  {
+    id: 'direcao', label: 'Direção & Acessos da Equipe', icon: '🏛️', homologado: true,
+    filhos: [
+      { id: 'direcao.cadastro', label: 'Cadastro de Membros / Equipe' },
+      { id: 'direcao.responsaveis', label: 'EDUCA MOBILE (Responsáveis)' },
+      { id: 'direcao.educa_capture', label: 'Educa-Capture (Reconhecimento)' },
+      { id: 'direcao.governanca', label: 'Governança da Unidade' },
+    ],
+  },
+  {
+    id: 'comunicacao', label: 'Comunicação Institucional', icon: '💬', homologado: true,
+    filhos: [
+      { id: 'comunicacao.avisos', label: 'Avisos' },
+      { id: 'comunicacao.comunicados', label: 'Comunicados' },
+      { id: 'comunicacao.mural', label: 'Mural' },
+    ],
+  },
+  {
+    id: 'monitoramento', label: 'Monitoramento & Portaria Facial', icon: '📡', homologado: true,
+    filhos: [
+      { id: 'monitoramento.painel', label: 'Painel' },
+      { id: 'monitoramento.alertas', label: 'Alertas' },
+      { id: 'monitoramento.embeddings', label: 'Embeddings' },
+    ],
+  },
+];
+
+const MODULOS_PARTICULAR_EM_ADAPTACAO = [
+  {
+    id: 'secretaria', label: 'Secretaria Acadêmica (Em adaptação)', icon: '📋', emAdaptacao: true,
+    filhos: [
+      { id: 'secretaria.matriculas', label: 'Matrículas' },
+      { id: 'secretaria.alunos', label: 'Alunos' },
+      { id: 'secretaria.responsaveis', label: 'Responsáveis' },
+      { id: 'secretaria.cargas_horarias', label: 'Cargas Horárias' },
+      { id: 'secretaria.disciplinas', label: 'Disciplinas' },
+      { id: 'secretaria.turmas', label: 'Turmas' },
+      { id: 'secretaria.professores', label: 'Professores' },
+      { id: 'secretaria.boletim', label: 'Boletim (Edição)' },
+      { id: 'secretaria.relatorios', label: 'Relatórios' },
+      { id: 'secretaria.horarios', label: 'Horários' },
+      { id: 'secretaria.modulacao', label: 'Modulação' },
+      { id: 'secretaria.etapas', label: 'Etapas de Ensino' },
+      { id: 'secretaria.conflitos_notas', label: 'Conflitos de Notas' },
+      { id: 'secretaria.faltas', label: 'Faltas' },
+      { id: 'secretaria.liberacao', label: 'Liberação' },
+    ],
+  },
+  {
+    id: 'pedagogico', label: 'Pedagógico (Em adaptação)', icon: '🎓', emAdaptacao: true,
+    filhos: [
+      { id: 'pedagogico.agenda', label: 'Agenda' },
+      { id: 'pedagogico.conselho', label: 'Conselho de Classe' },
+      { id: 'pedagogico.conteudos', label: 'Conteúdos' },
+      { id: 'pedagogico.relatorios', label: 'Relatórios' },
+      { id: 'pedagogico.correcoes', label: 'Correções' },
+    ],
+  },
+  {
+    id: 'gabarito', label: 'Gabarito & Simulados (Em adaptação)', icon: '✅', emAdaptacao: true,
+    filhos: [
+      { id: 'gabarito.gerar', label: 'Gerar / Imprimir' },
+      { id: 'gabarito.corrigir_lote', label: 'Corrigir Lote' },
+      { id: 'gabarito.corrigir', label: 'Corrigir' },
+      { id: 'gabarito.resultados', label: 'Resultados' },
+    ],
+  },
+  { id: 'questoes', label: 'Banco de Questões (Em adaptação)', icon: '❓', emAdaptacao: true, filhos: [] },
+  {
+    id: 'professores', label: 'Portal dos Professores (Em adaptação)', icon: '👩‍🏫', emAdaptacao: true,
+    filhos: [
+      { id: 'professores.planos', label: 'Planos' },
+      { id: 'professores.avaliacoes', label: 'Avaliações' },
+      { id: 'professores.chamada', label: 'Chamada' },
+      { id: 'professores.conteudos', label: 'Conteúdos' },
+      { id: 'professores.provas', label: 'Provas' },
+      { id: 'professores.conselho', label: 'Conselho de Classe' },
+      { id: 'professores.boletim', label: 'Boletim Manual' },
+      { id: 'professores.sala_recurso', label: 'Sala de Recursos' },
+    ],
+  },
+  {
+    id: 'frequencia', label: 'Frequência (Em adaptação)', icon: '📅', emAdaptacao: true,
+    filhos: [
+      { id: 'frequencia.atestados', label: 'Atestados' },
+      { id: 'frequencia.relatorios', label: 'Relatórios' },
+      { id: 'frequencia.liberacao', label: 'Liberação' },
+    ],
+  },
+  {
+    id: 'biblioteca', label: 'Biblioteca (Em adaptação)', icon: '📚', emAdaptacao: true,
+    filhos: [
+      { id: 'biblioteca.acervo', label: 'Acervo' },
+      { id: 'biblioteca.emprestimos', label: 'Empréstimos' },
+      { id: 'biblioteca.alunos', label: 'Alunos Leitores' },
+      { id: 'biblioteca.leitor_destaque', label: 'Leitor Destaque' },
+      { id: 'biblioteca.concurso', label: 'Ranking & Concurso' },
+      { id: 'biblioteca.metadados', label: 'Metadados' },
+    ],
+  },
+  {
+    id: 'impressao', label: 'Impressão (Em adaptação)', icon: '🖨️', emAdaptacao: true,
+    filhos: [
+      { id: 'impressao.gabaritos', label: 'Gabaritos' },
+      { id: 'impressao.boletins', label: 'Boletins' },
+      { id: 'impressao.listas', label: 'Listas' },
+      { id: 'impressao.documentos', label: 'Documentos' },
+    ],
+  },
+  {
+    id: 'sala_recurso', label: 'Atendimento Especializado / AEE (Em adaptação)', icon: '🧩', emAdaptacao: true,
+    filhos: [
+      { id: 'sala_recurso.alunos', label: 'Alunos AEE' },
+      { id: 'sala_recurso.adequacoes', label: 'Adequações Curriculares' },
+      { id: 'sala_recurso.impressao', label: 'Impressão' },
+      { id: 'sala_recurso.pdi', label: 'Plano Individual (PDI/PEI)' },
+      { id: 'sala_recurso.atendimentos', label: 'Diário de Sessões' },
+    ],
+  },
+];
+
+const MODULOS_TREE_PARTICULAR = [
+  ...MODULOS_PARTICULAR_HOMOLOGADOS,
+  ...MODULOS_PARTICULAR_EM_ADAPTACAO,
+];
+
+// ── 3) ÁRVORE DE MÓDULOS — REGIONAIS DE ENSINO (CREs) ─────────────────────────
+const MODULOS_TREE_CRE = [
+  {
+    id: 'cre', label: 'Gestão Regional de Ensino (CRE)', icon: '🗺️',
+    filhos: [
+      { id: 'cre.gabinete', label: 'Gabinete Regional (Visão Executiva da Rede)' },
+      { id: 'cre.uniag', label: 'UNIAG • Auditoria Trimestral PDAF (Pré-SEI)' },
+    ],
+  },
+];
+
+// ── Perfis Escolares & Cargos Regionais ───────────────────────────────────────
+const PERFIS_ESCOLA_PUBLICA = [
+  { key: 'diretor',                   label: 'Diretor' },
+  { key: 'vice_diretor',              label: 'Vice-Diretor' },
+  { key: 'coordenacao',               label: 'Coordenação' },
+  { key: 'secretaria',                label: 'Secretaria' },
+  { key: 'orientador',                label: 'Orientador' },
+  { key: 'supervisor_pedagogico',     label: 'Supervisor Pedagógico' },
+  { key: 'supervisor_administrativo', label: 'Supervisor Administrativo' },
+  { key: 'disciplinar',               label: 'Disciplinar' },
+  { key: 'administrativo',            label: 'Administrativo' },
+  { key: 'financeiro',                label: 'Financeiro' },
+  { key: 'psicopedagogia',            label: 'Psicopedagogia' },
+  { key: 'sala_recurso',              label: 'Sala de Recurso' },
+  { key: 'apoio',                     label: 'Apoio' },
+  { key: 'educador_social',           label: 'Educador Social' },
+  { key: 'vigilancia',                label: 'Vigilância' },
+  { key: 'merenda',                   label: 'Merenda' },
+  { key: 'biblioteca',                label: 'Biblioteca' },
+  { key: 'professor',                 label: 'Professor' },
+  { key: 'pedagogo',                  label: 'Pedagogo' },
+  { key: 'aluno',                     label: 'Aluno' },
+  { key: 'responsavel',               label: 'Responsável' },
+  { key: 'psicologo',                 label: 'Psicólogo' },
+  { key: 'monitor',                   label: 'Monitor' },
+];
+
+const PERFIS_ESCOLA_PARTICULAR = [
+  { key: 'diretor',                   label: 'Diretor / Mantenedor' },
+  { key: 'vice_diretor',              label: 'Vice-Diretor' },
+  { key: 'financeiro',                label: 'Financeiro / Tesouraria' },
+  { key: 'secretaria',                label: 'Secretaria' },
+  { key: 'coordenacao',               label: 'Coordenação Pedagógica' },
+  { key: 'orientador',                label: 'Orientação Educacional' },
+  { key: 'administrativo',            label: 'Administrativo' },
+  { key: 'professor',                 label: 'Professor' },
+  { key: 'psicopedagogia',            label: 'Psicopedagogia' },
+  { key: 'sala_recurso',              label: 'Atendimento AEE' },
+  { key: 'biblioteca',                label: 'Biblioteca' },
+  { key: 'vigilancia',                label: 'Portaria / Segurança' },
+  { key: 'aluno',                     label: 'Aluno' },
+  { key: 'responsavel',               label: 'Responsável Financeiro' },
+];
+
+const CARGOS_CRE_LISTA = [
+  { key: 'coordenador_regional', label: 'Coordenador(a) Geral (Gabinete)', sigla: 'GABINETE' },
+  { key: 'chefe_uniag',          label: 'Administração Geral (UNIAG)',     sigla: 'UNIAG' },
+  { key: 'chefe_unieb',          label: 'Educação Básica (UNIEB)',         sigla: 'UNIEB' },
+  { key: 'chefe_uniplat',        label: 'Planejamento & Tec. (UNIPLAT)',   sigla: 'UNIPLAT' },
+  { key: 'chefe_unigep',         label: 'Gestão de Pessoas (UNIGEP)',      sigla: 'UNIGEP' },
+  { key: 'chefe_uniae',          label: 'Infraestrutura & Apoio (UNIAE)',  sigla: 'UNIAE' },
+];
+
+const PERFIL_ICONS = {
+  diretor: '🎓', vice_diretor: '👔', professor: '👩‍🏫',
+  coordenacao: '📋', coordenador: '📋', supervisor_pedagogico: '🔍',
+  supervisor_administrativo: '🗂️', pedagogo: '📚', secretaria: '🗂️',
+  orientador: '🧭', aluno: '👨‍🎓', biblioteca: '📖', educador_social: '🤝',
+  merenda: '🍽️', psicologo: '🧠', psicopedagogia: '🧠', responsavel: '👨‍👩‍👧',
+  vigilancia: '🔒', administrativo: '🏢', financeiro: '💰', sala_recurso: '🧩',
+  disciplinar: '🛡️', apoio: '🤝', monitor: '👁️',
+  coordenador_regional: '🏛️', chefe_uniag: '💰', chefe_unieb: '🎓',
+  chefe_uniplat: '📊', chefe_unigep: '👥', chefe_uniae: '🏗️',
+};
+
 const GROUP_COLORS = [
   { accent: '#6366f1', bg: 'rgba(99,102,241,0.06)' },
   { accent: '#3b82f6', bg: 'rgba(59,130,246,0.06)' },
@@ -182,12 +396,9 @@ const GROUP_COLORS = [
   { accent: '#14b8a6', bg: 'rgba(20,184,166,0.06)' },
 ];
 
-// ── Total leaf count ──────────────────────────────────────────────────────────
-const TOTAL_MODULOS = MODULOS_TREE.reduce((acc, g) =>
-  acc + (g.filhos.length > 0 ? g.filhos.length : 1), 0
-);
+const countLeaves = (tree) =>
+  tree.reduce((acc, g) => acc + (g.filhos.length > 0 ? g.filhos.length : 1), 0);
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 function getGroupState(grupo, ativos) {
   if (grupo.filhos.length === 0) {
     return ativos.has(grupo.id) ? 'all' : 'none';
@@ -210,13 +421,12 @@ function getGroupBorder(state, accent) {
   return 'rgba(255,255,255,0.06)';
 }
 
-// ── Toggle switch ─────────────────────────────────────────────────────────────
 function ToggleSwitch({ isActive, onClick, size = 'md' }) {
   const [hover, setHover] = useState(false);
   const w = size === 'sm' ? 38 : 44;
   const h = size === 'sm' ? 20 : 24;
   const knob = size === 'sm' ? 16 : 20;
-  const knobOffset = size === 'sm' ? 2 : 2;
+  const knobOffset = 2;
   const knobActiveLeft = w - knob - knobOffset;
 
   return (
@@ -255,12 +465,8 @@ function ToggleSwitch({ isActive, onClick, size = 'md' }) {
   );
 }
 
-// ── Copy modal ────────────────────────────────────────────────────────────────
-function CopyModal({ escolas, escolaAtual, onConfirm, onClose }) {
+function CopyModal({ escolas, escolaAtual, esferaLabel, onConfirm, onClose }) {
   const [origemId, setOrigemId] = useState('');
-  const [confirmHover, setConfirmHover] = useState(false);
-  const [cancelHover, setCancelHover] = useState(false);
-
   const origens = escolas.filter(e => e.id !== escolaAtual?.id);
   const origem = origens.find(e => String(e.id) === String(origemId));
 
@@ -270,51 +476,37 @@ function CopyModal({ escolas, escolaAtual, onConfirm, onClose }) {
       background: 'rgba(0,0,0,0.7)',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
       backdropFilter: 'blur(6px)',
-      animation: 'fadeIn 0.2s ease',
     }}>
       <div style={{
         background: 'linear-gradient(135deg, #1e293b, #0f172a)',
         border: '1px solid rgba(99,102,241,0.25)',
-        borderRadius: 24,
-        padding: '36px 40px',
-        width: '100%',
-        maxWidth: 480,
-        boxShadow: '0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(99,102,241,0.15)',
-        animation: 'slideUp 0.3s cubic-bezier(0.4,0,0.2,1)',
+        borderRadius: 24, padding: '32px 36px', width: '100%', maxWidth: 480,
+        boxShadow: '0 32px 80px rgba(0,0,0,0.6)',
       }}>
-        <div style={{ fontSize: '2.5rem', textAlign: 'center', marginBottom: 12 }}>📋</div>
-        <h3 style={{
-          fontSize: '1.2rem', fontWeight: 800, color: '#f1f5f9',
-          textAlign: 'center', marginBottom: 8,
-        }}>
-          Copiar configuração
+        <div style={{ fontSize: '2.2rem', textAlign: 'center', marginBottom: 10 }}>📋</div>
+        <h3 style={{ fontSize: '1.15rem', fontWeight: 800, color: '#f1f5f9', textAlign: 'center', marginBottom: 6 }}>
+          Copiar configuração ({esferaLabel})
         </h3>
-        <p style={{
-          fontSize: '0.85rem', color: 'rgba(148,163,184,0.8)',
-          textAlign: 'center', marginBottom: 28, lineHeight: 1.6,
-        }}>
-          Selecione a escola de origem. Isso substituirá a configuração atual de{' '}
+        <p style={{ fontSize: '0.82rem', color: 'rgba(148,163,184,0.8)', textAlign: 'center', marginBottom: 22, lineHeight: 1.6 }}>
+          Apenas instituições da mesma natureza são listadas para evitar contaminação de módulos. Destino:{' '}
           <strong style={{ color: '#f1f5f9' }}>{escolaAtual?.nome}</strong>.
         </p>
 
-        <div style={{ marginBottom: 24 }}>
+        <div style={{ marginBottom: 20 }}>
           <label style={{
-            display: 'block', fontSize: '0.72rem', fontWeight: 700,
+            display: 'block', fontSize: '0.7rem', fontWeight: 700,
             color: 'rgba(148,163,184,0.7)', textTransform: 'uppercase',
             letterSpacing: '0.05em', marginBottom: 8,
           }}>
-            Escola de Origem
+            Instituição de Origem
           </label>
           <select
             value={origemId}
             onChange={e => setOrigemId(e.target.value)}
             style={{
-              width: '100%', padding: '12px 16px',
-              borderRadius: 12, fontSize: '0.9rem',
-              background: 'rgba(255,255,255,0.05)',
-              border: '1px solid rgba(255,255,255,0.12)',
-              color: '#f1f5f9', outline: 'none',
-              cursor: 'pointer',
+              width: '100%', padding: '11px 14px', borderRadius: 12, fontSize: '0.88rem',
+              background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)',
+              color: '#f1f5f9', outline: 'none', cursor: 'pointer',
             }}
           >
             <option value="">— Selecione uma escola —</option>
@@ -328,27 +520,21 @@ function CopyModal({ escolas, escolaAtual, onConfirm, onClose }) {
 
         {origemId && (
           <div style={{
-            marginBottom: 24, padding: '12px 16px',
-            borderRadius: 12,
-            background: 'rgba(245,158,11,0.08)',
-            border: '1px solid rgba(245,158,11,0.2)',
-            fontSize: '0.82rem', color: '#fbbf24', lineHeight: 1.5,
+            marginBottom: 20, padding: '11px 14px', borderRadius: 12,
+            background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)',
+            fontSize: '0.8rem', color: '#fbbf24', lineHeight: 1.5,
           }}>
-            ⚠️ A configuração atual de <strong>{escolaAtual?.nome}</strong> será <strong>substituída</strong> pelos módulos de <strong>{origem?.nome}</strong>.
+            ⚠️ A configuração deste perfil em <strong>{escolaAtual?.nome}</strong> será substituída pela de <strong>{origem?.nome}</strong>.
           </div>
         )}
 
         <div style={{ display: 'flex', gap: 12 }}>
           <button
             onClick={onClose}
-            onMouseEnter={() => setCancelHover(true)}
-            onMouseLeave={() => setCancelHover(false)}
             style={{
-              flex: 1, padding: '12px 20px', borderRadius: 12,
-              border: '1px solid rgba(255,255,255,0.1)',
-              background: cancelHover ? 'rgba(255,255,255,0.06)' : 'transparent',
-              color: 'rgba(148,163,184,0.9)', fontWeight: 600, fontSize: '0.9rem',
-              cursor: 'pointer', transition: 'all 0.2s',
+              flex: 1, padding: '11px 18px', borderRadius: 12,
+              border: '1px solid rgba(255,255,255,0.1)', background: 'transparent',
+              color: 'rgba(148,163,184,0.9)', fontWeight: 600, fontSize: '0.88rem', cursor: 'pointer',
             }}
           >
             Cancelar
@@ -356,24 +542,15 @@ function CopyModal({ escolas, escolaAtual, onConfirm, onClose }) {
           <button
             disabled={!origemId}
             onClick={() => origemId && onConfirm(origemId)}
-            onMouseEnter={() => setConfirmHover(true)}
-            onMouseLeave={() => setConfirmHover(false)}
             style={{
-              flex: 1, padding: '12px 20px', borderRadius: 12,
-              border: 'none',
-              background: origemId
-                ? confirmHover
-                  ? 'linear-gradient(135deg, #4f46e5, #7c3aed)'
-                  : 'linear-gradient(135deg, #6366f1, #8b5cf6)'
-                : 'rgba(255,255,255,0.06)',
+              flex: 1, padding: '11px 18px', borderRadius: 12, border: 'none',
+              background: origemId ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'rgba(255,255,255,0.06)',
               color: origemId ? '#fff' : 'rgba(148,163,184,0.4)',
-              fontWeight: 700, fontSize: '0.9rem',
+              fontWeight: 700, fontSize: '0.88rem',
               cursor: origemId ? 'pointer' : 'not-allowed',
-              transition: 'all 0.2s',
-              boxShadow: origemId && confirmHover ? '0 8px 24px rgba(99,102,241,0.35)' : 'none',
             }}
           >
-            Confirmar
+            Confirmar Cópia
           </button>
         </div>
       </div>
@@ -381,13 +558,11 @@ function CopyModal({ escolas, escolaAtual, onConfirm, onClose }) {
   );
 }
 
-// ── Module Group Card ─────────────────────────────────────────────────────────
 function ModuloGrupo({ grupo, colorDef, ativos, onToggle, expandido, onToggleExpand }) {
   const [hoverGroup, setHoverGroup] = useState(false);
   const groupState = getGroupState(grupo, ativos);
   const accent = getGroupAccent(groupState, colorDef.accent);
   const borderColor = getGroupBorder(groupState, colorDef.accent);
-
   const hasSubs = grupo.filhos.length > 0;
 
   return (
@@ -403,7 +578,6 @@ function ModuloGrupo({ grupo, colorDef, ativos, onToggle, expandido, onToggleExp
       transition: 'all 0.25s cubic-bezier(0.4,0,0.2,1)',
       boxShadow: groupState !== 'none' ? `0 4px 20px ${accent}18` : 'none',
     }}>
-      {/* Group header row */}
       <div
         style={{
           display: 'flex', alignItems: 'center', gap: 12,
@@ -411,13 +585,11 @@ function ModuloGrupo({ grupo, colorDef, ativos, onToggle, expandido, onToggleExp
           cursor: hasSubs ? 'pointer' : 'default',
           userSelect: 'none',
           background: hoverGroup && hasSubs ? 'rgba(255,255,255,0.03)' : 'transparent',
-          transition: 'background 0.15s',
         }}
         onMouseEnter={() => hasSubs && setHoverGroup(true)}
         onMouseLeave={() => setHoverGroup(false)}
         onClick={() => hasSubs && onToggleExpand(grupo.id)}
       >
-        {/* Expand chevron */}
         {hasSubs ? (
           <span style={{
             fontSize: '0.65rem', color: 'rgba(148,163,184,0.5)',
@@ -429,27 +601,25 @@ function ModuloGrupo({ grupo, colorDef, ativos, onToggle, expandido, onToggleExp
           <span style={{ width: 12 }} />
         )}
 
-        {/* Icon */}
-        <span style={{ fontSize: '1.3rem', lineHeight: 1, filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.3))' }}>
-          {grupo.icon}
-        </span>
+        <span style={{ fontSize: '1.3rem', lineHeight: 1 }}>{grupo.icon}</span>
 
-        {/* Label */}
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{
-            fontSize: '0.9rem', fontWeight: 700,
-            color: groupState === 'none' ? 'rgba(148,163,184,0.7)' : '#f1f5f9',
-            letterSpacing: '0.01em',
+            fontSize: '0.88rem', fontWeight: 700,
+            color: groupState === 'none' ? 'rgba(148,163,184,0.75)' : '#f1f5f9',
+            display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap',
           }}>
-            {grupo.label}
+            <span>{grupo.label}</span>
+            {grupo.homologado && (
+              <span style={{
+                fontSize: '0.55rem', fontWeight: 800, padding: '1px 7px', borderRadius: 10,
+                background: 'rgba(245,158,11,0.16)', color: '#fbbf24', border: '1px solid rgba(245,158,11,0.3)',
+                textTransform: 'uppercase', letterSpacing: '0.04em',
+              }}>Homologado Particular</span>
+            )}
           </div>
           {hasSubs && (
-            <div style={{
-              fontSize: '0.65rem', fontWeight: 600,
-              color: accent,
-              marginTop: 1,
-              opacity: 0.8,
-            }}>
+            <div style={{ fontSize: '0.65rem', fontWeight: 600, color: accent, marginTop: 1, opacity: 0.85 }}>
               {groupState === 'all' ? `${grupo.filhos.length}/${grupo.filhos.length} ativos` :
                groupState === 'some' ? `${grupo.filhos.filter(f => ativos.has(f.id)).length}/${grupo.filhos.length} ativos` :
                'nenhum ativo'}
@@ -457,24 +627,19 @@ function ModuloGrupo({ grupo, colorDef, ativos, onToggle, expandido, onToggleExp
           )}
         </div>
 
-        {/* Status pill */}
         <div style={{
-          padding: '3px 10px', borderRadius: 20,
-          fontSize: '0.6rem', fontWeight: 800,
+          padding: '3px 10px', borderRadius: 20, fontSize: '0.6rem', fontWeight: 800,
           textTransform: 'uppercase', letterSpacing: '0.06em',
           background: groupState === 'all'
             ? 'rgba(16,185,129,0.15)'
             : groupState === 'some'
               ? `${colorDef.accent}20`
               : 'rgba(255,255,255,0.05)',
-          color: accent,
-          border: `1px solid ${accent}30`,
-          whiteSpace: 'nowrap',
+          color: accent, border: `1px solid ${accent}30`, whiteSpace: 'nowrap',
         }}>
           {groupState === 'all' ? '✓ ATIVO' : groupState === 'some' ? '◐ PARCIAL' : '○ OFF'}
         </div>
 
-        {/* Group toggle */}
         <div onClick={e => e.stopPropagation()}>
           <ToggleSwitch
             isActive={ativos.has(grupo.id)}
@@ -483,12 +648,8 @@ function ModuloGrupo({ grupo, colorDef, ativos, onToggle, expandido, onToggleExp
         </div>
       </div>
 
-      {/* Submenu rows */}
       {hasSubs && expandido && (
-        <div style={{
-          borderTop: '1px solid rgba(255,255,255,0.05)',
-          background: 'rgba(0,0,0,0.15)',
-        }}>
+        <div style={{ borderTop: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.15)' }}>
           {grupo.filhos.map((filho, fi) => {
             const isLast = fi === grupo.filhos.length - 1;
             const isOn = ativos.has(filho.id);
@@ -499,35 +660,23 @@ function ModuloGrupo({ grupo, colorDef, ativos, onToggle, expandido, onToggleExp
                   display: 'flex', alignItems: 'center', gap: 12,
                   padding: '10px 18px 10px 48px',
                   borderBottom: isLast ? 'none' : '1px solid rgba(255,255,255,0.03)',
-                  transition: 'background 0.15s',
                 }}
               >
-                {/* Tree line indicator */}
-                <span style={{
-                  fontSize: '0.6rem',
-                  color: isOn ? accent : 'rgba(148,163,184,0.25)',
-                  transition: 'color 0.2s',
-                }}>
+                <span style={{ fontSize: '0.6rem', color: isOn ? accent : 'rgba(148,163,184,0.25)' }}>
                   {isLast ? '└─' : '├─'}
                 </span>
-
                 <span style={{
-                  flex: 1, fontSize: '0.85rem',
-                  color: isOn ? 'rgba(226,232,240,0.9)' : 'rgba(148,163,184,0.45)',
+                  flex: 1, fontSize: '0.84rem',
+                  color: isOn ? 'rgba(226,232,240,0.92)' : 'rgba(148,163,184,0.48)',
                   fontWeight: isOn ? 500 : 400,
-                  transition: 'color 0.2s',
                 }}>
                   {filho.label}
                 </span>
-
-                {/* Active dot */}
                 <div style={{
                   width: 6, height: 6, borderRadius: '50%',
                   background: isOn ? accent : 'rgba(255,255,255,0.1)',
-                  transition: 'background 0.2s',
                   boxShadow: isOn ? `0 0 6px ${accent}` : 'none',
                 }} />
-
                 <ToggleSwitch
                   isActive={isOn}
                   onClick={() => onToggle(filho.id, 'child', grupo)}
@@ -542,81 +691,59 @@ function ModuloGrupo({ grupo, colorDef, ativos, onToggle, expandido, onToggleExp
   );
 }
 
-// ── School Status Badge ───────────────────────────────────────────────────────
 function StatusBadge({ status }) {
   const cfg = {
     ativa:     { bg: 'rgba(16,185,129,0.15)', color: '#10b981', label: 'Ativa',     dot: '#10b981' },
     bloqueada: { bg: 'rgba(249,115,22,0.15)', color: '#f97316', label: 'Bloqueada', dot: '#f97316' },
     cancelada: { bg: 'rgba(239,68,68,0.15)',  color: '#ef4444', label: 'Cancelada', dot: '#ef4444' },
-  }[status] || { bg: 'rgba(148,163,184,0.1)', color: '#94a3b8', label: status || 'N/D', dot: '#64748b' };
+  }[status] || { bg: 'rgba(148,163,184,0.1)', color: '#94a3b8', label: status || 'Ativa', dot: '#10b981' };
 
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 5,
       padding: '2px 8px', borderRadius: 20,
       background: cfg.bg, color: cfg.color,
-      fontSize: '0.6rem', fontWeight: 800,
-      textTransform: 'uppercase', letterSpacing: '0.05em',
+      fontSize: '0.58rem', fontWeight: 800,
+      textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0,
     }}>
-      <span style={{ width: 5, height: 5, borderRadius: '50%', background: cfg.dot, flexShrink: 0 }} />
+      <span style={{ width: 5, height: 5, borderRadius: '50%', background: cfg.dot }} />
       {cfg.label}
     </span>
   );
 }
 
-// ── Lista de perfis gerenciáveis pelo CEO ─────────────────────────────────────
-// Regras:
-// - 'secretario' removido: duplicata de 'secretaria'
-// - 'visitante'  removido: duplicata de 'vigilancia'
-// - 'subcomandante', 'supervisor_disciplinar', 'monitor_disciplinar' removidos:
-//   módulo DISCIPLINAR é padrão/fixo para escolas CCMDF — CEO não o gerencia.
-const PERFIS_LISTA = [
-  { key: 'diretor',                   label: 'Diretor' },
-  { key: 'vice_diretor',              label: 'Vice-Diretor' },
-  { key: 'coordenacao',               label: 'Coordenação' },
-  { key: 'secretaria',                label: 'Secretaria' },
-  { key: 'orientador',                label: 'Orientador' },
-  { key: 'supervisor_pedagogico',     label: 'Supervisor Pedagógico' },
-  { key: 'supervisor_administrativo', label: 'Supervisor Administrativo' },
-  { key: 'disciplinar',               label: 'Disciplinar' },
-  { key: 'administrativo',            label: 'Administrativo' },
-  { key: 'financeiro',                label: 'Financeiro' },
-  { key: 'psicopedagogia',            label: 'Psicopedagogia' },
-  { key: 'sala_recurso',              label: 'Sala de Recurso' },
-  { key: 'apoio',                     label: 'Apoio' },
-  { key: 'educador_social',           label: 'Educador Social' },
-  { key: 'vigilancia',                label: 'Vigilância' },
-  { key: 'merenda',                   label: 'Merenda' },
-  { key: 'biblioteca',                label: 'Biblioteca' },
-  { key: 'professor',                 label: 'Professor' },
-  { key: 'pedagogo',                  label: 'Pedagogo' },
-  { key: 'aluno',                     label: 'Aluno' },
-  { key: 'responsavel',               label: 'Responsável' },
-  { key: 'psicologo',                 label: 'Psicólogo' },
-  { key: 'monitor',                   label: 'Monitor' }
-];
-
-// ── Main Component ────────────────────────────────────────────────────────────
 export default function PlataformaModulos() {
+  const location = useLocation();
+
+  // ── Esfera ativa: 'publica' | 'particular' | 'cre' ──
+  const [esfera, setEsfera] = useState('publica');
+
+  // ── Dados das instituições ──
   const [escolas, setEscolas] = useState([]);
-  const [escolaId, setEscolaId] = useState(null);
-  const [perfilSel, setPerfilSel] = useState(null); // perfil selecionado (Passo 5)
+  const [regionais, setRegionais] = useState([]);
+  const [resumoEscolas, setResumoEscolas] = useState({});
+  const [resumoCre, setResumoCre] = useState({});
+
+  const [entidadeId, setEntidadeId] = useState(null); // escola_id ou regional_id
+  const [perfilSel, setPerfilSel] = useState(null);   // perfil escolar ou cargo_regional
   const [modulosAtivos, setModulosAtivos] = useState(new Set());
+  const [creCustomizado, setCreCustomizado] = useState(false);
+  const [mostrarAdaptacaoPrivada, setMostrarAdaptacaoPrivada] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [applyingTemplate, setApplyingTemplate] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [expandidos, setExpandidos] = useState(new Set(MODULOS_TREE.map(m => m.id)));
+  const [toastMsg, setToastMsg] = useState(null);
+  const [expandidos, setExpandidos] = useState(
+    new Set([...MODULOS_TREE_PUBLICA, ...MODULOS_TREE_PARTICULAR, ...MODULOS_TREE_CRE].map(m => m.id))
+  );
   const [schoolLoading, setSchoolLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showCopyModal, setShowCopyModal] = useState(false);
-  const [refreshHover, setRefreshHover] = useState(false);
-  const [saveHover, setSaveHover] = useState(false);
-  const [activarHover, setActivarHover] = useState(false);
-  const [desativarHover, setDesativarHover] = useState(false);
   const [error, setError] = useState(null);
-  const [copyError, setCopyError] = useState(null);
 
-  // ── Manutensão Programada ──
+  // ── Manutenção Programada ──
   const [manutData, setManutData] = useState(null);
   const [manutInicio, setManutInicio] = useState('');
   const [manutFim, setManutFim] = useState('');
@@ -624,35 +751,75 @@ export default function PlataformaModulos() {
   const [manutSaving, setManutSaving] = useState(false);
   const [manutError, setManutError] = useState(null);
   const [showManutConfirm, setShowManutConfirm] = useState(false);
+  const [manutEncerrada, setManutEncerrada] = useState(false);
+  const manutAnteriorRef = React.useRef(null);
 
-  // Count active modules per school (for the left panel display)
-  const [schoolModulosCounts, setSchoolModulosCounts] = useState({});
+  const activeTree = useMemo(() => {
+    if (esfera === 'cre') return MODULOS_TREE_CRE;
+    if (esfera === 'particular') return MODULOS_TREE_PARTICULAR;
+    return MODULOS_TREE_PUBLICA;
+  }, [esfera]);
 
-  // ── Load school list ────────────────────────────────────────────────────────
-  const fetchEscolas = useCallback(async () => {
+  const totalModulosEsfera = useMemo(() => {
+    if (esfera === 'cre') return countLeaves(MODULOS_TREE_CRE);
+    if (esfera === 'particular') return countLeaves(MODULOS_PARTICULAR_HOMOLOGADOS);
+    return countLeaves(MODULOS_TREE_PUBLICA);
+  }, [esfera]);
+
+  const mostrarToast = useCallback((texto) => {
+    setToastMsg(texto);
+    setTimeout(() => setToastMsg(null), 4500);
+  }, []);
+
+  // ── Carregar Escolas + Regionais + Resumos ──────────────────────────────────
+  const carregarDadosGlobais = useCallback(async () => {
     setSchoolLoading(true);
     try {
-      const { data } = await api.get('/api/plataforma/escolas');
-      const list = Array.isArray(data?.escolas) ? data.escolas : Array.isArray(data) ? data : [];
-      setEscolas(list);
+      const [escRes, regRes, resEsc, resCre] = await Promise.all([
+        api.get('/api/plataforma/escolas'),
+        api.get('/api/plataforma/regionais').catch(() => ({ data: { regionais: [] } })),
+        api.get('/api/plataforma/modulos/resumo-escolas').catch(() => ({ data: { resumo: {} } })),
+        api.get('/api/plataforma/modulos/cre/resumo').catch(() => ({ data: { resumo: {} } })),
+      ]);
+      const listEsc = Array.isArray(escRes.data?.escolas) ? escRes.data.escolas : Array.isArray(escRes.data) ? escRes.data : [];
+      const listReg = Array.isArray(regRes.data?.regionais) ? regRes.data.regionais : Array.isArray(regRes.data) ? regRes.data : [];
+      setEscolas(listEsc);
+      setRegionais(listReg);
+      setResumoEscolas(resEsc.data?.resumo || {});
+      setResumoCre(resCre.data?.resumo || {});
     } catch (err) {
-      console.error('[PlataformaModulos] erro ao buscar escolas:', err);
+      console.error('[PlataformaModulos] erro ao buscar dados:', err);
     } finally {
       setSchoolLoading(false);
     }
   }, []);
 
-  useEffect(() => { fetchEscolas(); }, [fetchEscolas]);
+  useEffect(() => { carregarDadosGlobais(); }, [carregarDadosGlobais]);
 
-  // ── Fetch manutenção status ──
-  const [manutEncerrada, setManutEncerrada] = useState(false);
-  const manutAnteriorRef = React.useRef(null);
+  // Lê query string opcional (?esfera=particular&escola=12) vinda de PlataformaEscolas
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const esfParam = params.get('esfera');
+    const escParam = params.get('escola');
+    const regParam = params.get('regional');
+    if (esfParam && ['publica', 'particular', 'cre'].includes(esfParam)) {
+      setEsfera(esfParam);
+      setPerfilSel(null);
+      setModulosAtivos(new Set());
+    }
+    if (escParam && Number(escParam) > 0) {
+      setEntidadeId(Number(escParam));
+    } else if (regParam && Number(regParam) > 0) {
+      setEsfera('cre');
+      setEntidadeId(Number(regParam));
+    }
+  }, [location.search]);
 
+  // ── Manutenção ──
   const fetchManutencao = useCallback(async () => {
     try {
       const { data } = await api.get('/api/plataforma/manutencao');
       const novo = data?.manutencao || null;
-      // Detecta transição: era ativa → agora null (expirou)
       if (manutAnteriorRef.current && !novo) {
         setManutEncerrada(true);
         setTimeout(() => setManutEncerrada(false), 8000);
@@ -664,7 +831,6 @@ export default function PlataformaModulos() {
 
   useEffect(() => { fetchManutencao(); }, [fetchManutencao]);
 
-  // Auto-refresh a cada 30s quando manutenção está ativa
   useEffect(() => {
     if (!manutData) return;
     const interval = setInterval(fetchManutencao, 30000);
@@ -673,9 +839,7 @@ export default function PlataformaModulos() {
 
   const handleAtivarManutencao = () => {
     if (!manutInicio || !manutFim) { setManutError('Informe início e fim.'); return; }
-    const dtInicio = new Date(manutInicio);
-    const dtFim = new Date(manutFim);
-    if (dtFim <= dtInicio) { setManutError("'Fim' deve ser posterior a 'Início'."); return; }
+    if (new Date(manutFim) <= new Date(manutInicio)) { setManutError("'Fim' deve ser posterior a 'Início'."); return; }
     setManutError(null);
     setShowManutConfirm(true);
   };
@@ -685,7 +849,6 @@ export default function PlataformaModulos() {
     setManutSaving(true); setManutError(null);
     try {
       await api.post('/api/plataforma/manutencao', {
-        // datetime-local dá horário local (Brasília) — converte para UTC ISO
         inicio: new Date(manutInicio).toISOString(),
         fim: new Date(manutFim).toISOString(),
         mensagem: manutMsg,
@@ -707,39 +870,47 @@ export default function PlataformaModulos() {
     } finally { setManutSaving(false); }
   };
 
-  // ── Load modules for a school (+ optional perfil) ─────────────────────────
-  const fetchModulos = useCallback(async (id, perfil) => {
-    if (!id) return;
+  // ── Carregar Módulos da Entidade + Perfil/Cargo ─────────────────────────────
+  const fetchModulos = useCallback(async (id, perfil, esferaAlvo = esfera) => {
+    if (!id || !perfil) return;
     setLoading(true);
     setError(null);
     try {
-      const url = perfil
-        ? `/api/plataforma/modulos/${id}/perfil/${perfil}`
-        : `/api/plataforma/modulos/${id}`;
+      const url =
+        esferaAlvo === 'cre'
+          ? `/api/plataforma/modulos/cre/${id}/cargo/${perfil}`
+          : `/api/plataforma/modulos/${id}/perfil/${perfil}`;
+
       const { data } = await api.get(url);
       const list = Array.isArray(data?.modulos) ? data.modulos : [];
+      const treeRef =
+        esferaAlvo === 'cre'
+          ? MODULOS_TREE_CRE
+          : esferaAlvo === 'particular'
+          ? MODULOS_TREE_PARTICULAR
+          : MODULOS_TREE_PUBLICA;
+
+      const idsPermitidosTree = new Set();
+      treeRef.forEach(g => {
+        idsPermitidosTree.add(g.id);
+        g.filhos.forEach(f => idsPermitidosTree.add(f.id));
+      });
+
       const ativos = new Set(
-        list.filter(m => m.ativo).map(m => m.modulo)
+        list.filter(m => m.ativo && idsPermitidosTree.has(m.modulo)).map(m => m.modulo)
       );
 
-      // ── Normalizar estado: se filho está ativo, pai DEVE estar ativo ──────
-      MODULOS_TREE.forEach(grupo => {
+      treeRef.forEach(grupo => {
         if (grupo.filhos.length > 0) {
           const algumFilhoAtivo = grupo.filhos.some(f => ativos.has(f.id));
           if (algumFilhoAtivo) ativos.add(grupo.id);
-        }
-      });
-      // ── Direção inversa: pai ativo mas nenhum filho → desativa pai ────────
-      MODULOS_TREE.forEach(grupo => {
-        if (grupo.filhos.length > 0 && ativos.has(grupo.id)) {
-          const algumFilhoAtivo = grupo.filhos.some(f => ativos.has(f.id));
-          if (!algumFilhoAtivo) ativos.delete(grupo.id);
+          else ativos.delete(grupo.id);
         }
       });
 
       setModulosAtivos(ativos);
-      if (!perfil) {
-        setSchoolModulosCounts(prev => ({ ...prev, [id]: ativos.size }));
+      if (esferaAlvo === 'cre') {
+        setCreCustomizado(Boolean(data?.customizado));
       }
     } catch (err) {
       console.error('[PlataformaModulos] erro ao buscar módulos:', err);
@@ -748,89 +919,90 @@ export default function PlataformaModulos() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [esfera]);
 
-  const selectEscola = useCallback((id) => {
-    if (id === escolaId) return;
-    setEscolaId(id);
-    setPerfilSel(null);     // reseta perfil ao trocar de escola
+  const trocarEsfera = (novaEsfera) => {
+    if (novaEsfera === esfera) return;
+    setEsfera(novaEsfera);
+    setEntidadeId(null);
+    setPerfilSel(null);
+    setModulosAtivos(new Set());
+    setSearch('');
+    setSaved(false);
+    setError(null);
+    setMostrarAdaptacaoPrivada(false);
+  };
+
+  const selectEntidade = (id) => {
+    if (id === entidadeId) return;
+    setEntidadeId(id);
+    setPerfilSel(null);
     setModulosAtivos(new Set());
     setSaved(false);
     setError(null);
-  }, [escolaId]);
+  };
 
-  const selectPerfil = useCallback((perfil) => {
+  const selectPerfil = (perfil) => {
     if (perfil === perfilSel) return;
     setPerfilSel(perfil);
     setSaved(false);
     setError(null);
-    if (escolaId) fetchModulos(escolaId, perfil);
-  }, [perfilSel, escolaId, fetchModulos]);
+    if (entidadeId) fetchModulos(entidadeId, perfil, esfera);
+  };
 
-  // ── Toggle logic ────────────────────────────────────────────────────────────
+  // ── Toggle de Módulos ───────────────────────────────────────────────────────
   const handleToggle = useCallback((id, type, grupo) => {
     setSaved(false);
     setModulosAtivos(prev => {
       const next = new Set(prev);
-
       if (type === 'group') {
-        const g = MODULOS_TREE.find(m => m.id === id);
+        const g = activeTree.find(m => m.id === id);
         if (!g) return next;
-
         if (g.filhos.length === 0) {
-          // Leaf-only group: simple toggle
           if (next.has(id)) next.delete(id);
           else next.add(id);
           return next;
         }
-
-        // Usa estado REAL do pai no Set (não depende se todos filhos estão on)
         if (next.has(id)) {
-          // Pai estava ON → desliga tudo
           g.filhos.forEach(f => next.delete(f.id));
           next.delete(id);
         } else {
-          // Pai estava OFF → liga tudo
           g.filhos.forEach(f => next.add(f.id));
           next.add(id);
         }
         return next;
       }
 
-      // Child toggle
       if (next.has(id)) {
         next.delete(id);
-        // Pai só desativa quando TODOS os filhos estiverem off
         if (grupo) {
           const anyOn = grupo.filhos.some(f => f.id !== id && next.has(f.id));
           if (!anyOn) next.delete(grupo.id);
         }
       } else {
         next.add(id);
-        // Filho ativo → pai ativa automaticamente (sem pai renderizado, filho é inacessível)
         if (grupo) next.add(grupo.id);
       }
       return next;
     });
-  }, []);
+  }, [activeTree]);
 
-  // ── Activate / Deactivate All ───────────────────────────────────────────────
-  const activarTodos = useCallback(() => {
+  const activarHomologadosEsfera = useCallback(() => {
     setSaved(false);
     const all = new Set();
-    MODULOS_TREE.forEach(g => {
+    const alvo = esfera === 'particular' ? MODULOS_PARTICULAR_HOMOLOGADOS : activeTree;
+    alvo.forEach(g => {
       all.add(g.id);
       g.filhos.forEach(f => all.add(f.id));
     });
     setModulosAtivos(all);
-  }, []);
+  }, [esfera, activeTree]);
 
   const desativarTodos = useCallback(() => {
     setSaved(false);
     setModulosAtivos(new Set());
   }, []);
 
-  // ── Toggle expand group ─────────────────────────────────────────────────────
   const toggleExpand = useCallback((id) => {
     setExpandidos(prev => {
       const next = new Set(prev);
@@ -840,280 +1012,383 @@ export default function PlataformaModulos() {
     });
   }, []);
 
-  // ── Save (por perfil quando perfilSel definido) ────────────────────────────
+  // ── Salvar Configuração do Perfil / Cargo ───────────────────────────────────
   const salvar = useCallback(async () => {
-    if (!escolaId) return;
-    if (!perfilSel) { setError('Selecione um perfil antes de salvar.'); return; }
+    if (!entidadeId || !perfilSel) return;
     setSaving(true);
     setError(null);
     try {
       const modulos = [];
-      MODULOS_TREE.forEach(g => {
-        if (g.filhos.length === 0) {
-          modulos.push({ modulo: g.id, ativo: modulosAtivos.has(g.id) });
-        } else {
-          modulos.push({ modulo: g.id, ativo: modulosAtivos.has(g.id) });
-          g.filhos.forEach(f => {
-            modulos.push({ modulo: f.id, ativo: modulosAtivos.has(f.id) });
-          });
-        }
+      activeTree.forEach(g => {
+        modulos.push({ modulo: g.id, ativo: modulosAtivos.has(g.id) });
+        g.filhos.forEach(f => {
+          modulos.push({ modulo: f.id, ativo: modulosAtivos.has(f.id) });
+        });
       });
-      await api.put(`/api/plataforma/modulos/${escolaId}/perfil/${perfilSel}`, { modulos });
+
+      if (esfera === 'cre') {
+        await api.put(`/api/plataforma/modulos/cre/${entidadeId}/cargo/${perfilSel}`, { modulos });
+        setCreCustomizado(true);
+      } else {
+        await api.put(`/api/plataforma/modulos/${entidadeId}/perfil/${perfilSel}`, { modulos });
+      }
+
       setSaved(true);
+      carregarDadosGlobais();
       setTimeout(() => setSaved(false), 3000);
     } catch (err) {
       console.error('[PlataformaModulos] erro ao salvar:', err);
-      setError('Erro ao salvar. Tente novamente.');
+      setError(err.response?.data?.message || 'Erro ao salvar configuração.');
     } finally {
       setSaving(false);
     }
-  }, [escolaId, perfilSel, modulosAtivos]);
+  }, [entidadeId, perfilSel, modulosAtivos, activeTree, esfera, carregarDadosGlobais]);
 
-  // ── Copy from another school (por perfil) ──────────────────────────────────
+  // ── Templates Automáticos de 1 Clique ───────────────────────────────────────
+  const aplicarTemplateEntidade = async () => {
+    if (!entidadeId) return;
+    setApplyingTemplate(true);
+    setError(null);
+    try {
+      if (esfera === 'cre') {
+        const { data } = await api.post(`/api/plataforma/modulos/cre/${entidadeId}/aplicar-template`);
+        mostrarToast(`✅ ${data?.message || 'Padrão CRE aplicado!'}`);
+      } else {
+        const { data } = await api.post(`/api/plataforma/modulos/${entidadeId}/aplicar-template`);
+        mostrarToast(`✅ ${data?.message || 'Pacote padrão aplicado!'}`);
+      }
+      await carregarDadosGlobais();
+      if (perfilSel) {
+        await fetchModulos(entidadeId, perfilSel, esfera);
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Erro ao aplicar pacote padrão.');
+    } finally {
+      setApplyingTemplate(false);
+    }
+  };
+
+  const replicarCreParaTodas = async () => {
+    setApplyingTemplate(true);
+    setError(null);
+    try {
+      const payload = entidadeId ? { origem_regional_id: entidadeId } : {};
+      const { data } = await api.post('/api/plataforma/modulos/cre/aplicar-template-todas', payload);
+      mostrarToast(`🌐 ${data?.message || 'Padrão replicado em todas as CREs!'}`);
+      await carregarDadosGlobais();
+      if (entidadeId && perfilSel) {
+        await fetchModulos(entidadeId, perfilSel, 'cre');
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Erro ao replicar para todas as CREs.');
+    } finally {
+      setApplyingTemplate(false);
+    }
+  };
+
+  // ── Copiar de outra escola da mesma origem ──────────────────────────────────
   const copiarDe = useCallback(async (origemId) => {
-    if (!escolaId || !perfilSel) return;
+    if (!entidadeId || !perfilSel || esfera === 'cre') return;
     setShowCopyModal(false);
     setLoading(true);
-    setCopyError(null);
+    setError(null);
     try {
-      await api.post(`/api/plataforma/modulos/${escolaId}/copiar-de/${origemId}/perfil/${perfilSel}`);
-      await fetchModulos(escolaId, perfilSel);
-      setSaved(false);
+      await api.post(`/api/plataforma/modulos/${entidadeId}/copiar-de/${origemId}/perfil/${perfilSel}`);
+      await fetchModulos(entidadeId, perfilSel, esfera);
+      carregarDadosGlobais();
+      mostrarToast('✅ Configuração copiada com sucesso!');
     } catch (err) {
-      console.error('[PlataformaModulos] erro ao copiar:', err);
-      setCopyError('Erro ao copiar configuração. Tente novamente.');
+      setError(err.response?.data?.message || 'Erro ao copiar configuração.');
     } finally {
       setLoading(false);
     }
-  }, [escolaId, perfilSel, fetchModulos]);
+  }, [entidadeId, perfilSel, esfera, fetchModulos, carregarDadosGlobais, mostrarToast]);
 
-  // ── Derived values ──────────────────────────────────────────────────────────
-  const escolaSelecionada = escolas.find(e => e.id === escolaId) || null;
-  const escolasFiltradas = escolas.filter(e =>
-    !search || e.nome?.toLowerCase().includes(search.toLowerCase()) ||
-    e.apelido?.toLowerCase().includes(search.toLowerCase())
+  // ── Listas Filtradas por Esfera ─────────────────────────────────────────────
+  const escolasPublicas = useMemo(
+    () => escolas.filter(e => e.origem !== 'particular'),
+    [escolas]
+  );
+  const escolasParticulares = useMemo(
+    () => escolas.filter(e => e.origem === 'particular'),
+    [escolas]
   );
 
-  const countAtivos = modulosAtivos.size;
+  const listaColunaEsquerda = useMemo(() => {
+    const base =
+      esfera === 'cre'
+        ? regionais
+        : esfera === 'particular'
+        ? escolasParticulares
+        : escolasPublicas;
 
-  // ── Perfil icons ─────────────────────────────────────────────────────────
-  const PERFIL_ICONS = {
-    diretor: '🎓', vice_diretor: '👔', professor: '👩‍🏫',
-    coordenador: '📋', supervisor: '🔍', pedagogo: '📚',
-    secretaria: '🗂️', orientador: '🧭', aluno: '👨‍🎓',
-    biblioteca: '📖', educador_social: '🤝', merenda: '🍽️',
-    psicologo: '🧠', responsavel: '👨‍👩‍👧', vigilancia: '🔒',
-    administrativo: '🏢', financeiro: '💰',
-  };
+    if (!search.trim()) return base;
+    const q = search.toLowerCase();
+    return base.filter(item =>
+      item.nome?.toLowerCase().includes(q) ||
+      item.apelido?.toLowerCase().includes(q) ||
+      item.codigo_cre?.toLowerCase().includes(q) ||
+      item.regional_apelido?.toLowerCase().includes(q)
+    );
+  }, [esfera, regionais, escolasParticulares, escolasPublicas, search]);
 
-  // ── Styles ──────────────────────────────────────────────────────────────────
-  const S = {
-    page: {
-      width: '100%', height: '100vh',
-      fontFamily: "'Inter','Segoe UI',system-ui,sans-serif",
-      background: '#060d1f', color: '#f1f5f9',
-      display: 'flex', flexDirection: 'column', overflow: 'hidden',
-    },
-    hero: {
-      padding: '0 28px', height: 60, flexShrink: 0,
-      display: 'flex', alignItems: 'center',
-      background: 'rgba(6,13,31,0.98)',
-      borderBottom: '1px solid rgba(255,255,255,0.06)',
-      backdropFilter: 'blur(20px)',
-      position: 'relative', zIndex: 100,
-    },
-    heroInner: {
-      width: '100%', display: 'flex',
-      alignItems: 'center', justifyContent: 'space-between',
-    },
-    heroLeft: { display: 'flex', alignItems: 'center', gap: 12 },
-    heroIconBox: {
-      width: 32, height: 32, borderRadius: 8, flexShrink: 0,
-      background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: '0.85rem', boxShadow: '0 2px 8px rgba(99,102,241,0.45)',
-    },
-    heroTitle: {
-      fontSize: '0.9rem', fontWeight: 800, color: '#f1f5f9',
-      letterSpacing: '-0.02em',
-    },
-    heroSub: {
-      fontSize: '0.65rem', color: 'rgba(148,163,184,0.5)', marginTop: 1,
-    },
-    body: {
-      display: 'flex', flex: 1,
-      overflow: 'hidden',
-    },
-    leftPanel: {
-      width: 252, flexShrink: 0,
-      display: 'flex', flexDirection: 'column',
-      background: 'rgba(255,255,255,0.016)',
-      borderRight: '1px solid rgba(255,255,255,0.05)',
-      overflow: 'hidden',
-    },
-    leftHeader: {
-      padding: '14px 13px 11px', flexShrink: 0,
-      borderBottom: '1px solid rgba(255,255,255,0.05)',
-    },
-    panelLabel: {
-      fontSize: '0.57rem', fontWeight: 800, letterSpacing: '0.09em',
-      color: 'rgba(148,163,184,0.4)', textTransform: 'uppercase', marginBottom: 9,
-    },
-    searchBox: {
-      width: '100%', padding: '8px 11px', borderRadius: 8,
-      fontSize: '0.78rem', background: 'rgba(255,255,255,0.04)',
-      border: '1px solid rgba(255,255,255,0.07)',
-      color: '#f1f5f9', outline: 'none', boxSizing: 'border-box',
-    },
-    schoolList: { flex: 1, overflowY: 'auto', padding: '8px 8px' },
-    mainPanel: {
-      flex: 1, overflowY: 'auto',
-      display: 'flex', flexDirection: 'column',
-    },
-    mainInner: {
-      padding: '20px 26px', flex: 1,
-      display: 'flex', flexDirection: 'column', gap: 16,
-    },
-  };
+  const entidadeSelecionada = useMemo(() => {
+    const base = esfera === 'cre' ? regionais : escolas;
+    return base.find(x => Number(x.id) === Number(entidadeId)) || null;
+  }, [esfera, regionais, escolas, entidadeId]);
 
-  // ── Spinner ──────────────────────────────────────────────────────────────
+  const perfisDaEsfera = useMemo(() => {
+    if (esfera === 'cre') return CARGOS_CRE_LISTA;
+    if (esfera === 'particular') return PERFIS_ESCOLA_PARTICULAR;
+    return PERFIS_ESCOLA_PUBLICA;
+  }, [esfera]);
+
+  // Conta apenas folhas (ou grupo sem filhos) ativos para não inflar com IDs de pais
+  const countFolhasAtivas = useMemo(() => {
+    let c = 0;
+    activeTree.forEach(g => {
+      if (g.filhos.length === 0) {
+        if (modulosAtivos.has(g.id)) c += 1;
+      } else {
+        g.filhos.forEach(f => {
+          if (modulosAtivos.has(f.id)) c += 1;
+        });
+      }
+    });
+    return c;
+  }, [activeTree, modulosAtivos]);
+
+  const ESFERA_META = {
+    publica: {
+      titulo: 'Escolas Públicas',
+      cor: '#10b981',
+      grad: 'linear-gradient(135deg, #10b981, #059669)',
+      bgSoft: 'rgba(16,185,129,0.12)',
+      border: 'rgba(16,185,129,0.35)',
+      icone: '🏛️',
+      btnTemplate: '⚡ Aplicar Pacote Padrão (Rede Pública)',
+    },
+    particular: {
+      titulo: 'Escolas Particulares',
+      cor: '#f59e0b',
+      grad: 'linear-gradient(135deg, #f59e0b, #d97706)',
+      bgSoft: 'rgba(245,158,11,0.12)',
+      border: 'rgba(245,158,11,0.35)',
+      icone: '🏫',
+      btnTemplate: '⚡ Aplicar Pacote Inicial (Rede Particular)',
+    },
+    cre: {
+      titulo: 'Regionais de Ensino (CREs)',
+      cor: '#a855f7',
+      grad: 'linear-gradient(135deg, #a855f7, #7c3aed)',
+      bgSoft: 'rgba(168,85,247,0.14)',
+      border: 'rgba(168,85,247,0.38)',
+      icone: '🗺️',
+      btnTemplate: '⚡ Aplicar Padrão nesta CRE',
+    },
+  }[esfera];
+
   const Spinner = ({ size = 32 }) => (
     <div style={{
       width: size, height: size,
       border: `${Math.max(2, size / 12)}px solid rgba(255,255,255,0.06)`,
-      borderTop: `${Math.max(2, size / 12)}px solid #6366f1`,
+      borderTop: `${Math.max(2, size / 12)}px solid ${ESFERA_META.cor}`,
       borderRadius: '50%',
       animation: 'spin 0.7s linear infinite',
       flexShrink: 0,
     }} />
   );
 
-  const escolaModulosCount = escolaId
-    ? (schoolModulosCounts[escolaId] !== undefined ? schoolModulosCounts[escolaId] : countAtivos)
-    : 0;
-
   return (
-    <div style={S.page}>
+    <div style={{
+      width: '100%', height: '100vh',
+      fontFamily: "'Inter','Segoe UI',system-ui,sans-serif",
+      background: '#060d1f', color: '#f1f5f9',
+      display: 'flex', flexDirection: 'column', overflow: 'hidden',
+    }}>
       <style>{`
         @keyframes spin { to { transform: rotate(360deg) } }
-        @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
-        @keyframes slideUp { from { opacity: 0; transform: translateY(20px) } to { opacity: 1; transform: translateY(0) } }
-        @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px) } to { opacity: 1; transform: translateY(0) } }
-        .mod-fade { animation: fadeInUp 0.28s ease forwards; }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: translateY(0) } }
+        .mod-fade { animation: fadeInUp 0.25s ease forwards; }
         .s-row { transition: all 0.15s; cursor: pointer; }
-        .s-row:hover { background: rgba(255,255,255,0.035) !important; }
+        .s-row:hover { background: rgba(255,255,255,0.04) !important; }
         .p-chip { transition: all 0.2s cubic-bezier(0.4,0,0.2,1); cursor: pointer; }
-        .p-chip:hover { transform: translateY(-3px) !important; border-color: rgba(99,102,241,0.45) !important; box-shadow: 0 8px 22px rgba(99,102,241,0.22) !important; }
-        .p-chip:hover .p-chip-icon { transform: scale(1.15); }
-        .p-chip-icon { transition: transform 0.2s; display: inline-block; }
-        .action-btn { transition: all 0.18s; }
-        .action-btn:hover { opacity: 0.85 !important; transform: translateY(-1px) !important; }
-        .save-main:hover { transform: translateY(-1px) !important; box-shadow: 0 8px 24px rgba(99,102,241,0.45) !important; }
-        .refresh-btn:hover { background: rgba(255,255,255,0.07) !important; color: #f1f5f9 !important; }
-        *::-webkit-scrollbar { width: 3px; }
-        *::-webkit-scrollbar-track { background: transparent; }
-        *::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.07); border-radius: 2px; }
-        *::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.13); }
-        select option { background: #1e293b; color: #f1f5f9; }
+        .p-chip:hover { transform: translateY(-3px) !important; border-color: rgba(139,92,246,0.45) !important; box-shadow: 0 8px 22px rgba(99,102,241,0.2) !important; }
+        *::-webkit-scrollbar { width: 4px; }
+        *::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
       `}</style>
 
       {/* ══ HERO BAR ══ */}
-      <div style={S.hero}>
-        <div style={S.heroInner}>
-          <div style={S.heroLeft}>
-            <div style={S.heroIconBox}>🔐</div>
-            <div>
-              <div style={S.heroTitle}>Módulos por Escola · Configuração de Acesso</div>
-              <div style={S.heroSub}>
-                {schoolLoading
-                  ? 'Carregando escolas...'
-                  : `${escolas.length} escola${escolas.length !== 1 ? 's' : ''} · ${TOTAL_MODULOS} módulos disponíveis`}
-              </div>
+      <div style={{
+        padding: '0 24px', height: 60, flexShrink: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        background: 'rgba(6,13,31,0.98)',
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{
+            width: 34, height: 34, borderRadius: 9,
+            background: ESFERA_META.grad,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '0.95rem',
+          }}>{ESFERA_META.icone}</div>
+          <div>
+            <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#f1f5f9' }}>
+              Central de Modulação Institucional · {ESFERA_META.titulo}
+            </div>
+            <div style={{ fontSize: '0.66rem', color: 'rgba(148,163,184,0.55)', marginTop: 1 }}>
+              {escolasPublicas.length} Públicas · {escolasParticulares.length} Particulares · {regionais.length} CREs
             </div>
           </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {toastMsg && (
+            <span style={{
+              padding: '5px 12px', borderRadius: 20, fontSize: '0.73rem', fontWeight: 700,
+              background: 'rgba(16,185,129,0.14)', color: '#34d399', border: '1px solid rgba(16,185,129,0.3)',
+            }}>{toastMsg}</span>
+          )}
           <button
-            className="refresh-btn"
-            onClick={fetchEscolas}
+            onClick={carregarDadosGlobais}
             disabled={schoolLoading}
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
               padding: '6px 14px', borderRadius: 8,
               border: '1px solid rgba(255,255,255,0.09)',
               background: 'rgba(255,255,255,0.04)',
-              color: 'rgba(148,163,184,0.75)',
+              color: 'rgba(203,213,225,0.8)',
               fontWeight: 600, fontSize: '0.75rem', cursor: 'pointer',
             }}
           >
-            <span style={{ animation: schoolLoading ? 'spin 0.7s linear infinite' : 'none', display: 'inline-block' }}>⟳</span>
-            {schoolLoading ? 'Atualizando...' : 'Atualizar'}
+            <span>⟳</span> {schoolLoading ? 'Atualizando...' : 'Atualizar'}
           </button>
         </div>
       </div>
 
       {/* ══ BODY ══ */}
-      <div style={S.body}>
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
 
-        {/* ─ LEFT: Schools ─ */}
-        <div style={S.leftPanel}>
-          <div style={S.leftHeader}>
-            <div style={S.panelLabel}>Escolas ({escolasFiltradas.length})</div>
+        {/* ─── COLUNA ESQUERDA: SELETOR DE ESFERA (3 ABAS) + LISTA ─── */}
+        <div style={{
+          width: 286, flexShrink: 0,
+          display: 'flex', flexDirection: 'column',
+          background: 'rgba(255,255,255,0.016)',
+          borderRight: '1px solid rgba(255,255,255,0.06)',
+          overflow: 'hidden',
+        }}>
+          {/* 3 Abas de Esfera Institucional */}
+          <div style={{ padding: '12px 10px 10px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+            <div style={{
+              fontSize: '0.56rem', fontWeight: 800, letterSpacing: '0.09em',
+              color: 'rgba(148,163,184,0.45)', textTransform: 'uppercase', marginBottom: 8, paddingLeft: 2,
+            }}>
+              Esfera Institucional
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 5, marginBottom: 10 }}>
+              {[
+                { k: 'publica', label: 'Públicas', icon: '🏛️', count: escolasPublicas.length, cor: '#10b981', bg: 'rgba(16,185,129,0.16)', bd: 'rgba(16,185,129,0.45)' },
+                { k: 'particular', label: 'Partic.', icon: '🏫', count: escolasParticulares.length, cor: '#fbbf24', bg: 'rgba(245,158,11,0.16)', bd: 'rgba(245,158,11,0.45)' },
+                { k: 'cre', label: 'CREs', icon: '🗺️', count: regionais.length, cor: '#c084fc', bg: 'rgba(168,85,247,0.18)', bd: 'rgba(168,85,247,0.45)' },
+              ].map(tab => {
+                const ativa = esfera === tab.k;
+                return (
+                  <button
+                    key={tab.k}
+                    type="button"
+                    onClick={() => trocarEsfera(tab.k)}
+                    style={{
+                      padding: '7px 4px', borderRadius: 9, cursor: 'pointer',
+                      background: ativa ? tab.bg : 'rgba(255,255,255,0.03)',
+                      border: `1px solid ${ativa ? tab.bd : 'rgba(255,255,255,0.06)'}`,
+                      color: ativa ? '#ffffff' : 'rgba(148,163,184,0.7)',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+                      transition: 'all 0.18s',
+                    }}
+                  >
+                    <span style={{ fontSize: '0.88rem', lineHeight: 1 }}>{tab.icon}</span>
+                    <span style={{ fontSize: '0.65rem', fontWeight: 800 }}>{tab.label}</span>
+                    <span style={{ fontSize: '0.58rem', fontWeight: 700, color: ativa ? tab.cor : 'rgba(148,163,184,0.45)' }}>
+                      ({tab.count})
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="🔍  Buscar..."
-              style={S.searchBox}
+              placeholder={esfera === 'cre' ? '🔍 Buscar CRE...' : '🔍 Buscar instituição...'}
+              style={{
+                width: '100%', padding: '8px 11px', borderRadius: 8,
+                fontSize: '0.78rem', background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                color: '#f1f5f9', outline: 'none', boxSizing: 'border-box',
+              }}
             />
           </div>
-          <div style={S.schoolList}>
+
+          {/* Lista de Instituições da Esfera Selecionada */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '8px 8px' }}>
             {schoolLoading ? (
               <div style={{ display: 'flex', justifyContent: 'center', padding: 24 }}><Spinner /></div>
-            ) : escolasFiltradas.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '20px 12px', color: 'rgba(148,163,184,0.3)', fontSize: '0.75rem' }}>
-                {search ? 'Nenhuma encontrada.' : 'Nenhuma escola.'}
+            ) : listaColunaEsquerda.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '24px 12px', color: 'rgba(148,163,184,0.4)', fontSize: '0.75rem', lineHeight: 1.5 }}>
+                {search
+                  ? 'Nenhum resultado encontrado.'
+                  : esfera === 'particular'
+                  ? 'Nenhuma escola particular cadastrada ainda em Instituições → Escolas.'
+                  : esfera === 'cre'
+                  ? 'Nenhuma Regional (CRE) cadastrada.'
+                  : 'Nenhuma escola pública cadastrada.'}
               </div>
             ) : (
-              escolasFiltradas.map(escola => {
-                const isSel = escola.id === escolaId;
-                const count = schoolModulosCounts[escola.id];
+              listaColunaEsquerda.map(item => {
+                const isSel = Number(item.id) === Number(entidadeId);
+                const resumoItem = esfera === 'cre' ? resumoCre[item.id] : resumoEscolas[item.id];
                 return (
                   <div
-                    key={escola.id}
+                    key={item.id}
                     className="s-row"
-                    onClick={() => selectEscola(escola.id)}
+                    onClick={() => selectEntidade(item.id)}
                     style={{
                       padding: '10px 11px', borderRadius: 10, marginBottom: 4,
-                      background: isSel
-                        ? 'linear-gradient(135deg,rgba(99,102,241,0.18),rgba(139,92,246,0.1))'
-                        : 'transparent',
-                      border: isSel
-                        ? '1px solid rgba(99,102,241,0.4)'
-                        : '1px solid transparent',
-                      boxShadow: isSel ? '0 3px 14px rgba(99,102,241,0.18)' : 'none',
+                      background: isSel ? ESFERA_META.bgSoft : 'transparent',
+                      border: `1px solid ${isSel ? ESFERA_META.border : 'transparent'}`,
                     }}
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6, marginBottom: 5 }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{
                           fontSize: '0.76rem', fontWeight: 700,
-                          color: isSel ? '#f1f5f9' : 'rgba(203,213,225,0.75)',
+                          color: isSel ? '#ffffff' : 'rgba(226,232,240,0.8)',
                           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                        }}>{escola.nome}</div>
-                        {escola.apelido && (
-                          <div style={{ fontSize: '0.62rem', color: 'rgba(148,163,184,0.4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>
-                            {escola.apelido}
-                          </div>
-                        )}
+                        }}>
+                          {item.nome}
+                        </div>
+                        <div style={{
+                          fontSize: '0.62rem', color: 'rgba(148,163,184,0.5)',
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2,
+                        }}>
+                          {esfera === 'cre'
+                            ? (item.codigo_cre || item.apelido || 'SEEDF')
+                            : (item.regional_apelido ? `🏛️ ${item.regional_apelido}` : item.apelido || '')}
+                        </div>
                       </div>
-                      <StatusBadge status={escola.status} />
+                      <StatusBadge status={item.status} />
                     </div>
+
                     <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                       <span style={{
                         fontSize: '0.57rem', fontWeight: 700,
-                        color: isSel ? '#818cf8' : 'rgba(148,163,184,0.3)',
-                        background: isSel ? 'rgba(99,102,241,0.14)' : 'rgba(255,255,255,0.03)',
+                        color: isSel ? ESFERA_META.cor : 'rgba(148,163,184,0.42)',
+                        background: 'rgba(255,255,255,0.03)',
                         padding: '1px 7px', borderRadius: 5,
                       }}>
-                        {count !== undefined ? `${count}/${TOTAL_MODULOS}` : '—'} mód.
+                        {esfera === 'cre'
+                          ? (resumoItem?.customizado ? `${resumoItem.cargos_ativos} cargos mod.` : 'Padrão ativo')
+                          : (resumoItem?.perfis_ativos ? `${resumoItem.perfis_ativos} perfis config.` : 'Sem config.')}
                       </span>
                     </div>
                   </div>
@@ -1123,16 +1398,15 @@ export default function PlataformaModulos() {
           </div>
         </div>
 
-        {/* ─ MAIN PANEL ─ */}
-        <div style={S.mainPanel}>
-          <div style={S.mainInner}>
+        {/* ─── PAINEL PRINCIPAL ─── */}
+        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '20px 26px', flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
 
             {/* ── MANUTENÇÃO PROGRAMADA ── */}
             <div style={{
               padding: '14px 20px', borderRadius: 13, flexShrink: 0,
               background: manutData ? 'rgba(245,158,11,0.07)' : 'rgba(255,255,255,0.02)',
               border: `1px solid ${manutData ? 'rgba(245,158,11,0.22)' : 'rgba(255,255,255,0.05)'}`,
-              transition: 'all 0.3s',
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: manutData ? 11 : 0 }}>
                 <span style={{ fontSize: '1rem' }}>🔧</span>
@@ -1140,34 +1414,28 @@ export default function PlataformaModulos() {
                 {manutData ? (
                   <span style={{
                     padding: '2px 7px', borderRadius: 20, fontSize: '0.55rem', fontWeight: 800,
-                    textTransform: 'uppercase', letterSpacing: '0.05em',
+                    textTransform: 'uppercase',
                     background: manutData.em_andamento ? 'rgba(239,68,68,0.15)' : 'rgba(245,158,11,0.15)',
                     color: manutData.em_andamento ? '#f87171' : '#fbbf24',
-                    border: `1px solid ${manutData.em_andamento ? 'rgba(239,68,68,0.3)' : 'rgba(245,158,11,0.3)'}`,
                   }}>
                     {manutData.em_andamento ? '● Em andamento' : '◑ Agendada'}
                   </span>
                 ) : (
                   <span style={{
                     padding: '2px 7px', borderRadius: 20, fontSize: '0.55rem', fontWeight: 800,
-                    textTransform: 'uppercase', letterSpacing: '0.05em',
-                    background: 'rgba(16,185,129,0.1)', color: '#34d399',
-                    border: '1px solid rgba(16,185,129,0.18)',
+                    textTransform: 'uppercase', background: 'rgba(16,185,129,0.1)', color: '#34d399',
                   }}>● Sistema Normal</span>
                 )}
                 {manutEncerrada && (
-                  <span style={{
-                    padding: '2px 9px', borderRadius: 20, fontSize: '0.6rem', fontWeight: 700,
-                    background: 'rgba(16,185,129,0.12)', color: '#34d399',
-                    border: '1px solid rgba(16,185,129,0.22)', animation: 'fadeIn 0.4s ease',
-                  }}>✅ Manutenção encerrada — acesso restaurado</span>
+                  <span style={{ fontSize: '0.62rem', fontWeight: 700, color: '#34d399' }}>
+                    ✅ Manutenção encerrada — acesso restaurado
+                  </span>
                 )}
               </div>
 
               {manutData ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
                   <div style={{ flex: 1, minWidth: 180 }}>
-                    <div style={{ fontSize: '0.68rem', color: 'rgba(148,163,184,0.55)', marginBottom: 3 }}>Período</div>
                     <div style={{ fontSize: '0.82rem', color: '#f1f5f9', fontWeight: 600 }}>
                       {new Date(manutData.inicio).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })} →{' '}
                       {new Date(manutData.fim).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
@@ -1182,10 +1450,7 @@ export default function PlataformaModulos() {
                     style={{
                       padding: '7px 15px', borderRadius: 9, border: 'none',
                       background: 'linear-gradient(135deg,#ef4444,#dc2626)',
-                      color: '#fff', fontWeight: 700, fontSize: '0.77rem',
-                      cursor: manutSaving ? 'not-allowed' : 'pointer',
-                      opacity: manutSaving ? 0.6 : 1,
-                      boxShadow: '0 3px 10px rgba(239,68,68,0.28)',
+                      color: '#fff', fontWeight: 700, fontSize: '0.77rem', cursor: 'pointer',
                     }}
                   >{manutSaving ? 'Cancelando...' : '✕ Cancelar Manutenção'}</button>
                 </div>
@@ -1196,23 +1461,20 @@ export default function PlataformaModulos() {
                     { label: 'Fim',    value: manutFim,    onChange: e => setManutFim(e.target.value),    type: 'datetime-local', flex: '1 1 150px' },
                   ].map(({ label, value, onChange, type, flex }) => (
                     <div key={label} style={{ display: 'flex', flexDirection: 'column', gap: 3, flex }}>
-                      <label style={{ fontSize: '0.57rem', fontWeight: 700, color: 'rgba(148,163,184,0.5)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</label>
+                      <label style={{ fontSize: '0.57rem', fontWeight: 700, color: 'rgba(148,163,184,0.5)', textTransform: 'uppercase' }}>{label}</label>
                       <input type={type} value={value} onChange={onChange} style={{
                         padding: '7px 9px', borderRadius: 8, fontSize: '0.78rem',
-                        background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-                        color: '#f1f5f9', outline: 'none',
+                        background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#f1f5f9',
                       }} />
                     </div>
                   ))}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 3, flex: '2 1 180px' }}>
-                    <label style={{ fontSize: '0.57rem', fontWeight: 700, color: 'rgba(148,163,184,0.5)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Mensagem</label>
+                    <label style={{ fontSize: '0.57rem', fontWeight: 700, color: 'rgba(148,163,184,0.5)', textTransform: 'uppercase' }}>Mensagem</label>
                     <input
                       type="text" value={manutMsg} onChange={e => setManutMsg(e.target.value)}
-                      placeholder="Mensagem para os usuários"
                       style={{
                         padding: '7px 9px', borderRadius: 8, fontSize: '0.78rem',
-                        background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
-                        color: '#f1f5f9', outline: 'none',
+                        background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#f1f5f9',
                       }}
                     />
                   </div>
@@ -1222,182 +1484,232 @@ export default function PlataformaModulos() {
                     style={{
                       padding: '7px 15px', borderRadius: 9, border: 'none',
                       background: 'linear-gradient(135deg,#f59e0b,#d97706)',
-                      color: '#fff', fontWeight: 700, fontSize: '0.77rem',
-                      cursor: manutSaving ? 'not-allowed' : 'pointer',
-                      opacity: manutSaving ? 0.6 : 1,
-                      boxShadow: '0 3px 10px rgba(245,158,11,0.28)', flexShrink: 0,
+                      color: '#fff', fontWeight: 700, fontSize: '0.77rem', cursor: 'pointer',
                     }}
                   >{manutSaving ? 'Ativando...' : '🚀 Ativar Manutenção'}</button>
                 </div>
               )}
               {manutError && (
-                <div style={{ marginTop: 9, padding: '7px 11px', borderRadius: 8,
-                  background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.18)',
-                  fontSize: '0.73rem', color: '#f87171' }}>{manutError}</div>
+                <div style={{ marginTop: 9, fontSize: '0.73rem', color: '#f87171' }}>{manutError}</div>
               )}
             </div>
 
-            {/* ── EMPTY: no school ── */}
-            {!escolaId && (
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', minHeight: 320 }}>
-                <div style={{ fontSize: '3rem', marginBottom: 14, opacity: 0.35 }}>🏫</div>
-                <div style={{ fontSize: '1rem', fontWeight: 700, color: 'rgba(226,232,240,0.45)', marginBottom: 7 }}>Selecione uma escola</div>
-                <div style={{ fontSize: '0.8rem', color: 'rgba(148,163,184,0.3)', maxWidth: 280, lineHeight: 1.6 }}>
-                  Escolha uma escola na lista à esquerda para configurar os módulos por perfil.
+            {/* ── NENHUMA ENTIDADE SELECIONADA ── */}
+            {!entidadeId && (
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', minHeight: 300 }}>
+                <div style={{ fontSize: '3rem', marginBottom: 12, opacity: 0.4 }}>{ESFERA_META.icone}</div>
+                <div style={{ fontSize: '1.02rem', fontWeight: 700, color: 'rgba(226,232,240,0.65)', marginBottom: 7 }}>
+                  Selecione uma instituição em {ESFERA_META.titulo}
                 </div>
+                <div style={{ fontSize: '0.8rem', color: 'rgba(148,163,184,0.45)', maxWidth: 360, lineHeight: 1.6 }}>
+                  {esfera === 'cre'
+                    ? 'Escolha uma Coordenação Regional de Ensino à esquerda para modular os acessos de cada cargo orgânico (Gabinete, UNIAG, UNIEB, UNIPLAT, UNIGEP e UNIAE).'
+                    : esfera === 'particular'
+                    ? 'Escolha uma Escola Particular à esquerda. Apenas módulos compatíveis com a rede privada são habilitados.'
+                    : 'Escolha uma Escola Pública à esquerda para configurar os módulos por perfil ou aplicar o pacote padrão em 1 clique.'}
+                </div>
+
+                {esfera === 'cre' && regionais.length > 0 && (
+                  <button
+                    onClick={replicarCreParaTodas}
+                    disabled={applyingTemplate}
+                    style={{
+                      marginTop: 18, padding: '9px 18px', borderRadius: 10,
+                      border: '1px solid rgba(168,85,247,0.4)', background: 'rgba(168,85,247,0.14)',
+                      color: '#e9d5ff', fontWeight: 700, fontSize: '0.78rem', cursor: 'pointer',
+                    }}
+                  >
+                    {applyingTemplate ? 'Aplicando...' : `🌐 Garantir Padrão Inicial nas ${regionais.length} CREs`}
+                  </button>
+                )}
               </div>
             )}
 
-            {/* ── SCHOOL SELECTED — PROFILE GRID ── */}
-            {escolaId && !perfilSel && (
+            {/* ── ENTIDADE SELECIONADA — ESCOLHA DE PERFIL / CARGO ── */}
+            {entidadeId && !perfilSel && entidadeSelecionada && (
               <div className="mod-fade" style={{ flex: 1 }}>
-                {/* School card */}
                 <div style={{
-                  display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20,
-                  padding: '14px 18px', borderRadius: 13,
-                  background: 'rgba(99,102,241,0.06)',
-                  border: '1px solid rgba(99,102,241,0.18)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14,
+                  marginBottom: 20, padding: '16px 20px', borderRadius: 14, flexWrap: 'wrap',
+                  background: ESFERA_META.bgSoft, border: `1px solid ${ESFERA_META.border}`,
                 }}>
-                  <div style={{
-                    width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-                    background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1rem',
-                    boxShadow: '0 2px 8px rgba(99,102,241,0.35)',
-                  }}>🏫</div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: '0.92rem', fontWeight: 800, color: '#f1f5f9', marginBottom: 3 }}>
-                      {escolaSelecionada?.nome}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{
+                      width: 40, height: 40, borderRadius: 11, background: ESFERA_META.grad,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.15rem',
+                    }}>{ESFERA_META.icone}</div>
+                    <div>
+                      <div style={{ fontSize: '0.96rem', fontWeight: 800, color: '#ffffff', marginBottom: 3 }}>
+                        {entidadeSelecionada.nome}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <StatusBadge status={entidadeSelecionada.status} />
+                        <span style={{ fontSize: '0.68rem', color: 'rgba(226,232,240,0.7)', fontWeight: 600 }}>
+                          {ESFERA_META.titulo}
+                        </span>
+                      </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                      {escolaSelecionada && <StatusBadge status={escolaSelecionada.status} />}
-                      <span style={{ fontSize: '0.62rem', color: 'rgba(148,163,184,0.45)' }}>
-                        {escolaModulosCount > 0 ? `${escolaModulosCount} módulos configurados` : 'Nenhum módulo configurado ainda'}
-                      </span>
-                    </div>
+                  </div>
+
+                  {/* Ações Rápidas de Template 1 Clique */}
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    <button
+                      onClick={aplicarTemplateEntidade}
+                      disabled={applyingTemplate}
+                      style={{
+                        padding: '8px 15px', borderRadius: 10, border: 'none',
+                        background: ESFERA_META.grad, color: '#ffffff',
+                        fontWeight: 800, fontSize: '0.76rem', cursor: 'pointer',
+                        boxShadow: '0 4px 14px rgba(0,0,0,0.3)',
+                      }}
+                    >
+                      {applyingTemplate ? 'Aplicando...' : ESFERA_META.btnTemplate}
+                    </button>
+
+                    {esfera === 'cre' && (
+                      <button
+                        onClick={replicarCreParaTodas}
+                        disabled={applyingTemplate}
+                        style={{
+                          padding: '8px 14px', borderRadius: 10,
+                          border: '1px solid rgba(192,132,252,0.45)', background: 'rgba(168,85,247,0.16)',
+                          color: '#f3e8ff', fontWeight: 700, fontSize: '0.75rem', cursor: 'pointer',
+                        }}
+                      >
+                        🌐 Replicar esta CRE para todas as {regionais.length} CREs
+                      </button>
+                    )}
                   </div>
                 </div>
 
-                {/* Profile label */}
+                {esfera === 'particular' && (
+                  <div style={{
+                    marginBottom: 16, padding: '11px 15px', borderRadius: 11,
+                    background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)',
+                    fontSize: '0.76rem', color: '#fde68a', lineHeight: 1.55,
+                  }}>
+                    🛡️ <strong>Isolamento Rede Particular Ativo:</strong> Módulos governamentais da SEEDF (`Agente EDUCADF`, `PDAF`, `PDDE`, `Sincronizar SEEDF`) estão bloqueados nesta esfera. O botão de 1 clique ativa exclusivamente o núcleo privado homologado (`Direção`, `Financeiro Particular`, `Comunicação` e `Monitoramento`).
+                  </div>
+                )}
+
                 <div style={{
-                  fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.09em',
-                  color: 'rgba(148,163,184,0.4)', textTransform: 'uppercase',
-                  marginBottom: 13,
+                  fontSize: '0.62rem', fontWeight: 800, letterSpacing: '0.09em',
+                  color: 'rgba(148,163,184,0.5)', textTransform: 'uppercase', marginBottom: 12,
                 }}>
-                  Selecione o perfil para configurar
+                  {esfera === 'cre'
+                    ? 'Selecione o cargo regional para modular'
+                    : 'Selecione o perfil da instituição para modular'}
                 </div>
 
-                {/* Profile grid */}
                 <div style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
-                  gap: 9,
+                  gridTemplateColumns: esfera === 'cre' ? 'repeat(auto-fill, minmax(200px, 1fr))' : 'repeat(auto-fill, minmax(132px, 1fr))',
+                  gap: 10,
                 }}>
-                  {PERFIS_LISTA.map(p => (
+                  {perfisDaEsfera.map(p => (
                     <div
                       key={p.key}
                       className="p-chip"
                       onClick={() => selectPerfil(p.key)}
                       style={{
-                        padding: '16px 10px 14px',
-                        borderRadius: 13,
-                        background: 'rgba(255,255,255,0.025)',
-                        border: '1px solid rgba(255,255,255,0.07)',
-                        textAlign: 'center',
-                        userSelect: 'none',
+                        padding: '16px 12px 14px', borderRadius: 13,
+                        background: 'rgba(255,255,255,0.028)',
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        textAlign: 'center', userSelect: 'none',
                       }}
                     >
-                      <div className="p-chip-icon" style={{ fontSize: '1.4rem', marginBottom: 7, lineHeight: 1 }}>
+                      <div style={{ fontSize: '1.45rem', marginBottom: 7, lineHeight: 1 }}>
                         {PERFIL_ICONS[p.key] || '👤'}
                       </div>
-                      <div style={{ fontSize: '0.72rem', fontWeight: 600, color: 'rgba(203,213,225,0.72)', lineHeight: 1.3 }}>
+                      <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#e2e8f0', lineHeight: 1.3 }}>
                         {p.label}
                       </div>
+                      {p.sigla && (
+                        <div style={{ fontSize: '0.6rem', fontWeight: 800, color: '#c084fc', marginTop: 4 }}>
+                          {p.sigla}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* ── SCHOOL + PROFILE — MODULE CONFIGURATION ── */}
-            {escolaId && perfilSel && (
+            {/* ── ENTIDADE + PERFIL/CARGO SELECIONADOS — INTERRUPTORES ── */}
+            {entidadeId && perfilSel && entidadeSelecionada && (
               <div className="mod-fade" style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-                {/* Header bar */}
+                {/* Header de Configuração */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                  {/* Breadcrumb / school info */}
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.68rem', color: 'rgba(148,163,184,0.45)', marginBottom: 5, flexWrap: 'wrap' }}>
-                      <span style={{ color: 'rgba(203,213,225,0.6)' }}>{escolaSelecionada?.nome}</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.72rem', color: 'rgba(148,163,184,0.55)', marginBottom: 5, flexWrap: 'wrap' }}>
+                      <span style={{ color: '#cbd5e1', fontWeight: 600 }}>{entidadeSelecionada.nome}</span>
                       <span>›</span>
-                      <span style={{ color: '#34d399', fontWeight: 600 }}>
-                        {PERFIL_ICONS[perfilSel] || '👤'} {PERFIS_LISTA.find(p => p.key === perfilSel)?.label || perfilSel}
+                      <span style={{ color: ESFERA_META.cor, fontWeight: 700 }}>
+                        {PERFIL_ICONS[perfilSel] || '👤'} {perfisDaEsfera.find(p => p.key === perfilSel)?.label || perfilSel}
                       </span>
                       <button
                         onClick={() => { setPerfilSel(null); setModulosAtivos(new Set()); setSaved(false); }}
                         style={{
-                          padding: '1px 8px', borderRadius: 5,
-                          border: '1px solid rgba(255,255,255,0.09)',
-                          background: 'rgba(255,255,255,0.04)',
-                          color: 'rgba(148,163,184,0.55)', fontSize: '0.62rem',
-                          cursor: 'pointer',
+                          padding: '2px 9px', borderRadius: 6,
+                          border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.05)',
+                          color: '#cbd5e1', fontSize: '0.64rem', cursor: 'pointer',
                         }}
-                      >← trocar</button>
+                      >← trocar {esfera === 'cre' ? 'cargo' : 'perfil'}</button>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
-                      {escolaSelecionada && <StatusBadge status={escolaSelecionada.status} />}
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <StatusBadge status={entidadeSelecionada.status} />
                       <span style={{
-                        padding: '2px 9px', borderRadius: 20,
-                        background: countAtivos > 0 ? 'rgba(99,102,241,0.13)' : 'rgba(255,255,255,0.04)',
-                        border: countAtivos > 0 ? '1px solid rgba(99,102,241,0.28)' : '1px solid rgba(255,255,255,0.06)',
-                        fontSize: '0.62rem', fontWeight: 800,
-                        color: countAtivos > 0 ? '#818cf8' : 'rgba(148,163,184,0.4)',
+                        padding: '2px 10px', borderRadius: 20,
+                        background: ESFERA_META.bgSoft, border: `1px solid ${ESFERA_META.border}`,
+                        fontSize: '0.63rem', fontWeight: 800, color: ESFERA_META.cor,
                       }}>
-                        {countAtivos} / {TOTAL_MODULOS} módulos ativos
+                        {countFolhasAtivas} módulos ativos
                       </span>
+                      {esfera === 'cre' && !creCustomizado && (
+                        <span style={{ fontSize: '0.63rem', color: 'rgba(192,132,252,0.8)' }}>
+                          (Usando padrão institucional SEEDF — salve para personalizar)
+                        </span>
+                      )}
                     </div>
                   </div>
 
-                  {/* Action buttons */}
+                  {/* Botões de Ação */}
                   <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', alignItems: 'center' }}>
                     <button
-                      className="action-btn"
-                      onClick={activarTodos}
+                      onClick={activarHomologadosEsfera}
                       style={{
                         padding: '7px 13px', borderRadius: 8,
-                        border: '1px solid rgba(16,185,129,0.28)',
-                        background: 'rgba(16,185,129,0.08)',
-                        color: '#34d399', fontWeight: 700, fontSize: '0.73rem',
-                        cursor: 'pointer',
+                        border: '1px solid rgba(16,185,129,0.3)', background: 'rgba(16,185,129,0.1)',
+                        color: '#34d399', fontWeight: 700, fontSize: '0.73rem', cursor: 'pointer',
                       }}
-                    >✓ Ativar Todos</button>
+                    >
+                      {esfera === 'particular' ? '✓ Ativar Núcleo Homologado' : '✓ Ativar Todos'}
+                    </button>
                     <button
-                      className="action-btn"
                       onClick={desativarTodos}
                       style={{
                         padding: '7px 13px', borderRadius: 8,
-                        border: '1px solid rgba(255,255,255,0.08)',
-                        background: 'rgba(255,255,255,0.04)',
-                        color: 'rgba(148,163,184,0.65)', fontWeight: 700, fontSize: '0.73rem',
-                        cursor: 'pointer',
+                        border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.04)',
+                        color: 'rgba(203,213,225,0.75)', fontWeight: 700, fontSize: '0.73rem', cursor: 'pointer',
                       }}
                     >✕ Desativar Todos</button>
+
+                    {esfera !== 'cre' && (
+                      <button
+                        onClick={() => setShowCopyModal(true)}
+                        style={{
+                          padding: '7px 13px', borderRadius: 8,
+                          border: '1px solid rgba(59,130,246,0.3)', background: 'rgba(59,130,246,0.08)',
+                          color: '#60a5fa', fontWeight: 700, fontSize: '0.73rem', cursor: 'pointer',
+                        }}
+                      >📋 Copiar de outra {esfera === 'particular' ? 'particular' : 'pública'}</button>
+                    )}
+
                     <button
-                      className="action-btn"
-                      onClick={() => setShowCopyModal(true)}
-                      style={{
-                        padding: '7px 13px', borderRadius: 8,
-                        border: '1px solid rgba(59,130,246,0.28)',
-                        background: 'rgba(59,130,246,0.07)',
-                        color: '#60a5fa', fontWeight: 700, fontSize: '0.73rem',
-                        cursor: 'pointer',
-                      }}
-                    >📋 Copiar de outra escola</button>
-                    <button
-                      className="save-main"
                       onClick={salvar}
                       disabled={saving}
-                      onMouseEnter={() => setSaveHover(true)}
-                      onMouseLeave={() => setSaveHover(false)}
                       style={{
                         padding: '8px 20px', borderRadius: 10, border: 'none',
                         background: saved
@@ -1405,10 +1717,7 @@ export default function PlataformaModulos() {
                           : 'linear-gradient(135deg,#6366f1,#8b5cf6)',
                         color: '#fff', fontWeight: 800, fontSize: '0.8rem',
                         cursor: saving ? 'not-allowed' : 'pointer',
-                        transition: 'all 0.2s',
                         display: 'flex', alignItems: 'center', gap: 6,
-                        boxShadow: saved ? '0 4px 14px rgba(16,185,129,0.3)' : '0 4px 14px rgba(99,102,241,0.3)',
-                        opacity: saving ? 0.7 : 1,
                       }}
                     >
                       {saving ? <><Spinner size={13} /> Salvando...</> : saved ? '✓ Salvo!' : '💾 Salvar'}
@@ -1416,108 +1725,145 @@ export default function PlataformaModulos() {
                   </div>
                 </div>
 
-                {/* Progress bar */}
-                <div style={{ height: 3, borderRadius: 3, background: 'rgba(255,255,255,0.05)', overflow: 'hidden', flexShrink: 0 }}>
-                  <div style={{
-                    height: '100%',
-                    width: `${TOTAL_MODULOS > 0 ? (countAtivos / TOTAL_MODULOS) * 100 : 0}%`,
-                    background: 'linear-gradient(90deg,#6366f1,#10b981)',
-                    borderRadius: 3,
-                    transition: 'width 0.4s cubic-bezier(0.4,0,0.2,1)',
-                    boxShadow: '0 0 6px rgba(99,102,241,0.5)',
-                  }} />
-                </div>
-
-                {/* Error */}
-                {(error || copyError) && (
+                {/* Erro */}
+                {error && (
                   <div style={{
                     padding: '9px 13px', borderRadius: 9,
-                    background: 'rgba(239,68,68,0.07)', border: '1px solid rgba(239,68,68,0.18)',
+                    background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.22)',
                     color: '#fca5a5', fontSize: '0.78rem', fontWeight: 600,
-                    display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0,
+                    display: 'flex', alignItems: 'center', gap: 8,
                   }}>
-                    <span>⚠️</span> {error || copyError}
+                    <span>⚠️</span> {error}
                     <button
-                      onClick={() => { setError(null); setCopyError(null); }}
-                      style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#fca5a5', cursor: 'pointer', fontSize: '0.85rem' }}
+                      onClick={() => setError(null)}
+                      style={{ marginLeft: 'auto', background: 'none', border: 'none', color: '#fca5a5', cursor: 'pointer' }}
                     >✕</button>
                   </div>
                 )}
 
-                {/* Loading */}
-                {loading && (
+                {loading ? (
                   <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}>
                     <Spinner size={38} />
                   </div>
-                )}
-
-                {/* ── 2-column module grid ── */}
-                {!loading && (
+                ) : esfera === 'particular' ? (
                   <>
-                    <div style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(2, 1fr)',
-                      gap: 10,
-                    }}>
-                      {MODULOS_TREE.map((grupo, gi) => {
-                        const colorDef = GROUP_COLORS[gi % GROUP_COLORS.length];
-                        return (
-                          <ModuloGrupo
-                            key={grupo.id}
-                            grupo={grupo}
-                            colorDef={colorDef}
-                            ativos={modulosAtivos}
-                            onToggle={handleToggle}
-                            expandido={expandidos.has(grupo.id)}
-                            onToggleExpand={toggleExpand}
-                          />
-                        );
-                      })}
+                    {/* 1) Núcleo Homologado para Escola Particular */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 10 }}>
+                      {MODULOS_PARTICULAR_HOMOLOGADOS.map((grupo, gi) => (
+                        <ModuloGrupo
+                          key={grupo.id}
+                          grupo={grupo}
+                          colorDef={GROUP_COLORS[gi % GROUP_COLORS.length]}
+                          ativos={modulosAtivos}
+                          onToggle={handleToggle}
+                          expandido={expandidos.has(grupo.id)}
+                          onToggleExpand={toggleExpand}
+                        />
+                      ))}
                     </div>
 
-                    {/* Bottom save bar */}
+                    {/* 2) Gaveta Recolhida: Módulos Base em Adaptação para Rede Particular */}
                     <div style={{
-                      padding: '14px 20px', borderRadius: 12,
-                      background: 'rgba(99,102,241,0.04)',
-                      border: '1px solid rgba(99,102,241,0.12)',
-                      display: 'flex', alignItems: 'center',
-                      justifyContent: 'space-between', flexWrap: 'wrap', gap: 10,
+                      marginTop: 8, borderRadius: 14,
+                      border: '1px solid rgba(255,255,255,0.08)',
+                      background: 'rgba(255,255,255,0.015)', overflow: 'hidden',
                     }}>
-                      <div>
-                        <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#f1f5f9', marginBottom: 2 }}>
-                          Configuração de{' '}
-                          <span style={{ color: '#818cf8' }}>{escolaSelecionada?.nome}</span>
-                          <span style={{ color: 'rgba(148,163,184,0.5)', margin: '0 6px' }}>·</span>
-                          <span style={{ color: '#34d399', fontSize: '0.75rem' }}>
-                            {PERFIL_ICONS[perfilSel]} {PERFIS_LISTA.find(p => p.key === perfilSel)?.label}
-                          </span>
-                        </div>
-                        <div style={{ fontSize: '0.66rem', color: 'rgba(148,163,184,0.45)' }}>
-                          {countAtivos} módulos ativos de {TOTAL_MODULOS} disponíveis
-                        </div>
-                      </div>
                       <button
-                        onClick={salvar}
-                        disabled={saving}
+                        type="button"
+                        onClick={() => setMostrarAdaptacaoPrivada(v => !v)}
                         style={{
-                          padding: '9px 22px', borderRadius: 10, border: 'none',
-                          background: saved
-                            ? 'linear-gradient(135deg,#10b981,#059669)'
-                            : 'linear-gradient(135deg,#6366f1,#8b5cf6)',
-                          color: '#fff', fontWeight: 800, fontSize: '0.83rem',
-                          cursor: saving ? 'not-allowed' : 'pointer',
-                          boxShadow: saved
-                            ? '0 5px 16px rgba(16,185,129,0.28)'
-                            : '0 5px 16px rgba(99,102,241,0.28)',
-                          transition: 'all 0.2s',
-                          display: 'flex', alignItems: 'center', gap: 7,
-                          opacity: saving ? 0.7 : 1,
+                          width: '100%', padding: '13px 18px', background: 'transparent', border: 'none',
+                          color: 'rgba(203,213,225,0.8)', cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left',
                         }}
                       >
-                        {saving ? <><Spinner size={13} /> Salvando...</> : saved ? '✓ Configuração salva!' : '💾 Salvar Configuração'}
+                        <div>
+                          <div style={{ fontSize: '0.82rem', fontWeight: 700 }}>
+                            ⚙️ Módulos Acadêmicos Base (Em adaptação da Rede Pública para Particular)
+                          </div>
+                          <div style={{ fontSize: '0.68rem', color: 'rgba(148,163,184,0.55)', marginTop: 2 }}>
+                            Desligados por padrão no pacote inicial. Ative individualmente apenas conforme cada módulo for homologado para escolas privadas.
+                          </div>
+                        </div>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#fbbf24' }}>
+                          {mostrarAdaptacaoPrivada ? '▲ Recolher' : `▼ Exibir (${MODULOS_PARTICULAR_EM_ADAPTACAO.length})`}
+                        </span>
                       </button>
+
+                      {mostrarAdaptacaoPrivada && (
+                        <div style={{
+                          padding: '14px 16px', borderTop: '1px solid rgba(255,255,255,0.06)',
+                          display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 10,
+                        }}>
+                          {MODULOS_PARTICULAR_EM_ADAPTACAO.map((grupo, gi) => (
+                            <ModuloGrupo
+                              key={grupo.id}
+                              grupo={grupo}
+                              colorDef={GROUP_COLORS[(gi + 2) % GROUP_COLORS.length]}
+                              ativos={modulosAtivos}
+                              onToggle={handleToggle}
+                              expandido={expandidos.has(grupo.id)}
+                              onToggleExpand={toggleExpand}
+                            />
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </>
+                ) : (
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: esfera === 'cre' ? '1fr' : 'repeat(auto-fit, minmax(340px, 1fr))',
+                    gap: 10,
+                  }}>
+                    {activeTree.map((grupo, gi) => (
+                      <ModuloGrupo
+                        key={grupo.id}
+                        grupo={grupo}
+                        colorDef={GROUP_COLORS[gi % GROUP_COLORS.length]}
+                        ativos={modulosAtivos}
+                        onToggle={handleToggle}
+                        expandido={expandidos.has(grupo.id)}
+                        onToggleExpand={toggleExpand}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* Barra Inferior de Salvamento */}
+                {!loading && (
+                  <div style={{
+                    padding: '14px 20px', borderRadius: 12,
+                    background: 'rgba(99,102,241,0.05)',
+                    border: '1px solid rgba(99,102,241,0.15)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10,
+                  }}>
+                    <div>
+                      <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#f1f5f9' }}>
+                        Configuração de <span style={{ color: ESFERA_META.cor }}>{entidadeSelecionada.nome}</span>
+                        {' · '}
+                        <span style={{ color: '#cbd5e1' }}>
+                          {PERFIL_ICONS[perfilSel]} {perfisDaEsfera.find(p => p.key === perfilSel)?.label}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: '0.66rem', color: 'rgba(148,163,184,0.5)', marginTop: 2 }}>
+                        As alterações entram em vigor em até 30 segundos nas sessões ativas, sem exigir novo login.
+                      </div>
+                    </div>
+                    <button
+                      onClick={salvar}
+                      disabled={saving}
+                      style={{
+                        padding: '9px 22px', borderRadius: 10, border: 'none',
+                        background: saved
+                          ? 'linear-gradient(135deg,#10b981,#059669)'
+                          : 'linear-gradient(135deg,#6366f1,#8b5cf6)',
+                        color: '#fff', fontWeight: 800, fontSize: '0.83rem', cursor: 'pointer',
+                      }}
+                    >
+                      {saving ? 'Salvando...' : saved ? '✓ Configuração salva!' : '💾 Salvar Configuração'}
+                    </button>
+                  </div>
                 )}
               </div>
             )}
@@ -1529,32 +1875,20 @@ export default function PlataformaModulos() {
       {/* ══ MODAL: Confirmação Manutenção ══ */}
       {showManutConfirm && (
         <div style={{
-          position: 'fixed', inset: 0, zIndex: 2000,
-          background: 'rgba(0,0,0,0.78)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          backdropFilter: 'blur(8px)', animation: 'fadeIn 0.2s ease',
+          position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(0,0,0,0.78)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(8px)',
         }}>
           <div style={{
             background: 'linear-gradient(135deg,#1e293b,#0f172a)',
-            border: '1px solid rgba(245,158,11,0.28)',
-            borderRadius: 20, padding: '30px 34px',
+            border: '1px solid rgba(245,158,11,0.28)', borderRadius: 20, padding: '30px 34px',
             width: '100%', maxWidth: 430,
-            boxShadow: '0 24px 60px rgba(0,0,0,0.6)',
-            animation: 'slideUp 0.28s cubic-bezier(0.4,0,0.2,1)',
           }}>
-            <div style={{ fontSize: '2rem', textAlign: 'center', marginBottom: 10 }}>🔧</div>
-            <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#f1f5f9', textAlign: 'center', marginBottom: 6 }}>
-              Confirmar Manutenção
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#f1f5f9', textAlign: 'center', marginBottom: 14 }}>
+              🔧 Confirmar Manutenção
             </h3>
-            <p style={{ fontSize: '0.78rem', color: 'rgba(148,163,184,0.65)', textAlign: 'center', marginBottom: 18, lineHeight: 1.6 }}>
-              {new Date(manutInicio) <= new Date()
-                ? 'A manutenção será ativada IMEDIATAMENTE.'
-                : 'A manutenção será ativada no horário agendado.'}
-            </p>
             <div style={{
               background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.18)',
-              borderRadius: 10, padding: '11px 15px', marginBottom: 18,
-              fontSize: '0.78rem', color: '#fbbf24', lineHeight: 1.7,
+              borderRadius: 10, padding: '11px 15px', marginBottom: 18, fontSize: '0.78rem', color: '#fbbf24', lineHeight: 1.7,
             }}>
               <div><strong>Início:</strong> {manutInicio ? new Date(manutInicio).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : '—'}</div>
               <div><strong>Fim:</strong> {manutFim ? new Date(manutFim).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : '—'}</div>
@@ -1565,9 +1899,8 @@ export default function PlataformaModulos() {
                 onClick={() => setShowManutConfirm(false)}
                 style={{
                   flex: 1, padding: '10px 18px', borderRadius: 10,
-                  border: '1px solid rgba(255,255,255,0.09)',
-                  background: 'transparent', color: 'rgba(148,163,184,0.8)',
-                  fontWeight: 600, fontSize: '0.85rem', cursor: 'pointer',
+                  border: '1px solid rgba(255,255,255,0.1)', background: 'transparent',
+                  color: '#cbd5e1', fontWeight: 600, cursor: 'pointer',
                 }}
               >Cancelar</button>
               <button
@@ -1575,8 +1908,7 @@ export default function PlataformaModulos() {
                 style={{
                   flex: 1, padding: '10px 18px', borderRadius: 10, border: 'none',
                   background: 'linear-gradient(135deg,#f59e0b,#d97706)',
-                  color: '#fff', fontWeight: 700, fontSize: '0.85rem',
-                  cursor: 'pointer', boxShadow: '0 5px 16px rgba(245,158,11,0.28)',
+                  color: '#fff', fontWeight: 700, cursor: 'pointer',
                 }}
               >🚀 Confirmar e Ativar</button>
             </div>
@@ -1584,11 +1916,12 @@ export default function PlataformaModulos() {
         </div>
       )}
 
-      {/* ══ MODAL: Copy ══ */}
-      {showCopyModal && (
+      {/* ══ MODAL: Copiar de Outra Escola da Mesma Natureza ══ */}
+      {showCopyModal && esfera !== 'cre' && (
         <CopyModal
-          escolas={escolas}
-          escolaAtual={escolaSelecionada}
+          escolas={esfera === 'particular' ? escolasParticulares : escolasPublicas}
+          escolaAtual={entidadeSelecionada}
+          esferaLabel={esfera === 'particular' ? 'Escolas Particulares' : 'Escolas Públicas'}
           onConfirm={copiarDe}
           onClose={() => setShowCopyModal(false)}
         />

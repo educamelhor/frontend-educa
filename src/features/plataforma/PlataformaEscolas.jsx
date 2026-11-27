@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../../services/api";
 
 const TIPOS_ESCOLA = [
@@ -6,15 +7,27 @@ const TIPOS_ESCOLA = [
   "Profissionalizante", "Integral", "CCMDF",
 ];
 const ORIGENS = [
-  { value: "publica", label: "Pública" },
-  { value: "particular", label: "Particular" },
+  {
+    value: "publica",
+    label: "Escola Pública",
+    icon: "🏛️",
+    desc: "Rede oficial • Vínculo CRE • Recursos Públicos",
+  },
+  {
+    value: "particular",
+    label: "Escola Particular",
+    icon: "🏫",
+    desc: "Rede privada • Mantenedora • Gestão Comercial",
+  },
 ];
 
 export default function PlataformaEscolas() {
+  const navigate = useNavigate();
   const [escolas, setEscolas] = useState([]);
   const [regionais, setRegionais] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busca, setBusca] = useState("");
+  const [abaOrigem, setAbaOrigem] = useState("todas"); // "todas" | "publica" | "particular"
 
   // ── Modais ──────────────────────────────────
   const [modalCriar, setModalCriar] = useState(false);
@@ -30,9 +43,10 @@ export default function PlataformaEscolas() {
   const [fEstado, setFEstado] = useState("");
   const [fEndereco, setFEndereco] = useState("");
   const [fTipos, setFTipos] = useState([]);
-  const [fOrigem, setFOrigem] = useState("");
+  const [fOrigem, setFOrigem] = useState("publica");
   const [fCnpj, setFCnpj] = useState("");
   const [fRegionalId, setFRegionalId] = useState("");
+  const [fAplicarTemplate, setFAplicarTemplate] = useState(true);
   const [salvando, setSalvando] = useState(false);
 
   // Form Diretor
@@ -129,9 +143,9 @@ export default function PlataformaEscolas() {
     try { return JSON.parse(v); } catch { return []; }
   };
 
-  const resetFormEscola = () => {
+  const resetFormEscola = (origemPadrao = "publica") => {
     setEditId(null); setFNome(""); setFApelido(""); setFCidade(""); setFEstado(""); setFEndereco("");
-    setFTipos([]); setFOrigem(""); setFCnpj(""); setFRegionalId("");
+    setFTipos([]); setFOrigem(origemPadrao); setFCnpj(""); setFRegionalId(""); setFAplicarTemplate(true);
   };
 
   const resetFormDiretor = () => {
@@ -139,7 +153,12 @@ export default function PlataformaEscolas() {
   };
 
   // ── Actions ─────────────────────────────────
-  const abrirCriar = () => { resetFormEscola(); setModalCriar(true); setMenuAberto(null); };
+  const abrirCriar = () => {
+    const padrao = abaOrigem === "particular" ? "particular" : "publica";
+    resetFormEscola(padrao);
+    setModalCriar(true);
+    setMenuAberto(null);
+  };
 
   const abrirEditar = (esc) => {
     setEditId(esc.id);
@@ -148,10 +167,11 @@ export default function PlataformaEscolas() {
     setFCidade(esc.cidade || "");
     setFEstado(esc.estado || "");
     setFEndereco(esc.endereco || "");
-    setFTipos(parseTipo(esc.tipo));
-    setFOrigem(esc.origem || "");
+    const orig = esc.origem === "particular" ? "particular" : "publica";
+    setFOrigem(orig);
+    setFTipos(parseTipo(esc.tipo).filter(t => orig !== "particular" || t !== "CCMDF"));
     setFCnpj(esc.cnpj || "");
-    setFRegionalId(esc.regional_id ? String(esc.regional_id) : "");
+    setFRegionalId(orig === "particular" ? "" : (esc.regional_id ? String(esc.regional_id) : ""));
     setModalEditar(true);
     setMenuAberto(null);
   };
@@ -174,17 +194,31 @@ export default function PlataformaEscolas() {
   const handleCriar = async (e) => {
     e.preventDefault();
     if (!fNome.trim()) return;
+    if (!["publica", "particular"].includes(fOrigem)) {
+      mostrarMensagem("❌ Selecione a natureza da instituição (Pública ou Particular).", "erro");
+      return;
+    }
     setSalvando(true);
     try {
-      await api.post("/api/plataforma/escolas", {
+      const tiposLimpos = fOrigem === "particular" ? fTipos.filter(t => t !== "CCMDF") : fTipos;
+      const { data: resCriacao } = await api.post("/api/plataforma/escolas", {
         nome: fNome.trim(), apelido: fApelido.trim() || undefined,
         endereco: fEndereco.trim() || undefined,
         cidade: fCidade.trim() || undefined, estado: fEstado.trim() || undefined,
-        tipo: fTipos.length ? fTipos : undefined, origem: fOrigem || undefined,
+        tipo: tiposLimpos.length ? tiposLimpos : undefined,
+        origem: fOrigem,
         cnpj: fCnpj.trim() || undefined,
-        regional_id: fRegionalId ? Number(fRegionalId) : null,
+        regional_id: fOrigem === "particular" ? null : (fRegionalId ? Number(fRegionalId) : null),
       });
-      mostrarMensagem("✅ Escola criada!"); setModalCriar(false); resetFormEscola(); fetchEscolas();
+      if (fAplicarTemplate && resCriacao?.escola_id) {
+        await api.post(`/api/plataforma/modulos/${resCriacao.escola_id}/aplicar-template`).catch(() => {});
+      }
+      mostrarMensagem(
+        fAplicarTemplate
+          ? `✅ Escola ${fOrigem === "particular" ? "particular" : "pública"} criada e pacote inicial de módulos ativado!`
+          : "✅ Escola criada com sucesso!"
+      );
+      setModalCriar(false); resetFormEscola(); fetchEscolas();
     } catch (err) {
       mostrarMensagem(`❌ ${err?.response?.data?.message || "Erro ao criar escola."}`, "erro");
     } finally { setSalvando(false); }
@@ -194,15 +228,21 @@ export default function PlataformaEscolas() {
   const handleEditar = async (e) => {
     e.preventDefault();
     if (!fNome.trim()) return;
+    if (!["publica", "particular"].includes(fOrigem)) {
+      mostrarMensagem("❌ Selecione a natureza da instituição (Pública ou Particular).", "erro");
+      return;
+    }
     setSalvando(true);
     try {
+      const tiposLimpos = fOrigem === "particular" ? fTipos.filter(t => t !== "CCMDF") : fTipos;
       await api.put(`/api/plataforma/escolas/${editId}`, {
         nome: fNome.trim(), apelido: fApelido.trim() || undefined,
         endereco: fEndereco.trim() || undefined,
         cidade: fCidade.trim() || undefined, estado: fEstado.trim() || undefined,
-        tipo: fTipos.length ? fTipos : [], origem: fOrigem || undefined,
+        tipo: tiposLimpos.length ? tiposLimpos : [],
+        origem: fOrigem,
         cnpj: fCnpj.trim() || undefined,
-        regional_id: fRegionalId ? Number(fRegionalId) : null,
+        regional_id: fOrigem === "particular" ? null : (fRegionalId ? Number(fRegionalId) : null),
       });
       mostrarMensagem("✅ Escola atualizada!"); setModalEditar(false); resetFormEscola(); fetchEscolas();
     } catch (err) {
@@ -254,11 +294,16 @@ export default function PlataformaEscolas() {
   };
   const isCCMDF = escolaDirIsCCMDF();
 
-  // ── Filtragem ───────────────────────────────
+  // ── Contadores & Filtragem por Natureza ─────
+  const totalPublicas = escolas.filter(e => e.origem !== "particular").length;
+  const totalParticulares = escolas.filter(e => e.origem === "particular").length;
+
   const escolasFiltradas = escolas.filter((esc) => {
+    const origNorm = esc.origem === "particular" ? "particular" : "publica";
+    if (abaOrigem !== "todas" && origNorm !== abaOrigem) return false;
     if (!busca.trim()) return true;
     const q = busca.toLowerCase();
-    return [esc.nome, esc.apelido, esc.cidade, esc.cnpj, esc.diretor, String(esc.id)]
+    return [esc.nome, esc.apelido, esc.cidade, esc.cnpj, esc.diretor, esc.regional_apelido, esc.regional_nome, String(esc.id)]
       .some(v => String(v || "").toLowerCase().includes(q));
   });
 
@@ -273,104 +318,206 @@ export default function PlataformaEscolas() {
   };
 
   // ── Form de escola (reutilizável create/edit) ─
-  const renderFormEscola = (onSubmit, btnLabel) => (
-    <form onSubmit={onSubmit} className="p-6 space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">Nome da Escola *</label>
-        <input type="text" required value={fNome} onChange={e => setFNome(e.target.value)}
-          className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-          placeholder="Ex: CEF 04 CEM" autoFocus />
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">Apelido</label>
-        <input type="text" value={fApelido} onChange={e => setFApelido(e.target.value)}
-          className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-          placeholder="Ex: CEF04_PLAN" />
-        <p className="text-xs text-slate-400 mt-1">Se vazio, será igual ao nome.</p>
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">Endereço</label>
-        <input type="text" value={fEndereco} onChange={e => setFEndereco(e.target.value)}
-          className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-          placeholder="Setor Educacional, Lotes C/D" />
-      </div>
-      <div className="grid grid-cols-2 gap-4">
+  const renderFormEscola = (onSubmit, btnLabel, ehCriacao = false) => {
+    const tiposDisponiveis = fOrigem === "particular"
+      ? TIPOS_ESCOLA.filter(t => t !== "CCMDF")
+      : TIPOS_ESCOLA;
+
+    return (
+      <form onSubmit={onSubmit} className="p-6 space-y-4">
+        {/* PASSO 1 OBRIGATÓRIO: NATUREZA INSTITUCIONAL */}
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Cidade</label>
-          <input type="text" value={fCidade} onChange={e => setFCidade(e.target.value)}
-            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="Brasília" />
+          <label className="block text-sm font-semibold text-slate-800 mb-2">
+            Natureza da Instituição *
+          </label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {ORIGENS.map(o => {
+              const ativo = fOrigem === o.value;
+              const isPart = o.value === "particular";
+              return (
+                <button
+                  key={o.value}
+                  type="button"
+                  onClick={() => {
+                    setFOrigem(o.value);
+                    if (o.value === "particular") {
+                      setFRegionalId("");
+                      setFTipos(prev => prev.filter(t => t !== "CCMDF"));
+                    }
+                  }}
+                  className={`text-left p-3.5 rounded-xl border-2 transition-all ${
+                    ativo
+                      ? isPart
+                        ? "border-amber-500 bg-amber-50/70 shadow-sm"
+                        : "border-emerald-600 bg-emerald-50/70 shadow-sm"
+                      : "border-slate-200 bg-white hover:border-slate-300"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-bold text-sm text-slate-800">
+                      {o.icon} {o.label}
+                    </span>
+                    <span className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                      ativo
+                        ? isPart ? "border-amber-600 bg-amber-500" : "border-emerald-600 bg-emerald-600"
+                        : "border-slate-300"
+                    }`}>
+                      {ativo && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">{o.desc}</p>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Nome da Escola *</label>
+          <input type="text" required value={fNome} onChange={e => setFNome(e.target.value)}
+            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            placeholder={fOrigem === "particular" ? "Ex: Colégio Horizonte" : "Ex: CEF 04 de Planaltina"} autoFocus />
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">Estado</label>
-          <input type="text" value={fEstado} onChange={e => setFEstado(e.target.value.toUpperCase().slice(0,2))}
-            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="DF" maxLength={2} />
+          <label className="block text-sm font-medium text-slate-700 mb-1">Apelido / Sigla</label>
+          <input type="text" value={fApelido} onChange={e => setFApelido(e.target.value)}
+            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            placeholder={fOrigem === "particular" ? "Ex: COL_HORIZONTE" : "Ex: CEF04_PLAN"} />
+          <p className="text-xs text-slate-400 mt-1">Se vazio, será igual ao nome.</p>
         </div>
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-slate-700 mb-2">Tipo</label>
-        <div className="flex flex-wrap gap-2">
-          {TIPOS_ESCOLA.map(t => (
-            <button key={t} type="button" onClick={() => toggleTipo(t)}
-              className={`px-3 py-1 rounded-full text-sm font-medium border transition-all ${
-                fTipos.includes(t) ? "bg-blue-600 text-white border-blue-600"
-                  : "bg-white text-slate-600 border-slate-300 hover:border-blue-400"
-              }`}>{t}</button>
-          ))}
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">Endereço</label>
+          <input type="text" value={fEndereco} onChange={e => setFEndereco(e.target.value)}
+            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            placeholder="Setor Educacional, Lotes C/D" />
         </div>
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">Origem</label>
-        <div className="flex gap-6">
-          {ORIGENS.map(o => (
-            <label key={o.value} className="flex items-center gap-2 cursor-pointer">
-              <input type="radio" name="origem" value={o.value} checked={fOrigem === o.value}
-                onChange={() => setFOrigem(o.value)} className="w-4 h-4 text-blue-600" />
-              <span className="text-sm text-slate-700">{o.label}</span>
-            </label>
-          ))}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Cidade</label>
+            <input type="text" value={fCidade} onChange={e => setFCidade(e.target.value)}
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="Brasília" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Estado</label>
+            <input type="text" value={fEstado} onChange={e => setFEstado(e.target.value.toUpperCase().slice(0,2))}
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="DF" maxLength={2} />
+          </div>
         </div>
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">Coordenação Regional de Ensino (CRE)</label>
-        <select
-          value={fRegionalId}
-          onChange={e => setFRegionalId(e.target.value)}
-          className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
-        >
-          <option value="">-- Sem vínculo com Regional (CRE) --</option>
-          {regionais.map(r => (
-            <option key={r.id} value={r.id}>
-              {r.apelido ? `${r.apelido} — ${r.nome}` : r.nome}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1">CNPJ</label>
-        <input type="text" value={fCnpj} onChange={e => setFCnpj(fmtCNPJ(e.target.value))}
-          className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-          placeholder="00.000.000/0001-00" maxLength={18} />
-      </div>
-      <div className="flex gap-3 pt-2">
-        <button type="button" onClick={() => { setModalCriar(false); setModalEditar(false); }}
-          className="flex-1 border border-slate-300 text-slate-700 font-medium py-2.5 rounded-lg hover:bg-slate-50 transition">Cancelar</button>
-        <button type="submit" disabled={salvando}
-          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition disabled:opacity-50">{salvando ? "Salvando..." : btnLabel}</button>
-      </div>
-    </form>
-  );
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-2">Etapas / Modalidades</label>
+          <div className="flex flex-wrap gap-2">
+            {tiposDisponiveis.map(t => (
+              <button key={t} type="button" onClick={() => toggleTipo(t)}
+                className={`px-3 py-1 rounded-full text-sm font-medium border transition-all ${
+                  fTipos.includes(t) ? "bg-blue-600 text-white border-blue-600"
+                    : "bg-white text-slate-600 border-slate-300 hover:border-blue-400"
+                }`}>{t}</button>
+            ))}
+          </div>
+        </div>
+
+        {fOrigem === "publica" && (
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Coordenação Regional de Ensino (CRE)</label>
+            <select
+              value={fRegionalId}
+              onChange={e => setFRegionalId(e.target.value)}
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white"
+            >
+              <option value="">-- Sem vínculo com Regional (CRE) --</option>
+              {regionais.map(r => (
+                <option key={r.id} value={r.id}>
+                  {r.apelido ? `${r.apelido} — ${r.nome}` : r.nome}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">
+            {fOrigem === "particular" ? "CNPJ da Instituição / Mantenedora" : "CNPJ (Caixa Escolar / UEx)"}
+          </label>
+          <input type="text" value={fCnpj} onChange={e => setFCnpj(fmtCNPJ(e.target.value))}
+            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-slate-800 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            placeholder="00.000.000/0001-00" maxLength={18} />
+        </div>
+
+        {ehCriacao && (
+          <label className="flex items-start gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-200 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={fAplicarTemplate}
+              onChange={e => setFAplicarTemplate(e.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-blue-600 rounded"
+            />
+            <div className="text-xs text-slate-700 leading-relaxed">
+              <strong className="text-slate-900 block">
+                ⚡ Ativar pacote inicial de módulos ({fOrigem === "particular" ? "Rede Particular" : "Rede Pública"})
+              </strong>
+              {fOrigem === "particular"
+                ? "Habilita apenas o núcleo privado homologado (Direção, Financeiro Particular e Comunicação), sem módulos da rede pública."
+                : "Pré-configura automaticamente os acessos padrão para Direção, Secretaria, Coordenação, Professores e Financeiro Público."}
+            </div>
+          </label>
+        )}
+
+        <div className="flex gap-3 pt-2">
+          <button type="button" onClick={() => { setModalCriar(false); setModalEditar(false); }}
+            className="flex-1 border border-slate-300 text-slate-700 font-medium py-2.5 rounded-lg hover:bg-slate-50 transition">Cancelar</button>
+          <button type="submit" disabled={salvando}
+            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition disabled:opacity-50">{salvando ? "Salvando..." : btnLabel}</button>
+        </div>
+      </form>
+    );
+  };
 
   // ── RENDER ──────────────────────────────────
   return (
     <div className="w-full p-4 sm:p-6 lg:p-8">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-slate-800">Escolas</h1>
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-5">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800">Escolas</h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+            Pré-cadastro institucional separado entre Rede Pública e Rede Particular
+          </p>
+        </div>
         <button onClick={abrirCriar}
           className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-5 py-2.5 rounded-lg transition shadow-sm">
           <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-          </svg>Adicionar</button>
+          </svg>Adicionar Escola</button>
+      </div>
+
+      {/* Abas Rápidas de Natureza Institucional (Opção A) */}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        {[
+          { key: "todas", label: "Todas", count: escolas.length, activeCls: "bg-slate-800 text-white border-slate-800" },
+          { key: "publica", label: "🏛️ Escolas Públicas", count: totalPublicas, activeCls: "bg-emerald-600 text-white border-emerald-600" },
+          { key: "particular", label: "🏫 Escolas Particulares", count: totalParticulares, activeCls: "bg-amber-600 text-white border-amber-600" },
+        ].map(tab => {
+          const ativa = abaOrigem === tab.key;
+          return (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setAbaOrigem(tab.key)}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold border transition-all ${
+                ativa
+                  ? `${tab.activeCls} shadow-sm`
+                  : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"
+              }`}
+            >
+              <span>{tab.label}</span>
+              <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                ativa ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
+              }`}>
+                {tab.count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {!algumModalAberto && mensagem.texto && (
@@ -517,6 +664,21 @@ export default function PlataformaEscolas() {
                 Editar dados
               </button>
 
+              {/* 2) Modular Acessos direto na Central de Módulos */}
+              <button
+                onClick={() => {
+                  setMenuAberto(null);
+                  const esf = esc.origem === "particular" ? "particular" : "publica";
+                  navigate(`/plataforma/modulos?esfera=${esf}&escola=${esc.id}`);
+                }}
+                className="flex items-center w-full px-4 py-2.5 text-sm text-indigo-700 hover:bg-indigo-50 transition gap-2 font-medium"
+              >
+                <svg className="h-4 w-4 text-indigo-500" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" />
+                </svg>
+                Modular acessos
+              </button>
+
               <div className="border-t border-slate-100 my-1" />
 
               {/* 3) Bloquear / Desbloquear */}
@@ -559,7 +721,7 @@ export default function PlataformaEscolas() {
               </button>
             </div>
             <div className="px-6 pt-4">{renderMensagem()}</div>
-            {renderFormEscola(handleCriar, "Criar Escola")}
+            {renderFormEscola(handleCriar, "Criar Escola", true)}
           </div>
         </div>
       )}

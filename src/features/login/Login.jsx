@@ -710,6 +710,7 @@ export default function Login() {
         localStorage.setItem("token", data.token);
         localStorage.setItem("userName", data.nome || "Usuário");
         localStorage.setItem("escola_id", data.escola_id ?? 1);
+        localStorage.setItem("escola_origem", data.escola_origem || "publica");
         localStorage.setItem("nome_escola", data.nome_escola || "Instituição");
         localStorage.setItem("perfil", data.perfil || "aluno");
         localStorage.setItem("scope", data.scope || "escola");
@@ -840,6 +841,7 @@ export default function Login() {
         localStorage.setItem("permissoes", JSON.stringify(Array.isArray(data?.permissoes) ? data.permissoes : []));
 
         localStorage.removeItem("escola_id");
+        localStorage.removeItem("escola_origem");
         localStorage.removeItem("nome_escola");
         localStorage.removeItem("cpf");
         localStorage.removeItem("foto_url");
@@ -894,6 +896,7 @@ export default function Login() {
       localStorage.setItem("token", data.token);
       localStorage.setItem("userName", data.nome || "Usuário");
       localStorage.setItem("escola_id", data.escola_id ?? 1);
+      localStorage.setItem("escola_origem", data.escola_origem || "publica");
       localStorage.setItem("nome_escola", data.nome_escola || "Instituição");
       localStorage.setItem("perfil", data.perfil || "aluno");
       localStorage.setItem("scope", data.scope || "escola");
@@ -947,6 +950,7 @@ export default function Login() {
       limparSessaoPlataforma();
       localStorage.setItem("userName", data.nome || "Usuário");
       localStorage.setItem("escola_id", data.escola_id || 1);
+      localStorage.setItem("escola_origem", data.escola_origem || "publica");
       localStorage.setItem("nome_escola", data.nome_escola || "Escola não definida");
       localStorage.setItem("perfil", data.perfil || "aluno");
       localStorage.setItem("scope", data.scope || "escola");
@@ -960,7 +964,10 @@ export default function Login() {
       localStorage.setItem("cpf", String(cpfLs || "").replace(/\D/g, ""));
       localStorage.setItem("foto_url", String(fotoLs || ""));
       localStorage.setItem("last_escola_id", String(data.escola_id || ""));
-      localStorage.setItem("modulos_ativos", "[]");
+      localStorage.setItem(
+        "modulos_ativos",
+        JSON.stringify(Array.isArray(data?.modulos_ativos) ? data.modulos_ativos : [])
+      );
       sessionStorage.removeItem("modulos_last_refresh");
 
       setNomeUsuarioLogin(data.nome || "");

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../../services/api";
 
 // ── Estrutura Oficial das Coordenações Regionais de Ensino (SEEDF) com rótulos claros e sem jargão confuso ──
@@ -95,6 +96,7 @@ const ORIGENS = [
 ];
 
 export default function PlataformaRegionais() {
+  const navigate = useNavigate();
   const [regionais, setRegionais] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busca, setBusca] = useState("");
@@ -761,6 +763,19 @@ export default function PlataformaRegionais() {
                   Vincular Coordenador / Chefe
                 </button>
               )}
+
+              <button
+                onClick={() => {
+                  setMenuAberto(null);
+                  navigate(`/plataforma/modulos?esfera=cre&regional=${reg.id}`);
+                }}
+                className="flex items-center w-full px-4 py-2.5 text-sm text-purple-700 hover:bg-purple-50 transition gap-2 font-medium"
+              >
+                <svg className="h-4 w-4 text-purple-600" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" />
+                </svg>
+                Modular acessos da CRE
+              </button>
 
               <div className="border-t border-slate-100 my-1" />
 

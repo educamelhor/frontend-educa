@@ -138,6 +138,14 @@ export default function Sidebar({ isOpen, onClose }) {
       const data = await res.json();
       if (!data?.ok) return;
 
+      if (data.escola_origem) {
+        const prevOrigem = localStorage.getItem('escola_origem');
+        if (prevOrigem !== data.escola_origem) {
+          localStorage.setItem('escola_origem', data.escola_origem);
+          window.dispatchEvent(new Event('escola_origem_updated'));
+        }
+      }
+
       if (Array.isArray(data.modulos_ativos)) {
         const rawCurrent = localStorage.getItem('modulos_ativos');
         const current = rawCurrent && rawCurrent !== 'null'
@@ -665,27 +673,29 @@ export default function Sidebar({ isOpen, onClose }) {
             </div>
 
             {/* 1) GABINETE REGIONAL */}
-            <Link
-              to="/cre/gabinete"
-              className={getMainLinkClasses('/cre/gabinete')}
-              style={{
-                marginBottom: 6,
-                background: isActive('/cre/gabinete')
-                  ? 'linear-gradient(90deg, rgba(168,85,247,0.28), transparent)'
-                  : undefined,
-              }}
-            >
-              <BuildingLibraryIcon
-                className="h-5 w-5 mr-2"
-                style={{ color: isActive('/cre/gabinete') ? '#d8b4fe' : undefined }}
-              />
-              <span className="flex-1 text-left" style={{ fontWeight: 700 }}>
-                Gabinete Regional
-              </span>
-            </Link>
+            {(_modulos === null || hasModulo('cre.gabinete')) && (
+              <Link
+                to="/cre/gabinete"
+                className={getMainLinkClasses('/cre/gabinete')}
+                style={{
+                  marginBottom: 6,
+                  background: isActive('/cre/gabinete')
+                    ? 'linear-gradient(90deg, rgba(168,85,247,0.28), transparent)'
+                    : undefined,
+                }}
+              >
+                <BuildingLibraryIcon
+                  className="h-5 w-5 mr-2"
+                  style={{ color: isActive('/cre/gabinete') ? '#d8b4fe' : undefined }}
+                />
+                <span className="flex-1 text-left" style={{ fontWeight: 700 }}>
+                  Gabinete Regional
+                </span>
+              </Link>
+            )}
 
             {/* 2) UNIAG — Administração Geral & Prestação de Contas */}
-            {canCreUniag && (
+            {(_modulos === null ? canCreUniag : hasModulo('cre.uniag')) && (
               <Link
                 to="/cre/uniag"
                 className={getMainLinkClasses('/cre/uniag')}
